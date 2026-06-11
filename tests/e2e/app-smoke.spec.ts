@@ -39,17 +39,29 @@ test("agent completes intake handoff without dead ends", async ({ page }) => {
   await pageSurface.getByRole("button", { name: "Создать черновик" }).first().click();
 
   await expect(page.locator("h1")).toHaveText("Ivan Petrov");
-  await expect(page.getByText("Intake cockpit")).toBeVisible();
+  await expect(page.getByLabel("Case Workspace")).toContainText(
+    "До передачи оператору",
+  );
+  await expect(page.getByLabel("Applicant Tasks")).toContainText("Ivan Petrov: задачи");
+  await expect(page.getByLabel("Applicant Tasks")).toContainText(
+    "Заполнить обязательные поля",
+  );
 
   await page.getByLabel("Дата выдачи паспорта").fill("2021-03-12");
   await page.getByLabel("Срок действия паспорта").fill("2031-03-12");
 
-  const uploadButtons = page.getByRole("button", { name: "Отметить загруженным" });
-  while ((await uploadButtons.count()) > 0) {
-    await uploadButtons.first().click();
+  for (const task of [
+    "Загрузить: Фото на белом фоне",
+    "Загрузить: Селфи",
+    "Загрузить: Видео",
+  ]) {
+    await page.getByRole("button", { name: new RegExp(task) }).click();
+    await page.getByRole("button", { name: "Отметить загруженным" }).click();
   }
 
-  await expect(page.getByText("Можно передать оператору")).toBeVisible();
+  await expect(page.getByLabel("Readiness Review")).toContainText(
+    "Готовность является результатом закрытых задач",
+  );
   await page.getByRole("button", { name: "Проверить готовность" }).first().click();
   await expect(
     page.getByRole("dialog", { name: "Проверка перед передачей" }),
@@ -57,14 +69,13 @@ test("agent completes intake handoff without dead ends", async ({ page }) => {
   await expect(page.getByLabel("Чеклист передачи оператору")).toContainText(
     "Нет блокеров",
   );
-  await page.getByRole("button", { name: "Передать оператору" }).click();
+  await page
+    .getByRole("dialog", { name: "Проверка перед передачей" })
+    .getByRole("button", { name: "Передать оператору" })
+    .click();
 
-  await expect(page.getByLabel("Состояние завершения intake")).toContainText(
-    "Передано оператору",
-  );
-  await expect(page.getByText("Ожидайте решения оператора")).toBeVisible();
+  await expect(page.getByText("Передано оператору")).toBeVisible();
   await expect(page.getByText("Заполнение закрыто")).toHaveCount(0);
-  await expect(page.getByText("На проверке")).toBeVisible();
 });
 
 test("agent create form keeps focus and scroll position while typing", async ({
@@ -103,5 +114,7 @@ test("agent create form keeps focus and scroll position while typing", async ({
     .click();
 
   await expect(page.locator("h1")).toHaveText("Focus Petrov");
-  await expect(page.getByText("Intake cockpit")).toBeVisible();
+  await expect(page.getByLabel("Case Workspace")).toContainText(
+    "До передачи оператору",
+  );
 });

@@ -13,16 +13,10 @@ import type {
 } from "../types/domain";
 import type { AiHelperResult } from "../services/aiHelperService";
 import type { ExportRow } from "../services/exportService";
+import { buildAdminReviewSummary } from "../services/aiHelperService";
 import {
-  buildAdminReviewSummary,
-  buildReadinessSummary,
-} from "../services/aiHelperService";
-import {
-  applicantAcceptedMediaCompletion,
-  applicantBlockers,
   applicantCountLabel,
   applicantFieldCompletion,
-  applicantMediaCompletion,
   applicantReadiness,
   appointmentMeta,
   blockers,
@@ -40,7 +34,6 @@ import {
   statusGroups,
   statusMeta,
   submissionPreflight,
-  submissionAutobotSummary,
   typeLabel,
 } from "../lib/workflow";
 
@@ -894,7 +887,6 @@ export function DetailView({
   onSetStatus,
   onReturnOpen,
   onNavigate,
-  onUpdateTripField,
   onUpdateApplicant,
   onAddApplicant,
   onUpdateMediaSlot,
@@ -909,11 +901,6 @@ export function DetailView({
   onSetStatus: (id: string, status: Submission["status"]) => void;
   onReturnOpen: (id: string) => void;
   onNavigate: (screen: Screen) => void;
-  onUpdateTripField: (
-    submissionId: string,
-    field: "country" | "city" | "travelDate",
-    value: string,
-  ) => void;
   onUpdateApplicant: (
     submissionId: string,
     applicantId: string,
@@ -964,37 +951,39 @@ export function DetailView({
         }
       />
 
-      <div className="grid detail">
+      <div className={`grid detail ${admin ? "" : "agent-detail"}`}>
         <div className="grid">
-          <section className="card">
-            <div className="detail-title">
-              <div className="card-title-row">
-                <StatusChip status={submission.status} />
-                <Chip>{typeLabel(submission.type)}</Chip>
-                <AppointmentChip status={submission.appointment} />
+          {admin ? (
+            <section className="card">
+              <div className="detail-title">
+                <div className="card-title-row">
+                  <StatusChip status={submission.status} />
+                  <Chip>{typeLabel(submission.type)}</Chip>
+                  <AppointmentChip status={submission.appointment} />
+                </div>
+                <strong>{ready}%</strong>
               </div>
-              <strong>{ready}%</strong>
-            </div>
-            <Progress value={ready} label={`Готовность ${ready}%`} />
-            <div className="info-grid">
-              <div className="info-item">
-                <span>Агент</span>
-                <strong>{submission.agentName}</strong>
+              <Progress value={ready} label={`Готовность ${ready}%`} />
+              <div className="info-grid">
+                <div className="info-item">
+                  <span>Агент</span>
+                  <strong>{submission.agentName}</strong>
+                </div>
+                <div className="info-item">
+                  <span>Заявители</span>
+                  <strong>{applicantCountLabel(submission)}</strong>
+                </div>
+                <div className="info-item">
+                  <span>Дата поездки</span>
+                  <strong>{submission.travelDate}</strong>
+                </div>
+                <div className="info-item">
+                  <span>Обновлено</span>
+                  <strong>{submission.updated}</strong>
+                </div>
               </div>
-              <div className="info-item">
-                <span>Заявители</span>
-                <strong>{applicantCountLabel(submission)}</strong>
-              </div>
-              <div className="info-item">
-                <span>Дата поездки</span>
-                <strong>{submission.travelDate}</strong>
-              </div>
-              <div className="info-item">
-                <span>Обновлено</span>
-                <strong>{submission.updated}</strong>
-              </div>
-            </div>
-          </section>
+            </section>
+          ) : null}
 
           {admin ? (
             <>
@@ -1093,14 +1082,14 @@ export function DetailView({
               <AdminTimeline submission={submission} />
             </>
           ) : (
-            <AgentCockpit
+            <AgentTaskWorkspace
               submission={submission}
-              onUpdateTripField={onUpdateTripField}
               onUpdateApplicant={onUpdateApplicant}
               onAddApplicant={onAddApplicant}
               onUpdateMediaSlot={onUpdateMediaSlot}
               onFixCorrection={onFixCorrection}
               onConfirmFamilyRoles={onConfirmFamilyRoles}
+              onSubmitPreflight={onSubmitPreflight}
             />
           )}
         </div>
@@ -1113,33 +1102,41 @@ export function DetailView({
               onReturnOpen={onReturnOpen}
               onNavigate={onNavigate}
             />
-          ) : (
-            <AgentActionPanel
-              submission={submission}
-              onSubmitPreflight={onSubmitPreflight}
-            />
-          )}
+          ) : null}
         </aside>
       </div>
     </>
   );
 }
 
-function AgentCockpit({
+type AgentTaskKind = "field" | "media" | "correction" | "family" | "handoff";
+
+interface AgentTask {
+  id: string;
+  kind: AgentTaskKind;
+  title: string;
+  problem: string;
+  reason: string;
+  action: string;
+  applicantId?: string;
+  applicantName?: string;
+  field?: keyof Applicant;
+  fields?: Array<keyof Applicant>;
+  mediaType?: MediaSlotType;
+  noteId?: string;
+  tone: Tone;
+}
+
+function AgentTaskWorkspace({
   submission,
-  onUpdateTripField,
   onUpdateApplicant,
   onAddApplicant,
   onUpdateMediaSlot,
   onFixCorrection,
   onConfirmFamilyRoles,
+  onSubmitPreflight,
 }: {
   submission: Submission;
-  onUpdateTripField: (
-    submissionId: string,
-    field: "country" | "city" | "travelDate",
-    value: string,
-  ) => void;
   onUpdateApplicant: (
     submissionId: string,
     applicantId: string,
@@ -1155,265 +1152,278 @@ function AgentCockpit({
   ) => void;
   onFixCorrection: (submissionId: string, correctionId: string) => void;
   onConfirmFamilyRoles: (submissionId: string, applySuggestedRoles: boolean) => void;
+  onSubmitPreflight: (submissionId: string) => void;
 }) {
-  const summary = submissionAutobotSummary(submission);
   const suggestion = familySuggestion(submission);
   const preflight = submissionPreflight(submission);
-  const helper = buildReadinessSummary(submission);
+  const applicantSummaries = submission.applicants.map((applicant, index) => {
+    const applicantId = getApplicantId(submission, applicant, index);
+    const tasks = buildApplicantTasks(submission, applicant, index);
+    return { applicant, applicantId, tasks };
+  });
+  const firstNeedsAttention =
+    applicantSummaries.find((item) => item.tasks.length > 0) ?? applicantSummaries[0];
+  const [selectedApplicantId, setSelectedApplicantId] = useState(
+    firstNeedsAttention?.applicantId ?? "",
+  );
+  const selectedSummary =
+    applicantSummaries.find((item) => item.applicantId === selectedApplicantId) ??
+    firstNeedsAttention;
+  const applicantTasks = selectedSummary?.tasks ?? [];
+  const familyTask = buildFamilyTask(submission);
+  const caseTasks = familyTask ? [familyTask, ...applicantTasks] : applicantTasks;
+  const handoffTask = buildHandoffTask(submission);
+  const tasks = caseTasks.length ? caseTasks : [handoffTask];
+  const [selectedTaskId, setSelectedTaskId] = useState(tasks[0]?.id ?? "");
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? tasks[0];
+  const blockersRemaining = preflight.blockers.length;
+  const nextActionText = selectedTask
+    ? selectedTask.action
+    : preflight.canSubmit
+      ? "Передать оператору"
+      : "Закрыть первый блокер";
 
   return (
-    <>
-      <section className="card cockpit-card">
-        <div className="section-head">
+    <div className="agent-workspace">
+      <section className="case-command card" aria-label="Case Workspace">
+        <div className="case-command-main">
           <div>
-            <h2>Intake cockpit</h2>
-            <p>Локальная сборка заявки: маршрут, заявители, медиа и готовность.</p>
+            <div className="page-kicker">Рабочее пространство кейса</div>
+            <h2>До передачи оператору</h2>
+            <p>
+              {submission.id} · {submission.country}, {submission.city} · цель: READY
+              FOR OPERATOR REVIEW
+            </p>
           </div>
-          <Button variant="primary" onClick={() => onAddApplicant(submission.id)}>
-            Добавить заявителя
-          </Button>
+          <div className="case-command-answer">
+            <span>Следующее действие</span>
+            <strong>{nextActionText}</strong>
+          </div>
         </div>
 
-        <div className="form-grid">
-          <div className="field">
-            <label htmlFor={`${submission.id}-country`}>Страна</label>
-            <select
-              id={`${submission.id}-country`}
-              value={submission.country}
-              onChange={(event) =>
-                onUpdateTripField(submission.id, "country", event.target.value)
-              }
-            >
-              <option>Испания</option>
-              <option>Италия</option>
-              <option>Франция</option>
-              <option>Германия</option>
-              <option>Португалия</option>
-              <option>Австрия</option>
-            </select>
+        <div className="case-command-grid">
+          <div className="case-command-metric">
+            <span>Готовность</span>
+            <strong>{preflight.readiness}%</strong>
           </div>
-          <div className="field">
-            <label htmlFor={`${submission.id}-city`}>Город подачи</label>
-            <input
-              id={`${submission.id}-city`}
-              value={submission.city}
-              onChange={(event) =>
-                onUpdateTripField(submission.id, "city", event.target.value)
-              }
-            />
+          <div className="case-command-metric">
+            <span>Блокеры</span>
+            <strong>{blockersRemaining}</strong>
           </div>
-          <div className="field">
-            <label htmlFor={`${submission.id}-travel`}>Дата поездки</label>
-            <input
-              id={`${submission.id}-travel`}
-              value={submission.travelDate}
-              onChange={(event) =>
-                onUpdateTripField(submission.id, "travelDate", event.target.value)
-              }
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="card autobot-card">
-        <div className="section-head">
-          <div>
-            <h2>Readiness / Autobot</h2>
-            <p>{summary.text}</p>
-          </div>
-          <Chip tone={preflight.canSubmit ? "success" : "warning"}>
-            {preflight.canSubmit ? "Можно передать" : "Есть блокеры"}
-          </Chip>
-        </div>
-        <div className="media-lifecycle-grid" aria-label="Состояние медиа">
-          <div>
-            <span>Загружено</span>
+          <div className="case-command-metric">
+            <span>Требуют внимания</span>
             <strong>
-              {preflight.media.uploaded}/{preflight.media.required}
+              {applicantSummaries.filter((item) => item.tasks.length > 0).length}/
+              {applicantSummaries.length}
             </strong>
           </div>
-          <div>
-            <span>Принято оператором</span>
-            <strong>
-              {preflight.media.accepted}/{preflight.media.required}
-            </strong>
-          </div>
-          <div>
-            <span>Нет файла</span>
-            <strong>{preflight.media.missing}</strong>
-          </div>
-          <div>
-            <span>На замену</span>
-            <strong>{preflight.media.replace}</strong>
+          <div className="case-command-metric">
+            <span>Можно передать?</span>
+            <strong>{preflight.canSubmit ? "Да" : "Нет"}</strong>
           </div>
         </div>
-        {preflight.blockers.length ? (
-          <div className="blocker-list">
-            {preflight.blockers.map((blocker) => (
-              <div className="status-next" key={blocker}>
-                {blocker}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="status-next">
-            Можно передать оператору после ручной проверки агента.
-          </div>
-        )}
-      </section>
 
-      <AiHelperPanel result={helper} />
-
-      <section className="card family-intelligence-card">
-        <div className="section-head">
+        <div className="case-answer-grid">
           <div>
-            <h2>Family Intelligence</h2>
-            <p>{suggestion.text}</p>
+            <strong>Кто требует внимания?</strong>
+            <p>{attentionAnswer(applicantSummaries)}</p>
           </div>
-          <Chip
-            tone={
-              suggestion.confidence === "high"
-                ? "success"
-                : suggestion.confidence === "medium"
-                  ? "warning"
-                  : "neutral"
-            }
-          >
-            {suggestion.score} баллов
-          </Chip>
-        </div>
-
-        <div className="signal-grid">
-          {suggestion.signals.map((item) => (
-            <div
-              className={`signal-item ${item.matched ? "matched" : ""}`}
-              key={item.key}
-            >
-              <strong>{item.label}</strong>
-              <small>{item.matched ? `+${item.score}` : "нет сигнала"}</small>
-            </div>
-          ))}
-        </div>
-
-        <div className="role-proposals">
-          {suggestion.roles.map((proposal) => (
-            <div className="role-proposal" key={proposal.applicantId}>
-              <div>
-                <strong>{proposal.name}</strong>
-                <small>
-                  Сейчас: {proposal.currentRole} · Предложение: {proposal.suggestedRole}
-                </small>
-                <p>{proposal.reason}</p>
-              </div>
-              <Chip
-                tone={
-                  proposal.currentRole === proposal.suggestedRole ? "success" : "info"
-                }
-              >
-                {proposal.suggestedRole}
-              </Chip>
-            </div>
-          ))}
-        </div>
-
-        <div className="action-strip">
           <div>
-            <strong>
-              {submission.familyIntelligence?.status === "confirmed"
-                ? "Группа подтверждена агентом"
-                : "Требуется подтверждение агента"}
-            </strong>
-            <small>
-              Система не объединяет и не меняет роли без явного действия агента.
-            </small>
+            <strong>Что не готово?</strong>
+            <p>{preflight.blockers[0] ?? "Блокеров нет."}</p>
           </div>
-          <div className="actions">
-            <Button onClick={() => onConfirmFamilyRoles(submission.id, false)}>
-              Подтвердить вручную
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => onConfirmFamilyRoles(submission.id, true)}
-            >
-              Применить роли
-            </Button>
+          <div>
+            <strong>Что делать дальше?</strong>
+            <p>{nextActionText}</p>
+          </div>
+          <div>
+            <strong>Можно ли передавать кейс?</strong>
+            <p>
+              {preflight.canSubmit
+                ? "Да, после ручной проверки агентом."
+                : `Нет, осталось закрыть ${blockersRemaining} блокер(а).`}
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="card">
-        <div className="section-head">
-          <div>
-            <h2>Заявители</h2>
-            <p>Каждый участник остаётся отдельной проверяемой единицей.</p>
-          </div>
-        </div>
-        <div className="list">
-          {submission.applicants.map((person, index) => (
-            <ApplicantIntakeCard
-              key={person.id ?? `${submission.id}-${index}`}
-              applicant={person}
-              index={index}
-              submission={submission}
-              onUpdateApplicant={onUpdateApplicant}
-              onUpdateMediaSlot={onUpdateMediaSlot}
-            />
-          ))}
-        </div>
-      </section>
-
-      {submission.notes.length ? (
-        <section className="card">
+      <section className="workspace-grid">
+        <div className="applicant-workqueue card" aria-label="Applicants">
           <div className="section-head">
             <div>
-              <h2>Замечания</h2>
+              <h2>Заявители</h2>
+              <p>Выберите человека, затем закройте его задачи.</p>
             </div>
+            <Button variant="ghost" onClick={() => onAddApplicant(submission.id)}>
+              Добавить
+            </Button>
           </div>
-          <div className="list">
-            {submission.notes.map((note) => (
-              <div
-                className="timeline-row"
-                key={note.id ?? `${note.target}-${note.text}`}
+
+          <div className="applicant-task-list">
+            {applicantSummaries.map(({ applicant, applicantId, tasks }) => (
+              <button
+                className={`applicant-task-card ${
+                  selectedSummary?.applicantId === applicantId ? "active" : ""
+                }`}
+                type="button"
+                key={applicantId}
+                onClick={() => {
+                  setSelectedApplicantId(applicantId);
+                  setSelectedTaskId(tasks[0]?.id ?? handoffTask.id);
+                }}
               >
-                <div>
-                  <strong>{note.target}</strong>
-                  <small>{note.text}</small>
-                </div>
-                <div className="actions">
-                  <Chip tone={(note.status ?? "open") === "open" ? "error" : "success"}>
-                    {(note.status ?? "open") === "open" ? "Открыто" : "Исправлено"}
+                <span>
+                  <strong>{applicant.name}</strong>
+                  <small>{applicant.role}</small>
+                </span>
+                <Progress
+                  value={applicantReadiness(applicant)}
+                  label={`Готовность ${applicant.name}`}
+                />
+                <span className="applicant-card-footer">
+                  <Chip tone={tasks.length ? "error" : "success"}>
+                    {tasks.length ? `${tasks.length} задач` : "Готов"}
                   </Chip>
-                  {(note.status ?? "open") === "open" ? (
-                    <Button
-                      onClick={() =>
-                        onFixCorrection(
-                          submission.id,
-                          note.id ?? `${note.target}-${note.text}`,
-                        )
-                      }
-                    >
-                      Отметить исправленным
-                    </Button>
-                  ) : null}
-                </div>
+                  <small>{applicantReadiness(applicant)}%</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="task-workspace card" aria-label="Applicant Tasks">
+          <div className="section-head">
+            <div>
+              <h2>{selectedSummary?.applicant.name ?? "Кейс"}: задачи</h2>
+              <p>
+                Сначала задача и причина. Данные открываются только для выбранного
+                действия.
+              </p>
+            </div>
+            <Chip tone={preflight.canSubmit ? "success" : "warning"}>
+              {preflight.canSubmit ? "Ready" : "Not ready"}
+            </Chip>
+          </div>
+
+          <div className="task-list">
+            {tasks.map((task, index) => (
+              <button
+                className={`task-card ${selectedTask?.id === task.id ? "active" : ""}`}
+                type="button"
+                key={task.id}
+                onClick={() => setSelectedTaskId(task.id)}
+              >
+                <span className="task-number">{index + 1}</span>
+                <span>
+                  <strong>{task.title}</strong>
+                  <small>{task.problem}</small>
+                </span>
+                <Chip tone={task.tone}>
+                  {task.kind === "handoff" ? "Review" : "Задача"}
+                </Chip>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {selectedTask ? (
+        <section className="task-detail card" aria-label="Applicant Editing">
+          <div className="task-detail-copy">
+            <div className="page-kicker">Selected task</div>
+            <h2>{selectedTask.title}</h2>
+            <dl>
+              <div>
+                <dt>Проблема</dt>
+                <dd>{selectedTask.problem}</dd>
+              </div>
+              <div>
+                <dt>Причина</dt>
+                <dd>{selectedTask.reason}</dd>
+              </div>
+              <div>
+                <dt>Что сделать</dt>
+                <dd>{selectedTask.action}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <TaskDataEditor
+            task={selectedTask}
+            submission={submission}
+            onUpdateApplicant={onUpdateApplicant}
+            onUpdateMediaSlot={onUpdateMediaSlot}
+            onFixCorrection={onFixCorrection}
+            onConfirmFamilyRoles={onConfirmFamilyRoles}
+            onSubmitPreflight={onSubmitPreflight}
+          />
+        </section>
+      ) : null}
+
+      <section className="readiness-review card" aria-label="Readiness Review">
+        <div>
+          <div className="section-head">
+            <div>
+              <h2>Проверка готовности</h2>
+              <p>Готовность является результатом закрытых задач.</p>
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => onSubmitPreflight(submission.id)}
+              disabled={
+                !["draft", "filling", "ready_for_review", "returned"].includes(
+                  submission.status,
+                )
+              }
+            >
+              {preflight.canSubmit ? "Передать оператору" : "Проверить готовность"}
+            </Button>
+          </div>
+
+          <div className="review-checks">
+            {preflight.checklist.map((item) => (
+              <div className="review-check" key={item.label}>
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.detail}</small>
+                </span>
+                <Chip tone={item.tone}>{item.ok ? "OK" : "Action"}</Chip>
               </div>
             ))}
           </div>
-        </section>
-      ) : null}
-    </>
+        </div>
+        {submission.type === "family" ? (
+          <div className="support-note">
+            <strong>Family analysis</strong>
+            <p>{suggestion.text}</p>
+            <div className="actions">
+              <Button onClick={() => onConfirmFamilyRoles(submission.id, false)}>
+                Подтвердить вручную
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => onConfirmFamilyRoles(submission.id, true)}
+              >
+                Применить роли
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
-function ApplicantIntakeCard({
-  applicant,
-  index,
+function TaskDataEditor({
+  task,
   submission,
   onUpdateApplicant,
   onUpdateMediaSlot,
+  onFixCorrection,
+  onConfirmFamilyRoles,
+  onSubmitPreflight,
 }: {
-  applicant: Applicant;
-  index: number;
+  task: AgentTask;
   submission: Submission;
   onUpdateApplicant: (
     submissionId: string,
@@ -1427,209 +1437,279 @@ function ApplicantIntakeCard({
     type: MediaSlotType,
     state: "missing" | "uploaded",
   ) => void;
+  onFixCorrection: (submissionId: string, correctionId: string) => void;
+  onConfirmFamilyRoles: (submissionId: string, applySuggestedRoles: boolean) => void;
+  onSubmitPreflight: (submissionId: string) => void;
 }) {
-  const applicantId = applicant.id ?? `${submission.id}-${index + 1}`;
-  const fieldCompletion = applicantFieldCompletion(applicant);
-  const mediaCompletion = applicantMediaCompletion(applicant);
-  const acceptedMediaCompletion = applicantAcceptedMediaCompletion(applicant);
-  const personBlockers = applicantBlockers(applicant);
-  const slots = ensureMediaSlots(applicant);
+  const applicant = task.applicantId
+    ? findApplicantById(submission, task.applicantId)
+    : undefined;
+
+  if (
+    task.kind === "field" &&
+    applicant &&
+    task.applicantId &&
+    (task.field || task.fields?.length)
+  ) {
+    const fields = task.fields ?? (task.field ? [task.field] : []);
+    return (
+      <div className="task-data-panel">
+        <h3>Данные для этой задачи</h3>
+        <div className="form-grid">
+          {fields.map((field) => (
+            <ApplicantTextField
+              applicant={applicant}
+              applicantId={task.applicantId ?? ""}
+              field={field}
+              label={fieldLabel(field)}
+              type={String(field).toLowerCase().includes("date") ? "date" : "text"}
+              submissionId={submission.id}
+              onUpdateApplicant={onUpdateApplicant}
+              key={field}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (task.kind === "media" && applicant && task.applicantId && task.mediaType) {
+    const slot = ensureMediaSlots(applicant).find(
+      (item) => item.type === task.mediaType,
+    );
+    if (!slot) return null;
+
+    return (
+      <div className="task-data-panel">
+        <h3>Документ для этой задачи</h3>
+        <div className="media-card task-media-card">
+          <div>
+            <div className="card-title-row">
+              <h3>{slot.label}</h3>
+              <MediaChip row={{ label: slot.label, state: slot.state }} />
+            </div>
+            <small>
+              {slot.generatedFileName ??
+                "Укажите номер паспорта, чтобы сформировать имя файла."}
+            </small>
+          </div>
+          <Button
+            variant={
+              slot.state === "missing" || slot.state === "replace"
+                ? "primary"
+                : "secondary"
+            }
+            onClick={() =>
+              onUpdateMediaSlot(
+                submission.id,
+                task.applicantId ?? "",
+                slot.type,
+                slot.state === "missing" || slot.state === "replace"
+                  ? "uploaded"
+                  : "missing",
+              )
+            }
+          >
+            {slot.state === "missing" || slot.state === "replace"
+              ? "Отметить загруженным"
+              : "Снять файл"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (task.kind === "correction") {
+    return (
+      <div className="task-data-panel">
+        <h3>Закрытие замечания</h3>
+        <p>Отметьте задачу исправленной только после реального исправления.</p>
+        <Button
+          variant="primary"
+          onClick={() => onFixCorrection(submission.id, task.noteId ?? task.id)}
+        >
+          Отметить исправленным
+        </Button>
+      </div>
+    );
+  }
+
+  if (task.kind === "family") {
+    return (
+      <div className="task-data-panel">
+        <h3>Подтверждение группы</h3>
+        <p>Система не объединяет и не меняет роли без явного действия агента.</p>
+        <div className="actions">
+          <Button onClick={() => onConfirmFamilyRoles(submission.id, false)}>
+            Подтвердить вручную
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => onConfirmFamilyRoles(submission.id, true)}
+          >
+            Применить роли
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <article className="intake-card">
-      <div className="intake-head">
-        <div>
-          <div className="card-title-row">
-            <h3>{applicant.name}</h3>
-            <Chip>{applicant.role}</Chip>
-          </div>
-          <div className="meta-line">
-            <span>Анкета {fieldCompletion}%</span>
-            <span className="dot" />
-            <span>Медиа загружено {mediaCompletion}%</span>
-            <span className="dot" />
-            <span>Принято оператором {acceptedMediaCompletion}%</span>
-          </div>
-        </div>
-        <strong>{applicantReadiness(applicant)}%</strong>
-      </div>
-
-      <Progress
-        value={applicantReadiness(applicant)}
-        label={`Готовность ${applicant.name} ${applicantReadiness(applicant)}%`}
-      />
-
-      {personBlockers.length ? (
-        <div className="blockers compact-blockers">
-          {personBlockers.slice(0, 3).map((blocker) => (
-            <span className="blocker" key={blocker}>
-              {blocker}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      <details className="accordion-section" open>
-        <summary>
-          <span>Анкета</span>
-          <Chip tone={fieldCompletion === 100 ? "success" : "warning"}>
-            {fieldCompletion}%
-          </Chip>
-        </summary>
-        <div className="form-grid">
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="name"
-            label="ФИО"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="role"
-            label="Роль"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="birthDate"
-            label="Дата рождения"
-            type="date"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="patronymic"
-            label="Отчество / middle name"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="citizenship"
-            label="Гражданство"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="passport"
-            label="Номер паспорта"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="passportIssuedAt"
-            label="Дата выдачи паспорта"
-            type="date"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="passportExpiresAt"
-            label="Срок действия паспорта"
-            type="date"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="phone"
-            label="Телефон"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="email"
-            label="Email"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="address"
-            label="Адрес"
-            wide
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="hotelName"
-            label="Отель"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-          <ApplicantTextField
-            applicant={applicant}
-            applicantId={applicantId}
-            field="hotelAddress"
-            label="Адрес отеля"
-            submissionId={submission.id}
-            onUpdateApplicant={onUpdateApplicant}
-          />
-        </div>
-      </details>
-
-      <details className="accordion-section" open>
-        <summary>
-          <span>Медиа-слоты</span>
-          <Chip tone={mediaCompletion === 100 ? "success" : "warning"}>
-            {slots.filter((slot) => slot.state !== "missing").length}/{slots.length}
-          </Chip>
-        </summary>
-        <div className="media-grid">
-          {slots.map((slot) => (
-            <div className="media-card" key={slot.id}>
-              <div>
-                <div className="card-title-row">
-                  <h3>{slot.label}</h3>
-                  <MediaChip row={{ label: slot.label, state: slot.state }} />
-                </div>
-                <small>
-                  {slot.generatedFileName ??
-                    "Укажите номер паспорта, чтобы сформировать имя файла."}
-                </small>
-                {slot.state === "uploaded" ? (
-                  <p>Файл загружен. Оператор ещё не принял файл.</p>
-                ) : null}
-              </div>
-              <Button
-                variant={slot.state === "missing" ? "primary" : "secondary"}
-                onClick={() =>
-                  onUpdateMediaSlot(
-                    submission.id,
-                    applicantId,
-                    slot.type,
-                    slot.state === "missing" ? "uploaded" : "missing",
-                  )
-                }
-              >
-                {slot.state === "missing" ? "Отметить загруженным" : "Снять файл"}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </details>
-    </article>
+    <div className="task-data-panel">
+      <h3>Передача оператору</h3>
+      <p>Откройте финальный чеклист и передайте кейс только если блокеров нет.</p>
+      <Button variant="primary" onClick={() => onSubmitPreflight(submission.id)}>
+        Проверить готовность
+      </Button>
+    </div>
   );
+}
+
+function buildApplicantTasks(
+  submission: Submission,
+  applicant: Applicant,
+  index: number,
+): AgentTask[] {
+  const applicantId = getApplicantId(submission, applicant, index);
+  const tasks: AgentTask[] = [];
+  const missingFields = requiredApplicantFields.filter((item) => {
+    const value = applicant[item.key];
+    return typeof value === "string"
+      ? value.trim().length === 0 || value === "-"
+      : !value;
+  });
+
+  if (missingFields.length) {
+    tasks.push({
+      id: `${applicantId}-fields-required`,
+      kind: "field",
+      title: `Заполнить обязательные поля (${missingFields.length})`,
+      problem: `${applicant.name}: не хватает ${missingFields
+        .slice(0, 3)
+        .map((item) => item.label.toLowerCase())
+        .join(", ")}${missingFields.length > 3 ? "..." : ""}.`,
+      reason: "Неполный профиль блокирует передачу кейса оператору.",
+      action: "Заполнить недостающие поля профиля.",
+      applicantId,
+      applicantName: applicant.name,
+      fields: missingFields.map((item) => item.key),
+      tone: "warning",
+    });
+  }
+
+  for (const slot of ensureMediaSlots(applicant)) {
+    if (slot.state === "missing" || slot.state === "replace") {
+      tasks.push({
+        id: `${applicantId}-media-${slot.type}`,
+        kind: "media",
+        title: `${slot.state === "replace" ? "Заменить" : "Загрузить"}: ${slot.label}`,
+        problem:
+          slot.state === "replace"
+            ? `${applicant.name}: документ требует замены.`
+            : `${applicant.name}: документ не загружен.`,
+        reason:
+          slot.state === "replace"
+            ? "Оператор запросил корректный файл для продолжения проверки."
+            : "Комплект документов неполный.",
+        action:
+          slot.state === "replace"
+            ? `Загрузить новый файл: ${slot.label.toLowerCase()}.`
+            : `Добавить файл: ${slot.label.toLowerCase()}.`,
+        applicantId,
+        applicantName: applicant.name,
+        mediaType: slot.type,
+        tone: slot.state === "replace" ? "error" : "warning",
+      });
+    }
+  }
+
+  for (const note of submission.notes) {
+    if ((note.status ?? "open") !== "open") continue;
+    const belongsToApplicant =
+      note.applicantId === applicantId ||
+      note.target.includes(applicant.name) ||
+      (submission.applicants.length === 1 && !note.applicantId);
+    if (!belongsToApplicant) continue;
+
+    tasks.push({
+      id: `${applicantId}-correction-${note.id ?? note.target}`,
+      kind: "correction",
+      title: `Исправить замечание: ${note.target}`,
+      problem: note.text,
+      reason: "Открытое замечание блокирует готовность кейса.",
+      action: "Исправить причину и отметить замечание закрытым.",
+      applicantId,
+      applicantName: applicant.name,
+      noteId: note.id ?? `${note.target}-${note.text}`,
+      tone: note.severity === "note" ? "warning" : "error",
+    });
+  }
+
+  return tasks;
+}
+
+function buildFamilyTask(submission: Submission): AgentTask | null {
+  if (
+    submission.type !== "family" ||
+    submission.applicants.length < 2 ||
+    submission.familyIntelligence?.status === "confirmed"
+  ) {
+    return null;
+  }
+
+  return {
+    id: `${submission.id}-family-confirmation`,
+    kind: "family",
+    title: "Подтвердить семейную группу",
+    problem: "Роли и группа заявителей ещё не подтверждены агентом.",
+    reason: "Система не объединяет заявителей автоматически.",
+    action: "Проверить роли и подтвердить группу вручную.",
+    tone: "warning",
+  };
+}
+
+function buildHandoffTask(submission: Submission): AgentTask {
+  const preflight = submissionPreflight(submission);
+  return {
+    id: `${submission.id}-handoff`,
+    kind: "handoff",
+    title: preflight.canSubmit ? "Передать оператору" : "Проверить готовность",
+    problem: preflight.canSubmit
+      ? "Блокеров нет."
+      : (preflight.blockers[0] ?? "Проверьте оставшиеся условия передачи."),
+    reason: "Кейс передаётся оператору только после закрытия блокеров.",
+    action: preflight.canSubmit
+      ? "Открыть финальный чеклист и передать оператору."
+      : "Открыть чеклист готовности и закрыть блокеры.",
+    tone: preflight.canSubmit ? "success" : "warning",
+  };
+}
+
+function getApplicantId(submission: Submission, applicant: Applicant, index: number) {
+  return applicant.id ?? `${submission.id}-${index + 1}`;
+}
+
+function findApplicantById(submission: Submission, applicantId: string) {
+  return submission.applicants.find(
+    (applicant, index) => getApplicantId(submission, applicant, index) === applicantId,
+  );
+}
+
+function fieldLabel(field: keyof Applicant) {
+  return (
+    requiredApplicantFields.find((item) => item.key === field)?.label ?? String(field)
+  );
+}
+
+function attentionAnswer(
+  summaries: Array<{ applicant: Applicant; tasks: AgentTask[] }>,
+) {
+  const names = summaries
+    .filter((item) => item.tasks.length > 0)
+    .map((item) => item.applicant.name);
+  if (!names.length) return "Никто. Заявители не имеют открытых задач.";
+  const visible = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${visible} и ещё ${names.length - 3}` : visible;
 }
 
 function ApplicantTextField({
@@ -1866,152 +1946,6 @@ function AdminDecisionPanel({
             chip={
               <Chip tone={media.accepted === media.required ? "success" : "warning"}>
                 {media.accepted === media.required ? "Принято" : "На проверке"}
-              </Chip>
-            }
-          />
-          <TimelineRow
-            title="Замечания"
-            text={currentBlockers.length ? `${currentBlockers.length} открыто` : "нет"}
-            chip={
-              <Chip tone={currentBlockers.length ? "error" : "success"}>
-                {currentBlockers.length ? "Есть" : "Нет блокеров"}
-              </Chip>
-            }
-          />
-        </div>
-      </section>
-    </>
-  );
-}
-
-function AgentActionPanel({
-  submission,
-  onSubmitPreflight,
-}: {
-  submission: Submission;
-  onSubmitPreflight: (submissionId: string) => void;
-}) {
-  const currentBlockers = blockers(submission);
-  const preflight = submissionPreflight(submission);
-  const handoffComplete = ["waiting_review", "in_review"].includes(submission.status);
-  const intakeClosed = [
-    "accepted",
-    "ready_for_excel",
-    "exported",
-    "sent_to_appointment",
-    "appointment_scheduled",
-    "completed",
-  ].includes(submission.status);
-
-  return (
-    <>
-      {handoffComplete || intakeClosed ? (
-        <section
-          className={`panel completion-panel ${intakeClosed ? "complete" : ""}`}
-          aria-label="Состояние завершения intake"
-        >
-          <div className="section-head">
-            <div>
-              <h2>{intakeClosed ? "Intake завершён" : "Передано оператору"}</h2>
-              <p>
-                {intakeClosed
-                  ? "Пакет прошёл агентский intake. Следующие действия выполняет операционная команда."
-                  : "Агентский intake завершён: заявка передана в операционную проверку."}
-              </p>
-            </div>
-            <Chip tone={intakeClosed ? "success" : "info"}>
-              {intakeClosed ? "Готово" : "Передано"}
-            </Chip>
-          </div>
-          <div className="status-next">
-            {intakeClosed
-              ? "Пользователю больше не нужно заполнять данные в этом flow."
-              : "Ожидайте решения оператора или точечный возврат с причиной."}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="panel">
-        <div className="section-head">
-          <div>
-            <h2>Действия</h2>
-          </div>
-        </div>
-        <div className="grid">
-          {submission.status === "returned" ? (
-            <Button variant="primary" onClick={() => onSubmitPreflight(submission.id)}>
-              Отметить исправленным
-            </Button>
-          ) : null}
-          {submission.status === "ready_for_review" ? (
-            <Button variant="primary" onClick={() => onSubmitPreflight(submission.id)}>
-              Передать оператору
-            </Button>
-          ) : null}
-          {["draft", "filling"].includes(submission.status) ? (
-            <Button variant="primary" onClick={() => onSubmitPreflight(submission.id)}>
-              Проверить готовность
-            </Button>
-          ) : null}
-          {handoffComplete || intakeClosed ? (
-            <Chip tone={intakeClosed ? "success" : "info"}>
-              {intakeClosed ? "Заполнение закрыто" : "На проверке"}
-            </Chip>
-          ) : (
-            <Button>Сохранить</Button>
-          )}
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="section-head">
-          <div>
-            <h2>Проверка перед отправкой</h2>
-          </div>
-        </div>
-        <div className="list">
-          <TimelineRow
-            title="Анкета"
-            text={`${submission.fields}%`}
-            chip={
-              <Chip tone={submission.fields === 100 ? "success" : "warning"}>
-                {submission.fields === 100 ? "Заполнено" : "Заполнить"}
-              </Chip>
-            }
-          />
-          <TimelineRow
-            title="Медиа загружены"
-            text={`${preflight.media.uploaded}/${preflight.media.required}`}
-            chip={
-              <Chip
-                tone={
-                  preflight.media.uploaded === preflight.media.required &&
-                  preflight.media.replace === 0
-                    ? "success"
-                    : "error"
-                }
-              >
-                {preflight.media.uploaded === preflight.media.required &&
-                preflight.media.replace === 0
-                  ? "Комплект"
-                  : "Неполно"}
-              </Chip>
-            }
-          />
-          <TimelineRow
-            title="Принято оператором"
-            text={`${preflight.media.accepted}/${preflight.media.required}`}
-            chip={
-              <Chip
-                tone={
-                  preflight.media.accepted === preflight.media.required
-                    ? "success"
-                    : "warning"
-                }
-              >
-                {preflight.media.accepted === preflight.media.required
-                  ? "Принято"
-                  : "Не принято"}
               </Chip>
             }
           />

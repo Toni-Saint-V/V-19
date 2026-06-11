@@ -456,32 +456,6 @@ function App() {
     return createAttempted && !createDraft[key].trim();
   }
 
-  function updateTripField(
-    submissionId: string,
-    field: "country" | "city" | "travelDate",
-    value: string,
-  ) {
-    setSubmissions((current) =>
-      current.map((submission) => {
-        if (submission.id !== submissionId) return submission;
-
-        const next = {
-          ...submission,
-          [field]: value,
-          updated: currentDate,
-          applicants: submission.applicants.map((applicant) => ({
-            ...applicant,
-            ...(field === "country" ? { country: value } : {}),
-            ...(field === "city" ? { city: value } : {}),
-            ...(field === "travelDate" ? { tripDates: value } : {}),
-          })),
-        };
-
-        return normalizeSubmission(next);
-      }),
-    );
-  }
-
   function updateApplicant(
     submissionId: string,
     applicantId: string,
@@ -1001,7 +975,6 @@ function App() {
           onSetStatus={setStatus}
           onReturnOpen={openReturnModal}
           onNavigate={navigate}
-          onUpdateTripField={updateTripField}
           onUpdateApplicant={updateApplicant}
           onAddApplicant={addApplicant}
           onUpdateMediaSlot={updateMediaSlot}
@@ -1023,7 +996,6 @@ function App() {
           onSetStatus={setStatus}
           onReturnOpen={openReturnModal}
           onNavigate={navigate}
-          onUpdateTripField={updateTripField}
           onUpdateApplicant={updateApplicant}
           onAddApplicant={addApplicant}
           onUpdateMediaSlot={updateMediaSlot}
@@ -1365,7 +1337,7 @@ function App() {
           <div className="section-head">
             <div>
               <h2>Основной заявитель</h2>
-              <p>Полный профиль можно продолжить в cockpit после создания.</p>
+              <p>Полный профиль продолжится в задачах после создания кейса.</p>
             </div>
           </div>
           <div className="form-grid">
