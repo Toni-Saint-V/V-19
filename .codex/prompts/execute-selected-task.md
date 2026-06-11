@@ -36,8 +36,9 @@ Output:
 
 What changed:
 Verification:
+QA findings:
 Screenshots:
-Risks:
-Readiness:
-Next mode:
+Readiness delta:
+Remaining risks:
+Next highest-impact task:
 Verdict:

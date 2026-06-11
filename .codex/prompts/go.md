@@ -21,7 +21,7 @@ Steps:
 8. Run the smallest proof first, then `npm run verify`.
 9. Run `npm run test:e2e` for UI/runtime behavior.
 10. Run `npm run verify:security` for release-facing auth/storage/dependency changes.
-11. Review and fix all serious/medium findings before finalizing.
+11. Review and fix all critical, serious, and medium findings before finalizing.
 12. Stop at the next unrelated blocker.
 
 Rules:
@@ -36,8 +36,9 @@ Output:
 
 What changed:
 Verification:
+QA findings:
 Screenshots:
-Risks:
-Readiness:
-Next mode:
+Readiness delta:
+Remaining risks:
+Next highest-impact task:
 Verdict:

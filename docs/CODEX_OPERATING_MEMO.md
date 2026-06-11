@@ -60,6 +60,23 @@ Avoid:
 - Cleanup mixed with product work.
 - New dependencies unless the task clearly needs them.
 
+## Execution Priority
+
+Always work in this order:
+
+1. Broken flow
+2. Runtime issues
+3. UX friction
+4. Trust/copy issues
+5. Visual hierarchy
+6. Accessibility
+7. Performance
+8. Motion/polish
+
+Do not work on polish while a higher-priority problem remains unresolved.
+
+Task count is not the goal. If the goal needs 4 tasks, do 4. If it needs 10, do 10.
+
 ## Token Economy
 
 Default to the smallest useful stack.
@@ -93,6 +110,8 @@ MCP/tools: Browser, Computer Use
 Model: default
 ```
 
+Every activated tool must be justified. Do not activate Browser, Computer Use, extra MCP servers, or additional skills if the task can be solved without them.
+
 ## Premium UI Flow
 
 For new screens, redesigns, and premium UI direction:
@@ -111,13 +130,21 @@ Skip prototype only for tiny UI fixes, copy changes, or already-approved compone
 Premium UI means:
 
 - Clear hierarchy.
-- No clipping or overlap.
-- Good density.
-- Fast interaction.
+- Good spacing.
+- Correct interface density.
+- One component language.
+- Quality loading states.
+- Quality empty states.
+- Quality validation states.
 - Lightweight animations.
-- Reduced-motion safe behavior.
-- Reusable components.
-- No fake AI/OCR/uploads/results/official verification.
+- Mobile quality not lower than desktop.
+
+Premium UI does not mean:
+
+- Large shadows.
+- Random gradients.
+- Glassmorphism for decoration.
+- Unnecessary animation.
 
 ## Verification Ladder
 
@@ -143,12 +170,25 @@ If QA is unsatisfactory:
 
 1. Do not mark done.
 2. Name the failed proof.
-3. Classify the issue: UI, runtime, performance, security, AI trust, architecture, or test gap.
-4. Adjust only the needed plugins/skills.
-5. Fix the smallest failing surface.
-6. Re-run the failed proof first.
-7. Re-run `npm run verify`.
-8. Repeat until no serious or medium findings remain.
+3. Classify severity as `Critical`, `Serious`, `Medium`, or `Minor`.
+4. Classify area: UI, runtime, performance, security, AI trust, architecture, or test gap.
+5. Adjust only the needed plugins/skills.
+6. Fix the smallest failing surface.
+7. Re-run the failed proof first.
+8. Re-run `npm run verify`.
+9. Repeat until `Critical = 0`, `Serious = 0`, and `Medium = 0`.
+
+Do not write the final report while critical, serious, or medium findings remain.
+
+Merge gate blocks completion if any of these remain:
+
+- failing tests
+- failing verification
+- critical, serious, or medium QA finding
+- broken responsive layout
+- obvious visual inconsistency
+- accessibility regression
+- unexplained tradeoff
 
 Tool adjustment examples:
 
@@ -159,6 +199,28 @@ Tool adjustment examples:
 - AI trust issue: use `codex-logic`, `ru-text`, and safety scan.
 - Performance issue: run `npm run verify:performance`, then inspect bundle split.
 
+## Evidence First
+
+Before edits, report:
+
+- Files inspected.
+- Components inspected.
+- Routes/screens inspected.
+- Tests/verifiers inspected.
+
+Do not edit without repo evidence.
+
+## Readiness Delta
+
+Every report must include a delta:
+
+```text
+Readiness delta:
+82 -> 89 (+7)
+```
+
+Never report only the final readiness value.
+
 ## Intermediate Reports
 
 For long blocks, report after each meaningful phase:
@@ -167,13 +229,42 @@ For long blocks, report after each meaningful phase:
 - After implementation: changed files and why.
 - After verification: exact commands and result.
 - After QA: screenshots and findings.
-- After review: remaining risks and readiness percent.
+- After review: remaining risks and readiness delta.
 
 Keep reports short. Do not narrate every command.
+
+## Final Report Standard
+
+Always finish with:
+
+```text
+What changed:
+Verification:
+QA findings:
+Screenshots:
+Readiness delta:
+Remaining risks:
+Next highest-impact task:
+Verdict:
+```
 
 ## Screenshot Policy
 
 Screenshots are required when UI changes.
+
+Any UI change requires:
+
+- desktop start
+- desktop final
+- mobile final
+
+Multi-step flows require:
+
+- desktop start
+- desktop middle
+- desktop completion
+- mobile start
+- mobile completion
 
 Store evidence under:
 
@@ -201,18 +292,23 @@ Default:
 5. Commit only after checks pass.
 6. Do not push/deploy unless explicitly requested.
 
+Scope protection:
+
+- If a change touches auth, database, schema, deployment, or admin outside scope, stop and request confirmation.
+
 ## 100% Operating Standard
 
 A block is operating at 100% only when:
 
 - Goal was explicit.
 - Scope stayed bounded.
+- Evidence was shown before edits.
 - Active plugins/skills were named.
 - UI used prototype and visual proof when needed.
 - Performance/security/AI trust gates were considered.
 - Fresh verification passed.
-- Serious and medium review findings are closed.
+- Critical, serious, and medium review findings are closed.
 - Screenshots exist for UI work.
-- Final report includes readiness percent and next best task.
+- Final report includes readiness delta and next best task.
 
-If any item is missing, report the honest readiness percent and the single next action to raise it.
+If any item is missing, report the honest current readiness, the missing delta, and the single next action to raise it.

@@ -25,5 +25,7 @@ Output:
 Prototype:
 Visual evidence:
 React implementation plan:
-Risks:
+QA findings:
+Readiness delta:
+Remaining risks:
 Verdict:

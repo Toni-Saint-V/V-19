@@ -60,6 +60,85 @@ Founder control loop:
 5. `-check`: verify current diff with the smallest valid command stack.
 6. `-ship`: final release-confidence gate with `npm run verify:full`, review, and clean git status.
 
+## Additional Execution Rules
+
+Priority order:
+
+1. Broken flow
+2. Runtime issues
+3. UX friction
+4. Trust/copy issues
+5. Visual hierarchy
+6. Accessibility
+7. Performance
+8. Motion/polish
+
+Do not work on polish while a higher-priority problem remains unresolved.
+
+Task quality:
+
+- Do not perform tasks for task count.
+- If the goal needs 4 tasks, do 4.
+- If the goal needs 10 tasks, do 10.
+- Task count is not the goal; readiness movement is the goal.
+
+Evidence first:
+
+- Before edits, state which files were inspected.
+- Before edits, state which components were inspected.
+- Before edits, state which routes or screens were inspected.
+- Before edits, state which tests or verifiers were inspected.
+- Do not edit without repo evidence.
+
+Readiness delta:
+
+- Every report must include a delta, for example `Readiness delta: 82 -> 89 (+7)`.
+- Never report only the final readiness value.
+
+Merge gate:
+
+Do not consider a task complete if any of these remain:
+
+- failing tests
+- failing verification
+- critical, serious, or medium QA finding
+- broken responsive layout
+- obvious visual inconsistency
+- accessibility regression
+- unexplained tradeoff
+
+QA severity:
+
+- Classify findings as `Critical`, `Serious`, `Medium`, or `Minor`.
+- Completion is allowed only when `Critical = 0`, `Serious = 0`, and `Medium = 0`.
+
+Review loop:
+
+- After QA, if `Critical`, `Serious`, or `Medium` findings exist, do not write the final report.
+- Fix the finding first.
+- Re-run the failed QA/proof.
+- Repeat until no critical, serious, or medium findings remain.
+
+Screenshot requirements:
+
+- Any UI change requires desktop start, desktop final, and mobile final screenshots.
+- Multi-step flows require desktop start, desktop middle, desktop completion, mobile start, and mobile completion screenshots.
+- Store screenshots under `docs/qa/`.
+
+Tool discipline:
+
+- Do not activate Browser, Computer Use, extra MCP servers, or additional skills if the task can be solved without them.
+- Every activated tool, plugin, MCP server, and skill must be justified in the report.
+
+Scope protection:
+
+- If a change touches auth, database, schema, deployment, or admin outside the declared scope, stop and request confirmation.
+
+Premium UI standard:
+
+- Premium UI means clear visual hierarchy, good spacing, correct interface density, one component language, quality loading states, quality empty states, quality validation states, lightweight animations, and mobile quality not lower than desktop.
+- Premium UI does not mean large shadows, random gradients, glassmorphism for decoration, or unnecessary animation.
+
 Feature:
 
 1. `-logic`
@@ -132,7 +211,7 @@ A task can claim 95+ readiness only when all relevant items are true:
 - `npm run test:e2e` passes for UI/runtime changes.
 - Review findings are fixed or explicitly rejected with source evidence.
 - Git diff is understandable, reversible, and free of unrelated churn.
-- Final report includes percent readiness and the next highest-impact task.
+- Final report includes readiness delta and the next highest-impact task.
 
 Readiness scoring:
 
@@ -192,10 +271,11 @@ Every task ends with:
 
 What changed:
 Verification:
+QA findings:
 Screenshots:
-Risks:
-Readiness:
-Next mode:
+Readiness delta:
+Remaining risks:
+Next highest-impact task:
 Verdict:
 
 If not run:

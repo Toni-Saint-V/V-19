@@ -11,14 +11,15 @@ Steps:
 3. Run `npm run verify:full`.
 4. Run extra Browser/Computer Use QA if visible UI changed since the last accepted proof.
 5. Run `-ux` review for architecture, trust, security, state, AI behavior, and release risks.
-6. Confirm no serious or medium findings remain.
+6. Confirm no critical, serious, or medium findings remain.
 7. Do not push, deploy, or open PR unless explicitly requested.
 
 Output:
 
 Verification:
+QA findings:
 Screenshots:
-Risks:
-Readiness:
+Readiness delta:
+Remaining risks:
 Ship verdict:
-Next mode:
+Next highest-impact task:
