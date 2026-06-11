@@ -31,6 +31,7 @@ Forbidden legacy modes:
 - Never enable all plugins.
 - Use the smallest useful stack for the current task.
 - Prefer repo-local files and current runtime evidence over memory.
+- For day-to-day operating details, use `docs/CODEX_OPERATING_MEMO.md`.
 - No broad refactors unless explicitly requested.
 - No fake completion.
 - No "done" without fresh verification.
