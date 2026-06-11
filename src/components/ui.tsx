@@ -136,7 +136,7 @@ export function AiHelperPanel({ result }: { result: AiHelperResult }) {
           <p>{result.summary}</p>
         </div>
         <Chip tone="violet">
-          {result.source === "local-stub" ? "Local stub" : "Edge stub"}
+          {result.source === "local-stub" ? "Локальная подсказка" : "Edge-подсказка"}
         </Chip>
       </div>
       <div className="ai-helper-body">
