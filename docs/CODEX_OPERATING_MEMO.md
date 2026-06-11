@@ -127,8 +127,15 @@ It runs after edit tools and stays silent unless it sees a high-leverage risk:
 - Auth, storage, Supabase, schema, deployment, or admin scope was touched.
 - Dependency manifests changed.
 - Trust-copy language may violate the safety contract.
+- The hook, prompts, AGENTS, operating memo, or workflow scripts changed.
 
 The hook is advisory. It must not auto-commit, push, deploy, delete, rewrite project state, or expand task scope.
+
+Its verifier runs deterministic scenario coverage first, then the live dirty-diff radar:
+
+```bash
+npm run verify:codex-hook
+```
 
 ## Premium UI Flow
 
