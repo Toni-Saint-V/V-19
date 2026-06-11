@@ -129,6 +129,7 @@ Tool discipline:
 
 - Do not activate Browser, Computer Use, extra MCP servers, or additional skills if the task can be solved without them.
 - Every activated tool, plugin, MCP server, and skill must be justified in the report.
+- `.codex/hooks.json` runs the quiet quality radar after edits; treat its output as guidance, not permission to broaden scope.
 
 Scope protection:
 
