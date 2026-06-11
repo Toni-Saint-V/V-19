@@ -11,6 +11,14 @@ Use only these public modes:
 - `-auto`: autonomous delivery using the smallest valid stack.
 - `-auto2`: one bounded quality/performance/UX polish target.
 
+Convenience aliases are allowed:
+
+- `-go`: inspect, choose the highest-impact bounded task, execute, verify, review, and stop.
+- `-pick N`: execute task N from the last `-next` batch.
+- `-ui-go`: premium UI flow with HTML prototype first, then React implementation, then Browser/Computer Use QA.
+- `-check`: run the right verification/review stack for the current diff.
+- `-ship`: final release-confidence gate for the current branch.
+
 Forbidden legacy modes:
 
 - `$product`
@@ -27,7 +35,7 @@ Forbidden legacy modes:
 - No fake completion.
 - No "done" without fresh verification.
 - Optimize for quality and speed together: remove ceremony that does not improve product, proof, premium UI, or reuse.
-- User control should stay at one or two commands: plan with `-next`, execute with `-auto` or the selected mode.
+- User control should stay at one command by default: use `-go`. Use `-next` plus `-pick N` only when you want to choose manually.
 
 ## Real Local Surfaces
 
@@ -44,10 +52,12 @@ Prefer these installed local skills when a matching mode is requested:
 
 Founder control loop:
 
-1. `-next`: inspect repo evidence, output one goal plus 8-10 next tasks with 7.5-8.5/10 difficulty, readiness impact, smallest mode stack, and proof command; do not edit files.
-2. `-auto`: execute only the selected bounded task, using the smallest valid stack; stop when the next blocker is unrelated.
-3. `-ux`: review the result when the task touches architecture, trust, security, state, or release quality.
-4. `-qa`: verify runtime and UI when user-visible behavior changed.
+1. `-go`: default. Inspect repo evidence, choose one highest-impact bounded task, create the goal, execute, verify, review when needed, and stop.
+2. `-next`: manual planning. Output one goal plus 8-10 next tasks with 7.5-8.5/10 difficulty, readiness impact, smallest mode stack, and proof command; do not edit files.
+3. `-pick N`: manual execution. Execute only task N from the last batch, using the smallest valid stack; stop when the next blocker is unrelated.
+4. `-ui-go`: premium UI. Create an HTML prototype first unless the change is tiny, inspect with Browser or Computer Use, implement in React, verify desktop/mobile.
+5. `-check`: verify current diff with the smallest valid command stack.
+6. `-ship`: final release-confidence gate with `npm run verify:full`, review, and clean git status.
 
 Feature:
 
@@ -75,6 +85,7 @@ Autonomous:
 
 - `-auto` chooses the smallest valid stack.
 - `-auto2` improves one bounded quality target only.
+- `-go` is the preferred wrapper around `-auto` for day-to-day work.
 
 ## VisaOps Safety
 
