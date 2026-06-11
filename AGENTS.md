@@ -32,6 +32,7 @@ Forbidden legacy modes:
 - Use the smallest useful stack for the current task.
 - Prefer repo-local files and current runtime evidence over memory.
 - For day-to-day operating details, use `docs/CODEX_OPERATING_MEMO.md`.
+- For Agent Workspace, Agent Intake, applicant detail, task lists, readiness, issue flows, or AI helper redesign, read `docs/product/agent-workspace-principles.md` before planning or editing.
 - No broad refactors unless explicitly requested.
 - No fake completion.
 - No "done" without fresh verification.
@@ -172,6 +173,8 @@ Autonomous:
 ## VisaOps Safety
 
 AI helps assemble, explain, and simplify case readiness.
+
+VisaFlow AI is a visa-agent workspace. It is not a CRM, admin panel, form builder, or AI chat. The core product job is moving a case to `READY FOR OPERATOR REVIEW` with fewer mistakes and returns. Tasks are the core interface; forms, documents, media, and AI are supporting layers.
 
 AI must not:
 
