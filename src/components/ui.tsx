@@ -1301,7 +1301,7 @@ function AgentTaskWorkspace({
               </p>
             </div>
             <Chip tone={preflight.canSubmit ? "success" : "warning"}>
-              {preflight.canSubmit ? "Ready" : "Not ready"}
+              {preflight.canSubmit ? "Готово" : "Не готово"}
             </Chip>
           </div>
 
@@ -1319,7 +1319,7 @@ function AgentTaskWorkspace({
                   <small>{task.problem}</small>
                 </span>
                 <Chip tone={task.tone}>
-                  {task.kind === "handoff" ? "Review" : "Задача"}
+                  {task.kind === "handoff" ? "Проверка" : "Задача"}
                 </Chip>
               </button>
             ))}
@@ -1330,7 +1330,7 @@ function AgentTaskWorkspace({
       {selectedTask ? (
         <section className="task-detail card" aria-label="Applicant Editing">
           <div className="task-detail-copy">
-            <div className="page-kicker">Selected task</div>
+            <div className="page-kicker">Выбранная задача</div>
             <h2>{selectedTask.title}</h2>
             <dl>
               <div>
@@ -1387,14 +1387,14 @@ function AgentTaskWorkspace({
                   <strong>{item.label}</strong>
                   <small>{item.detail}</small>
                 </span>
-                <Chip tone={item.tone}>{item.ok ? "OK" : "Action"}</Chip>
+                <Chip tone={item.tone}>{item.ok ? "OK" : "Действие"}</Chip>
               </div>
             ))}
           </div>
         </div>
         {submission.type === "family" ? (
           <div className="support-note">
-            <strong>Family analysis</strong>
+            <strong>Семейный анализ</strong>
             <p>{suggestion.text}</p>
             <div className="actions">
               <Button onClick={() => onConfirmFamilyRoles(submission.id, false)}>
