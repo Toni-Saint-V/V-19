@@ -94,7 +94,7 @@ const defaultCreateDraft: CreateDraft = {
   city: "Мадрид",
   travelDate: "2026-08-20",
   tripType: "Туризм",
-  primaryName: "New Applicant",
+  primaryName: "",
   primaryPassport: "",
   primaryBirthDate: "",
   primaryCitizenship: "РФ",
@@ -122,6 +122,7 @@ function App() {
   const [agentFilter, setAgentFilter] = useState<StatusGroup | "all">("all");
   const [queueFilter, setQueueFilter] = useState<StatusGroup | "all">("review");
   const [createDraft, setCreateDraft] = useState<CreateDraft>(defaultCreateDraft);
+  const [createAttempted, setCreateAttempted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [returnModalId, setReturnModalId] = useState<string | null>(null);
   const [returnTarget, setReturnTarget] = useState("Анкета");
@@ -354,12 +355,18 @@ function App() {
     showToast("Заявка передана оператору");
   }
 
-  function createSubmission(withPrimaryApplicant = true) {
+  function createSubmission() {
+    const missingFields = createDraftMissingFields(createDraft);
+
+    if (missingFields.length) {
+      setCreateAttempted(true);
+      showToast("Заполните обязательные поля перед созданием заявки");
+      return;
+    }
+
     const id = `VF-${1043 + submissions.length}`;
     const type = createDraft.mode;
-    const title =
-      createDraft.primaryName.trim() ||
-      (type === "family" ? "Новая семья" : "Новый заявитель");
+    const title = createDraft.primaryName.trim();
     const primaryApplicant: Applicant = normalizeApplicant({
       id: `${id}-1`,
       name: title,
@@ -382,8 +389,7 @@ function App() {
       hotelAddress: createDraft.hotelAddress,
       tripPurpose: createDraft.tripType,
     });
-    const applicants: Applicant[] =
-      withPrimaryApplicant || type === "single" ? [primaryApplicant] : [];
+    const applicants: Applicant[] = [primaryApplicant];
     const newSubmission: Submission = {
       id,
       title,
@@ -421,6 +427,7 @@ function App() {
     setSelectedId(id);
     setScreen("agent-detail");
     setCreateDraft(defaultCreateDraft);
+    setCreateAttempted(false);
     showToast("Заявка создана");
   }
 
@@ -429,6 +436,24 @@ function App() {
     value: CreateDraft[Key],
   ) {
     setCreateDraft((draft) => ({ ...draft, [key]: value }));
+  }
+
+  function createDraftMissingFields(draft: CreateDraft) {
+    return [
+      { key: "primaryName" as const, label: "ФИО" },
+      { key: "primaryPassport" as const, label: "Номер паспорта" },
+      { key: "primaryBirthDate" as const, label: "Дата рождения" },
+      { key: "primaryCitizenship" as const, label: "Гражданство" },
+      { key: "primaryPhone" as const, label: "Телефон" },
+      { key: "primaryEmail" as const, label: "Email" },
+      { key: "address" as const, label: "Адрес" },
+      { key: "hotelName" as const, label: "Отель" },
+      { key: "hotelAddress" as const, label: "Адрес отеля" },
+    ].filter(({ key }) => !draft[key].trim());
+  }
+
+  function createFieldInvalid(key: keyof CreateDraft) {
+    return createAttempted && !createDraft[key].trim();
   }
 
   function updateTripField(
@@ -509,17 +534,19 @@ function App() {
 
         const index = submission.applicants.length + 1;
         const primary = submission.applicants[0];
-        const familyName = primary?.name.trim().split(/\s+/).slice(-1)[0] || "Family";
+        const familyName = primary?.name.trim().split(/\s+/).slice(-1)[0] || "";
         const newApplicant = normalizeApplicant(
           {
             id: `${submission.id}-${index}`,
-            name: `Family Member ${familyName} ${index}`,
+            name: familyName
+              ? `Заявитель ${index} ${familyName}`
+              : `Заявитель ${index}`,
             role: "Член семьи",
-            passport: "-",
+            passport: "",
             form: 0,
             media: 0,
             mediaRequired: 3,
-            birthDate: "2015-01-01",
+            birthDate: "",
             citizenship: primary?.citizenship,
             address: primary?.address,
             phone: primary?.phone,
@@ -1206,18 +1233,11 @@ function App() {
         <PageHead
           kicker="Агент"
           title="Новая заявка"
-          subtitle="Локальный черновик: маршрут, основной заявитель и стартовые медиа-слоты."
+          subtitle="Создайте проверяемый черновик с базовыми данными заявителя и поездки."
           actions={
-            <>
-              {createDraft.mode === "family" ? (
-                <Button onClick={() => createSubmission(false)}>
-                  Создать без заявителей
-                </Button>
-              ) : null}
-              <Button variant="primary" onClick={() => createSubmission(true)}>
-                Создать черновик
-              </Button>
-            </>
+            <Button variant="primary" onClick={createSubmission}>
+              Создать черновик
+            </Button>
           }
         />
         <div className="choice-tabs" role="group" aria-label="Тип заявки">
@@ -1243,6 +1263,20 @@ function App() {
               <p>Эти поля попадут в заявку и карточку первого заявителя.</p>
             </div>
           </div>
+          {createAttempted && createDraftMissingFields(createDraft).length ? (
+            <div
+              className="blocker-box create-validation"
+              role="alert"
+              aria-live="polite"
+            >
+              <strong>Заполните обязательные поля</strong>
+              <ul>
+                {createDraftMissingFields(createDraft).map((field) => (
+                  <li key={field.key}>{field.label}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="form-grid">
             <div className="field">
               <label htmlFor="country">Страна</label>
@@ -1293,18 +1327,36 @@ function App() {
               <input
                 id="hotel-name"
                 value={createDraft.hotelName}
+                aria-invalid={createFieldInvalid("hotelName")}
+                aria-describedby={
+                  createFieldInvalid("hotelName") ? "hotel-name-error" : undefined
+                }
                 onChange={(event) => updateCreateDraft("hotelName", event.target.value)}
               />
+              {createFieldInvalid("hotelName") ? (
+                <small className="field-error" id="hotel-name-error">
+                  Укажите отель.
+                </small>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="hotel-address">Адрес отеля</label>
               <input
                 id="hotel-address"
                 value={createDraft.hotelAddress}
+                aria-invalid={createFieldInvalid("hotelAddress")}
+                aria-describedby={
+                  createFieldInvalid("hotelAddress") ? "hotel-address-error" : undefined
+                }
                 onChange={(event) =>
                   updateCreateDraft("hotelAddress", event.target.value)
                 }
               />
+              {createFieldInvalid("hotelAddress") ? (
+                <small className="field-error" id="hotel-address-error">
+                  Укажите адрес отеля.
+                </small>
+              ) : null}
             </div>
           </div>
         </section>
@@ -1322,20 +1374,40 @@ function App() {
               <input
                 id="primary-name"
                 value={createDraft.primaryName}
+                aria-invalid={createFieldInvalid("primaryName")}
+                aria-describedby={
+                  createFieldInvalid("primaryName") ? "primary-name-error" : undefined
+                }
                 onChange={(event) =>
                   updateCreateDraft("primaryName", event.target.value)
                 }
               />
+              {createFieldInvalid("primaryName") ? (
+                <small className="field-error" id="primary-name-error">
+                  Укажите ФИО заявителя.
+                </small>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="primary-passport">Номер паспорта</label>
               <input
                 id="primary-passport"
                 value={createDraft.primaryPassport}
+                aria-invalid={createFieldInvalid("primaryPassport")}
+                aria-describedby={
+                  createFieldInvalid("primaryPassport")
+                    ? "primary-passport-error"
+                    : undefined
+                }
                 onChange={(event) =>
                   updateCreateDraft("primaryPassport", event.target.value)
                 }
               />
+              {createFieldInvalid("primaryPassport") ? (
+                <small className="field-error" id="primary-passport-error">
+                  Укажите номер паспорта.
+                </small>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="primary-birth">Дата рождения</label>
@@ -1343,48 +1415,97 @@ function App() {
                 id="primary-birth"
                 type="date"
                 value={createDraft.primaryBirthDate}
+                aria-invalid={createFieldInvalid("primaryBirthDate")}
+                aria-describedby={
+                  createFieldInvalid("primaryBirthDate")
+                    ? "primary-birth-error"
+                    : undefined
+                }
                 onChange={(event) =>
                   updateCreateDraft("primaryBirthDate", event.target.value)
                 }
               />
+              {createFieldInvalid("primaryBirthDate") ? (
+                <small className="field-error" id="primary-birth-error">
+                  Укажите дату рождения.
+                </small>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="primary-citizenship">Гражданство</label>
               <input
                 id="primary-citizenship"
                 value={createDraft.primaryCitizenship}
+                aria-invalid={createFieldInvalid("primaryCitizenship")}
+                aria-describedby={
+                  createFieldInvalid("primaryCitizenship")
+                    ? "primary-citizenship-error"
+                    : undefined
+                }
                 onChange={(event) =>
                   updateCreateDraft("primaryCitizenship", event.target.value)
                 }
               />
+              {createFieldInvalid("primaryCitizenship") ? (
+                <small className="field-error" id="primary-citizenship-error">
+                  Укажите гражданство.
+                </small>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="primary-phone">Телефон</label>
               <input
                 id="primary-phone"
                 value={createDraft.primaryPhone}
+                aria-invalid={createFieldInvalid("primaryPhone")}
+                aria-describedby={
+                  createFieldInvalid("primaryPhone") ? "primary-phone-error" : undefined
+                }
                 onChange={(event) =>
                   updateCreateDraft("primaryPhone", event.target.value)
                 }
               />
+              {createFieldInvalid("primaryPhone") ? (
+                <small className="field-error" id="primary-phone-error">
+                  Укажите телефон.
+                </small>
+              ) : null}
             </div>
             <div className="field">
               <label htmlFor="primary-email">Email</label>
               <input
                 id="primary-email"
                 value={createDraft.primaryEmail}
+                aria-invalid={createFieldInvalid("primaryEmail")}
+                aria-describedby={
+                  createFieldInvalid("primaryEmail") ? "primary-email-error" : undefined
+                }
                 onChange={(event) =>
                   updateCreateDraft("primaryEmail", event.target.value)
                 }
               />
+              {createFieldInvalid("primaryEmail") ? (
+                <small className="field-error" id="primary-email-error">
+                  Укажите email.
+                </small>
+              ) : null}
             </div>
             <div className="field wide">
               <label htmlFor="primary-address">Адрес</label>
               <input
                 id="primary-address"
                 value={createDraft.address}
+                aria-invalid={createFieldInvalid("address")}
+                aria-describedby={
+                  createFieldInvalid("address") ? "primary-address-error" : undefined
+                }
                 onChange={(event) => updateCreateDraft("address", event.target.value)}
               />
+              {createFieldInvalid("address") ? (
+                <small className="field-error" id="primary-address-error">
+                  Укажите адрес.
+                </small>
+              ) : null}
             </div>
           </div>
           <div className="action-strip">
@@ -1399,12 +1520,7 @@ function App() {
                 агента.
               </small>
             </div>
-            {createDraft.mode === "family" ? (
-              <Button onClick={() => createSubmission(false)}>
-                Создать без заявителей
-              </Button>
-            ) : null}
-            <Button variant="primary" onClick={() => createSubmission(true)}>
+            <Button variant="primary" onClick={createSubmission}>
               Создать черновик
             </Button>
           </div>

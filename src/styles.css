@@ -549,6 +549,11 @@ a:focus-visible {
   resize: vertical;
 }
 
+.field [aria-invalid="true"] {
+  border-color: rgba(242, 109, 109, 0.72);
+  box-shadow: 0 0 0 3px rgba(242, 109, 109, 0.12);
+}
+
 .field-label-row {
   display: flex;
   align-items: center;
@@ -1019,6 +1024,12 @@ a:focus-visible {
   color: var(--amber);
 }
 
+.field-error {
+  display: block;
+  margin-top: var(--s-2);
+  color: var(--red);
+}
+
 .action-strip {
   display: flex;
   align-items: center;
@@ -1278,6 +1289,31 @@ a:focus-visible {
   gap: var(--s-3);
 }
 
+.create-validation {
+  margin-bottom: var(--s-5);
+}
+
+.completion-panel {
+  border-color: rgba(120, 166, 255, 0.28);
+  background:
+    linear-gradient(145deg, rgba(120, 166, 255, 0.08), rgba(255, 255, 255, 0.018)),
+    var(--bg-card);
+}
+
+.completion-panel.complete {
+  border-color: rgba(69, 196, 134, 0.28);
+  background:
+    linear-gradient(145deg, rgba(69, 196, 134, 0.08), rgba(255, 255, 255, 0.018)),
+    var(--bg-card);
+}
+
+.completion-panel .chip {
+  min-width: 92px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 .status-next {
   padding: var(--s-4);
   border-left: 3px solid var(--role);
@@ -1348,7 +1384,8 @@ a:focus-visible {
 .media-card {
   min-height: 220px;
   display: grid;
-  align-content: space-between;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
   gap: var(--s-5);
   padding: 24px 28px;
   border: 1px solid var(--border);
@@ -1368,6 +1405,8 @@ a:focus-visible {
 }
 
 .media-card .btn {
+  position: relative;
+  z-index: 1;
   width: 100%;
 }
 

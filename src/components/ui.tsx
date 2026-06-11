@@ -1738,7 +1738,24 @@ function AgentHeaderActions({
     );
   }
 
-  return <Button variant="primary">Сохранить</Button>;
+  if (["waiting_review", "in_review"].includes(submission.status)) {
+    return <Chip tone="info">Передано оператору</Chip>;
+  }
+
+  if (
+    [
+      "accepted",
+      "ready_for_excel",
+      "exported",
+      "sent_to_appointment",
+      "appointment_scheduled",
+      "completed",
+    ].includes(submission.status)
+  ) {
+    return <Chip tone="success">Intake завершён</Chip>;
+  }
+
+  return null;
 }
 
 function AdminDecisionPanel({
@@ -1876,9 +1893,44 @@ function AgentActionPanel({
 }) {
   const currentBlockers = blockers(submission);
   const preflight = submissionPreflight(submission);
+  const handoffComplete = ["waiting_review", "in_review"].includes(submission.status);
+  const intakeClosed = [
+    "accepted",
+    "ready_for_excel",
+    "exported",
+    "sent_to_appointment",
+    "appointment_scheduled",
+    "completed",
+  ].includes(submission.status);
 
   return (
     <>
+      {handoffComplete || intakeClosed ? (
+        <section
+          className={`panel completion-panel ${intakeClosed ? "complete" : ""}`}
+          aria-label="Состояние завершения intake"
+        >
+          <div className="section-head">
+            <div>
+              <h2>{intakeClosed ? "Intake завершён" : "Передано оператору"}</h2>
+              <p>
+                {intakeClosed
+                  ? "Пакет прошёл агентский intake. Следующие действия выполняет операционная команда."
+                  : "Агентский intake завершён: заявка передана в операционную проверку."}
+              </p>
+            </div>
+            <Chip tone={intakeClosed ? "success" : "info"}>
+              {intakeClosed ? "Готово" : "Передано"}
+            </Chip>
+          </div>
+          <div className="status-next">
+            {intakeClosed
+              ? "Пользователю больше не нужно заполнять данные в этом flow."
+              : "Ожидайте решения оператора или точечный возврат с причиной."}
+          </div>
+        </section>
+      ) : null}
+
       <section className="panel">
         <div className="section-head">
           <div>
@@ -1901,7 +1953,13 @@ function AgentActionPanel({
               Проверить готовность
             </Button>
           ) : null}
-          <Button>Сохранить</Button>
+          {handoffComplete || intakeClosed ? (
+            <Chip tone={intakeClosed ? "success" : "info"}>
+              {intakeClosed ? "Заполнение закрыто" : "На проверке"}
+            </Chip>
+          ) : (
+            <Button>Сохранить</Button>
+          )}
         </div>
       </section>
 
