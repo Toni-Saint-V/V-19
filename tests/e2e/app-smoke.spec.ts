@@ -66,3 +66,42 @@ test("agent completes intake handoff without dead ends", async ({ page }) => {
   await expect(page.getByText("Заполнение закрыто")).toHaveCount(0);
   await expect(page.getByText("На проверке")).toBeVisible();
 });
+
+test("agent create form keeps focus and scroll position while typing", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /Агент/ }).click();
+  await page.locator(".page").getByRole("button", { name: "Новая заявка" }).click();
+  await expect(page.getByRole("heading", { name: "Новая заявка" })).toBeVisible();
+
+  const hotelField = page.getByLabel("Отель");
+  await hotelField.scrollIntoViewIfNeeded();
+  await hotelField.click();
+  const scrollBeforeTyping = await page.evaluate<number>("window.scrollY");
+
+  await page.keyboard.type("Madrid Central Hotel", { delay: 5 });
+
+  await expect(hotelField).toBeFocused();
+  await expect(hotelField).toHaveValue("Madrid Central Hotel");
+  const scrollAfterTyping = await page.evaluate<number>("window.scrollY");
+  expect(Math.abs(scrollAfterTyping - scrollBeforeTyping)).toBeLessThan(24);
+
+  await page.getByLabel("ФИО").fill("Focus Petrov");
+  await page.getByLabel("Номер паспорта").fill("75 5556677");
+  await page.getByLabel("Дата рождения").fill("1992-04-11");
+  await page.getByLabel("Телефон").fill("+7 900 555 66 77");
+  await page.getByLabel("Email").fill("focus.petrov@example.com");
+  await page.getByLabel("Адрес", { exact: true }).fill("Moscow, Focus 7");
+  await page.getByLabel("Адрес отеля").fill("Gran Via 77, Madrid");
+
+  await page
+    .locator(".page")
+    .getByRole("button", { name: "Создать черновик" })
+    .first()
+    .click();
+
+  await expect(page.locator("h1")).toHaveText("Focus Petrov");
+  await expect(page.getByText("Intake cockpit")).toBeVisible();
+});

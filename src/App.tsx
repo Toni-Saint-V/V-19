@@ -981,17 +981,17 @@ function App() {
         {renderScreen()}
       </AppShell>
 
-      <ReturnModal />
-      <SubmitPreflightModal />
+      {ReturnModal()}
+      {SubmitPreflightModal()}
       <Toast message={toastMessage} />
     </>
   );
 
   function renderScreen() {
-    if (screen === "agent-overview") return <AgentOverview />;
-    if (screen === "agent-create") return <AgentCreate />;
-    if (screen === "agent-applications") return <AgentApplications />;
-    if (screen === "agent-corrections") return <AgentCorrections />;
+    if (screen === "agent-overview") return AgentOverview();
+    if (screen === "agent-create") return AgentCreate();
+    if (screen === "agent-applications") return AgentApplications();
+    if (screen === "agent-corrections") return AgentCorrections();
     if (screen === "agent-detail") {
       return (
         <DetailView
@@ -1012,8 +1012,8 @@ function App() {
         />
       );
     }
-    if (screen === "admin-overview") return <AdminOverview />;
-    if (screen === "admin-queue") return <AdminQueue />;
+    if (screen === "admin-overview") return AdminOverview();
+    if (screen === "admin-queue") return AdminQueue();
     if (screen === "admin-detail") {
       return (
         <DetailView
@@ -1034,9 +1034,9 @@ function App() {
         />
       );
     }
-    if (screen === "admin-export") return <AdminExport />;
-    if (screen === "admin-appointments") return <AdminAppointments />;
-    return <AgentOverview />;
+    if (screen === "admin-export") return AdminExport();
+    if (screen === "admin-appointments") return AdminAppointments();
+    return AgentOverview();
   }
 
   function AgentOverview() {
