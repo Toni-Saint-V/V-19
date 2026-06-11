@@ -34,9 +34,13 @@ async function completeHandoff(page: Page) {
   await page.getByLabel("Дата выдачи паспорта").fill("2021-05-17");
   await page.getByLabel("Срок действия паспорта").fill("2031-05-17");
 
-  const uploadButtons = page.getByRole("button", { name: "Отметить загруженным" });
-  while ((await uploadButtons.count()) > 0) {
-    await uploadButtons.first().click();
+  for (const task of [
+    "Загрузить: Фото на белом фоне",
+    "Загрузить: Селфи",
+    "Загрузить: Видео",
+  ]) {
+    await page.getByRole("button", { name: new RegExp(task) }).click();
+    await page.getByRole("button", { name: "Отметить загруженным" }).click();
   }
 
   await page.getByRole("button", { name: "Проверить готовность" }).first().click();
@@ -45,10 +49,11 @@ async function completeHandoff(page: Page) {
   ).toBeVisible();
   await scanCurrentState(page, "agent intake preflight modal");
 
-  await page.getByRole("button", { name: "Передать оператору" }).click();
-  await expect(page.getByLabel("Состояние завершения intake")).toContainText(
-    "Передано оператору",
-  );
+  await page
+    .getByRole("dialog", { name: "Проверка перед передачей" })
+    .getByRole("button", { name: "Передать оператору" })
+    .click();
+  await expect(page.getByText("Передано оператору")).toBeVisible();
 }
 
 test("agent intake flow has no automated accessibility violations", async ({

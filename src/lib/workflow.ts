@@ -826,31 +826,6 @@ export function validateSubmissionInvariants(submission: Submission): string[] {
   return list;
 }
 
-export function submissionAutobotSummary(submission: Submission): {
-  ready: boolean;
-  title: string;
-  text: string;
-  blockers: string[];
-} {
-  const list = blockers(submission);
-
-  if (!list.length) {
-    return {
-      ready: true,
-      title: "Пакет можно передать оператору",
-      text: "Детерминированные проверки не нашли блокеров.",
-      blockers: [],
-    };
-  }
-
-  return {
-    ready: false,
-    title: "Есть блокеры перед отправкой",
-    text: "Autobot показывает, что нужно закрыть в анкете и медиа.",
-    blockers: list,
-  };
-}
-
 export function familySuggestion(submission: Submission): FamilySuggestion {
   const applicants = submission.applicants.map((applicant, index) =>
     normalizeApplicant(applicant, index, submission),

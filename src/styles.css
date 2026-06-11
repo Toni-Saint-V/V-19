@@ -1107,17 +1107,6 @@ a:focus-visible {
   margin-top: var(--s-3);
 }
 
-.cockpit-card,
-.autobot-card {
-  border-color: rgba(var(--role-rgb), 0.18);
-}
-
-.autobot-card {
-  background:
-    linear-gradient(145deg, rgba(var(--role-rgb), 0.085), rgba(255, 255, 255, 0.018)),
-    var(--bg-card);
-}
-
 .family-intelligence-card {
   border-color: rgba(120, 166, 255, 0.2);
   background:
@@ -1127,6 +1116,262 @@ a:focus-visible {
 
 .family-review-card {
   border-color: rgba(120, 166, 255, 0.18);
+}
+
+.agent-detail {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.agent-detail .decision {
+  display: none;
+}
+
+.agent-workspace {
+  display: grid;
+  gap: var(--s-5);
+}
+
+.agent-workspace .card {
+  border-radius: 14px;
+  border-color: rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 42%),
+    linear-gradient(135deg, rgba(120, 166, 255, 0.055), transparent 36%), #0c1118;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 18px 56px rgba(0, 0, 0, 0.34);
+}
+
+.case-command {
+  display: grid;
+  gap: var(--s-5);
+}
+
+.case-command-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: var(--s-5);
+  align-items: stretch;
+}
+
+.case-command-main h2 {
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.case-command-answer {
+  display: grid;
+  align-content: center;
+  gap: var(--s-2);
+  min-height: 126px;
+  padding: var(--s-5);
+  border: 1px solid rgba(var(--role-rgb), 0.32);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(var(--role-rgb), 0.18), transparent 42%),
+    rgba(var(--role-rgb), 0.065);
+}
+
+.case-command-answer span,
+.case-command-metric span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.case-command-answer strong {
+  font-size: 22px;
+  line-height: 1.12;
+}
+
+.case-command-grid,
+.case-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+
+.case-command-metric,
+.case-answer-grid > div,
+.review-check,
+.support-note,
+.task-data-panel {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.case-command-metric {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4);
+}
+
+.case-command-metric strong {
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.case-answer-grid > div {
+  display: grid;
+  gap: var(--s-1);
+  min-height: 112px;
+  padding: var(--s-4);
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+
+.applicant-workqueue,
+.task-workspace {
+  min-height: 100%;
+}
+
+.applicant-task-list,
+.task-list,
+.review-checks {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.applicant-task-card,
+.task-card {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.028);
+  text-align: left;
+}
+
+.applicant-task-card {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+}
+
+.applicant-task-card.active,
+.task-card.active {
+  border-color: rgba(var(--role-rgb), 0.72);
+  background:
+    linear-gradient(135deg, rgba(var(--role-rgb), 0.12), transparent 48%),
+    rgba(255, 255, 255, 0.045);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 1px rgba(var(--role-rgb), 0.1),
+    0 20px 48px rgba(0, 0, 0, 0.26);
+}
+
+.applicant-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.task-card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: var(--s-3);
+  align-items: start;
+  padding: var(--s-4);
+}
+
+.task-number {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--role-ink);
+  background: var(--role);
+  font-weight: 860;
+}
+
+.task-card strong,
+.applicant-task-card strong {
+  display: block;
+}
+
+.task-card small,
+.applicant-task-card small {
+  display: block;
+  margin-top: var(--s-1);
+}
+
+.task-detail {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
+  gap: var(--s-5);
+}
+
+.task-detail-copy {
+  display: grid;
+  align-content: start;
+  gap: var(--s-4);
+}
+
+.task-detail dl {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0;
+}
+
+.task-detail dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.task-detail dd {
+  margin: var(--s-1) 0 0;
+  color: var(--text-soft);
+}
+
+.task-data-panel {
+  display: grid;
+  gap: var(--s-4);
+  padding: var(--s-5);
+}
+
+.task-media-card {
+  margin-top: 0;
+}
+
+.readiness-review {
+  display: grid;
+  gap: var(--s-4);
+}
+
+.review-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-4);
+}
+
+.review-check span {
+  min-width: 0;
+  display: grid;
+  gap: var(--s-1);
+}
+
+.support-note {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding: var(--s-4);
+  border-color: rgba(120, 166, 255, 0.2);
+  background: rgba(120, 166, 255, 0.055);
 }
 
 .ai-helper-panel {
@@ -1674,6 +1919,11 @@ tr:last-child td {
   }
 
   .detail,
+  .case-command-main,
+  .case-command-grid,
+  .case-answer-grid,
+  .workspace-grid,
+  .task-detail,
   .cols-5 {
     grid-template-columns: 1fr;
   }
@@ -1693,6 +1943,10 @@ tr:last-child td {
   .media-grid,
   .media-lifecycle-grid,
   .preflight-summary,
+  .case-command-grid,
+  .case-answer-grid,
+  .workspace-grid,
+  .task-detail,
   .signal-grid,
   .info-grid {
     grid-template-columns: 1fr;
@@ -1804,7 +2058,8 @@ tr:last-child td {
   .media-row,
   .media-review-main,
   .timeline-row,
-  .applicant-card {
+  .applicant-card,
+  .review-check {
     grid-template-columns: 1fr;
     display: grid;
   }
@@ -1827,8 +2082,22 @@ tr:last-child td {
   }
 
   .intake-card,
-  .media-card {
+  .media-card,
+  .agent-workspace .card {
     padding: 20px;
+  }
+
+  .case-command-main h2 {
+    font-size: 32px;
+  }
+
+  .task-card {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .task-card .chip {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .accordion-section summary {
