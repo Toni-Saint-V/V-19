@@ -112,6 +112,24 @@ Model: default
 
 Every activated tool must be justified. Do not activate Browser, Computer Use, extra MCP servers, or additional skills if the task can be solved without them.
 
+## Quality Radar Hook
+
+The repo has one local Codex hook:
+
+```text
+.codex/hooks.json -> scripts/codex-quality-radar.mjs
+```
+
+It runs after edit tools and stays silent unless it sees a high-leverage risk:
+
+- UI/runtime changed without screenshot evidence.
+- Old final-report fields returned.
+- Auth, storage, Supabase, schema, deployment, or admin scope was touched.
+- Dependency manifests changed.
+- Trust-copy language may violate the safety contract.
+
+The hook is advisory. It must not auto-commit, push, deploy, delete, rewrite project state, or expand task scope.
+
 ## Premium UI Flow
 
 For new screens, redesigns, and premium UI direction:
