@@ -19,7 +19,7 @@ Output:
 Verification:
 Findings:
 Screenshots:
-Risks:
-Readiness:
-Next mode:
+Readiness delta:
+Remaining risks:
+Next highest-impact task:
 Verdict:

@@ -25,7 +25,7 @@ Required for 95+:
 - Browser or Computer Use evidence for premium UI claims.
 - `npm run verify` passes.
 - `npm run test:e2e` passes when UI/runtime changed.
-- Review findings fixed or rejected with source evidence.
+- Critical, serious, and medium review findings fixed or rejected with source evidence.
 - Rollback path is obvious from git diff or branch/worktree.
 
 If any item is missing, report the highest honest score below 95 and name the single next task that would raise it.
