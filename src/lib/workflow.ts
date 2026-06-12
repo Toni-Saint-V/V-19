@@ -697,7 +697,7 @@ export function createStatusHistoryItem(
   entityType: "submission" | "applicant" | "media" | "appointment" = "submission",
 ) {
   return {
-    id: `${entityId}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: crypto.randomUUID(),
     entityType,
     entityId,
     fromStatus,

@@ -13,13 +13,16 @@ function mapProfile(row: ProfileRow): AppProfile {
   };
 }
 
+const profileSelect =
+  "id,email,display_name,organization_name,role,created_at" as const;
+
 export async function fetchCurrentProfile(userId: string): Promise<AppProfile | null> {
   const client = getSupabaseClient();
   if (!client) return null;
 
   const { data, error } = await client
     .from("profiles")
-    .select("*")
+    .select(profileSelect)
     .eq("id", userId)
     .maybeSingle();
 
@@ -38,9 +41,8 @@ export async function upsertProfile(profile: AppProfile): Promise<AppProfile | n
       email: profile.email,
       display_name: profile.displayName,
       organization_name: profile.organizationName,
-      role: profile.role,
     })
-    .select("*")
+    .select(profileSelect)
     .single();
 
   if (error) throw error;
