@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import type { AppSession } from "./services/authService";
 import {
   getCurrentAppSession,
   signInDemo,
+  signInSupabaseWithPassword,
   signOutCurrentSession,
 } from "./services/authService";
 import { roleRouteStart } from "./services/profileService";
@@ -66,6 +67,15 @@ import {
   saveLocalSubmissions,
   updateAppointmentStatus,
 } from "./services/localRepository";
+import {
+  listSubmissionsForRole,
+  saveSubmissionDraft,
+} from "./services/submissionService";
+import {
+  deleteMediaFromStorage,
+  storageTargetForSlot,
+  uploadMediaToStorage,
+} from "./services/storageService";
 
 const currentAgentId = "agent-1";
 const currentDate = "11.06.2026";
@@ -132,6 +142,11 @@ function App() {
   );
   const [preflightModalId, setPreflightModalId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const supabaseHydratedRef = useRef(false);
+  const skipNextSupabasePersistRef = useRef(false);
+  const dirtySubmissionIdsRef = useRef<Set<string>>(new Set());
+  const persistedStatusHistoryIdsRef = useRef<Set<string>>(new Set());
 
   const profile = roleProfile(role);
   const selectedSubmission =
@@ -139,6 +154,7 @@ function App() {
   const authed = Boolean(session);
   const activeAgentId =
     session?.profile.role === "agent" ? session.profile.id : currentAgentId;
+  const activeActor = session?.mode === "supabase" ? session.profile.id : currentActor;
 
   useEffect(() => {
     document.documentElement.style.setProperty("--role", profile.accent);
@@ -147,18 +163,109 @@ function App() {
   }, [profile.accent, profile.accentRgb, profile.ink]);
 
   useEffect(() => {
-    saveLocalSubmissions(submissions);
-  }, [submissions]);
+    if (session?.mode !== "supabase") {
+      saveLocalSubmissions(submissions);
+      return undefined;
+    }
+
+    if (!supabaseHydratedRef.current) return undefined;
+    if (skipNextSupabasePersistRef.current) {
+      skipNextSupabasePersistRef.current = false;
+      return undefined;
+    }
+
+    const dirtyIds = Array.from(dirtySubmissionIdsRef.current);
+    if (!dirtyIds.length) return undefined;
+
+    for (const id of dirtyIds) {
+      dirtySubmissionIdsRef.current.delete(id);
+    }
+
+    let active = true;
+    const dirtySubmissions = submissions.filter((submission) =>
+      dirtyIds.includes(submission.id),
+    );
+    void Promise.all(
+      dirtySubmissions.map((submission) =>
+        saveSubmissionDraft(submission, {
+          actorId: session.profile.id,
+          role: session.profile.role,
+          persistedStatusHistoryIds: persistedStatusHistoryIdsRef.current,
+        }),
+      ),
+    )
+      .then(() => {
+        for (const submission of dirtySubmissions) {
+          for (const item of submission.timeline ?? []) {
+            persistedStatusHistoryIdsRef.current.add(item.id);
+          }
+        }
+      })
+      .catch(() => {
+        for (const id of dirtyIds) {
+          dirtySubmissionIdsRef.current.add(id);
+        }
+
+        if (active) {
+          setToastMessage(
+            "Supabase сохранение не прошло. Изменение осталось на экране.",
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session?.mode, session?.profile.id, session?.profile.role, submissions]);
 
   useEffect(() => {
     let active = true;
 
-    void getCurrentAppSession().then((currentSession) => {
-      if (!active || !currentSession) return;
-      setSession(currentSession);
-      setRole(currentSession.profile.role);
-      setScreen(roleRouteStart(currentSession.profile.role));
-    });
+    void getCurrentAppSession()
+      .then(async (currentSession) => {
+        if (!active || !currentSession) return;
+
+        if (currentSession.mode === "supabase") {
+          const remoteSubmissions = await listSubmissionsForRole(
+            currentSession.profile.role,
+            currentSession.profile.id,
+          );
+
+          if (!remoteSubmissions) {
+            throw new Error("Supabase submissions could not be loaded.");
+          }
+
+          if (!active) return;
+          skipNextSupabasePersistRef.current = true;
+          supabaseHydratedRef.current = true;
+          persistedStatusHistoryIdsRef.current = new Set(
+            remoteSubmissions.flatMap((submission) =>
+              (submission.timeline ?? []).map((item) => item.id),
+            ),
+          );
+          setSubmissions(remoteSubmissions);
+          setSelectedId(remoteSubmissions[0]?.id ?? "");
+        }
+
+        setBackendError(null);
+        setSession(currentSession);
+        setRole(currentSession.profile.role);
+        setScreen(roleRouteStart(currentSession.profile.role));
+      })
+      .catch(() => {
+        if (active) {
+          void signOutCurrentSession();
+          setSession(null);
+          supabaseHydratedRef.current = false;
+          skipNextSupabasePersistRef.current = false;
+          dirtySubmissionIdsRef.current.clear();
+          persistedStatusHistoryIdsRef.current.clear();
+          setBackendError(
+            "Supabase сессия не загружена. Local demo остаётся отдельным входом.",
+          );
+          setToastMessage("Supabase сессия не загружена. Доступен local-demo режим.");
+        }
+      });
 
     return () => {
       active = false;
@@ -239,6 +346,17 @@ function App() {
     setToastMessage(message);
   }
 
+  function updateSubmissionsWithDirty(
+    dirtyIds: Iterable<string>,
+    updater: (current: Submission[]) => Submission[],
+  ) {
+    for (const id of dirtyIds) {
+      dirtySubmissionIdsRef.current.add(id);
+    }
+
+    setSubmissions(updater);
+  }
+
   function navigate(nextScreen: Screen) {
     if (nextScreen !== "login" && !canAccessScreen(nextScreen, role)) {
       setScreen(roleRouteStart(role));
@@ -253,14 +371,63 @@ function App() {
 
   async function login(nextRole: Role) {
     const nextSession = await signInDemo(nextRole);
+    supabaseHydratedRef.current = false;
+    skipNextSupabasePersistRef.current = false;
+    dirtySubmissionIdsRef.current.clear();
+    persistedStatusHistoryIdsRef.current.clear();
+    setBackendError(null);
     setSession(nextSession);
     setRole(nextSession.profile.role);
     setScreen(roleRouteStart(nextSession.profile.role));
     setMobileMenuOpen(false);
   }
 
+  async function loginSupabase(email: string, password: string) {
+    try {
+      const nextSession = await signInSupabaseWithPassword(email, password);
+      const remoteSubmissions = await listSubmissionsForRole(
+        nextSession.profile.role,
+        nextSession.profile.id,
+      );
+
+      if (!remoteSubmissions) {
+        throw new Error("Supabase submissions could not be loaded.");
+      }
+
+      skipNextSupabasePersistRef.current = true;
+      supabaseHydratedRef.current = true;
+      dirtySubmissionIdsRef.current.clear();
+      persistedStatusHistoryIdsRef.current = new Set(
+        remoteSubmissions.flatMap((submission) =>
+          (submission.timeline ?? []).map((item) => item.id),
+        ),
+      );
+      setSubmissions(remoteSubmissions);
+      setSelectedId(remoteSubmissions[0]?.id ?? "");
+      setBackendError(null);
+      setSession(nextSession);
+      setRole(nextSession.profile.role);
+      setScreen(roleRouteStart(nextSession.profile.role));
+      setMobileMenuOpen(false);
+    } catch (error) {
+      await signOutCurrentSession();
+      supabaseHydratedRef.current = false;
+      skipNextSupabasePersistRef.current = false;
+      dirtySubmissionIdsRef.current.clear();
+      persistedStatusHistoryIdsRef.current.clear();
+      setBackendError(
+        error instanceof Error ? error.message : "Supabase вход не выполнен.",
+      );
+      showToast("Supabase вход не выполнен");
+    }
+  }
+
   async function logout() {
     await signOutCurrentSession();
+    supabaseHydratedRef.current = false;
+    skipNextSupabasePersistRef.current = false;
+    dirtySubmissionIdsRef.current.clear();
+    persistedStatusHistoryIdsRef.current.clear();
     setSession(null);
     setScreen("login");
     setMobileMenuOpen(false);
@@ -307,16 +474,11 @@ function App() {
       }
     }
 
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([id], (current) =>
       current.map((submission) => {
         if (submission.id !== id) return submission;
 
-        return transitionSubmissionStatus(
-          submission,
-          status,
-          currentActor,
-          currentDate,
-        );
+        return transitionSubmissionStatus(submission, status, activeActor, currentDate);
       }),
     );
     showToast("Статус обновлён");
@@ -338,13 +500,13 @@ function App() {
       return;
     }
 
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([preflightModalId], (current) =>
       current.map((submission) =>
         submission.id === preflightModalId
           ? transitionSubmissionStatus(
               submission,
               "waiting_review",
-              currentActor,
+              activeActor,
               currentDate,
               "Агент передал заявку оператору после preflight.",
             )
@@ -423,7 +585,10 @@ function App() {
           : undefined,
     };
 
-    setSubmissions((current) => [normalizeSubmission(newSubmission), ...current]);
+    updateSubmissionsWithDirty([id], (current) => [
+      normalizeSubmission(newSubmission),
+      ...current,
+    ]);
     setSelectedId(id);
     setScreen("agent-detail");
     setCreateDraft(defaultCreateDraft);
@@ -462,7 +627,7 @@ function App() {
     field: keyof Applicant,
     value: string,
   ) {
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId) return submission;
 
@@ -502,7 +667,7 @@ function App() {
   }
 
   function addApplicant(submissionId: string) {
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId) return submission;
 
@@ -556,7 +721,14 @@ function App() {
     type: MediaSlotType,
     state: "missing" | "uploaded",
   ) {
-    setSubmissions((current) =>
+    if (session?.mode === "supabase" && state === "uploaded") {
+      showToast(
+        "Supabase требует реальный файл. Demo-отметка доступна только в local-demo.",
+      );
+      return;
+    }
+
+    updateSubmissionsWithDirty([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId) return submission;
 
@@ -598,6 +770,93 @@ function App() {
     showToast(state === "uploaded" ? "Файл отмечен загруженным" : "Файл снят");
   }
 
+  async function uploadMediaSlot(
+    submissionId: string,
+    applicantId: string,
+    type: MediaSlotType,
+    file: File,
+  ) {
+    const targetSubmission = submissions.find(
+      (submission) => submission.id === submissionId,
+    );
+    if (!targetSubmission) return;
+
+    const normalizedApplicant = targetSubmission.applicants
+      .map((applicant, index) => normalizeApplicant(applicant, index, targetSubmission))
+      .find((applicant) => applicant.id === applicantId);
+    const slot = normalizedApplicant?.mediaSlots?.find((item) => item.type === type);
+
+    if (!normalizedApplicant || !slot) {
+      showToast("Не найден слот медиа для загрузки");
+      return;
+    }
+
+    try {
+      const target = storageTargetForSlot(submissionId, applicantId, slot);
+      const result = await uploadMediaToStorage(target, file);
+      if (!result) {
+        showToast("Supabase storage не активен");
+        return;
+      }
+
+      const uploadedAt = new Date().toISOString();
+      const nextSubmission = normalizeSubmission({
+        ...targetSubmission,
+        applicants: targetSubmission.applicants.map((applicant, index) => {
+          const normalized = normalizeApplicant(applicant, index, targetSubmission);
+          if (normalized.id !== applicantId) return normalized;
+
+          return normalizeApplicant(
+            {
+              ...normalized,
+              mediaSlots: ensureMediaSlots(normalized).map((mediaSlot) =>
+                mediaSlot.type === type
+                  ? {
+                      ...mediaSlot,
+                      state: "uploaded",
+                      originalFileName: file.name,
+                      mimeType: file.type,
+                      sizeBytes: file.size,
+                      uploadStatus: "uploaded",
+                      reviewStatus: "not_reviewed",
+                      uploadedAt,
+                    }
+                  : mediaSlot,
+              ),
+            },
+            index,
+            targetSubmission,
+          );
+        }),
+        status:
+          targetSubmission.status === "draft" ? "filling" : targetSubmission.status,
+        updated: uploadedAt,
+      });
+
+      if (session?.mode === "supabase") {
+        try {
+          await saveSubmissionDraft(nextSubmission, {
+            actorId: session.profile.id,
+            role: session.profile.role,
+            persistedStatusHistoryIds: persistedStatusHistoryIdsRef.current,
+          });
+        } catch (error) {
+          await deleteMediaFromStorage(target).catch(() => undefined);
+          throw error;
+        }
+      }
+
+      setSubmissions((current) =>
+        current.map((submission) =>
+          submission.id === submissionId ? nextSubmission : submission,
+        ),
+      );
+      showToast("Файл загружен в Supabase storage");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Загрузка не прошла");
+    }
+  }
+
   function reviewMediaSlot(
     submissionId: string,
     applicantId: string,
@@ -605,7 +864,7 @@ function App() {
     state: "accepted" | "replace",
     reason?: string,
   ) {
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId) return submission;
 
@@ -630,7 +889,7 @@ function App() {
         const correction =
           state === "replace"
             ? {
-                id: `${submission.id}-${applicantId}-${type}-${Date.now()}`,
+                id: crypto.randomUUID(),
                 target: targetLabel,
                 text: reason?.trim() || "Нужно заменить файл.",
                 scope: "media" as const,
@@ -638,7 +897,7 @@ function App() {
                 mediaType: type,
                 severity: "blocking" as const,
                 status: "open" as const,
-                createdBy: currentActor,
+                createdBy: activeActor,
                 createdAt: currentDate,
               }
             : null;
@@ -670,7 +929,7 @@ function App() {
                 ? `Оператор принял файл: ${targetLabel}`
                 : `Оператор запросил замену файла: ${targetLabel}`,
               "uploaded",
-              currentActor,
+              activeActor,
               currentDate,
             ),
           ],
@@ -681,7 +940,7 @@ function App() {
   }
 
   function confirmFamilyRoles(submissionId: string, applySuggestedRoles: boolean) {
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId) return submission;
 
@@ -744,7 +1003,7 @@ function App() {
 
     const target = parseReturnTarget(returnTarget);
 
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([returnModalId], (current) =>
       current.map((submission) => {
         if (submission.id !== returnModalId) return submission;
 
@@ -780,7 +1039,7 @@ function App() {
             applicants,
             notes: [
               {
-                id: `${submission.id}-${Date.now()}`,
+                id: crypto.randomUUID(),
                 target: target.label,
                 text: returnText.trim(),
                 scope: target.scope,
@@ -789,14 +1048,14 @@ function App() {
                 mediaType: target.mediaType,
                 severity: returnSeverity,
                 status: "open",
-                createdBy: currentActor,
+                createdBy: activeActor,
                 createdAt: currentDate,
               },
               ...submission.notes,
             ],
           },
           "returned",
-          currentActor,
+          activeActor,
           currentDate,
           `Оператор вернул заявку: ${target.label}`,
         );
@@ -840,10 +1099,10 @@ function App() {
   }
 
   function fixCorrection(submissionId: string, correctionId: string) {
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([submissionId], (current) =>
       current.map((submission) =>
         submission.id === submissionId
-          ? markCorrectionFixed(submission, correctionId, currentActor, currentDate)
+          ? markCorrectionFixed(submission, correctionId, activeActor, currentDate)
           : submission,
       ),
     );
@@ -901,24 +1160,24 @@ function App() {
 
     const readyIds = new Set(plan.readySubmissions.map((submission) => submission.id));
     const batch = {
-      id: `EXP-${Date.now()}`,
-      createdBy: currentActor,
+      id: session?.mode === "supabase" ? crypto.randomUUID() : `EXP-${Date.now()}`,
+      createdBy: activeActor,
       createdAt: currentDate,
       format: "xlsx" as const,
       rowCount: plan.applicantRowCount,
       submissionIds: plan.readySubmissions.map((submission) => submission.id),
     };
-    setSubmissions((current) =>
-      markSubmissionsExported(current, readyIds, batch, currentActor, currentDate),
+    updateSubmissionsWithDirty(readyIds, (current) =>
+      markSubmissionsExported(current, readyIds, batch, activeActor, currentDate),
     );
     showToast(`Статус обновлён: выгружено ${plan.readySubmissions.length}`);
   }
 
   function changeAppointment(id: string, status: AppointmentStatus) {
-    setSubmissions((current) =>
+    updateSubmissionsWithDirty([id], (current) =>
       current.map((submission) =>
         submission.id === id
-          ? updateAppointmentStatus(submission, status, currentActor, currentDate)
+          ? updateAppointmentStatus(submission, status, activeActor, currentDate)
           : submission,
       ),
     );
@@ -929,9 +1188,16 @@ function App() {
     return (
       <>
         <LoginPage
-          authMode={supabaseRuntimeConfig.mode}
-          missingConfig={supabaseRuntimeConfig.missing}
+          authMode={supabaseRuntimeConfig.selected}
+          missingConfig={
+            backendError
+              ? [backendError]
+              : supabaseRuntimeConfig.target === "supabase"
+                ? supabaseRuntimeConfig.blockedReasons
+                : supabaseRuntimeConfig.missing
+          }
           onLogin={login}
+          onSupabaseLogin={loginSupabase}
         />
         <Toast message={toastMessage} />
       </>
@@ -967,6 +1233,12 @@ function App() {
     if (screen === "agent-applications") return AgentApplications();
     if (screen === "agent-corrections") return AgentCorrections();
     if (screen === "agent-detail") {
+      if (!selectedSubmission) {
+        return (
+          <EmptyState title="Заявка не найдена" text="Выберите заявку из списка." />
+        );
+      }
+
       return (
         <DetailView
           submission={selectedSubmission}
@@ -978,6 +1250,8 @@ function App() {
           onUpdateApplicant={updateApplicant}
           onAddApplicant={addApplicant}
           onUpdateMediaSlot={updateMediaSlot}
+          onUploadMediaSlot={uploadMediaSlot}
+          mediaUploadMode={session?.mode ?? "local-demo"}
           onReviewMediaSlot={reviewMediaSlot}
           onFixCorrection={fixCorrection}
           onConfirmFamilyRoles={confirmFamilyRoles}
@@ -988,6 +1262,12 @@ function App() {
     if (screen === "admin-overview") return AdminOverview();
     if (screen === "admin-queue") return AdminQueue();
     if (screen === "admin-detail") {
+      if (!selectedSubmission) {
+        return (
+          <EmptyState title="Заявка не найдена" text="Выберите заявку из очереди." />
+        );
+      }
+
       return (
         <DetailView
           submission={selectedSubmission}
@@ -999,6 +1279,8 @@ function App() {
           onUpdateApplicant={updateApplicant}
           onAddApplicant={addApplicant}
           onUpdateMediaSlot={updateMediaSlot}
+          onUploadMediaSlot={uploadMediaSlot}
+          mediaUploadMode={session?.mode ?? "local-demo"}
           onReviewMediaSlot={reviewMediaSlot}
           onFixCorrection={fixCorrection}
           onConfirmFamilyRoles={confirmFamilyRoles}
