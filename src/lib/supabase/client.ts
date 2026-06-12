@@ -7,7 +7,7 @@ export type VisaFlowSupabaseClient = SupabaseClient<Database>;
 let cachedClient: VisaFlowSupabaseClient | null = null;
 
 export function getSupabaseClient(): VisaFlowSupabaseClient | null {
-  if (!supabaseRuntimeConfig.configured) return null;
+  if (!supabaseRuntimeConfig.allowClientActivation) return null;
   if (cachedClient) return cachedClient;
 
   cachedClient = createClient<Database>(
@@ -28,7 +28,7 @@ export function getSupabaseClient(): VisaFlowSupabaseClient | null {
 export function requireSupabaseClient(): VisaFlowSupabaseClient {
   const client = getSupabaseClient();
   if (!client) {
-    throw new Error("Supabase is not configured. Local demo mode is active.");
+    throw new Error("Supabase activation gate is closed. Local demo mode is active.");
   }
 
   return client;

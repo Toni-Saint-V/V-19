@@ -18,6 +18,11 @@ export interface AppSession {
   supabaseSession: Session | null;
 }
 
+export interface SignInResult {
+  session: AppSession | null;
+  error: string | null;
+}
+
 const demoProfiles: Record<Role, AppProfile> = {
   agent: {
     id: "agent-1",
@@ -57,6 +62,49 @@ export async function signInDemo(role: Role): Promise<AppSession> {
     mode: supabaseRuntimeConfig.mode,
     profile: demoProfiles[role],
     supabaseSession: null,
+  };
+}
+
+export async function signInWithPassword(
+  email: string,
+  password: string,
+): Promise<SignInResult> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      session: null,
+      error: "Supabase is not configured for password sign-in.",
+    };
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.session?.user.email) {
+    return {
+      session: null,
+      error: "Sign-in failed. Check the email and password.",
+    };
+  }
+
+  const profile = await fetchCurrentProfile(data.session.user.id);
+  if (!profile) {
+    await client.auth.signOut();
+    return {
+      session: null,
+      error: "This account does not have a VisaFlow profile.",
+    };
+  }
+
+  return {
+    session: {
+      mode: "supabase",
+      profile,
+      supabaseSession: data.session,
+    },
+    error: null,
   };
 }
 
