@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import {
   adminAcceptancePreflight,
   buildMediaSlot,
@@ -17,9 +16,7 @@ import {
 import type { AppProfile, AppSession } from "./services/authService";
 import {
   canAccessRole,
-  getCurrentAppSession,
   signInDemo,
-  signInWithPassword,
   signOutCurrentSession,
 } from "./services/authService";
 import {
@@ -340,10 +337,6 @@ function candidateWithClosedCorrections(
   );
 }
 
-function canUseLocalDemoAuth(): boolean {
-  return supabaseRuntimeConfig.mode === "local-demo";
-}
-
 function profileInitial(profile: AppProfile): string {
   return profile.displayName.trim().charAt(0).toUpperCase() || "A";
 }
@@ -391,15 +384,12 @@ function createAgentDraft(profile: AppProfile, count: number): Submission {
 
 function App() {
   const [session, setSession] = useState<AppSession | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const authChecked = true;
   const [submissions, setSubmissions] = useState<Submission[]>(() =>
     loadLocalSubmissions(),
   );
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authBusy, setAuthBusy] = useState(false);
 
   const profile = session?.profile ?? null;
   const hasAdminAccess = canAccessRole(profile, "admin");
@@ -495,23 +485,6 @@ function App() {
   }, [visibleSubmissions]);
 
   useEffect(() => {
-    let active = true;
-
-    void getCurrentAppSession()
-      .then((currentSession) => {
-        if (!active) return;
-        setSession(currentSession);
-      })
-      .finally(() => {
-        if (active) setAuthChecked(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
     saveLocalSubmissions(submissions);
   }, [submissions]);
 
@@ -536,35 +509,9 @@ function App() {
   }, [selectedCaseId]);
 
   async function loginDemo(role: Role) {
-    if (!canUseLocalDemoAuth()) {
-      setToast("A Supabase session is required for this environment.");
-      return;
-    }
-
     const nextSession = await signInDemo(role);
     setSession(nextSession);
     setSelectedCaseId(null);
-  }
-
-  async function loginSupabase() {
-    const email = authEmail.trim();
-    if (!email || !authPassword) {
-      setToast("Enter email and password to sign in.");
-      return;
-    }
-
-    setAuthBusy(true);
-    const result = await signInWithPassword(email, authPassword);
-    setAuthBusy(false);
-
-    if (!result.session) {
-      setToast(result.error ?? "Sign-in failed.");
-      return;
-    }
-
-    setSession(result.session);
-    setSelectedCaseId(null);
-    setAuthPassword("");
   }
 
   async function logout() {
@@ -924,63 +871,26 @@ function App() {
             Operator queues are gated. Admin review actions are available only after the
             current session is known.
           </p>
-          {canUseLocalDemoAuth() ? (
-            <div className="auth-actions">
-              <button
-                className="button button-primary"
-                type="button"
-                onClick={() => void loginDemo("admin")}
-              >
-                Continue as Admin demo
-              </button>
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => void loginDemo("agent")}
-              >
-                Continue as Agent demo
-              </button>
-            </div>
-          ) : (
-            <form
-              className="auth-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void loginSupabase();
-              }}
+          <div className="auth-actions">
+            <button
+              className="button button-primary"
+              type="button"
+              onClick={() => void loginDemo("admin")}
             >
-              <label>
-                <span>Email</span>
-                <input
-                  type="email"
-                  value={authEmail}
-                  onChange={(event) => setAuthEmail(event.currentTarget.value)}
-                  autoComplete="email"
-                  required
-                />
-              </label>
-              <label>
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.currentTarget.value)}
-                  autoComplete="current-password"
-                  required
-                />
-              </label>
-              <button
-                className="button button-primary"
-                type="submit"
-                disabled={authBusy}
-              >
-                {authBusy ? "Signing in..." : "Sign in with Supabase"}
-              </button>
-              <p className="auth-note">
-                Demo role switching is disabled because Supabase is configured.
-              </p>
-            </form>
-          )}
+              Continue as Admin demo
+            </button>
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => void loginDemo("agent")}
+            >
+              Continue as Agent demo
+            </button>
+          </div>
+          <p className="auth-note">
+            This branch uses local demo data while Supabase persistence is integrated
+            separately.
+          </p>
         </section>
         <div
           className={`toast ${toast ? "is-visible" : ""}`}
@@ -1051,9 +961,7 @@ function App() {
               />
             </label>
             <div className="topbar-actions">
-              <span className="demo-pill">
-                {session.mode === "local-demo" ? "Local demo data" : "Supabase session"}
-              </span>
+              <span className="demo-pill">Local demo data</span>
               <div className="role-switch" aria-label="Current role">
                 <strong>Agent</strong>
                 <span>Admin</span>
@@ -1400,15 +1308,13 @@ function App() {
             the admin review console.
           </p>
           <div className="auth-actions">
-            {canUseLocalDemoAuth() ? (
-              <button
-                className="button button-primary"
-                type="button"
-                onClick={() => void loginDemo("admin")}
-              >
-                Switch to Admin demo
-              </button>
-            ) : null}
+            <button
+              className="button button-primary"
+              type="button"
+              onClick={() => void loginDemo("admin")}
+            >
+              Switch to Admin demo
+            </button>
             <button
               className="button button-secondary"
               type="button"
@@ -1497,9 +1403,7 @@ function App() {
             />
           </label>
           <div className="topbar-actions">
-            <span className="demo-pill">
-              {session.mode === "local-demo" ? "Local demo data" : "Supabase session"}
-            </span>
+            <span className="demo-pill">Local demo data</span>
             <div className="role-switch" aria-label="Current role">
               <span>Agent</span>
               <strong>Admin</strong>
