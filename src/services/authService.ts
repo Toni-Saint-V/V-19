@@ -1,7 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import type { Role } from "../types/domain";
 import { getSupabaseClient } from "../lib/supabase/client";
-import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { fetchCurrentProfile } from "./profileService";
 
 export interface AppProfile {
@@ -54,9 +53,40 @@ export async function getCurrentAppSession(): Promise<AppSession | null> {
 
 export async function signInDemo(role: Role): Promise<AppSession> {
   return {
-    mode: supabaseRuntimeConfig.mode,
+    mode: "local-demo",
     profile: demoProfiles[role],
     supabaseSession: null,
+  };
+}
+
+export async function signInSupabaseWithPassword(
+  email: string,
+  password: string,
+): Promise<AppSession> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase is inactive.");
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  if (!data.session?.user.id) {
+    throw new Error("Supabase session was not returned.");
+  }
+
+  const profile = await fetchCurrentProfile(data.session.user.id);
+  if (!profile) {
+    throw new Error("Supabase profile was not found for this user.");
+  }
+
+  return {
+    mode: "supabase",
+    profile,
+    supabaseSession: data.session,
   };
 }
 

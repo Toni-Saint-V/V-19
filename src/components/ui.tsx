@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import type {
   Applicant,
   AppointmentStatus,
@@ -460,11 +460,27 @@ export function LoginPage({
   authMode,
   missingConfig,
   onLogin,
+  onSupabaseLogin,
 }: {
   authMode: "supabase" | "local-demo";
   missingConfig: string[];
   onLogin: (role: Role) => void;
+  onSupabaseLogin: (email: string, password: string) => Promise<void>;
 }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submitSupabaseLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    try {
+      await onSupabaseLogin(email, password);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <main className="login">
       <div className="login-shell">
@@ -511,28 +527,60 @@ export function LoginPage({
               <span>Не хватает: {missingConfig.join(", ")}.</span>
             </div>
           ) : null}
-          <button
-            className="role-choice"
-            type="button"
-            onClick={() => onLogin("agent")}
-          >
-            <span>
-              <strong>Агент</strong>
-              <span>Заявки, заявители, медиа и исправления.</span>
-            </span>
-            <i>AG</i>
-          </button>
-          <button
-            className="role-choice admin-choice"
-            type="button"
-            onClick={() => onLogin("admin")}
-          >
-            <span>
-              <strong>Операции</strong>
-              <span>Очередь, проверка, Excel и запись.</span>
-            </span>
-            <i>OP</i>
-          </button>
+          {authMode === "supabase" ? (
+            <form className="supabase-login-form" onSubmit={submitSupabaseLogin}>
+              <label>
+                <span>Email</span>
+                <input
+                  autoComplete="email"
+                  name="email"
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  type="email"
+                  value={email}
+                />
+              </label>
+              <label>
+                <span>Пароль</span>
+                <input
+                  autoComplete="current-password"
+                  name="password"
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  type="password"
+                  value={password}
+                />
+              </label>
+              <Button disabled={submitting} full type="submit" variant="primary">
+                {submitting ? "Вход..." : "Войти через Supabase"}
+              </Button>
+            </form>
+          ) : (
+            <>
+              <button
+                className="role-choice"
+                type="button"
+                onClick={() => onLogin("agent")}
+              >
+                <span>
+                  <strong>Агент</strong>
+                  <span>Заявки, заявители, медиа и исправления.</span>
+                </span>
+                <i>AG</i>
+              </button>
+              <button
+                className="role-choice admin-choice"
+                type="button"
+                onClick={() => onLogin("admin")}
+              >
+                <span>
+                  <strong>Операции</strong>
+                  <span>Очередь, проверка, Excel и запись.</span>
+                </span>
+                <i>OP</i>
+              </button>
+            </>
+          )}
         </section>
       </div>
     </main>
@@ -890,6 +938,8 @@ export function DetailView({
   onUpdateApplicant,
   onAddApplicant,
   onUpdateMediaSlot,
+  onUploadMediaSlot,
+  mediaUploadMode,
   onReviewMediaSlot,
   onFixCorrection,
   onConfirmFamilyRoles,
@@ -914,6 +964,13 @@ export function DetailView({
     type: MediaSlotType,
     state: "missing" | "uploaded",
   ) => void;
+  onUploadMediaSlot: (
+    submissionId: string,
+    applicantId: string,
+    type: MediaSlotType,
+    file: File,
+  ) => Promise<void>;
+  mediaUploadMode: "supabase" | "local-demo";
   onReviewMediaSlot: (
     submissionId: string,
     applicantId: string,
@@ -1087,6 +1144,8 @@ export function DetailView({
               onUpdateApplicant={onUpdateApplicant}
               onAddApplicant={onAddApplicant}
               onUpdateMediaSlot={onUpdateMediaSlot}
+              onUploadMediaSlot={onUploadMediaSlot}
+              mediaUploadMode={mediaUploadMode}
               onFixCorrection={onFixCorrection}
               onConfirmFamilyRoles={onConfirmFamilyRoles}
               onSubmitPreflight={onSubmitPreflight}
@@ -1132,6 +1191,8 @@ function AgentTaskWorkspace({
   onUpdateApplicant,
   onAddApplicant,
   onUpdateMediaSlot,
+  onUploadMediaSlot,
+  mediaUploadMode,
   onFixCorrection,
   onConfirmFamilyRoles,
   onSubmitPreflight,
@@ -1150,6 +1211,13 @@ function AgentTaskWorkspace({
     type: MediaSlotType,
     state: "missing" | "uploaded",
   ) => void;
+  onUploadMediaSlot: (
+    submissionId: string,
+    applicantId: string,
+    type: MediaSlotType,
+    file: File,
+  ) => Promise<void>;
+  mediaUploadMode: "supabase" | "local-demo";
   onFixCorrection: (submissionId: string, correctionId: string) => void;
   onConfirmFamilyRoles: (submissionId: string, applySuggestedRoles: boolean) => void;
   onSubmitPreflight: (submissionId: string) => void;
@@ -1353,6 +1421,8 @@ function AgentTaskWorkspace({
             submission={submission}
             onUpdateApplicant={onUpdateApplicant}
             onUpdateMediaSlot={onUpdateMediaSlot}
+            onUploadMediaSlot={onUploadMediaSlot}
+            mediaUploadMode={mediaUploadMode}
             onFixCorrection={onFixCorrection}
             onConfirmFamilyRoles={onConfirmFamilyRoles}
             onSubmitPreflight={onSubmitPreflight}
@@ -1419,6 +1489,8 @@ function TaskDataEditor({
   submission,
   onUpdateApplicant,
   onUpdateMediaSlot,
+  onUploadMediaSlot,
+  mediaUploadMode,
   onFixCorrection,
   onConfirmFamilyRoles,
   onSubmitPreflight,
@@ -1437,6 +1509,13 @@ function TaskDataEditor({
     type: MediaSlotType,
     state: "missing" | "uploaded",
   ) => void;
+  onUploadMediaSlot: (
+    submissionId: string,
+    applicantId: string,
+    type: MediaSlotType,
+    file: File,
+  ) => Promise<void>;
+  mediaUploadMode: "supabase" | "local-demo";
   onFixCorrection: (submissionId: string, correctionId: string) => void;
   onConfirmFamilyRoles: (submissionId: string, applySuggestedRoles: boolean) => void;
   onSubmitPreflight: (submissionId: string) => void;
@@ -1444,6 +1523,8 @@ function TaskDataEditor({
   const applicant = task.applicantId
     ? findApplicantById(submission, task.applicantId)
     : undefined;
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
 
   if (
     task.kind === "field" &&
@@ -1478,6 +1559,7 @@ function TaskDataEditor({
       (item) => item.type === task.mediaType,
     );
     if (!slot) return null;
+    const accept = slot.type === "video" ? "video/mp4" : "image/jpeg,image/png";
 
     return (
       <div className="task-data-panel">
@@ -1493,27 +1575,58 @@ function TaskDataEditor({
                 "Укажите номер паспорта, чтобы сформировать имя файла."}
             </small>
           </div>
-          <Button
-            variant={
-              slot.state === "missing" || slot.state === "replace"
-                ? "primary"
-                : "secondary"
-            }
-            onClick={() =>
-              onUpdateMediaSlot(
-                submission.id,
-                task.applicantId ?? "",
-                slot.type,
+          {mediaUploadMode === "supabase" ? (
+            <div className="media-upload-control">
+              <label>
+                <span>Файл</span>
+                <input
+                  accept={accept}
+                  onChange={(event) =>
+                    setSelectedUploadFile(event.target.files?.[0] ?? null)
+                  }
+                  type="file"
+                />
+              </label>
+              <Button
+                disabled={!selectedUploadFile || uploadingMedia}
+                onClick={() => {
+                  if (!selectedUploadFile) return;
+                  setUploadingMedia(true);
+                  void onUploadMediaSlot(
+                    submission.id,
+                    task.applicantId ?? "",
+                    slot.type,
+                    selectedUploadFile,
+                  ).finally(() => setUploadingMedia(false));
+                }}
+                variant="primary"
+              >
+                {uploadingMedia ? "Загрузка..." : "Загрузить файл"}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant={
                 slot.state === "missing" || slot.state === "replace"
-                  ? "uploaded"
-                  : "missing",
-              )
-            }
-          >
-            {slot.state === "missing" || slot.state === "replace"
-              ? "Отметить загруженным"
-              : "Снять файл"}
-          </Button>
+                  ? "primary"
+                  : "secondary"
+              }
+              onClick={() =>
+                onUpdateMediaSlot(
+                  submission.id,
+                  task.applicantId ?? "",
+                  slot.type,
+                  slot.state === "missing" || slot.state === "replace"
+                    ? "uploaded"
+                    : "missing",
+                )
+              }
+            >
+              {slot.state === "missing" || slot.state === "replace"
+                ? "Отметить загруженным"
+                : "Снять файл"}
+            </Button>
+          )}
         </div>
       </div>
     );

@@ -69,7 +69,19 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      save_submission_draft: {
+        Args: {
+          payload: SubmissionDraftPersistencePayload;
+        };
+        Returns: {
+          submissionId: string;
+          applicants: number;
+          mediaAssets: number;
+          statusHistory: number;
+        };
+      };
+    };
     Enums: {
       profile_role: Role;
       submission_status: SubmissionStatus;
@@ -99,7 +111,8 @@ export interface ProfileRow extends DbRecord {
   created_at: string;
 }
 
-export type ProfileInsert = Omit<ProfileRow, "created_at"> & {
+export type ProfileInsert = Omit<ProfileRow, "created_at" | "role"> & {
+  role?: Role;
   created_at?: string;
 };
 
@@ -208,7 +221,11 @@ export interface CorrectionRow extends DbRecord {
   fixed_at: string | null;
 }
 
-export type CorrectionInsert = CorrectionRow;
+export type CorrectionInsert = Omit<CorrectionRow, "id" | "created_at" | "fixed_at"> & {
+  id?: string;
+  created_at?: string;
+  fixed_at?: string | null;
+};
 
 export interface ExportBatchRow extends DbRecord {
   id: string;
@@ -219,7 +236,10 @@ export interface ExportBatchRow extends DbRecord {
   submission_ids: string[];
 }
 
-export type ExportBatchInsert = ExportBatchRow;
+export type ExportBatchInsert = Omit<ExportBatchRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
 
 export interface AppointmentRow extends DbRecord {
   id: string;
@@ -233,7 +253,10 @@ export interface AppointmentRow extends DbRecord {
   updated_at: string;
 }
 
-export type AppointmentInsert = AppointmentRow;
+export type AppointmentInsert = Omit<AppointmentRow, "id" | "updated_at"> & {
+  id?: string;
+  updated_at?: string;
+};
 
 export interface StatusHistoryRow extends DbRecord {
   id: string;
@@ -246,4 +269,14 @@ export interface StatusHistoryRow extends DbRecord {
   changed_at: string;
 }
 
-export type StatusHistoryInsert = StatusHistoryRow;
+export type StatusHistoryInsert = Omit<StatusHistoryRow, "id" | "changed_at"> & {
+  id?: string;
+  changed_at?: string;
+};
+
+export interface SubmissionDraftPersistencePayload extends DbRecord {
+  submission: SubmissionInsert;
+  applicants: ApplicantInsert[];
+  media_assets: MediaAssetInsert[];
+  status_history: StatusHistoryInsert[];
+}

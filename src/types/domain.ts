@@ -107,6 +107,8 @@ export interface MediaSlot {
   state: MediaState;
   originalFileName?: string;
   generatedFileName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
   reason?: string;
   uploadStatus?: MediaUploadStatus;
   reviewStatus?: MediaReviewStatus;
