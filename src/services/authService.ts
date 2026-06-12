@@ -59,6 +59,37 @@ export async function signInDemo(role: Role): Promise<AppSession> {
   };
 }
 
+export async function signInSupabaseWithPassword(
+  email: string,
+  password: string,
+): Promise<AppSession> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase is inactive.");
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  if (!data.session?.user.id) {
+    throw new Error("Supabase session was not returned.");
+  }
+
+  const profile = await fetchCurrentProfile(data.session.user.id);
+  if (!profile) {
+    throw new Error("Supabase profile was not found for this user.");
+  }
+
+  return {
+    mode: "supabase",
+    profile,
+    supabaseSession: data.session,
+  };
+}
+
 export async function signOutCurrentSession(): Promise<void> {
   const client = getSupabaseClient();
   if (!client) return;

@@ -888,8 +888,8 @@ function App() {
             </button>
           </div>
           <p className="auth-note">
-            This branch uses local demo data while Supabase persistence is integrated
-            separately.
+            This workspace uses local demo data until Supabase RLS, storage, and
+            persistence activation pass live review.
           </p>
         </section>
         <div
