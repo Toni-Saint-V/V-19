@@ -83,4 +83,68 @@ describe("Supabase security contract", () => {
       expect(migration).toContain("a.submission_id = submission_record.id");
     }
   });
+
+  test("keeps child and storage writes locked after review handoff", () => {
+    const runtimeGuards = readProjectFile(
+      "supabase/migrations/20260613005039_visaflow_runtime_write_guards.sql",
+    );
+
+    expect(runtimeGuards).toContain(
+      "create constraint trigger submissions_review_readiness_guard",
+    );
+    expect(runtimeGuards).toContain(
+      "create trigger corrections_actor_guard",
+    );
+    expect(runtimeGuards).toContain("new.status not in ('ready_for_review', 'waiting_review')");
+    expect(runtimeGuards).toContain("Blocking corrections must be fixed before review");
+    expect(runtimeGuards).toContain("Applicant required fields must be complete before review");
+    expect(runtimeGuards).toContain("All required media must be uploaded before review");
+
+    for (const policyName of [
+      'create policy "applicants update editable submission"',
+      'create policy "media update editable submission"',
+      'create policy "corrections update editable submission"',
+      'create policy "media storage update editable owner or admin"',
+      'create policy "media storage delete editable owner or admin"',
+    ]) {
+      expect(runtimeGuards).toContain(policyName);
+    }
+
+    expect(runtimeGuards).toContain(
+      "and s.status in ('draft', 'filling', 'returned', 'ready_for_review')",
+    );
+    expect(runtimeGuards).toContain(
+      "and status in ('draft', 'filling', 'returned', 'ready_for_review')",
+    );
+  });
+
+  test("does not trust client-provided correction authors", () => {
+    const submissionService = readProjectFile("src/services/submissionService.ts");
+    const runtimeGuards = readProjectFile(
+      "supabase/migrations/20260613005039_visaflow_runtime_write_guards.sql",
+    );
+
+    expect(submissionService).toContain("created_by: actorId");
+    expect(submissionService).not.toContain(
+      "created_by: toNullableUuid(note.createdBy) ?? actorId",
+    );
+    expect(runtimeGuards).toContain("new.created_by := auth.uid()");
+    expect(runtimeGuards).toContain("new.created_by := old.created_by");
+  });
+
+  test("keeps submit RPC idempotent while child rows stay locked after handoff", () => {
+    const rpcBoundary = readProjectFile(
+      "supabase/migrations/20260613010029_visaflow_rpc_submit_boundary.sql",
+    );
+
+    expect(rpcBoundary).toContain("can_write_children boolean := false");
+    expect(rpcBoundary).toContain(
+      "submission_record.status in ('draft', 'filling', 'returned', 'ready_for_review')",
+    );
+    expect(rpcBoundary).toContain("if can_write_children then");
+    expect(rpcBoundary).toContain("insert into public.applicants");
+    expect(rpcBoundary).toContain("insert into public.media_assets");
+    expect(rpcBoundary).toContain("insert into public.corrections");
+    expect(rpcBoundary).toContain("insert into public.status_history");
+  });
 });
