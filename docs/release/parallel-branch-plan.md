@@ -1,66 +1,91 @@
 # Parallel Branch Plan
 
-Base commit: `51a9523 Package Supabase workspace promotion review`
+Base commit: `cd8437d Merge Supabase persistence observability`
 
-## Branch 1: Release Hygiene
+The previous release hygiene and Supabase persistence observability branches have
+been merged into `main`. The next parallel split should keep runtime/data work
+separate from UI polish to avoid conflicts and preserve review quality.
 
-- Branch: `chore/release-workspace-hygiene`
-- Worktree: `/Users/user/Documents/V-19`
-- Purpose: keep the release workspace clean and reviewable.
+## Branch 1: Supabase Live Hardening
 
-Owns:
-
-- untracked artifact triage under `docs/codex/`;
-- root archive/html artifact decision;
-- production checklist documentation updates;
-- final local `main` gate after both branches merge.
-
-Does not own:
-
-- `src/` runtime changes;
-- Supabase migrations;
-- RLS policy behavior;
-- UI behavior.
-
-Suggested tasks:
-
-1. Decide whether each untracked `docs/codex/*` file should be committed, moved, archived, or deleted.
-2. Decide whether `visaflow_codex_docs_patch.zip` and `visaflow_operations_cockpit.html` belong in the repo.
-3. Keep only reviewable docs; avoid binary/root clutter unless it is explicitly release evidence.
-4. Run `npm run format:check` and `npm run verify:supabase-release`.
-
-## Branch 2: Supabase Persistence Observability
-
-- Branch: `feat/supabase-persistence-observability`
-- Worktree: `/Users/user/Documents/V-19-observability`
-- Purpose: make Supabase persistence failures diagnosable without weakening security.
+- Branch: `feat/supabase-live-hardening`
+- Worktree: `/Users/user/Documents/V-19-supabase-hardening`
+- Purpose: prove real Supabase persistence, RLS, and Storage behavior without
+  fake success states.
 
 Owns:
 
-- safe client-side persistence error normalization;
-- user-facing error states for Supabase save/upload/auth failures;
-- non-secret diagnostics for RLS/RPC/Storage failures;
-- targeted unit/E2E coverage for failure paths.
+- Supabase live smoke coverage;
+- repository/service failure-path tests;
+- RLS and Storage negative-path proof;
+- status-history idempotency and persistence proof;
+- production runbook gaps for live persistence.
 
 Does not own:
 
-- release artifact cleanup;
-- production migration apply;
+- workspace visual redesign;
+- component extraction for UI polish;
 - auth redesign;
-- schema expansion;
+- schema expansion unless a smoke test exposes a real migration bug;
 - billing/admin redesign.
 
 Suggested tasks:
 
-1. Add a typed safe error mapper for Supabase persistence and Storage failures.
-2. Route save/upload failures through honest UI messages without stack traces or secrets.
-3. Add test coverage for RPC failure, Storage upload failure, and offline/local-demo boundaries.
-4. Run `npm run typecheck`, `npm run test`, and targeted E2E if UI states change.
+1. Expand `npm run test:supabase-live` to cover remote load/save, media upload,
+   owner overwrite denial after handoff, admin review write, and RLS denial for
+   the wrong actor.
+2. Add repository-level tests for save/upload/list failure paths using
+   `PersistenceObservableError`, without exposing provider messages or secrets.
+3. Verify status history writes are deterministic and do not duplicate timeline
+   rows during retry.
+4. Update Supabase release docs only where the new smoke proof changes the
+   operator runbook.
+5. Run `npm run typecheck`, `npm run test`, `npm run verify:supabase-release`,
+   `npm run test:supabase-live`, and `npm run verify`.
+
+## Branch 2: Agent Workspace UI Hardening
+
+- Branch: `feat/agent-workspace-ui-hardening`
+- Worktree: `/Users/user/Documents/V-19-ui-hardening`
+- Purpose: make the task-first workspace feel production-grade on desktop and
+  mobile while preserving current business logic.
+
+Owns:
+
+- task-first workspace component structure;
+- responsive layout and no horizontal overflow around 390px;
+- loading, empty, error, disabled, and success states;
+- accessibility labels/focus states;
+- small purposeful motion and reduced-motion behavior;
+- E2E and screenshot evidence for visible flows.
+
+Does not own:
+
+- Supabase migrations;
+- RLS/storage policy logic;
+- auth/session model redesign;
+- repository persistence semantics;
+- billing/admin redesign.
+
+Suggested tasks:
+
+1. Extract the largest workspace sections from `src/App.tsx` only where it
+   reduces risk and improves reviewability.
+2. Harden desktop density, mobile stacking, focus order, save/error affordances,
+   and returned-correction editing without changing workflow state transitions.
+3. Add or update E2E proof for workspace visibility, task selection, selected
+   task detail, editing surface, readiness/preflight/handoff reachability, and
+   mobile overflow.
+4. Capture desktop and mobile screenshots under `docs/qa/` for changed visible
+   flows.
+5. Run `npm run typecheck`, `npm run test:e2e`, and `npm run verify`.
 
 ## Merge Order
 
-1. Finish and merge `chore/release-workspace-hygiene` into `main`.
-2. Finish and merge `feat/supabase-persistence-observability` into `main`.
+1. Merge `feat/supabase-live-hardening` first if it only touches services,
+   tests, scripts, Supabase docs, and release docs.
+2. Merge `feat/agent-workspace-ui-hardening` second after rebasing on the
+   hardened runtime base.
 3. Run final gates on `main`:
 
 ```bash
@@ -70,6 +95,7 @@ npm run test:supabase-live
 
 ## Conflict Rules
 
-- Branch 1 should stay in docs/release and artifact cleanup.
-- Branch 2 should stay in `src/`, `tests/`, and related service docs if needed.
-- If both branches need the same file, merge Branch 1 first unless Branch 2 has runtime changes.
+- Branch 1 should avoid `src/App.tsx` and `src/styles.css` unless it is fixing
+  a real persistence bug that cannot be handled in services.
+- Branch 2 should avoid Supabase migrations, policies, and live-smoke semantics.
+- If both branches need the same file, stop and re-split the task before editing.
