@@ -49,6 +49,7 @@ const exportBatchSelect =
   "id,created_by,created_at,format,row_count,submission_ids" as const;
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at" as const;
+const submissionListLimit = 100;
 
 function mapSubmissionRow(
   row: SubmissionRow,
@@ -446,6 +447,7 @@ export function toSubmissionDraftPersistencePayload(
       toApplicantInsert(normalized.id, applicant),
     ),
     media_assets: toMediaAssetInserts(normalized),
+    corrections: toCorrectionInserts(normalized, actorId),
     status_history: toStatusHistoryInserts(normalized, actorId).filter(
       (item) => !persistedStatusHistoryIds?.has(item.id ?? ""),
     ),
@@ -456,9 +458,13 @@ export async function listSubmissionsForRole(role: "agent" | "admin", agentId: s
   const client = getSupabaseClient();
   if (!client) return null;
 
-  const query = client.from("submissions").select(submissionSelect).order("updated_at", {
-    ascending: false,
-  });
+  const query = client
+    .from("submissions")
+    .select(submissionSelect)
+    .order("updated_at", {
+      ascending: false,
+    })
+    .limit(submissionListLimit);
   const { data: submissionRows, error } =
     role === "agent" ? await query.eq("agent_id", agentId) : await query;
 

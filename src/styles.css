@@ -128,6 +128,41 @@ p {
   margin-top: 24px;
 }
 
+.auth-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.auth-form input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+  background: #fff;
+  font-size: 16px;
+}
+
+.auth-error {
+  padding: 12px 14px;
+  border: 1px solid rgba(239, 99, 84, 0.28);
+  border-radius: 14px;
+  color: #9f352c !important;
+  background: #fff1ef;
+  font-weight: 850;
+}
+
 .auth-note {
   padding: 14px 16px;
   border: 1px solid var(--border);
@@ -328,7 +363,8 @@ p {
 }
 
 .demo-pill,
-.soft-pill {
+.soft-pill,
+.save-pill {
   display: inline-flex;
   align-items: center;
   min-height: 36px;
@@ -340,6 +376,24 @@ p {
   font-size: 14px;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.save-pill {
+  border-color: rgba(66, 120, 92, 0.24);
+  color: #2f7653;
+  background: #ecfff4;
+}
+
+.save-pill-saving {
+  border-color: rgba(45, 108, 223, 0.24);
+  color: #255cb5;
+  background: #edf4ff;
+}
+
+.save-pill-error {
+  border-color: rgba(239, 99, 84, 0.28);
+  color: #9f352c;
+  background: #fff1ef;
 }
 
 .role-switch {
@@ -1066,6 +1120,23 @@ p {
   font-size: 12px;
   font-weight: 800;
   text-transform: capitalize;
+}
+
+.upload-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-button.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .modal-muted,

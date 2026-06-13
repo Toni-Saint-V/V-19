@@ -7,11 +7,34 @@ Block #5 adds a persistence-ready Supabase boundary without requiring live keys.
 Use only public browser variables:
 
 ```bash
+VITE_SUPABASE_BACKEND_TARGET=supabase
+VITE_SUPABASE_SANDBOX_PROBE_ENABLED=true
+VITE_SUPABASE_PROJECT_ID=oevvaowoklqttqkraxho
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_SUPABASE_EDGE_FUNCTIONS_URL=
 ```
 
 Do not place service-role, OpenAI, or other backend secrets in frontend env files.
+
+## Live smoke env
+
+`npm run test:supabase-live` uses browser-safe Supabase clients and real user JWTs. It must not use a service-role key. Put local smoke credentials in ignored `.env.supabase-smoke.local` so normal Vite and Playwright runs stay on `local-demo`.
+
+Required test accounts must already exist in Supabase Auth and have matching `public.profiles` rows:
+
+```bash
+SUPABASE_SMOKE_AGENT_EMAIL=
+SUPABASE_SMOKE_AGENT_PASSWORD=
+SUPABASE_SMOKE_OTHER_AGENT_EMAIL=
+SUPABASE_SMOKE_OTHER_AGENT_PASSWORD=
+SUPABASE_SMOKE_ADMIN_EMAIL=
+SUPABASE_SMOKE_ADMIN_PASSWORD=
+```
+
+The smoke verifies owner reads/writes, cross-agent denial, admin review write access, private media upload, cross-agent Storage denial, and signed URL access.
+
+The smoke upserts one deterministic `SMOKE-*` submission. It resets that row through the admin JWT at the start of each run and intentionally does not add runtime delete permissions. Clean sandbox smoke rows with a maintenance SQL session when needed.
 
 ## Local/demo behavior
 

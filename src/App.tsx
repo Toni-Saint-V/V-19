@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   adminAcceptancePreflight,
   buildMediaSlot,
@@ -16,14 +16,25 @@ import {
 import type { AppProfile, AppSession } from "./services/authService";
 import {
   canAccessRole,
+  getCurrentAppSession,
   signInDemo,
+  signInSupabaseWithPassword,
   signOutCurrentSession,
 } from "./services/authService";
+import { supabaseRuntimeConfig } from "./lib/supabase/config";
+import { selectSubmissionsForRole } from "./services/localRepository";
 import {
-  loadLocalSubmissions,
-  saveLocalSubmissions,
-  selectSubmissionsForRole,
-} from "./services/localRepository";
+  deleteMediaFromStorage,
+  storageTargetForSlot,
+  uploadMediaToStorage,
+  type MediaStorageTarget,
+} from "./services/storageService";
+import {
+  collectPersistedStatusHistoryIds,
+  loadWorkspaceSubmissions,
+  saveLocalWorkspaceSubmissions,
+  saveWorkspaceSubmission,
+} from "./services/workspacePersistenceService";
 import type {
   Applicant,
   CorrectionNote,
@@ -341,6 +352,33 @@ function profileInitial(profile: AppProfile): string {
   return profile.displayName.trim().charAt(0).toUpperCase() || "A";
 }
 
+function dataSourceLabel(session: AppSession | null): string {
+  if (session?.mode !== "supabase") return "Local demo data";
+
+  return supabaseRuntimeConfig.activation.ready
+    ? "Supabase data"
+    : "Supabase sandbox probe";
+}
+
+function safeErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    if (/password|credential|invalid login/i.test(error.message)) {
+      return "Unable to sign in. Check email, password, and Supabase profile.";
+    }
+  }
+
+  return fallback;
+}
+
+function mediaAccept(type: MediaSlotType): string {
+  return type === "video" ? "video/mp4" : "image/jpeg";
+}
+
+function mediaUploadButtonLabel(type: MediaSlotType): string {
+  if (type === "video") return "Choose MP4";
+  return "Choose JPG";
+}
+
 function createAgentDraft(profile: AppProfile, count: number): Submission {
   const id = `VF-AGENT-${Date.now().toString().slice(-6)}-${count + 1}`;
   const applicantId = `${id}-1`;
@@ -384,14 +422,27 @@ function createAgentDraft(profile: AppProfile, count: number): Submission {
 
 function App() {
   const [session, setSession] = useState<AppSession | null>(null);
-  const authChecked = true;
-  const [submissions, setSubmissions] = useState<Submission[]>(() =>
-    loadLocalSubmissions(),
+  const [authChecked, setAuthChecked] = useState(
+    supabaseRuntimeConfig.selected !== "supabase",
   );
+  const [authError, setAuthError] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [uploadingMediaKey, setUploadingMediaKey] = useState("");
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const persistedStatusHistoryIdsRef = useRef<Map<string, Set<string>>>(new Map());
+  const dirtySubmissionVersionsRef = useRef<Map<string, number>>(new Map());
+  const pendingSaveMessagesRef = useRef<Map<string, string>>(new Map());
+  const savingRemoteRef = useRef(false);
 
   const profile = session?.profile ?? null;
+  const sourceLabel = dataSourceLabel(session);
+  const isSupabaseSession = session?.mode === "supabase";
   const hasAdminAccess = canAccessRole(profile, "admin");
   const agentSubmissions = useMemo(
     () =>
@@ -485,8 +536,218 @@ function App() {
   }, [visibleSubmissions]);
 
   useEffect(() => {
-    saveLocalSubmissions(submissions);
-  }, [submissions]);
+    let cancelled = false;
+
+    async function bootstrapSupabaseSession() {
+      if (supabaseRuntimeConfig.selected !== "supabase") {
+        setAuthChecked(true);
+        return;
+      }
+
+      setAuthChecked(false);
+      setAuthError("");
+      try {
+        const currentSession = await getCurrentAppSession();
+        if (cancelled) return;
+
+        if (currentSession) {
+          setSession(currentSession);
+          setDataLoading(true);
+          const loaded = (await loadWorkspaceSubmissions(currentSession)).map(
+            normalizeSubmission,
+          );
+          if (cancelled) return;
+          persistedStatusHistoryIdsRef.current =
+            collectPersistedStatusHistoryIds(loaded);
+          setSubmissions(loaded);
+        }
+      } catch (error) {
+        console.error("Supabase session bootstrap failed", error);
+        if (!cancelled) {
+          setAuthError(
+            safeErrorMessage(error, "Unable to load the current Supabase session."),
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setDataLoading(false);
+          setAuthChecked(true);
+        }
+      }
+    }
+
+    void bootstrapSupabaseSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (supabaseRuntimeConfig.selected === "supabase") return;
+    if (session?.mode !== "local-demo") return;
+    saveLocalWorkspaceSubmissions(submissions);
+  }, [session?.mode, submissions]);
+
+  function rememberSubmissionHistoryPersisted(submission: Submission): void {
+    const current =
+      persistedStatusHistoryIdsRef.current.get(submission.id) ?? new Set<string>();
+
+    for (const item of submission.timeline ?? []) {
+      if (item.id) current.add(item.id);
+    }
+
+    persistedStatusHistoryIdsRef.current.set(submission.id, current);
+  }
+
+  function queueRemoteSave(submissionIds: string[], successMessage?: string): void {
+    if (!isSupabaseSession) return;
+
+    for (const id of new Set(submissionIds)) {
+      dirtySubmissionVersionsRef.current.set(
+        id,
+        (dirtySubmissionVersionsRef.current.get(id) ?? 0) + 1,
+      );
+      if (successMessage) pendingSaveMessagesRef.current.set(id, successMessage);
+    }
+  }
+
+  function stageSubmissionUpdates(
+    submissionIds: string[],
+    updater: (current: Submission[]) => Submission[],
+    successMessage?: string,
+  ): void {
+    queueRemoteSave(submissionIds, successMessage);
+    setSubmissions((current) => updater(current).map(normalizeSubmission));
+
+    if (!isSupabaseSession && successMessage) {
+      setToast(successMessage);
+    }
+  }
+
+  async function reloadRemoteSubmissions(activeSession: AppSession): Promise<void> {
+    setDataLoading(true);
+    try {
+      const loaded = (await loadWorkspaceSubmissions(activeSession)).map(
+        normalizeSubmission,
+      );
+      persistedStatusHistoryIdsRef.current = collectPersistedStatusHistoryIds(loaded);
+      setSubmissions(loaded);
+    } finally {
+      setDataLoading(false);
+    }
+  }
+
+  async function persistSubmissionImmediately(
+    activeSession: AppSession,
+    submission: Submission,
+    successMessage: string,
+    cleanupTarget?: MediaStorageTarget,
+  ): Promise<void> {
+    setSaveState("saving");
+    try {
+      await saveWorkspaceSubmission(
+        activeSession,
+        submission,
+        persistedStatusHistoryIdsRef.current.get(submission.id),
+      );
+      rememberSubmissionHistoryPersisted(submission);
+      dirtySubmissionVersionsRef.current.delete(submission.id);
+      pendingSaveMessagesRef.current.delete(submission.id);
+      setSaveState("idle");
+      setToast(successMessage);
+    } catch (error) {
+      console.error("Immediate Supabase save failed", error);
+      if (cleanupTarget) {
+        try {
+          await deleteMediaFromStorage(cleanupTarget);
+        } catch (cleanupError) {
+          console.error("Uploaded media cleanup failed", cleanupError);
+        }
+      }
+      dirtySubmissionVersionsRef.current.delete(submission.id);
+      pendingSaveMessagesRef.current.delete(submission.id);
+      setSaveState("error");
+      await reloadRemoteSubmissions(activeSession);
+      setToast("Remote save failed. Last saved Supabase data was reloaded.");
+    }
+  }
+
+  useEffect(() => {
+    if (!isSupabaseSession || !session) return undefined;
+    if (savingRemoteRef.current) return undefined;
+
+    const queued = Array.from(dirtySubmissionVersionsRef.current.entries());
+    if (!queued.length) return undefined;
+
+    let cancelled = false;
+    let started = false;
+    const timer = window.setTimeout(() => {
+      started = true;
+      const saveQueuedChanges = async () => {
+        const activeSession = session;
+        const submissionsById = new Map(
+          submissions.map((submission) => [submission.id, submission]),
+        );
+        let finalSuccessMessage = "";
+
+        savingRemoteRef.current = true;
+        setSaveState("saving");
+        try {
+          for (const [id, version] of queued) {
+            const submission = submissionsById.get(id);
+            if (!submission) {
+              dirtySubmissionVersionsRef.current.delete(id);
+              pendingSaveMessagesRef.current.delete(id);
+              continue;
+            }
+
+            await saveWorkspaceSubmission(
+              activeSession,
+              submission,
+              persistedStatusHistoryIdsRef.current.get(id),
+            );
+            rememberSubmissionHistoryPersisted(submission);
+
+            if (dirtySubmissionVersionsRef.current.get(id) === version) {
+              dirtySubmissionVersionsRef.current.delete(id);
+              finalSuccessMessage =
+                pendingSaveMessagesRef.current.get(id) ?? finalSuccessMessage;
+              pendingSaveMessagesRef.current.delete(id);
+            }
+          }
+
+          if (!cancelled) {
+            setSaveState("idle");
+            if (finalSuccessMessage) setToast(finalSuccessMessage);
+          }
+        } catch (error) {
+          console.error("Supabase autosave failed", error);
+          dirtySubmissionVersionsRef.current.clear();
+          pendingSaveMessagesRef.current.clear();
+          if (!cancelled) {
+            setSaveState("error");
+            try {
+              await reloadRemoteSubmissions(activeSession);
+              setToast("Remote save failed. Last saved Supabase data was reloaded.");
+            } catch (reloadError) {
+              console.error("Supabase reload after save failure failed", reloadError);
+              setToast("Remote save failed. Refresh before continuing.");
+            }
+          }
+        } finally {
+          savingRemoteRef.current = false;
+        }
+      };
+
+      void saveQueuedChanges();
+    }, 450);
+
+    return () => {
+      if (!started) cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isSupabaseSession, saveState, session, submissions]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -510,13 +771,51 @@ function App() {
 
   async function loginDemo(role: Role) {
     const nextSession = await signInDemo(role);
+    const loaded = (await loadWorkspaceSubmissions(nextSession)).map(
+      normalizeSubmission,
+    );
     setSession(nextSession);
+    setSubmissions(loaded);
+    persistedStatusHistoryIdsRef.current = collectPersistedStatusHistoryIds(loaded);
     setSelectedCaseId(null);
+  }
+
+  async function loginSupabase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthError("");
+    setLoginBusy(true);
+    setDataLoading(true);
+    try {
+      const nextSession = await signInSupabaseWithPassword(loginEmail, loginPassword);
+      const loaded = (await loadWorkspaceSubmissions(nextSession)).map(
+        normalizeSubmission,
+      );
+      setSession(nextSession);
+      setSubmissions(loaded);
+      persistedStatusHistoryIdsRef.current = collectPersistedStatusHistoryIds(loaded);
+      setSelectedCaseId(null);
+      setToast(`Signed in as ${nextSession.profile.displayName}.`);
+    } catch (error) {
+      console.error("Supabase sign-in failed", error);
+      setAuthError(
+        safeErrorMessage(
+          error,
+          "Unable to sign in. Check email, password, and Supabase profile.",
+        ),
+      );
+    } finally {
+      setLoginBusy(false);
+      setDataLoading(false);
+    }
   }
 
   async function logout() {
     await signOutCurrentSession();
     setSession(null);
+    setSubmissions([]);
+    persistedStatusHistoryIdsRef.current = new Map();
+    dirtySubmissionVersionsRef.current.clear();
+    pendingSaveMessagesRef.current.clear();
     setSelectedCaseId(null);
   }
 
@@ -527,9 +826,12 @@ function App() {
     }
 
     const nextSubmission = createAgentDraft(profile, submissions.length);
-    setSubmissions((current) => [nextSubmission, ...current]);
+    stageSubmissionUpdates(
+      [nextSubmission.id],
+      (current) => [nextSubmission, ...current],
+      `${nextSubmission.id} draft created for intake.`,
+    );
     setSelectedCaseId(nextSubmission.id);
-    setToast(`${nextSubmission.id} draft created for intake.`);
   }
 
   function updateAgentApplicantField(
@@ -543,7 +845,7 @@ function App() {
       return;
     }
 
-    setSubmissions((current) =>
+    stageSubmissionUpdates([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId || submission.agentId !== profile.id) {
           return submission;
@@ -592,17 +894,151 @@ function App() {
     );
   }
 
-  function updateAgentMediaSlot(
+  async function updateAgentMediaSlot(
     submissionId: string,
     applicantId: string,
     type: MediaSlotType,
+    file?: File,
   ) {
     if (!profile || profile.role !== "agent") {
       setToast("Agent access is required to update media.");
       return;
     }
 
-    setSubmissions((current) =>
+    const submission = submissions.find(
+      (item) => item.id === submissionId && item.agentId === profile.id,
+    );
+    if (!submission) {
+      setToast("This media slot is not available for the current agent.");
+      return;
+    }
+
+    if (isSupabaseSession && session?.mode === "supabase") {
+      if (!file) {
+        setToast("Choose a real media file before marking this slot uploaded.");
+        return;
+      }
+
+      if (type !== "video" && file.type !== "image/jpeg") {
+        setToast("Photo and selfie slots require a JPG file for this storage path.");
+        return;
+      }
+
+      const applicant = submission.applicants
+        .map((item, index) => normalizeApplicant(item, index, submission))
+        .find((item) => item.id === applicantId);
+      if (!applicant?.id) {
+        setToast("Applicant data must be saved before uploading media.");
+        return;
+      }
+
+      const existingSlot = (applicant.mediaSlots ?? []).find(
+        (slot) => slot.type === type,
+      );
+      const rebuilt = buildMediaSlot(applicant, type, "uploaded");
+      if (!rebuilt.generatedFileName) {
+        setToast("Enter a passport number before uploading this media file.");
+        return;
+      }
+
+      const uploadedSlot = {
+        ...existingSlot,
+        ...rebuilt,
+        state: "uploaded" as const,
+        originalFileName: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        uploadedAt: currentDate,
+        uploadStatus: "uploaded" as const,
+        reviewStatus: "not_reviewed" as const,
+      };
+      const target = storageTargetForSlot(submissionId, applicant.id, uploadedSlot);
+      const mediaKey = `${submissionId}:${applicant.id}:${type}`;
+
+      setUploadingMediaKey(mediaKey);
+      try {
+        await saveWorkspaceSubmission(
+          session,
+          submission,
+          persistedStatusHistoryIdsRef.current.get(submission.id),
+        );
+        rememberSubmissionHistoryPersisted(submission);
+
+        const upload = await uploadMediaToStorage(target, file);
+        if (!upload) {
+          throw new Error("Supabase storage is inactive.");
+        }
+
+        const nextSubmissions = submissions.map((currentSubmission) => {
+          if (
+            currentSubmission.id !== submissionId ||
+            currentSubmission.agentId !== profile.id
+          ) {
+            return currentSubmission;
+          }
+
+          const applicants = currentSubmission.applicants.map(
+            (currentApplicant, index) => {
+              const normalized = normalizeApplicant(
+                currentApplicant,
+                index,
+                currentSubmission,
+              );
+              if (normalized.id !== applicantId) return normalized;
+
+              const mediaSlots = (normalized.mediaSlots ?? []).map((slot) =>
+                slot.type === type ? uploadedSlot : slot,
+              );
+
+              return normalizeApplicant(
+                {
+                  ...normalized,
+                  mediaSlots,
+                },
+                index,
+                currentSubmission,
+              );
+            },
+          );
+
+          return normalizeSubmission({
+            ...currentSubmission,
+            applicants,
+            status:
+              currentSubmission.status === "draft"
+                ? "filling"
+                : currentSubmission.status,
+            updated: currentDate,
+          });
+        });
+        const nextSubmission = nextSubmissions.find((item) => item.id === submissionId);
+        if (!nextSubmission) {
+          throw new Error("Updated submission was not found after media upload.");
+        }
+
+        setSubmissions(nextSubmissions);
+        await persistSubmissionImmediately(
+          session,
+          nextSubmission,
+          `${uploadedSlot.label} uploaded and saved.`,
+          target,
+        );
+      } catch (error) {
+        console.error("Supabase media upload failed", error);
+        setSaveState("error");
+        try {
+          await reloadRemoteSubmissions(session);
+        } catch (reloadError) {
+          console.error("Supabase reload after media failure failed", reloadError);
+        }
+        setToast("Media upload failed. No uploaded file was marked complete.");
+      } finally {
+        setUploadingMediaKey("");
+      }
+      return;
+    }
+
+    stageSubmissionUpdates([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId || submission.agentId !== profile.id) {
           return submission;
@@ -669,22 +1105,24 @@ function App() {
       return;
     }
 
-    setSubmissions((current) =>
-      current.map((item) => {
-        if (item.id !== submission.id) return item;
+    stageSubmissionUpdates(
+      [submission.id],
+      (current) =>
+        current.map((item) => {
+          if (item.id !== submission.id) return item;
 
-        const fixed = candidateWithClosedCorrections(item, profile.displayName);
+          const fixed = candidateWithClosedCorrections(item, profile.displayName);
 
-        return transitionSubmissionStatus(
-          fixed,
-          "ready_for_review",
-          profile.displayName,
-          currentDate,
-          "Agent marked returned corrections as fixed.",
-        );
-      }),
+          return transitionSubmissionStatus(
+            fixed,
+            "ready_for_review",
+            profile.displayName,
+            currentDate,
+            "Agent marked returned corrections as fixed.",
+          );
+        }),
+      `${submission.id} corrections marked fixed.`,
     );
-    setToast(`${submission.id} corrections marked fixed.`);
   }
 
   function submitAgentCase(submission: Submission) {
@@ -704,20 +1142,22 @@ function App() {
       return;
     }
 
-    setSubmissions((current) =>
-      current.map((item) =>
-        item.id === submission.id
-          ? transitionSubmissionStatus(
-              item,
-              "waiting_review",
-              profile.displayName,
-              currentDate,
-              "Agent submitted the case to operator review.",
-            )
-          : item,
-      ),
+    stageSubmissionUpdates(
+      [submission.id],
+      (current) =>
+        current.map((item) =>
+          item.id === submission.id
+            ? transitionSubmissionStatus(
+                item,
+                "waiting_review",
+                profile.displayName,
+                currentDate,
+                "Agent submitted the case to operator review.",
+              )
+            : item,
+        ),
+      `${submission.id} sent to operator review.`,
     );
-    setToast(`${submission.id} sent to operator review.`);
   }
 
   function openPriorityCase() {
@@ -747,32 +1187,34 @@ function App() {
       return;
     }
 
-    setSubmissions((current) =>
-      current.map((submission) => {
-        if (submission.id !== selectedSubmission.id) return submission;
+    stageSubmissionUpdates(
+      [selectedSubmission.id],
+      (current) =>
+        current.map((submission) => {
+          if (submission.id !== selectedSubmission.id) return submission;
 
-        const reviewStarted =
-          submission.status === "in_review"
-            ? submission
-            : transitionSubmissionStatus(
-                submission,
-                "in_review",
-                currentActor,
-                currentDate,
-                "Operator started human readiness review.",
-              );
+          const reviewStarted =
+            submission.status === "in_review"
+              ? submission
+              : transitionSubmissionStatus(
+                  submission,
+                  "in_review",
+                  currentActor,
+                  currentDate,
+                  "Operator started human readiness review.",
+                );
 
-        return transitionSubmissionStatus(
-          reviewStarted,
-          "accepted",
-          currentActor,
-          currentDate,
-          "Operator accepted the case for manual handoff.",
-        );
-      }),
+          return transitionSubmissionStatus(
+            reviewStarted,
+            "accepted",
+            currentActor,
+            currentDate,
+            "Operator accepted the case for manual handoff.",
+          );
+        }),
+      `${selectedSubmission.id} marked ready for manual handoff.`,
     );
     setSelectedCaseId(null);
-    setToast(`${selectedSubmission.id} marked ready for manual handoff.`);
   }
 
   function returnToAgent() {
@@ -790,7 +1232,7 @@ function App() {
 
     const changedAt = currentDate;
     const correction: CorrectionNote = {
-      id: `${selectedSubmission.id}-admin-return-${Date.now()}`,
+      id: crypto.randomUUID(),
       target: "Admin review",
       scope: "submission",
       severity: "blocking",
@@ -800,24 +1242,26 @@ function App() {
       createdAt: changedAt,
     };
 
-    setSubmissions((current) =>
-      current.map((submission) => {
-        if (submission.id !== selectedSubmission.id) return submission;
+    stageSubmissionUpdates(
+      [selectedSubmission.id],
+      (current) =>
+        current.map((submission) => {
+          if (submission.id !== selectedSubmission.id) return submission;
 
-        return transitionSubmissionStatus(
-          {
-            ...submission,
-            notes: [correction, ...submission.notes],
-          },
-          "returned",
-          currentActor,
-          changedAt,
-          "Operator returned the case for correction.",
-        );
-      }),
+          return transitionSubmissionStatus(
+            {
+              ...submission,
+              notes: [correction, ...submission.notes],
+            },
+            "returned",
+            currentActor,
+            changedAt,
+            "Operator returned the case for correction.",
+          );
+        }),
+      `${selectedSubmission.id} returned to the agency for correction.`,
     );
     setSelectedCaseId(null);
-    setToast(`${selectedSubmission.id} returned to the agency for correction.`);
   }
 
   function advanceHandoff() {
@@ -832,21 +1276,23 @@ function App() {
       return;
     }
 
-    setSubmissions((current) =>
-      current.map((submission) =>
-        submission.id === selectedSubmission.id
-          ? transitionSubmissionStatus(
-              submission,
-              nextStatus,
-              currentActor,
-              currentDate,
-              `Operator advanced handoff to ${statusMeta[nextStatus].label}.`,
-            )
-          : submission,
-      ),
+    stageSubmissionUpdates(
+      [selectedSubmission.id],
+      (current) =>
+        current.map((submission) =>
+          submission.id === selectedSubmission.id
+            ? transitionSubmissionStatus(
+                submission,
+                nextStatus,
+                currentActor,
+                currentDate,
+                `Operator advanced handoff to ${statusMeta[nextStatus].label}.`,
+              )
+            : submission,
+        ),
+      `${selectedSubmission.id}: ${handoffActionLabel(selectedSubmission)}.`,
     );
     setSelectedCaseId(null);
-    setToast(`${selectedSubmission.id}: ${handoffActionLabel(selectedSubmission)}.`);
   }
 
   if (!authChecked) {
@@ -862,6 +1308,11 @@ function App() {
   }
 
   if (!session) {
+    const canUseSupabaseAuth = supabaseRuntimeConfig.selected === "supabase";
+    const activationBlocked =
+      supabaseRuntimeConfig.target === "supabase" &&
+      supabaseRuntimeConfig.selected !== "supabase";
+
     return (
       <main className="auth-shell">
         <section className="auth-card" aria-labelledby="login-title">
@@ -871,25 +1322,65 @@ function App() {
             Operator queues are gated. Admin review actions are available only after the
             current session is known.
           </p>
-          <div className="auth-actions">
-            <button
-              className="button button-primary"
-              type="button"
-              onClick={() => void loginDemo("admin")}
-            >
-              Continue as Admin demo
-            </button>
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => void loginDemo("agent")}
-            >
-              Continue as Agent demo
-            </button>
-          </div>
+          {canUseSupabaseAuth ? (
+            <form className="auth-form" onSubmit={loginSupabase}>
+              <label>
+                <span>Email</span>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={loginEmail}
+                  onChange={(event) => setLoginEmail(event.currentTarget.value)}
+                  required
+                />
+              </label>
+              <label>
+                <span>Password</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={loginPassword}
+                  onChange={(event) => setLoginPassword(event.currentTarget.value)}
+                  required
+                />
+              </label>
+              <button
+                className="button button-primary"
+                type="submit"
+                disabled={loginBusy || dataLoading}
+              >
+                {loginBusy || dataLoading ? "Signing in..." : "Sign in"}
+              </button>
+            </form>
+          ) : (
+            <div className="auth-actions">
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => void loginDemo("admin")}
+              >
+                Continue as Admin demo
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => void loginDemo("agent")}
+              >
+                Continue as Agent demo
+              </button>
+            </div>
+          )}
+          {authError ? (
+            <p className="auth-error" role="alert">
+              {authError}
+            </p>
+          ) : null}
           <p className="auth-note">
-            This workspace uses local demo data until Supabase RLS, storage, and
-            persistence activation pass live review.
+            {canUseSupabaseAuth
+              ? "Supabase sandbox access is enabled for real Auth, database, and Storage smoke. Human review still owns readiness and handoff."
+              : activationBlocked
+                ? `Supabase remains fail-closed: ${supabaseRuntimeConfig.blockedReasons[0] ?? "activation evidence is incomplete."}`
+                : "This workspace uses local demo data until Supabase RLS, storage, and persistence activation pass live review."}
           </p>
         </section>
         <div
@@ -961,7 +1452,16 @@ function App() {
               />
             </label>
             <div className="topbar-actions">
-              <span className="demo-pill">Local demo data</span>
+              <span className="demo-pill">{sourceLabel}</span>
+              {isSupabaseSession ? (
+                <span className={`save-pill save-pill-${saveState}`}>
+                  {saveState === "saving"
+                    ? "Saving"
+                    : saveState === "error"
+                      ? "Save failed"
+                      : "Saved"}
+                </span>
+              ) : null}
               <div className="role-switch" aria-label="Current role">
                 <strong>Agent</strong>
                 <span>Admin</span>
@@ -1043,7 +1543,7 @@ function App() {
                   className="link-button"
                   type="button"
                   onClick={() =>
-                    setToast("Agent cases are loaded from the submission repository.")
+                    setToast(`Agent cases are loaded from ${sourceLabel}.`)
                   }
                 >
                   Repository source <span aria-hidden="true">→</span>
@@ -1193,32 +1693,69 @@ function App() {
                       </div>
 
                       <div className="media-edit-list" aria-label="Applicant media">
-                        {(normalized.mediaSlots ?? []).map((slot) => (
-                          <div className="media-edit-row" key={slot.id}>
-                            <div>
-                              <strong>{slot.label}</strong>
-                              <span>{slot.state}</span>
+                        {(normalized.mediaSlots ?? []).map((slot) => {
+                          const mediaKey = `${selectedAgentSubmission.id}:${normalized.id ?? ""}:${slot.type}`;
+                          const mediaComplete =
+                            slot.state === "uploaded" || slot.state === "accepted";
+                          const mediaBusy = uploadingMediaKey === mediaKey;
+
+                          return (
+                            <div className="media-edit-row" key={slot.id}>
+                              <div>
+                                <strong>{slot.label}</strong>
+                                <span>{slot.state}</span>
+                              </div>
+                              {isSupabaseSession ? (
+                                <label
+                                  className={`button button-secondary upload-button ${
+                                    mediaComplete || mediaBusy ? "is-disabled" : ""
+                                  }`}
+                                  aria-disabled={mediaComplete || mediaBusy}
+                                >
+                                  <input
+                                    type="file"
+                                    accept={mediaAccept(slot.type)}
+                                    disabled={mediaComplete || mediaBusy}
+                                    onChange={(event) => {
+                                      const file = event.currentTarget.files?.[0];
+                                      event.currentTarget.value = "";
+                                      if (file) {
+                                        void updateAgentMediaSlot(
+                                          selectedAgentSubmission.id,
+                                          normalized.id ?? "",
+                                          slot.type,
+                                          file,
+                                        );
+                                      }
+                                    }}
+                                  />
+                                  {mediaBusy
+                                    ? "Uploading..."
+                                    : mediaComplete
+                                      ? "Uploaded"
+                                      : mediaUploadButtonLabel(slot.type)}
+                                </label>
+                              ) : (
+                                <button
+                                  className="button button-secondary"
+                                  type="button"
+                                  onClick={() =>
+                                    void updateAgentMediaSlot(
+                                      selectedAgentSubmission.id,
+                                      normalized.id ?? "",
+                                      slot.type,
+                                    )
+                                  }
+                                  disabled={mediaComplete}
+                                >
+                                  {slot.state === "missing" || slot.state === "replace"
+                                    ? "Mark uploaded"
+                                    : "Uploaded"}
+                                </button>
+                              )}
                             </div>
-                            <button
-                              className="button button-secondary"
-                              type="button"
-                              onClick={() =>
-                                updateAgentMediaSlot(
-                                  selectedAgentSubmission.id,
-                                  normalized.id ?? "",
-                                  slot.type,
-                                )
-                              }
-                              disabled={
-                                slot.state === "uploaded" || slot.state === "accepted"
-                              }
-                            >
-                              {slot.state === "missing" || slot.state === "replace"
-                                ? "Mark uploaded"
-                                : "Uploaded"}
-                            </button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </section>
                   );
@@ -1308,13 +1845,15 @@ function App() {
             the admin review console.
           </p>
           <div className="auth-actions">
-            <button
-              className="button button-primary"
-              type="button"
-              onClick={() => void loginDemo("admin")}
-            >
-              Switch to Admin demo
-            </button>
+            {!isSupabaseSession ? (
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => void loginDemo("admin")}
+              >
+                Switch to Admin demo
+              </button>
+            ) : null}
             <button
               className="button button-secondary"
               type="button"
@@ -1403,7 +1942,16 @@ function App() {
             />
           </label>
           <div className="topbar-actions">
-            <span className="demo-pill">Local demo data</span>
+            <span className="demo-pill">{sourceLabel}</span>
+            {isSupabaseSession ? (
+              <span className={`save-pill save-pill-${saveState}`}>
+                {saveState === "saving"
+                  ? "Saving"
+                  : saveState === "error"
+                    ? "Save failed"
+                    : "Saved"}
+              </span>
+            ) : null}
             <div className="role-switch" aria-label="Current role">
               <span>Agent</span>
               <strong>Admin</strong>
@@ -1446,9 +1994,7 @@ function App() {
               <button
                 className="button button-primary"
                 type="button"
-                onClick={() =>
-                  setToast("Showing the repository-backed case queue below.")
-                }
+                onClick={() => setToast(`Showing the ${sourceLabel} case queue below.`)}
               >
                 View all cases
               </button>
@@ -1510,9 +2056,7 @@ function App() {
                 <button
                   className="link-button"
                   type="button"
-                  onClick={() =>
-                    setToast("Queue is loaded from the local submission repository.")
-                  }
+                  onClick={() => setToast(`Queue is loaded from ${sourceLabel}.`)}
                 >
                   Queue source <span aria-hidden="true">→</span>
                 </button>

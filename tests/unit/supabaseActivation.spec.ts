@@ -63,6 +63,47 @@ describe("Supabase activation gate", () => {
     expect(readiness.missing.map((item) => item.id)).toContain("rls-policy-tests");
   });
 
+  test("allows sandbox probe without marking activation ready", () => {
+    const readiness = evaluateSupabaseActivationReadiness({
+      target: "supabase",
+      releaseEnabled: false,
+      sandboxProbeEnabled: true,
+      config: completeConfig,
+      evidence: {
+        ...completeEvidence,
+        migrationApproved: false,
+        migrationsApplied: false,
+        rlsPolicyTestsPassed: false,
+        storagePolicyTestsPassed: false,
+        edgeFunctionDryRunsPassed: false,
+        browserQaPassed: false,
+        browserKeyAudited: false,
+      },
+    });
+
+    expect(readiness.state).toBe("contract-only");
+    expect(readiness.ready).toBe(false);
+    expect(readiness.allowClientActivation).toBe(false);
+    expect(readiness.allowSandboxProbe).toBe(true);
+  });
+
+  test("does not allow sandbox probe for production target", () => {
+    const readiness = evaluateSupabaseActivationReadiness({
+      target: "supabase",
+      releaseEnabled: false,
+      sandboxProbeEnabled: true,
+      config: completeConfig,
+      evidence: {
+        ...completeEvidence,
+        target: "production",
+        productionApproved: false,
+      },
+    });
+
+    expect(readiness.allowSandboxProbe).toBe(false);
+    expect(readiness.allowClientActivation).toBe(false);
+  });
+
   test("keeps placeholder config blocked", () => {
     const readiness = evaluateSupabaseActivationReadiness({
       target: "supabase",

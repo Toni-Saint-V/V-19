@@ -46,6 +46,7 @@ export interface SupabaseActivationReadiness {
   target: SupabaseActivationTarget;
   ready: boolean;
   allowClientActivation: boolean;
+  allowSandboxProbe: boolean;
   state:
     | "local-demo"
     | "missing-config"
@@ -211,6 +212,7 @@ function evidenceReady(
 export function evaluateSupabaseActivationReadiness(input: {
   target: SupabaseBackendTarget;
   releaseEnabled: boolean;
+  sandboxProbeEnabled?: boolean;
   config: SupabaseActivationConfig;
   evidence: SupabaseActivationEvidence;
 }): SupabaseActivationReadiness {
@@ -222,6 +224,7 @@ export function evaluateSupabaseActivationReadiness(input: {
       target: input.evidence.target,
       ready: false,
       allowClientActivation: false,
+      allowSandboxProbe: false,
       state: "local-demo",
       missing: [],
       warnings: [],
@@ -240,6 +243,12 @@ export function evaluateSupabaseActivationReadiness(input: {
   });
   const ready = missing.length === 0;
   const projectConfigReady = isProjectConfigReady(configured);
+  const allowSandboxProbe =
+    input.sandboxProbeEnabled === true &&
+    input.target === "supabase" &&
+    input.evidence.target === "sandbox" &&
+    input.evidence.activationTargetDeclared === true &&
+    projectConfigReady;
   const state = ready
     ? input.evidence.target === "production"
       ? "production-ready"
@@ -261,6 +270,12 @@ export function evaluateSupabaseActivationReadiness(input: {
     );
   }
 
+  if (allowSandboxProbe && !ready) {
+    warnings.push(
+      "Supabase sandbox probe is enabled for Auth, database, and Storage smoke only. Activation evidence remains incomplete.",
+    );
+  }
+
   if (state === "placeholder-config") {
     warnings.push(
       "Supabase config contains placeholder values. Replace them before live probes.",
@@ -273,6 +288,7 @@ export function evaluateSupabaseActivationReadiness(input: {
     target: input.evidence.target,
     ready,
     allowClientActivation: ready,
+    allowSandboxProbe,
     state,
     missing,
     warnings,
