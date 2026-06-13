@@ -7,6 +7,14 @@ const releaseRunbookPath = resolve(
   repoRoot,
   "docs/release/supabase-production-promotion.md",
 );
+const prPackagePath = resolve(
+  repoRoot,
+  "docs/release/supabase-workspace-pr-package.md",
+);
+const productionApprovalChecklistPath = resolve(
+  repoRoot,
+  "docs/release/supabase-production-approval-checklist.md",
+);
 const supabaseReadmePath = resolve(repoRoot, "supabase/README.md");
 const liveSmokePath = resolve(repoRoot, "tests/integration/supabase-live.spec.ts");
 const packagePath = resolve(repoRoot, "package.json");
@@ -248,6 +256,11 @@ function verifyDocsAndScripts() {
     releaseRunbookPath,
     "Supabase production runbook exists",
   );
+  const prPackage = readProjectFile(prPackagePath, "Supabase PR package exists");
+  const approvalChecklist = readProjectFile(
+    productionApprovalChecklistPath,
+    "Supabase production approval checklist exists",
+  );
 
   if (packageJson.scripts?.["verify:supabase-release"]) {
     pass("Package exposes verify:supabase-release");
@@ -275,12 +288,38 @@ function verifyDocsAndScripts() {
 
   for (const expected of [
     "Do not apply these migrations to production from Codex without explicit owner approval.",
+    "supabase-workspace-pr-package.md",
+    "supabase-production-approval-checklist.md",
     "Rollback Boundary",
     "Migration Order",
     "Final Sandbox RLS And Storage Smoke",
     "VITE_SUPABASE_PRODUCTION_APPROVED=true",
   ]) {
     expectContains(runbook, expected, `Production runbook documents ${expected}`);
+  }
+
+  for (const expected of [
+    "768a3a4 Harden Supabase workspace write guards",
+    "5d73f7d Add Supabase production promotion gate",
+    "Ready for PR review",
+    "Not ready for production activation until the production approval checklist is completed.",
+  ]) {
+    expectContains(prPackage, expected, `PR package documents ${expected}`);
+  }
+
+  for (const expected of [
+    "Production project id:",
+    "Rollout owner:",
+    "Agent smoke account exists.",
+    "Backup owner:",
+    "Go / No-Go:",
+    "VITE_SUPABASE_PRODUCTION_APPROVED=true",
+  ]) {
+    expectContains(
+      approvalChecklist,
+      expected,
+      `Production approval checklist documents ${expected}`,
+    );
   }
 }
 
