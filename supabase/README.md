@@ -19,7 +19,7 @@ Do not place service-role, OpenAI, or other backend secrets in frontend env file
 
 ## Live smoke env
 
-`npm run test:supabase-live` uses browser-safe Supabase clients and real user JWTs. It must not use a service-role key. Put local smoke credentials in ignored `.env.supabase-smoke.local` so normal Vite and Playwright runs stay on `local-demo`.
+`npm run test:supabase-live` uses browser-safe Supabase clients and real user JWTs. It must not use a service-role key. Put local smoke credentials only in ignored `.env.supabase-smoke.local`; the smoke runner does not read `.env` or `.env.local`, and it requires `VITE_SUPABASE_ACTIVATION_TARGET=sandbox` plus the allow-listed V-19 sandbox project.
 
 Required test accounts must already exist in Supabase Auth and have matching `public.profiles` rows:
 

@@ -67,8 +67,6 @@ type QueueCase = {
   submission: Submission;
 };
 
-const currentActor = "Demo operator";
-const currentDate = "11.06.2026";
 const reviewStageStatuses: Array<Submission["status"]> = [
   "waiting_review",
   "in_review",
@@ -332,9 +330,14 @@ function nextHandoffStatus(status: Submission["status"]): Submission["status"] |
   return null;
 }
 
+function actionTimestamp(): string {
+  return new Date().toISOString();
+}
+
 function candidateWithClosedCorrections(
   submission: Submission,
   changedBy: string,
+  changedAt: string,
 ): Submission {
   return submission.notes.reduce(
     (next, note) =>
@@ -342,7 +345,7 @@ function candidateWithClosedCorrections(
         next,
         note.id ?? `${note.target}-${note.text}`,
         changedBy,
-        currentDate,
+        changedAt,
       ),
     submission,
   );
@@ -383,6 +386,7 @@ function createAgentDraft(profile: AppProfile, count: number): Submission {
   const id = `VF-AGENT-${Date.now().toString().slice(-6)}-${count + 1}`;
   const applicantId = `${id}-1`;
   const title = `New applicant ${count + 1}`;
+  const createdAt = actionTimestamp();
 
   return normalizeSubmission({
     id,
@@ -393,8 +397,8 @@ function createAgentDraft(profile: AppProfile, count: number): Submission {
     country: "Spain",
     city: "Madrid",
     travelDate: "2026-08-20",
-    updated: currentDate,
-    createdAt: currentDate,
+    updated: createdAt,
+    createdAt,
     status: "draft",
     appointment: "not_started",
     priority: "Средний",
@@ -501,7 +505,11 @@ function App() {
   const selectedAgentCorrectionPreflight =
     selectedAgentSubmission?.status === "returned" && profile
       ? submissionPreflight(
-          candidateWithClosedCorrections(selectedAgentSubmission, profile.displayName),
+          candidateWithClosedCorrections(
+            selectedAgentSubmission,
+            profile.displayName,
+            selectedAgentSubmission.updated,
+          ),
         )
       : selectedAgentPreflight;
   const priorityCase = queueCases[0] ?? null;
@@ -845,6 +853,7 @@ function App() {
       return;
     }
 
+    const changedAt = actionTimestamp();
     stageSubmissionUpdates([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId || submission.agentId !== profile.id) {
@@ -888,7 +897,7 @@ function App() {
               : submission.travelDate,
           applicants,
           status: submission.status === "draft" ? "filling" : submission.status,
-          updated: currentDate,
+          updated: changedAt,
         });
       }),
     );
@@ -941,6 +950,7 @@ function App() {
         return;
       }
 
+      const changedAt = actionTimestamp();
       const uploadedSlot = {
         ...existingSlot,
         ...rebuilt,
@@ -948,7 +958,7 @@ function App() {
         originalFileName: file.name,
         mimeType: file.type,
         sizeBytes: file.size,
-        uploadedAt: currentDate,
+        uploadedAt: changedAt,
         uploadStatus: "uploaded" as const,
         reviewStatus: "not_reviewed" as const,
       };
@@ -1008,7 +1018,7 @@ function App() {
               currentSubmission.status === "draft"
                 ? "filling"
                 : currentSubmission.status,
-            updated: currentDate,
+            updated: changedAt,
           });
         });
         const nextSubmission = nextSubmissions.find((item) => item.id === submissionId);
@@ -1038,6 +1048,7 @@ function App() {
       return;
     }
 
+    const changedAt = actionTimestamp();
     stageSubmissionUpdates([submissionId], (current) =>
       current.map((submission) => {
         if (submission.id !== submissionId || submission.agentId !== profile.id) {
@@ -1059,7 +1070,7 @@ function App() {
               originalFileName:
                 slot.originalFileName ??
                 `${normalized.name.replace(/\s+/g, "_").toLowerCase()}_${type}`,
-              uploadedAt: currentDate,
+              uploadedAt: changedAt,
             };
           });
 
@@ -1077,7 +1088,7 @@ function App() {
           ...submission,
           applicants,
           status: submission.status === "draft" ? "filling" : submission.status,
-          updated: currentDate,
+          updated: changedAt,
         });
       }),
     );
@@ -1094,9 +1105,11 @@ function App() {
       return;
     }
 
+    const changedAt = actionTimestamp();
     const fixedCandidate = candidateWithClosedCorrections(
       submission,
       profile.displayName,
+      changedAt,
     );
     const preflight = submissionPreflight(fixedCandidate);
     if (!preflight.canSubmit) {
@@ -1111,13 +1124,17 @@ function App() {
         current.map((item) => {
           if (item.id !== submission.id) return item;
 
-          const fixed = candidateWithClosedCorrections(item, profile.displayName);
+          const fixed = candidateWithClosedCorrections(
+            item,
+            profile.displayName,
+            changedAt,
+          );
 
           return transitionSubmissionStatus(
             fixed,
             "ready_for_review",
             profile.displayName,
-            currentDate,
+            changedAt,
             "Agent marked returned corrections as fixed.",
           );
         }),
@@ -1142,6 +1159,7 @@ function App() {
       return;
     }
 
+    const changedAt = actionTimestamp();
     stageSubmissionUpdates(
       [submission.id],
       (current) =>
@@ -1151,7 +1169,7 @@ function App() {
                 item,
                 "waiting_review",
                 profile.displayName,
-                currentDate,
+                changedAt,
                 "Agent submitted the case to operator review.",
               )
             : item,
@@ -1187,6 +1205,8 @@ function App() {
       return;
     }
 
+    const actor = profile?.displayName ?? "Operator";
+    const changedAt = actionTimestamp();
     stageSubmissionUpdates(
       [selectedSubmission.id],
       (current) =>
@@ -1199,16 +1219,16 @@ function App() {
               : transitionSubmissionStatus(
                   submission,
                   "in_review",
-                  currentActor,
-                  currentDate,
+                  actor,
+                  changedAt,
                   "Operator started human readiness review.",
                 );
 
           return transitionSubmissionStatus(
             reviewStarted,
             "accepted",
-            currentActor,
-            currentDate,
+            actor,
+            changedAt,
             "Operator accepted the case for manual handoff.",
           );
         }),
@@ -1230,7 +1250,9 @@ function App() {
       return;
     }
 
-    const changedAt = currentDate;
+    const actor = profile?.displayName ?? "Operator";
+    const actorId = profile?.id ?? actor;
+    const changedAt = actionTimestamp();
     const correction: CorrectionNote = {
       id: crypto.randomUUID(),
       target: "Admin review",
@@ -1238,7 +1260,7 @@ function App() {
       severity: "blocking",
       status: "open",
       text: "Human review returned this case for agency correction.",
-      createdBy: currentActor,
+      createdBy: actorId,
       createdAt: changedAt,
     };
 
@@ -1254,7 +1276,7 @@ function App() {
               notes: [correction, ...submission.notes],
             },
             "returned",
-            currentActor,
+            actor,
             changedAt,
             "Operator returned the case for correction.",
           );
@@ -1276,6 +1298,8 @@ function App() {
       return;
     }
 
+    const actor = profile?.displayName ?? "Operator";
+    const changedAt = actionTimestamp();
     stageSubmissionUpdates(
       [selectedSubmission.id],
       (current) =>
@@ -1284,8 +1308,8 @@ function App() {
             ? transitionSubmissionStatus(
                 submission,
                 nextStatus,
-                currentActor,
-                currentDate,
+                actor,
+                changedAt,
                 `Operator advanced handoff to ${statusMeta[nextStatus].label}.`,
               )
             : submission,

@@ -180,7 +180,7 @@ describe("Supabase submission mapping", () => {
           fieldKey: "address" as const,
           severity: "blocking" as const,
           status: "fixed" as const,
-          createdBy: actorId,
+          createdBy: "00000000-0000-4000-8000-000000000999",
           createdAt: "11.06.2026",
           fixedAt: "2026-06-12T10:00:00.000Z",
         },
@@ -227,6 +227,7 @@ describe("Supabase submission mapping", () => {
       scope: "field",
       field_key: "address",
       status: "fixed",
+      created_by: actorId,
       created_at: "2026-06-11T00:00:00.000Z",
       fixed_at: "2026-06-12T10:00:00.000Z",
     });

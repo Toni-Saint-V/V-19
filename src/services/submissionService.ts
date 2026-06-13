@@ -384,7 +384,7 @@ export function toCorrectionInserts(
     reason: note.text,
     severity: note.severity ?? "blocking",
     status: note.status ?? "open",
-    created_by: toNullableUuid(note.createdBy) ?? actorId,
+    created_by: actorId,
     created_at: timestampOrNow(note.createdAt),
     fixed_at: timestampOrNull(note.fixedAt),
   }));

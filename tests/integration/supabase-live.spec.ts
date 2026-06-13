@@ -16,7 +16,10 @@ import type { Applicant, Submission } from "../../src/types/domain";
 const liveEnabled = process.env.VITEST_SUPABASE_LIVE === "1";
 const describeLive = liveEnabled ? describe : describe.skip;
 const smokeEnv = loadSmokeEnv();
+const allowedSmokeProjectId = "oevvaowoklqttqkraxho";
 const requiredSmokeEnv = [
+  "VITE_SUPABASE_PROJECT_ID",
+  "VITE_SUPABASE_ACTIVATION_TARGET",
   "VITE_SUPABASE_URL",
   "SUPABASE_SMOKE_AGENT_EMAIL",
   "SUPABASE_SMOKE_AGENT_PASSWORD",
@@ -43,28 +46,20 @@ function assertSmokeEnvReady(): void {
 
 function loadSmokeEnv(): Record<string, string> {
   const env: Record<string, string> = {};
-  for (const fileName of [
-    ".env",
-    ".env.local",
-    ".env.test",
-    ".env.test.local",
-    ".env.supabase-smoke.local",
-  ]) {
-    const filePath = resolve(process.cwd(), fileName);
-    if (!existsSync(filePath)) continue;
+  const filePath = resolve(process.cwd(), ".env.supabase-smoke.local");
+  if (!existsSync(filePath)) return env;
 
-    const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
+  const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
 
-      const separatorIndex = trimmed.indexOf("=");
-      if (separatorIndex <= 0) continue;
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) continue;
 
-      const key = trimmed.slice(0, separatorIndex).trim();
-      const rawValue = trimmed.slice(separatorIndex + 1).trim();
-      env[key] = rawValue.replace(/^['"]|['"]$/g, "");
-    }
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const rawValue = trimmed.slice(separatorIndex + 1).trim();
+    env[key] = rawValue.replace(/^['"]|['"]$/g, "");
   }
 
   return env;
@@ -83,7 +78,23 @@ function requiredEnv(name: string): string {
 }
 
 function supabaseUrl(): string {
-  return requiredEnv("VITE_SUPABASE_URL");
+  const projectId = requiredEnv("VITE_SUPABASE_PROJECT_ID");
+  const activationTarget = requiredEnv("VITE_SUPABASE_ACTIVATION_TARGET");
+  const url = requiredEnv("VITE_SUPABASE_URL");
+
+  if (activationTarget !== "sandbox") {
+    throw new Error("Supabase live smoke may only run against sandbox activation.");
+  }
+
+  if (projectId !== allowedSmokeProjectId) {
+    throw new Error(`Supabase live smoke project is not allowed: ${projectId}.`);
+  }
+
+  if (!url.startsWith(`https://${projectId}.supabase.co`)) {
+    throw new Error("Supabase live smoke URL does not match the allowed project.");
+  }
+
+  return url;
 }
 
 function supabasePublishableKey(): string {
@@ -209,6 +220,15 @@ async function saveDraft(
   if (error) throw error;
 }
 
+async function trySaveDraft(
+  client: SupabaseClient<Database>,
+  submission: Submission,
+  actorId: string,
+) {
+  const payload = toSubmissionDraftPersistencePayload(submission, actorId);
+  return client.rpc("save_submission_draft", { payload });
+}
+
 describeLive("Supabase live persistence, RLS and Storage smoke", () => {
   beforeAll(() => {
     assertSmokeEnvReady();
@@ -233,6 +253,41 @@ describeLive("Supabase live persistence, RLS and Storage smoke", () => {
     expect(admin.profile.role).toBe("admin");
 
     const { submission, applicant } = makeSmokeSubmission(owner.profile);
+    const blockedId = `${submission.id}-BLOCKED`;
+    const blockedSubmission = normalizeSubmission({
+      ...submission,
+      id: blockedId,
+      applicants: [
+        {
+          ...applicant,
+          id: `${blockedId}-1`,
+          address: "",
+          mediaSlots: [
+            buildMediaSlot(
+              {
+                ...applicant,
+                id: `${blockedId}-1`,
+                address: "",
+              },
+              "photo_white",
+              "missing",
+            ),
+          ],
+        },
+      ],
+    });
+    await saveDraft(owner.client, blockedSubmission, owner.profile.id);
+    const { error: blockedReviewError } = await trySaveDraft(
+      owner.client,
+      normalizeSubmission({
+        ...blockedSubmission,
+        status: "waiting_review",
+        submittedAt: new Date().toISOString(),
+      }),
+      owner.profile.id,
+    );
+    expect(blockedReviewError).toBeTruthy();
+    expect(blockedReviewError?.message).toContain("required fields");
 
     // The smoke uses one deterministic submission id. Admin reset keeps repeated
     // runs stable without adding runtime delete permissions to the app role.
@@ -276,28 +331,35 @@ describeLive("Supabase live persistence, RLS and Storage smoke", () => {
     );
     expect(agentAcceptedError).toBeTruthy();
 
-    const adminAccepted = normalizeSubmission({
-      ...submission,
-      status: "accepted",
-      acceptedAt: new Date().toISOString(),
-    });
-    await saveDraft(admin.client, adminAccepted, admin.profile.id);
+    const uploadedSlots = [
+      buildMediaSlot(applicant, "photo_white", "uploaded"),
+      buildMediaSlot(applicant, "selfie", "uploaded"),
+      buildMediaSlot(applicant, "video", "uploaded"),
+    ];
+    const uploadedTargets = uploadedSlots.map((slot) => ({
+      slot,
+      target: storageTargetForSlot(submission.id, applicant.id ?? "", slot),
+      file:
+        slot.type === "video"
+          ? new Blob(["supabase-smoke-video"], { type: "video/mp4" })
+          : new Blob(["supabase-smoke-image"], { type: "image/jpeg" }),
+    }));
+    const photoTarget = uploadedTargets[0].target;
+    const photoFile = uploadedTargets[0].file;
 
-    const photoSlot = buildMediaSlot(applicant, "photo_white", "uploaded");
-    const target = storageTargetForSlot(submission.id, applicant.id ?? "", photoSlot);
-    const file = new Blob(["supabase-smoke"], { type: "image/jpeg" });
-
-    const { error: ownerUploadError } = await owner.client.storage
-      .from(mediaStorageBucket)
-      .upload(target.path, file, {
-        contentType: "image/jpeg",
-        upsert: true,
-      });
-    expect(ownerUploadError).toBeNull();
+    for (const { target, file } of uploadedTargets) {
+      const { error: ownerUploadError } = await owner.client.storage
+        .from(mediaStorageBucket)
+        .upload(target.path, file, {
+          contentType: file.type,
+          upsert: true,
+        });
+      expect(ownerUploadError).toBeNull();
+    }
 
     const { error: otherUploadError } = await otherAgent.client.storage
       .from(mediaStorageBucket)
-      .upload(target.path, file, {
+      .upload(photoTarget.path, photoFile, {
         contentType: "image/jpeg",
         upsert: true,
       });
@@ -305,20 +367,87 @@ describeLive("Supabase live persistence, RLS and Storage smoke", () => {
 
     const { data: signedUrlData, error: signedUrlError } = await owner.client.storage
       .from(mediaStorageBucket)
-      .createSignedUrl(target.path, 60);
+      .createSignedUrl(photoTarget.path, 60);
     expect(signedUrlError).toBeNull();
-    expect(signedUrlData?.signedUrl).toContain(target.path);
+    expect(signedUrlData?.signedUrl).toContain(photoTarget.path);
+
+    const readySubmission = normalizeSubmission({
+      ...submission,
+      status: "ready_for_review",
+      media: 100,
+      updated: new Date().toISOString(),
+      applicants: [
+        {
+          ...applicant,
+          media: 100,
+          mediaSlots: uploadedSlots,
+        },
+      ],
+    });
+    await saveDraft(owner.client, readySubmission, owner.profile.id);
+
+    const waitingSubmission = normalizeSubmission({
+      ...readySubmission,
+      status: "waiting_review",
+      submittedAt: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    });
+    await saveDraft(owner.client, waitingSubmission, owner.profile.id);
+
+    const adminAccepted = normalizeSubmission({
+      ...waitingSubmission,
+      status: "accepted",
+      acceptedAt: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    });
+    await saveDraft(admin.client, adminAccepted, admin.profile.id);
+
+    const { data: ownerApplicantUpdateRows, error: ownerApplicantUpdateError } =
+      await owner.client
+        .from("applicants")
+        .update({ full_name: "Tampered After Handoff" })
+        .eq("id", applicant.id ?? "")
+        .select("id");
+    expect(ownerApplicantUpdateError).toBeNull();
+    expect(ownerApplicantUpdateRows).toEqual([]);
+
+    const { data: ownerMediaUpdateRows, error: ownerMediaUpdateError } =
+      await owner.client
+        .from("media_assets")
+        .update({ upload_status: "uploaded" })
+        .eq("applicant_id", applicant.id ?? "")
+        .eq("type", "photo_white")
+        .select("id");
+    expect(ownerMediaUpdateError).toBeNull();
+    expect(ownerMediaUpdateRows).toEqual([]);
+
+    const { error: ownerOverwriteAfterHandoffError } = await owner.client.storage
+      .from(mediaStorageBucket)
+      .upload(photoTarget.path, photoFile, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+    expect(ownerOverwriteAfterHandoffError).toBeTruthy();
 
     const { data: otherSignedUrlData, error: otherSignedUrlError } =
       await otherAgent.client.storage
         .from(mediaStorageBucket)
-        .createSignedUrl(target.path, 60);
+        .createSignedUrl(photoTarget.path, 60);
     expect(otherSignedUrlError).toBeTruthy();
     expect(otherSignedUrlData?.signedUrl).toBeFalsy();
 
-    const { error: cleanupError } = await owner.client.storage
+    const { data: applicantAfterTamper, error: applicantAfterTamperError } =
+      await admin.client
+        .from("applicants")
+        .select("full_name")
+        .eq("id", applicant.id ?? "")
+        .single();
+    expect(applicantAfterTamperError).toBeNull();
+    expect(applicantAfterTamper?.full_name).toBe("Supabase Smoke Applicant");
+
+    const { error: cleanupError } = await admin.client.storage
       .from(mediaStorageBucket)
-      .remove([target.path]);
+      .remove(uploadedTargets.map(({ target }) => target.path));
     expect(cleanupError).toBeNull();
-  });
+  }, 30_000);
 });
