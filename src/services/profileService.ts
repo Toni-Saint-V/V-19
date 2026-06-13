@@ -2,6 +2,7 @@ import type { Role, Screen } from "../types/domain";
 import { getSupabaseClient } from "../lib/supabase/client";
 import type { ProfileRow } from "../lib/supabase/database.types";
 import type { AppProfile } from "./authService";
+import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 function mapProfile(row: ProfileRow): AppProfile {
   return {
@@ -26,7 +27,13 @@ export async function fetchCurrentProfile(userId: string): Promise<AppProfile | 
     .eq("id", userId)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "profile.read",
+      fallbackKind: "database",
+    });
+  }
+  if (!data) return null;
   return mapProfile(data);
 }
 
@@ -45,7 +52,12 @@ export async function upsertProfile(profile: AppProfile): Promise<AppProfile | n
     .select(profileSelect)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "profile.upsert",
+      fallbackKind: "database",
+    });
+  }
   return mapProfile(data);
 }
 
