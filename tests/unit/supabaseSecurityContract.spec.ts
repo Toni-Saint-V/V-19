@@ -92,13 +92,17 @@ describe("Supabase security contract", () => {
     expect(runtimeGuards).toContain(
       "create constraint trigger submissions_review_readiness_guard",
     );
+    expect(runtimeGuards).toContain("create trigger corrections_actor_guard");
     expect(runtimeGuards).toContain(
-      "create trigger corrections_actor_guard",
+      "new.status not in ('ready_for_review', 'waiting_review')",
     );
-    expect(runtimeGuards).toContain("new.status not in ('ready_for_review', 'waiting_review')");
     expect(runtimeGuards).toContain("Blocking corrections must be fixed before review");
-    expect(runtimeGuards).toContain("Applicant required fields must be complete before review");
-    expect(runtimeGuards).toContain("All required media must be uploaded before review");
+    expect(runtimeGuards).toContain(
+      "Applicant required fields must be complete before review",
+    );
+    expect(runtimeGuards).toContain(
+      "All required media must be uploaded before review",
+    );
 
     for (const policyName of [
       'create policy "applicants update editable submission"',
