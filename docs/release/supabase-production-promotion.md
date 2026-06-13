@@ -4,6 +4,11 @@ Do not apply these migrations to production from Codex without explicit owner ap
 
 This runbook promotes the task-first workspace persistence boundary from the proven sandbox contract to a production Supabase project. It is intentionally fail-closed: production activation is blocked until migration, RLS, Storage, browser QA, key audit, and owner approval evidence all exist.
 
+Related release artifacts:
+
+- `docs/release/supabase-workspace-pr-package.md`
+- `docs/release/supabase-production-approval-checklist.md`
+
 ## Current Scope
 
 Promote only the agent workspace, intake continuation, readiness review, operator handoff, private media storage, and Supabase persistence guards.
