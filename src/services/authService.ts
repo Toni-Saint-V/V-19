@@ -2,6 +2,7 @@ import type { Session } from "@supabase/supabase-js";
 import type { Role } from "../types/domain";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { fetchCurrentProfile } from "./profileService";
+import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 export interface AppProfile {
   id: string;
@@ -39,7 +40,13 @@ export async function getCurrentAppSession(): Promise<AppSession | null> {
   if (!client) return null;
 
   const { data, error } = await client.auth.getSession();
-  if (error || !data.session?.user.email) return null;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "auth.get_session",
+      fallbackKind: "auth",
+    });
+  }
+  if (!data.session?.user.email) return null;
 
   const profile = await fetchCurrentProfile(data.session.user.id);
   if (!profile) return null;
@@ -73,7 +80,12 @@ export async function signInSupabaseWithPassword(
     password,
   });
 
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "auth.sign_in_password",
+      fallbackKind: "auth",
+    });
+  }
   if (!data.session?.user.id) {
     throw new Error("Supabase session was not returned.");
   }

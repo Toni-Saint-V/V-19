@@ -33,6 +33,7 @@ import {
   normalizeSubmission,
   readiness,
 } from "../lib/workflow";
+import { mapSupabasePersistenceError } from "./persistenceObservability";
 import { storageTargetForSlot } from "./storageService";
 
 const submissionSelect =
@@ -468,7 +469,12 @@ export async function listSubmissionsForRole(role: "agent" | "admin", agentId: s
   const { data: submissionRows, error } =
     role === "agent" ? await query.eq("agent_id", agentId) : await query;
 
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "submissions.list",
+      fallbackKind: "database",
+    });
+  }
   if (!submissionRows?.length) return [];
 
   const ids = submissionRows.map((row) => row.id);
@@ -477,35 +483,60 @@ export async function listSubmissionsForRole(role: "agent" | "admin", agentId: s
     .select(applicantSelect)
     .in("submission_id", ids);
 
-  if (applicantError) throw applicantError;
+  if (applicantError) {
+    throw mapSupabasePersistenceError(applicantError, {
+      operation: "applicants.list",
+      fallbackKind: "database",
+    });
+  }
 
   const { data: mediaRows, error: mediaError } = await client
     .from("media_assets")
     .select(mediaAssetSelect)
     .in("submission_id", ids);
 
-  if (mediaError) throw mediaError;
+  if (mediaError) {
+    throw mapSupabasePersistenceError(mediaError, {
+      operation: "media_assets.list",
+      fallbackKind: "database",
+    });
+  }
 
   const { data: correctionRows, error: correctionError } = await client
     .from("corrections")
     .select(correctionSelect)
     .in("submission_id", ids);
 
-  if (correctionError) throw correctionError;
+  if (correctionError) {
+    throw mapSupabasePersistenceError(correctionError, {
+      operation: "corrections.list",
+      fallbackKind: "database",
+    });
+  }
 
   const { data: appointmentRows, error: appointmentError } = await client
     .from("appointments")
     .select(appointmentSelect)
     .in("submission_id", ids);
 
-  if (appointmentError) throw appointmentError;
+  if (appointmentError) {
+    throw mapSupabasePersistenceError(appointmentError, {
+      operation: "appointments.list",
+      fallbackKind: "database",
+    });
+  }
 
   const { data: exportRows, error: exportError } = await client
     .from("export_batches")
     .select(exportBatchSelect)
     .overlaps("submission_ids", ids);
 
-  if (exportError) throw exportError;
+  if (exportError) {
+    throw mapSupabasePersistenceError(exportError, {
+      operation: "export_batches.list",
+      fallbackKind: "database",
+    });
+  }
 
   const allTimelineEntityIds = Array.from(
     new Set([
@@ -520,7 +551,12 @@ export async function listSubmissionsForRole(role: "agent" | "admin", agentId: s
     .select(statusHistorySelect)
     .in("entity_id", allTimelineEntityIds);
 
-  if (statusError) throw statusError;
+  if (statusError) {
+    throw mapSupabasePersistenceError(statusError, {
+      operation: "status_history.list",
+      fallbackKind: "database",
+    });
+  }
 
   return submissionRows.map((submissionRow) => {
     const applicants = (applicantRows ?? [])
@@ -591,5 +627,10 @@ export async function saveSubmissionDraft(
   );
   const { error } = await client.rpc("save_submission_draft", { payload });
 
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "rpc.save_submission_draft",
+      fallbackKind: "save",
+    });
+  }
 }

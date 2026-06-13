@@ -1,5 +1,6 @@
 import type { MediaSlot, MediaSlotType } from "../types/domain";
 import { getSupabaseClient } from "../lib/supabase/client";
+import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 export const mediaStorageBucket = "submission-media";
 
@@ -209,7 +210,12 @@ export async function uploadMediaToStorage(
       contentType: file.type,
     });
 
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "storage.upload_media",
+      fallbackKind: "upload",
+    });
+  }
   return { path: data.path };
 }
 
@@ -222,7 +228,12 @@ export async function deleteMediaFromStorage(
   validateMediaStorageTarget({ target });
 
   const { error } = await client.storage.from(target.bucket).remove([target.path]);
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "storage.delete_media",
+      fallbackKind: "storage",
+    });
+  }
 }
 
 export async function createMediaSignedUrl(
@@ -238,6 +249,11 @@ export async function createMediaSignedUrl(
     .from(target.bucket)
     .createSignedUrl(target.path, expiresInSeconds);
 
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "storage.create_signed_url",
+      fallbackKind: "storage",
+    });
+  }
   return data.signedUrl;
 }
