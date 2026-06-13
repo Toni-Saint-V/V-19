@@ -36,6 +36,20 @@ The smoke verifies owner reads/writes, cross-agent denial, admin review write ac
 
 The smoke upserts one deterministic `SMOKE-*` submission. It resets that row through the admin JWT at the start of each run and intentionally does not add runtime delete permissions. Clean sandbox smoke rows with a maintenance SQL session when needed.
 
+## Production promotion gate
+
+Production promotion is documented in `docs/release/supabase-production-promotion.md`.
+
+Before any production migration or client activation, run:
+
+```bash
+npm run verify:supabase-release
+npm run test:supabase-live
+npm run verify:full
+```
+
+`npm run verify:supabase-release` checks local migration order, RLS/Storage guard migrations, the sandbox-only smoke target guard, rollback documentation, and the production env evidence gate. `npm run test:supabase-live` remains sandbox-only; do not point it at production. Production activation also requires `VITE_SUPABASE_ACTIVATION_TARGET=production` and `VITE_SUPABASE_PRODUCTION_APPROVED=true` after owner approval.
+
 ## Local/demo behavior
 
 When the public Supabase values are missing, the app stays in local demo mode:
