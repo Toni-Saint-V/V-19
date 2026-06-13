@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../lib/supabase/client";
+import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 export interface StatusHistoryInput {
   id?: string;
@@ -26,5 +27,10 @@ export async function appendStatusHistory(input: StatusHistoryInput): Promise<vo
     changed_at: input.changed_at ?? new Date().toISOString(),
   });
 
-  if (error) throw error;
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "status_history.insert",
+      fallbackKind: "database",
+    });
+  }
 }

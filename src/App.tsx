@@ -35,6 +35,11 @@ import {
   saveLocalWorkspaceSubmissions,
   saveWorkspaceSubmission,
 } from "./services/workspacePersistenceService";
+import {
+  formatPersistenceFailureForUser,
+  logPersistenceDiagnostics,
+  userMessageForPersistenceError,
+} from "./services/persistenceObservability";
 import type {
   Applicant,
   CorrectionNote,
@@ -364,6 +369,9 @@ function dataSourceLabel(session: AppSession | null): string {
 }
 
 function safeErrorMessage(error: unknown, fallback: string): string {
+  const persistenceMessage = userMessageForPersistenceError(error, "");
+  if (persistenceMessage) return persistenceMessage;
+
   if (error instanceof Error && error.message.trim()) {
     if (/password|credential|invalid login/i.test(error.message)) {
       return "Unable to sign in. Check email, password, and Supabase profile.";
@@ -371,6 +379,10 @@ function safeErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+function safeFailureToast(error: unknown, fallback: string): string {
+  return formatPersistenceFailureForUser(error, fallback);
 }
 
 function mediaAccept(type: MediaSlotType): string {
@@ -435,6 +447,7 @@ function App() {
   const [loginBusy, setLoginBusy] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [saveError, setSaveError] = useState("");
   const [uploadingMediaKey, setUploadingMediaKey] = useState("");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
@@ -447,6 +460,10 @@ function App() {
   const profile = session?.profile ?? null;
   const sourceLabel = dataSourceLabel(session);
   const isSupabaseSession = session?.mode === "supabase";
+  const saveStatusLabel =
+    saveState === "saving" ? "Saving" : saveState === "error" ? "Save failed" : "Saved";
+  const saveStatusDescription =
+    saveState === "error" && saveError ? saveError : saveStatusLabel;
   const hasAdminAccess = canAccessRole(profile, "admin");
   const agentSubmissions = useMemo(
     () =>
@@ -570,7 +587,7 @@ function App() {
           setSubmissions(loaded);
         }
       } catch (error) {
-        console.error("Supabase session bootstrap failed", error);
+        logPersistenceDiagnostics("Supabase session bootstrap failed", error);
         if (!cancelled) {
           setAuthError(
             safeErrorMessage(error, "Unable to load the current Supabase session."),
@@ -610,6 +627,7 @@ function App() {
 
   function queueRemoteSave(submissionIds: string[], successMessage?: string): void {
     if (!isSupabaseSession) return;
+    setSaveError("");
 
     for (const id of new Set(submissionIds)) {
       dirtySubmissionVersionsRef.current.set(
@@ -653,6 +671,7 @@ function App() {
     cleanupTarget?: MediaStorageTarget,
   ): Promise<void> {
     setSaveState("saving");
+    setSaveError("");
     try {
       await saveWorkspaceSubmission(
         activeSession,
@@ -663,21 +682,35 @@ function App() {
       dirtySubmissionVersionsRef.current.delete(submission.id);
       pendingSaveMessagesRef.current.delete(submission.id);
       setSaveState("idle");
+      setSaveError("");
       setToast(successMessage);
     } catch (error) {
-      console.error("Immediate Supabase save failed", error);
+      logPersistenceDiagnostics("Immediate Supabase save failed", error);
       if (cleanupTarget) {
         try {
           await deleteMediaFromStorage(cleanupTarget);
         } catch (cleanupError) {
-          console.error("Uploaded media cleanup failed", cleanupError);
+          logPersistenceDiagnostics("Uploaded media cleanup failed", cleanupError);
         }
       }
       dirtySubmissionVersionsRef.current.delete(submission.id);
       pendingSaveMessagesRef.current.delete(submission.id);
       setSaveState("error");
-      await reloadRemoteSubmissions(activeSession);
-      setToast("Remote save failed. Last saved Supabase data was reloaded.");
+      const message = safeFailureToast(
+        error,
+        "Remote save failed. Last saved Supabase data was reloaded.",
+      );
+      setSaveError(message);
+      try {
+        await reloadRemoteSubmissions(activeSession);
+        setToast(message);
+      } catch (reloadError) {
+        logPersistenceDiagnostics(
+          "Supabase reload after save failure failed",
+          reloadError,
+        );
+        setToast("Remote save failed. Refresh before continuing.");
+      }
     }
   }
 
@@ -701,6 +734,7 @@ function App() {
 
         savingRemoteRef.current = true;
         setSaveState("saving");
+        setSaveError("");
         try {
           for (const [id, version] of queued) {
             const submission = submissionsById.get(id);
@@ -727,19 +761,28 @@ function App() {
 
           if (!cancelled) {
             setSaveState("idle");
+            setSaveError("");
             if (finalSuccessMessage) setToast(finalSuccessMessage);
           }
         } catch (error) {
-          console.error("Supabase autosave failed", error);
+          logPersistenceDiagnostics("Supabase autosave failed", error);
           dirtySubmissionVersionsRef.current.clear();
           pendingSaveMessagesRef.current.clear();
           if (!cancelled) {
             setSaveState("error");
+            const message = safeFailureToast(
+              error,
+              "Remote save failed. Last saved Supabase data was reloaded.",
+            );
+            setSaveError(message);
             try {
               await reloadRemoteSubmissions(activeSession);
-              setToast("Remote save failed. Last saved Supabase data was reloaded.");
+              setToast(message);
             } catch (reloadError) {
-              console.error("Supabase reload after save failure failed", reloadError);
+              logPersistenceDiagnostics(
+                "Supabase reload after save failure failed",
+                reloadError,
+              );
               setToast("Remote save failed. Refresh before continuing.");
             }
           }
@@ -791,6 +834,7 @@ function App() {
   async function loginSupabase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthError("");
+    setSaveError("");
     setLoginBusy(true);
     setDataLoading(true);
     try {
@@ -804,7 +848,7 @@ function App() {
       setSelectedCaseId(null);
       setToast(`Signed in as ${nextSession.profile.displayName}.`);
     } catch (error) {
-      console.error("Supabase sign-in failed", error);
+      logPersistenceDiagnostics("Supabase sign-in failed", error);
       setAuthError(
         safeErrorMessage(
           error,
@@ -824,6 +868,7 @@ function App() {
     persistedStatusHistoryIdsRef.current = new Map();
     dirtySubmissionVersionsRef.current.clear();
     pendingSaveMessagesRef.current.clear();
+    setSaveError("");
     setSelectedCaseId(null);
   }
 
@@ -966,6 +1011,7 @@ function App() {
       const mediaKey = `${submissionId}:${applicant.id}:${type}`;
 
       setUploadingMediaKey(mediaKey);
+      setSaveError("");
       try {
         await saveWorkspaceSubmission(
           session,
@@ -1034,14 +1080,22 @@ function App() {
           target,
         );
       } catch (error) {
-        console.error("Supabase media upload failed", error);
+        logPersistenceDiagnostics("Supabase media upload failed", error);
         setSaveState("error");
+        const message = safeFailureToast(
+          error,
+          "Media upload failed. No uploaded file was marked complete.",
+        );
+        setSaveError(message);
         try {
           await reloadRemoteSubmissions(session);
         } catch (reloadError) {
-          console.error("Supabase reload after media failure failed", reloadError);
+          logPersistenceDiagnostics(
+            "Supabase reload after media failure failed",
+            reloadError,
+          );
         }
-        setToast("Media upload failed. No uploaded file was marked complete.");
+        setToast(message);
       } finally {
         setUploadingMediaKey("");
       }
@@ -1478,12 +1532,12 @@ function App() {
             <div className="topbar-actions">
               <span className="demo-pill">{sourceLabel}</span>
               {isSupabaseSession ? (
-                <span className={`save-pill save-pill-${saveState}`}>
-                  {saveState === "saving"
-                    ? "Saving"
-                    : saveState === "error"
-                      ? "Save failed"
-                      : "Saved"}
+                <span
+                  className={`save-pill save-pill-${saveState}`}
+                  aria-label={saveStatusDescription}
+                  title={saveStatusDescription}
+                >
+                  {saveStatusLabel}
                 </span>
               ) : null}
               <div className="role-switch" aria-label="Current role">
@@ -1968,12 +2022,12 @@ function App() {
           <div className="topbar-actions">
             <span className="demo-pill">{sourceLabel}</span>
             {isSupabaseSession ? (
-              <span className={`save-pill save-pill-${saveState}`}>
-                {saveState === "saving"
-                  ? "Saving"
-                  : saveState === "error"
-                    ? "Save failed"
-                    : "Saved"}
+              <span
+                className={`save-pill save-pill-${saveState}`}
+                aria-label={saveStatusDescription}
+                title={saveStatusDescription}
+              >
+                {saveStatusLabel}
               </span>
             ) : null}
             <div className="role-switch" aria-label="Current role">
