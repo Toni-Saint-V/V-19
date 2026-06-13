@@ -247,7 +247,7 @@ describe("Supabase submission mapping", () => {
     });
   });
 
-  test("builds an atomic Supabase draft payload for questionnaire, media and timeline only", () => {
+  test("builds an atomic Supabase draft payload for questionnaire, media, corrections and timeline", () => {
     const actorId = "00000000-0000-4000-8000-000000000001";
     const submission = {
       ...makeSubmission(),
@@ -295,7 +295,12 @@ describe("Supabase submission mapping", () => {
       "video",
     ]);
     expect(payload.status_history).toHaveLength(0);
-    expect(payload).not.toHaveProperty("corrections");
+    expect(payload.corrections).toHaveLength(1);
+    expect(payload.corrections[0]).toMatchObject({
+      submission_id: "VF-1044",
+      reason: "Уточнить адрес",
+      status: "open",
+    });
     expect(payload).not.toHaveProperty("export_batches");
     expect(payload).not.toHaveProperty("appointments");
   });

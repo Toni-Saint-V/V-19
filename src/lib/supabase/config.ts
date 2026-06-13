@@ -24,6 +24,7 @@ export interface SupabaseRuntimeConfig {
 
 interface VisaFlowEnv {
   readonly VITE_SUPABASE_BACKEND_TARGET?: string;
+  readonly VITE_SUPABASE_SANDBOX_PROBE_ENABLED?: string;
   readonly VITE_SUPABASE_RELEASE_ENABLED?: string;
   readonly VITE_SUPABASE_PROJECT_ID?: string;
   readonly VITE_SUPABASE_URL?: string;
@@ -76,6 +77,7 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
   );
   const edgeFunctionsUrl = clean(env.VITE_SUPABASE_EDGE_FUNCTIONS_URL);
   const target = backendTarget(env.VITE_SUPABASE_BACKEND_TARGET);
+  const sandboxProbeEnabled = enabled(env.VITE_SUPABASE_SANDBOX_PROBE_ENABLED);
   const activationTargetRaw = env.VITE_SUPABASE_ACTIVATION_TARGET;
   const releaseEnabled = enabled(env.VITE_SUPABASE_RELEASE_ENABLED);
   const evidence: SupabaseActivationEvidence = {
@@ -96,6 +98,7 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
   const activation = evaluateSupabaseActivationReadiness({
     target,
     releaseEnabled,
+    sandboxProbeEnabled,
     config: {
       projectId,
       url,
@@ -116,7 +119,8 @@ export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
     activation.configured.publishableKey &&
     activation.configured.edgeFunctionsUrl;
   const selected: SupabaseBackendTarget =
-    target === "supabase" && activation.allowClientActivation
+    target === "supabase" &&
+    (activation.allowClientActivation || activation.allowSandboxProbe)
       ? "supabase"
       : "local-demo";
 

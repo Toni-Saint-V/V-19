@@ -9,6 +9,11 @@ export default defineConfig({
   },
   webServer: {
     command: "npm run dev -- --port 4197 --strictPort",
+    env: {
+      VITE_SUPABASE_BACKEND_TARGET: "local-demo",
+      VITE_SUPABASE_SANDBOX_PROBE_ENABLED: "false",
+      VITE_SUPABASE_RELEASE_ENABLED: "false",
+    },
     url: "http://127.0.0.1:4197",
     reuseExistingServer: false,
     timeout: 120_000,

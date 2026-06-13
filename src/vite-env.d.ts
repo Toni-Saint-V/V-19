@@ -5,6 +5,7 @@ export {};
 declare global {
   interface ImportMetaEnv {
     readonly VITE_SUPABASE_BACKEND_TARGET?: string;
+    readonly VITE_SUPABASE_SANDBOX_PROBE_ENABLED?: string;
     readonly VITE_SUPABASE_RELEASE_ENABLED?: string;
     readonly VITE_SUPABASE_PROJECT_ID?: string;
     readonly VITE_SUPABASE_URL?: string;

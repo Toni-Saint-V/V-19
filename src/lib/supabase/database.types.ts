@@ -278,5 +278,6 @@ export interface SubmissionDraftPersistencePayload extends DbRecord {
   submission: SubmissionInsert;
   applicants: ApplicantInsert[];
   media_assets: MediaAssetInsert[];
+  corrections: CorrectionInsert[];
   status_history: StatusHistoryInsert[];
 }

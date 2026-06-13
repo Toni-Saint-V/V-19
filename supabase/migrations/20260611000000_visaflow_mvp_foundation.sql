@@ -176,6 +176,20 @@ create table public.status_history (
   changed_at timestamptz not null default now()
 );
 
+create index if not exists submissions_agent_id_idx on public.submissions (agent_id);
+create index if not exists submissions_updated_at_idx on public.submissions (updated_at desc);
+create index if not exists applicants_submission_id_idx on public.applicants (submission_id);
+create index if not exists media_assets_submission_id_idx on public.media_assets (submission_id);
+create index if not exists media_assets_reviewed_by_idx on public.media_assets (reviewed_by);
+create index if not exists corrections_submission_id_idx on public.corrections (submission_id);
+create index if not exists corrections_applicant_id_idx on public.corrections (applicant_id);
+create index if not exists corrections_created_by_idx on public.corrections (created_by);
+create index if not exists export_batches_created_by_idx on public.export_batches (created_by);
+create index if not exists appointments_submission_id_idx on public.appointments (submission_id);
+create index if not exists appointments_updated_by_idx on public.appointments (updated_by);
+create index if not exists status_history_changed_by_idx on public.status_history (changed_by);
+create index if not exists status_history_entity_id_idx on public.status_history (entity_id);
+
 create function app_private.enforce_submission_agent_mutation()
 returns trigger
 language plpgsql
@@ -227,8 +241,8 @@ begin
   end if;
 
   if old.status = 'returned' then
-    if new.status not in ('returned', 'waiting_review') then
-      raise exception 'Returned submissions can only stay returned or be resubmitted'
+    if new.status not in ('returned', 'ready_for_review', 'waiting_review') then
+      raise exception 'Returned submissions can only stay returned, be marked ready, or be resubmitted'
         using errcode = '42501';
     end if;
   elsif old.status in ('draft', 'filling', 'ready_for_review') then
@@ -260,21 +274,21 @@ alter table public.status_history enable row level security;
 
 create policy "profiles read own or admin"
 on public.profiles for select
-using (id = auth.uid() or app_private.current_profile_role() = 'admin');
+using (id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin');
 
 create policy "profiles insert own agent"
 on public.profiles for insert
-with check (id = auth.uid() and role = 'agent');
+with check (id = (select auth.uid()) and role = 'agent');
 
 create policy "profiles update own identity"
 on public.profiles for update
-using (id = auth.uid())
-with check (id = auth.uid() and role = app_private.current_profile_role());
+using (id = (select auth.uid()))
+with check (id = (select auth.uid()) and role = (select app_private.current_profile_role()));
 
 create policy "submissions agent own admin all"
 on public.submissions for all
-using (agent_id = auth.uid() or app_private.current_profile_role() = 'admin')
-with check (agent_id = auth.uid() or app_private.current_profile_role() = 'admin');
+using (agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin')
+with check (agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin');
 
 create policy "applicants through submission"
 on public.applicants for all
@@ -282,14 +296,14 @@ using (
   exists (
     select 1 from public.submissions s
     where s.id = applicants.submission_id
-    and (s.agent_id = auth.uid() or app_private.current_profile_role() = 'admin')
+    and (s.agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin')
   )
 )
 with check (
   exists (
     select 1 from public.submissions s
     where s.id = applicants.submission_id
-    and (s.agent_id = auth.uid() or app_private.current_profile_role() = 'admin')
+    and (s.agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin')
   )
 );
 
@@ -299,14 +313,14 @@ using (
   exists (
     select 1 from public.submissions s
     where s.id = media_assets.submission_id
-    and (s.agent_id = auth.uid() or app_private.current_profile_role() = 'admin')
+    and (s.agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin')
   )
 )
 with check (
   exists (
     select 1 from public.submissions s
     where s.id = media_assets.submission_id
-    and (s.agent_id = auth.uid() or app_private.current_profile_role() = 'admin')
+    and (s.agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin')
   )
 );
 
@@ -316,65 +330,81 @@ using (
   exists (
     select 1 from public.submissions s
     where s.id = corrections.submission_id
-    and (s.agent_id = auth.uid() or app_private.current_profile_role() = 'admin')
+    and (s.agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin')
+  )
+  and (
+    corrections.applicant_id is null
+    or exists (
+      select 1 from public.applicants a
+      where a.id = corrections.applicant_id
+      and a.submission_id = corrections.submission_id
+    )
   )
 )
 with check (
   exists (
     select 1 from public.submissions s
     where s.id = corrections.submission_id
-    and (s.agent_id = auth.uid() or app_private.current_profile_role() = 'admin')
+    and (s.agent_id = (select auth.uid()) or (select app_private.current_profile_role()) = 'admin')
+  )
+  and (
+    corrections.applicant_id is null
+    or exists (
+      select 1 from public.applicants a
+      where a.id = corrections.applicant_id
+      and a.submission_id = corrections.submission_id
+    )
   )
 );
 
 create policy "export batches admin only"
 on public.export_batches for all
-using (app_private.current_profile_role() = 'admin')
-with check (app_private.current_profile_role() = 'admin');
+using ((select app_private.current_profile_role()) = 'admin')
+with check ((select app_private.current_profile_role()) = 'admin');
 
 create policy "appointments admin only"
 on public.appointments for all
-using (app_private.current_profile_role() = 'admin')
-with check (app_private.current_profile_role() = 'admin');
+using ((select app_private.current_profile_role()) = 'admin')
+with check ((select app_private.current_profile_role()) = 'admin');
 
 create policy "status history read visible"
 on public.status_history for select
 using (
-  app_private.current_profile_role() = 'admin'
+  (select app_private.current_profile_role()) = 'admin'
   or entity_id in (
-    select id from public.submissions where agent_id = auth.uid()
+    select id from public.submissions where agent_id = (select auth.uid())
   )
   or entity_id in (
     select a.id
     from public.applicants a
     join public.submissions s on s.id = a.submission_id
-    where s.agent_id = auth.uid()
+    where s.agent_id = (select auth.uid())
   )
   or entity_id in (
     select m.id
     from public.media_assets m
     join public.submissions s on s.id = m.submission_id
-    where s.agent_id = auth.uid()
+    where s.agent_id = (select auth.uid())
   )
   or entity_id in (
     select ap.id::text
     from public.appointments ap
     join public.submissions s on s.id = ap.submission_id
-    where s.agent_id = auth.uid()
+    where s.agent_id = (select auth.uid())
   )
 );
 
 create policy "status history insert owned"
 on public.status_history for insert
 with check (
-  app_private.current_profile_role() = 'admin'
+  (select app_private.current_profile_role()) = 'admin'
   or (
-    changed_by = auth.uid()
+    changed_by = (select auth.uid())
     and (
       (
         entity_type = 'submission'
         and entity_id in (
-        select id from public.submissions where agent_id = auth.uid()
+        select id from public.submissions where agent_id = (select auth.uid())
         )
       )
       or (
@@ -383,7 +413,7 @@ with check (
         select a.id
         from public.applicants a
         join public.submissions s on s.id = a.submission_id
-        where s.agent_id = auth.uid()
+        where s.agent_id = (select auth.uid())
         )
       )
       or (
@@ -392,7 +422,7 @@ with check (
         select m.id
         from public.media_assets m
         join public.submissions s on s.id = m.submission_id
-        where s.agent_id = auth.uid()
+        where s.agent_id = (select auth.uid())
         )
       )
       or (
@@ -401,7 +431,7 @@ with check (
           select ap.id::text
           from public.appointments ap
           join public.submissions s on s.id = ap.submission_id
-          where s.agent_id = auth.uid()
+          where s.agent_id = (select auth.uid())
         )
       )
     )
@@ -483,6 +513,42 @@ begin
        or split_part(media_payload.storage_path, '/', 5) <> ''
   ) then
     raise exception 'Media payload does not match the storage path contract';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(payload -> 'corrections', '[]'::jsonb)) as correction_payload (
+      submission_id text
+    )
+    where correction_payload.submission_id is distinct from submission_record.id
+  ) then
+    raise exception 'Correction payload contains a mismatched submission id';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_to_recordset(coalesce(payload -> 'corrections', '[]'::jsonb)) as correction_payload (
+      submission_id text,
+      applicant_id text
+    )
+    where correction_payload.applicant_id is not null
+      and not exists (
+        select 1
+        from jsonb_to_recordset(coalesce(payload -> 'applicants', '[]'::jsonb)) as applicant_payload (
+          id text,
+          submission_id text
+        )
+        where applicant_payload.id = correction_payload.applicant_id
+          and applicant_payload.submission_id = submission_record.id
+      )
+      and not exists (
+        select 1
+        from public.applicants a
+        where a.id = correction_payload.applicant_id
+          and a.submission_id = submission_record.id
+      )
+  ) then
+    raise exception 'Correction payload contains an applicant outside the submission';
   end if;
 
   insert into public.submissions (
@@ -705,6 +771,57 @@ begin
 
   get diagnostics media_count = row_count;
 
+  insert into public.corrections (
+    id,
+    submission_id,
+    applicant_id,
+    scope,
+    field_key,
+    media_type,
+    reason,
+    severity,
+    status,
+    created_by,
+    created_at,
+    fixed_at
+  )
+  select
+    correction_payload.id,
+    correction_payload.submission_id,
+    correction_payload.applicant_id,
+    correction_payload.scope,
+    correction_payload.field_key,
+    correction_payload.media_type,
+    correction_payload.reason,
+    correction_payload.severity,
+    correction_payload.status,
+    correction_payload.created_by,
+    correction_payload.created_at,
+    correction_payload.fixed_at
+  from jsonb_to_recordset(coalesce(payload -> 'corrections', '[]'::jsonb)) as correction_payload (
+    id uuid,
+    submission_id text,
+    applicant_id text,
+    scope text,
+    field_key text,
+    media_type public.media_slot_type,
+    reason text,
+    severity text,
+    status text,
+    created_by uuid,
+    created_at timestamptz,
+    fixed_at timestamptz
+  )
+  on conflict (id) do update set
+    applicant_id = excluded.applicant_id,
+    scope = excluded.scope,
+    field_key = excluded.field_key,
+    media_type = excluded.media_type,
+    reason = excluded.reason,
+    severity = excluded.severity,
+    status = excluded.status,
+    fixed_at = excluded.fixed_at;
+
   insert into public.status_history (
     id,
     entity_type,
@@ -789,9 +906,9 @@ using (
       and a.submission_id = split_part(name, '/', 1)
   )
   and (
-    app_private.current_profile_role() = 'admin'
+    (select app_private.current_profile_role()) = 'admin'
     or split_part(name, '/', 1) in (
-      select id from public.submissions where agent_id = auth.uid()
+      select id from public.submissions where agent_id = (select auth.uid())
     )
   )
 )
@@ -813,9 +930,9 @@ with check (
       and a.submission_id = split_part(name, '/', 1)
   )
   and (
-    app_private.current_profile_role() = 'admin'
+    (select app_private.current_profile_role()) = 'admin'
     or split_part(name, '/', 1) in (
-      select id from public.submissions where agent_id = auth.uid()
+      select id from public.submissions where agent_id = (select auth.uid())
     )
   )
 );
