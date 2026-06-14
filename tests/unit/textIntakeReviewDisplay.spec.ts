@@ -24,11 +24,7 @@ function finding(code: TextIntakeReviewCode): TextIntakeReviewFinding {
       ? ["Artem Sokolov", "Maria Sokolova"]
       : undefined;
   const fieldKey =
-    scope === "submission"
-      ? undefined
-      : code === "invalid_email"
-        ? "email"
-        : "name";
+    scope === "submission" ? undefined : code === "invalid_email" ? "email" : "name";
 
   return {
     id: `${applicantId ?? "submission"}:${fieldKey ?? scope}:${code}`,
@@ -76,9 +72,7 @@ function review(findings: TextIntakeReviewFinding[]): TextIntakeReviewResult {
 
 describe("text intake review display adapter", () => {
   test("localizes every finding code before UI consumption", () => {
-    const display = buildTextIntakeReviewDisplay(
-      review(allReviewCodes.map(finding)),
-    );
+    const display = buildTextIntakeReviewDisplay(review(allReviewCodes.map(finding)));
     const visibleCopy = [
       ...display.review.findings.flatMap((item) => [
         item.problem,
@@ -104,8 +98,9 @@ describe("text intake review display adapter", () => {
   });
 
   test("prepares real BLS questionnaire findings for future UI without raw English actions", () => {
-    const corpus: BlsTextQuestionnaireInput[] =
-      buildBlsTextReviewTrainingCorpus().map((item) => item.input);
+    const corpus: BlsTextQuestionnaireInput[] = buildBlsTextReviewTrainingCorpus().map(
+      (item) => item.input,
+    );
     const displayCopy = corpus
       .map((input) => buildTextIntakeReviewDisplay(reviewBlsTextQuestionnaire(input)))
       .flatMap((display) => [
