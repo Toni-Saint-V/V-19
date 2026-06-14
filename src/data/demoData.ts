@@ -10,7 +10,7 @@ function acceptedMediaSlots(applicantId: string, passport: string): MediaSlot[] 
       type: "photo_white",
       label: "Фото на белом фоне",
       state: "accepted",
-      originalFileName: `${cleanPassport}_photo.jpg`,
+      passportFileName: `${cleanPassport}_photo_white.jpg`,
       generatedFileName: `${cleanPassport}_photo_white.jpg`,
     },
     {
@@ -19,7 +19,7 @@ function acceptedMediaSlots(applicantId: string, passport: string): MediaSlot[] 
       type: "selfie",
       label: "Селфи",
       state: "accepted",
-      originalFileName: `${cleanPassport}_selfie.jpg`,
+      passportFileName: `${cleanPassport}_selfie.jpg`,
       generatedFileName: `${cleanPassport}_selfie.jpg`,
     },
     {
@@ -28,7 +28,7 @@ function acceptedMediaSlots(applicantId: string, passport: string): MediaSlot[] 
       type: "video",
       label: "Видео",
       state: "accepted",
-      originalFileName: `${cleanPassport}_video.mp4`,
+      passportFileName: `${cleanPassport}_video.mp4`,
       generatedFileName: `${cleanPassport}_video.mp4`,
     },
   ];
@@ -175,7 +175,7 @@ export const initialSubmissions: Submission[] = [
             type: "photo_white",
             label: "Фото на белом фоне",
             state: "uploaded",
-            originalFileName: "artem_photo.jpg",
+            passportFileName: "721190482_photo_white.jpg",
             generatedFileName: "721190482_photo_white.jpg",
           },
           {
@@ -184,7 +184,7 @@ export const initialSubmissions: Submission[] = [
             type: "selfie",
             label: "Селфи",
             state: "uploaded",
-            originalFileName: "artem_selfie.jpg",
+            passportFileName: "721190482_selfie.jpg",
             generatedFileName: "721190482_selfie.jpg",
           },
           {
@@ -193,7 +193,7 @@ export const initialSubmissions: Submission[] = [
             type: "video",
             label: "Видео",
             state: "uploaded",
-            originalFileName: "artem_video.mp4",
+            passportFileName: "721190482_video.mp4",
             generatedFileName: "721190482_video.mp4",
           },
         ],
