@@ -10,7 +10,7 @@ import {
   mediaStorageBucket,
   storageTargetForSlot,
 } from "../../src/services/storageService";
-import type { AppProfile } from "../../src/services/authService";
+import type { AppProfile } from "../../src/types/session";
 import type { Applicant, Submission } from "../../src/types/domain";
 
 const liveEnabled = process.env.VITEST_SUPABASE_LIVE === "1";

@@ -1,4 +1,4 @@
-import type { AppSession } from "./authService";
+import type { AppSession } from "../types/session";
 import { loadLocalSubmissions, saveLocalSubmissions } from "./localRepository";
 import { listSubmissionsForRole, saveSubmissionDraft } from "./submissionService";
 import type { Submission } from "../types/domain";

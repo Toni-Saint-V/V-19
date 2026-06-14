@@ -1,22 +1,10 @@
-import type { Session } from "@supabase/supabase-js";
 import type { Role } from "../types/domain";
+import type { AppProfile, AppSession } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { fetchCurrentProfile } from "./profileService";
 import { mapSupabasePersistenceError } from "./persistenceObservability";
 
-export interface AppProfile {
-  id: string;
-  email: string;
-  displayName: string;
-  organizationName: string | null;
-  role: Role;
-}
-
-export interface AppSession {
-  mode: "supabase" | "local-demo";
-  profile: AppProfile;
-  supabaseSession: Session | null;
-}
+export type { AppProfile, AppSession };
 
 const demoProfiles: Record<Role, AppProfile> = {
   agent: {

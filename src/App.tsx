@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   adminAcceptancePreflight,
   buildMediaSlot,
@@ -13,40 +13,15 @@ import {
   statusMeta,
   transitionSubmissionStatus,
 } from "./lib/workflow";
-import type { AppProfile, AppSession } from "./services/authService";
-import {
-  canAccessRole,
-  getCurrentAppSession,
-  signInDemo,
-  signInSupabaseWithPassword,
-  signOutCurrentSession,
-} from "./services/authService";
+import type { AppProfile, AppSession } from "./types/session";
+import { canAccessRole } from "./services/authService";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { selectSubmissionsForRole } from "./services/localRepository";
-import {
-  deleteMediaFromStorage,
-  storageTargetForSlot,
-  uploadMediaToStorage,
-  type MediaStorageTarget,
-} from "./services/storageService";
-import {
-  collectPersistedStatusHistoryIds,
-  loadWorkspaceSubmissions,
-  saveLocalWorkspaceSubmissions,
-  saveWorkspaceSubmission,
-} from "./services/workspacePersistenceService";
-import {
-  formatPersistenceFailureForUser,
-  logPersistenceDiagnostics,
-  userMessageForPersistenceError,
-} from "./services/persistenceObservability";
+import { storageTargetForSlot, uploadMediaToStorage } from "./services/storageService";
+import { logPersistenceDiagnostics } from "./services/persistenceObservability";
 import { buildSmartCorrectionReturnPackage } from "./services/smartCorrectionReturn";
-import type {
-  Applicant,
-  MediaSlotType,
-  Role,
-  Submission,
-} from "./types/domain";
+import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence";
+import type { Applicant, MediaSlotType, Role, Submission } from "./types/domain";
 
 type Tone = "blue" | "green" | "gold" | "red" | "purple" | "neutral";
 
@@ -368,23 +343,6 @@ function dataSourceLabel(session: AppSession | null): string {
     : "Supabase sandbox probe";
 }
 
-function safeErrorMessage(error: unknown, fallback: string): string {
-  const persistenceMessage = userMessageForPersistenceError(error, "");
-  if (persistenceMessage) return persistenceMessage;
-
-  if (error instanceof Error && error.message.trim()) {
-    if (/password|credential|invalid login/i.test(error.message)) {
-      return "Unable to sign in. Check email, password, and Supabase profile.";
-    }
-  }
-
-  return fallback;
-}
-
-function safeFailureToast(error: unknown, fallback: string): string {
-  return formatPersistenceFailureForUser(error, fallback);
-}
-
 function mediaAccept(type: MediaSlotType): string {
   return type === "video" ? "video/mp4" : "image/jpeg";
 }
@@ -437,33 +395,35 @@ function createAgentDraft(profile: AppProfile, count: number): Submission {
 }
 
 function App() {
-  const [session, setSession] = useState<AppSession | null>(null);
-  const [authChecked, setAuthChecked] = useState(
-    supabaseRuntimeConfig.selected !== "supabase",
-  );
-  const [authError, setAuthError] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [loginBusy, setLoginBusy] = useState(false);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
-  const [saveError, setSaveError] = useState("");
   const [uploadingMediaKey, setUploadingMediaKey] = useState("");
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
-  const persistedStatusHistoryIdsRef = useRef<Map<string, Set<string>>>(new Map());
-  const dirtySubmissionVersionsRef = useRef<Map<string, number>>(new Map());
-  const pendingSaveMessagesRef = useRef<Map<string, string>>(new Map());
-  const savingRemoteRef = useRef(false);
+  const {
+    authChecked,
+    authError,
+    dataLoading,
+    isSupabaseSession,
+    loginBusy,
+    loginDemo,
+    loginSupabase,
+    logout,
+    persistExistingSubmission,
+    persistSubmissionImmediately,
+    recoverRemoteFailure,
+    saveState,
+    saveStatusDescription,
+    saveStatusLabel,
+    session,
+    setSaveError,
+    setSubmissions,
+    stageSubmissionUpdates,
+    submissions,
+  } = useWorkspacePersistence({ setToast });
 
   const profile = session?.profile ?? null;
   const sourceLabel = dataSourceLabel(session);
-  const isSupabaseSession = session?.mode === "supabase";
-  const saveStatusLabel =
-    saveState === "saving" ? "Saving" : saveState === "error" ? "Save failed" : "Saved";
-  const saveStatusDescription =
-    saveState === "error" && saveError ? saveError : saveStatusLabel;
   const hasAdminAccess = canAccessRole(profile, "admin");
   const agentSubmissions = useMemo(
     () =>
@@ -561,246 +521,6 @@ function App() {
   }, [visibleSubmissions]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function bootstrapSupabaseSession() {
-      if (supabaseRuntimeConfig.selected !== "supabase") {
-        setAuthChecked(true);
-        return;
-      }
-
-      setAuthChecked(false);
-      setAuthError("");
-      try {
-        const currentSession = await getCurrentAppSession();
-        if (cancelled) return;
-
-        if (currentSession) {
-          setSession(currentSession);
-          setDataLoading(true);
-          const loaded = (await loadWorkspaceSubmissions(currentSession)).map(
-            normalizeSubmission,
-          );
-          if (cancelled) return;
-          persistedStatusHistoryIdsRef.current =
-            collectPersistedStatusHistoryIds(loaded);
-          setSubmissions(loaded);
-        }
-      } catch (error) {
-        logPersistenceDiagnostics("Supabase session bootstrap failed", error);
-        if (!cancelled) {
-          setAuthError(
-            safeErrorMessage(error, "Unable to load the current Supabase session."),
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setDataLoading(false);
-          setAuthChecked(true);
-        }
-      }
-    }
-
-    void bootstrapSupabaseSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (supabaseRuntimeConfig.selected === "supabase") return;
-    if (session?.mode !== "local-demo") return;
-    saveLocalWorkspaceSubmissions(submissions);
-  }, [session?.mode, submissions]);
-
-  function rememberSubmissionHistoryPersisted(submission: Submission): void {
-    const current =
-      persistedStatusHistoryIdsRef.current.get(submission.id) ?? new Set<string>();
-
-    for (const item of submission.timeline ?? []) {
-      if (item.id) current.add(item.id);
-    }
-
-    persistedStatusHistoryIdsRef.current.set(submission.id, current);
-  }
-
-  function queueRemoteSave(submissionIds: string[], successMessage?: string): void {
-    if (!isSupabaseSession) return;
-    setSaveError("");
-
-    for (const id of new Set(submissionIds)) {
-      dirtySubmissionVersionsRef.current.set(
-        id,
-        (dirtySubmissionVersionsRef.current.get(id) ?? 0) + 1,
-      );
-      if (successMessage) pendingSaveMessagesRef.current.set(id, successMessage);
-    }
-  }
-
-  function stageSubmissionUpdates(
-    submissionIds: string[],
-    updater: (current: Submission[]) => Submission[],
-    successMessage?: string,
-  ): void {
-    queueRemoteSave(submissionIds, successMessage);
-    setSubmissions((current) => updater(current).map(normalizeSubmission));
-
-    if (!isSupabaseSession && successMessage) {
-      setToast(successMessage);
-    }
-  }
-
-  async function reloadRemoteSubmissions(activeSession: AppSession): Promise<void> {
-    setDataLoading(true);
-    try {
-      const loaded = (await loadWorkspaceSubmissions(activeSession)).map(
-        normalizeSubmission,
-      );
-      persistedStatusHistoryIdsRef.current = collectPersistedStatusHistoryIds(loaded);
-      setSubmissions(loaded);
-    } finally {
-      setDataLoading(false);
-    }
-  }
-
-  async function persistSubmissionImmediately(
-    activeSession: AppSession,
-    submission: Submission,
-    successMessage: string,
-    cleanupTarget?: MediaStorageTarget,
-  ): Promise<void> {
-    setSaveState("saving");
-    setSaveError("");
-    try {
-      await saveWorkspaceSubmission(
-        activeSession,
-        submission,
-        persistedStatusHistoryIdsRef.current.get(submission.id),
-      );
-      rememberSubmissionHistoryPersisted(submission);
-      dirtySubmissionVersionsRef.current.delete(submission.id);
-      pendingSaveMessagesRef.current.delete(submission.id);
-      setSaveState("idle");
-      setSaveError("");
-      setToast(successMessage);
-    } catch (error) {
-      logPersistenceDiagnostics("Immediate Supabase save failed", error);
-      if (cleanupTarget) {
-        try {
-          await deleteMediaFromStorage(cleanupTarget);
-        } catch (cleanupError) {
-          logPersistenceDiagnostics("Uploaded media cleanup failed", cleanupError);
-        }
-      }
-      dirtySubmissionVersionsRef.current.delete(submission.id);
-      pendingSaveMessagesRef.current.delete(submission.id);
-      setSaveState("error");
-      const message = safeFailureToast(
-        error,
-        "Remote save failed. Last saved Supabase data was reloaded.",
-      );
-      setSaveError(message);
-      try {
-        await reloadRemoteSubmissions(activeSession);
-        setToast(message);
-      } catch (reloadError) {
-        logPersistenceDiagnostics(
-          "Supabase reload after save failure failed",
-          reloadError,
-        );
-        setToast("Remote save failed. Refresh before continuing.");
-      }
-    }
-  }
-
-  useEffect(() => {
-    if (!isSupabaseSession || !session) return undefined;
-    if (savingRemoteRef.current) return undefined;
-
-    const queued = Array.from(dirtySubmissionVersionsRef.current.entries());
-    if (!queued.length) return undefined;
-
-    let cancelled = false;
-    let started = false;
-    const timer = window.setTimeout(() => {
-      started = true;
-      const saveQueuedChanges = async () => {
-        const activeSession = session;
-        const submissionsById = new Map(
-          submissions.map((submission) => [submission.id, submission]),
-        );
-        let finalSuccessMessage = "";
-
-        savingRemoteRef.current = true;
-        setSaveState("saving");
-        setSaveError("");
-        try {
-          for (const [id, version] of queued) {
-            const submission = submissionsById.get(id);
-            if (!submission) {
-              dirtySubmissionVersionsRef.current.delete(id);
-              pendingSaveMessagesRef.current.delete(id);
-              continue;
-            }
-
-            await saveWorkspaceSubmission(
-              activeSession,
-              submission,
-              persistedStatusHistoryIdsRef.current.get(id),
-            );
-            rememberSubmissionHistoryPersisted(submission);
-
-            if (dirtySubmissionVersionsRef.current.get(id) === version) {
-              dirtySubmissionVersionsRef.current.delete(id);
-              finalSuccessMessage =
-                pendingSaveMessagesRef.current.get(id) ?? finalSuccessMessage;
-              pendingSaveMessagesRef.current.delete(id);
-            }
-          }
-
-          if (!cancelled) {
-            setSaveState("idle");
-            setSaveError("");
-            if (finalSuccessMessage) setToast(finalSuccessMessage);
-          }
-        } catch (error) {
-          logPersistenceDiagnostics("Supabase autosave failed", error);
-          dirtySubmissionVersionsRef.current.clear();
-          pendingSaveMessagesRef.current.clear();
-          if (!cancelled) {
-            setSaveState("error");
-            const message = safeFailureToast(
-              error,
-              "Remote save failed. Last saved Supabase data was reloaded.",
-            );
-            setSaveError(message);
-            try {
-              await reloadRemoteSubmissions(activeSession);
-              setToast(message);
-            } catch (reloadError) {
-              logPersistenceDiagnostics(
-                "Supabase reload after save failure failed",
-                reloadError,
-              );
-              setToast("Remote save failed. Refresh before continuing.");
-            }
-          }
-        } finally {
-          savingRemoteRef.current = false;
-        }
-      };
-
-      void saveQueuedChanges();
-    }, 450);
-
-    return () => {
-      if (!started) cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [isSupabaseSession, saveState, session, submissions]);
-
-  useEffect(() => {
     if (!toast) return undefined;
 
     const timer = window.setTimeout(() => setToast(""), 2600);
@@ -820,55 +540,18 @@ function App() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [selectedCaseId]);
 
-  async function loginDemo(role: Role) {
-    const nextSession = await signInDemo(role);
-    const loaded = (await loadWorkspaceSubmissions(nextSession)).map(
-      normalizeSubmission,
-    );
-    setSession(nextSession);
-    setSubmissions(loaded);
-    persistedStatusHistoryIdsRef.current = collectPersistedStatusHistoryIds(loaded);
+  async function handleLoginDemo(role: Role) {
+    await loginDemo(role);
     setSelectedCaseId(null);
   }
 
-  async function loginSupabase(event: FormEvent<HTMLFormElement>) {
+  async function handleLoginSupabase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setAuthError("");
-    setSaveError("");
-    setLoginBusy(true);
-    setDataLoading(true);
-    try {
-      const nextSession = await signInSupabaseWithPassword(loginEmail, loginPassword);
-      const loaded = (await loadWorkspaceSubmissions(nextSession)).map(
-        normalizeSubmission,
-      );
-      setSession(nextSession);
-      setSubmissions(loaded);
-      persistedStatusHistoryIdsRef.current = collectPersistedStatusHistoryIds(loaded);
-      setSelectedCaseId(null);
-      setToast(`Signed in as ${nextSession.profile.displayName}.`);
-    } catch (error) {
-      logPersistenceDiagnostics("Supabase sign-in failed", error);
-      setAuthError(
-        safeErrorMessage(
-          error,
-          "Unable to sign in. Check email, password, and Supabase profile.",
-        ),
-      );
-    } finally {
-      setLoginBusy(false);
-      setDataLoading(false);
-    }
+    if (await loginSupabase(loginEmail, loginPassword)) setSelectedCaseId(null);
   }
 
-  async function logout() {
-    await signOutCurrentSession();
-    setSession(null);
-    setSubmissions([]);
-    persistedStatusHistoryIdsRef.current = new Map();
-    dirtySubmissionVersionsRef.current.clear();
-    pendingSaveMessagesRef.current.clear();
-    setSaveError("");
+  async function handleLogout() {
+    await logout();
     setSelectedCaseId(null);
   }
 
@@ -1013,12 +696,7 @@ function App() {
       setUploadingMediaKey(mediaKey);
       setSaveError("");
       try {
-        await saveWorkspaceSubmission(
-          session,
-          submission,
-          persistedStatusHistoryIdsRef.current.get(submission.id),
-        );
-        rememberSubmissionHistoryPersisted(submission);
+        await persistExistingSubmission(session, submission);
 
         const upload = await uploadMediaToStorage(target, file);
         if (!upload) {
@@ -1081,20 +759,12 @@ function App() {
         );
       } catch (error) {
         logPersistenceDiagnostics("Supabase media upload failed", error);
-        setSaveState("error");
-        const message = safeFailureToast(
+        const message = await recoverRemoteFailure(
+          session,
           error,
           "Media upload failed. No uploaded file was marked complete.",
+          "Supabase reload after media failure failed",
         );
-        setSaveError(message);
-        try {
-          await reloadRemoteSubmissions(session);
-        } catch (reloadError) {
-          logPersistenceDiagnostics(
-            "Supabase reload after media failure failed",
-            reloadError,
-          );
-        }
         setToast(message);
       } finally {
         setUploadingMediaKey("");
@@ -1396,7 +1066,7 @@ function App() {
             current session is known.
           </p>
           {canUseSupabaseAuth ? (
-            <form className="auth-form" onSubmit={loginSupabase}>
+            <form className="auth-form" onSubmit={handleLoginSupabase}>
               <label>
                 <span>Email</span>
                 <input
@@ -1430,14 +1100,14 @@ function App() {
               <button
                 className="button button-primary"
                 type="button"
-                onClick={() => void loginDemo("admin")}
+                onClick={() => void handleLoginDemo("admin")}
               >
                 Continue as Admin demo
               </button>
               <button
                 className="button button-secondary"
                 type="button"
-                onClick={() => void loginDemo("agent")}
+                onClick={() => void handleLoginDemo("agent")}
               >
                 Continue as Agent demo
               </button>
@@ -1543,7 +1213,7 @@ function App() {
                 className="icon-button"
                 type="button"
                 aria-label="Sign out"
-                onClick={() => void logout()}
+                onClick={() => void handleLogout()}
               >
                 ≡
               </button>
@@ -1922,7 +1592,7 @@ function App() {
               <button
                 className="button button-primary"
                 type="button"
-                onClick={() => void loginDemo("admin")}
+                onClick={() => void handleLoginDemo("admin")}
               >
                 Switch to Admin demo
               </button>
@@ -1930,7 +1600,7 @@ function App() {
             <button
               className="button button-secondary"
               type="button"
-              onClick={() => void logout()}
+              onClick={() => void handleLogout()}
             >
               Sign out
             </button>
@@ -2033,7 +1703,7 @@ function App() {
               className="icon-button"
               type="button"
               aria-label="Sign out"
-              onClick={() => void logout()}
+              onClick={() => void handleLogout()}
             >
               ≡
             </button>

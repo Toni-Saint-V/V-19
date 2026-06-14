@@ -34,7 +34,7 @@ import {
   readiness,
 } from "../lib/workflow";
 import { mapSupabasePersistenceError } from "./persistenceObservability";
-import { storageTargetForSlot } from "./storageService";
+import { storageTargetForSlot } from "./storagePathPolicy";
 
 const submissionSelect =
   "id,agent_id,type,title,country,city,travel_date,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
