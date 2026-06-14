@@ -8,9 +8,12 @@ import {
   typeLabel,
 } from "../lib/workflow";
 import { buildExportPlan } from "./exportService";
+import { buildTextIntakeReviewDisplay } from "./textIntakeReviewDisplay";
+import { reviewTextIntake, type TextIntakeReviewResult } from "./textIntakeReviewer";
 
 export type AiHelperIntent =
   | "readiness_summary"
+  | "text_intake_review"
   | "admin_review"
   | "correction_draft"
   | "export_guard";
@@ -23,6 +26,9 @@ export interface AiHelperResult {
   blockers: string[];
   guardrails: string[];
   source: "local-stub" | "edge-stub";
+  textReview?: TextIntakeReviewResult;
+  operatorSummary?: string[];
+  agentFollowUpDrafts?: string[];
 }
 
 const helperGuardrails = [
@@ -54,6 +60,35 @@ export function buildReadinessSummary(submission: Submission): AiHelperResult {
     blockers: preflight.blockers,
     guardrails: helperGuardrails,
     source: "local-stub",
+  };
+}
+
+export function buildTextIntakeReview(submission: Submission): AiHelperResult {
+  const review = reviewTextIntake(submission);
+  const display = buildTextIntakeReviewDisplay(review);
+
+  return {
+    intent: "text_intake_review",
+    title:
+      review.status === "clear"
+        ? "Текст анкеты без явных блокеров"
+        : review.status === "needs_correction"
+          ? "Текст анкеты требует исправлений"
+          : "Текст анкеты требует ручной проверки",
+    summary: `Проверено ${review.reviewedApplicants} заявителя(ей), ${review.reviewedFields} текстовых полей. Найдено ${review.findings.length} замечаний.`,
+    suggestions: display.topFindings.length
+      ? display.topFindings.map((finding) => finding.requiredAction)
+      : ["Можно продолжать deterministic readiness/preflight перед передачей."],
+    blockers: display.blockingFindings.map((finding) =>
+      finding.applicantName
+        ? `${finding.applicantName}: ${finding.problem}`
+        : finding.problem,
+    ),
+    guardrails: [...helperGuardrails, ...review.guardrails],
+    source: "local-stub",
+    textReview: display.review,
+    operatorSummary: display.operatorSummary,
+    agentFollowUpDrafts: display.agentFollowUpDrafts,
   };
 }
 
