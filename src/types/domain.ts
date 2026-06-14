@@ -105,6 +105,8 @@ export interface MediaSlot {
   type: MediaSlotType;
   label: string;
   state: MediaState;
+  passportFileName?: string;
+  /** Legacy upload-origin name; never use as the stored file identifier. */
   originalFileName?: string;
   generatedFileName?: string;
   mimeType?: string;
@@ -125,8 +127,6 @@ export interface Agent {
 
 export interface MediaAsset extends MediaSlot {
   submissionId: string;
-  originalFileName?: string;
-  generatedFileName?: string;
 }
 
 export interface MediaRowData {

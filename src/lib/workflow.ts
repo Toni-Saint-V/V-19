@@ -378,11 +378,14 @@ export function ensureMediaSlots(applicant: Applicant): MediaSlot[] {
     const state: MediaState =
       existing?.state ?? (index < uploadedCount ? "uploaded" : "missing");
     const rebuilt = buildMediaSlot(applicant, slot.type, state);
+    const generatedFileName = getGeneratedFileName(applicant.passport, slot.type);
 
     return {
       ...rebuilt,
       ...existing,
-      generatedFileName: getGeneratedFileName(applicant.passport, slot.type),
+      passportFileName: state === "missing" ? undefined : generatedFileName,
+      originalFileName: undefined,
+      generatedFileName,
       uploadStatus:
         existing?.uploadStatus ?? (state === "missing" ? "none" : "uploaded"),
       reviewStatus: existing?.reviewStatus ?? mediaReviewStatusForState(state),
@@ -397,6 +400,7 @@ export function buildMediaSlot(
 ): MediaSlot {
   const meta = mediaSlotTypes.find((slot) => slot.type === type) ?? mediaSlotTypes[0];
   const applicantId = applicant.id ?? applicant.name.replace(/\s+/g, "-").toLowerCase();
+  const generatedFileName = getGeneratedFileName(applicant.passport, type);
 
   return {
     id: `${applicantId}-${type}`,
@@ -404,7 +408,8 @@ export function buildMediaSlot(
     type,
     label: meta.label,
     state,
-    generatedFileName: getGeneratedFileName(applicant.passport, type),
+    passportFileName: state === "missing" ? undefined : generatedFileName,
+    generatedFileName,
     uploadStatus: state === "missing" ? "none" : "uploaded",
     reviewStatus: mediaReviewStatusForState(state),
   };

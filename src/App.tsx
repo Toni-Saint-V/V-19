@@ -683,7 +683,7 @@ function App() {
         ...existingSlot,
         ...rebuilt,
         state: "uploaded" as const,
-        originalFileName: file.name,
+        passportFileName: rebuilt.generatedFileName,
         mimeType: file.type,
         sizeBytes: file.size,
         uploadedAt: changedAt,
@@ -791,9 +791,7 @@ function App() {
               ...slot,
               ...rebuilt,
               state: "uploaded" as const,
-              originalFileName:
-                slot.originalFileName ??
-                `${normalized.name.replace(/\s+/g, "_").toLowerCase()}_${type}`,
+              passportFileName: rebuilt.generatedFileName,
               uploadedAt: changedAt,
             };
           });

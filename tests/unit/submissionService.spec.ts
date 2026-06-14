@@ -133,6 +133,8 @@ describe("Supabase submission mapping", () => {
       submission_id: "VF-1044",
       applicant_id: "applicant-1",
       type: "photo_white",
+      original_file_name: "751234567_photo_white.jpg",
+      generated_file_name: "751234567_photo_white.jpg",
       storage_bucket: "submission-media",
       storage_path: "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg",
       upload_status: "uploaded",

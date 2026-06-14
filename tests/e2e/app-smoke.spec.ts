@@ -23,7 +23,7 @@ function acceptedMediaSlots(applicantId: string) {
       type: "photo_white",
       label: "Фото на белом фоне",
       state: "accepted",
-      originalFileName: "repo_photo.jpg",
+      passportFileName: "709001001_photo_white.jpg",
       generatedFileName: "709001001_photo_white.jpg",
     },
     {
@@ -32,7 +32,7 @@ function acceptedMediaSlots(applicantId: string) {
       type: "selfie",
       label: "Селфи",
       state: "accepted",
-      originalFileName: "repo_selfie.jpg",
+      passportFileName: "709001001_selfie.jpg",
       generatedFileName: "709001001_selfie.jpg",
     },
     {
@@ -41,7 +41,7 @@ function acceptedMediaSlots(applicantId: string) {
       type: "video",
       label: "Видео",
       state: "accepted",
-      originalFileName: "repo_video.mp4",
+      passportFileName: "709001001_video.mp4",
       generatedFileName: "709001001_video.mp4",
     },
   ];

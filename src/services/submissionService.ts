@@ -151,7 +151,7 @@ function mapMediaAssetRow(row: MediaAssetRow): MediaSlot {
           ? "Селфи"
           : "Видео",
     state: mediaStateFromRow(row),
-    originalFileName: row.original_file_name ?? undefined,
+    passportFileName: row.original_file_name ?? row.generated_file_name ?? undefined,
     generatedFileName: row.generated_file_name ?? undefined,
     mimeType: row.mime_type ?? undefined,
     sizeBytes: row.size_bytes ?? undefined,
@@ -348,7 +348,7 @@ export function toMediaAssetInserts(submission: Submission): MediaAssetInsert[] 
           applicant_id: applicant.id,
           submission_id: normalized.id,
           type: slot.type,
-          original_file_name: slot.originalFileName ?? null,
+          original_file_name: slot.passportFileName ?? slot.generatedFileName,
           generated_file_name: slot.generatedFileName,
           storage_bucket: target.bucket,
           storage_path: target.path,
