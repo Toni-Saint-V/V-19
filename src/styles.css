@@ -284,8 +284,25 @@ p {
 }
 
 .nav-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   color: currentColor;
   font-size: 20px;
+}
+
+.nav-icon svg,
+.search-box svg,
+.icon-button svg,
+.signal svg,
+.spark svg,
+.button svg,
+.link-button svg {
+  display: block;
+  width: 1em;
+  height: 1em;
+  stroke-width: 2.35;
 }
 
 .demo-card {
@@ -526,6 +543,9 @@ p {
 }
 
 .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 0;
   color: var(--blue-strong);
   background: transparent;

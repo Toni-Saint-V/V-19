@@ -1,5 +1,24 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarCheck,
+  ClipboardCheck,
+  FileText,
+  FolderKanban,
+  LayoutDashboard,
+  LogOut,
+  MessageSquareText,
+  RefreshCcw,
+  Search,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import {
   adminAcceptancePreflight,
   buildMediaSlot,
   canAcceptSubmission,
@@ -30,7 +49,7 @@ type Metric = {
   value: string;
   hint: string;
   tone: Tone;
-  icon: string;
+  icon: LucideIcon;
 };
 
 type QueueCase = {
@@ -215,28 +234,28 @@ function buildMetrics(submissions: Submission[]): Metric[] {
       value: String(reviewCount),
       hint: "operator-owned review work",
       tone: reviewCount ? "green" : "neutral",
-      icon: "✓",
+      icon: ClipboardCheck,
     },
     {
       label: "Blocked cases",
       value: String(blockedCount),
       hint: "corrections or manual issue",
       tone: blockedCount ? "red" : "neutral",
-      icon: "!",
+      icon: AlertTriangle,
     },
     {
       label: "Returned",
       value: String(returnedCount),
       hint: "awaiting agency fixes",
       tone: returnedCount ? "gold" : "neutral",
-      icon: "↺",
+      icon: RefreshCcw,
     },
     {
       label: "In appointment queue",
       value: String(appointmentCount),
       hint: "manual tracking statuses",
       tone: appointmentCount ? "purple" : "neutral",
-      icon: "▣",
+      icon: CalendarCheck,
     },
   ];
 }
@@ -253,28 +272,28 @@ function buildAgentMetrics(submissions: Submission[]): Metric[] {
       value: String(draftCount),
       hint: "cases still being prepared",
       tone: draftCount ? "blue" : "neutral",
-      icon: "□",
+      icon: FileText,
     },
     {
       label: "Returned",
       value: String(returnedCount),
       hint: "corrections to close",
       tone: returnedCount ? "red" : "neutral",
-      icon: "!",
+      icon: RefreshCcw,
     },
     {
       label: "Ready to send",
       value: String(readyCount),
       hint: "preflight can run",
       tone: readyCount ? "green" : "neutral",
-      icon: "✓",
+      icon: Send,
     },
     {
       label: "With operator",
       value: String(reviewCount),
       hint: "waiting for human review",
       tone: reviewCount ? "purple" : "neutral",
-      icon: "▣",
+      icon: ShieldCheck,
     },
   ];
 }
@@ -1153,21 +1172,21 @@ function App() {
             <p className="nav-kicker">Intake</p>
             <a className="nav-item is-active" href="#agent-workspace">
               <span className="nav-icon" aria-hidden="true">
-                ◇
+                <LayoutDashboard />
               </span>
               <span>Workspace</span>
               <strong>{agentSubmissions.length}</strong>
             </a>
             <a className="nav-item" href="#agent-cases">
               <span className="nav-icon" aria-hidden="true">
-                ▣
+                <FolderKanban />
               </span>
               <span>Cases</span>
               <strong>{agentCases.length}</strong>
             </a>
             <a className="nav-item" href="#agent-cases">
               <span className="nav-icon" aria-hidden="true">
-                !
+                <RefreshCcw />
               </span>
               <span>Corrections</span>
               <strong>{countMatching(agentSubmissions, ["returned"])}</strong>
@@ -1186,7 +1205,9 @@ function App() {
         <div className="workspace">
           <header className="topbar">
             <label className="search-box">
-              <span aria-hidden="true">⌕</span>
+              <span aria-hidden="true">
+                <Search />
+              </span>
               <input
                 placeholder="Search your cases..."
                 aria-label="Search agent cases"
@@ -1213,7 +1234,7 @@ function App() {
                 aria-label="Sign out"
                 onClick={() => void handleLogout()}
               >
-                ≡
+                <LogOut />
               </button>
               <span className="avatar" aria-label={`${profile.displayName} profile`}>
                 {profileInitial(profile)}
@@ -1243,23 +1264,27 @@ function App() {
             </section>
 
             <section className="metric-grid" aria-label="Agent metrics">
-              {agentMetrics.map((metric) => (
-                <article className="metric-card" key={metric.label}>
-                  <span className={`signal signal-${metric.tone}`} aria-hidden="true">
-                    {metric.icon}
-                  </span>
-                  <div>
-                    <strong>{metric.value}</strong>
-                    <p>{metric.label}</p>
-                    <small>{metric.hint}</small>
-                  </div>
-                </article>
-              ))}
+              {agentMetrics.map((metric) => {
+                const MetricIcon = metric.icon;
+
+                return (
+                  <article className="metric-card" key={metric.label}>
+                    <span className={`signal signal-${metric.tone}`} aria-hidden="true">
+                      <MetricIcon />
+                    </span>
+                    <div>
+                      <strong>{metric.value}</strong>
+                      <p>{metric.label}</p>
+                      <small>{metric.hint}</small>
+                    </div>
+                  </article>
+                );
+              })}
             </section>
 
             <section className="ai-next-action" aria-label="Agent readiness guardrail">
               <span className="spark" aria-hidden="true">
-                ✦
+                <Sparkles />
               </span>
               <div>
                 <p className="eyebrow">Readiness guardrail</p>
@@ -1287,7 +1312,7 @@ function App() {
                     setToast(`Agent cases are loaded from ${sourceLabel}.`)
                   }
                 >
-                  Repository source <span aria-hidden="true">→</span>
+                  Repository source <ArrowRight aria-hidden="true" />
                 </button>
               </div>
 
@@ -1399,7 +1424,7 @@ function App() {
                   aria-label="Close intake editor"
                   onClick={() => setSelectedCaseId(null)}
                 >
-                  ×
+                  <X />
                 </button>
               </header>
 
@@ -1625,40 +1650,40 @@ function App() {
           <p className="nav-kicker">Operations</p>
           <a className="nav-item is-active" href="#command-center">
             <span className="nav-icon" aria-hidden="true">
-              ◇
+              <LayoutDashboard />
             </span>
             <span>Command Center</span>
             <strong>{visibleSubmissions.length}</strong>
           </a>
           <a className="nav-item" href="#priority-queue">
             <span className="nav-icon" aria-hidden="true">
-              ▣
+              <FolderKanban />
             </span>
             <span>Cases</span>
             <strong>{queueCases.length}</strong>
           </a>
           <a className="nav-item" href="#queue-load">
             <span className="nav-icon" aria-hidden="true">
-              □
+              <CalendarCheck />
             </span>
             <span>Appointment Queue</span>
             <strong>{metrics[3]?.value ?? 0}</strong>
           </a>
           <a className="nav-item" href="#status-board">
             <span className="nav-icon" aria-hidden="true">
-              ▥
+              <UsersRound />
             </span>
             <span>Agents</span>
           </a>
           <a className="nav-item" href="#status-board">
             <span className="nav-icon" aria-hidden="true">
-              ◌
+              <ShieldCheck />
             </span>
             <span>Trust & Audit</span>
           </a>
           <a className="nav-item" href="#events">
             <span className="nav-icon" aria-hidden="true">
-              ◱
+              <MessageSquareText />
             </span>
             <span>Messages</span>
           </a>
@@ -1676,7 +1701,9 @@ function App() {
       <div className="workspace">
         <header className="topbar">
           <label className="search-box">
-            <span aria-hidden="true">⌕</span>
+            <span aria-hidden="true">
+              <Search />
+            </span>
             <input
               placeholder="Search cases, tourists, agencies..."
               aria-label="Search cases"
@@ -1703,7 +1730,7 @@ function App() {
               aria-label="Sign out"
               onClick={() => void handleLogout()}
             >
-              ≡
+              <LogOut />
             </button>
             <span
               className="avatar"
@@ -1730,7 +1757,7 @@ function App() {
                 type="button"
                 onClick={openPriorityCase}
               >
-                Open priority case <span aria-hidden="true">→</span>
+                Open priority case <ArrowRight aria-hidden="true" />
               </button>
               <button
                 className="button button-primary"
@@ -1743,23 +1770,27 @@ function App() {
           </section>
 
           <section className="metric-grid" aria-label="Case metrics">
-            {metrics.map((metric) => (
-              <article className="metric-card" key={metric.label}>
-                <span className={`signal signal-${metric.tone}`} aria-hidden="true">
-                  {metric.icon}
-                </span>
-                <div>
-                  <strong>{metric.value}</strong>
-                  <p>{metric.label}</p>
-                  <small>{metric.hint}</small>
-                </div>
-              </article>
-            ))}
+            {metrics.map((metric) => {
+              const MetricIcon = metric.icon;
+
+              return (
+                <article className="metric-card" key={metric.label}>
+                  <span className={`signal signal-${metric.tone}`} aria-hidden="true">
+                    <MetricIcon />
+                  </span>
+                  <div>
+                    <strong>{metric.value}</strong>
+                    <p>{metric.label}</p>
+                    <small>{metric.hint}</small>
+                  </div>
+                </article>
+              );
+            })}
           </section>
 
           <section className="ai-next-action" aria-label="Next review action">
             <span className="spark" aria-hidden="true">
-              ✦
+              <Sparkles />
             </span>
             <div>
               <p className="eyebrow">Next review action</p>
@@ -1799,7 +1830,7 @@ function App() {
                   type="button"
                   onClick={() => setToast(`Queue is loaded from ${sourceLabel}.`)}
                 >
-                  Queue source <span aria-hidden="true">→</span>
+                  Queue source <ArrowRight aria-hidden="true" />
                 </button>
               </div>
               <div className="case-list">
@@ -1977,7 +2008,7 @@ function App() {
                 aria-label="Close case details"
                 onClick={() => setSelectedCaseId(null)}
               >
-                ×
+                <X />
               </button>
             </header>
 
