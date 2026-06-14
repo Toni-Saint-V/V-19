@@ -1,7 +1,7 @@
 import type { Role, Screen } from "../types/domain";
+import type { AppProfile } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
 import type { ProfileRow } from "../lib/supabase/database.types";
-import type { AppProfile } from "./authService";
 import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 function mapProfile(row: ProfileRow): AppProfile {
