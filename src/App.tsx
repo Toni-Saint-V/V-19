@@ -40,9 +40,9 @@ import {
   logPersistenceDiagnostics,
   userMessageForPersistenceError,
 } from "./services/persistenceObservability";
+import { buildSmartCorrectionReturnPackage } from "./services/smartCorrectionReturn";
 import type {
   Applicant,
-  CorrectionNote,
   MediaSlotType,
   Role,
   Submission,
@@ -1307,16 +1307,11 @@ function App() {
     const actor = profile?.displayName ?? "Operator";
     const actorId = profile?.id ?? actor;
     const changedAt = actionTimestamp();
-    const correction: CorrectionNote = {
-      id: crypto.randomUUID(),
-      target: "Admin review",
-      scope: "submission",
-      severity: "blocking",
-      status: "open",
-      text: "Human review returned this case for agency correction.",
+    const correctionPackage = buildSmartCorrectionReturnPackage(selectedSubmission, {
       createdBy: actorId,
       createdAt: changedAt,
-    };
+      idFactory: () => crypto.randomUUID(),
+    });
 
     stageSubmissionUpdates(
       [selectedSubmission.id],
@@ -1327,12 +1322,12 @@ function App() {
           return transitionSubmissionStatus(
             {
               ...submission,
-              notes: [correction, ...submission.notes],
+              notes: [...correctionPackage.notes, ...submission.notes],
             },
             "returned",
             actor,
             changedAt,
-            "Operator returned the case for correction.",
+            correctionPackage.summary,
           );
         }),
       `${selectedSubmission.id} returned to the agency for correction.`,

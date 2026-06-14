@@ -7,42 +7,46 @@ import {
 
 export type TextIntakeReviewSeverity = "blocking" | "warning" | "info";
 
-export type TextIntakeReviewCode =
-  | "missing_required_text"
-  | "missing_conditional_text"
-  | "placeholder_text"
-  | "invalid_email"
-  | "weak_phone"
-  | "invalid_date_format"
-  | "invalid_birth_date"
-  | "passport_expired_before_travel"
-  | "passport_issued_after_expiry"
-  | "date_order_inconsistent"
-  | "duration_dates_mismatch"
-  | "non_numeric_duration"
-  | "weak_passport_number"
-  | "passport_number_unexpected_format"
-  | "passport_validity_too_short_after_departure"
-  | "passport_validity_period_unexpected"
-  | "latin_text_expected"
-  | "family_trip_mismatch"
-  | "residence_submission_city_mismatch"
-  | "home_address_incomplete"
-  | "host_country_unexpected"
-  | "spanish_host_postal_invalid"
-  | "spanish_host_phone_unexpected"
-  | "appointment_after_travel_date"
-  | "minor_occupation_age_mismatch"
-  | "employer_contact_matches_applicant"
-  | "employer_address_matches_home"
-  | "submission_applicant_country_mismatch"
-  | "submission_applicant_city_mismatch"
-  | "trip_dates_not_machine_readable"
-  | "travel_date_outside_trip_dates"
-  | "duplicate_passport"
-  | "shared_contact_requires_review"
-  | "name_too_short"
-  | "family_role_unconfirmed";
+export const textIntakeReviewCodes = [
+  "missing_required_text",
+  "missing_conditional_text",
+  "placeholder_text",
+  "invalid_email",
+  "weak_phone",
+  "invalid_date_format",
+  "invalid_birth_date",
+  "birth_date_in_future",
+  "passport_expired_before_travel",
+  "passport_issued_after_expiry",
+  "date_order_inconsistent",
+  "duration_dates_mismatch",
+  "non_numeric_duration",
+  "weak_passport_number",
+  "passport_number_unexpected_format",
+  "passport_validity_too_short_after_departure",
+  "passport_validity_period_unexpected",
+  "latin_text_expected",
+  "family_trip_mismatch",
+  "residence_submission_city_mismatch",
+  "home_address_incomplete",
+  "host_country_unexpected",
+  "spanish_host_postal_invalid",
+  "spanish_host_phone_unexpected",
+  "appointment_after_travel_date",
+  "minor_occupation_age_mismatch",
+  "employer_contact_matches_applicant",
+  "employer_address_matches_home",
+  "submission_applicant_country_mismatch",
+  "submission_applicant_city_mismatch",
+  "trip_dates_not_machine_readable",
+  "travel_date_outside_trip_dates",
+  "duplicate_passport",
+  "shared_contact_requires_review",
+  "name_too_short",
+  "family_role_unconfirmed",
+] as const;
+
+export type TextIntakeReviewCode = (typeof textIntakeReviewCodes)[number];
 
 export interface TextIntakeReviewFinding {
   id: string;
@@ -54,6 +58,7 @@ export interface TextIntakeReviewFinding {
   fieldKey?: keyof Applicant;
   sourceField?: string;
   fieldLabel?: string;
+  relatedApplicantNames?: string[];
   problem: string;
   reason: string;
   requiredAction: string;
@@ -91,9 +96,9 @@ const fieldLabels = new Map<keyof Applicant, string>(
 );
 
 const textReviewGuardrails = [
-  "Text review checks questionnaire fields only; photos and videos remain manual media review.",
-  "Findings are correction drafts, not outcome decisions or authority claims.",
-  "Readiness and handoff still depend on deterministic preflight and human review.",
+  "Текстовая проверка смотрит только поля анкеты; фото и видео остаются ручной проверкой медиа.",
+  "Замечания являются черновиками исправлений, а не решением по исходу или официальной проверкой.",
+  "Готовность и передача зависят от deterministic preflight и ручной проверки.",
 ];
 
 export type BlsAppointmentTextKey =
@@ -558,7 +563,7 @@ function addFormatAndDateFindings(
     });
   } else if (birthDate && birthDate > today) {
     addFinding(findings, {
-      code: "invalid_birth_date",
+      code: "birth_date_in_future",
       severity: "blocking",
       scope: "field",
       applicantId,
@@ -675,6 +680,7 @@ function addCrossApplicantFindings(
       code: "duplicate_passport",
       severity: "blocking",
       scope: "submission",
+      relatedApplicantNames: owners.map((owner) => owner.name),
       problem: "Two or more applicants use the same passport number.",
       reason: "Duplicate passport numbers usually indicate copied applicant data.",
       requiredAction: `Check passport numbers for: ${names}.`,
@@ -694,6 +700,7 @@ function addCrossApplicantFindings(
         scope: "field",
         fieldKey,
         fieldLabel: fieldLabel(fieldKey),
+        relatedApplicantNames: owners.map((owner) => owner.name),
         problem: "Multiple applicants share the same contact value.",
         reason:
           submission.type === "family"
@@ -965,7 +972,7 @@ function addBlsApplicantConsistencyFindings(
   const today = new Date();
   if (birthDate && birthDate > today) {
     addBlsFieldFinding(findings, {
-      code: "invalid_birth_date",
+      code: "birth_date_in_future",
       severity: "blocking",
       applicantId,
       applicantName,
@@ -1303,6 +1310,7 @@ function addBlsCrossApplicantFindings(
       scope: "submission",
       sourceField: "passport_number",
       fieldLabel: "Passport No",
+      relatedApplicantNames: names,
       problem: "Two or more BLS applicants use the same passport number.",
       reason: "Duplicate passport numbers usually indicate copied applicant data.",
       requiredAction: `Check passport numbers for: ${names.join(", ")}.`,
@@ -1321,6 +1329,7 @@ function addBlsCrossApplicantFindings(
         scope: "submission",
         sourceField,
         fieldLabel: sourceField === "email" ? "Email" : "Contact Number",
+        relatedApplicantNames: names,
         problem: "Multiple BLS applicants share the same contact value.",
         reason: "Shared contacts can be valid for families, but should be intentional.",
         requiredAction: `Confirm shared contact data for: ${names.join(", ")}.`,
@@ -1338,6 +1347,9 @@ function addBlsCrossApplicantFindings(
       scope: "submission",
       sourceField: "arrival_date",
       fieldLabel: "Travel dates",
+      relatedApplicantNames: Array.from(
+        new Set(Array.from(tripOwners.values()).flat()),
+      ),
       problem: "Family applicants have different arrival/departure date ranges.",
       reason:
         "Family members can travel separately, but copied or shifted dates are a common intake error.",

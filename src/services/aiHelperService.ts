@@ -8,6 +8,7 @@ import {
   typeLabel,
 } from "../lib/workflow";
 import { buildExportPlan } from "./exportService";
+import { buildTextIntakeReviewDisplay } from "./textIntakeReviewDisplay";
 import { reviewTextIntake, type TextIntakeReviewResult } from "./textIntakeReviewer";
 
 export type AiHelperIntent =
@@ -26,6 +27,8 @@ export interface AiHelperResult {
   guardrails: string[];
   source: "local-stub" | "edge-stub";
   textReview?: TextIntakeReviewResult;
+  operatorSummary?: string[];
+  agentFollowUpDrafts?: string[];
 }
 
 const helperGuardrails = [
@@ -62,10 +65,7 @@ export function buildReadinessSummary(submission: Submission): AiHelperResult {
 
 export function buildTextIntakeReview(submission: Submission): AiHelperResult {
   const review = reviewTextIntake(submission);
-  const blockingFindings = review.findings.filter(
-    (finding) => finding.severity === "blocking",
-  );
-  const topFindings = review.findings.slice(0, 4);
+  const display = buildTextIntakeReviewDisplay(review);
 
   return {
     intent: "text_intake_review",
@@ -76,17 +76,19 @@ export function buildTextIntakeReview(submission: Submission): AiHelperResult {
           ? "Текст анкеты требует исправлений"
           : "Текст анкеты требует ручной проверки",
     summary: `Проверено ${review.reviewedApplicants} заявителя(ей), ${review.reviewedFields} текстовых полей. Найдено ${review.findings.length} замечаний.`,
-    suggestions: topFindings.length
-      ? topFindings.map((finding) => finding.requiredAction)
+    suggestions: display.topFindings.length
+      ? display.topFindings.map((finding) => finding.requiredAction)
       : ["Можно продолжать deterministic readiness/preflight перед передачей."],
-    blockers: blockingFindings.map((finding) =>
+    blockers: display.blockingFindings.map((finding) =>
       finding.applicantName
         ? `${finding.applicantName}: ${finding.problem}`
         : finding.problem,
     ),
     guardrails: [...helperGuardrails, ...review.guardrails],
     source: "local-stub",
-    textReview: review,
+    textReview: display.review,
+    operatorSummary: display.operatorSummary,
+    agentFollowUpDrafts: display.agentFollowUpDrafts,
   };
 }
 
