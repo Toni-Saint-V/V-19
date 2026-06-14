@@ -306,9 +306,7 @@ describe("text intake reviewer", () => {
     expect(helperWithFindings.agentFollowUpDrafts?.join(" ")).toContain(
       "Введите корректный email",
     );
-    expect(helperWithFindings.agentFollowUpDrafts?.[0]).toContain(
-      "Blocking Applicant",
-    );
+    expect(helperWithFindings.agentFollowUpDrafts?.[0]).toContain("Blocking Applicant");
     expect(helper.guardrails.join(" ")).toContain(
       "не решением по исходу или официальной проверкой",
     );

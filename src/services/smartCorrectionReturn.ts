@@ -74,10 +74,7 @@ function withReturnMetadata(
   };
 }
 
-function fallbackCorrection(
-  text: string,
-  options: ReturnMetadata,
-): CorrectionNote {
+function fallbackCorrection(text: string, options: ReturnMetadata): CorrectionNote {
   return {
     id: options.idFactory(),
     target: "Ручная проверка",
@@ -108,7 +105,8 @@ function textReviewSummary({
 
   const details = [`добавлено ${addedCount}`];
   if (skippedExistingCount) details.push(`уже было открыто ${skippedExistingCount}`);
-  if (truncatedCount) details.push(`ещё ${truncatedCount} осталось в текстовой проверке`);
+  if (truncatedCount)
+    details.push(`ещё ${truncatedCount} осталось в текстовой проверке`);
   return `Текстовая проверка: ${details.join(", ")}.`;
 }
 
@@ -153,9 +151,7 @@ function existingCorrectionIndex(notes: CorrectionNote[]): ExistingCorrectionInd
   const openNotes = notes.filter(isOpenCorrection);
   return {
     keys: new Set(openNotes.map(openCorrectionKey)),
-    texts: new Set(
-      openNotes.map((note) => note.text.trim()).filter(Boolean),
-    ),
+    texts: new Set(openNotes.map((note) => note.text.trim()).filter(Boolean)),
   };
 }
 
@@ -174,8 +170,7 @@ function isNewCorrection(
   existing: ExistingCorrectionIndex,
 ): boolean {
   return (
-    !existing.keys.has(openCorrectionKey(note)) &&
-    !existing.texts.has(note.text.trim())
+    !existing.keys.has(openCorrectionKey(note)) && !existing.texts.has(note.text.trim())
   );
 }
 
@@ -203,7 +198,8 @@ function limitedTextNotes(
   existing: ExistingCorrectionIndex,
   maxNotes: number,
 ): { notes: CorrectionNote[]; truncatedCount: number } {
-  const selectedLimit = notesToAdd.length > maxNotes ? Math.max(0, maxNotes - 1) : maxNotes;
+  const selectedLimit =
+    notesToAdd.length > maxNotes ? Math.max(0, maxNotes - 1) : maxNotes;
   const selectedNotes = notesToAdd.slice(0, selectedLimit);
   const truncatedCount = notesToAdd.length - selectedNotes.length;
   const overflowText = `Есть ещё ${truncatedCount} текстовых замечаний. Проверьте текстовую проверку перед повторной передачей.`;
@@ -258,8 +254,8 @@ function buildAgentPreflightFallbackPackage(
   existing: ExistingCorrectionIndex,
   maxNotes: number,
 ): SmartCorrectionReturnPackage {
-  const blockerTexts = submissionPreflight(normalized).blockers
-    .map((blocker) => blocker.trim())
+  const blockerTexts = submissionPreflight(normalized)
+    .blockers.map((blocker) => blocker.trim())
     .filter(Boolean)
     .filter((blocker) => !existing.texts.has(blocker))
     .map(fallbackNoteText);

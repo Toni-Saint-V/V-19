@@ -45,19 +45,13 @@ export function sortTextReviewFindings(
     const scopeDelta = findingScopeRank(left) - findingScopeRank(right);
     if (scopeDelta) return scopeDelta;
 
-    return [
-      left.applicantName ?? "",
-      left.fieldLabel ?? "",
-      left.code,
-      left.id,
-    ].join("|").localeCompare(
-      [
-        right.applicantName ?? "",
-        right.fieldLabel ?? "",
-        right.code,
-        right.id,
-      ].join("|"),
-    );
+    return [left.applicantName ?? "", left.fieldLabel ?? "", left.code, left.id]
+      .join("|")
+      .localeCompare(
+        [right.applicantName ?? "", right.fieldLabel ?? "", right.code, right.id].join(
+          "|",
+        ),
+      );
   });
 }
 
@@ -394,9 +388,7 @@ export function buildTextIntakeReviewDisplay(
   return {
     review: displayReview,
     topFindings: findings.slice(0, 4),
-    blockingFindings: findings.filter(
-      (finding) => finding.severity === "blocking",
-    ),
+    blockingFindings: findings.filter((finding) => finding.severity === "blocking"),
     operatorSummary: buildOperatorSummary(displayReview),
     agentFollowUpDrafts: buildAgentFollowUpDrafts(displayReview),
   };
