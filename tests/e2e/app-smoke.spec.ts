@@ -256,6 +256,26 @@ async function storedStatusById(page: Page, id?: string) {
   );
 }
 
+async function storedNoteTextsById(page: Page, id?: string) {
+  return page.evaluate(
+    ([key, targetId]) => {
+      const storage = (
+        globalThis as unknown as {
+          localStorage: { getItem(key: string): string | null };
+        }
+      ).localStorage;
+      const rows = JSON.parse(storage.getItem(key) ?? "[]") as Array<{
+        id?: string;
+        notes?: Array<{ text?: string }>;
+      }>;
+      if (!Array.isArray(rows)) return [];
+      const row = rows.find((item) => !targetId || item.id === targetId);
+      return row?.notes?.map((note) => note.text ?? "") ?? [];
+    },
+    [storageKey, id] as const,
+  );
+}
+
 async function fillIntakeModal(page: Page) {
   const dialog = page.getByRole("dialog").filter({ hasText: "Applicant data" });
   await expect(dialog).toBeVisible();
@@ -441,6 +461,12 @@ test("persists the return-to-agent review action across refresh", async ({ page 
     "LOCAL-9003 returned to the agency for correction.",
   );
   await expect.poll(() => storedStatus(page)).toBe("returned");
+  await expect
+    .poll(async () => (await storedNoteTextsById(page, "LOCAL-9003")).join(" "))
+    .toContain("Оператор вернул заявку на ручное уточнение");
+  expect((await storedNoteTextsById(page, "LOCAL-9003")).join(" ")).not.toContain(
+    "Human review returned this case for agency correction.",
+  );
 
   await page.reload();
   await page.getByRole("button", { name: "Continue as Admin demo" }).click();

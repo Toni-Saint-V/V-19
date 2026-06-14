@@ -240,6 +240,22 @@ describe("text intake reviewer", () => {
       ]),
     );
     const helper = buildTextIntakeReview(submission());
+    const helperWithFindings = buildTextIntakeReview(
+      submission([
+        {
+          ...completeApplicant,
+          name: "Warning Applicant",
+          country: "France",
+        },
+        {
+          ...completeApplicant,
+          id: "applicant-2",
+          name: "Blocking Applicant",
+          email: "not-an-email",
+          passportExpiresAt: "2026-01-01",
+        },
+      ]),
+    );
 
     expect(review.status).toBe("needs_correction");
     expect(review.findings.map((finding) => finding.code)).toEqual(
@@ -247,8 +263,69 @@ describe("text intake reviewer", () => {
     );
     expect(helper.intent).toBe("text_intake_review");
     expect(helper.textReview?.status).toBe("clear");
+    expect(helper.operatorSummary).toEqual(
+      expect.arrayContaining(["Явных текстовых блокеров в анкете не найдено."]),
+    );
+    expect(helper.agentFollowUpDrafts).toEqual([]);
+    expect(helperWithFindings.operatorSummary?.[0]).toBe(
+      "Текст анкеты: блокеров 3, предупреждений 2.",
+    );
+    expect(helperWithFindings.operatorSummary?.[1]).toContain("Blocking Applicant");
+    expect(
+      helperWithFindings.textReview?.findings.map((finding) => ({
+        code: finding.code,
+        applicantName: finding.applicantName,
+      })),
+    ).toEqual([
+      { code: "invalid_email", applicantName: "Blocking Applicant" },
+      {
+        code: "passport_expired_before_travel",
+        applicantName: "Blocking Applicant",
+      },
+      { code: "duplicate_passport", applicantName: undefined },
+      { code: "shared_contact_requires_review", applicantName: undefined },
+      {
+        code: "submission_applicant_country_mismatch",
+        applicantName: "Warning Applicant",
+      },
+    ]);
+    expect(
+      helperWithFindings.textReview?.correctionCandidates.map(
+        (candidate) => candidate.id,
+      ),
+    ).toEqual([
+      "text-review:applicant-2:email:invalid_email",
+      "text-review:applicant-2:passportExpiresAt:passport_expired_before_travel",
+      "text-review:submission:submission:duplicate_passport",
+      "text-review:submission:phone:shared_contact_requires_review",
+      "text-review:applicant-1:country:submission_applicant_country_mismatch",
+    ]);
+    expect(helperWithFindings.agentFollowUpDrafts?.join(" ")).toContain(
+      "Email указан в некорректном формате",
+    );
+    expect(helperWithFindings.agentFollowUpDrafts?.join(" ")).toContain(
+      "Введите корректный email",
+    );
+    expect(helperWithFindings.agentFollowUpDrafts?.[0]).toContain(
+      "Blocking Applicant",
+    );
     expect(helper.guardrails.join(" ")).toContain(
-      "not outcome decisions or authority claims",
+      "не решением по исходу или официальной проверкой",
+    );
+    const visibleHelperCopy = [
+      helperWithFindings.title,
+      helperWithFindings.summary,
+      ...helperWithFindings.suggestions,
+      ...helperWithFindings.blockers,
+      ...helperWithFindings.guardrails,
+      ...(helperWithFindings.operatorSummary ?? []),
+      ...(helperWithFindings.agentFollowUpDrafts ?? []),
+    ].join(" ");
+    expect(visibleHelperCopy).not.toMatch(
+      /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|шанс[а-я\s]+визы/i,
+    );
+    expect(visibleHelperCopy).not.toMatch(
+      /Email format is invalid|Enter a valid email address|Passport expires before the case travel date/i,
     );
   });
 });

@@ -158,7 +158,7 @@ export function buildBlsTextReviewTrainingCorpus(): BlsTextReviewTrainingCase[] 
       title: "Birth date is in the future",
       category: "dates",
       input: questionnaire({ birth_date: "01.01.2099" }),
-      expectedFindingCodes: ["invalid_birth_date"],
+      expectedFindingCodes: ["birth_date_in_future"],
     },
     {
       id: "passport-date-range-impossible",
