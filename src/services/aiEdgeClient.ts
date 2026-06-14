@@ -1,17 +1,34 @@
 import { getSupabaseClient } from "../lib/supabase/client";
-import type { AiHelperIntent, AiHelperResult } from "./aiHelperService";
+import {
+  parseAiHelperResult,
+  type AiHelperActor,
+  type AiHelperIntent,
+  type AiHelperResult,
+  type AiHelperRequest,
+} from "../../supabase/functions/_shared/ai-helper-contract";
 
 export async function invokeAiHelperEdge(
   intent: AiHelperIntent,
   context: Record<string, unknown>,
+  actor: AiHelperActor,
 ): Promise<AiHelperResult | null> {
   const client = getSupabaseClient();
   if (!client) return null;
 
-  const { data, error } = await client.functions.invoke<AiHelperResult>("ai-helper", {
-    body: { intent, context },
+  const request: AiHelperRequest = {
+    intent,
+    context,
+    actor,
+  };
+  const { data, error } = await client.functions.invoke<unknown>("ai-helper", {
+    body: request,
   });
 
   if (error) throw error;
-  return data ?? null;
+  const parsed = parseAiHelperResult(data);
+  if (!parsed.ok) {
+    throw new Error(parsed.safeMessage);
+  }
+
+  return parsed.data;
 }

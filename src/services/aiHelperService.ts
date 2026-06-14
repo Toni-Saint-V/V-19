@@ -10,32 +10,19 @@ import {
 import { buildExportPlan } from "./exportService";
 import { buildTextIntakeReviewDisplay } from "./textIntakeReviewDisplay";
 import { reviewTextIntake, type TextIntakeReviewResult } from "./textIntakeReviewer";
+import {
+  aiHelperBaseGuardrails,
+  type AiHelperIntent,
+  type AiHelperResult as BaseAiHelperResult,
+} from "../../supabase/functions/_shared/ai-helper-contract";
 
-export type AiHelperIntent =
-  | "readiness_summary"
-  | "text_intake_review"
-  | "admin_review"
-  | "correction_draft"
-  | "export_guard";
+export type { AiHelperIntent };
 
-export interface AiHelperResult {
-  intent: AiHelperIntent;
-  title: string;
-  summary: string;
-  suggestions: string[];
-  blockers: string[];
-  guardrails: string[];
-  source: "local-stub" | "edge-stub";
+export interface AiHelperResult extends Omit<BaseAiHelperResult, "textReview"> {
   textReview?: TextIntakeReviewResult;
-  operatorSummary?: string[];
-  agentFollowUpDrafts?: string[];
 }
 
-const helperGuardrails = [
-  "Подсказка не является решением.",
-  "Детерминированные проверки остаются источником истины.",
-  "Оператор принимает медиа и заявку вручную.",
-];
+const helperGuardrails = [...aiHelperBaseGuardrails];
 
 export function buildReadinessSummary(submission: Submission): AiHelperResult {
   const preflight = submissionPreflight(submission);
