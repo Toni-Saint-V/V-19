@@ -74,6 +74,16 @@ When the public Supabase values are missing, the app stays in local demo mode:
 `functions/ai-helper/index.ts` is a backend-safe stub for Block #7.
 
 - Frontend calls should go through Supabase Functions, never directly to a model provider.
+- Requests and responses use the shared contract in `functions/_shared/ai-helper-contract.ts`.
+- Every request must include an actor with `id`, `role`, and `canUseAI`; admin review and export helpers require the admin role.
+- Durable audit and quota are mandatory server-side boundaries. If the edge function is deployed without `SUPABASE_URL`, `SUPABASE_FUNCTION_ADMIN_KEY`, and quota wiring, it fails closed with `503` instead of silently using console-only or in-memory protection.
+- `migrations/20260614000000_ai_helper_audit_quota.sql` creates the default audit table and `consume_ai_helper_quota` RPC with RLS enabled on helper audit/quota storage.
+- Audit writes use `AI_HELPER_AUDIT_TABLE` or default `ai_helper_audit_events`. Rows must store only redacted metadata: `event`, `intent`, `actor_id`, `actor_role`, `request_id`, `reason`, and `created_at`; raw helper context, prompts, documents, and direct contact data must not be written.
+- Quota checks use `AI_HELPER_QUOTA_RPC=consume_ai_helper_quota`. The RPC atomically consumes one helper allowance for `p_actor_id`, `p_actor_role`, `p_intent`, and `p_request_id`, then returns `remaining` and optional `reset_at`. Missing or failing quota storage returns `503`; exhausted quota returns `429`.
+- The edge handler generates `request_id` server-side for audit/quota idempotency; client-supplied request IDs are ignored.
+- Edge responses are parsed and safety-validated before UI consumption; unsafe copy fails closed.
+- The edge handler records safe audit events for invoked, denied, quota-limited, quota-failed, provider-failed, and rejected helper calls.
+- The model provider is behind `AiHelperProvider`; provider keys must remain in Supabase function secrets and provider failures return safe `502` errors.
 - Model/provider keys must stay server-side in Supabase function secrets and must not use a `VITE_` prefix.
 - The helper may summarize, explain, and draft text only.
 - Deterministic validation remains the source of truth for blockers, submit guards, media state, and export eligibility.

@@ -1,69 +1,23 @@
-type HelperIntent =
-  | "readiness_summary"
-  | "text_intake_review"
-  | "admin_review"
-  | "correction_draft"
-  | "export_guard";
+import {
+  createSupabaseRestAiHelperDependencies,
+  handleAiHelperRequest,
+} from "../_shared/ai-helper-handler.ts";
 
-interface HelperRequest {
-  intent: HelperIntent;
-  context?: Record<string, unknown>;
-}
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+  serve(handler: (request: Request) => Response | Promise<Response>): void;
 };
 
-const guardrails = [
-  "AI suggests only.",
-  "Deterministic validation remains the source of truth.",
-  "A human operator makes all media and submission decisions.",
-];
-
-function safeResponse(intent: HelperIntent) {
-  return {
-    intent,
-    title: "Helper draft",
-    summary:
-      "Backend helper stub is available. Configure a server-side model provider later to generate richer drafts.",
-    suggestions: [
-      "Use deterministic blockers before sending or exporting.",
-      "Review the draft before showing it to an agent.",
-    ],
-    blockers: [],
-    guardrails,
-    source: "edge-stub",
-  };
-}
-
-Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  if (request.method !== "POST") {
-    return Response.json(
-      { error: "Use POST with an AI helper intent." },
-      { status: 405, headers: corsHeaders },
-    );
-  }
-
-  const body = (await request.json().catch(() => ({}))) as Partial<HelperRequest>;
-  const intent = body.intent;
-
-  if (
-    intent !== "readiness_summary" &&
-    intent !== "text_intake_review" &&
-    intent !== "admin_review" &&
-    intent !== "correction_draft" &&
-    intent !== "export_guard"
-  ) {
-    return Response.json(
-      { error: "Unsupported helper intent." },
-      { status: 400, headers: corsHeaders },
-    );
-  }
-
-  return Response.json(safeResponse(intent), { headers: corsHeaders });
-});
+Deno.serve((request) =>
+  handleAiHelperRequest(
+    request,
+    createSupabaseRestAiHelperDependencies({
+      SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
+      SUPABASE_FUNCTION_ADMIN_KEY: Deno.env.get("SUPABASE_FUNCTION_ADMIN_KEY"),
+      AI_HELPER_AUDIT_TABLE: Deno.env.get("AI_HELPER_AUDIT_TABLE"),
+      AI_HELPER_QUOTA_RPC: Deno.env.get("AI_HELPER_QUOTA_RPC"),
+    }),
+  ),
+);

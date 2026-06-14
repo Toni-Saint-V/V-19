@@ -176,14 +176,12 @@ describe("AI helper service contract", () => {
         ]),
       );
       expect(visibleCopy(result)).not.toMatch(forbiddenTrustCopy);
-      expect(
-        model.sections.flatMap((section) => section.items).join(" "),
-      ).not.toMatch(forbiddenTrustCopy);
+      expect(model.sections.flatMap((section) => section.items).join(" ")).not.toMatch(
+        forbiddenTrustCopy,
+      );
     }
 
-    const textReview = results.find(
-      (result) => result.intent === "text_intake_review",
-    );
+    const textReview = results.find((result) => result.intent === "text_intake_review");
     expect(textReview?.operatorSummary?.[0]).toBe(
       "Текст анкеты: блокеров 2, предупреждений 0.",
     );
@@ -224,8 +222,8 @@ describe("AI helper service contract", () => {
       "guardrails",
     ]);
     expect(model.sections.every((section) => section.items.length > 0)).toBe(true);
-    expect(
-      model.sections.flatMap((section) => section.items).join(" "),
-    ).not.toMatch(forbiddenTrustCopy);
+    expect(model.sections.flatMap((section) => section.items).join(" ")).not.toMatch(
+      forbiddenTrustCopy,
+    );
   });
 });
