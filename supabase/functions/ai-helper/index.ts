@@ -1,5 +1,6 @@
 type HelperIntent =
   | "readiness_summary"
+  | "text_intake_review"
   | "admin_review"
   | "correction_draft"
   | "export_guard";
@@ -53,6 +54,7 @@ Deno.serve(async (request) => {
 
   if (
     intent !== "readiness_summary" &&
+    intent !== "text_intake_review" &&
     intent !== "admin_review" &&
     intent !== "correction_draft" &&
     intent !== "export_guard"
