@@ -16,11 +16,12 @@
     "test:e2e:supabase": "playwright test --config playwright.supabase.config.ts",
     "verify:performance": "node scripts/verify-performance.mjs",
     "verify:safety": "node scripts/verify-safety.mjs",
+    "verify:codex-hook": "node scripts/verify-codex-hook.mjs",
     "verify:v19-boundary": "node scripts/verify-v19-boundary.mjs",
     "verify:supabase-release": "node scripts/verify-supabase-release.mjs",
     "verify:production-readiness": "node scripts/verify-production-readiness.mjs",
     "verify:security": "npm audit --omit=dev",
-    "verify": "npm run typecheck && npm run lint && npm run verify:safety && npm run verify:v19-boundary && npm run test && npm run build && npm run verify:performance",
+    "verify": "npm run typecheck && npm run lint && npm run verify:safety && npm run verify:codex-hook && npm run verify:v19-boundary && npm run test && npm run build && npm run verify:performance",
     "verify:full": "npm run verify && npm run verify:supabase-release && npm run verify:security && npm run test:e2e"
   },
   "dependencies": {
