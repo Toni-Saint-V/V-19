@@ -145,7 +145,7 @@ export function AdminReviewScreen({
         </section>
         <aside className="right-rail" aria-label="Контекст проверки">
           <section className="rail-panel rail-summary">
-            <p className="kicker">Информация по заявкам</p>
+            <p className="kicker">Сводка проверки</p>
             <SummaryRow
               chips={[
                 ["blue", String(summary.inReview), "на проверке"],
@@ -231,6 +231,7 @@ export function ExportScreen({
   selectedExportIds: string[];
 }) {
   const actionHint = exportActionHint(exportPlan);
+  const packageFacts = exportPackageFacts(exportPlan);
 
   return (
     <>
@@ -298,7 +299,7 @@ export function ExportScreen({
 
         <aside className="export-side" aria-label="Информация и предпросмотр выгрузки">
           <section className="rail-panel rail-summary">
-            <p className="kicker">Информация по заявкам</p>
+            <p className="kicker">Сводка выгрузки</p>
             <SummaryRow
               chips={[
                 [
@@ -318,8 +319,9 @@ export function ExportScreen({
           <section className="export-preview" aria-label="Предпросмотр Эксель">
             <div className="preview-header">
               <div>
-                <p className="kicker">Предпросмотр Эксель</p>
-                <h2>{exportPlan.rowCount} строк</h2>
+                <p className="kicker">Пакет выгрузки</p>
+                <h2>{exportPackageTitle(exportPlan)}</h2>
+                <p className="export-package-line">{exportPackageLine(exportPlan)}</p>
               </div>
               <span className={`status-chip ${exportPlan.ready ? "teal" : "danger"}`}>
                 {exportPlan.ready
@@ -327,6 +329,14 @@ export function ExportScreen({
                   : "Блокировано"}
               </span>
             </div>
+            <dl className="export-package-summary" aria-label="Состав выбранного пакета">
+              {packageFacts.items.map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
             {exportPlan.blockers.length ? (
               <div className="blocker-box">
                 {exportPlan.blockers.map((blocker) => (
@@ -335,9 +345,9 @@ export function ExportScreen({
               </div>
             ) : (
               <div className="export-checklist" aria-label="Проверки перед выгрузкой">
-                <span>Город совпадает</span>
-                <span>Даты совпадают</span>
-                <span>Тип подачи совпадает</span>
+                <span>{exportCheckLabel("Город", packageFacts.city)}</span>
+                <span>{exportCheckLabel("Даты", packageFacts.dates)}</span>
+                <span>{exportCheckLabel("Тип", packageFacts.type)}</span>
                 <span>Повторная выгрузка защищена</span>
               </div>
             )}
@@ -404,6 +414,59 @@ export function ExportScreen({
       </div>
     </>
   );
+}
+
+function exportPackageFacts(plan: ExportSummary) {
+  const submissionIds = new Set(plan.rows.map((row) => row.submissionId));
+  const cities = uniqueValues(plan.rows.map((row) => row.city));
+  const dates = uniqueValues(plan.rows.map((row) => row.tripDates));
+  const types = uniqueValues(plan.rows.map((row) => row.type));
+  const city = singleOrMixed(cities);
+  const tripDatesValue = singleOrMixed(dates);
+  const type = singleOrMixed(types);
+
+  return {
+    city,
+    dates: tripDatesValue,
+    type,
+    items: [
+      ["Подачи", String(submissionIds.size)],
+      ["Строки", String(plan.rowCount)],
+      ["Город", city],
+      ["Даты", tripDatesValue],
+      ["Тип", type],
+    ] satisfies Array<[string, string]>,
+  };
+}
+
+function uniqueValues(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function singleOrMixed(values: string[]) {
+  if (values.length === 0) return "Не выбран";
+  if (values.length === 1) return values[0];
+  return "Смешано";
+}
+
+function exportPackageTitle(plan: ExportSummary) {
+  if (plan.rowCount === 0) return "Пакет не выбран";
+  const submissions = new Set(plan.rows.map((row) => row.submissionId)).size;
+  return `${submissions} ${pluralRu(submissions, "подача", "подачи", "подач")} · ${plan.rowCount} ${pluralRu(plan.rowCount, "строка", "строки", "строк")}`;
+}
+
+function exportPackageLine(plan: ExportSummary) {
+  if (plan.blockers.length > 0) return "Пакет нужно привести к одному городу, датам и типу.";
+  if (plan.rowCount === 0) return "Выберите готовые подачи слева.";
+  if (plan.exportState === "file_generated") return "Файл сформирован и ждёт скачивания.";
+  if (plan.exportState === "file_downloaded") return "Файл скачан, осталось отметить выгрузку.";
+  if (plan.exportState === "marked_exported") return "Пакет уже отмечен выгруженным.";
+  return "Все строки будут добавлены в один Эксель-файл.";
+}
+
+function exportCheckLabel(label: string, value: string) {
+  if (value === "Не выбран") return `${label}: не выбран`;
+  return `${label}: ${value}`;
 }
 
 function exportStateLabel(state: ExportSummary["exportState"]) {
