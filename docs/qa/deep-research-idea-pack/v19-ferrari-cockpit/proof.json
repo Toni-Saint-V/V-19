@@ -1,0 +1,32 @@
+{
+  "url": "file:///Users/user/.codex/worktrees/ca2c/V-19/docs/prototypes/visaflow-v19-ferrari-cockpit.html",
+  "checks": {
+    "desktop": {
+      "overflow": 0,
+      "h1": "Экспорт",
+      "themeDark": true
+    },
+    "desktopConsoleErrors": [],
+    "mobile": {
+      "overflow": 0,
+      "h1": "Мои подачи",
+      "drawerOpen": true,
+      "notesVisible": true,
+      "tabs": ["Обзор", "Люди", "Анкета", "Файлы", "Замечания", "История"],
+      "bodyBottom": 697,
+      "footTop": 697
+    },
+    "mobileConsoleErrors": []
+  },
+  "screenshots": [
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/desktop-agent-focus.png",
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/desktop-agent-drawer-overview.png",
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/desktop-agent-drawer-files.png",
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/desktop-admin-board.png",
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/desktop-export.png",
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/desktop-dark-theme.png",
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/mobile-agent.png",
+    "/Users/user/.codex/worktrees/ca2c/V-19/docs/qa/visaflow-v19-ferrari-cockpit/mobile-drawer.png"
+  ],
+  "ok": true
+}
