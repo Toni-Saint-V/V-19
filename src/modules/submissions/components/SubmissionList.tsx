@@ -1,13 +1,14 @@
 import { applicantCountLabel, nextAuditLine, tripDates } from "../selectors";
 import {
   blockerCount,
+  fileTypeLabels,
   getCardActionLabel,
   getPrimaryAction,
   nextProblem,
   responsibleRole,
   typeLabels,
 } from "../status";
-import type { DrawerTab, Role, Submission } from "../types";
+import type { DrawerTab, Issue, Role, Submission } from "../types";
 import { EmptyState, StatusChip, SummaryRow } from "./Primitives";
 
 export function SubmissionList({
@@ -61,6 +62,9 @@ function SubmissionCard({
     role === "admin" ? "review" : "agent",
   );
   const cardLabel = getCardActionLabel(submission, role);
+  const blockers = blockerCount(submission);
+  const issueLines = cardIssueLines(submission);
+  const fileSlots = fileSlotSummary(submission);
 
   return (
     <article
@@ -71,10 +75,8 @@ function SubmissionCard({
         <div className="card-topline">
           <strong>{submission.id}</strong>
           <StatusChip submission={submission} />
-          {blockerCount(submission) > 0 ? (
-            <span className="status-chip danger">
-              {blockerCount(submission)} блокера
-            </span>
+          {blockers > 0 ? (
+            <span className="status-chip danger">{blockers} блокера</span>
           ) : null}
         </div>
         <h3>{submission.title}</h3>
@@ -83,9 +85,24 @@ function SubmissionCard({
           {applicantCountLabel(submission.applicants.length)} · Испания ·{" "}
           {submission.city} · {tripDates(submission)}
         </p>
-        <div className="problem-line">
-          <span aria-hidden="true">!</span>
-          <p>{nextProblem(submission)}</p>
+        <div className="card-facts" aria-label="Операционная сводка">
+          <span>Анкета {submission.completeness.questionnaire}%</span>
+          <span>
+            Файлы {fileSlots.ready}/{fileSlots.total}
+          </span>
+        </div>
+        {issueLines.length ? (
+          <p className={`card-issue-summary is-${issueLines[0].severity}`}>
+            <strong>{issueLines[0].target}</strong>
+            <span>{issueLines[0].text}</span>
+            {issueLines.length > 1 ? <em>+{issueLines.length - 1}</em> : null}
+          </p>
+        ) : null}
+        <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
+          <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
+          <p>
+            <strong>Следующее:</strong> {nextProblem(submission)}
+          </p>
         </div>
         <div
           className="progress-line"
@@ -183,6 +200,49 @@ export function RightRail({
       </section>
     </aside>
   );
+}
+
+function cardIssueLines(submission: Submission) {
+  return submission.issues
+    .filter((issue) => issue.status !== "closed_by_admin")
+    .sort((left, right) => issueRank(left) - issueRank(right))
+    .slice(0, 2)
+    .map((issue) => ({
+      id: issue.id,
+      severity: issue.severity,
+      target: issueTarget(issue),
+      text:
+        issue.status === "fixed_by_manager"
+          ? `${issue.reason}: исправлено агентом`
+          : issue.reason,
+    }));
+}
+
+function issueRank(issue: Issue) {
+  if (issue.severity === "blocker") return 0;
+  if (issue.severity === "warning") return 1;
+  return 2;
+}
+
+function issueTarget(issue: Issue) {
+  const parts = [
+    issue.target.applicantName,
+    issue.target.field,
+    issue.target.fileType
+      ? fileTypeLabels[issue.target.fileType]
+      : issue.target.section,
+  ];
+
+  return parts.filter(Boolean).join(" · ");
+}
+
+function fileSlotSummary(submission: Submission) {
+  return {
+    ready: submission.files.filter(
+      (file) => file.status !== "missing" && file.status !== "needs_replacement",
+    ).length,
+    total: submission.files.length,
+  };
 }
 
 function agentNextSteps(submission: Submission) {
