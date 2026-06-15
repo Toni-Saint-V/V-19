@@ -797,9 +797,7 @@ test.describe("V-19 operations workspace", () => {
       page.locator(".export-preview").getByText("1 подача · 4 строки"),
     ).toBeVisible();
     await expect(page.locator(".export-preview").getByText("4/4")).toBeVisible();
-    await expect(
-      page.locator(".export-preview").getByText("Тип: Семья"),
-    ).toBeVisible();
+    await expect(page.locator(".export-preview").getByText("Тип: Семья")).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
     await page.getByRole("button", { name: "Скачать" }).click();
     await page.getByRole("button", { name: "Отметить выгружено" }).click();
