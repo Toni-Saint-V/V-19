@@ -233,7 +233,8 @@ function App() {
           : [];
 
     if (visibleList.length === 0) return;
-    if (visibleList.some((submission) => submission.id === selectedSubmissionId)) return;
+    if (visibleList.some((submission) => submission.id === selectedSubmissionId))
+      return;
     setSelectedSubmissionId(visibleList[0].id);
   }, [agentList, drawerMode, reviewList, selectedSubmissionId, surface]);
 

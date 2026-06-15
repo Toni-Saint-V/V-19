@@ -151,4 +151,44 @@ describe("Supabase security contract", () => {
     expect(rpcBoundary).toContain("insert into public.corrections");
     expect(rpcBoundary).toContain("insert into public.status_history");
   });
+
+  test("keeps AI helper quota surfaces service-role only", () => {
+    const quotaMigration = readProjectFile(
+      "supabase/migrations/20260614000000_ai_helper_audit_quota.sql",
+    );
+    const hardeningMigration = readProjectFile(
+      "supabase/migrations/20260615000000_ai_helper_security_advisor_hardening.sql",
+    );
+
+    expect(quotaMigration).toContain("api_role is distinct from expected_api_role");
+    expect(hardeningMigration).toContain(
+      "revoke all on table public.ai_helper_audit_events from anon, authenticated",
+    );
+    expect(hardeningMigration).toContain(
+      "revoke all on table public.ai_helper_quota_counters from anon, authenticated",
+    );
+    expect(hardeningMigration).toContain(
+      "revoke all on table public.ai_helper_quota_receipts from anon, authenticated",
+    );
+
+    for (const policyName of [
+      'create policy "ai helper audit service only"',
+      'create policy "ai helper counters service only"',
+      'create policy "ai helper receipts service only"',
+    ]) {
+      expect(hardeningMigration).toContain(policyName);
+    }
+
+    expect(hardeningMigration).toContain(
+      "revoke all on function public.consume_ai_helper_quota(text, text, text, text) from public",
+    );
+    expect(hardeningMigration).toContain("from anon, authenticated");
+    expect(hardeningMigration).toContain(
+      "grant execute on function public.consume_ai_helper_quota(text, text, text, text)",
+    );
+    expect(hardeningMigration).toContain("to service_role");
+    expect(hardeningMigration).not.toContain(
+      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public",
+    );
+  });
 });
