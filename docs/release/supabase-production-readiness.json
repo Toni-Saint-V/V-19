@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "status": "BLOCKED",
+  "scope": "supabase-production-activation",
+  "updatedAt": "2026-06-15T10:45:00+03:00",
+  "supabaseDiscovery": {
+    "checkedAt": "2026-06-15T10:45:00+03:00",
+    "organization": {
+      "id": "hsolrwjysdlmyqopryon",
+      "name": "Toni-Saint-V's Org",
+      "plan": "free"
+    },
+    "projects": [
+      {
+        "id": "urxjejgctagfacajcnah",
+        "name": "Visa-M1",
+        "region": "eu-north-1",
+        "status": "ACTIVE_HEALTHY"
+      },
+      {
+        "id": "oevvaowoklqttqkraxho",
+        "name": "Visa V-19",
+        "region": "eu-central-1",
+        "status": "ACTIVE_HEALTHY",
+        "classification": "allow-listed sandbox"
+      }
+    ],
+    "productionProjectFound": false,
+    "v19Sandbox": {
+      "projectId": "oevvaowoklqttqkraxho",
+      "edgeFunctions": [],
+      "remoteMigrations": [
+        "20260612204519_visaflow_mvp_foundation",
+        "20260612205051_visaflow_rls_performance_hardening",
+        "20260612215114_visaflow_rpc_corrections_persistence",
+        "20260613005039_visaflow_runtime_write_guards",
+        "20260613010029_visaflow_rpc_submit_boundary"
+      ],
+      "branchListStatus": "blocked by Supabase MCP permissions: Project reference is missing when validating permissions"
+    }
+  },
+  "sandboxReference": {
+    "projectId": "oevvaowoklqttqkraxho",
+    "activationTarget": "sandbox",
+    "evidenceArtifact": "docs/qa/supabase-live-sandbox-readiness-2026-06-15.md",
+    "browserKeyAuditScreenshot": "docs/qa/supabase-browser-key-audit-desktop.png"
+  },
+  "productionTarget": {
+    "projectId": "",
+    "projectUrl": "",
+    "supabaseOrganization": "Toni-Saint-V's Org (hsolrwjysdlmyqopryon)",
+    "activationTarget": "production"
+  },
+  "owners": {
+    "rolloutOwner": "single project owner/operator (user-stated 2026-06-15)",
+    "technicalApprover": "single project owner/operator (user-stated 2026-06-15)",
+    "businessApprover": "single project owner/operator (user-stated 2026-06-15)",
+    "rollbackDecisionOwner": "single project owner/operator (user-stated 2026-06-15)",
+    "plannedPromotionWindow": ""
+  },
+  "migrationContract": {
+    "targetHistoryChecked": false,
+    "targetHistoryCompatible": false,
+    "ownerApprovedExactMigrationContract": false,
+    "migrationApplyOperator": "single project owner/operator (user-stated 2026-06-15)",
+    "expectedPostApplyMigrationListRecorded": false,
+    "requiredOrder": [
+      "20260611000000_visaflow_mvp_foundation.sql",
+      "20260612000000_visaflow_rls_performance_hardening.sql",
+      "20260612001000_visaflow_rpc_corrections_persistence.sql",
+      "20260613005039_visaflow_runtime_write_guards.sql",
+      "20260613010029_visaflow_rpc_submit_boundary.sql"
+    ]
+  },
+  "smokeAccounts": {
+    "agent": {
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
+    },
+    "otherAgent": {
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
+    },
+    "admin": {
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
+    }
+  },
+  "backupRestore": {
+    "backupOwner": "single project owner/operator (user-stated 2026-06-15)",
+    "backupMechanism": "",
+    "latestBackupTimestamp": "",
+    "restorePathConfirmed": false,
+    "restoreEvidenceRecorded": false,
+    "rpoRtoAcceptedByOwner": false,
+    "rollbackCommunicationOwner": "single project owner/operator (user-stated 2026-06-15)"
+  },
+  "preActivationVerification": {
+    "verifySupabaseReleasePassed": true,
+    "testSupabaseLivePassed": true,
+    "testE2eSupabasePassed": true,
+    "verifyFullPassed": true,
+    "finalDiffReviewed": true,
+    "evidenceArtifact": "docs/qa/pre-production-local-proof-2026-06-15.md"
+  },
+  "productionEnvEvidence": {
+    "backendTargetSupabase": false,
+    "activationTargetProduction": false,
+    "releaseEnabled": false,
+    "transactionalPersistenceTested": false,
+    "migrationApproved": false,
+    "migrationsApplied": false,
+    "rlsPolicyTestsPassed": false,
+    "storagePolicyTestsPassed": false,
+    "edgeFunctionDryRunsPassed": false,
+    "browserQaPassed": false,
+    "browserKeyAudited": false,
+    "productionApproved": false,
+    "publicConfigRecorded": false
+  },
+  "postActivationChecks": {
+    "agentSignInWorks": false,
+    "adminSignInWorks": false,
+    "agentCanCreateDraft": false,
+    "agentCanUploadRequiredMedia": false,
+    "incompleteWaitingReviewRejected": false,
+    "validWaitingReviewReachesQueue": false,
+    "adminCanAcceptOrReturnCase": false,
+    "postHandoffAgentMutationBlocked": false,
+    "privateMediaSignedUrlScoped": false,
+    "logsAndErrorRateChecked": false
+  },
+  "goNoGo": {
+    "decision": "NO_GO",
+    "approvalTime": "",
+    "reason": "Local and sandbox pre-activation proof is current. Supabase discovery found only the allow-listed V-19 sandbox project, not a separate production project. Production target identity, backup/restore mechanism, production migration history, production env evidence, and post-activation checks are not complete."
+  }
+}

@@ -1,8 +1,11 @@
 node_modules/
 dist/
 .playwright-mcp/
+.vercel/
+supabase/.temp/
 playwright-report/
 test-results/
 coverage/
 .DS_Store
 *.local
+.vercel
