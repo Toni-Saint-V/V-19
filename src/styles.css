@@ -694,6 +694,82 @@ p {
   line-height: 1.45;
 }
 
+.card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.card-facts span {
+  position: relative;
+  white-space: nowrap;
+}
+
+.card-facts span:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  width: 1px;
+  height: 10px;
+  background: var(--border-soft);
+  transform: translateY(-50%);
+}
+
+.card-issue-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.card-issue-summary strong,
+.card-issue-summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-issue-summary strong {
+  flex: 0 1 auto;
+  color: var(--text-secondary);
+  font-weight: 760;
+}
+
+.card-issue-summary span {
+  flex: 1 1 auto;
+}
+
+.card-issue-summary em {
+  flex: 0 0 auto;
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 780;
+  text-align: center;
+}
+
+.card-issue-summary.is-blocker strong {
+  color: #ffaca8;
+}
+
+.card-issue-summary.is-warning strong {
+  color: #efc180;
+}
+
 .problem-line {
   display: flex;
   align-items: center;
@@ -704,7 +780,7 @@ p {
   line-height: 1.35;
 }
 
-.submission-card.is-selected .problem-line {
+.submission-card.is-selected .problem-line.is-danger {
   width: fit-content;
   max-width: 100%;
   padding: 6px 9px 6px 6px;
@@ -720,10 +796,20 @@ p {
   height: 18px;
   flex: 0 0 auto;
   border-radius: 50%;
-  color: #180606;
-  background: var(--red-blocker);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.07);
   font-size: 12px;
   font-weight: 900;
+}
+
+.problem-line.is-danger span {
+  color: #180606;
+  background: var(--red-blocker);
+}
+
+.problem-line strong {
+  color: var(--text-primary);
+  font-weight: 780;
 }
 
 .progress-line {
@@ -872,7 +958,7 @@ p {
   margin: 16px 0;
 }
 
-.rail-panel div {
+.rail-panel dl div {
   min-width: 0;
 }
 
