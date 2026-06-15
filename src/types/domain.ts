@@ -105,8 +105,6 @@ export interface MediaSlot {
   type: MediaSlotType;
   label: string;
   state: MediaState;
-  passportFileName?: string;
-  /** Legacy upload-origin name; never use as the stored file identifier. */
   originalFileName?: string;
   generatedFileName?: string;
   mimeType?: string;

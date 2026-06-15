@@ -70,9 +70,9 @@ test("exposes only browser-safe Supabase sandbox values", async ({ page }) => {
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
-  await expect(
-    page.getByRole("button", { name: /Continue as Agent demo|Sign in/i }),
-  ).toBeVisible();
+  await expect(page.getByRole("main", { name: "Рабочая область подач" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();
   await page.screenshot({
     fullPage: true,
     path: "docs/qa/supabase-browser-key-audit-desktop.png",

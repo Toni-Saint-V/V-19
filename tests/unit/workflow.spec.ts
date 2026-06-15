@@ -137,26 +137,5 @@ describe("workflow domain gates", () => {
     const slot = buildMediaSlot(completeApplicant, "photo_white", "uploaded");
 
     expect(slot.generatedFileName).toBe("721190482_photo_white.jpg");
-    expect(slot.passportFileName).toBe("721190482_photo_white.jpg");
-  });
-
-  test("normalizes legacy media file names back to the passport number", () => {
-    const submission = makeSubmission({
-      ...completeApplicant,
-      mediaSlots: [
-        {
-          ...buildMediaSlot(completeApplicant, "selfie", "uploaded"),
-          originalFileName: "artem_selfie.jpg",
-          generatedFileName: "manual_selfie.jpg",
-        },
-      ],
-    });
-    const slot = submission.applicants[0].mediaSlots?.find(
-      (item) => item.type === "selfie",
-    );
-
-    expect(slot?.passportFileName).toBe("721190482_selfie.jpg");
-    expect(slot?.originalFileName).toBeUndefined();
-    expect(slot?.generatedFileName).toBe("721190482_selfie.jpg");
   });
 });
