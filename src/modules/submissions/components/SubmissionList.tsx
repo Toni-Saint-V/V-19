@@ -152,7 +152,7 @@ export function RightRail({
     <aside className="right-rail" aria-label="Контекст выбранной подачи">
       {summaryChips ? (
         <section className="rail-panel rail-summary">
-          <p className="kicker">Информация по заявкам</p>
+          <p className="kicker">Сводка подач</p>
           <SummaryRow chips={summaryChips} />
         </section>
       ) : null}
@@ -166,11 +166,11 @@ export function RightRail({
             <dd>{nextProblem(activeSubmission)}</dd>
           </div>
           <div>
-            <dt>Действует</dt>
+            <dt>Кто отвечает</dt>
             <dd>{responsibleRole(activeSubmission)}</dd>
           </div>
           <div>
-            <dt>Следующая кнопка</dt>
+            <dt>Основное действие</dt>
             <dd>{getCardActionLabel(activeSubmission, "agent")}</dd>
           </div>
         </dl>

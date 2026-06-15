@@ -150,9 +150,9 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       agentContext.getByText("2 блокера мешают движению дальше"),
     ).toBeVisible();
-    await expect(agentContext.getByText("Действует")).toBeVisible();
+    await expect(agentContext.getByText("Кто отвечает")).toBeVisible();
     await expect(agentContext.getByText("Агент", { exact: true })).toBeVisible();
-    await expect(agentContext.getByText("Следующая кнопка")).toBeVisible();
+    await expect(agentContext.getByText("Основное действие")).toBeVisible();
     await expect(agentContext.getByRole("button", { name: "Исправить" })).toBeVisible();
 
     await agentContext.getByRole("button", { name: "Исправить" }).click();
@@ -216,7 +216,9 @@ test.describe("V-19 operations workspace", () => {
     await page
       .getByRole("combobox", { name: "Фильтр по городу" })
       .selectOption("Казань");
-    await expect(page.locator(".export-preview").getByText("0 строк")).toBeVisible();
+    await expect(
+      page.locator(".export-preview").getByText("Пакет не выбран"),
+    ).toBeVisible();
     await expect(page.locator("#export-action-hint")).toContainText(
       "Выберите хотя бы одну подачу",
     );
@@ -483,7 +485,7 @@ test.describe("V-19 operations workspace", () => {
 
     await page.getByRole("button", { name: "Выгрузка" }).click();
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
-    await expect(page.getByText("Предпросмотр Эксель")).toBeVisible();
+    await expect(page.getByText("Пакет выгрузки")).toBeVisible();
     await expect(
       page.locator(".export-preview").getByText("Дмитрий Орлов"),
     ).toBeVisible();
@@ -650,10 +652,11 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
   });
 
-  test("family and two single applicants pass issue, ББ, return, correction and export corner cases", async ({
+  test("two families and two single applicants pass issue, ББ, return, correction and export corner cases", async ({
     page,
   }) => {
     const familyTitle = "Семья Кузнецовых";
+    const secondFamilyTitle = "Семья Смирновых";
     const firstSingle = "Романов Павел";
     const secondSingle = "Белова Ольга";
 
@@ -663,6 +666,17 @@ test.describe("V-19 operations workspace", () => {
     });
     await expect(
       drawer(page).getByRole("heading", { name: familyTitle }),
+    ).toBeVisible();
+    await drawer(page).getByRole("tab", { name: "Анкета" }).click();
+    await fillQuestionnaire(page);
+    await fillFilesAndSubmit(page);
+
+    await createNamedSubmission(page, {
+      type: "family",
+      names: ["Смирнова Елена", "Смирнов Андрей", "Смирнова Ника", "Смирнов Артём"],
+    });
+    await expect(
+      drawer(page).getByRole("heading", { name: secondFamilyTitle }),
     ).toBeVisible();
     await drawer(page).getByRole("tab", { name: "Анкета" }).click();
     await fillQuestionnaire(page);
@@ -720,7 +734,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(drawer(page).getByText("Возвращено")).toBeVisible();
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
-    for (const title of [firstSingle, secondSingle]) {
+    for (const title of [secondFamilyTitle, firstSingle, secondSingle]) {
       await submissionCard(page, title)
         .getByRole("button", { name: "Проверить" })
         .click();
@@ -779,10 +793,25 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: firstSingle })
       .getByRole("checkbox")
       .uncheck();
-    await expect(page.locator(".export-preview").getByText("4 строк")).toBeVisible();
+    await expect(
+      page.locator(".export-preview").getByText("1 подача · 4 строки"),
+    ).toBeVisible();
     await expect(page.locator(".export-preview").getByText("4/4")).toBeVisible();
     await expect(
-      page.locator(".export-preview").getByText("Тип подачи совпадает"),
+      page.locator(".export-preview").getByText("Тип: Семья"),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Сформировать Эксель" }).click();
+    await page.getByRole("button", { name: "Скачать" }).click();
+    await page.getByRole("button", { name: "Отметить выгружено" }).click();
+
+    await clearExportSelection(page);
+    await page
+      .locator(".export-row")
+      .filter({ hasText: secondFamilyTitle })
+      .getByRole("checkbox")
+      .check();
+    await expect(
+      page.locator(".export-preview").getByText("1 подача · 4 строки"),
     ).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
     await page.getByRole("button", { name: "Скачать" }).click();
@@ -799,13 +828,18 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: secondSingle })
       .getByRole("checkbox")
       .check();
-    await expect(page.locator(".export-preview").getByText("2 строк")).toBeVisible();
+    await expect(
+      page.locator(".export-preview").getByText("2 подачи · 2 строки"),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
     await page.getByRole("button", { name: "Скачать" }).click();
     await page.getByRole("button", { name: "Отметить выгружено" }).click();
     await page.getByRole("tab", { name: "История" }).click();
     await expect(
       page.locator(".submission-panel").getByText(familyTitle),
+    ).toBeVisible();
+    await expect(
+      page.locator(".submission-panel").getByText(secondFamilyTitle),
     ).toBeVisible();
     await expect(
       page.locator(".submission-panel").getByText(firstSingle),
