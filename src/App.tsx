@@ -138,6 +138,11 @@ function normalizeCreateApplicantNames(names: string[], count: number) {
   );
 }
 
+function firstSubmissionForRole(submissions: Submission[], role: Role) {
+  if (role === "admin") return reviewQueue(submissions)[0] ?? submissions[0];
+  return agentQueue(submissions)[0] ?? submissions[0];
+}
+
 function App() {
   const [workspaceEmail, setWorkspaceEmail] = useState(loadWorkspaceEmail);
   const initialWorkspaceRole = resolveWorkspaceRole(workspaceEmail) ?? "agent";
@@ -148,9 +153,10 @@ function App() {
     initialWorkspaceRole === "admin" ? "admin-review" : "agent-submissions",
   );
   const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState(
-    () => loadSubmissions()[0].id,
-  );
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState(() => {
+    const initialSubmissions = loadSubmissions();
+    return firstSubmissionForRole(initialSubmissions, initialWorkspaceRole).id;
+  });
   const [drawerMode, setDrawerMode] = useState<DrawerMode>("closed");
   const [activeDrawerTab, setActiveDrawerTab] = useState<DrawerTab>(
     defaultDrawerTab(loadSubmissions()[0]),
@@ -215,6 +221,21 @@ function App() {
   useEffect(() => {
     saveSubmissions(submissions);
   }, [submissions]);
+
+  useEffect(() => {
+    if (drawerMode !== "closed") return;
+
+    const visibleList =
+      surface === "admin-review"
+        ? reviewList
+        : surface === "agent-submissions"
+          ? agentList
+          : [];
+
+    if (visibleList.length === 0) return;
+    if (visibleList.some((submission) => submission.id === selectedSubmissionId)) return;
+    setSelectedSubmissionId(visibleList[0].id);
+  }, [agentList, drawerMode, reviewList, selectedSubmissionId, surface]);
 
   useEffect(() => {
     const readyIds = new Set(readyList.map((submission) => submission.id));
@@ -500,7 +521,11 @@ function App() {
                 className={`rail-item ${surface === "admin-review" ? "is-active" : ""}`}
                 type="button"
                 aria-current={surface === "admin-review" ? "page" : undefined}
-                onClick={() => setSurface("admin-review")}
+                onClick={() => {
+                  setSurface("admin-review");
+                  const firstReview = reviewList[0] ?? reviewQueue(submissions)[0];
+                  if (firstReview) setSelectedSubmissionId(firstReview.id);
+                }}
               >
                 <span className="rail-icon" aria-hidden="true">
                   П

@@ -76,7 +76,7 @@ function SubmissionCard({
           <strong>{submission.id}</strong>
           <StatusChip submission={submission} />
           {blockers > 0 ? (
-            <span className="status-chip danger">{blockers} блокера</span>
+            <span className="status-chip blocker-count">{blockers} блокера</span>
           ) : null}
         </div>
         <h3>{submission.title}</h3>
@@ -101,7 +101,7 @@ function SubmissionCard({
         <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
           <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
           <p>
-            <strong>Следующее:</strong> {nextProblem(submission)}
+            <strong>Следующее:</strong> {cardNextActionLine(submission, role)}
           </p>
         </div>
         <div
@@ -146,9 +146,6 @@ export function RightRail({
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   summaryChips?: Array<[string, string, string]>;
 }) {
-  const isProblemState =
-    activeSubmission.status === "returned" ||
-    activeSubmission.status === "requires_action";
   const steps = agentNextSteps(activeSubmission);
 
   return (
@@ -178,9 +175,7 @@ export function RightRail({
           </div>
         </dl>
         <button
-          className={
-            isProblemState ? "primary-button wide danger-action" : "primary-button wide"
-          }
+          className="primary-button wide"
           type="button"
           onClick={() => onOpen(activeSubmission)}
         >
@@ -243,6 +238,33 @@ function fileSlotSummary(submission: Submission) {
     ).length,
     total: submission.files.length,
   };
+}
+
+function cardNextActionLine(submission: Submission, role: Role) {
+  const hasOpenIssue = submission.issues.some((issue) => issue.status === "open");
+  const hasFixedIssue = submission.issues.some(
+    (issue) => issue.status === "fixed_by_manager",
+  );
+  const fileSlots = fileSlotSummary(submission);
+
+  if (role === "admin") {
+    if (submission.status === "submitted_for_review")
+      return hasOpenIssue ? "Вернуть с точным замечанием" : "Проверить и принять";
+    if (submission.status === "corrections_received")
+      return "Проверить исправления агента";
+    if (submission.status === "ready_for_export") return "Перейти к выгрузке";
+    if (submission.status === "exported") return "Открыть историю";
+  }
+
+  if (hasOpenIssue) return "Открыть замечания и исправить целевые пункты";
+  if (hasFixedIssue) return "Ждать закрытия администратором";
+  if (submission.completeness.questionnaire < 100) return "Дозаполнить анкету";
+  if (fileSlots.ready < fileSlots.total) return "Дозагрузить обязательные файлы";
+  if (submission.status === "submitted_for_review") return "Ждать внутренней проверки";
+  if (submission.status === "ready_for_export") return "Подача готова к выгрузке";
+  if (submission.status === "exported") return "Открыть историю";
+
+  return "Продолжить подготовку подачи";
 }
 
 function agentNextSteps(submission: Submission) {

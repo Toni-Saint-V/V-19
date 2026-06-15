@@ -133,7 +133,7 @@ describe("Supabase submission mapping", () => {
       submission_id: "VF-1044",
       applicant_id: "applicant-1",
       type: "photo_white",
-      original_file_name: "751234567_photo_white.jpg",
+      original_file_name: null,
       generated_file_name: "751234567_photo_white.jpg",
       storage_bucket: "submission-media",
       storage_path: "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg",
@@ -144,6 +144,30 @@ describe("Supabase submission mapping", () => {
       uploaded_at: "2026-06-11T00:00:00.000Z",
       reviewed_at: "2026-06-12T10:00:00.000Z",
     });
+  });
+
+  test("preserves original media file name separately from generated storage file name", () => {
+    const submission = makeSubmission();
+    const [insert] = toMediaAssetInserts({
+      ...submission,
+      applicants: [
+        {
+          ...submission.applicants[0],
+          mediaSlots: [
+            {
+              ...submission.applicants[0].mediaSlots![0],
+              originalFileName: "phone_upload_name.jpg",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(insert.original_file_name).toBe("phone_upload_name.jpg");
+    expect(insert.generated_file_name).toBe("751234567_photo_white.jpg");
+    expect(insert.storage_path).toBe(
+      "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg",
+    );
   });
 
   test("derives replacement review status from media state", () => {

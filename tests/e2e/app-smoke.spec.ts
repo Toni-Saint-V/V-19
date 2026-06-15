@@ -468,9 +468,11 @@ test.describe("V-19 operations workspace", () => {
   }) => {
     await switchToAdmin(page);
     await page.getByRole("tab", { name: "Исправления получены" }).click();
-    await expect(page.getByText("Семья Петровых")).toBeVisible();
+    await expect(submissionCard(page, "Семья Петровых")).toBeVisible();
 
-    await page.getByRole("button", { name: "Проверить исправления" }).click();
+    await submissionCard(page, "Семья Петровых")
+      .getByRole("button", { name: "Проверить исправления" })
+      .click();
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Петровых" }),
     ).toBeVisible();
@@ -511,7 +513,9 @@ test.describe("V-19 operations workspace", () => {
   test("export blocks mixed packages before file generation", async ({ page }) => {
     await switchToAdmin(page);
     await page.getByRole("tab", { name: "Исправления получены" }).click();
-    await page.getByRole("button", { name: "Проверить исправления" }).click();
+    await submissionCard(page, "Семья Петровых")
+      .getByRole("button", { name: "Проверить исправления" })
+      .click();
     await page.getByRole("button", { name: "Закрыть и принять" }).click();
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.playwright-mcp/
+supabase/.temp/
+
+docs/qa/
+research_20260615_085333/
+research_20260615_085333.zip
+/*.zip
+/Снимок экрана*.png
+/VisaFlow_AI_*.html

@@ -17,6 +17,7 @@ const requiredMigrationOrder = [
   "20260612001000_visaflow_rpc_corrections_persistence.sql",
   "20260613005039_visaflow_runtime_write_guards.sql",
   "20260613010029_visaflow_rpc_submit_boundary.sql",
+  "20260614000000_ai_helper_audit_quota.sql",
 ];
 
 const blockers = [];
@@ -133,6 +134,64 @@ function verifyPackageScript() {
     pass("Package exposes verify:production-readiness");
   } else {
     block("Package exposes verify:production-readiness", "missing npm script");
+  }
+}
+
+function verifyProductionMigrationEvidence(packet) {
+  const artifact = packet.productionEnvEvidence?.productionMigrationEvidenceArtifact;
+  requireExistingProjectFile(artifact, "Production migration evidence artifact exists");
+  if (!present(artifact)) return;
+
+  const evidence = readText(
+    resolve(repoRoot, artifact),
+    "Production migration evidence artifact exists",
+  );
+  if (!evidence) return;
+
+  const targetProjectId = packet.productionTarget?.projectId;
+  if (present(targetProjectId) && evidence.includes(targetProjectId)) {
+    pass("Production migration evidence records target project id");
+  } else {
+    block("Production migration evidence records target project id", "missing");
+  }
+
+  for (const migration of requiredMigrationOrder) {
+    const version = migration.replace(/\.sql$/, "");
+    if (evidence.includes(version)) {
+      pass(`Production migration evidence records ${version}`);
+    } else {
+      block(`Production migration evidence records ${version}`, "missing");
+    }
+  }
+
+  for (const [label, snippet] of [
+    [
+      "Production migration evidence records public base table count",
+      "Public base tables: `11`",
+    ],
+    [
+      "Production migration evidence records all public tables have RLS",
+      "Public tables with RLS enabled: `11`",
+    ],
+    [
+      "Production migration evidence records zero public tables without RLS",
+      "Public tables without RLS: `0`",
+    ],
+    [
+      "Production migration evidence records private submission-media bucket",
+      "Private `submission-media` bucket: `1`",
+    ],
+    [
+      "Production migration evidence records zero public storage buckets",
+      "Public storage buckets: `0`",
+    ],
+    [
+      "Production migration evidence records storage policy count",
+      "`submission-media` storage policies: `4`",
+    ],
+  ]) {
+    if (evidence.includes(snippet)) pass(label);
+    else block(label, "missing");
   }
 }
 
@@ -261,6 +320,7 @@ function verifyPacket(packet, rawContent) {
   ]) {
     requireTrue(env[key], label);
   }
+  verifyProductionMigrationEvidence(packet);
 
   const post = packet.postActivationChecks ?? {};
   for (const [key, label] of [

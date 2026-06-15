@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "status": "BLOCKED",
   "scope": "supabase-production-activation",
-  "updatedAt": "2026-06-15T10:45:00+03:00",
+  "updatedAt": "2026-06-15T15:40:29+03:00",
   "supabaseDiscovery": {
-    "checkedAt": "2026-06-15T10:45:00+03:00",
+    "checkedAt": "2026-06-15T15:40:29+03:00",
     "organization": {
       "id": "hsolrwjysdlmyqopryon",
       "name": "Toni-Saint-V's Org",
@@ -23,9 +23,16 @@
         "region": "eu-central-1",
         "status": "ACTIVE_HEALTHY",
         "classification": "allow-listed sandbox"
+      },
+      {
+        "id": "tsymifccglpepvbmrcgh",
+        "name": "Visa V-19 Production",
+        "region": "eu-north-1",
+        "status": "ACTIVE_HEALTHY",
+        "classification": "production"
       }
     ],
-    "productionProjectFound": false,
+    "productionProjectFound": true,
     "v19Sandbox": {
       "projectId": "oevvaowoklqttqkraxho",
       "edgeFunctions": [],
@@ -46,8 +53,8 @@
     "browserKeyAuditScreenshot": "docs/qa/supabase-browser-key-audit-desktop.png"
   },
   "productionTarget": {
-    "projectId": "",
-    "projectUrl": "",
+    "projectId": "tsymifccglpepvbmrcgh",
+    "projectUrl": "https://tsymifccglpepvbmrcgh.supabase.co",
     "supabaseOrganization": "Toni-Saint-V's Org (hsolrwjysdlmyqopryon)",
     "activationTarget": "production"
   },
@@ -59,17 +66,18 @@
     "plannedPromotionWindow": ""
   },
   "migrationContract": {
-    "targetHistoryChecked": false,
-    "targetHistoryCompatible": false,
-    "ownerApprovedExactMigrationContract": false,
+    "targetHistoryChecked": true,
+    "targetHistoryCompatible": true,
+    "ownerApprovedExactMigrationContract": true,
     "migrationApplyOperator": "single project owner/operator (user-stated 2026-06-15)",
-    "expectedPostApplyMigrationListRecorded": false,
+    "expectedPostApplyMigrationListRecorded": true,
     "requiredOrder": [
       "20260611000000_visaflow_mvp_foundation.sql",
       "20260612000000_visaflow_rls_performance_hardening.sql",
       "20260612001000_visaflow_rpc_corrections_persistence.sql",
       "20260613005039_visaflow_runtime_write_guards.sql",
-      "20260613010029_visaflow_rpc_submit_boundary.sql"
+      "20260613010029_visaflow_rpc_submit_boundary.sql",
+      "20260614000000_ai_helper_audit_quota.sql"
     ]
   },
   "smokeAccounts": {
@@ -111,15 +119,16 @@
     "activationTargetProduction": false,
     "releaseEnabled": false,
     "transactionalPersistenceTested": false,
-    "migrationApproved": false,
-    "migrationsApplied": false,
-    "rlsPolicyTestsPassed": false,
-    "storagePolicyTestsPassed": false,
+    "migrationApproved": true,
+    "migrationsApplied": true,
+    "rlsPolicyTestsPassed": true,
+    "storagePolicyTestsPassed": true,
     "edgeFunctionDryRunsPassed": false,
     "browserQaPassed": false,
     "browserKeyAudited": false,
     "productionApproved": false,
-    "publicConfigRecorded": false
+    "publicConfigRecorded": true,
+    "productionMigrationEvidenceArtifact": "docs/qa/supabase-production-migration-2026-06-15.md"
   },
   "postActivationChecks": {
     "agentSignInWorks": false,
@@ -136,6 +145,6 @@
   "goNoGo": {
     "decision": "NO_GO",
     "approvalTime": "",
-    "reason": "Local and sandbox pre-activation proof is current. Supabase discovery found only the allow-listed V-19 sandbox project, not a separate production project. Production target identity, backup/restore mechanism, production migration history, production env evidence, and post-activation checks are not complete."
+    "reason": "Production project identity is recorded and committed local migrations were applied to the production project on 2026-06-15. Production activation remains blocked until the promotion window, role-verified smoke accounts, backup/restore evidence, production env activation flags, browser QA, logs, and post-activation checks are complete."
   }
 }
