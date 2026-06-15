@@ -6,10 +6,11 @@ Harden Supabase persistence for task-first workspace
 
 ## Commit Scope
 
-This package covers exactly these commits:
+This package anchors these production-readiness commits and includes follow-up review fixes in this PR branch:
 
 1. `768a3a4 Harden Supabase workspace write guards`
 2. `5d73f7d Add Supabase production promotion gate`
+3. `7f715e7 Harden AI helper Supabase security`
 
 ## Product Scope
 
@@ -88,21 +89,22 @@ Out of scope:
 Latest completed verification:
 
 ```bash
-npx vitest run tests/unit/workflow.spec.ts tests/unit/submissionService.spec.ts
-npm run verify:supabase-release
 npm run format:check
+git diff --check
+npx vitest run tests/unit/supabaseSecurityContract.spec.ts
+npm run verify:supabase-release
 node scripts/verify-production-readiness.mjs --expect-blocked
-npm run test:e2e:supabase
+npm run verify:full
 ```
 
 Results:
 
-- `npx vitest run tests/unit/workflow.spec.ts tests/unit/submissionService.spec.ts`: passed, 10 tests.
-- `npm run verify:supabase-release`: passed, 42 checks.
 - `npm run format:check`: passed.
-- `node scripts/verify-production-readiness.mjs --expect-blocked`: passed fail-closed, 34 blockers remain.
-- `npm run test:e2e:supabase`: passed, 1 Playwright browser key audit.
 - `git diff --check`: passed.
+- `npx vitest run tests/unit/supabaseSecurityContract.spec.ts`: passed, 8 tests.
+- `npm run verify:supabase-release`: passed, including AI helper SQL grant/revoke statement checks.
+- `node scripts/verify-production-readiness.mjs --expect-blocked`: passed fail-closed, 34 blockers remain.
+- `npm run verify:full`: passed, including typecheck, lint, safety, boundary, unit/integration tests, build, performance, Supabase release gate, security audit, and 28 Playwright E2E tests.
 
 ## Screenshots
 
@@ -146,7 +148,7 @@ Database rollback must be a forward migration or approved restore path. Do not m
 
 ## Merge Checklist
 
-- [ ] Branch reviewed against the two listed commits.
+- [ ] Branch reviewed against the listed production-readiness commits and current PR head.
 - [ ] `npm run verify:full` passed after final diff.
 - [ ] `npm run test:supabase-live` passed against sandbox.
 - [ ] Production approval checklist completed if production activation is planned.
@@ -160,6 +162,7 @@ Database rollback must be a forward migration or approved restore path. Do not m
 
 - Hardened Supabase persistence for the task-first Agent Workspace.
 - Added server-side readiness, correction author, child-table, and private Storage write guards.
+- Added AI helper quota/audit hardening so browser roles cannot execute the quota RPC or access service-owned helper tables.
 - Added sandbox-only Supabase live smoke coverage for valid handoff and denied post-handoff mutations.
 - Added production promotion gate and rollback-aware runbook.
 

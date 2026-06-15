@@ -5,6 +5,48 @@ function readProjectFile(relativePath: string): string {
   return readFileSync(`${process.cwd()}/${relativePath}`, "utf8");
 }
 
+function normalizeSql(content: string): string {
+  return content.replace(/--.*$/gm, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function sqlStatements(content: string): string[] {
+  return content
+    .replace(/--.*$/gm, " ")
+    .split(";")
+    .map((statement) => normalizeSql(statement))
+    .filter(Boolean);
+}
+
+function expectSqlStatement(content: string, statement: string): void {
+  expect(normalizeSql(content)).toContain(normalizeSql(statement));
+}
+
+function expectNoSqlStatement(content: string, statement: string): void {
+  expect(normalizeSql(content)).not.toContain(normalizeSql(statement));
+}
+
+function expectNoQuotaExecuteGrantToRole(content: string, role: string): void {
+  const grantPrefix = normalizeSql(
+    "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to ",
+  );
+  const forbiddenRole = role.toLowerCase();
+  const matchingStatement = sqlStatements(content).find((statement) => {
+    if (!statement.startsWith(grantPrefix)) return false;
+
+    return statement
+      .slice(grantPrefix.length)
+      .split(",")
+      .map((candidateRole) => candidateRole.trim())
+      .some(
+        (candidateRole) =>
+          candidateRole === forbiddenRole ||
+          candidateRole.startsWith(`${forbiddenRole} `),
+      );
+  });
+
+  expect(matchingStatement).toBeUndefined();
+}
+
 describe("Supabase security contract", () => {
   test("keeps profile role out of client-owned profile writes", () => {
     const profileService = readProjectFile("src/services/profileService.ts");
@@ -161,14 +203,17 @@ describe("Supabase security contract", () => {
     );
 
     expect(quotaMigration).toContain("api_role is distinct from expected_api_role");
-    expect(hardeningMigration).toContain(
-      "revoke all on table public.ai_helper_audit_events from anon, authenticated",
+    expectSqlStatement(
+      hardeningMigration,
+      "revoke all on table public.ai_helper_audit_events from anon, authenticated;",
     );
-    expect(hardeningMigration).toContain(
-      "revoke all on table public.ai_helper_quota_counters from anon, authenticated",
+    expectSqlStatement(
+      hardeningMigration,
+      "revoke all on table public.ai_helper_quota_counters from anon, authenticated;",
     );
-    expect(hardeningMigration).toContain(
-      "revoke all on table public.ai_helper_quota_receipts from anon, authenticated",
+    expectSqlStatement(
+      hardeningMigration,
+      "revoke all on table public.ai_helper_quota_receipts from anon, authenticated;",
     );
 
     for (const policyName of [
@@ -179,16 +224,24 @@ describe("Supabase security contract", () => {
       expect(hardeningMigration).toContain(policyName);
     }
 
-    expect(hardeningMigration).toContain(
-      "revoke all on function public.consume_ai_helper_quota(text, text, text, text) from public",
+    expectSqlStatement(
+      hardeningMigration,
+      "revoke all on function public.consume_ai_helper_quota(text, text, text, text) from public;",
     );
-    expect(hardeningMigration).toContain("from anon, authenticated");
-    expect(hardeningMigration).toContain(
-      "grant execute on function public.consume_ai_helper_quota(text, text, text, text)",
+    expectSqlStatement(
+      hardeningMigration,
+      "revoke execute on function public.consume_ai_helper_quota(text, text, text, text) from anon, authenticated;",
     );
-    expect(hardeningMigration).toContain("to service_role");
-    expect(hardeningMigration).not.toContain(
-      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public",
+    expectSqlStatement(
+      hardeningMigration,
+      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to service_role;",
     );
+    expectNoSqlStatement(
+      hardeningMigration,
+      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public;",
+    );
+    expectNoQuotaExecuteGrantToRole(hardeningMigration, "public");
+    expectNoQuotaExecuteGrantToRole(hardeningMigration, "anon");
+    expectNoQuotaExecuteGrantToRole(hardeningMigration, "authenticated");
   });
 });

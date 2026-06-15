@@ -78,6 +78,66 @@ function expectContains(content, expected, label) {
   }
 }
 
+function normalizeSql(content) {
+  return content.replace(/--.*$/gm, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function sqlStatements(content) {
+  return content
+    .replace(/--.*$/gm, " ")
+    .split(";")
+    .map((statement) => normalizeSql(statement))
+    .filter(Boolean);
+}
+
+function expectSqlStatement(content, statement, label) {
+  const normalizedContent = normalizeSql(content);
+  const normalizedStatement = normalizeSql(statement);
+
+  if (normalizedContent.includes(normalizedStatement)) {
+    pass(label);
+  } else {
+    fail(label, `Missing expected SQL statement: ${statement}`);
+  }
+}
+
+function expectNoSqlStatement(content, statement, label) {
+  const normalizedContent = normalizeSql(content);
+  const normalizedStatement = normalizeSql(statement);
+
+  if (normalizedContent.includes(normalizedStatement)) {
+    fail(label, `Forbidden SQL statement found: ${statement}`);
+  } else {
+    pass(label);
+  }
+}
+
+function expectNoQuotaExecuteGrantToRole(content, role, label) {
+  const grantPrefix = normalizeSql(
+    "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to ",
+  );
+  const forbiddenRole = role.toLowerCase();
+  const matchingStatement = sqlStatements(content).find((statement) => {
+    if (!statement.startsWith(grantPrefix)) return false;
+
+    return statement
+      .slice(grantPrefix.length)
+      .split(",")
+      .map((candidateRole) => candidateRole.trim())
+      .some(
+        (candidateRole) =>
+          candidateRole === forbiddenRole ||
+          candidateRole.startsWith(`${forbiddenRole} `),
+      );
+  });
+
+  if (matchingStatement) {
+    fail(label, `Forbidden SQL grant found: ${matchingStatement}`);
+  } else {
+    pass(label);
+  }
+}
+
 function verifyMigrationOrder() {
   const migrationFiles = readdirSync(migrationsDir)
     .filter((fileName) => fileName.endsWith(".sql"))
@@ -184,10 +244,20 @@ function verifyAiHelperSecurityHardening() {
     "api_role is distinct from expected_api_role",
     "AI helper quota RPC requires service role claim",
   );
-  expectContains(
+  expectSqlStatement(
     hardeningMigration,
-    "revoke all on table public.ai_helper_audit_events from anon, authenticated",
+    "revoke all on table public.ai_helper_audit_events from anon, authenticated;",
     "AI helper audit table grants are revoked from browser roles",
+  );
+  expectSqlStatement(
+    hardeningMigration,
+    "revoke all on table public.ai_helper_quota_counters from anon, authenticated;",
+    "AI helper quota counters table grants are revoked from browser roles",
+  );
+  expectSqlStatement(
+    hardeningMigration,
+    "revoke all on table public.ai_helper_quota_receipts from anon, authenticated;",
+    "AI helper quota receipts table grants are revoked from browser roles",
   );
   expectContains(
     hardeningMigration,
@@ -204,34 +274,36 @@ function verifyAiHelperSecurityHardening() {
     'create policy "ai helper receipts service only"',
     "AI helper quota receipts table has explicit deny policy",
   );
-  expectContains(
+  expectSqlStatement(
     hardeningMigration,
-    "revoke execute on function public.consume_ai_helper_quota(text, text, text, text)",
+    "revoke execute on function public.consume_ai_helper_quota(text, text, text, text) from anon, authenticated;",
     "AI helper quota RPC execute is revoked from browser roles",
   );
-  expectContains(
+  expectSqlStatement(
     hardeningMigration,
-    "grant execute on function public.consume_ai_helper_quota(text, text, text, text)",
+    "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to service_role;",
     "AI helper quota RPC execute grant is explicit",
   );
-  expectContains(
+  expectNoSqlStatement(
     hardeningMigration,
-    "to service_role",
-    "AI helper quota RPC is service-role only",
+    "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public;",
+    "AI helper quota RPC has no exact public execute grant",
   );
-
-  if (
-    hardeningMigration.includes(
-      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public",
-    )
-  ) {
-    fail(
-      "AI helper quota RPC is not granted to public",
-      "Security advisor hardening must not expose the RPC to public",
-    );
-  } else {
-    pass("AI helper quota RPC is not granted to public");
-  }
+  expectNoQuotaExecuteGrantToRole(
+    hardeningMigration,
+    "public",
+    "AI helper quota RPC is not granted to public",
+  );
+  expectNoQuotaExecuteGrantToRole(
+    hardeningMigration,
+    "anon",
+    "AI helper quota RPC is not granted to anon",
+  );
+  expectNoQuotaExecuteGrantToRole(
+    hardeningMigration,
+    "authenticated",
+    "AI helper quota RPC is not granted to authenticated",
+  );
 }
 
 function verifySmokeGuard() {
@@ -368,6 +440,8 @@ function verifyDocsAndScripts() {
   for (const expected of [
     "768a3a4 Harden Supabase workspace write guards",
     "5d73f7d Add Supabase production promotion gate",
+    "7f715e7 Harden AI helper Supabase security",
+    "20260615000000_ai_helper_security_advisor_hardening.sql",
     "Ready for PR review",
     "Not ready for production activation until the production approval checklist is completed.",
   ]) {
