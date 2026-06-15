@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import {
   acceptAiSuggestionAsIssue,
   dismissAiSuggestion,
@@ -6,6 +7,13 @@ import {
 } from "./modules/submissions/aiSuggestions";
 import { exportSummary } from "./modules/submissions/exportRules";
 import { loadSubmissions, saveSubmissions } from "./modules/submissions/persistence";
+import {
+  changedCockpitSubmissions,
+  cockpitSubmissionFingerprint,
+  cockpitSubmissionFingerprintMap,
+  loadCockpitSubmissionsForProfile,
+  saveCockpitSubmissionsForProfile,
+} from "./modules/submissions/supabasePersistence";
 import {
   agentQueue,
   counts,
@@ -53,6 +61,13 @@ import {
   type ReviewTab,
   surfaceTitle,
 } from "./modules/submissions/uiTypes";
+import {
+  getCurrentAppSession,
+  signInSupabaseWithPassword,
+  signOutCurrentSession,
+} from "./services/authService";
+import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
+import type { AppProfile } from "./types/session";
 
 const cities: Array<City | "Все города"> = [
   "Все города",
@@ -144,18 +159,27 @@ function firstSubmissionForRole(submissions: Submission[], role: Role) {
 }
 
 function App() {
+  const isSupabaseMode = supabaseRuntimeConfig.selected === "supabase";
   const [workspaceEmail, setWorkspaceEmail] = useState(loadWorkspaceEmail);
   const initialWorkspaceRole = resolveWorkspaceRole(workspaceEmail) ?? "agent";
   const [role, setRole] = useState<Role>(initialWorkspaceRole);
   const [workspaceEmailDraft, setWorkspaceEmailDraft] = useState(workspaceEmail);
+  const [workspacePasswordDraft, setWorkspacePasswordDraft] = useState("");
   const [workspaceAccessError, setWorkspaceAccessError] = useState("");
+  const [authChecked, setAuthChecked] = useState(!isSupabaseMode);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [remoteProfile, setRemoteProfile] = useState<AppProfile | null>(null);
+  const [remoteSaveState, setRemoteSaveState] = useState<
+    "idle" | "loading" | "saving" | "error"
+  >("idle");
+  const [remoteSaveError, setRemoteSaveError] = useState("");
   const [surface, setSurface] = useState<Surface>(
     initialWorkspaceRole === "admin" ? "admin-review" : "agent-submissions",
   );
   const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(() => {
     const initialSubmissions = loadSubmissions();
-    return firstSubmissionForRole(initialSubmissions, initialWorkspaceRole).id;
+    return firstSubmissionForRole(initialSubmissions, initialWorkspaceRole)?.id ?? "";
   });
   const [drawerMode, setDrawerMode] = useState<DrawerMode>("closed");
   const [activeDrawerTab, setActiveDrawerTab] = useState<DrawerTab>(
@@ -182,6 +206,9 @@ function App() {
     "Ребёнок 2",
   ]);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const remoteOwnerIdsRef = useRef<Map<string, string>>(new Map());
+  const remoteSubmissionFingerprintsRef = useRef<Map<string, string>>(new Map());
+  const skipNextRemoteSaveRef = useRef(false);
 
   const activeSubmission =
     submissions.find((submission) => submission.id === selectedSubmissionId) ??
@@ -214,13 +241,117 @@ function App() {
   const selectedVisibleExportIds = selectedForExport.map((submission) => submission.id);
   const exportPlan = exportSummary(selectedForExport);
   const showRoleSwitcher =
-    import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true";
+    !isSupabaseMode &&
+    (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
   const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
-  const hasWorkspaceAccess = showRoleSwitcher || Boolean(resolvedWorkspaceRole);
+  const hasWorkspaceAccess = isSupabaseMode
+    ? Boolean(remoteProfile)
+    : showRoleSwitcher || Boolean(resolvedWorkspaceRole);
+  const emptyRemoteWorkspace =
+    isSupabaseMode && Boolean(remoteProfile) && authChecked && submissions.length === 0;
 
   useEffect(() => {
+    if (isSupabaseMode) return;
     saveSubmissions(submissions);
-  }, [submissions]);
+  }, [isSupabaseMode, submissions]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapSupabaseSession() {
+      if (!isSupabaseMode) return;
+
+      setAuthChecked(false);
+      setRemoteSaveState("loading");
+      setWorkspaceAccessError("");
+      try {
+        const session = await getCurrentAppSession();
+        if (cancelled) return;
+
+        if (session) {
+          const loaded = await loadCockpitSubmissionsForProfile(session.profile);
+          if (cancelled) return;
+          applyRemoteWorkspace(
+            session.profile,
+            loaded.submissions,
+            loaded.ownerIdsBySubmissionId,
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceAccessError(
+            formatPersistenceFailureForUser(
+              error,
+              "Не удалось загрузить текущую Supabase-сессию.",
+            ),
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setRemoteSaveState("idle");
+          setAuthChecked(true);
+        }
+      }
+    }
+
+    void bootstrapSupabaseSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSupabaseMode]);
+
+  useEffect(() => {
+    if (!isSupabaseMode || !remoteProfile || !authChecked) return;
+    const activeRemoteProfile = remoteProfile;
+
+    if (skipNextRemoteSaveRef.current) {
+      skipNextRemoteSaveRef.current = false;
+      return;
+    }
+
+    const dirtySubmissions = changedCockpitSubmissions(
+      submissions,
+      remoteSubmissionFingerprintsRef.current,
+    );
+    if (!dirtySubmissions.length) return;
+
+    const timer = window.setTimeout(() => {
+      async function saveRemoteWorkspace() {
+        setRemoteSaveState("saving");
+        setRemoteSaveError("");
+        try {
+          remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
+            activeRemoteProfile,
+            dirtySubmissions,
+            remoteOwnerIdsRef.current,
+          );
+          remoteSubmissionFingerprintsRef.current = new Map(
+            remoteSubmissionFingerprintsRef.current,
+          );
+          for (const submission of dirtySubmissions) {
+            remoteSubmissionFingerprintsRef.current.set(
+              submission.id,
+              cockpitSubmissionFingerprint(submission),
+            );
+          }
+          setRemoteSaveState("idle");
+        } catch (error) {
+          setRemoteSaveState("error");
+          setRemoteSaveError(
+            formatPersistenceFailureForUser(
+              error,
+              "Удалённое сохранение не прошло. Обновите данные перед продолжением.",
+            ),
+          );
+        }
+      }
+
+      void saveRemoteWorkspace();
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [authChecked, isSupabaseMode, remoteProfile, submissions]);
 
   useEffect(() => {
     if (drawerMode !== "closed") return;
@@ -275,16 +406,17 @@ function App() {
   }
 
   function chooseRole(nextRole: Role) {
+    if (isSupabaseMode) return;
     setRole(nextRole);
     setDrawerMode("closed");
     setDirty(false);
     if (nextRole === "agent") {
       setSurface("agent-submissions");
-      setSelectedSubmissionId(submissions[0].id);
+      setSelectedSubmissionId(submissions[0]?.id ?? "");
     } else {
       setSurface("admin-review");
       const firstReview = reviewQueue(submissions)[0] ?? submissions[0];
-      setSelectedSubmissionId(firstReview.id);
+      setSelectedSubmissionId(firstReview?.id ?? "");
     }
   }
 
@@ -309,6 +441,7 @@ function App() {
   }
 
   function updateActiveSubmission(transform: (submission: Submission) => Submission) {
+    if (!activeSubmission) return;
     setSubmissions((current) =>
       current.map((submission) =>
         submission.id === activeSubmission.id ? transform(submission) : submission,
@@ -317,6 +450,7 @@ function App() {
   }
 
   function updateSubmission(action: SubmissionAction) {
+    if (!activeSubmission) return;
     const nextSubmissions = applyActionToSubmissionList(
       submissions,
       activeSubmission.id,
@@ -366,10 +500,12 @@ function App() {
   }
 
   function runAiReviewForActiveSubmission() {
+    if (!activeSubmission) return;
     updateActiveSubmission(runAiReview);
   }
 
   function acceptAiSuggestionForActiveSubmission(suggestionId: string) {
+    if (!activeSubmission) return;
     updateActiveSubmission((submission) =>
       acceptAiSuggestionAsIssue(submission, suggestionId, role),
     );
@@ -377,6 +513,7 @@ function App() {
   }
 
   function dismissAiSuggestionForActiveSubmission(suggestionId: string) {
+    if (!activeSubmission) return;
     updateActiveSubmission((submission) =>
       dismissAiSuggestion(submission, suggestionId, role),
     );
@@ -425,9 +562,67 @@ function App() {
     setSelectedExportIds([]);
   }
 
-  function submitWorkspaceEmail(event: FormEvent<HTMLFormElement>) {
+  function applyRemoteWorkspace(
+    profile: AppProfile,
+    remoteSubmissions: Submission[],
+    ownerIdsBySubmissionId: Map<string, string>,
+  ) {
+    const nextSubmissions = remoteSubmissions;
+    const nextRole = profile.role;
+    const firstSubmission = firstSubmissionForRole(nextSubmissions, nextRole);
+
+    remoteOwnerIdsRef.current = ownerIdsBySubmissionId;
+    remoteSubmissionFingerprintsRef.current =
+      cockpitSubmissionFingerprintMap(nextSubmissions);
+    skipNextRemoteSaveRef.current = true;
+    setRemoteProfile(profile);
+    setRole(nextRole);
+    setSurface(nextRole === "admin" ? "admin-review" : "agent-submissions");
+    setSubmissions(nextSubmissions);
+    setSelectedSubmissionId(firstSubmission?.id ?? "");
+    if (firstSubmission) setActiveDrawerTab(defaultDrawerTab(firstSubmission));
+    setDrawerMode("closed");
+    setDirty(false);
+    setWorkspaceEmail(profile.email);
+    setWorkspaceEmailDraft(profile.email);
+    saveWorkspaceEmail(profile.email);
+  }
+
+  async function submitWorkspaceEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const email = normalizeEmail(workspaceEmailDraft);
+
+    if (isSupabaseMode) {
+      if (!email || !workspacePasswordDraft) {
+        setWorkspaceAccessError("Введите почту и пароль Supabase.");
+        return;
+      }
+
+      setLoginBusy(true);
+      setWorkspaceAccessError("");
+      try {
+        const session = await signInSupabaseWithPassword(email, workspacePasswordDraft);
+        const loaded = await loadCockpitSubmissionsForProfile(session.profile);
+        applyRemoteWorkspace(
+          session.profile,
+          loaded.submissions,
+          loaded.ownerIdsBySubmissionId,
+        );
+        setWorkspacePasswordDraft("");
+      } catch (error) {
+        setWorkspaceAccessError(
+          formatPersistenceFailureForUser(
+            error,
+            "Не удалось войти. Проверьте почту, пароль и профиль Supabase.",
+          ),
+        );
+      } finally {
+        setLoginBusy(false);
+        setAuthChecked(true);
+      }
+      return;
+    }
+
     const nextRole = resolveWorkspaceRole(email);
 
     if (!email || !nextRole) {
@@ -441,7 +636,27 @@ function App() {
     chooseRole(nextRole);
   }
 
-  function resetWorkspaceEmail() {
+  async function resetWorkspaceEmail() {
+    if (isSupabaseMode) {
+      await signOutCurrentSession();
+      remoteOwnerIdsRef.current = new Map();
+      remoteSubmissionFingerprintsRef.current = new Map();
+      setRemoteProfile(null);
+      setWorkspacePasswordDraft("");
+      setWorkspaceAccessError("");
+      const localSubmissions = loadSubmissions();
+      setSubmissions(localSubmissions);
+      setSelectedSubmissionId(
+        firstSubmissionForRole(localSubmissions, "agent")?.id ?? "",
+      );
+      setRole("agent");
+      setSurface("agent-submissions");
+      clearWorkspaceEmail();
+      setWorkspaceEmail("");
+      setWorkspaceEmailDraft("");
+      return;
+    }
+
     clearWorkspaceEmail();
     setWorkspaceEmail("");
     setWorkspaceEmailDraft("");
@@ -464,10 +679,14 @@ function App() {
   if (!hasWorkspaceAccess) {
     return (
       <WorkspaceAccessGate
+        busy={loginBusy || !authChecked}
         email={workspaceEmailDraft}
         error={workspaceAccessError}
         onEmail={setWorkspaceEmailDraft}
+        onPassword={setWorkspacePasswordDraft}
         onSubmit={submitWorkspaceEmail}
+        password={workspacePasswordDraft}
+        requiresPassword={isSupabaseMode}
       />
     );
   }
@@ -597,10 +816,44 @@ function App() {
               <span aria-hidden="true">В</span>
               <strong>19</strong>
             </div>
+            {isSupabaseMode ? (
+              <p
+                className="save-status"
+                role={remoteSaveState === "error" ? "alert" : "status"}
+              >
+                {remoteSaveState === "saving"
+                  ? "Сохранение"
+                  : remoteSaveState === "error"
+                    ? remoteSaveError
+                    : "Supabase"}
+              </p>
+            ) : null}
           </div>
         </header>
 
-        {surface === "agent-submissions" ? (
+        {emptyRemoteWorkspace ? (
+          <RemoteWorkspaceEmptyState
+            role={role}
+            onCreate={
+              role === "agent"
+                ? () => {
+                    rememberReturnFocus();
+                    setDrawerMode("create");
+                    setCreateStep("params");
+                    setCreateType("single");
+                    setCreateFamilyCount(2);
+                    setCreateApplicantNames([
+                      "Новый заявитель",
+                      "Супруг",
+                      "Ребёнок 1",
+                      "Ребёнок 2",
+                    ]);
+                    setDirty(false);
+                  }
+                : undefined
+            }
+          />
+        ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
             activeSubmission={activeSubmission}
             agentList={agentList}
@@ -613,7 +866,7 @@ function App() {
           />
         ) : null}
 
-        {surface === "admin-review" ? (
+        {surface === "admin-review" && activeSubmission ? (
           <AdminReviewScreen
             activeSubmission={activeSubmission}
             onAddIssue={() => openIssueComposer(activeSubmission)}
@@ -645,7 +898,7 @@ function App() {
         ) : null}
       </section>
 
-      {drawerMode === "detail" ? (
+      {drawerMode === "detail" && activeSubmission ? (
         <SubmissionDrawer
           activeTab={activeDrawerTab}
           issueComposerRequest={issueComposerRequest}
@@ -737,15 +990,23 @@ function App() {
 }
 
 function WorkspaceAccessGate({
+  busy = false,
   email,
   error,
   onEmail,
+  onPassword,
   onSubmit,
+  password = "",
+  requiresPassword = false,
 }: {
+  busy?: boolean;
   email: string;
   error: string;
   onEmail: (email: string) => void;
+  onPassword?: (password: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  password?: string;
+  requiresPassword?: boolean;
 }) {
   return (
     <main className="access-shell" aria-label="Служебный вход">
@@ -760,26 +1021,73 @@ function WorkspaceAccessGate({
             <span>Почта</span>
             <input
               autoComplete="email"
+              id="workspace-email"
               inputMode="email"
+              name="email"
               placeholder="admin@visaflow.local"
               type="email"
               value={email}
               onChange={(event) => onEmail(event.target.value)}
             />
           </label>
+          {requiresPassword ? (
+            <label>
+              <span>Пароль</span>
+              <input
+                autoComplete="current-password"
+                id="workspace-password"
+                name="password"
+                placeholder="Пароль Supabase"
+                type="password"
+                value={password}
+                onChange={(event) => onPassword?.(event.target.value)}
+              />
+            </label>
+          ) : null}
           {error ? (
             <p className="access-error" role="alert">
               {error}
             </p>
           ) : (
-            <p className="access-note">Список почты задаётся в окружении приложения.</p>
+            <p className="access-note">
+              {busy
+                ? "Проверяем текущую сессию."
+                : requiresPassword
+                  ? "Вход идёт через Supabase Auth."
+                  : "Список почты задаётся в окружении приложения."}
+            </p>
           )}
-          <button className="primary-button" type="submit">
-            Войти
+          <button className="primary-button" type="submit" disabled={busy}>
+            {busy ? "Проверяем" : "Войти"}
           </button>
         </form>
       </section>
     </main>
+  );
+}
+
+function RemoteWorkspaceEmptyState({
+  onCreate,
+  role,
+}: {
+  onCreate?: () => void;
+  role: Role;
+}) {
+  return (
+    <section className="workspace-empty-state" aria-labelledby="workspace-empty-title">
+      <p className="kicker">Supabase workspace</p>
+      <h2 id="workspace-empty-title">В этой рабочей области пока нет подач</h2>
+      <p>
+        {role === "agent"
+          ? "Создайте первую подачу: она будет сохранена в вашем Supabase-профиле без подмешивания локальных демо-данных."
+          : "Администратор увидит реальные подачи после того, как агент создаст или отправит их на проверку."}
+      </p>
+      {onCreate ? (
+        <button className="primary-button" type="button" onClick={onCreate}>
+          Новая подача
+        </button>
+      ) : null}
+    </section>
   );
 }
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import type { Json } from "../../src/lib/supabase/database.types";
 import { generateAiSuggestions } from "../../src/modules/submissions/aiRules";
 import {
   acceptAiSuggestionAsIssue,
@@ -17,6 +18,14 @@ import {
   loadSubmissions,
   saveSubmissions,
 } from "../../src/modules/submissions/persistence";
+import {
+  cockpitSnapshotKey,
+  cockpitSnapshotStatus,
+  cockpitSnapshotStorageField,
+  cockpitSnapshotVersion,
+  readCockpitSnapshot,
+  toCockpitDraftPersistencePayload,
+} from "../../src/modules/submissions/supabasePersistence";
 import {
   addPreciseAdminIssue,
   applyExportStateToSelection,
@@ -620,5 +629,57 @@ describe("V-19 persistence boundary", () => {
 
     testStorage().setItem("visaflow.v19.submissions.v1", "[]");
     expect(loadSubmissions()[0].id).toBe(initialSubmissions[0].id);
+  });
+
+  it("builds a Supabase draft payload from the current cockpit model", () => {
+    const submission = byId("ПД-1048");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+    );
+
+    expect(payload.submission).toMatchObject({
+      id: "ПД-1048",
+      agent_id: "00000000-0000-4000-8000-000000000002",
+      status: "returned",
+      readiness_percent: submission.completeness.total,
+    });
+    expect(payload.applicants).toHaveLength(submission.applicants.length);
+    expect(payload.corrections).toHaveLength(submission.issues.length);
+    expect(payload.status_history).toHaveLength(submission.history.length);
+    expect(payload.media_assets).toEqual([]);
+  });
+
+  it("round-trips the exact cockpit snapshot without relying on fake uploads", () => {
+    const submission = byId("ПД-1051");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000001",
+    );
+
+    expect(readCockpitSnapshot(payload.submission.family_intelligence as Json)).toEqual(
+      submission,
+    );
+  });
+
+  it("keeps the cockpit snapshot storage contract explicit", () => {
+    const payload = toCockpitDraftPersistencePayload(
+      byId("ПД-1051"),
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000001",
+    );
+    const familyIntelligence = payload.submission.family_intelligence as Record<
+      string,
+      unknown
+    >;
+    const envelope = familyIntelligence[cockpitSnapshotKey] as Record<string, unknown>;
+
+    expect(cockpitSnapshotStorageField).toBe(
+      "submissions.family_intelligence.v19CockpitSnapshot",
+    );
+    expect(familyIntelligence.status).toBe(cockpitSnapshotStatus);
+    expect(envelope.version).toBe(cockpitSnapshotVersion);
   });
 });

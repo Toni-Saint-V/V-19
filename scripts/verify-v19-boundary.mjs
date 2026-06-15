@@ -17,6 +17,17 @@ const forbiddenRuntimeRoots = [
   path.join(root, "src/services"),
   path.join(root, "src/types/domain.ts"),
 ];
+const promotedRuntimeFiles = [
+  path.join(root, "src/lib/supabase/activation.ts"),
+  path.join(root, "src/lib/supabase/client.ts"),
+  path.join(root, "src/lib/supabase/config.ts"),
+  path.join(root, "src/lib/supabase/database.types.ts"),
+  path.join(root, "src/services/authService.ts"),
+  path.join(root, "src/services/persistenceObservability.ts"),
+  path.join(root, "src/services/profileService.ts"),
+  path.join(root, "src/types/domain.ts"),
+  path.join(root, "src/types/session.ts"),
+];
 const forbiddenCopy = [
   "Люди",
   "Семьи",
@@ -68,6 +79,10 @@ function walkImports(filePath) {
 }
 
 function assertAllowedRuntimeFile(filePath) {
+  if (promotedRuntimeFiles.some((promotedFile) => isInside(filePath, promotedFile))) {
+    return;
+  }
+
   if (
     forbiddenRuntimeRoots.some((forbiddenRoot) => isInside(filePath, forbiddenRoot))
   ) {
