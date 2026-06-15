@@ -329,7 +329,10 @@ export function ExportScreen({
                   : "Блокировано"}
               </span>
             </div>
-            <dl className="export-package-summary" aria-label="Состав выбранного пакета">
+            <dl
+              className="export-package-summary"
+              aria-label="Состав выбранного пакета"
+            >
               {packageFacts.items.map(([label, value]) => (
                 <div key={label}>
                   <dt>{label}</dt>
@@ -456,10 +459,13 @@ function exportPackageTitle(plan: ExportSummary) {
 }
 
 function exportPackageLine(plan: ExportSummary) {
-  if (plan.blockers.length > 0) return "Пакет нужно привести к одному городу, датам и типу.";
+  if (plan.blockers.length > 0)
+    return "Пакет нужно привести к одному городу, датам и типу.";
   if (plan.rowCount === 0) return "Выберите готовые подачи слева.";
-  if (plan.exportState === "file_generated") return "Файл сформирован и ждёт скачивания.";
-  if (plan.exportState === "file_downloaded") return "Файл скачан, осталось отметить выгрузку.";
+  if (plan.exportState === "file_generated")
+    return "Файл сформирован и ждёт скачивания.";
+  if (plan.exportState === "file_downloaded")
+    return "Файл скачан, осталось отметить выгрузку.";
   if (plan.exportState === "marked_exported") return "Пакет уже отмечен выгруженным.";
   return "Все строки будут добавлены в один Эксель-файл.";
 }
