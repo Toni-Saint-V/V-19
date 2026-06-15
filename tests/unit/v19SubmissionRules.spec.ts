@@ -1,0 +1,624 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { generateAiSuggestions } from "../../src/modules/submissions/aiRules";
+import {
+  acceptAiSuggestionAsIssue,
+  activeAiSuggestions,
+  dismissAiSuggestion,
+  runAiReview,
+} from "../../src/modules/submissions/aiSuggestions";
+import {
+  buildExportRows,
+  exportSummary,
+  getExportBlockers,
+} from "../../src/modules/submissions/exportRules";
+import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import {
+  clearSubmissions,
+  loadSubmissions,
+  saveSubmissions,
+} from "../../src/modules/submissions/persistence";
+import {
+  addPreciseAdminIssue,
+  applyExportStateToSelection,
+  completeQuestionnaire,
+  createDraftSubmission,
+  markSelectedExported,
+  uploadRequiredFile,
+  uploadRequiredFiles,
+  updateQuestionnaireField,
+} from "../../src/modules/submissions/submissionActions";
+import {
+  applySubmissionAction,
+  canAddAdminIssue,
+  canPerformAction,
+  defaultDrawerTab,
+  transitionMatrix,
+} from "../../src/modules/submissions/status";
+import type {
+  IssueInput,
+  Role,
+  Submission,
+  SubmissionAction,
+  SubmissionStatus,
+} from "../../src/modules/submissions/types";
+
+function byId(id: string) {
+  const submission = initialSubmissions.find((item) => item.id === id);
+  if (!submission) throw new Error(`Missing fixture ${id}`);
+  return submission;
+}
+
+function routeIssueInput(submission: Submission): IssueInput {
+  const applicant = submission.applicants[0];
+  if (!applicant) throw new Error("Missing applicant");
+
+  return {
+    applicantId: applicant.id,
+    comment: "Маршрут поездки должен быть конкретным.",
+    field: "Маршрут поездки",
+    reason: "Нужно уточнить маршрут поездки",
+    section: "Анкета",
+    severity: "blocker",
+    type: "field",
+  };
+}
+
+afterEach(() => {
+  clearSubmissions();
+});
+
+function installStorageStub() {
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  });
+}
+
+function testStorage() {
+  return (
+    globalThis as unknown as {
+      localStorage: { setItem(key: string, value: string): void };
+    }
+  ).localStorage;
+}
+
+function readyClone(patch: Partial<Submission>): Submission {
+  return {
+    ...byId("ПД-1056"),
+    id: patch.id ?? "ПД-ТЕСТ",
+    title: patch.title ?? "Тестовая подача",
+    ...patch,
+  };
+}
+
+describe("V-19 submission status rules", () => {
+  it("keeps the exact centralized transition matrix", () => {
+    const expected = {
+      save_progress: { from: ["draft"], to: "in_progress", role: "agent" },
+      submit_for_review: {
+        from: ["in_progress"],
+        to: "submitted_for_review",
+        role: "agent",
+      },
+      submit_corrections: {
+        from: ["returned", "requires_action"],
+        to: "corrections_received",
+        role: "agent",
+      },
+      return_with_issues: {
+        from: ["submitted_for_review"],
+        to: "returned",
+        role: "admin",
+      },
+      accept: {
+        from: ["submitted_for_review"],
+        to: "ready_for_export",
+        role: "admin",
+      },
+      close_issues_accept: {
+        from: ["corrections_received"],
+        to: "ready_for_export",
+        role: "admin",
+      },
+      return_again: {
+        from: ["corrections_received"],
+        to: "returned",
+        role: "admin",
+      },
+      generate_export: {
+        from: ["ready_for_export"],
+        to: "ready_for_export",
+        role: "admin",
+      },
+      mark_exported: {
+        from: ["ready_for_export"],
+        to: "exported",
+        role: "admin",
+      },
+      open_history: {
+        from: ["exported"],
+        to: "exported",
+        role: "admin",
+      },
+    } satisfies Record<
+      SubmissionAction,
+      { from: SubmissionStatus[]; to: SubmissionStatus; role: Role }
+    >;
+
+    expect(transitionMatrix).toEqual(expected);
+  });
+
+  it("keeps action ownership separated by role", () => {
+    const agentActions: SubmissionAction[] = [
+      "save_progress",
+      "submit_for_review",
+      "submit_corrections",
+    ];
+    const adminActions: SubmissionAction[] = [
+      "return_with_issues",
+      "accept",
+      "close_issues_accept",
+      "return_again",
+      "generate_export",
+      "mark_exported",
+      "open_history",
+    ];
+
+    for (const action of agentActions)
+      expect(transitionMatrix[action].role).toBe("agent");
+    for (const action of adminActions)
+      expect(transitionMatrix[action].role).toBe("admin");
+  });
+
+  it("routes returned submissions directly to issues", () => {
+    expect(defaultDrawerTab(byId("ПД-1048"))).toBe("issues");
+  });
+
+  it("blocks role-incompatible actions", () => {
+    expect(canPerformAction(byId("ПД-1053"), "accept", "agent")).toEqual({
+      ok: false,
+      reason: "Недостаточно прав",
+    });
+    expect(canPerformAction(byId("ПД-1053"), "accept", "admin")).toEqual({ ok: true });
+  });
+
+  it("blocks review submission while required work is missing", () => {
+    expect(canPerformAction(byId("ПД-1051"), "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Есть незаполненные поля или недостающие файлы",
+    });
+  });
+
+  it("allows admin issues only while a submission is under active review", () => {
+    expect(canAddAdminIssue(byId("ПД-1053"), "admin")).toBe(true);
+    expect(canAddAdminIssue(byId("ПД-1056"), "admin")).toBe(false);
+    expect(canAddAdminIssue(byId("ПД-1053"), "agent")).toBe(false);
+  });
+});
+
+describe("V-19 export rules", () => {
+  it("exports one row per applicant and keeps family rows together", () => {
+    const rows = buildExportRows([byId("ПД-1048")]);
+    expect(rows).toHaveLength(4);
+    expect(rows.map((row) => row.submissionId)).toEqual([
+      "ПД-1048",
+      "ПД-1048",
+      "ПД-1048",
+      "ПД-1048",
+    ]);
+  });
+
+  it("allows a single ready submission", () => {
+    expect(getExportBlockers([byId("ПД-1056")])).toEqual([]);
+  });
+
+  it("blocks mixed city, date, type, and already exported packages", () => {
+    const blockers = getExportBlockers([
+      byId("ПД-1056"),
+      readyClone({ id: "ПД-ГОРОД", city: "Казань" }),
+      readyClone({ id: "ПД-ДАТА", tripDateFrom: "10.10", tripDateTo: "20.10" }),
+      readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
+      byId("ПД-1057"),
+    ]).map((blocker) => blocker.reason);
+
+    expect(blockers).toContain("В выборке есть подачи не готовые к выгрузке");
+    expect(blockers).toContain("В выборке есть уже выгруженные подачи");
+    expect(blockers).toContain("Нельзя смешивать разные города");
+    expect(blockers).toContain("Нельзя смешивать разные даты поездки");
+    expect(blockers).toContain("Нельзя смешивать одинарные и семейные подачи");
+  });
+
+  it("keeps download and exported actions locked to the generated selection", () => {
+    const submissions = [
+      byId("ПД-1056"),
+      readyClone({ id: "ПД-1058", title: "Вторая готовая подача" }),
+    ];
+    const generated = applyExportStateToSelection(
+      submissions,
+      ["ПД-1056"],
+      "file_generated",
+    );
+
+    expect(exportSummary([generated[0]])).toMatchObject({
+      canDownload: true,
+      canGenerate: false,
+      canMarkExported: false,
+    });
+    expect(exportSummary([generated[1]])).toMatchObject({
+      canDownload: false,
+      canGenerate: true,
+      canMarkExported: false,
+    });
+    expect(
+      exportSummary(generated).blockers.map((blocker) => blocker.reason),
+    ).toContain("В выборке разные состояния выгрузки");
+  });
+});
+
+describe("V-19 submission actions", () => {
+  it("creates a Spain-only family draft inside the submission model", () => {
+    const draft = createDraftSubmission({
+      city: "Казань",
+      familyCount: 3,
+      submissions: initialSubmissions,
+      type: "family",
+    });
+
+    expect(draft.country).toBe("Испания");
+    expect(draft.city).toBe("Казань");
+    expect(draft.type).toBe("family");
+    expect(draft.status).toBe("draft");
+    expect(draft.applicants).toHaveLength(3);
+    expect(draft.files).toHaveLength(9);
+    expect(draft.history[0].source).toBe("agent");
+  });
+
+  it("fills a draft enough to submit it for review", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 2,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const inProgress = applySubmissionAction(filled, "save_progress", "agent");
+
+    expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
+      ok: true,
+    });
+    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    expect(submitted.status).toBe("submitted_for_review");
+    expect(submitted.files.every((file) => file.status === "pending_review")).toBe(
+      true,
+    );
+    expect(submitted.history[0].source).toBe("agent");
+  });
+
+  it("uploads one file without marking the whole package complete", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 2,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const firstFile = draft.files[0];
+    if (!firstFile) throw new Error("Missing draft file");
+
+    const updated = uploadRequiredFile(completeQuestionnaire(draft), firstFile.id);
+
+    expect(updated.files[0]?.status).toBe("uploaded");
+    expect(updated.completeness.files).toBe(33);
+    expect(updated.applicants[0]?.fileStatus).toBe("partial");
+    const inProgress = applySubmissionAction(updated, "save_progress", "agent");
+
+    expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Есть незаполненные поля или недостающие файлы",
+    });
+  });
+
+  it("blocks file uploads after the submission leaves editable agent states", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const firstFile = draft.files[0];
+    if (!firstFile) throw new Error("Missing draft file");
+
+    const locked = {
+      ...draft,
+      status: "submitted_for_review" as const,
+    };
+
+    expect(uploadRequiredFile(locked, firstFile.id)).toBe(locked);
+  });
+
+  it("updates questionnaire fields and recalculates readiness", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const applicant = draft.applicants[0];
+    if (!applicant) throw new Error("Missing draft applicant");
+    const firstSection = applicant.sections[0];
+    const firstField = firstSection?.fields[0];
+    if (!firstSection || !firstField) throw new Error("Missing questionnaire field");
+
+    const updated = updateQuestionnaireField(draft, {
+      applicantId: applicant.id,
+      sectionId: firstSection.id,
+      fieldId: firstField.id,
+      value: "Иван Иванов",
+    });
+
+    expect(updated.applicants[0]?.sections[0]?.fields[0]?.value).toBe("Иван Иванов");
+    expect(updated.applicants[0]?.sections[0]?.status).toBe("partial");
+    expect(updated.applicants[0]?.questionnaireStatus).toBe("partial");
+    expect(updated.completeness.questionnaire).toBe(17);
+    expect(canPerformAction(updated, "submit_for_review", "agent").ok).toBe(false);
+  });
+
+  it("adds a precise admin issue with a target", () => {
+    const submission = byId("ПД-1053");
+    const updated = addPreciseAdminIssue(submission, routeIssueInput(submission));
+    expect(updated.issues[0]).toMatchObject({
+      severity: "blocker",
+      status: "open",
+      target: {
+        applicantName: "Нина Волкова",
+        section: "Анкета",
+        field: "Маршрут поездки",
+      },
+    });
+    expect(updated.history[0].source).toBe("admin");
+  });
+
+  it("does not add issues to export-ready submissions", () => {
+    const submission = byId("ПД-1056");
+    const updated = addPreciseAdminIssue(submission, routeIssueInput(submission));
+
+    expect(updated).toBe(submission);
+    expect(exportSummary([updated])).toMatchObject({
+      canGenerate: true,
+      rowCount: submission.applicants.length,
+    });
+  });
+
+  it("recalculates file completeness from the actual family file count", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 4,
+      submissions: initialSubmissions,
+      type: "family",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const inProgress = applySubmissionAction(filled, "save_progress", "agent");
+    const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
+    const applicant = submitted.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+
+    const withIssue = addPreciseAdminIssue(submitted, {
+      applicantId: applicant.id,
+      comment: "Замените фото и отправьте исправление.",
+      fileType: "photo",
+      reason: "Файл требует замены",
+      section: "Файлы",
+      severity: "blocker",
+      type: "file",
+    });
+
+    expect(withIssue.files).toHaveLength(12);
+    expect(withIssue.completeness.files).toBe(92);
+    expect(withIssue.completeness.total).toBe(96);
+  });
+
+  it("keeps a field issue open until the agent submits corrections", () => {
+    const submission = byId("ПД-1053");
+    const withIssue = addPreciseAdminIssue(submission, routeIssueInput(submission));
+    const applicant = withIssue.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const tripSection = applicant.sections.find(
+      (section) => section.title === "Поездка",
+    );
+    const routeField = tripSection?.fields.find(
+      (field) => field.label === "Маршрут поездки",
+    );
+    if (!tripSection || !routeField) throw new Error("Missing route field");
+
+    const edited = updateQuestionnaireField(withIssue, {
+      applicantId: applicant.id,
+      sectionId: tripSection.id,
+      fieldId: routeField.id,
+      value: "Москва, Барселона, Москва",
+    });
+
+    expect(edited.issues[0]?.status).toBe("open");
+    expect(
+      edited.applicants[0]?.sections
+        .find((section) => section.title === "Поездка")
+        ?.fields.find((field) => field.label === "Маршрут поездки")?.error,
+    ).toBe("Нужно уточнить маршрут поездки");
+
+    const returned = applySubmissionAction(edited, "return_with_issues", "admin");
+    const corrected = applySubmissionAction(returned, "submit_corrections", "agent");
+
+    expect(corrected.issues[0]?.status).toBe("fixed_by_manager");
+    expect(
+      corrected.applicants[0]?.sections
+        .find((section) => section.title === "Поездка")
+        ?.fields.find((field) => field.label === "Маршрут поездки")?.error,
+    ).toBeUndefined();
+    expect(corrected.applicants[0]?.questionnaireStatus).toBe("complete");
+  });
+
+  it("updates export state and marks selected submissions exported", () => {
+    const generated = applyExportStateToSelection(
+      initialSubmissions,
+      ["ПД-1056"],
+      "file_generated",
+    );
+    expect(
+      generated.find((submission) => submission.id === "ПД-1056")?.exportState,
+    ).toBe("file_generated");
+
+    const exported = markSelectedExported(generated, ["ПД-1056"]);
+    expect(exported.find((submission) => submission.id === "ПД-1056")?.status).toBe(
+      "exported",
+    );
+    expect(
+      exported.find((submission) => submission.id === "ПД-1056")?.history[0].source,
+    ).toBe("admin");
+  });
+});
+
+describe("V-19 ББ helper suggestions", () => {
+  it("generates exact targets without changing submission status", () => {
+    const submission = byId("ПД-1051");
+    const reviewed = runAiReview(submission);
+    const suggestions = activeAiSuggestions(reviewed);
+    const fileSuggestion = suggestions.find(
+      (suggestion) => suggestion.target.fileType === "selfie",
+    );
+
+    expect(reviewed.status).toBe(submission.status);
+    expect(reviewed.aiReviewState).toBe("ready");
+    expect(reviewed.history[0]).toMatchObject({
+      text: "ББ-проверка запущена",
+      detail: expect.stringContaining("Активных подсказок для ручной проверки"),
+      source: "bb",
+    });
+    expect(suggestions.length).toBeGreaterThan(0);
+    expect(fileSuggestion).toMatchObject({
+      severity: "blocker",
+      target: {
+        applicantId: "з-1051-1",
+        applicantName: "Артём Соколов",
+        section: "Файлы",
+        fileType: "selfie",
+      },
+    });
+  });
+
+  it("does not duplicate suggestions that already have open issues", () => {
+    const suggestions = generateAiSuggestions(byId("ПД-1048"));
+
+    expect(
+      suggestions.some(
+        (suggestion) =>
+          suggestion.target.applicantName === "Мария Иванова" &&
+          suggestion.target.section === "Файлы" &&
+          suggestion.target.fileType === "photo",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps agents from converting suggestions into issues", () => {
+    const reviewed = runAiReview(byId("ПД-1051"));
+    const suggestionId = activeAiSuggestions(reviewed)[0]?.id;
+    if (!suggestionId) throw new Error("Нет подсказки для проверки");
+
+    const next = acceptAiSuggestionAsIssue(reviewed, suggestionId, "agent");
+
+    expect(next).toBe(reviewed);
+    expect(next.issues).toHaveLength(0);
+    expect(activeAiSuggestions(next)).toHaveLength(
+      activeAiSuggestions(reviewed).length,
+    );
+  });
+
+  it("blocks ББ issue actions outside active review statuses", () => {
+    const reviewed = {
+      ...runAiReview(byId("ПД-1051")),
+      status: "ready_for_export" as const,
+    };
+    const suggestionId = activeAiSuggestions(reviewed)[0]?.id;
+    if (!suggestionId) throw new Error("Нет подсказки для проверки");
+
+    expect(acceptAiSuggestionAsIssue(reviewed, suggestionId, "admin")).toBe(reviewed);
+    expect(dismissAiSuggestion(reviewed, suggestionId, "admin")).toBe(reviewed);
+  });
+
+  it("lets admins convert a suggestion into a precise issue", () => {
+    const reviewed = runAiReview(byId("ПД-1053"));
+    const fileSuggestion = activeAiSuggestions(reviewed).find(
+      (suggestion) => suggestion.target.fileType === "photo",
+    );
+    if (!fileSuggestion) throw new Error("Нет файловой подсказки для проверки");
+
+    const next = acceptAiSuggestionAsIssue(reviewed, fileSuggestion.id, "admin");
+
+    expect(next.status).toBe(reviewed.status);
+    expect(next.issues[0]).toMatchObject({
+      createdBy: "admin",
+      status: "open",
+      severity: "warning",
+      target: {
+        applicantName: "Нина Волкова",
+        section: "Файлы",
+        fileType: "photo",
+      },
+    });
+    expect(
+      activeAiSuggestions(next).some(
+        (suggestion) => suggestion.id === fileSuggestion.id,
+      ),
+    ).toBe(false);
+    expect(next.history[0]).toMatchObject({
+      text: "Подсказка ББ принята администратором",
+      detail: "Нина Волкова · Файлы · Фото",
+      source: "bb",
+    });
+  });
+
+  it("lets admins dismiss a suggestion without creating an issue", () => {
+    const reviewed = runAiReview(byId("ПД-1053"));
+    const suggestionId = activeAiSuggestions(reviewed)[0]?.id;
+    if (!suggestionId) throw new Error("Нет подсказки для проверки");
+
+    const next = dismissAiSuggestion(reviewed, suggestionId, "admin");
+
+    expect(next.status).toBe(reviewed.status);
+    expect(next.issues).toHaveLength(0);
+    expect(next.history[0]).toMatchObject({
+      text: "Подсказка ББ отклонена администратором",
+      source: "bb",
+    });
+    expect(
+      activeAiSuggestions(next).some((suggestion) => suggestion.id === suggestionId),
+    ).toBe(false);
+  });
+});
+
+describe("V-19 persistence boundary", () => {
+  it("saves and loads submissions", () => {
+    installStorageStub();
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 2,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+
+    saveSubmissions([draft, ...initialSubmissions]);
+    expect(loadSubmissions()[0].id).toBe(draft.id);
+  });
+
+  it("falls back to initial submissions for invalid storage", () => {
+    installStorageStub();
+    testStorage().setItem("visaflow.v19.submissions.v1", "{bad");
+    expect(loadSubmissions()[0].id).toBe(initialSubmissions[0].id);
+
+    testStorage().setItem("visaflow.v19.submissions.v1", "[]");
+    expect(loadSubmissions()[0].id).toBe(initialSubmissions[0].id);
+  });
+});

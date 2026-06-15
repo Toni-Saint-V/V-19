@@ -1,2141 +1,759 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarCheck,
-  ClipboardCheck,
-  FileText,
-  FolderKanban,
-  LayoutDashboard,
-  LogOut,
-  MessageSquareText,
-  RefreshCcw,
-  Search,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+  acceptAiSuggestionAsIssue,
+  dismissAiSuggestion,
+  runAiReview,
+} from "./modules/submissions/aiSuggestions";
+import { exportSummary } from "./modules/submissions/exportRules";
+import { loadSubmissions, saveSubmissions } from "./modules/submissions/persistence";
 import {
-  adminAcceptancePreflight,
-  buildMediaSlot,
-  canAcceptSubmission,
-  canSubmitToOperator,
-  markCorrectionFixed,
-  nextAction,
-  normalizeApplicant,
-  normalizeSubmission,
-  readiness as submissionReadiness,
-  submissionPreflight,
-  statusMeta,
-  transitionSubmissionStatus,
-} from "./lib/workflow";
-import type { AppProfile, AppSession } from "./types/session";
-import { canAccessRole } from "./services/authService";
-import { supabaseRuntimeConfig } from "./lib/supabase/config";
-import { selectSubmissionsForRole } from "./services/localRepository";
-import { storageTargetForSlot, uploadMediaToStorage } from "./services/storageService";
-import { logPersistenceDiagnostics } from "./services/persistenceObservability";
-import { buildSmartCorrectionReturnPackage } from "./services/smartCorrectionReturn";
-import { useWorkspacePersistence } from "./hooks/useWorkspacePersistence";
-import type { Applicant, MediaSlotType, Role, Submission } from "./types/domain";
+  agentQueue,
+  counts,
+  exportedHistory,
+  highestPriorityFirst,
+  readyForExport,
+  reviewQueue,
+  searchSubmissions,
+} from "./modules/submissions/selectors";
+import {
+  addPreciseAdminIssue,
+  applyActionToSubmissionList,
+  applyExportStateToSelection,
+  createDraftSubmission,
+  markSelectedExported,
+  updateQuestionnaireField,
+  uploadRequiredFile,
+} from "./modules/submissions/submissionActions";
+import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
+import { CreateSubmissionDrawer } from "./modules/submissions/components/CreateSubmissionDrawer";
+import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
+import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
+import {
+  AdminReviewScreen,
+  AgentSubmissionsScreen,
+  ExportScreen,
+} from "./modules/submissions/pages/OperationsScreens";
+import type {
+  City,
+  DrawerTab,
+  IssueInput,
+  Role,
+  Submission,
+  SubmissionAction,
+  Surface,
+  QuestionnaireField,
+} from "./modules/submissions/types";
+import {
+  type AgentTab,
+  type CreateStep,
+  type DrawerMode,
+  type ExportTab,
+  matchesAgentTab,
+  matchesReviewTab,
+  type ReviewTab,
+  surfaceTitle,
+} from "./modules/submissions/uiTypes";
 
-type Tone = "blue" | "green" | "gold" | "red" | "purple" | "neutral";
+const cities: Array<City | "Все города"> = [
+  "Все города",
+  "Москва",
+  "Санкт-Петербург",
+  "Казань",
+];
+const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
+const fallbackAdminEmails = ["admin@visaflow.local"];
+const fallbackAgentEmails = ["agent@visaflow.local"];
 
-type Metric = {
-  label: string;
-  value: string;
-  hint: string;
-  tone: Tone;
-  icon: LucideIcon;
+type IssueComposerRequest = {
+  submissionId: string;
+  token: number;
 };
 
-type QueueCase = {
-  id: string;
-  applicant: string;
-  agency: string;
-  country: string;
-  city: string;
-  group: string;
-  readiness: number;
-  status: string;
-  nextAction: string;
-  tone: Tone;
-  submission: Submission;
-};
-
-const reviewStageStatuses: Array<Submission["status"]> = [
-  "waiting_review",
-  "in_review",
-];
-const handoffStageStatuses: Array<Submission["status"]> = [
-  "accepted",
-  "ready_for_excel",
-  "exported",
-  "sent_to_appointment",
-  "appointment_scheduled",
-];
-const editableApplicantFields: Array<{
-  key: keyof Pick<
-    Applicant,
-    | "name"
-    | "passport"
-    | "birthDate"
-    | "citizenship"
-    | "address"
-    | "phone"
-    | "email"
-    | "passportIssuedAt"
-    | "passportExpiresAt"
-    | "country"
-    | "city"
-    | "tripDates"
-    | "hotelName"
-    | "hotelAddress"
-  >;
-  label: string;
-}> = [
-  { key: "name", label: "Full name" },
-  { key: "passport", label: "Passport number" },
-  { key: "birthDate", label: "Birth date" },
-  { key: "citizenship", label: "Citizenship" },
-  { key: "address", label: "Address" },
-  { key: "phone", label: "Phone" },
-  { key: "email", label: "Email" },
-  { key: "passportIssuedAt", label: "Passport issued" },
-  { key: "passportExpiresAt", label: "Passport expires" },
-  { key: "country", label: "Submission country" },
-  { key: "city", label: "Submission city" },
-  { key: "tripDates", label: "Trip dates" },
-  { key: "hotelName", label: "Hotel" },
-  { key: "hotelAddress", label: "Hotel address" },
-];
-
-const statusRank: Record<Submission["status"], number> = {
-  waiting_review: 1,
-  in_review: 2,
-  attention_required: 3,
-  returned: 4,
-  accepted: 5,
-  ready_for_excel: 6,
-  exported: 7,
-  sent_to_appointment: 8,
-  appointment_scheduled: 9,
-  ready_for_review: 10,
-  filling: 11,
-  draft: 12,
-  completed: 13,
-};
-
-const statusColumns = [
-  {
-    title: "Agent prepares",
-    description: "Collect fields, files, and corrections before admin review.",
-    items: [
-      ["Draft", "Agent", "Fill required fields"],
-      ["Needs fixes", "Agent", "Correct returned blocker"],
-    ],
-  },
-  {
-    title: "Admin reviews",
-    description: "Human review decides if the package is ready for handoff.",
-    items: [
-      ["In review", "Admin", "Accept or return"],
-      ["Ready for queue", "Admin", "Prepare manual tracking"],
-    ],
-  },
-  {
-    title: "Manual tracking",
-    description: "Admin tracks appointments and results outside automation.",
-    items: [
-      ["Queued", "Admin", "Update date/comment"],
-      ["Result pending", "Admin", "Monitor final status"],
-    ],
-  },
-];
-
-function uiTone(tone: string): Tone {
-  if (tone === "success") return "green";
-  if (tone === "error") return "red";
-  if (tone === "warning" || tone === "gold") return "gold";
-  if (tone === "violet") return "purple";
-  if (tone === "info") return "blue";
-  return "neutral";
+function parseWorkspaceEmails(input: unknown, fallback: string[]) {
+  if (typeof input !== "string" || input.trim() === "") return fallback;
+  const parsed = input
+    .split(",")
+    .map((email) => normalizeEmail(email))
+    .filter(Boolean);
+  return parsed.length ? parsed : fallback;
 }
 
-function caseGroup(submission: Submission): string {
-  return submission.type === "family"
-    ? `Family · ${submission.applicants.length}`
-    : "Single";
+const adminEmails = parseWorkspaceEmails(
+  import.meta.env.VITE_ADMIN_EMAILS,
+  fallbackAdminEmails,
+);
+const agentEmails = parseWorkspaceEmails(
+  import.meta.env.VITE_AGENT_EMAILS,
+  fallbackAgentEmails,
+);
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
 }
 
-function actionSummary(submission: Submission): string {
-  if (submission.status === "waiting_review" || submission.status === "in_review") {
-    return "Human review can accept the package or return corrections.";
-  }
-  if (submission.status === "returned") {
-    return "Waiting for agency corrections before another review.";
-  }
-  if (submission.status === "accepted" || submission.status === "ready_for_excel") {
-    return "Ready for manual queue handoff and export preparation.";
-  }
-  if (
-    ["exported", "sent_to_appointment", "appointment_scheduled"].includes(
-      submission.status,
-    )
-  ) {
-    return "Manual appointment tracking is the next operator step.";
-  }
-
-  return nextAction(submission, true).label;
-}
-
-function toQueueCase(submission: Submission): QueueCase {
-  const meta = statusMeta[submission.status];
-
-  return {
-    id: submission.id,
-    applicant: submission.title,
-    agency: submission.agentName,
-    country: submission.country,
-    city: submission.city,
-    group: caseGroup(submission),
-    readiness: submissionReadiness(submission),
-    status: meta.label,
-    nextAction: actionSummary(submission),
-    tone: uiTone(meta.tone),
-    submission,
-  };
-}
-
-function countMatching(
-  submissions: Submission[],
-  statuses: Array<Submission["status"]>,
-): number {
-  return submissions.filter((submission) => statuses.includes(submission.status))
-    .length;
-}
-
-function buildMetrics(submissions: Submission[]): Metric[] {
-  const reviewCount = countMatching(submissions, ["waiting_review", "in_review"]);
-  const blockedCount = countMatching(submissions, ["returned", "attention_required"]);
-  const returnedCount = countMatching(submissions, ["returned"]);
-  const appointmentCount = countMatching(submissions, [
-    "exported",
-    "sent_to_appointment",
-    "appointment_scheduled",
-  ]);
-
-  return [
-    {
-      label: "Ready for review",
-      value: String(reviewCount),
-      hint: "operator-owned review work",
-      tone: reviewCount ? "green" : "neutral",
-      icon: ClipboardCheck,
-    },
-    {
-      label: "Blocked cases",
-      value: String(blockedCount),
-      hint: "corrections or manual issue",
-      tone: blockedCount ? "red" : "neutral",
-      icon: AlertTriangle,
-    },
-    {
-      label: "Returned",
-      value: String(returnedCount),
-      hint: "awaiting agency fixes",
-      tone: returnedCount ? "gold" : "neutral",
-      icon: RefreshCcw,
-    },
-    {
-      label: "In appointment queue",
-      value: String(appointmentCount),
-      hint: "manual tracking statuses",
-      tone: appointmentCount ? "purple" : "neutral",
-      icon: CalendarCheck,
-    },
-  ];
-}
-
-function buildAgentMetrics(submissions: Submission[]): Metric[] {
-  const draftCount = countMatching(submissions, ["draft", "filling"]);
-  const returnedCount = countMatching(submissions, ["returned"]);
-  const readyCount = countMatching(submissions, ["ready_for_review"]);
-  const reviewCount = countMatching(submissions, ["waiting_review", "in_review"]);
-
-  return [
-    {
-      label: "In progress",
-      value: String(draftCount),
-      hint: "cases still being prepared",
-      tone: draftCount ? "blue" : "neutral",
-      icon: FileText,
-    },
-    {
-      label: "Returned",
-      value: String(returnedCount),
-      hint: "corrections to close",
-      tone: returnedCount ? "red" : "neutral",
-      icon: RefreshCcw,
-    },
-    {
-      label: "Ready to send",
-      value: String(readyCount),
-      hint: "preflight can run",
-      tone: readyCount ? "green" : "neutral",
-      icon: Send,
-    },
-    {
-      label: "With operator",
-      value: String(reviewCount),
-      hint: "waiting for human review",
-      tone: reviewCount ? "purple" : "neutral",
-      icon: ShieldCheck,
-    },
-  ];
-}
-
-function firstBlocker(submission: Submission): string {
-  const preflight = adminAcceptancePreflight(submission);
-  return preflight.blockers[0] ?? "Review preflight is not clear.";
-}
-
-function canRunReviewAction(submission: Submission): boolean {
-  return reviewStageStatuses.includes(submission.status);
-}
-
-function canRunHandoffAction(submission: Submission): boolean {
-  return handoffStageStatuses.includes(submission.status);
-}
-
-function handoffActionLabel(submission: Submission): string {
-  if (submission.status === "accepted") return "Prepare Excel";
-  if (submission.status === "ready_for_excel") return "Mark exported";
-  if (submission.status === "exported") return "Send to appointment tracking";
-  if (submission.status === "sent_to_appointment") return "Mark appointment scheduled";
-  if (submission.status === "appointment_scheduled") return "Complete tracking";
-  return "Continue handoff";
-}
-
-function nextHandoffStatus(status: Submission["status"]): Submission["status"] | null {
-  if (status === "accepted") return "ready_for_excel";
-  if (status === "ready_for_excel") return "exported";
-  if (status === "exported") return "sent_to_appointment";
-  if (status === "sent_to_appointment") return "appointment_scheduled";
-  if (status === "appointment_scheduled") return "completed";
+function resolveWorkspaceRole(email: string): Role | null {
+  const normalized = normalizeEmail(email);
+  if (adminEmails.includes(normalized)) return "admin";
+  if (agentEmails.includes(normalized)) return "agent";
   return null;
 }
 
-function actionTimestamp(): string {
-  return new Date().toISOString();
+function loadWorkspaceEmail() {
+  try {
+    return localStorage.getItem(workspaceEmailStorageKey) ?? "";
+  } catch {
+    return "";
+  }
 }
 
-function candidateWithClosedCorrections(
-  submission: Submission,
-  changedBy: string,
-  changedAt: string,
-): Submission {
-  return submission.notes.reduce(
-    (next, note) =>
-      markCorrectionFixed(
-        next,
-        note.id ?? `${note.target}-${note.text}`,
-        changedBy,
-        changedAt,
-      ),
-    submission,
+function saveWorkspaceEmail(email: string) {
+  try {
+    localStorage.setItem(workspaceEmailStorageKey, email);
+  } catch {
+    // Хранилище может быть недоступно в приватном режиме.
+  }
+}
+
+function clearWorkspaceEmail() {
+  try {
+    localStorage.removeItem(workspaceEmailStorageKey);
+  } catch {
+    // Хранилище может быть недоступно в приватном режиме.
+  }
+}
+
+function normalizeCreateApplicantNames(names: string[], count: number) {
+  const fallbacks = [
+    "Новый заявитель",
+    "Супруг",
+    "Ребёнок 1",
+    "Ребёнок 2",
+    "Ребёнок 3",
+    "Ребёнок 4",
+  ];
+
+  return Array.from(
+    { length: count },
+    (_, index) => names[index] ?? fallbacks[index] ?? `Заявитель ${index + 1}`,
   );
-}
-
-function profileInitial(profile: AppProfile): string {
-  return profile.displayName.trim().charAt(0).toUpperCase() || "A";
-}
-
-function dataSourceLabel(session: AppSession | null): string {
-  if (session?.mode !== "supabase") return "Local demo data";
-
-  return supabaseRuntimeConfig.activation.ready
-    ? "Supabase data"
-    : "Supabase sandbox probe";
-}
-
-function mediaAccept(type: MediaSlotType): string {
-  return type === "video" ? "video/mp4" : "image/jpeg";
-}
-
-function mediaUploadButtonLabel(type: MediaSlotType): string {
-  if (type === "video") return "Choose MP4";
-  return "Choose JPG";
-}
-
-function createAgentDraft(profile: AppProfile, count: number): Submission {
-  const id = `VF-AGENT-${Date.now().toString().slice(-6)}-${count + 1}`;
-  const applicantId = `${id}-1`;
-  const title = `New applicant ${count + 1}`;
-  const createdAt = actionTimestamp();
-
-  return normalizeSubmission({
-    id,
-    title,
-    type: "single",
-    agentId: profile.id,
-    agentName: profile.organizationName ?? profile.displayName,
-    country: "Spain",
-    city: "Madrid",
-    travelDate: "2026-08-20",
-    updated: createdAt,
-    createdAt,
-    status: "draft",
-    appointment: "not_started",
-    priority: "Средний",
-    fields: 0,
-    media: 0,
-    mediaRequired: 3,
-    applicants: [
-      {
-        id: applicantId,
-        name: title,
-        role: "Заявитель",
-        passport: "-",
-        form: 0,
-        media: 0,
-        mediaRequired: 3,
-        country: "Spain",
-        city: "Madrid",
-        tripDates: "2026-08-20",
-      },
-    ],
-    mediaRows: [],
-    notes: [],
-  });
 }
 
 function App() {
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [uploadingMediaKey, setUploadingMediaKey] = useState("");
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-  const [toast, setToast] = useState("");
-  const {
-    authChecked,
-    authError,
-    dataLoading,
-    isSupabaseSession,
-    loginBusy,
-    loginDemo,
-    loginSupabase,
-    logout,
-    persistExistingSubmission,
-    persistSubmissionImmediately,
-    recoverRemoteFailure,
-    saveState,
-    saveStatusDescription,
-    saveStatusLabel,
-    session,
-    setSaveError,
-    setSubmissions,
-    stageSubmissionUpdates,
-    submissions,
-  } = useWorkspacePersistence({ setToast });
+  const [workspaceEmail, setWorkspaceEmail] = useState(loadWorkspaceEmail);
+  const initialWorkspaceRole = resolveWorkspaceRole(workspaceEmail) ?? "agent";
+  const [role, setRole] = useState<Role>(initialWorkspaceRole);
+  const [workspaceEmailDraft, setWorkspaceEmailDraft] = useState(workspaceEmail);
+  const [workspaceAccessError, setWorkspaceAccessError] = useState("");
+  const [surface, setSurface] = useState<Surface>(
+    initialWorkspaceRole === "admin" ? "admin-review" : "agent-submissions",
+  );
+  const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState(
+    () => loadSubmissions()[0].id,
+  );
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>("closed");
+  const [activeDrawerTab, setActiveDrawerTab] = useState<DrawerTab>(
+    defaultDrawerTab(loadSubmissions()[0]),
+  );
+  const [dirty, setDirty] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [query, setQuery] = useState("");
+  const [cityFilter, setCityFilter] = useState<City | "Все города">("Все города");
+  const [agentTab, setAgentTab] = useState<AgentTab>("action");
+  const [reviewTab, setReviewTab] = useState<ReviewTab>("review");
+  const [exportTab, setExportTab] = useState<ExportTab>("ready");
+  const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
+  const [issueComposerRequest, setIssueComposerRequest] =
+    useState<IssueComposerRequest | null>(null);
+  const [createStep, setCreateStep] = useState<CreateStep>("params");
+  const [createType, setCreateType] = useState<Submission["type"]>("single");
+  const [createCity, setCreateCity] = useState<City>("Москва");
+  const [createFamilyCount, setCreateFamilyCount] = useState(2);
+  const [createApplicantNames, setCreateApplicantNames] = useState<string[]>([
+    "Новый заявитель",
+    "Супруг",
+    "Ребёнок 1",
+    "Ребёнок 2",
+  ]);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  const profile = session?.profile ?? null;
-  const sourceLabel = dataSourceLabel(session);
-  const hasAdminAccess = canAccessRole(profile, "admin");
-  const agentSubmissions = useMemo(
-    () =>
-      profile?.role === "agent"
-        ? selectSubmissionsForRole(submissions, "agent", profile.id)
-        : [],
-    [profile?.id, profile?.role, submissions],
+  const activeSubmission =
+    submissions.find((submission) => submission.id === selectedSubmissionId) ??
+    submissions[0];
+  const summary = counts(submissions);
+
+  const searchedAgentQueue = useMemo(
+    () => searchSubmissions(agentQueue(submissions), query, cityFilter),
+    [cityFilter, query, submissions],
   );
-  const agentCases = useMemo(
-    () =>
-      [...agentSubmissions.map(toQueueCase)].sort((left, right) => {
-        const byStatus =
-          statusRank[left.submission.status] - statusRank[right.submission.status];
-        if (byStatus !== 0) return byStatus;
-        return right.readiness - left.readiness;
-      }),
-    [agentSubmissions],
+  const searchedReviewQueue = useMemo(
+    () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
+    [cityFilter, query, submissions],
   );
-  const agentMetrics = useMemo(
-    () => buildAgentMetrics(agentSubmissions),
-    [agentSubmissions],
+  const agentList = highestPriorityFirst(
+    searchedAgentQueue.filter(matchesAgentTab(agentTab)),
   );
-  const visibleSubmissions = useMemo(
-    () => selectSubmissionsForRole(submissions, "admin", profile?.id ?? "admin-1"),
-    [profile?.id, submissions],
+  const reviewList = highestPriorityFirst(
+    searchedReviewQueue.filter(matchesReviewTab(reviewTab)),
   );
-  const queueCases = useMemo(
-    () =>
-      [...visibleSubmissions.map(toQueueCase)].sort((left, right) => {
-        const byStatus =
-          statusRank[left.submission.status] - statusRank[right.submission.status];
-        if (byStatus !== 0) return byStatus;
-        return right.readiness - left.readiness;
-      }),
-    [visibleSubmissions],
+  const searchedExportSubmissions = useMemo(
+    () => searchSubmissions(submissions, query, cityFilter),
+    [cityFilter, query, submissions],
   );
-  const metrics = useMemo(() => buildMetrics(visibleSubmissions), [visibleSubmissions]);
-  const selectedSubmission = selectedCaseId
-    ? (submissions.find((submission) => submission.id === selectedCaseId) ?? null)
-    : null;
-  const selectedCase = selectedSubmission ? toQueueCase(selectedSubmission) : null;
-  const selectedPreflight = selectedSubmission
-    ? adminAcceptancePreflight(selectedSubmission)
-    : null;
-  const selectedAgentSubmission =
-    profile?.role === "agent" &&
-    selectedSubmission?.agentId === profile.id &&
-    ["draft", "filling", "returned", "ready_for_review"].includes(
-      selectedSubmission.status,
-    )
-      ? selectedSubmission
-      : null;
-  const selectedAgentPreflight = selectedAgentSubmission
-    ? submissionPreflight(selectedAgentSubmission)
-    : null;
-  const selectedAgentCorrectionPreflight =
-    selectedAgentSubmission?.status === "returned" && profile
-      ? submissionPreflight(
-          candidateWithClosedCorrections(
-            selectedAgentSubmission,
-            profile.displayName,
-            selectedAgentSubmission.updated,
-          ),
+  const readyList = readyForExport(searchedExportSubmissions);
+  const historyList = exportedHistory(searchedExportSubmissions);
+  const selectedForExport = readyList.filter((submission) =>
+    selectedExportIds.includes(submission.id),
+  );
+  const selectedVisibleExportIds = selectedForExport.map((submission) => submission.id);
+  const exportPlan = exportSummary(selectedForExport);
+  const showRoleSwitcher =
+    import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true";
+  const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
+  const hasWorkspaceAccess = showRoleSwitcher || Boolean(resolvedWorkspaceRole);
+
+  useEffect(() => {
+    saveSubmissions(submissions);
+  }, [submissions]);
+
+  useEffect(() => {
+    const readyIds = new Set(readyList.map((submission) => submission.id));
+    setSelectedExportIds((current) => {
+      const next = current.filter((id) => readyIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [readyList]);
+
+  useEffect(() => {
+    if (drawerMode !== "closed" || confirmClose) return;
+
+    const node = returnFocusRef.current;
+    returnFocusRef.current = null;
+    if (!node || !document.contains(node)) return;
+
+    requestAnimationFrame(() => {
+      node.focus({ preventScroll: true });
+    });
+  }, [confirmClose, drawerMode]);
+
+  function rememberReturnFocus() {
+    const activeElement = document.activeElement;
+    returnFocusRef.current =
+      activeElement instanceof HTMLElement ? activeElement : null;
+  }
+
+  function focusActiveDrawerTab() {
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(
+          ".submission-drawer [role='tab'][aria-selected='true']",
         )
-      : selectedAgentPreflight;
-  const priorityCase = queueCases[0] ?? null;
-  const recentEvents = useMemo(
-    () =>
-      [...visibleSubmissions]
-        .sort((left, right) => right.updated.localeCompare(left.updated))
-        .slice(0, 3),
-    [visibleSubmissions],
-  );
-  const countryLoad = useMemo(() => {
-    const tracked = visibleSubmissions.filter((submission) =>
-      ["exported", "sent_to_appointment", "appointment_scheduled"].includes(
-        submission.status,
+        ?.focus({ preventScroll: true });
+    });
+  }
+
+  function chooseRole(nextRole: Role) {
+    setRole(nextRole);
+    setDrawerMode("closed");
+    setDirty(false);
+    if (nextRole === "agent") {
+      setSurface("agent-submissions");
+      setSelectedSubmissionId(submissions[0].id);
+    } else {
+      setSurface("admin-review");
+      const firstReview = reviewQueue(submissions)[0] ?? submissions[0];
+      setSelectedSubmissionId(firstReview.id);
+    }
+  }
+
+  function openSubmission(submission: Submission, tab = defaultDrawerTab(submission)) {
+    rememberReturnFocus();
+    setSelectedSubmissionId(submission.id);
+    setActiveDrawerTab(tab);
+    setDrawerMode("detail");
+  }
+
+  function selectSubmission(submission: Submission) {
+    setSelectedSubmissionId(submission.id);
+    setActiveDrawerTab(defaultDrawerTab(submission));
+  }
+
+  function closeDrawer() {
+    if (dirty) {
+      setConfirmClose(true);
+      return;
+    }
+    setDrawerMode("closed");
+  }
+
+  function updateActiveSubmission(transform: (submission: Submission) => Submission) {
+    setSubmissions((current) =>
+      current.map((submission) =>
+        submission.id === activeSubmission.id ? transform(submission) : submission,
       ),
     );
-    const total = Math.max(1, tracked.length);
-    const counts = new Map<string, number>();
-
-    for (const submission of tracked) {
-      counts.set(submission.country, (counts.get(submission.country) ?? 0) + 1);
-    }
-
-    return Array.from(counts.entries())
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 3)
-      .map(([country, count]) => ({
-        country,
-        count,
-        width: Math.max(12, Math.round((count / total) * 100)),
-      }));
-  }, [visibleSubmissions]);
-
-  useEffect(() => {
-    if (!toast) return undefined;
-
-    const timer = window.setTimeout(() => setToast(""), 2600);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  useEffect(() => {
-    if (!selectedCaseId) return undefined;
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSelectedCaseId(null);
-      }
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedCaseId]);
-
-  async function handleLoginDemo(role: Role) {
-    await loginDemo(role);
-    setSelectedCaseId(null);
   }
 
-  async function handleLoginSupabase(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (await loginSupabase(loginEmail, loginPassword)) setSelectedCaseId(null);
-  }
-
-  async function handleLogout() {
-    await logout();
-    setSelectedCaseId(null);
-  }
-
-  function createAgentCase() {
-    if (!profile || profile.role !== "agent") {
-      setToast("Agent access is required to create a case.");
-      return;
-    }
-
-    const nextSubmission = createAgentDraft(profile, submissions.length);
-    stageSubmissionUpdates(
-      [nextSubmission.id],
-      (current) => [nextSubmission, ...current],
-      `${nextSubmission.id} draft created for intake.`,
+  function updateSubmission(action: SubmissionAction) {
+    const nextSubmissions = applyActionToSubmissionList(
+      submissions,
+      activeSubmission.id,
+      action,
+      role,
     );
-    setSelectedCaseId(nextSubmission.id);
+    setSubmissions(nextSubmissions);
+    const updated = nextSubmissions.find(
+      (submission) => submission.id === activeSubmission.id,
+    );
+    if (updated) setActiveDrawerTab(defaultDrawerTab(updated));
   }
 
-  function updateAgentApplicantField(
-    submissionId: string,
-    applicantId: string,
-    field: (typeof editableApplicantFields)[number]["key"],
-    value: string,
-  ) {
-    if (!profile || profile.role !== "agent") {
-      setToast("Agent access is required to edit intake data.");
+  function openIssueComposer(submission: Submission) {
+    if (!canAddAdminIssue(submission, "admin")) {
+      openSubmission(submission, "issues");
       return;
     }
+    rememberReturnFocus();
+    setSelectedSubmissionId(submission.id);
+    setActiveDrawerTab("issues");
+    setDrawerMode("detail");
+    setIssueComposerRequest((current) => ({
+      submissionId: submission.id,
+      token: (current?.token ?? 0) + 1,
+    }));
+  }
 
-    const changedAt = actionTimestamp();
-    stageSubmissionUpdates([submissionId], (current) =>
-      current.map((submission) => {
-        if (submission.id !== submissionId || submission.agentId !== profile.id) {
-          return submission;
-        }
+  function addAdminIssue(input: IssueInput) {
+    updateActiveSubmission((submission) => addPreciseAdminIssue(submission, input));
+    setActiveDrawerTab("issues");
+    setDrawerMode("detail");
+  }
 
-        const applicants = submission.applicants.map((applicant, index) => {
-          const normalized = normalizeApplicant(applicant, index, submission);
-          if (normalized.id !== applicantId) return normalized;
+  function uploadActiveFile(fileId: string) {
+    updateActiveSubmission((submission) => uploadRequiredFile(submission, fileId));
+    setActiveDrawerTab("files");
+  }
 
-          return normalizeApplicant(
-            {
-              ...normalized,
-              [field]: value,
-              ...(field === "name" ? { name: value || "New applicant" } : {}),
-              ...(field === "passport" ? { passport: value || "-" } : {}),
-            },
-            index,
-            submission,
-          );
-        });
-        const firstApplicant = applicants[0];
+  function updateActiveQuestionnaireField(input: {
+    applicantId: string;
+    sectionId: string;
+    fieldId: QuestionnaireField["id"];
+    value: string;
+  }) {
+    updateActiveSubmission((submission) => updateQuestionnaireField(submission, input));
+  }
 
-        return normalizeSubmission({
-          ...submission,
-          title:
-            submission.type === "single" && firstApplicant?.name
-              ? firstApplicant.name
-              : submission.title,
-          country:
-            field === "country" && applicants[0]?.country
-              ? applicants[0].country
-              : submission.country,
-          city:
-            field === "city" && applicants[0]?.city
-              ? applicants[0].city
-              : submission.city,
-          travelDate:
-            field === "tripDates" && applicants[0]?.tripDates
-              ? applicants[0].tripDates
-              : submission.travelDate,
-          applicants,
-          status: submission.status === "draft" ? "filling" : submission.status,
-          updated: changedAt,
-        });
-      }),
+  function runAiReviewForActiveSubmission() {
+    updateActiveSubmission(runAiReview);
+  }
+
+  function acceptAiSuggestionForActiveSubmission(suggestionId: string) {
+    updateActiveSubmission((submission) =>
+      acceptAiSuggestionAsIssue(submission, suggestionId, role),
+    );
+    setActiveDrawerTab("issues");
+  }
+
+  function dismissAiSuggestionForActiveSubmission(suggestionId: string) {
+    updateActiveSubmission((submission) =>
+      dismissAiSuggestion(submission, suggestionId, role),
     );
   }
 
-  async function updateAgentMediaSlot(
-    submissionId: string,
-    applicantId: string,
-    type: MediaSlotType,
-    file?: File,
-  ) {
-    if (!profile || profile.role !== "agent") {
-      setToast("Agent access is required to update media.");
-      return;
-    }
-
-    const submission = submissions.find(
-      (item) => item.id === submissionId && item.agentId === profile.id,
-    );
-    if (!submission) {
-      setToast("This media slot is not available for the current agent.");
-      return;
-    }
-
-    if (isSupabaseSession && session?.mode === "supabase") {
-      if (!file) {
-        setToast("Choose a real media file before marking this slot uploaded.");
-        return;
-      }
-
-      if (type !== "video" && file.type !== "image/jpeg") {
-        setToast("Photo and selfie slots require a JPG file for this storage path.");
-        return;
-      }
-
-      const applicant = submission.applicants
-        .map((item, index) => normalizeApplicant(item, index, submission))
-        .find((item) => item.id === applicantId);
-      if (!applicant?.id) {
-        setToast("Applicant data must be saved before uploading media.");
-        return;
-      }
-
-      const existingSlot = (applicant.mediaSlots ?? []).find(
-        (slot) => slot.type === type,
-      );
-      const rebuilt = buildMediaSlot(applicant, type, "uploaded");
-      if (!rebuilt.generatedFileName) {
-        setToast("Enter a passport number before uploading this media file.");
-        return;
-      }
-
-      const changedAt = actionTimestamp();
-      const uploadedSlot = {
-        ...existingSlot,
-        ...rebuilt,
-        state: "uploaded" as const,
-        passportFileName: rebuilt.generatedFileName,
-        mimeType: file.type,
-        sizeBytes: file.size,
-        uploadedAt: changedAt,
-        uploadStatus: "uploaded" as const,
-        reviewStatus: "not_reviewed" as const,
-      };
-      const target = storageTargetForSlot(submissionId, applicant.id, uploadedSlot);
-      const mediaKey = `${submissionId}:${applicant.id}:${type}`;
-
-      setUploadingMediaKey(mediaKey);
-      setSaveError("");
-      try {
-        await persistExistingSubmission(session, submission);
-
-        const upload = await uploadMediaToStorage(target, file);
-        if (!upload) {
-          throw new Error("Supabase storage is inactive.");
-        }
-
-        const nextSubmissions = submissions.map((currentSubmission) => {
-          if (
-            currentSubmission.id !== submissionId ||
-            currentSubmission.agentId !== profile.id
-          ) {
-            return currentSubmission;
-          }
-
-          const applicants = currentSubmission.applicants.map(
-            (currentApplicant, index) => {
-              const normalized = normalizeApplicant(
-                currentApplicant,
-                index,
-                currentSubmission,
-              );
-              if (normalized.id !== applicantId) return normalized;
-
-              const mediaSlots = (normalized.mediaSlots ?? []).map((slot) =>
-                slot.type === type ? uploadedSlot : slot,
-              );
-
-              return normalizeApplicant(
-                {
-                  ...normalized,
-                  mediaSlots,
-                },
-                index,
-                currentSubmission,
-              );
-            },
-          );
-
-          return normalizeSubmission({
-            ...currentSubmission,
-            applicants,
-            status:
-              currentSubmission.status === "draft"
-                ? "filling"
-                : currentSubmission.status,
-            updated: changedAt,
-          });
-        });
-        const nextSubmission = nextSubmissions.find((item) => item.id === submissionId);
-        if (!nextSubmission) {
-          throw new Error("Updated submission was not found after media upload.");
-        }
-
-        setSubmissions(nextSubmissions);
-        await persistSubmissionImmediately(
-          session,
-          nextSubmission,
-          `${uploadedSlot.label} uploaded and saved.`,
-          target,
-        );
-      } catch (error) {
-        logPersistenceDiagnostics("Supabase media upload failed", error);
-        const message = await recoverRemoteFailure(
-          session,
-          error,
-          "Media upload failed. No uploaded file was marked complete.",
-          "Supabase reload after media failure failed",
-        );
-        setToast(message);
-      } finally {
-        setUploadingMediaKey("");
-      }
-      return;
-    }
-
-    const changedAt = actionTimestamp();
-    stageSubmissionUpdates([submissionId], (current) =>
-      current.map((submission) => {
-        if (submission.id !== submissionId || submission.agentId !== profile.id) {
-          return submission;
-        }
-
-        const applicants = submission.applicants.map((applicant, index) => {
-          const normalized = normalizeApplicant(applicant, index, submission);
-          if (normalized.id !== applicantId) return normalized;
-
-          const mediaSlots = (normalized.mediaSlots ?? []).map((slot) => {
-            if (slot.type !== type) return slot;
-            const rebuilt = buildMediaSlot(normalized, type, "uploaded");
-
-            return {
-              ...slot,
-              ...rebuilt,
-              state: "uploaded" as const,
-              passportFileName: rebuilt.generatedFileName,
-              uploadedAt: changedAt,
-            };
-          });
-
-          return normalizeApplicant(
-            {
-              ...normalized,
-              mediaSlots,
-            },
-            index,
-            submission,
-          );
-        });
-
-        return normalizeSubmission({
-          ...submission,
-          applicants,
-          status: submission.status === "draft" ? "filling" : submission.status,
-          updated: changedAt,
-        });
-      }),
-    );
-  }
-
-  function fixReturnedCase(submission: Submission) {
-    if (!profile || profile.role !== "agent" || submission.agentId !== profile.id) {
-      setToast("Only the assigned agent can fix this case.");
-      return;
-    }
-
-    if (submission.status !== "returned") {
-      setToast("Only returned cases can be marked corrected.");
-      return;
-    }
-
-    const changedAt = actionTimestamp();
-    const fixedCandidate = candidateWithClosedCorrections(
-      submission,
-      profile.displayName,
-      changedAt,
-    );
-    const preflight = submissionPreflight(fixedCandidate);
-    if (!preflight.canSubmit) {
-      setSelectedCaseId(submission.id);
-      setToast("Fix data and media blockers before closing returned corrections.");
-      return;
-    }
-
-    stageSubmissionUpdates(
-      [submission.id],
-      (current) =>
-        current.map((item) => {
-          if (item.id !== submission.id) return item;
-
-          const fixed = candidateWithClosedCorrections(
-            item,
-            profile.displayName,
-            changedAt,
-          );
-
-          return transitionSubmissionStatus(
-            fixed,
-            "ready_for_review",
-            profile.displayName,
-            changedAt,
-            "Agent marked returned corrections as fixed.",
-          );
-        }),
-      `${submission.id} corrections marked fixed.`,
-    );
-  }
-
-  function submitAgentCase(submission: Submission) {
-    if (!profile || profile.role !== "agent" || submission.agentId !== profile.id) {
-      setToast("Only the assigned agent can submit this case.");
-      return;
-    }
-
-    if (!["draft", "filling", "ready_for_review"].includes(submission.status)) {
-      setToast("Case is not in an editable handoff state.");
-      return;
-    }
-
-    if (!canSubmitToOperator(submission)) {
-      setSelectedCaseId(submission.id);
-      setToast("Preflight blocked handoff: close required fields and media first.");
-      return;
-    }
-
-    const changedAt = actionTimestamp();
-    stageSubmissionUpdates(
-      [submission.id],
-      (current) =>
-        current.map((item) =>
-          item.id === submission.id
-            ? transitionSubmissionStatus(
-                item,
-                "waiting_review",
-                profile.displayName,
-                changedAt,
-                "Agent submitted the case to operator review.",
-              )
-            : item,
-        ),
-      `${submission.id} sent to operator review.`,
-    );
-  }
-
-  function openPriorityCase() {
-    if (!priorityCase) {
-      setToast("No operator cases are available.");
-      return;
-    }
-
-    setSelectedCaseId(priorityCase.id);
-  }
-
-  function markReady() {
-    if (!selectedSubmission || !hasAdminAccess) {
-      setToast("Admin access is required for this action.");
-      return;
-    }
-
-    if (!canRunReviewAction(selectedSubmission)) {
-      setToast(
-        `${selectedSubmission.id} has left review; use manual tracking instead.`,
-      );
-      return;
-    }
-
-    if (!canAcceptSubmission(selectedSubmission)) {
-      setToast(`Cannot mark ready: ${firstBlocker(selectedSubmission)}`);
-      return;
-    }
-
-    const actor = profile?.displayName ?? "Operator";
-    const changedAt = actionTimestamp();
-    stageSubmissionUpdates(
-      [selectedSubmission.id],
-      (current) =>
-        current.map((submission) => {
-          if (submission.id !== selectedSubmission.id) return submission;
-
-          const reviewStarted =
-            submission.status === "in_review"
-              ? submission
-              : transitionSubmissionStatus(
-                  submission,
-                  "in_review",
-                  actor,
-                  changedAt,
-                  "Operator started human readiness review.",
-                );
-
-          return transitionSubmissionStatus(
-            reviewStarted,
-            "accepted",
-            actor,
-            changedAt,
-            "Operator accepted the case for manual handoff.",
-          );
-        }),
-      `${selectedSubmission.id} marked ready for manual handoff.`,
-    );
-    setSelectedCaseId(null);
-  }
-
-  function returnToAgent() {
-    if (!selectedSubmission || !hasAdminAccess) {
-      setToast("Admin access is required for this action.");
-      return;
-    }
-
-    if (!canRunReviewAction(selectedSubmission)) {
-      setToast(
-        `${selectedSubmission.id} has left review; use manual tracking instead.`,
-      );
-      return;
-    }
-
-    const actor = profile?.displayName ?? "Operator";
-    const actorId = profile?.id ?? actor;
-    const changedAt = actionTimestamp();
-    const correctionPackage = buildSmartCorrectionReturnPackage(selectedSubmission, {
-      createdBy: actorId,
-      createdAt: changedAt,
-      idFactory: () => crypto.randomUUID(),
+  function createDraft() {
+    const newSubmission = createDraftSubmission({
+      applicantNames: createApplicantNames,
+      city: createCity,
+      familyCount: createFamilyCount,
+      submissions,
+      type: createType,
     });
-
-    stageSubmissionUpdates(
-      [selectedSubmission.id],
-      (current) =>
-        current.map((submission) => {
-          if (submission.id !== selectedSubmission.id) return submission;
-
-          return transitionSubmissionStatus(
-            {
-              ...submission,
-              notes: [...correctionPackage.notes, ...submission.notes],
-            },
-            "returned",
-            actor,
-            changedAt,
-            correctionPackage.summary,
-          );
-        }),
-      `${selectedSubmission.id} returned to the agency for correction.`,
-    );
-    setSelectedCaseId(null);
+    setSubmissions((current) => [newSubmission, ...current]);
+    setSelectedSubmissionId(newSubmission.id);
+    setDrawerMode("detail");
+    setActiveDrawerTab("overview");
+    setDirty(false);
   }
 
-  function advanceHandoff() {
-    if (!selectedSubmission || !hasAdminAccess) {
-      setToast("Admin access is required for this action.");
+  function toggleExportSelection(id: string) {
+    setSelectedExportIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
+
+  function generateExport() {
+    if (!exportPlan.canGenerate) return;
+    setSubmissions((current) =>
+      applyExportStateToSelection(current, selectedVisibleExportIds, "file_generated"),
+    );
+  }
+
+  function downloadExport() {
+    if (!exportPlan.canDownload) return;
+    setSubmissions((current) =>
+      applyExportStateToSelection(current, selectedVisibleExportIds, "file_downloaded"),
+    );
+  }
+
+  function markExported() {
+    if (!exportPlan.canMarkExported) return;
+    setSubmissions((current) =>
+      markSelectedExported(current, selectedVisibleExportIds),
+    );
+    setSelectedExportIds([]);
+  }
+
+  function submitWorkspaceEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = normalizeEmail(workspaceEmailDraft);
+    const nextRole = resolveWorkspaceRole(email);
+
+    if (!email || !nextRole) {
+      setWorkspaceAccessError("Почта не найдена в списке доступа.");
       return;
     }
 
-    const nextStatus = nextHandoffStatus(selectedSubmission.status);
-    if (!nextStatus) {
-      setToast(`${selectedSubmission.id} has no next handoff action.`);
-      return;
-    }
-
-    const actor = profile?.displayName ?? "Operator";
-    const changedAt = actionTimestamp();
-    stageSubmissionUpdates(
-      [selectedSubmission.id],
-      (current) =>
-        current.map((submission) =>
-          submission.id === selectedSubmission.id
-            ? transitionSubmissionStatus(
-                submission,
-                nextStatus,
-                actor,
-                changedAt,
-                `Operator advanced handoff to ${statusMeta[nextStatus].label}.`,
-              )
-            : submission,
-        ),
-      `${selectedSubmission.id}: ${handoffActionLabel(selectedSubmission)}.`,
-    );
-    setSelectedCaseId(null);
+    setWorkspaceAccessError("");
+    setWorkspaceEmail(email);
+    saveWorkspaceEmail(email);
+    chooseRole(nextRole);
   }
 
-  if (!authChecked) {
-    return (
-      <main className="auth-shell" aria-busy="true">
-        <section className="auth-card">
-          <p className="eyebrow">VisaOps AI</p>
-          <h1>Checking access</h1>
-          <p>Loading the current session before showing operator workspaces.</p>
-        </section>
-      </main>
-    );
+  function resetWorkspaceEmail() {
+    clearWorkspaceEmail();
+    setWorkspaceEmail("");
+    setWorkspaceEmailDraft("");
+    setWorkspaceAccessError("");
+    chooseRole("agent");
   }
 
-  if (!session) {
-    const canUseSupabaseAuth = supabaseRuntimeConfig.selected === "supabase";
-    const activationBlocked =
-      supabaseRuntimeConfig.target === "supabase" &&
-      supabaseRuntimeConfig.selected !== "supabase";
+  const searchControl = (
+    <label className="search panel-search">
+      <span aria-hidden="true">⌕</span>
+      <input
+        aria-label="Поиск в текущем списке"
+        placeholder="имя, номер, заявитель, статус"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+    </label>
+  );
 
+  if (!hasWorkspaceAccess) {
     return (
-      <main className="auth-shell">
-        <section className="auth-card" aria-labelledby="login-title">
-          <p className="eyebrow">VisaOps AI</p>
-          <h1 id="login-title">Sign in required</h1>
-          <p>
-            Operator queues are gated. Admin review actions are available only after the
-            current session is known.
-          </p>
-          {canUseSupabaseAuth ? (
-            <form className="auth-form" onSubmit={handleLoginSupabase}>
-              <label>
-                <span>Email</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  value={loginEmail}
-                  onChange={(event) => setLoginEmail(event.currentTarget.value)}
-                  required
-                />
-              </label>
-              <label>
-                <span>Password</span>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={loginPassword}
-                  onChange={(event) => setLoginPassword(event.currentTarget.value)}
-                  required
-                />
-              </label>
-              <button
-                className="button button-primary"
-                type="submit"
-                disabled={loginBusy || dataLoading}
-              >
-                {loginBusy || dataLoading ? "Signing in..." : "Sign in"}
-              </button>
-            </form>
-          ) : (
-            <div className="auth-actions">
-              <button
-                className="button button-primary"
-                type="button"
-                onClick={() => void handleLoginDemo("admin")}
-              >
-                Continue as Admin demo
-              </button>
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => void handleLoginDemo("agent")}
-              >
-                Continue as Agent demo
-              </button>
-            </div>
-          )}
-          {authError ? (
-            <p className="auth-error" role="alert">
-              {authError}
-            </p>
-          ) : null}
-          <p className="auth-note">
-            {canUseSupabaseAuth
-              ? "Supabase sandbox access is enabled for real Auth, database, and Storage smoke. Human review still owns readiness and handoff."
-              : activationBlocked
-                ? `Supabase remains fail-closed: ${supabaseRuntimeConfig.blockedReasons[0] ?? "activation evidence is incomplete."}`
-                : "This workspace uses local demo data until Supabase RLS, storage, and persistence activation pass live review."}
-          </p>
-        </section>
-        <div
-          className={`toast ${toast ? "is-visible" : ""}`}
-          role="status"
-          aria-live="polite"
-        >
-          {toast}
-        </div>
-      </main>
-    );
-  }
-
-  if (profile?.role === "agent") {
-    return (
-      <div className="app-shell agent-shell">
-        <aside className="sidebar" aria-label="Agent navigation">
-          <div className="brand">
-            <div className="brand-mark" aria-hidden="true">
-              V
-            </div>
-            <div>
-              <strong>VisaOps AI</strong>
-              <span>Agent Workspace</span>
-            </div>
-          </div>
-
-          <nav className="nav-stack" aria-label="Agent operations">
-            <p className="nav-kicker">Intake</p>
-            <a className="nav-item is-active" href="#agent-workspace">
-              <span className="nav-icon" aria-hidden="true">
-                <LayoutDashboard />
-              </span>
-              <span>Workspace</span>
-              <strong>{agentSubmissions.length}</strong>
-            </a>
-            <a className="nav-item" href="#agent-cases">
-              <span className="nav-icon" aria-hidden="true">
-                <FolderKanban />
-              </span>
-              <span>Cases</span>
-              <strong>{agentCases.length}</strong>
-            </a>
-            <a className="nav-item" href="#agent-cases">
-              <span className="nav-icon" aria-hidden="true">
-                <RefreshCcw />
-              </span>
-              <span>Corrections</span>
-              <strong>{countMatching(agentSubmissions, ["returned"])}</strong>
-            </a>
-          </nav>
-
-          <div className="demo-card">
-            <strong>Agent boundary</strong>
-            <p>
-              Agents prepare data, close corrections, and submit readiness. Human
-              operators still own review and handoff.
-            </p>
-          </div>
-        </aside>
-
-        <div className="workspace">
-          <header className="topbar">
-            <label className="search-box">
-              <span aria-hidden="true">
-                <Search />
-              </span>
-              <input
-                placeholder="Search your cases..."
-                aria-label="Search agent cases"
-              />
-            </label>
-            <div className="topbar-actions">
-              <span className="demo-pill">{sourceLabel}</span>
-              {isSupabaseSession ? (
-                <span
-                  className={`save-pill save-pill-${saveState}`}
-                  aria-label={saveStatusDescription}
-                  title={saveStatusDescription}
-                >
-                  {saveStatusLabel}
-                </span>
-              ) : null}
-              <div className="role-switch" aria-label="Current role">
-                <strong>Agent</strong>
-                <span>Admin</span>
-              </div>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Sign out"
-                onClick={() => void handleLogout()}
-              >
-                <LogOut />
-              </button>
-              <span className="avatar" aria-label={`${profile.displayName} profile`}>
-                {profileInitial(profile)}
-              </span>
-            </div>
-          </header>
-
-          <main className="main-surface" id="agent-workspace">
-            <section className="hero-row" aria-labelledby="agent-title">
-              <div>
-                <p className="eyebrow">Agent</p>
-                <h1 id="agent-title">Agent Workspace</h1>
-                <p className="lead">
-                  Prepare cases, resolve returned blockers, and submit only ready
-                  packages to operator review.
-                </p>
-              </div>
-              <div className="hero-actions">
-                <button
-                  className="button button-primary"
-                  type="button"
-                  onClick={createAgentCase}
-                >
-                  Create case
-                </button>
-              </div>
-            </section>
-
-            <section className="metric-grid" aria-label="Agent metrics">
-              {agentMetrics.map((metric) => {
-                const MetricIcon = metric.icon;
-
-                return (
-                  <article className="metric-card" key={metric.label}>
-                    <span className={`signal signal-${metric.tone}`} aria-hidden="true">
-                      <MetricIcon />
-                    </span>
-                    <div>
-                      <strong>{metric.value}</strong>
-                      <p>{metric.label}</p>
-                      <small>{metric.hint}</small>
-                    </div>
-                  </article>
-                );
-              })}
-            </section>
-
-            <section className="ai-next-action" aria-label="Agent readiness guardrail">
-              <span className="spark" aria-hidden="true">
-                <Sparkles />
-              </span>
-              <div>
-                <p className="eyebrow">Readiness guardrail</p>
-                <h2>Submit only after required data and media are complete.</h2>
-                <p>
-                  The app checks readiness before handoff; it does not approve visa
-                  outcomes or replace human review.
-                </p>
-              </div>
-            </section>
-
-            <section
-              className="priority-section"
-              id="agent-cases"
-              aria-labelledby="agent-cases-title"
-            >
-              <div className="section-heading">
-                <p className="eyebrow" id="agent-cases-title">
-                  Agent cases
-                </p>
-                <button
-                  className="link-button"
-                  type="button"
-                  onClick={() =>
-                    setToast(`Agent cases are loaded from ${sourceLabel}.`)
-                  }
-                >
-                  Repository source <ArrowRight aria-hidden="true" />
-                </button>
-              </div>
-
-              <div className="case-list">
-                {agentCases.length ? (
-                  agentCases.map((caseItem, index) => (
-                    <article className="case-card" key={caseItem.id}>
-                      <span className="rank">{index + 1}</span>
-                      <div className="case-main">
-                        <div className="case-meta-line">
-                          <strong>{caseItem.id}</strong>
-                          <span className={`chip chip-${caseItem.tone}`}>
-                            {caseItem.status}
-                          </span>
-                        </div>
-                        <div className="chip-row">
-                          <span className="chip chip-neutral">{caseItem.country}</span>
-                          <span className="chip chip-neutral">{caseItem.city}</span>
-                          <span className="chip chip-blue">{caseItem.group}</span>
-                        </div>
-                        <h3>{caseItem.applicant}</h3>
-                        <p>{nextAction(caseItem.submission, false).label}</p>
-                        <small>{caseItem.agency}</small>
-                      </div>
-                      <div className="case-readiness">
-                        <span>Readiness</span>
-                        <strong>{caseItem.readiness}%</strong>
-                        <div
-                          className="progress"
-                          aria-label={`${caseItem.readiness}% readiness`}
-                        >
-                          <span style={{ width: `${caseItem.readiness}%` }} />
-                        </div>
-                      </div>
-                      {caseItem.submission.status === "returned" ? (
-                        <button
-                          className="button button-primary"
-                          type="button"
-                          onClick={() => fixReturnedCase(caseItem.submission)}
-                        >
-                          Mark correction fixed
-                        </button>
-                      ) : caseItem.submission.status === "ready_for_review" ? (
-                        <button
-                          className="button button-primary"
-                          type="button"
-                          onClick={() => submitAgentCase(caseItem.submission)}
-                        >
-                          Send to review
-                        </button>
-                      ) : ["draft", "filling"].includes(caseItem.submission.status) ? (
-                        <button
-                          className="button button-primary"
-                          type="button"
-                          onClick={() => setSelectedCaseId(caseItem.id)}
-                        >
-                          Continue intake
-                        </button>
-                      ) : (
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          disabled
-                        >
-                          {nextAction(caseItem.submission, false).button}
-                        </button>
-                      )}
-                    </article>
-                  ))
-                ) : (
-                  <article className="empty-queue">
-                    <h3>No agent cases</h3>
-                    <p>Create a case to begin intake for this agent account.</p>
-                  </article>
-                )}
-              </div>
-            </section>
-          </main>
-        </div>
-
-        {selectedAgentSubmission && selectedAgentPreflight ? (
-          <div
-            className="modal-backdrop"
-            role="presentation"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                setSelectedCaseId(null);
-              }
-            }}
-          >
-            <section
-              className="case-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="agent-case-modal-title"
-            >
-              <header className="modal-header">
-                <div>
-                  <p className="eyebrow">{selectedAgentSubmission.id}</p>
-                  <h2 id="agent-case-modal-title">{selectedAgentSubmission.title}</h2>
-                  <p>
-                    {statusMeta[selectedAgentSubmission.status].label} ·{" "}
-                    {selectedAgentSubmission.country} · {selectedAgentSubmission.city}
-                  </p>
-                </div>
-                <button
-                  className="icon-button"
-                  type="button"
-                  aria-label="Close intake editor"
-                  onClick={() => setSelectedCaseId(null)}
-                >
-                  <X />
-                </button>
-              </header>
-
-              <div className="modal-body">
-                {selectedAgentSubmission.applicants.map((applicant, index) => {
-                  const normalized = normalizeApplicant(
-                    applicant,
-                    index,
-                    selectedAgentSubmission,
-                  );
-
-                  return (
-                    <section className="modal-card" key={normalized.id}>
-                      <p className="eyebrow">Applicant data</p>
-                      <div className="intake-form">
-                        {editableApplicantFields.map((field) => (
-                          <label key={field.key}>
-                            <span>{field.label}</span>
-                            <input
-                              value={String(normalized[field.key] ?? "")}
-                              onChange={(event) =>
-                                updateAgentApplicantField(
-                                  selectedAgentSubmission.id,
-                                  normalized.id ?? "",
-                                  field.key,
-                                  event.currentTarget.value,
-                                )
-                              }
-                            />
-                          </label>
-                        ))}
-                      </div>
-
-                      <div className="media-edit-list" aria-label="Applicant media">
-                        {(normalized.mediaSlots ?? []).map((slot) => {
-                          const mediaKey = `${selectedAgentSubmission.id}:${normalized.id ?? ""}:${slot.type}`;
-                          const mediaComplete =
-                            slot.state === "uploaded" || slot.state === "accepted";
-                          const mediaBusy = uploadingMediaKey === mediaKey;
-
-                          return (
-                            <div className="media-edit-row" key={slot.id}>
-                              <div>
-                                <strong>{slot.label}</strong>
-                                <span>{slot.state}</span>
-                              </div>
-                              {isSupabaseSession ? (
-                                <label
-                                  className={`button button-secondary upload-button ${
-                                    mediaComplete || mediaBusy ? "is-disabled" : ""
-                                  }`}
-                                  aria-disabled={mediaComplete || mediaBusy}
-                                >
-                                  <input
-                                    type="file"
-                                    accept={mediaAccept(slot.type)}
-                                    disabled={mediaComplete || mediaBusy}
-                                    onChange={(event) => {
-                                      const file = event.currentTarget.files?.[0];
-                                      event.currentTarget.value = "";
-                                      if (file) {
-                                        void updateAgentMediaSlot(
-                                          selectedAgentSubmission.id,
-                                          normalized.id ?? "",
-                                          slot.type,
-                                          file,
-                                        );
-                                      }
-                                    }}
-                                  />
-                                  {mediaBusy
-                                    ? "Uploading..."
-                                    : mediaComplete
-                                      ? "Uploaded"
-                                      : mediaUploadButtonLabel(slot.type)}
-                                </label>
-                              ) : (
-                                <button
-                                  className="button button-secondary"
-                                  type="button"
-                                  onClick={() =>
-                                    void updateAgentMediaSlot(
-                                      selectedAgentSubmission.id,
-                                      normalized.id ?? "",
-                                      slot.type,
-                                    )
-                                  }
-                                  disabled={mediaComplete}
-                                >
-                                  {slot.state === "missing" || slot.state === "replace"
-                                    ? "Mark uploaded"
-                                    : "Uploaded"}
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  );
-                })}
-
-                <section className="modal-card">
-                  <p className="eyebrow">Preflight</p>
-                  <ul className="checklist">
-                    {selectedAgentPreflight.checklist.map((item) => (
-                      <li key={item.label}>
-                        <strong>{item.label}</strong>
-                        <span>{item.detail}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-
-                <section className="modal-card">
-                  <p className="eyebrow">Blockers</p>
-                  {selectedAgentPreflight.blockers.length ? (
-                    <ul className="checklist">
-                      {selectedAgentPreflight.blockers.map((blocker) => (
-                        <li key={blocker}>
-                          <strong>Fix before handoff</strong>
-                          <span>{blocker}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="modal-muted">No blockers before operator handoff.</p>
-                  )}
-                </section>
-              </div>
-
-              <footer className="modal-footer">
-                <button
-                  className="button button-light"
-                  type="button"
-                  onClick={() => setSelectedCaseId(null)}
-                >
-                  Close
-                </button>
-                {selectedAgentSubmission.status === "returned" ? (
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={() => fixReturnedCase(selectedAgentSubmission)}
-                    disabled={!selectedAgentCorrectionPreflight?.canSubmit}
-                  >
-                    Close correction
-                  </button>
-                ) : (
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={() => submitAgentCase(selectedAgentSubmission)}
-                    disabled={!selectedAgentPreflight.canSubmit}
-                  >
-                    Send to review
-                  </button>
-                )}
-              </footer>
-            </section>
-          </div>
-        ) : null}
-
-        <div
-          className={`toast ${toast ? "is-visible" : ""}`}
-          role="status"
-          aria-live="polite"
-        >
-          {toast}
-        </div>
-      </div>
-    );
-  }
-
-  if (!hasAdminAccess) {
-    return (
-      <main className="auth-shell">
-        <section className="auth-card auth-card-denied" aria-labelledby="denied-title">
-          <p className="eyebrow">Permission denied</p>
-          <h1 id="denied-title">Admin access required</h1>
-          <p>
-            {profile?.displayName ?? "This user"} is signed in as{" "}
-            <strong>{profile?.role ?? "unknown"}</strong>. Agent sessions cannot open
-            the admin review console.
-          </p>
-          <div className="auth-actions">
-            {!isSupabaseSession ? (
-              <button
-                className="button button-primary"
-                type="button"
-                onClick={() => void handleLoginDemo("admin")}
-              >
-                Switch to Admin demo
-              </button>
-            ) : null}
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => void handleLogout()}
-            >
-              Sign out
-            </button>
-          </div>
-        </section>
-      </main>
+      <WorkspaceAccessGate
+        email={workspaceEmailDraft}
+        error={workspaceAccessError}
+        onEmail={setWorkspaceEmailDraft}
+        onSubmit={submitWorkspaceEmail}
+      />
     );
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar" aria-label="Admin navigation">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden="true">
-            V
-          </div>
-          <div>
-            <strong>VisaOps AI</strong>
-            <span>Admin Console</span>
-          </div>
+    <main className="ops-shell" aria-label="Рабочая область подач">
+      <aside className="left-rail" aria-label="Основная навигация">
+        <div className="rail-mark" aria-hidden="true">
+          П
         </div>
-
-        <nav className="nav-stack" aria-label="Operations">
-          <p className="nav-kicker">Operations</p>
-          <a className="nav-item is-active" href="#command-center">
-            <span className="nav-icon" aria-hidden="true">
-              <LayoutDashboard />
-            </span>
-            <span>Command Center</span>
-            <strong>{visibleSubmissions.length}</strong>
-          </a>
-          <a className="nav-item" href="#priority-queue">
-            <span className="nav-icon" aria-hidden="true">
-              <FolderKanban />
-            </span>
-            <span>Cases</span>
-            <strong>{queueCases.length}</strong>
-          </a>
-          <a className="nav-item" href="#queue-load">
-            <span className="nav-icon" aria-hidden="true">
-              <CalendarCheck />
-            </span>
-            <span>Appointment Queue</span>
-            <strong>{metrics[3]?.value ?? 0}</strong>
-          </a>
-          <a className="nav-item" href="#status-board">
-            <span className="nav-icon" aria-hidden="true">
-              <UsersRound />
-            </span>
-            <span>Agents</span>
-          </a>
-          <a className="nav-item" href="#status-board">
-            <span className="nav-icon" aria-hidden="true">
-              <ShieldCheck />
-            </span>
-            <span>Trust & Audit</span>
-          </a>
-          <a className="nav-item" href="#events">
-            <span className="nav-icon" aria-hidden="true">
-              <MessageSquareText />
-            </span>
-            <span>Messages</span>
-          </a>
+        <nav className="rail-nav" aria-label="Навигация">
+          {role === "agent" ? (
+            <>
+              <button
+                className="rail-item is-active"
+                type="button"
+                aria-current="page"
+                onClick={() => setSurface("agent-submissions")}
+              >
+                <span className="rail-icon" aria-hidden="true">
+                  П
+                </span>
+                <span>Мои подачи</span>
+              </button>
+              <button
+                className="rail-item rail-create"
+                type="button"
+                aria-label="Новая подача"
+                onClick={() => {
+                  rememberReturnFocus();
+                  setDrawerMode("create");
+                  setCreateStep("params");
+                  setCreateType("single");
+                  setCreateFamilyCount(2);
+                  setCreateApplicantNames([
+                    "Новый заявитель",
+                    "Супруг",
+                    "Ребёнок 1",
+                    "Ребёнок 2",
+                  ]);
+                  setDirty(false);
+                }}
+              >
+                <span className="rail-icon" aria-hidden="true">
+                  +
+                </span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className={`rail-item ${surface === "admin-review" ? "is-active" : ""}`}
+                type="button"
+                aria-current={surface === "admin-review" ? "page" : undefined}
+                onClick={() => setSurface("admin-review")}
+              >
+                <span className="rail-icon" aria-hidden="true">
+                  П
+                </span>
+                <span>Проверка</span>
+              </button>
+              <button
+                className={`rail-item ${surface === "export" ? "is-active" : ""}`}
+                type="button"
+                aria-current={surface === "export" ? "page" : undefined}
+                onClick={() => setSurface("export")}
+              >
+                <span className="rail-icon" aria-hidden="true">
+                  Э
+                </span>
+                <span>Выгрузка</span>
+              </button>
+            </>
+          )}
         </nav>
-
-        <div className="demo-card">
-          <strong>Review boundary</strong>
-          <p>
-            No consulate integration, booking automation, OCR result, or outcome
-            prediction. Human review owns readiness and handoff.
-          </p>
-        </div>
+        {showRoleSwitcher ? (
+          <button
+            className="rail-user"
+            type="button"
+            aria-label="Сменить роль"
+            onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
+          >
+            <span>{role === "agent" ? "АГ" : "АД"}</span>
+            <small>Демо</small>
+          </button>
+        ) : (
+          <button
+            className="rail-user"
+            type="button"
+            aria-label="Сменить служебную почту"
+            onClick={resetWorkspaceEmail}
+          >
+            <span>{role === "agent" ? "АГ" : "АД"}</span>
+            <small>Почта</small>
+          </button>
+        )}
       </aside>
 
-      <div className="workspace">
+      <section className="workspace">
         <header className="topbar">
-          <label className="search-box">
-            <span aria-hidden="true">
-              <Search />
-            </span>
-            <input
-              placeholder="Search cases, tourists, agencies..."
-              aria-label="Search cases"
-            />
-          </label>
+          <div>
+            <p className="kicker">
+              {role === "agent"
+                ? "Рабочее место агента"
+                : "Рабочее место администратора"}
+            </p>
+            <h1>{surfaceTitle(surface)}</h1>
+          </div>
           <div className="topbar-actions">
-            <span className="demo-pill">{sourceLabel}</span>
-            {isSupabaseSession ? (
-              <span
-                className={`save-pill save-pill-${saveState}`}
-                aria-label={saveStatusDescription}
-                title={saveStatusDescription}
-              >
-                {saveStatusLabel}
-              </span>
-            ) : null}
-            <div className="role-switch" aria-label="Current role">
-              <span>Agent</span>
-              <strong>Admin</strong>
+            <select
+              className="select-control"
+              aria-label="Фильтр по городу"
+              value={cityFilter}
+              onChange={(event) =>
+                setCityFilter(event.target.value as City | "Все города")
+              }
+            >
+              {cities.map((city) => (
+                <option key={city}>{city}</option>
+              ))}
+            </select>
+            <div className="service-logo" aria-label="Версия девятнадцать">
+              <span aria-hidden="true">В</span>
+              <strong>19</strong>
             </div>
-            <button
-              className="icon-button"
-              type="button"
-              aria-label="Sign out"
-              onClick={() => void handleLogout()}
-            >
-              <LogOut />
-            </button>
-            <span
-              className="avatar"
-              aria-label={`${profile?.displayName ?? "Admin"} profile`}
-            >
-              {profile ? profileInitial(profile) : "A"}
-            </span>
           </div>
         </header>
 
-        <main className="main-surface" id="command-center">
-          <section className="hero-row" aria-labelledby="command-title">
-            <div>
-              <p className="eyebrow">Administrator</p>
-              <h1 id="command-title">Command Center</h1>
-              <p className="lead">
-                One dense control room for blocked cases, review-ready packages, agency
-                corrections, and manual handoff.
-              </p>
-            </div>
-            <div className="hero-actions">
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={openPriorityCase}
-              >
-                Open priority case <ArrowRight aria-hidden="true" />
-              </button>
-              <button
-                className="button button-primary"
-                type="button"
-                onClick={() => setToast(`Showing the ${sourceLabel} case queue below.`)}
-              >
-                View all cases
-              </button>
-            </div>
-          </section>
+        {surface === "agent-submissions" ? (
+          <AgentSubmissionsScreen
+            activeSubmission={activeSubmission}
+            agentList={agentList}
+            agentTab={agentTab}
+            onOpen={openSubmission}
+            onSelect={selectSubmission}
+            onTab={setAgentTab}
+            searchControl={searchControl}
+            summary={summary}
+          />
+        ) : null}
 
-          <section className="metric-grid" aria-label="Case metrics">
-            {metrics.map((metric) => {
-              const MetricIcon = metric.icon;
+        {surface === "admin-review" ? (
+          <AdminReviewScreen
+            activeSubmission={activeSubmission}
+            onAddIssue={() => openIssueComposer(activeSubmission)}
+            onOpen={openSubmission}
+            onSelect={selectSubmission}
+            onTab={setReviewTab}
+            reviewList={reviewList}
+            reviewTab={reviewTab}
+            searchControl={searchControl}
+            summary={summary}
+          />
+        ) : null}
 
-              return (
-                <article className="metric-card" key={metric.label}>
-                  <span className={`signal signal-${metric.tone}`} aria-hidden="true">
-                    <MetricIcon />
-                  </span>
-                  <div>
-                    <strong>{metric.value}</strong>
-                    <p>{metric.label}</p>
-                    <small>{metric.hint}</small>
-                  </div>
-                </article>
-              );
-            })}
-          </section>
+        {surface === "export" ? (
+          <ExportScreen
+            exportPlan={exportPlan}
+            exportTab={exportTab}
+            historyList={historyList}
+            onDownload={downloadExport}
+            onGenerate={generateExport}
+            onMarkExported={markExported}
+            onOpen={openSubmission}
+            onTab={setExportTab}
+            onToggle={toggleExportSelection}
+            readyList={readyList}
+            searchControl={searchControl}
+            selectedExportIds={selectedVisibleExportIds}
+          />
+        ) : null}
+      </section>
 
-          <section className="ai-next-action" aria-label="Next review action">
-            <span className="spark" aria-hidden="true">
-              <Sparkles />
-            </span>
-            <div>
-              <p className="eyebrow">Next review action</p>
-              <h2>
-                {priorityCase
-                  ? `${priorityCase.id} needs operator review.`
-                  : "No operator cases are waiting."}
-              </h2>
-              <p>
-                {priorityCase
-                  ? priorityCase.nextAction
-                  : "The queue is empty for the current repository state."}
-              </p>
-            </div>
-            <button
-              className="button button-gold"
-              type="button"
-              onClick={openPriorityCase}
-              disabled={!priorityCase}
-            >
-              Review now
-            </button>
-          </section>
-
-          <div className="content-grid">
-            <section
-              className="priority-section"
-              id="priority-queue"
-              aria-labelledby="priority-title"
-            >
-              <div className="section-heading">
-                <p className="eyebrow" id="priority-title">
-                  Priority queue
-                </p>
-                <button
-                  className="link-button"
-                  type="button"
-                  onClick={() => setToast(`Queue is loaded from ${sourceLabel}.`)}
-                >
-                  Queue source <ArrowRight aria-hidden="true" />
-                </button>
-              </div>
-              <div className="case-list">
-                {queueCases.length ? (
-                  queueCases.map((caseItem, index) => (
-                    <article className="case-card" key={caseItem.id}>
-                      <span className="rank">{index + 1}</span>
-                      <div className="case-main">
-                        <div className="case-meta-line">
-                          <strong>{caseItem.id}</strong>
-                          <span className={`chip chip-${caseItem.tone}`}>
-                            {caseItem.status}
-                          </span>
-                        </div>
-                        <div className="chip-row">
-                          <span className="chip chip-neutral">{caseItem.country}</span>
-                          <span className="chip chip-neutral">{caseItem.city}</span>
-                          <span className="chip chip-blue">{caseItem.group}</span>
-                        </div>
-                        <h3>{caseItem.applicant}</h3>
-                        <p>{caseItem.nextAction}</p>
-                        <small>{caseItem.agency}</small>
-                      </div>
-                      <div className="case-readiness">
-                        <span>Readiness</span>
-                        <strong>{caseItem.readiness}%</strong>
-                        <div
-                          className="progress"
-                          aria-label={`${caseItem.readiness}% readiness`}
-                        >
-                          <span style={{ width: `${caseItem.readiness}%` }} />
-                        </div>
-                      </div>
-                      <button
-                        className="button button-primary"
-                        type="button"
-                        onClick={() => setSelectedCaseId(caseItem.id)}
-                      >
-                        Open
-                      </button>
-                    </article>
-                  ))
-                ) : (
-                  <article className="empty-queue">
-                    <h3>No cases available</h3>
-                    <p>The repository returned no submissions for the admin queue.</p>
-                  </article>
-                )}
-              </div>
-            </section>
-
-            <aside className="right-rail" aria-label="Queue overview">
-              <section
-                className="panel"
-                id="queue-load"
-                aria-labelledby="queue-load-title"
-              >
-                <div className="panel-head">
-                  <p className="eyebrow" id="queue-load-title">
-                    Queue load
-                  </p>
-                  <span className="soft-pill">Repository-backed</span>
-                </div>
-                {countryLoad.length ? (
-                  countryLoad.map((item) => (
-                    <div className="load-row" key={item.country}>
-                      <span>{item.country}</span>
-                      <strong>{item.count}</strong>
-                      <div className="load-bar">
-                        <span style={{ width: `${item.width}%` }} />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="panel-empty">No cases are in appointment tracking.</p>
-                )}
-                <div className="panel-stats">
-                  <div>
-                    <strong>
-                      {countMatching(visibleSubmissions, ["appointment_scheduled"])}
-                    </strong>
-                    <span>Scheduled</span>
-                  </div>
-                  <div>
-                    <strong>
-                      {countMatching(visibleSubmissions, ["attention_required"])}
-                    </strong>
-                    <span>Needs decision</span>
-                  </div>
-                </div>
-              </section>
-
-              <section
-                className="panel events-panel"
-                id="events"
-                aria-labelledby="events-title"
-              >
-                <p className="eyebrow" id="events-title">
-                  Recent events
-                </p>
-                <ol className="event-list">
-                  {recentEvents.map((submission) => (
-                    <li key={submission.id}>
-                      <strong>{submission.id}</strong>
-                      <span>{statusMeta[submission.status].label}</span>
-                      <small>{submission.updated}</small>
-                    </li>
-                  ))}
-                </ol>
-              </section>
-            </aside>
-          </div>
-
-          <section
-            className="status-board"
-            id="status-board"
-            aria-labelledby="status-board-title"
-          >
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow" id="status-board-title">
-                  Status board
-                </p>
-                <h2>Every state has an owner and next action.</h2>
-              </div>
-            </div>
-            <div className="status-columns">
-              {statusColumns.map((column) => (
-                <article className="status-column" key={column.title}>
-                  <h3>{column.title}</h3>
-                  <p>{column.description}</p>
-                  <ul>
-                    {column.items.map(([label, owner, action]) => (
-                      <li key={label}>
-                        <span className="chip chip-neutral">{label}</span>
-                        <strong>{owner}</strong>
-                        <small>{action}</small>
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-          </section>
-        </main>
-      </div>
-
-      {selectedCase && selectedSubmission && selectedPreflight ? (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setSelectedCaseId(null);
-            }
-          }}
-        >
-          <section
-            className="case-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="case-modal-title"
-          >
-            <header className="modal-header">
-              <div>
-                <p className="eyebrow">{selectedCase.id}</p>
-                <h2 id="case-modal-title">{selectedCase.applicant}</h2>
-                <p>
-                  {selectedCase.agency} · {selectedCase.country} · {selectedCase.city}
-                </p>
-              </div>
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Close case details"
-                onClick={() => setSelectedCaseId(null)}
-              >
-                <X />
-              </button>
-            </header>
-
-            <div className="modal-body">
-              <section className="modal-card">
-                <p className="eyebrow">Decision summary</p>
-                <p>{selectedCase.nextAction}</p>
-              </section>
-
-              <section className="modal-card data-card">
-                <p className="eyebrow">Case data</p>
-                <dl>
-                  <div>
-                    <dt>Status</dt>
-                    <dd>{selectedCase.status}</dd>
-                  </div>
-                  <div>
-                    <dt>Readiness</dt>
-                    <dd>{selectedCase.readiness}%</dd>
-                  </div>
-                  <div>
-                    <dt>Country</dt>
-                    <dd>{selectedCase.country}</dd>
-                  </div>
-                  <div>
-                    <dt>City</dt>
-                    <dd>{selectedCase.city}</dd>
-                  </div>
-                </dl>
-              </section>
-
-              <section className="modal-card">
-                <p className="eyebrow">Checklist</p>
-                <ul className="checklist">
-                  {selectedPreflight.checklist.map((item) => (
-                    <li key={item.label}>
-                      <strong>{item.label}</strong>
-                      <span>{item.detail}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section className="modal-card">
-                <p className="eyebrow">Open blockers</p>
-                {selectedPreflight.blockers.length ? (
-                  <ul className="checklist">
-                    {selectedPreflight.blockers.map((blocker) => (
-                      <li key={blocker}>
-                        <strong>Needs correction</strong>
-                        <span>{blocker}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="modal-muted">No blockers in the admin preflight.</p>
-                )}
-              </section>
-
-              {!canRunReviewAction(selectedSubmission) ? (
-                <section className="modal-card">
-                  <p className="eyebrow">Review actions closed</p>
-                  <p>
-                    This case has left human review. Use manual tracking instead of
-                    moving it back to review states.
-                  </p>
-                </section>
-              ) : null}
-            </div>
-
-            <footer className="modal-footer">
-              {canRunReviewAction(selectedSubmission) ? (
-                <>
-                  <button
-                    className="button button-light"
-                    type="button"
-                    onClick={returnToAgent}
-                  >
-                    Return to agent
-                  </button>
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={markReady}
-                  >
-                    Mark ready for queue
-                  </button>
-                </>
-              ) : canRunHandoffAction(selectedSubmission) ? (
-                <>
-                  <button
-                    className="button button-light"
-                    type="button"
-                    onClick={() => setSelectedCaseId(null)}
-                  >
-                    Close
-                  </button>
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={advanceHandoff}
-                  >
-                    {handoffActionLabel(selectedSubmission)}
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="button button-light"
-                  type="button"
-                  onClick={() => setSelectedCaseId(null)}
-                >
-                  Close
-                </button>
-              )}
-            </footer>
-          </section>
-        </div>
+      {drawerMode === "detail" ? (
+        <SubmissionDrawer
+          activeTab={activeDrawerTab}
+          issueComposerRequest={issueComposerRequest}
+          onIssueComposerConsumed={() => setIssueComposerRequest(null)}
+          onAction={updateSubmission}
+          onAddIssue={addAdminIssue}
+          onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
+          onClose={closeDrawer}
+          onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
+          onRunAiReview={runAiReviewForActiveSubmission}
+          onTab={setActiveDrawerTab}
+          onQuestionnaireField={updateActiveQuestionnaireField}
+          onUploadFile={uploadActiveFile}
+          role={role}
+          surface={
+            surface === "export"
+              ? "export"
+              : surface === "admin-review"
+                ? "review"
+                : "agent"
+          }
+          submission={activeSubmission}
+        />
       ) : null}
 
-      <div
-        className={`toast ${toast ? "is-visible" : ""}`}
-        role="status"
-        aria-live="polite"
-      >
-        {toast}
-      </div>
-    </div>
+      {drawerMode === "create" ? (
+        <CreateSubmissionDrawer
+          city={createCity}
+          applicantNames={createApplicantNames}
+          dirty={dirty}
+          familyCount={createFamilyCount}
+          onCity={(city) => {
+            setCreateCity(city);
+            setDirty(true);
+          }}
+          onClose={closeDrawer}
+          onCreate={createDraft}
+          onFamilyCount={(count) => {
+            const safeCount = Math.max(2, Math.min(6, count || 2));
+            setCreateFamilyCount(safeCount);
+            setCreateApplicantNames((current) =>
+              normalizeCreateApplicantNames(current, safeCount),
+            );
+            setDirty(true);
+          }}
+          onApplicantName={(index, name) => {
+            setCreateApplicantNames((current) => {
+              const next = normalizeCreateApplicantNames(current, createFamilyCount);
+              next[index] = name;
+              return next;
+            });
+            setDirty(true);
+          }}
+          onStep={setCreateStep}
+          onType={(type) => {
+            setCreateType(type);
+            if (type === "single") {
+              setCreateFamilyCount(2);
+              setCreateApplicantNames((current) =>
+                normalizeCreateApplicantNames(current, 1),
+              );
+            } else {
+              setCreateApplicantNames((current) =>
+                normalizeCreateApplicantNames(current, createFamilyCount),
+              );
+            }
+            setDirty(true);
+          }}
+          step={createStep}
+          type={createType}
+        />
+      ) : null}
+
+      {confirmClose ? (
+        <ConfirmationDialog
+          onCancel={() => {
+            setConfirmClose(false);
+            focusActiveDrawerTab();
+          }}
+          onConfirm={() => {
+            setConfirmClose(false);
+            setDirty(false);
+            setDrawerMode("closed");
+          }}
+        />
+      ) : null}
+    </main>
+  );
+}
+
+function WorkspaceAccessGate({
+  email,
+  error,
+  onEmail,
+  onSubmit,
+}: {
+  email: string;
+  error: string;
+  onEmail: (email: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <main className="access-shell" aria-label="Служебный вход">
+      <section className="access-card">
+        <p className="kicker">Служебный вход</p>
+        <h1>Войдите по заранее созданной почте</h1>
+        <p>
+          Администратор попадает в проверку и выгрузку. Агент попадает в свои подачи.
+        </p>
+        <form onSubmit={onSubmit}>
+          <label>
+            <span>Почта</span>
+            <input
+              autoComplete="email"
+              inputMode="email"
+              placeholder="admin@visaflow.local"
+              type="email"
+              value={email}
+              onChange={(event) => onEmail(event.target.value)}
+            />
+          </label>
+          {error ? (
+            <p className="access-error" role="alert">
+              {error}
+            </p>
+          ) : (
+            <p className="access-note">Список почты задаётся в окружении приложения.</p>
+          )}
+          <button className="primary-button" type="submit">
+            Войти
+          </button>
+        </form>
+      </section>
+    </main>
   );
 }
 
