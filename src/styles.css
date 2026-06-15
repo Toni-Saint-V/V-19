@@ -168,6 +168,29 @@ p {
   color: var(--text-muted);
 }
 
+.workspace-empty-state {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  min-height: min(520px, calc(100vh - 160px));
+  max-width: 680px;
+  gap: 14px;
+  padding: 28px 0;
+}
+
+.workspace-empty-state h2 {
+  max-width: 540px;
+  font-size: clamp(28px, 4vw, 46px);
+  line-height: 1.05;
+}
+
+.workspace-empty-state p:not(.kicker) {
+  max-width: 560px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
 .ops-shell {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
@@ -336,6 +359,16 @@ p {
 .service-logo strong {
   color: var(--text-primary);
   font-weight: 840;
+}
+
+.save-status {
+  max-width: 220px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .role-switch,
