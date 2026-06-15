@@ -27,6 +27,8 @@ const requiredMigrationOrder = [
   "20260612001000_visaflow_rpc_corrections_persistence.sql",
   "20260613005039_visaflow_runtime_write_guards.sql",
   "20260613010029_visaflow_rpc_submit_boundary.sql",
+  "20260614000000_ai_helper_audit_quota.sql",
+  "20260615000000_ai_helper_security_advisor_hardening.sql",
 ];
 
 const checks = [];
@@ -165,6 +167,71 @@ function verifyRuntimeGuards() {
     "submission_record.status in ('draft', 'filling', 'returned', 'ready_for_review')",
     "RPC child writes stop before waiting_review handoff",
   );
+}
+
+function verifyAiHelperSecurityHardening() {
+  const quotaMigration = readProjectFile(
+    resolve(migrationsDir, "20260614000000_ai_helper_audit_quota.sql"),
+    "AI helper quota migration exists",
+  );
+  const hardeningMigration = readProjectFile(
+    resolve(migrationsDir, "20260615000000_ai_helper_security_advisor_hardening.sql"),
+    "AI helper security advisor hardening migration exists",
+  );
+
+  expectContains(
+    quotaMigration,
+    "api_role is distinct from expected_api_role",
+    "AI helper quota RPC requires service role claim",
+  );
+  expectContains(
+    hardeningMigration,
+    "revoke all on table public.ai_helper_audit_events from anon, authenticated",
+    "AI helper audit table grants are revoked from browser roles",
+  );
+  expectContains(
+    hardeningMigration,
+    'create policy "ai helper audit service only"',
+    "AI helper audit table has explicit deny policy",
+  );
+  expectContains(
+    hardeningMigration,
+    'create policy "ai helper counters service only"',
+    "AI helper quota counters table has explicit deny policy",
+  );
+  expectContains(
+    hardeningMigration,
+    'create policy "ai helper receipts service only"',
+    "AI helper quota receipts table has explicit deny policy",
+  );
+  expectContains(
+    hardeningMigration,
+    "revoke execute on function public.consume_ai_helper_quota(text, text, text, text)",
+    "AI helper quota RPC execute is revoked from browser roles",
+  );
+  expectContains(
+    hardeningMigration,
+    "grant execute on function public.consume_ai_helper_quota(text, text, text, text)",
+    "AI helper quota RPC execute grant is explicit",
+  );
+  expectContains(
+    hardeningMigration,
+    "to service_role",
+    "AI helper quota RPC is service-role only",
+  );
+
+  if (
+    hardeningMigration.includes(
+      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public",
+    )
+  ) {
+    fail(
+      "AI helper quota RPC is not granted to public",
+      "Security advisor hardening must not expose the RPC to public",
+    );
+  } else {
+    pass("AI helper quota RPC is not granted to public");
+  }
 }
 
 function verifySmokeGuard() {
@@ -341,6 +408,7 @@ function report() {
 
 verifyMigrationOrder();
 verifyRuntimeGuards();
+verifyAiHelperSecurityHardening();
 verifySmokeGuard();
 verifyDocsAndScripts();
 report();

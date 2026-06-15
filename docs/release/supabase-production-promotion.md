@@ -25,6 +25,7 @@ Apply migrations in this exact order:
 4. `20260613005039_visaflow_runtime_write_guards.sql`
 5. `20260613010029_visaflow_rpc_submit_boundary.sql`
 6. `20260614000000_ai_helper_audit_quota.sql`
+7. `20260615000000_ai_helper_security_advisor_hardening.sql`
 
 Dry-run checklist before production:
 
@@ -38,8 +39,9 @@ Dry-run checklist before production:
 Current production state as of 2026-06-15:
 
 - target project: `tsymifccglpepvbmrcgh`;
-- production migration history matches the full local order above;
-- schema/RLS/Storage evidence is recorded in `docs/qa/supabase-production-migration-2026-06-15.md`;
+- production migration history matches the order above through `20260614000000_ai_helper_audit_quota.sql`;
+- `20260615000000_ai_helper_security_advisor_hardening.sql` is local-only until explicitly applied to production;
+- schema/RLS/Storage evidence for the applied production set is recorded in `docs/qa/supabase-production-migration-2026-06-15.md`;
 - client production activation remains blocked until backup/restore, role-verified smoke accounts, production browser QA, logs, and post-activation checks are complete.
 
 ## Final Sandbox RLS And Storage Smoke

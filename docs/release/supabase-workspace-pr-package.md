@@ -59,6 +59,10 @@ Out of scope:
   - production project id `tsymifccglpepvbmrcgh`;
   - no sandbox data copy or seed;
   - production client activation still blocked.
+- Added local-only security advisor hardening migration:
+  - revokes AI helper quota/audit table access from browser roles;
+  - grants quota RPC execution only to `service_role`;
+  - adds explicit deny-all RLS policies for AI helper service-owned tables.
 
 ## Business Logic Preserved
 
@@ -114,6 +118,7 @@ Required local migration order:
 4. `20260613005039_visaflow_runtime_write_guards.sql`
 5. `20260613010029_visaflow_rpc_submit_boundary.sql`
 6. `20260614000000_ai_helper_audit_quota.sql`
+7. `20260615000000_ai_helper_security_advisor_hardening.sql`
 
 Sandbox reference target:
 
@@ -124,7 +129,7 @@ Sandbox reference target:
 Production target:
 
 - project id: `tsymifccglpepvbmrcgh`
-- migrations: applied from committed local files only
+- migrations: applied through `20260614000000_ai_helper_audit_quota.sql`; `20260615000000_ai_helper_security_advisor_hardening.sql` is local-only until owner-approved production apply
 - schema/RLS/Storage evidence: `docs/qa/supabase-production-migration-2026-06-15.md`
 - activation: blocked until `VITE_SUPABASE_PRODUCTION_APPROVED=true` and every production evidence flag is set
 
