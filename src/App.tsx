@@ -1,6 +1,11 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import {
+  Button,
+  SearchBar,
+  Select,
+} from "./modules/submissions/components/magicpathPrimitives";
+import {
   acceptAiSuggestionAsIssue,
   dismissAiSuggestion,
   runAiReview,
@@ -666,32 +671,26 @@ function App() {
   }
 
   const searchControl = (
-    <label className="search panel-search">
-      <span aria-hidden="true">⌕</span>
-      <input
-        aria-label="Поиск в текущем списке"
-        placeholder="имя, номер, заявитель, статус"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-    </label>
+    <SearchBar
+      label="Поиск в текущем списке"
+      placeholder="имя, номер, заявитель, статус"
+      value={query}
+      onChange={setQuery}
+    />
   );
   const cityFilterControl = (
-    <label className="topbar-filter panel-filter">
-      <span>Город</span>
-      <select
-        className="select-control"
-        aria-label="Фильтр по городу"
-        value={cityFilter}
-        onChange={(event) =>
-          setCityFilter(event.target.value as City | "Все города")
-        }
-      >
-        {cities.map((city) => (
-          <option key={city}>{city}</option>
-        ))}
-      </select>
-    </label>
+    <Select
+      aria-label="Фильтр по городу"
+      containerClassName="topbar-filter panel-filter"
+      fieldClassName=""
+      label="Город"
+      options={cities.map((city) => ({ label: city, value: city }))}
+      selectClassName="select-control"
+      value={cityFilter}
+      onChange={(event) =>
+        setCityFilter(event.target.value as City | "Все города")
+      }
+    />
   );
 
   if (!hasWorkspaceAccess) {
@@ -722,21 +721,21 @@ function App() {
         <nav className="rail-nav" aria-label="Навигация">
           {role === "agent" ? (
             <>
-              <button
+              <Button
                 className="rail-item is-active"
-                type="button"
                 aria-current="page"
+                variant="ghost"
                 onClick={() => setSurface("agent-submissions")}
               >
                 <span className="rail-icon" aria-hidden="true">
                   П
                 </span>
                 <span>Мои подачи</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 className="rail-item rail-create"
-                type="button"
                 aria-label="Новая подача"
+                variant="ghost"
                 onClick={() => {
                   rememberReturnFocus();
                   setDrawerMode("create");
@@ -755,14 +754,14 @@ function App() {
                 <span className="rail-icon" aria-hidden="true">
                   +
                 </span>
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button
                 className={`rail-item ${surface === "admin-review" ? "is-active" : ""}`}
-                type="button"
                 aria-current={surface === "admin-review" ? "page" : undefined}
+                variant="ghost"
                 onClick={() => {
                   setSurface("admin-review");
                   const firstReview = reviewList[0] ?? reviewQueue(submissions)[0];
@@ -773,41 +772,41 @@ function App() {
                   П
                 </span>
                 <span>Проверка</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 className={`rail-item ${surface === "export" ? "is-active" : ""}`}
-                type="button"
                 aria-current={surface === "export" ? "page" : undefined}
+                variant="ghost"
                 onClick={() => setSurface("export")}
               >
                 <span className="rail-icon" aria-hidden="true">
                   Э
                 </span>
                 <span>Выгрузка</span>
-              </button>
+              </Button>
             </>
           )}
         </nav>
         {showRoleSwitcher ? (
-          <button
+          <Button
             className="rail-user"
-            type="button"
             aria-label="Сменить роль"
+            variant="ghost"
             onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
           >
             <span>{role === "agent" ? "АГ" : "АД"}</span>
             <small>Демо</small>
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             className="rail-user"
-            type="button"
             aria-label="Выйти из рабочей области"
+            variant="ghost"
             onClick={resetWorkspaceEmail}
           >
             <span>ВЫХ</span>
             <small>Выход</small>
-          </button>
+          </Button>
         )}
       </aside>
 
@@ -824,8 +823,13 @@ function App() {
           </div>
           <div className="topbar-actions">
             <div className="service-logo" aria-label="VisaFlow V-19">
-              <span>VisaFlow</span>
-              <strong>V-19</strong>
+              <span className="service-logo-mark" aria-hidden="true">
+                VF
+              </span>
+              <span className="service-logo-copy">
+                <span>VisaFlow</span>
+                <strong>V-19</strong>
+              </span>
             </div>
             {isSupabaseMode ? (
               <p
@@ -1079,9 +1083,9 @@ function WorkspaceAccessGate({
                   : "Доступ откроется после проверки почты."}
             </p>
           )}
-          <button className="primary-button" type="submit" disabled={busy}>
+          <Button type="submit" disabled={busy}>
             {busy ? "Проверяем" : "Войти"}
-          </button>
+          </Button>
         </form>
       </section>
     </main>
@@ -1105,9 +1109,9 @@ function RemoteWorkspaceEmptyState({
           : "Администратор увидит реальные подачи после того, как агент создаст или отправит их на проверку."}
       </p>
       {onCreate ? (
-        <button className="primary-button" type="button" onClick={onCreate}>
+        <Button onClick={onCreate}>
           Новая подача
-        </button>
+        </Button>
       ) : null}
     </section>
   );

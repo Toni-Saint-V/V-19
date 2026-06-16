@@ -1,5 +1,6 @@
 import { applicantCountLabel, nextAuditLine, tripDates } from "../selectors";
 import { type KeyboardEvent, useRef } from "react";
+import { Badge, Button, CardComponent } from "./magicpathPrimitives";
 import {
   blockerCount,
   fileTypeLabels,
@@ -134,7 +135,8 @@ function SubmissionCard({
   }
 
   return (
-    <article
+    <CardComponent
+      as="article"
       aria-current={active ? "true" : undefined}
       aria-label={`Выбрать подачу ${submission.id}: ${submission.title}`}
       className={`submission-card tone-${statusTone[submission.status]} ${
@@ -148,32 +150,36 @@ function SubmissionCard({
       onKeyDown={handleCardKeyDown}
     >
       <div className="card-main">
-        <div className="card-topline">
-          <strong>{submission.id}</strong>
-          <StatusChip submission={submission} />
-          {blockers > 0 ? (
-            <span className="status-chip blocker-count">{blockers} блокера</span>
+        <div className="card-identity">
+          <div className="card-topline">
+            <strong>{submission.id}</strong>
+            <StatusChip submission={submission} />
+            {blockers > 0 ? (
+              <Badge className="blocker-count">{blockers} блокера</Badge>
+            ) : null}
+          </div>
+          <h3>{submission.title}</h3>
+          <p className="meta-line">
+            Испания · {submission.city} · {tripDates(submission)}
+          </p>
+        </div>
+        <div className="card-summary">
+          <div className="card-facts" aria-label="Операционная сводка">
+            {submissionTypeFact ? <span>{submissionTypeFact}</span> : null}
+            <span>{applicantCountLabel(submission.applicants.length)}</span>
+            <span>Анкета {submission.completeness.questionnaire}%</span>
+            <span>
+              Файлы {fileSlots.ready}/{fileSlots.total}
+            </span>
+          </div>
+          {issueLines.length ? (
+            <p className={`card-issue-summary is-${issueLines[0].severity}`}>
+              <strong>{issueLines[0].target}</strong>
+              <span>{issueLines[0].text}</span>
+              {issueLines.length > 1 ? <em>+{issueLines.length - 1}</em> : null}
+            </p>
           ) : null}
         </div>
-        <h3>{submission.title}</h3>
-        <p className="meta-line">
-          Испания · {submission.city} · {tripDates(submission)}
-        </p>
-        <div className="card-facts" aria-label="Операционная сводка">
-          {submissionTypeFact ? <span>{submissionTypeFact}</span> : null}
-          <span>{applicantCountLabel(submission.applicants.length)}</span>
-          <span>Анкета {submission.completeness.questionnaire}%</span>
-          <span>
-            Файлы {fileSlots.ready}/{fileSlots.total}
-          </span>
-        </div>
-        {issueLines.length ? (
-          <p className={`card-issue-summary is-${issueLines[0].severity}`}>
-            <strong>{issueLines[0].target}</strong>
-            <span>{issueLines[0].text}</span>
-            {issueLines.length > 1 ? <em>+{issueLines.length - 1}</em> : null}
-          </p>
-        ) : null}
         <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
           <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
           <p>
@@ -193,7 +199,7 @@ function SubmissionCard({
         </div>
       </div>
       {cardSide}
-    </article>
+    </CardComponent>
   );
 }
 
@@ -216,20 +222,16 @@ function AgentCardSide({
         <span className="owner-pill">{responsibleRole(submission)}</span>
       </div>
       <p>{nextAuditLine(submission)}</p>
-      <button
-        className={
-          action.action === "return_with_issues"
-            ? "primary-button danger-action"
-            : "secondary-button"
-        }
-        type="button"
+      <Button
+        danger={action.action === "return_with_issues"}
+        variant={action.action === "return_with_issues" ? "primary" : "secondary"}
         onClick={(event) => {
           event.stopPropagation();
           onOpen(submission);
         }}
       >
         {cardLabel}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -246,14 +248,19 @@ export function RightRail({
   const steps = agentNextSteps(activeSubmission);
 
   return (
-    <aside className="right-rail" aria-label="Контекст выбранной подачи">
+    <CardComponent
+      as="aside"
+      className="right-rail"
+      aria-label="Контекст выбранной подачи"
+    >
       {summaryChips ? (
-        <section className="rail-panel rail-summary">
+        <CardComponent as="section" className="rail-panel rail-summary">
           <p className="kicker">Сводка подач</p>
           <SummaryRow chips={summaryChips} />
-        </section>
+        </CardComponent>
       ) : null}
-      <section
+      <CardComponent
+        as="section"
         className={`rail-panel selected-context tone-${statusTone[activeSubmission.status]}`}
       >
         <p className="kicker">Выбранная подача</p>
@@ -273,15 +280,11 @@ export function RightRail({
             <dd>{getCardActionLabel(activeSubmission, "agent")}</dd>
           </div>
         </dl>
-        <button
-          className="primary-button wide"
-          type="button"
-          onClick={() => onOpen(activeSubmission)}
-        >
+        <Button wide onClick={() => onOpen(activeSubmission)}>
           {getCardActionLabel(activeSubmission, "agent")}
-        </button>
-      </section>
-      <section className="rail-panel">
+        </Button>
+      </CardComponent>
+      <CardComponent as="section" className="rail-panel">
         <p className="kicker">Следующие действия</p>
         <ul className="next-list">
           {steps.map((step, index) => (
@@ -291,8 +294,8 @@ export function RightRail({
             </li>
           ))}
         </ul>
-      </section>
-    </aside>
+      </CardComponent>
+    </CardComponent>
   );
 }
 

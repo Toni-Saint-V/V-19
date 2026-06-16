@@ -551,9 +551,9 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
-    await expect(drawer(page).getByText("ББ-помощник", { exact: true })).toBeVisible();
+    await expect(drawer(page).getByText("ББ", { exact: true })).toBeVisible();
 
-    await drawer(page).getByRole("button", { name: "Проверить ББ" }).click();
+    await drawer(page).getByRole("button", { name: "Запустить проверку" }).click();
 
     await expect(drawer(page).getByText("Есть подсказки")).toBeVisible();
     await expect(
@@ -571,7 +571,7 @@ test.describe("V-19 operations workspace", () => {
       drawer(page).getByRole("heading", { name: "Нина Волкова" }),
     ).toBeVisible();
 
-    await drawer(page).getByRole("button", { name: "Проверить ББ" }).click();
+    await drawer(page).getByRole("button", { name: "Запустить проверку" }).click();
     await expect(drawer(page).getByText("Есть подсказки")).toBeVisible();
 
     await drawer(page)
@@ -863,7 +863,7 @@ test.describe("V-19 operations workspace", () => {
     await switchToAdmin(page);
     await page.getByRole("tab", { name: "На проверке" }).click();
     await openAdminSubmission(page, familyTitle);
-    await drawer(page).getByRole("button", { name: "Проверить ББ" }).click();
+    await drawer(page).getByRole("button", { name: "Запустить проверку" }).click();
     await expect(drawer(page).getByText("Есть подсказки")).toBeVisible();
     await drawer(page)
       .getByRole("button", { name: "Добавить как замечание" })

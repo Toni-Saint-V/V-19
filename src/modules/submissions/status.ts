@@ -21,7 +21,7 @@ export const statusLabels: Record<SubmissionStatus, string> = {
   exported: "Выгружено",
 };
 
-export const statusTone: Record<SubmissionStatus, string> = {
+export const statusTone = {
   draft: "muted",
   in_progress: "amber",
   requires_action: "danger",
@@ -30,7 +30,10 @@ export const statusTone: Record<SubmissionStatus, string> = {
   corrections_received: "amber",
   ready_for_export: "teal",
   exported: "muted",
-};
+} satisfies Record<
+  SubmissionStatus,
+  "amber" | "blue" | "danger" | "muted" | "teal"
+>;
 
 export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
   missing: "Нет файла",
