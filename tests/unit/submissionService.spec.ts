@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { buildMediaSlot, normalizeSubmission } from "../../src/lib/workflow";
 import {
+  mapExportBatchRow,
   toAppointmentInsert,
   toApplicantInsert,
   toCorrectionInserts,
@@ -229,6 +230,8 @@ describe("Supabase submission mapping", () => {
           createdBy: actorId,
           createdAt: "11.06.2026",
           format: "xlsx" as const,
+          idempotencyKey: "export-content-1",
+          fileName: "visaflow-export-export-content-1.xlsx",
           rowCount: 1,
           submissionIds: ["VF-1044"],
         },
@@ -264,6 +267,8 @@ describe("Supabase submission mapping", () => {
     expect(toExportBatchInserts(submission)[0]).toMatchObject({
       id: "00000000-0000-4000-8000-000000000301",
       created_at: "2026-06-11T00:00:00.000Z",
+      idempotency_key: "export-content-1",
+      file_name: "visaflow-export-export-content-1.xlsx",
     });
     expect(toAppointmentInsert(submission, actorId)).toMatchObject({
       submission_id: "VF-1044",
@@ -330,5 +335,37 @@ describe("Supabase submission mapping", () => {
     });
     expect(payload).not.toHaveProperty("export_batches");
     expect(payload).not.toHaveProperty("appointments");
+  });
+
+  test("maps export batch identity from Supabase rows while tolerating legacy nulls", () => {
+    expect(
+      mapExportBatchRow({
+        id: "00000000-0000-4000-8000-000000000301",
+        created_by: "00000000-0000-4000-8000-000000000001",
+        created_at: "2026-06-11T00:00:00.000Z",
+        format: "xlsx",
+        idempotency_key: "export-content-1",
+        file_name: "visaflow-export-export-content-1.xlsx",
+        row_count: 1,
+        submission_ids: ["VF-1044"],
+      }),
+    ).toMatchObject({
+      id: "00000000-0000-4000-8000-000000000301",
+      idempotencyKey: "export-content-1",
+      fileName: "visaflow-export-export-content-1.xlsx",
+    });
+
+    expect(
+      mapExportBatchRow({
+        id: "00000000-0000-4000-8000-000000000302",
+        created_by: "00000000-0000-4000-8000-000000000001",
+        created_at: "2026-06-11T00:00:00.000Z",
+        format: "csv",
+        idempotency_key: null,
+        file_name: null,
+        row_count: 1,
+        submission_ids: ["VF-1044"],
+      }),
+    ).not.toHaveProperty("idempotencyKey");
   });
 });

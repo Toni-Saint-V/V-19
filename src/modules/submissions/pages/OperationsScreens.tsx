@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, CardComponent } from "../components/magicpathPrimitives";
+import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import type { ExportSummary } from "../exportRules";
 import { counts, nextAuditLine, tripDates } from "../selectors";
 import {
@@ -133,10 +133,53 @@ export function AdminReviewScreen({
 
   return (
     <>
-      <div className="main-grid admin-review-grid">
+      <div className="main-grid admin-review-grid magic-admin-stage">
         <CardComponent
           as="section"
-          className="submission-panel"
+          className={`selected-context magic-admin-decision tone-${statusTone[activeSubmission.status]}`}
+          aria-label="Текущее решение администратора"
+        >
+          <div className="magic-admin-decision-copy">
+            <p className="kicker">Фокус проверки</p>
+            <h2>{activeSubmission.title}</h2>
+            <p>
+              {activeSubmission.id} · {activeSubmission.city} · {tripDates(activeSubmission)}
+            </p>
+          </div>
+          <div className="magic-admin-decision-facts">
+            <StatusChip submission={activeSubmission} />
+            <span>{nextAuditLine(activeSubmission)}</span>
+            <strong>{nextProblem(activeSubmission)}</strong>
+            <dl>
+              <div>
+                <dt>Ответственный</dt>
+                <dd>{responsibleRole(activeSubmission)}</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="magic-admin-decision-actions">
+            <Button wide onClick={() => onOpen(activeSubmission)}>
+              Открыть проверку
+            </Button>
+            <Button
+              aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
+              disabled={!canAddIssue}
+              variant="secondary"
+              wide
+              onClick={onAddIssue}
+            >
+              Вернуть с замечанием
+            </Button>
+          </div>
+          {!canAddIssue ? (
+            <p className="action-disabled-note" id="admin-return-disabled-note">
+              {addIssueReason}
+            </p>
+          ) : null}
+        </CardComponent>
+        <CardComponent
+          as="section"
+          className="submission-panel magic-admin-queue"
           aria-labelledby="review-title"
         >
           <PanelHeader
@@ -172,56 +215,8 @@ export function AdminReviewScreen({
             submissions={reviewList}
           />
         </CardComponent>
-        <CardComponent as="aside" className="right-rail" aria-label="Контекст проверки">
-          <CardComponent
-            as="section"
-            className={`rail-panel selected-context tone-${statusTone[activeSubmission.status]}`}
-          >
-            <div className="selected-context-head">
-              <div>
-                <p className="kicker">Выбранная подача</p>
-                <h2>{activeSubmission.title}</h2>
-                <span>{activeSubmission.id}</span>
-              </div>
-              <StatusChip submission={activeSubmission} />
-            </div>
-            <dl>
-              <div>
-                <dt>Решение сейчас</dt>
-                <dd>{nextAuditLine(activeSubmission)}</dd>
-              </div>
-              <div>
-                <dt>Проблема</dt>
-                <dd>{nextProblem(activeSubmission)}</dd>
-              </div>
-              <div>
-                <dt>Ответственный</dt>
-                <dd>{responsibleRole(activeSubmission)}</dd>
-              </div>
-            </dl>
-            <div className="stacked-actions">
-              <Button wide onClick={() => onOpen(activeSubmission)}>
-                Открыть проверку
-              </Button>
-              <Button
-                aria-describedby={
-                  !canAddIssue ? "admin-return-disabled-note" : undefined
-                }
-                disabled={!canAddIssue}
-                variant="secondary"
-                wide
-                onClick={onAddIssue}
-              >
-                Вернуть с замечанием
-              </Button>
-            </div>
-            {!canAddIssue ? (
-              <p className="action-disabled-note" id="admin-return-disabled-note">
-                {addIssueReason}
-              </p>
-            ) : null}
-          </CardComponent>
-          <CardComponent as="section" className="rail-panel rail-rule">
+        <CardComponent as="aside" className="right-rail magic-admin-aside" aria-label="Контекст проверки">
+          <CardComponent as="section" className="rail-panel rail-rule magic-admin-rule">
             <p className="kicker">Правило проверки</p>
             <p className="rail-copy">
               Решение принимается после проверки пакета. Возврат только с конкретным
@@ -268,12 +263,16 @@ export function ExportScreen({
 
   return (
     <>
-      <div className="export-grid">
-        <section className="submission-panel" aria-labelledby="export-title">
+      <div className="export-grid magic-export-stage">
+        <CardComponent
+          as="section"
+          className="submission-panel magic-export-queue"
+          aria-labelledby="export-title"
+        >
           <PanelHeader
             eyebrow="Выгрузка"
             titleId="export-title"
-            title="Что можно безопасно выгрузить"
+            title="Пакеты для Excel"
             tabs={[
               ["ready", "Готовы"],
               ["history", "История"],
@@ -284,9 +283,9 @@ export function ExportScreen({
             onTab={onTab}
           />
           {exportTab === "ready" ? (
-            <div className="submission-list">
+            <div className="submission-list magic-export-list">
               {readyList.map((submission) => (
-                <article className="export-row" key={submission.id}>
+                <CardComponent as="article" className="export-row magic-export-row" key={submission.id}>
                   <label className="export-check">
                     <input
                       checked={selectedExportIds.includes(submission.id)}
@@ -295,9 +294,9 @@ export function ExportScreen({
                     />
                     <span className="sr-only">Выбрать подачу</span>
                   </label>
-                  <button
+                  <Button
                     className="export-row-main"
-                    type="button"
+                    variant="plain"
                     onClick={() => onOpen(submission)}
                   >
                     <strong>{submission.title}</strong>
@@ -305,35 +304,35 @@ export function ExportScreen({
                       {submission.id} · {typeLabels[submission.type]} ·{" "}
                       {submission.city} · {tripDates(submission)}
                     </span>
-                  </button>
-                  <button type="button" onClick={() => onOpen(submission)}>
+                  </Button>
+                  <Button variant="secondary" onClick={() => onOpen(submission)}>
                     Смотреть пакет
-                  </button>
-                </article>
+                  </Button>
+                </CardComponent>
               ))}
               {readyList.length === 0 ? (
                 <EmptyState text="Нет подач готовых к выгрузке." />
               ) : null}
             </div>
           ) : (
-            <div className="submission-list">
+            <div className="submission-list magic-export-list">
               {historyList.map((submission) => (
-                <article className="export-row" key={submission.id}>
+                <CardComponent as="article" className="export-row magic-export-row" key={submission.id}>
                   <div>
                     <strong>{submission.title}</strong>
                     <p>
                       {submission.id} · {submission.city} · {tripDates(submission)}
                     </p>
                   </div>
-                  <span>Выгружено</span>
-                </article>
+                  <Badge className="visa-tag visa-tag-ready">Выгружено</Badge>
+                </CardComponent>
               ))}
             </div>
           )}
-        </section>
+        </CardComponent>
 
-        <aside className="export-side" aria-label="Информация и предпросмотр выгрузки">
-          <section className="rail-panel rail-summary">
+        <CardComponent as="aside" className="export-side magic-export-side" aria-label="Информация и предпросмотр выгрузки">
+          <CardComponent as="section" className="rail-panel rail-summary magic-export-summary">
             <p className="kicker">Сводка выгрузки</p>
             <SummaryRow
               chips={[
@@ -350,19 +349,19 @@ export function ExportScreen({
                 ],
               ]}
             />
-          </section>
-          <section className="export-preview" aria-label="Предпросмотр Эксель">
+          </CardComponent>
+          <CardComponent as="section" className="export-preview magic-export-preview" aria-label="Предпросмотр Эксель">
             <div className="preview-header">
               <div>
                 <p className="kicker">Пакет выгрузки</p>
                 <h2>{exportPackageTitle(exportPlan)}</h2>
                 <p className="export-package-line">{exportPackageLine(exportPlan)}</p>
               </div>
-              <span className={`status-chip ${exportPlan.ready ? "teal" : "danger"}`}>
+              <Badge className={exportPlan.ready ? "visa-tag visa-tag-ready" : "visa-tag visa-tag-danger"}>
                 {exportPlan.ready
                   ? exportStateLabel(exportPlan.exportState)
                   : "Блокировано"}
-              </span>
+              </Badge>
             </div>
             <dl
               className="export-package-summary"
@@ -419,36 +418,32 @@ export function ExportScreen({
               ))}
             </div>
             <div className="export-actions" aria-describedby="export-action-hint">
-              <button
-                className="primary-button"
+              <Button
                 disabled={!exportPlan.canGenerate}
-                type="button"
                 onClick={onGenerate}
               >
                 Сформировать Эксель
-              </button>
-              <button
-                className="secondary-button"
+              </Button>
+              <Button
                 disabled={!exportPlan.canDownload}
-                type="button"
+                variant="secondary"
                 onClick={onDownload}
               >
                 Скачать
-              </button>
-              <button
-                className="secondary-button"
+              </Button>
+              <Button
                 disabled={!exportPlan.canMarkExported}
-                type="button"
+                variant="secondary"
                 onClick={onMarkExported}
               >
                 Отметить выгружено
-              </button>
+              </Button>
             </div>
             <p className="export-action-hint" id="export-action-hint">
               {actionHint}
             </p>
-          </section>
-        </aside>
+          </CardComponent>
+        </CardComponent>
       </div>
     </>
   );

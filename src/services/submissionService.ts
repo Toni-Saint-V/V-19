@@ -47,7 +47,7 @@ const correctionSelect =
 const appointmentSelect =
   "id,submission_id,status,city,date,time,operator_comment,updated_by,updated_at" as const;
 const exportBatchSelect =
-  "id,created_by,created_at,format,row_count,submission_ids" as const;
+  "id,created_by,created_at,format,idempotency_key,file_name,row_count,submission_ids" as const;
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at" as const;
 const submissionListLimit = 100;
@@ -200,8 +200,8 @@ function mapStatusHistoryRow(row: StatusHistoryRow): StatusHistoryItem {
   };
 }
 
-function mapExportBatchRow(row: ExportBatchRow): ExportBatch {
-  return {
+export function mapExportBatchRow(row: ExportBatchRow): ExportBatch {
+  const batch: ExportBatch = {
     id: row.id,
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -209,6 +209,11 @@ function mapExportBatchRow(row: ExportBatchRow): ExportBatch {
     rowCount: row.row_count,
     submissionIds: row.submission_ids,
   };
+
+  if (row.idempotency_key) batch.idempotencyKey = row.idempotency_key;
+  if (row.file_name) batch.fileName = row.file_name;
+
+  return batch;
 }
 
 function mapAppointmentRow(row: AppointmentRow): Appointment {
@@ -413,9 +418,67 @@ export function toExportBatchInserts(submission: Submission): ExportBatchInsert[
     created_by: batch.createdBy,
     created_at: timestampOrNow(batch.createdAt),
     format: batch.format,
+    idempotency_key: batch.idempotencyKey ?? null,
+    file_name: batch.fileName ?? null,
     row_count: batch.rowCount,
     submission_ids: batch.submissionIds,
   }));
+}
+
+type ExportBatchWriteInsert = Omit<ExportBatchInsert, "created_by" | "created_at">;
+
+function toExportBatchWriteInsert(batch: ExportBatch): ExportBatchWriteInsert {
+  return {
+    ...(toNullableUuid(batch.id) ? { id: batch.id } : {}),
+    format: batch.format,
+    idempotency_key: batch.idempotencyKey ?? null,
+    file_name: batch.fileName ?? null,
+    row_count: batch.rowCount,
+    submission_ids: batch.submissionIds,
+  };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    !!error && typeof error === "object" && "code" in error && error.code === "23505"
+  );
+}
+
+export async function recordExportBatch(
+  batch: ExportBatch,
+): Promise<ExportBatch | null> {
+  const client = getSupabaseClient();
+  if (!client) return batch;
+
+  const { data, error } = await client
+    .from("export_batches")
+    .insert(toExportBatchWriteInsert(batch))
+    .select(exportBatchSelect)
+    .single();
+
+  if (!error) return mapExportBatchRow(data);
+
+  if (isUniqueViolation(error) && batch.idempotencyKey) {
+    const { data: duplicate, error: duplicateError } = await client
+      .from("export_batches")
+      .select(exportBatchSelect)
+      .eq("idempotency_key", batch.idempotencyKey)
+      .single();
+
+    if (duplicateError) {
+      throw mapSupabasePersistenceError(duplicateError, {
+        operation: "export_batches.read_duplicate",
+        fallbackKind: "database",
+      });
+    }
+
+    return mapExportBatchRow(duplicate);
+  }
+
+  throw mapSupabasePersistenceError(error, {
+    operation: "export_batches.insert",
+    fallbackKind: "database",
+  });
 }
 
 export function toAppointmentInsert(

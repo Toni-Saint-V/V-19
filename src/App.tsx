@@ -1,10 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
-import {
-  Button,
-  SearchBar,
-  Select,
-} from "./modules/submissions/components/magicpathPrimitives";
+import { Button, SearchBar, Select } from "./shared/ui/primitives";
 import {
   acceptAiSuggestionAsIssue,
   dismissAiSuggestion,

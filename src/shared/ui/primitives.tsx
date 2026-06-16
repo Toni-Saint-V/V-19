@@ -17,6 +17,13 @@ function cn(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(" ");
 }
 
+function mergeAriaIds(
+  ...values: Array<string | false | null | undefined>
+): string | undefined {
+  const merged = cn(...values);
+  return merged || undefined;
+}
+
 type ButtonVariant = "primary" | "secondary" | "ghost" | "icon" | "plain";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -173,7 +180,7 @@ export function Select({
       ) : null}
       <select
         {...props}
-        aria-describedby={props["aria-describedby"] ?? errorId}
+        aria-describedby={mergeAriaIds(props["aria-describedby"], errorId)}
         aria-invalid={props["aria-invalid"] ?? Boolean(errorMessage)}
         aria-required={props["aria-required"] ?? required}
         className={cn("mp-select", selectClassName)}
@@ -431,7 +438,7 @@ export function TextInputField({
       ) : null}
       <input
         {...props}
-        aria-describedby={props["aria-describedby"] ?? errorId}
+        aria-describedby={mergeAriaIds(props["aria-describedby"], errorId)}
         aria-invalid={props["aria-invalid"] ?? Boolean(errorMessage)}
         aria-required={props["aria-required"] ?? required}
         className={cn("mp-input", inputClassName)}

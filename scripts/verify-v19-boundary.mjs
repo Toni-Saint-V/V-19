@@ -7,6 +7,7 @@ const allowedSourceRoots = [
   path.join(root, "src/App.tsx"),
   path.join(root, "src/main.tsx"),
   path.join(root, "src/modules/submissions"),
+  path.join(root, "src/shared"),
   path.join(root, "src/styles.css"),
   path.join(root, "src/vite-env.d.ts"),
 ];
@@ -98,6 +99,9 @@ function scanV19Source() {
   const files = [
     path.join(root, "src/App.tsx"),
     ...listFiles(path.join(root, "src/modules/submissions")).filter((file) =>
+      /\.(ts|tsx)$/.test(file),
+    ),
+    ...listFiles(path.join(root, "src/shared")).filter((file) =>
       /\.(ts|tsx)$/.test(file),
     ),
   ];
