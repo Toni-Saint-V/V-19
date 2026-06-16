@@ -7,6 +7,7 @@ export function PanelHeader<T extends string>({
   eyebrow,
   onTab,
   search,
+  side,
   tabs,
   title,
   titleId,
@@ -16,6 +17,7 @@ export function PanelHeader<T extends string>({
   eyebrow: string;
   onTab: (tab: T) => void;
   search?: ReactNode;
+  side?: ReactNode;
   tabs: Array<[T, string]>;
   title: string;
   titleId?: string;
@@ -58,33 +60,36 @@ export function PanelHeader<T extends string>({
         <p className="kicker">{eyebrow}</p>
         <h2 id={titleId}>{title}</h2>
       </div>
+      {side ? <div className="panel-header-side">{side}</div> : null}
       <div className="panel-controls">
-        {search ? <div className="panel-search-slot">{search}</div> : null}
-        <div className="tabs" role="tablist" aria-label={title}>
-          {tabs.map(([id, label], index) => {
-            const selected = value === id;
+        <div className="panel-tabs-group">
+          <div className="tabs" role="tablist" aria-label={title}>
+            {tabs.map(([id, label], index) => {
+              const selected = value === id;
 
-            return (
-              <button
-                className={selected ? "is-active" : ""}
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                ref={(node) => {
-                  if (node) tabRefs.current.set(id, node);
-                  else tabRefs.current.delete(id);
-                }}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => focusTab(index)}
-                onKeyDown={(event) => handleTabKeyDown(event, index)}
-              >
-                {label}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  className={selected ? "is-active" : ""}
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  ref={(node) => {
+                    if (node) tabRefs.current.set(id, node);
+                    else tabRefs.current.delete(id);
+                  }}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => focusTab(index)}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {action}
         </div>
-        {action}
+        {search ? <div className="panel-search-slot">{search}</div> : null}
       </div>
     </div>
   );

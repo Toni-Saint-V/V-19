@@ -1,5 +1,11 @@
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { applicantCountLabel } from "../selectors";
+import {
+  type KeyboardEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { applicantCountLabel, tripDates } from "../selectors";
 import {
   fileStatusLabels,
   fileTypeLabels,
@@ -467,33 +473,38 @@ function DrawerOverview({
 }) {
   const blockers = blockerCount(submission);
   const openIssues = openIssueCount(submission);
+  const needsAttention = Boolean(blockers || openIssues);
   const fileProgress = fileReadyCount(submission);
   const nextLine = firstWorkLine(submission);
 
   return (
     <section className="drawer-section">
-      <article
-        className={`decision-card ${blockers || openIssues ? "needs-attention" : ""}`}
-      >
+      <article className={`decision-card ${needsAttention ? "needs-attention" : ""}`}>
         <div>
           <p className="kicker">Решение</p>
           <h3>{decisionTitle(submission, primaryAction)}</h3>
           <p>{nextLine}</p>
         </div>
-        <span>{decisionBadge(submission, primaryAction)}</span>
+        <span
+          className={`decision-card-badge ${
+            needsAttention ? "is-attention" : "is-clear"
+          }`}
+        >
+          {decisionBadge(submission, primaryAction)}
+        </span>
         <dl>
           <div>
-            <dt>Готовность</dt>
-            <dd>{submission.completeness.total}%</dd>
+            <dt>Статус</dt>
+            <dd>{reviewStageLabel(submission.status)}</dd>
           </div>
           <div>
-            <dt>Файлы</dt>
+            <dt>Пакет</dt>
             <dd>
-              {fileProgress.ready}/{fileProgress.total}
+              {fileProgress.ready} из {fileProgress.total}
             </dd>
           </div>
           <div>
-            <dt>Действие</dt>
+            <dt>Следующий шаг</dt>
             <dd>{primaryAction.label}</dd>
           </div>
         </dl>
@@ -567,7 +578,48 @@ function DrawerQuestionnaire({
 }) {
   const canEdit = role === "agent" && canAgentEditSubmissionContent(submission);
   const problemCount = questionnaireProblemCount(submission);
+  const questionnaireReady =
+    submission.completeness.questionnaire === 100 && problemCount === 0;
   const isSingleApplicant = submission.applicants.length === 1;
+  const [openSectionState, setOpenSectionState] = useState(() => ({
+    sectionKey: defaultQuestionnaireSectionKey(submission),
+    submissionId: submission.id,
+  }));
+  const [pendingSectionScrollId, setPendingSectionScrollId] = useState<string | null>(
+    null,
+  );
+  const openSectionKey =
+    openSectionState.submissionId === submission.id
+      ? openSectionState.sectionKey
+      : defaultQuestionnaireSectionKey(submission);
+
+  useLayoutEffect(() => {
+    if (!pendingSectionScrollId) return;
+
+    const sectionElement = document.getElementById(pendingSectionScrollId);
+    const drawerBody = sectionElement?.closest<HTMLElement>(".drawer-body");
+    if (!sectionElement || !drawerBody) return;
+
+    const sectionRect = sectionElement.getBoundingClientRect();
+    const drawerBodyRect = drawerBody.getBoundingClientRect();
+    drawerBody.scrollTo({
+      top: Math.max(
+        drawerBody.scrollTop + sectionRect.top - drawerBodyRect.top - 12,
+        0,
+      ),
+      behavior: "auto",
+    });
+    setPendingSectionScrollId(null);
+  }, [openSectionKey, pendingSectionScrollId]);
+
+  function setOpenSectionKey(sectionKey: string) {
+    setOpenSectionState({ sectionKey, submissionId: submission.id });
+  }
+
+  function openQuestionnaireSection(sectionKey: string, sectionElementId: string) {
+    setOpenSectionKey(sectionKey);
+    setPendingSectionScrollId(sectionElementId);
+  }
 
   function scrollToApplicant(applicantId: string) {
     document.getElementById(`questionnaire-applicant-${applicantId}`)?.scrollIntoView({
@@ -579,7 +631,11 @@ function DrawerQuestionnaire({
   }
 
   return (
-    <section className="drawer-section questionnaire-screen">
+    <section
+      className={`drawer-section questionnaire-screen ${
+        canEdit ? "is-editable" : "is-read-only"
+      }`}
+    >
       <div className="questionnaire-form-intro">
         <div>
           <p className="kicker">Анкета</p>
@@ -587,10 +643,12 @@ function DrawerQuestionnaire({
           <p className="drawer-muted">
             {canEdit
               ? "Заполняйте по порядку: запись, заявитель, паспорт, адрес, работа, поездка."
-              : "Проверьте поля по порядку перед решением по подаче."}
+              : "Сверьте раскрытый раздел. Если данные не сходятся с пакетом, добавьте точное замечание."}
           </p>
         </div>
-        {problemCount ? (
+        {questionnaireReady ? (
+          <span className="status-pill ready">Анкета готова</span>
+        ) : problemCount ? (
           <span className="status-pill warning">{problemCount} проблем</span>
         ) : null}
       </div>
@@ -665,14 +723,30 @@ function DrawerQuestionnaire({
             <div className="questionnaire-section-list">
               {applicant.sections.map((section) => {
                 const issue = sectionIssue(submission, applicant.id, section.title);
+                const sectionKey = questionnaireSectionKey(applicant.id, section.id);
+                const sectionElementId = `questionnaire-section-${applicant.id}-${section.id}`;
+                const fieldsId = `questionnaire-fields-${applicant.id}-${section.id}`;
+                const expanded = openSectionKey === sectionKey;
 
                 return (
                   <section
-                    className={`questionnaire-edit-section ${issue ? "has-issue" : ""}`}
+                    className={`questionnaire-edit-section ${issue ? "has-issue" : ""} ${expanded ? "is-expanded" : "is-collapsed"}`}
+                    id={sectionElementId}
                     key={section.id}
                     aria-label={`${applicant.fullName}: ${section.title}`}
                   >
-                    <div className="questionnaire-section-heading">
+                    <button
+                      className="questionnaire-section-heading"
+                      type="button"
+                      aria-controls={fieldsId}
+                      aria-expanded={expanded}
+                      onClick={() =>
+                        openQuestionnaireSection(sectionKey, sectionElementId)
+                      }
+                      onFocus={() =>
+                        openQuestionnaireSection(sectionKey, sectionElementId)
+                      }
+                    >
                       <div>
                         <span className="row-dot" aria-hidden="true" />
                         <div>
@@ -687,13 +761,20 @@ function DrawerQuestionnaire({
                           ) : null}
                         </div>
                       </div>
-                      {issue || section.status !== "complete" ? (
-                        <span className={statusPillClass(section.status)}>
-                          {questionnaireLabel(section.status)}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="questionnaire-fields">
+                      <span className="questionnaire-section-side">
+                        {issue || section.status !== "complete" ? (
+                          <span className={statusPillClass(section.status)}>
+                            {questionnaireLabel(section.status)}
+                          </span>
+                        ) : null}
+                        <span className="accordion-chevron" aria-hidden="true" />
+                      </span>
+                    </button>
+                    <div
+                      className="questionnaire-fields"
+                      hidden={!expanded}
+                      id={fieldsId}
+                    >
                       {section.fields.map((field) => {
                         const fieldIssue = fieldIssueFor(
                           submission,
@@ -780,11 +861,57 @@ function drawerMetaLine(submission: Submission) {
   const parts = [
     "Испания",
     submission.city,
+    tripDates(submission),
     submission.type === "family" ? typeLabels[submission.type] : undefined,
     applicantCountLabel(submission.applicants.length),
   ];
 
   return parts.filter(Boolean).join(" · ");
+}
+
+function reviewStageLabel(status: Submission["status"]) {
+  if (status === "submitted_for_review") return "Внутренняя проверка";
+  if (status === "requires_action" || status === "returned") return "Нужны исправления";
+  if (status === "corrections_received") return "Исправления получены";
+  if (status === "ready_for_export") return "Экспортный пакет готов";
+  if (status === "exported") return "Архив выгрузки";
+  return statusLabels[status];
+}
+
+function questionnaireSectionKey(applicantId: string, sectionId: string) {
+  return `${applicantId}:${sectionId}`;
+}
+
+function defaultQuestionnaireSectionKey(submission: Submission) {
+  for (const applicant of submission.applicants) {
+    const issue = submission.issues.find(
+      (item) =>
+        item.status !== "closed_by_admin" && item.target.applicantId === applicant.id,
+    );
+    const issueSection = applicant.sections.find(
+      (section) =>
+        section.title === issue?.target.section ||
+        section.fields.some((field) => field.label === issue?.target.field),
+    );
+
+    if (issueSection) return questionnaireSectionKey(applicant.id, issueSection.id);
+  }
+
+  for (const applicant of submission.applicants) {
+    const incompleteSection = applicant.sections.find(
+      (section) => section.status !== "complete",
+    );
+
+    if (incompleteSection)
+      return questionnaireSectionKey(applicant.id, incompleteSection.id);
+  }
+
+  const firstApplicant = submission.applicants[0];
+  const firstSection = firstApplicant?.sections[0];
+
+  return firstApplicant && firstSection
+    ? questionnaireSectionKey(firstApplicant.id, firstSection.id)
+    : "";
 }
 
 function DrawerFiles({

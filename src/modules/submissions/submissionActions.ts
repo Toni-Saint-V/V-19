@@ -10,6 +10,7 @@ import {
   updateQuestionnaireField as updateQuestionnaireFieldInSubmission,
   type QuestionnaireFieldUpdate,
 } from "./questionnaire";
+import { exportSummary } from "./exportRules";
 import type {
   City,
   ExportState,
@@ -249,12 +250,40 @@ export function applyExportStateToSelection(
   selectedIds: string[],
   exportState: ExportState,
 ) {
+  if (!canApplyExportStateToSelection(submissions, selectedIds, exportState)) {
+    return submissions;
+  }
+
   return submissions.map((submission) =>
     selectedIds.includes(submission.id) ? { ...submission, exportState } : submission,
   );
 }
 
+function canApplyExportStateToSelection(
+  submissions: Submission[],
+  selectedIds: string[],
+  exportState: ExportState,
+) {
+  const selected = submissions.filter((submission) =>
+    selectedIds.includes(submission.id),
+  );
+
+  if (selected.length === 0) return false;
+
+  const plan = exportSummary(selected);
+
+  if (exportState === "file_generated") return plan.canGenerate;
+  if (exportState === "file_downloaded") return plan.canDownload;
+  if (exportState === "marked_exported") return plan.canMarkExported;
+
+  return plan.ready;
+}
+
 export function markSelectedExported(submissions: Submission[], selectedIds: string[]) {
+  if (!canApplyExportStateToSelection(submissions, selectedIds, "marked_exported")) {
+    return submissions;
+  }
+
   return submissions.map((submission) =>
     selectedIds.includes(submission.id)
       ? applySubmissionAction(submission, "mark_exported", "admin")

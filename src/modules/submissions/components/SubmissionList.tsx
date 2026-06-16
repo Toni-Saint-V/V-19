@@ -1,5 +1,5 @@
 import { applicantCountLabel, nextAuditLine, tripDates } from "../selectors";
-import type { KeyboardEvent } from "react";
+import { type KeyboardEvent, useRef } from "react";
 import {
   blockerCount,
   fileTypeLabels,
@@ -7,6 +7,7 @@ import {
   getPrimaryAction,
   nextProblem,
   responsibleRole,
+  statusTone,
   typeLabels,
 } from "../status";
 import type { DrawerTab, Issue, Role, Submission } from "../types";
@@ -27,12 +28,32 @@ export function SubmissionList({
   role: Role;
   submissions: Submission[];
 }) {
+  const cardRefs = useRef(new Map<string, HTMLElement>());
+
+  function focusSubmissionAt(index: number) {
+    const nextIndex = Math.min(Math.max(index, 0), submissions.length - 1);
+    const nextSubmission = submissions[nextIndex];
+
+    if (!nextSubmission) return;
+
+    onSelect(nextSubmission);
+    requestAnimationFrame(() => {
+      cardRefs.current.get(nextSubmission.id)?.focus({ preventScroll: true });
+    });
+  }
+
   return (
     <div className="submission-list">
-      {submissions.map((submission) => (
+      {submissions.map((submission, index) => (
         <SubmissionCard
           active={submission.id === activeSubmission.id}
+          cardRef={(node) => {
+            if (node) cardRefs.current.set(submission.id, node);
+            else cardRefs.current.delete(submission.id);
+          }}
+          index={index}
           key={submission.id}
+          onMoveFocus={focusSubmissionAt}
           onOpen={onOpen}
           onSelect={onSelect}
           role={role}
@@ -46,42 +67,82 @@ export function SubmissionList({
 
 function SubmissionCard({
   active,
+  cardRef,
+  index,
+  onMoveFocus,
   onOpen,
   onSelect,
   role,
   submission,
 }: {
   active: boolean;
+  cardRef: (node: HTMLElement | null) => void;
+  index: number;
+  onMoveFocus: (index: number) => void;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
   role: Role;
   submission: Submission;
 }) {
-  const action = getPrimaryAction(
-    submission,
-    role,
-    role === "admin" ? "review" : "agent",
-  );
-  const cardLabel = getCardActionLabel(submission, role);
+  const isAdminCard = role === "admin";
   const blockers = blockerCount(submission);
   const issueLines = cardIssueLines(submission);
   const fileSlots = fileSlotSummary(submission);
   const submissionTypeFact =
     submission.type === "family" ? typeLabels[submission.type] : null;
+  const cardSide = isAdminCard ? null : (
+    <AgentCardSide onOpen={onOpen} role={role} submission={submission} />
+  );
 
   function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (event.target !== event.currentTarget) return;
-    if (event.key !== "Enter" && event.key !== " ") return;
 
-    event.preventDefault();
-    onSelect(submission);
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onOpen(submission);
+      return;
+    }
+
+    if (event.key === " ") {
+      event.preventDefault();
+      onSelect(submission);
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      onMoveFocus(index + 1);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      onMoveFocus(index - 1);
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      onMoveFocus(0);
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      onMoveFocus(Number.MAX_SAFE_INTEGER);
+    }
   }
 
   return (
     <article
       aria-current={active ? "true" : undefined}
       aria-label={`Выбрать подачу ${submission.id}: ${submission.title}`}
-      className={`submission-card ${active ? "is-selected" : ""}`}
+      className={`submission-card tone-${statusTone[submission.status]} ${
+        active ? "is-selected" : ""
+      } ${
+        isAdminCard ? "is-admin-card" : ""
+      }`}
+      ref={cardRef}
       tabIndex={0}
       onClick={() => onSelect(submission)}
       onKeyDown={handleCardKeyDown}
@@ -131,28 +192,45 @@ function SubmissionCard({
           <span style={{ width: `${submission.completeness.total}%` }} />
         </div>
       </div>
-      <div className="card-side">
-        <div className="card-side-head">
-          <small>Ответственный</small>
-          <span className="owner-pill">{responsibleRole(submission)}</span>
-        </div>
-        <p>{nextAuditLine(submission)}</p>
-        <button
-          className={
-            action.action === "return_with_issues"
-              ? "primary-button danger-action"
-              : "secondary-button"
-          }
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen(submission);
-          }}
-        >
-          {cardLabel}
-        </button>
-      </div>
+      {cardSide}
     </article>
+  );
+}
+
+function AgentCardSide({
+  onOpen,
+  role,
+  submission,
+}: {
+  onOpen: (submission: Submission, tab?: DrawerTab) => void;
+  role: Role;
+  submission: Submission;
+}) {
+  const action = getPrimaryAction(submission, role, "agent");
+  const cardLabel = getCardActionLabel(submission, role);
+
+  return (
+    <div className="card-side">
+      <div className="card-side-head">
+        <small>Ответственный</small>
+        <span className="owner-pill">{responsibleRole(submission)}</span>
+      </div>
+      <p>{nextAuditLine(submission)}</p>
+      <button
+        className={
+          action.action === "return_with_issues"
+            ? "primary-button danger-action"
+            : "secondary-button"
+        }
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen(submission);
+        }}
+      >
+        {cardLabel}
+      </button>
+    </div>
   );
 }
 
@@ -175,7 +253,9 @@ export function RightRail({
           <SummaryRow chips={summaryChips} />
         </section>
       ) : null}
-      <section className="rail-panel selected-context">
+      <section
+        className={`rail-panel selected-context tone-${statusTone[activeSubmission.status]}`}
+      >
         <p className="kicker">Выбранная подача</p>
         <h2>{activeSubmission.title}</h2>
         <StatusChip submission={activeSubmission} />

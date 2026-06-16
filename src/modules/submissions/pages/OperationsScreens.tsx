@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 import type { ExportSummary } from "../exportRules";
 import { counts, nextAuditLine, tripDates } from "../selectors";
-import { canAddAdminIssue, nextProblem, responsibleRole, typeLabels } from "../status";
+import {
+  canAddAdminIssue,
+  nextProblem,
+  responsibleRole,
+  statusTone,
+  typeLabels,
+} from "../status";
 import type { DrawerTab, Submission } from "../types";
 import type { AgentTab, ExportTab, ReviewTab } from "../uiTypes";
 import {
@@ -21,10 +27,19 @@ function pluralRu(count: number, one: string, few: string, many: string) {
   return many;
 }
 
+function adminIssueUnavailableReason(submission: Submission) {
+  if (submission.status === "ready_for_export")
+    return "Пакет уже принят. Новое замечание доступно только до принятия.";
+  if (submission.status === "exported")
+    return "Подача уже выгружена. Возврат из истории не выполняется.";
+  return "Возврат доступен только для подач на проверке или после исправлений.";
+}
+
 export function AgentSubmissionsScreen({
   activeSubmission,
   agentList,
   agentTab,
+  filterControl,
   onOpen,
   onSelect,
   onTab,
@@ -34,6 +49,7 @@ export function AgentSubmissionsScreen({
   activeSubmission: Submission;
   agentList: Submission[];
   agentTab: AgentTab;
+  filterControl?: ReactNode;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: AgentTab) => void;
@@ -55,6 +71,7 @@ export function AgentSubmissionsScreen({
               ["done", "Готово"],
             ]}
             search={searchControl}
+            side={filterControl}
             value={agentTab}
             onTab={onTab}
           />
@@ -83,6 +100,7 @@ export function AgentSubmissionsScreen({
 
 export function AdminReviewScreen({
   activeSubmission,
+  filterControl,
   onAddIssue,
   onOpen,
   onSelect,
@@ -90,9 +108,9 @@ export function AdminReviewScreen({
   reviewList,
   reviewTab,
   searchControl,
-  summary,
 }: {
   activeSubmission: Submission;
+  filterControl?: ReactNode;
   onAddIssue: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
@@ -100,9 +118,11 @@ export function AdminReviewScreen({
   reviewList: Submission[];
   reviewTab: ReviewTab;
   searchControl: ReactNode;
-  summary: ReturnType<typeof counts>;
 }) {
   const canAddIssue = canAddAdminIssue(activeSubmission, "admin");
+  const addIssueReason = canAddIssue
+    ? ""
+    : adminIssueUnavailableReason(activeSubmission);
   const firstReview = reviewList[0];
   const activeIsFirst = firstReview?.id === activeSubmission.id;
 
@@ -131,6 +151,7 @@ export function AdminReviewScreen({
               ["ready", "К выгрузке"],
             ]}
             search={searchControl}
+            side={filterControl}
             value={reviewTab}
             onTab={onTab}
           />
@@ -144,7 +165,9 @@ export function AdminReviewScreen({
           />
         </section>
         <aside className="right-rail" aria-label="Контекст проверки">
-          <section className="rail-panel selected-context">
+          <section
+            className={`rail-panel selected-context tone-${statusTone[activeSubmission.status]}`}
+          >
             <div className="selected-context-head">
               <div>
                 <p className="kicker">Выбранная подача</p>
@@ -177,6 +200,9 @@ export function AdminReviewScreen({
               </button>
               <button
                 className="secondary-button wide"
+                aria-describedby={
+                  !canAddIssue ? "admin-return-disabled-note" : undefined
+                }
                 disabled={!canAddIssue}
                 type="button"
                 onClick={onAddIssue}
@@ -184,16 +210,11 @@ export function AdminReviewScreen({
                 Вернуть с замечанием
               </button>
             </div>
-          </section>
-          <section className="rail-panel rail-summary">
-            <p className="kicker">Сводка проверки</p>
-            <SummaryRow
-              chips={[
-                ["blue", String(summary.inReview), "на проверке"],
-                ["amber", String(summary.corrections), "исправления"],
-                ["teal", String(summary.ready), "к выгрузке"],
-              ]}
-            />
+            {!canAddIssue ? (
+              <p className="action-disabled-note" id="admin-return-disabled-note">
+                {addIssueReason}
+              </p>
+            ) : null}
           </section>
           <section className="rail-panel rail-rule">
             <p className="kicker">Правило проверки</p>
@@ -211,6 +232,7 @@ export function AdminReviewScreen({
 export function ExportScreen({
   exportPlan,
   exportTab,
+  filterControl,
   historyList,
   onDownload,
   onGenerate,
@@ -224,6 +246,7 @@ export function ExportScreen({
 }: {
   exportPlan: ExportSummary;
   exportTab: ExportTab;
+  filterControl?: ReactNode;
   historyList: Submission[];
   onDownload: () => void;
   onGenerate: () => void;
@@ -251,6 +274,7 @@ export function ExportScreen({
               ["history", "История"],
             ]}
             search={searchControl}
+            side={filterControl}
             value={exportTab}
             onTab={onTab}
           />

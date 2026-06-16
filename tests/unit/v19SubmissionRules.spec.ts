@@ -279,6 +279,64 @@ describe("V-19 export rules", () => {
       exportSummary(generated).blockers.map((blocker) => blocker.reason),
     ).toContain("В выборке разные состояния выгрузки");
   });
+
+  it("keeps export state unchanged for invalid package generation attempts", () => {
+    const submissions = [
+      byId("ПД-1056"),
+      readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
+      byId("ПД-1051"),
+    ];
+
+    expect(
+      applyExportStateToSelection(
+        submissions,
+        ["ПД-1056", "ПД-СЕМЬЯ"],
+        "file_generated",
+      ),
+    ).toBe(submissions);
+    expect(
+      applyExportStateToSelection(submissions, ["ПД-1051"], "file_generated"),
+    ).toBe(submissions);
+  });
+
+  it("keeps download state locked until the selected package is generated", () => {
+    const submissions = [byId("ПД-1056")];
+
+    expect(
+      applyExportStateToSelection(submissions, ["ПД-1056"], "file_downloaded"),
+    ).toBe(submissions);
+
+    const generated = applyExportStateToSelection(
+      submissions,
+      ["ПД-1056"],
+      "file_generated",
+    );
+
+    expect(
+      applyExportStateToSelection(generated, ["ПД-1056"], "file_downloaded")[0]
+        ?.exportState,
+    ).toBe("file_downloaded");
+  });
+
+  it("keeps exported state locked until the selected package is downloaded", () => {
+    const submissions = [byId("ПД-1056")];
+
+    expect(markSelectedExported(submissions, ["ПД-1056"])).toBe(submissions);
+
+    const generated = applyExportStateToSelection(
+      submissions,
+      ["ПД-1056"],
+      "file_generated",
+    );
+    expect(markSelectedExported(generated, ["ПД-1056"])).toBe(generated);
+
+    const downloaded = applyExportStateToSelection(
+      generated,
+      ["ПД-1056"],
+      "file_downloaded",
+    );
+    expect(markSelectedExported(downloaded, ["ПД-1056"])[0]?.status).toBe("exported");
+  });
 });
 
 describe("V-19 submission actions", () => {
@@ -481,7 +539,7 @@ describe("V-19 submission actions", () => {
     expect(corrected.applicants[0]?.questionnaireStatus).toBe("complete");
   });
 
-  it("updates export state and marks selected submissions exported", () => {
+  it("updates export state and marks downloaded submissions exported", () => {
     const generated = applyExportStateToSelection(
       initialSubmissions,
       ["ПД-1056"],
@@ -491,7 +549,12 @@ describe("V-19 submission actions", () => {
       generated.find((submission) => submission.id === "ПД-1056")?.exportState,
     ).toBe("file_generated");
 
-    const exported = markSelectedExported(generated, ["ПД-1056"]);
+    const downloaded = applyExportStateToSelection(
+      generated,
+      ["ПД-1056"],
+      "file_downloaded",
+    );
+    const exported = markSelectedExported(downloaded, ["ПД-1056"]);
     expect(exported.find((submission) => submission.id === "ПД-1056")?.status).toBe(
       "exported",
     );

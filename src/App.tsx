@@ -676,6 +676,23 @@ function App() {
       />
     </label>
   );
+  const cityFilterControl = (
+    <label className="topbar-filter panel-filter">
+      <span>Город</span>
+      <select
+        className="select-control"
+        aria-label="Фильтр по городу"
+        value={cityFilter}
+        onChange={(event) =>
+          setCityFilter(event.target.value as City | "Все города")
+        }
+      >
+        {cities.map((city) => (
+          <option key={city}>{city}</option>
+        ))}
+      </select>
+    </label>
+  );
 
   if (!hasWorkspaceAccess) {
     return (
@@ -693,10 +710,14 @@ function App() {
   }
 
   return (
-    <main className="ops-shell" aria-label="Рабочая область подач">
+    <main
+      className={`ops-shell ${drawerMode !== "closed" ? "has-open-drawer" : ""}`}
+      aria-label="Рабочая область подач"
+    >
       <aside className="left-rail" aria-label="Основная навигация">
-        <div className="rail-mark" aria-hidden="true">
-          П
+        <div className="rail-mark" aria-label="VisaFlow">
+          <span>VF</span>
+          <strong>VisaFlow</strong>
         </div>
         <nav className="rail-nav" aria-label="Навигация">
           {role === "agent" ? (
@@ -781,11 +802,11 @@ function App() {
           <button
             className="rail-user"
             type="button"
-            aria-label="Сменить служебную почту"
+            aria-label="Выйти из рабочей области"
             onClick={resetWorkspaceEmail}
           >
-            <span>{role === "agent" ? "АГ" : "АД"}</span>
-            <small>Почта</small>
+            <span>ВЫХ</span>
+            <small>Выход</small>
           </button>
         )}
       </aside>
@@ -802,23 +823,8 @@ function App() {
             <p className="topbar-copy">{surfaceDescription(surface)}</p>
           </div>
           <div className="topbar-actions">
-            <label className="topbar-filter">
-              <span>Город</span>
-              <select
-                className="select-control"
-                aria-label="Фильтр по городу"
-                value={cityFilter}
-                onChange={(event) =>
-                  setCityFilter(event.target.value as City | "Все города")
-                }
-              >
-                {cities.map((city) => (
-                  <option key={city}>{city}</option>
-                ))}
-              </select>
-            </label>
-            <div className="service-logo" aria-label="Версия V-19">
-              <span>Версия</span>
+            <div className="service-logo" aria-label="VisaFlow V-19">
+              <span>VisaFlow</span>
               <strong>V-19</strong>
             </div>
             {isSupabaseMode ? (
@@ -863,6 +869,7 @@ function App() {
             activeSubmission={activeSubmission}
             agentList={agentList}
             agentTab={agentTab}
+            filterControl={cityFilterControl}
             onOpen={openSubmission}
             onSelect={selectSubmission}
             onTab={setAgentTab}
@@ -874,6 +881,7 @@ function App() {
         {surface === "admin-review" && activeSubmission ? (
           <AdminReviewScreen
             activeSubmission={activeSubmission}
+            filterControl={cityFilterControl}
             onAddIssue={() => openIssueComposer(activeSubmission)}
             onOpen={openSubmission}
             onSelect={selectSubmission}
@@ -881,7 +889,6 @@ function App() {
             reviewList={reviewList}
             reviewTab={reviewTab}
             searchControl={searchControl}
-            summary={summary}
           />
         ) : null}
 
@@ -889,6 +896,7 @@ function App() {
           <ExportScreen
             exportPlan={exportPlan}
             exportTab={exportTab}
+            filterControl={cityFilterControl}
             historyList={historyList}
             onDownload={downloadExport}
             onGenerate={generateExport}
