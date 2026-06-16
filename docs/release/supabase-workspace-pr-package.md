@@ -60,7 +60,7 @@ Out of scope:
   - production project id `tsymifccglpepvbmrcgh`;
   - no sandbox data copy or seed;
   - production client activation still blocked.
-- Added local-only security advisor hardening migration:
+- Added and production-applied security advisor hardening migration:
   - revokes AI helper quota/audit table access from browser roles;
   - grants quota RPC execution only to `service_role`;
   - adds explicit deny-all RLS policies for AI helper service-owned tables.
@@ -86,7 +86,7 @@ Out of scope:
 
 ## Verification
 
-Latest completed verification:
+Historical full-package verification:
 
 ```bash
 npm run format:check
@@ -105,6 +105,14 @@ Results:
 - `npm run verify:supabase-release`: passed, including AI helper SQL grant/revoke statement checks.
 - `node scripts/verify-production-readiness.mjs --expect-blocked`: passed fail-closed, 34 blockers remain.
 - `npm run verify:full`: passed, including typecheck, lint, safety, boundary, unit/integration tests, build, performance, Supabase release gate, security audit, and 28 Playwright E2E tests.
+
+Current focused verification after production advisor gate hardening:
+
+- `npm run test:supabase-live`: passed, 1 test.
+- `npm run verify:supabase-release`: passed, 75 checks.
+- `node scripts/verify-production-readiness.mjs --expect-blocked`: passed fail-closed, 41 blockers remain.
+- `npx vitest run tests/unit/supabaseSecurityContract.spec.ts tests/unit/supabaseActivation.spec.ts tests/unit/storageService.spec.ts tests/unit/persistenceObservability.spec.ts`: passed, 4 files and 28 tests.
+- `git diff --check`: passed.
 
 ## Screenshots
 
@@ -131,9 +139,9 @@ Sandbox reference target:
 Production target:
 
 - project id: `tsymifccglpepvbmrcgh`
-- migrations: applied through `20260614000000_ai_helper_audit_quota.sql`; `20260615000000_ai_helper_security_advisor_hardening.sql` is local-only until owner-approved production apply
+- migrations: applied through remote `20260616001949_ai_helper_security_advisor_hardening`, which applies local contract `20260615000000_ai_helper_security_advisor_hardening.sql`
 - schema/RLS/Storage evidence: `docs/qa/supabase-production-migration-2026-06-15.md`
-- activation: blocked until `VITE_SUPABASE_PRODUCTION_APPROVED=true` and every production evidence flag is set
+- activation: blocked until the Supabase plan can enable Auth leaked password protection, Auth leaked password protection is enabled, `VITE_SUPABASE_PRODUCTION_APPROVED=true`, and every production evidence flag is set
 
 ## Rollback
 
@@ -152,7 +160,7 @@ Database rollback must be a forward migration or approved restore path. Do not m
 - [ ] `npm run verify:full` passed after final diff.
 - [ ] `npm run test:supabase-live` passed against sandbox.
 - [ ] Production approval checklist completed if production activation is planned.
-- [ ] Production migrations are not applied from Codex without explicit owner approval.
+- [ ] Future production migrations are not applied from Codex without explicit owner approval.
 - [ ] Unrelated untracked files are excluded from commit/PR.
 
 ## PR Body

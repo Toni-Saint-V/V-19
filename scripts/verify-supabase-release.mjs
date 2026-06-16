@@ -416,6 +416,21 @@ function verifyDocsAndScripts() {
     );
   }
 
+  if (packageJson.scripts?.["verify:production-packet"]) {
+    pass("Package exposes verify:production-packet");
+  } else {
+    fail("Package exposes verify:production-packet", "missing npm script");
+  }
+
+  if (packageJson.scripts?.["verify:full"]?.includes("verify:production-packet")) {
+    pass("verify:full includes production packet gate");
+  } else {
+    fail(
+      "verify:full includes production packet gate",
+      "npm run verify:full must include npm run verify:production-packet",
+    );
+  }
+
   for (const expected of [
     "npm run verify:supabase-release",
     "npm run test:supabase-live",
@@ -432,6 +447,11 @@ function verifyDocsAndScripts() {
     "Rollback Boundary",
     "Migration Order",
     "Final Sandbox RLS And Storage Smoke",
+    "Auth Security Advisor Gate",
+    "Auth plan eligibility",
+    "Auth leaked password protection",
+    "Auth/Profile Repair Gate",
+    "Do not auto-create production profiles",
     "VITE_SUPABASE_PRODUCTION_APPROVED=true",
   ]) {
     expectContains(runbook, expected, `Production runbook documents ${expected}`);
@@ -451,8 +471,19 @@ function verifyDocsAndScripts() {
   for (const expected of [
     "Production project id:",
     "Rollout owner:",
+    "20260611000000_visaflow_mvp_foundation.sql",
+    "20260612000000_visaflow_rls_performance_hardening.sql",
+    "20260612001000_visaflow_rpc_corrections_persistence.sql",
+    "20260613005039_visaflow_runtime_write_guards.sql",
+    "20260613010029_visaflow_rpc_submit_boundary.sql",
+    "20260614000000_ai_helper_audit_quota.sql",
+    "20260615000000_ai_helper_security_advisor_hardening.sql",
     "Agent smoke account exists.",
     "Backup owner:",
+    "Supabase organization/project plan supports leaked password protection.",
+    "Supabase plan eligibility for leaked password protection is confirmed.",
+    "Auth leaked password protection is enabled.",
+    "Production auth/profile discovery has no orphan auth users.",
     "Go / No-Go:",
     "VITE_SUPABASE_PRODUCTION_APPROVED=true",
   ]) {
