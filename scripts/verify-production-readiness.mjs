@@ -156,10 +156,7 @@ function currentScopedDiffSha256() {
 }
 
 function unexpectedDirtyFiles() {
-  const status = gitOutput(
-    ["status", "--porcelain"],
-    "Current git status is readable",
-  );
+  const status = gitOutput(["status", "--porcelain"], "Current git status is readable");
   const allowed = new Set(scopedDiffPaths);
   const allowedPrefixes = [
     "docs/qa/supabase-production-security-advisors-",
@@ -220,11 +217,6 @@ function requireExistingProjectFile(value, label) {
 function requireSnippet(content, snippet, label) {
   if (content.includes(snippet)) pass(label);
   else block(label, "missing");
-}
-
-function requireNoSnippet(content, snippet, label) {
-  if (content.includes(snippet)) block(label, `found ${snippet}`);
-  else pass(label);
 }
 
 function verifyNoCommittedSecrets(content) {
@@ -316,7 +308,10 @@ function verifyProductionMigrationEvidence(packet) {
     if (evidence.includes(version)) {
       pass(`Production migration evidence records local contract ${version}`);
     } else {
-      block(`Production migration evidence records local contract ${version}`, "missing");
+      block(
+        `Production migration evidence records local contract ${version}`,
+        "missing",
+      );
     }
   }
 
@@ -380,7 +375,10 @@ function verifySmokeDiscoveryEvidence(packet, smokeDiscovery) {
   if (smokeDiscovery.projectId === targetProjectId) {
     pass("Production smoke discovery project id matches production target");
   } else {
-    block("Production smoke discovery project id matches production target", "mismatch");
+    block(
+      "Production smoke discovery project id matches production target",
+      "mismatch",
+    );
   }
   if (present(targetProjectId) && evidence.includes(targetProjectId)) {
     pass("Production smoke discovery evidence records target project id");
@@ -452,7 +450,10 @@ function verifyPreActivationCheck(pre, key, command, label, verifierSha256) {
     verifierSha256,
     `${label} is bound to the current readiness verifier`,
   );
-  requireExistingProjectFile(check.evidenceArtifact, `${label} evidence artifact exists`);
+  requireExistingProjectFile(
+    check.evidenceArtifact,
+    `${label} evidence artifact exists`,
+  );
   if (!present(check.evidenceArtifact)) return;
 
   const evidence = readText(
@@ -573,11 +574,7 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
   if (pre.finalDiffReviewed === true) {
     const review = pre.finalDiffReview ?? {};
     const dirtyFiles = unexpectedDirtyFiles();
-    requireEqual(
-      review.gitHead,
-      gitHead,
-      "Final diff review is bound to current HEAD",
-    );
+    requireEqual(review.gitHead, gitHead, "Final diff review is bound to current HEAD");
     requireEqual(
       review.diffSha256,
       scopedDiffSha256,
@@ -686,7 +683,9 @@ function verifyAuthSecurityEvidence(packet, authSecurity) {
   }
 
   if (authSecurity.leakedPasswordProtectionEnabled === true) {
-    if (openWarnings.some((warning) => warning.name === "auth_leaked_password_protection")) {
+    if (
+      openWarnings.some((warning) => warning.name === "auth_leaked_password_protection")
+    ) {
       block(
         "Supabase advisor snapshot does not contradict leaked-password enablement",
         "auth_leaked_password_protection is still open",
@@ -756,7 +755,10 @@ function verifyPacket(packet, rawContent) {
   requirePresent(owners.technicalApprover, "Technical approver is recorded");
   requirePresent(owners.businessApprover, "Business approver is recorded");
   requirePresent(owners.rollbackDecisionOwner, "Rollback decision owner is recorded");
-  requireActivationPresent(owners.plannedPromotionWindow, "Promotion window is recorded");
+  requireActivationPresent(
+    owners.plannedPromotionWindow,
+    "Promotion window is recorded",
+  );
 
   const migration = packet.migrationContract ?? {};
   requireTrue(migration.targetHistoryChecked, "Target migration history was checked");
@@ -779,10 +781,7 @@ function verifyPacket(packet, rawContent) {
 
   const smoke = packet.smokeAccounts ?? {};
   const smokeDiscovery = packet.smokeAccountDiscovery ?? {};
-  requireTrue(
-    smokeDiscovery.checked,
-    "Production smoke account discovery was checked",
-  );
+  requireTrue(smokeDiscovery.checked, "Production smoke account discovery was checked");
   requirePresent(
     smokeDiscovery.checkedAt,
     "Production smoke account discovery timestamp is recorded",
@@ -989,7 +988,11 @@ if (blockers.length) {
     for (const blocker of activationBlockers) console.error(`- ${blocker}`);
   }
 
-  if (expectBlocked && integrityBlockers.length === 0 && activationBlockers.length > 0) {
+  if (
+    expectBlocked &&
+    integrityBlockers.length === 0 &&
+    activationBlockers.length > 0
+  ) {
     console.log("Production readiness gate is fail-closed as expected.");
     process.exit(0);
   }
