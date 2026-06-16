@@ -153,6 +153,7 @@ export interface ExportBatch {
   createdAt: string;
   format: "csv" | "xlsx";
   idempotencyKey?: string;
+  contentFingerprint?: string;
   fileName?: string;
   rowCount: number;
   submissionIds: string[];

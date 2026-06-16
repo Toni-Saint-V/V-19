@@ -38,6 +38,17 @@ export type ExportState =
   | "file_downloaded"
   | "marked_exported";
 
+export type ExportPackageFormat = "csv" | "xlsx";
+
+export type ExportPackageIdentity = {
+  contentFingerprint: string;
+  fileName: string;
+  format: ExportPackageFormat;
+  idempotencyKey: string;
+  rowCount: number;
+  submissionIds: string[];
+};
+
 export type AiSuggestionStatus =
   | "suggested"
   | "accepted_by_admin"
@@ -184,6 +195,7 @@ export type Submission = {
   };
   aiSuggestions?: AiSuggestion[];
   aiReviewState?: AiReviewState;
+  exportPackage?: ExportPackageIdentity;
   exportState?: ExportState;
   createdAt: string;
   updatedAt: string;

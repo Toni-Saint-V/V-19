@@ -344,6 +344,7 @@ describe("Supabase submission mapping", () => {
         created_by: "00000000-0000-4000-8000-000000000001",
         created_at: "2026-06-11T00:00:00.000Z",
         format: "xlsx",
+        content_fingerprint: "xlsx|1|VF-1044",
         idempotency_key: "export-content-1",
         file_name: "visaflow-export-export-content-1.xlsx",
         row_count: 1,
@@ -352,6 +353,7 @@ describe("Supabase submission mapping", () => {
     ).toMatchObject({
       id: "00000000-0000-4000-8000-000000000301",
       idempotencyKey: "export-content-1",
+      contentFingerprint: "xlsx|1|VF-1044",
       fileName: "visaflow-export-export-content-1.xlsx",
     });
 
@@ -361,6 +363,7 @@ describe("Supabase submission mapping", () => {
         created_by: "00000000-0000-4000-8000-000000000001",
         created_at: "2026-06-11T00:00:00.000Z",
         format: "csv",
+        content_fingerprint: null,
         idempotency_key: null,
         file_name: null,
         row_count: 1,

@@ -158,7 +158,8 @@ export function buildExportPackageDraft(
   options: ExportPackageOptions,
 ): ExportPackageDraft {
   const plan = buildExportPlan(submissions);
-  const idempotencyKey = exportPackageIdempotencyKey(plan, options.format);
+  const contentFingerprint = exportPackageContentFingerprint(plan, options.format);
+  const idempotencyKey = stableKey(contentFingerprint);
 
   if (plan.blocked.length > 0 || plan.readySubmissions.length === 0) {
     return {
@@ -181,6 +182,7 @@ export function buildExportPackageDraft(
     plan.readySubmissions,
     options.format,
     plan.rows.length,
+    contentFingerprint,
     idempotencyKey,
   );
 
@@ -203,6 +205,7 @@ export function buildExportPackageDraft(
       createdBy: options.createdBy,
       createdAt: options.createdAt,
       format: options.format,
+      contentFingerprint,
       idempotencyKey,
       fileName: artifact.fileName,
       rowCount: plan.rows.length,
@@ -328,6 +331,7 @@ function findExistingExportBatch(
   submissions: Submission[],
   format: ExportPackageFormat,
   rowCount: number,
+  contentFingerprint: string,
   idempotencyKey: string,
 ): ExportBatch | undefined {
   const ids = sortedSubmissionIds(submissions);
@@ -337,6 +341,7 @@ function findExistingExportBatch(
     (batch) =>
       batch.format === format &&
       batch.rowCount === rowCount &&
+      batch.contentFingerprint === contentFingerprint &&
       batch.idempotencyKey === idempotencyKey &&
       sameStringSet(batch.submissionIds, ids) &&
       submissions.every((submission) =>
@@ -348,6 +353,16 @@ function findExistingExportBatch(
 }
 
 function exportBatchMatches(left: ExportBatch, right: ExportBatch): boolean {
+  if (left.contentFingerprint || right.contentFingerprint) {
+    return (
+      left.contentFingerprint === right.contentFingerprint &&
+      left.idempotencyKey === right.idempotencyKey &&
+      left.format === right.format &&
+      left.rowCount === right.rowCount &&
+      sameStringSet(left.submissionIds, right.submissionIds)
+    );
+  }
+
   if (left.idempotencyKey && right.idempotencyKey) {
     return left.idempotencyKey === right.idempotencyKey;
   }
@@ -363,6 +378,7 @@ function exportBatchMatches(left: ExportBatch, right: ExportBatch): boolean {
 function exportPlanMatchesDraft(plan: ExportPlan, draft: ExportPackageReady): boolean {
   if (plan.blocked.length > 0) return false;
   if (plan.rows.length !== draft.batch.rowCount) return false;
+  if (!draft.batch.contentFingerprint) return false;
   if (
     !sameStringSet(
       sortedSubmissionIds(plan.readySubmissions),
@@ -372,10 +388,14 @@ function exportPlanMatchesDraft(plan: ExportPlan, draft: ExportPackageReady): bo
     return false;
   }
 
-  return exportPackageIdempotencyKey(plan, draft.batch.format) === draft.idempotencyKey;
+  const contentFingerprint = exportPackageContentFingerprint(plan, draft.batch.format);
+  return (
+    contentFingerprint === draft.batch.contentFingerprint &&
+    stableKey(contentFingerprint) === draft.idempotencyKey
+  );
 }
 
-function exportPackageIdempotencyKey(
+function exportPackageContentFingerprint(
   plan: ExportPlan,
   format: ExportPackageFormat,
 ): string {
@@ -383,7 +403,7 @@ function exportPackageIdempotencyKey(
     .map((row) => exportColumns.map((column) => row[column]).join("\u001f"))
     .join("|");
 
-  return stableKey([format, plan.rows.length, source].join("|"));
+  return [format, plan.rows.length, source].join("|");
 }
 
 function sortedSubmissionIds(submissions: Submission[]): string[] {

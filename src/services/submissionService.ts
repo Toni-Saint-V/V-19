@@ -18,8 +18,6 @@ import type {
   CorrectionRow,
   ExportBatchInsert,
   ExportBatchRow,
-  ExportPackageCommitPayload,
-  ExportPackageCommitResult,
   MediaAssetInsert,
   MediaAssetRow,
   StatusHistoryInsert,
@@ -49,7 +47,7 @@ const correctionSelect =
 const appointmentSelect =
   "id,submission_id,status,city,date,time,operator_comment,updated_by,updated_at" as const;
 const exportBatchSelect =
-  "id,created_by,created_at,format,idempotency_key,file_name,row_count,submission_ids" as const;
+  "id,created_by,created_at,format,content_fingerprint,idempotency_key,file_name,row_count,submission_ids" as const;
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at" as const;
 const submissionListLimit = 100;
@@ -213,6 +211,7 @@ export function mapExportBatchRow(row: ExportBatchRow): ExportBatch {
   };
 
   if (row.idempotency_key) batch.idempotencyKey = row.idempotency_key;
+  if (row.content_fingerprint) batch.contentFingerprint = row.content_fingerprint;
   if (row.file_name) batch.fileName = row.file_name;
 
   return batch;
@@ -420,6 +419,7 @@ export function toExportBatchInserts(submission: Submission): ExportBatchInsert[
     created_by: batch.createdBy,
     created_at: timestampOrNow(batch.createdAt),
     format: batch.format,
+    content_fingerprint: batch.contentFingerprint ?? null,
     idempotency_key: batch.idempotencyKey ?? null,
     file_name: batch.fileName ?? null,
     row_count: batch.rowCount,
@@ -427,27 +427,18 @@ export function toExportBatchInserts(submission: Submission): ExportBatchInsert[
   }));
 }
 
-type ExportBatchWriteInsert = ExportPackageCommitPayload["batch"];
+type ExportBatchWriteInsert = Omit<ExportBatchInsert, "created_by" | "created_at">;
 
 function toExportBatchWriteInsert(batch: ExportBatch): ExportBatchWriteInsert {
   return {
     ...(toNullableUuid(batch.id) ? { id: batch.id } : {}),
     format: batch.format,
+    content_fingerprint: batch.contentFingerprint ?? null,
     idempotency_key: batch.idempotencyKey ?? null,
     file_name: batch.fileName ?? null,
     row_count: batch.rowCount,
     submission_ids: batch.submissionIds,
   };
-}
-
-function toExportPackageCommitPayload(batch: ExportBatch): ExportPackageCommitPayload {
-  return {
-    batch: toExportBatchWriteInsert(batch),
-  };
-}
-
-function mapExportPackageCommitResult(result: ExportPackageCommitResult): ExportBatch {
-  return mapExportBatchRow(result.exportBatch);
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -491,26 +482,6 @@ export async function recordExportBatch(
     operation: "export_batches.insert",
     fallbackKind: "database",
   });
-}
-
-export async function commitExportPackage(
-  batch: ExportBatch,
-): Promise<ExportBatch | null> {
-  const client = getSupabaseClient();
-  if (!client) return batch;
-
-  const { data, error } = await client.rpc("complete_export_package", {
-    payload: toExportPackageCommitPayload(batch),
-  });
-
-  if (error) {
-    throw mapSupabasePersistenceError(error, {
-      operation: "rpc.complete_export_package",
-      fallbackKind: "rpc",
-    });
-  }
-
-  return data ? mapExportPackageCommitResult(data) : null;
 }
 
 export function toAppointmentInsert(

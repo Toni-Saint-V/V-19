@@ -213,6 +213,8 @@ function App() {
   const remoteOwnerIdsRef = useRef<Map<string, string>>(new Map());
   const remoteSubmissionFingerprintsRef = useRef<Map<string, string>>(new Map());
   const skipNextRemoteSaveRef = useRef(false);
+  const remoteSaveTimerRef = useRef<number | null>(null);
+  const remoteSavePromiseRef = useRef<Promise<void> | null>(null);
 
   const activeSubmission =
     submissions.find((submission) => submission.id === selectedSubmissionId) ??
@@ -253,6 +255,73 @@ function App() {
     : showRoleSwitcher || Boolean(resolvedWorkspaceRole);
   const emptyRemoteWorkspace =
     isSupabaseMode && Boolean(remoteProfile) && authChecked && submissions.length === 0;
+
+  async function saveRemoteWorkspaceSnapshot(
+    activeRemoteProfile: AppProfile,
+    dirtySubmissions: Submission[],
+  ) {
+    setRemoteSaveState("saving");
+    setRemoteSaveError("");
+    try {
+      remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
+        activeRemoteProfile,
+        dirtySubmissions,
+        remoteOwnerIdsRef.current,
+      );
+      remoteSubmissionFingerprintsRef.current = new Map(
+        remoteSubmissionFingerprintsRef.current,
+      );
+      for (const submission of dirtySubmissions) {
+        remoteSubmissionFingerprintsRef.current.set(
+          submission.id,
+          cockpitSubmissionFingerprint(submission),
+        );
+      }
+      setRemoteSaveState("idle");
+    } catch (error) {
+      setRemoteSaveState("error");
+      setRemoteSaveError(
+        formatPersistenceFailureForUser(
+          error,
+          "Удалённое сохранение не прошло. Обновите данные перед продолжением.",
+        ),
+      );
+      throw error;
+    }
+  }
+
+  async function drainRemoteSavesBeforeExport(
+    activeRemoteProfile: AppProfile,
+    latestSubmissions: Submission[],
+  ) {
+    if (remoteSaveTimerRef.current !== null) {
+      window.clearTimeout(remoteSaveTimerRef.current);
+      remoteSaveTimerRef.current = null;
+    }
+
+    if (remoteSavePromiseRef.current) {
+      await remoteSavePromiseRef.current;
+    }
+
+    const dirtySubmissions = changedCockpitSubmissions(
+      latestSubmissions,
+      remoteSubmissionFingerprintsRef.current,
+    );
+    if (!dirtySubmissions.length) return;
+
+    const savePromise = saveRemoteWorkspaceSnapshot(
+      activeRemoteProfile,
+      dirtySubmissions,
+    );
+    remoteSavePromiseRef.current = savePromise;
+    try {
+      await savePromise;
+    } finally {
+      if (remoteSavePromiseRef.current === savePromise) {
+        remoteSavePromiseRef.current = null;
+      }
+    }
+  }
 
   useEffect(() => {
     if (isSupabaseMode) return;
@@ -321,40 +390,28 @@ function App() {
     if (!dirtySubmissions.length) return;
 
     const timer = window.setTimeout(() => {
-      async function saveRemoteWorkspace() {
-        setRemoteSaveState("saving");
-        setRemoteSaveError("");
-        try {
-          remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
-            activeRemoteProfile,
-            dirtySubmissions,
-            remoteOwnerIdsRef.current,
-          );
-          remoteSubmissionFingerprintsRef.current = new Map(
-            remoteSubmissionFingerprintsRef.current,
-          );
-          for (const submission of dirtySubmissions) {
-            remoteSubmissionFingerprintsRef.current.set(
-              submission.id,
-              cockpitSubmissionFingerprint(submission),
-            );
+      remoteSaveTimerRef.current = null;
+      const savePromise = saveRemoteWorkspaceSnapshot(
+        activeRemoteProfile,
+        dirtySubmissions,
+      );
+      remoteSavePromiseRef.current = savePromise;
+      void savePromise
+        .catch(() => undefined)
+        .finally(() => {
+          if (remoteSavePromiseRef.current === savePromise) {
+            remoteSavePromiseRef.current = null;
           }
-          setRemoteSaveState("idle");
-        } catch (error) {
-          setRemoteSaveState("error");
-          setRemoteSaveError(
-            formatPersistenceFailureForUser(
-              error,
-              "Удалённое сохранение не прошло. Обновите данные перед продолжением.",
-            ),
-          );
-        }
-      }
-
-      void saveRemoteWorkspace();
+        });
     }, 500);
+    remoteSaveTimerRef.current = timer;
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      if (remoteSaveTimerRef.current === timer) {
+        remoteSaveTimerRef.current = null;
+      }
+      window.clearTimeout(timer);
+    };
   }, [authChecked, isSupabaseMode, remoteProfile, submissions]);
 
   useEffect(() => {
@@ -573,6 +630,10 @@ function App() {
     }
 
     try {
+      if (isSupabaseMode && remoteProfile) {
+        await drainRemoteSavesBeforeExport(remoteProfile, submissions);
+      }
+
       const result = await completeExportPackage(selectedSubmissions, {
         createdAt: new Date().toISOString(),
         createdBy: remoteProfile?.id ?? "local-admin",

@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   completeExportPackage,
-  type ExportBatchRecorder,
+  type ExportPackageCommitter,
   type ExportedSubmissionPersister,
 } from "../../src/modules/submissions/exportWorkflow";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
@@ -26,15 +26,11 @@ function downloadedSelection(): Submission[] {
     "file_generated",
   );
 
-  return applyExportStateToSelection(
-    generated,
-    ["ПД-1056"],
-    "file_downloaded",
-  );
+  return applyExportStateToSelection(generated, ["ПД-1056"], "file_downloaded");
 }
 
 function options(
-  recordBatch: ExportBatchRecorder,
+  commitPackage: ExportPackageCommitter,
   persistExportedSubmissions?: ExportedSubmissionPersister,
 ) {
   return {
@@ -42,30 +38,36 @@ function options(
     createdAt,
     createdBy,
     format: "xlsx" as const,
+    commitPackage,
     persistExportedSubmissions,
-    recordBatch,
   };
 }
 
 describe("submission export workflow", () => {
   test("records the durable batch before marking submissions exported", async () => {
-    const recordBatch = vi.fn<ExportBatchRecorder>(async (batch) => ({
-      ...batch,
-      id: "00000000-0000-4000-8000-000000000777",
-      createdAt: serverCreatedAt,
-      createdBy: serverCreatedBy,
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+      batch: {
+        ...batch,
+        id: "00000000-0000-4000-8000-000000000777",
+        createdAt: serverCreatedAt,
+        createdBy: serverCreatedBy,
+      },
+      changedSubmissions: 1,
+      duplicate: false,
+      statusHistory: 1,
     }));
     const persistExportedSubmissions = vi.fn<ExportedSubmissionPersister>();
 
     const result = await completeExportPackage(
       downloadedSelection(),
-      options(recordBatch, persistExportedSubmissions),
+      options(commitPackage, persistExportedSubmissions),
     );
 
-    expect(recordBatch).toHaveBeenCalledTimes(1);
-    expect(recordBatch.mock.calls[0]?.[0]).toMatchObject({
+    expect(commitPackage).toHaveBeenCalledTimes(1);
+    expect(commitPackage.mock.calls[0]?.[0]).toMatchObject({
       createdAt,
       createdBy,
+      contentFingerprint: expect.stringContaining("ПД-1056"),
       format: "xlsx",
       rowCount: 1,
       submissionIds: ["ПД-1056"],
@@ -75,6 +77,7 @@ describe("submission export workflow", () => {
     if (result.status !== "exported") throw new Error("expected exported result");
     expect(result.batch).toMatchObject({
       id: "00000000-0000-4000-8000-000000000777",
+      contentFingerprint: expect.stringContaining("Дмитрий Орлов"),
       createdAt: serverCreatedAt,
       createdBy: serverCreatedBy,
     });
@@ -83,29 +86,27 @@ describe("submission export workflow", () => {
       exportState: "marked_exported",
       updatedAt: serverCreatedAt,
     });
-    expect(result.submissions[0]?.history[0]?.text).toContain(
-      result.batch.fileName,
-    );
+    expect(result.submissions[0]?.history[0]?.text).toContain(result.batch.fileName);
   });
 
   test("does not record or mutate when the package was not downloaded", async () => {
-    const recordBatch = vi.fn<ExportBatchRecorder>();
+    const commitPackage = vi.fn<ExportPackageCommitter>();
 
-    const result = await completeExportPackage([byId("ПД-1056")], options(recordBatch));
+    const result = await completeExportPackage([byId("ПД-1056")], options(commitPackage));
 
     expect(result.status).toBe("blocked");
-    expect(recordBatch).not.toHaveBeenCalled();
+    expect(commitPackage).not.toHaveBeenCalled();
     expect(result.submissions[0]?.status).toBe("ready_for_export");
   });
 
   test("does not mark exported when durable recording fails", async () => {
-    const recordBatch = vi.fn<ExportBatchRecorder>(async () => {
+    const commitPackage = vi.fn<ExportPackageCommitter>(async () => {
       throw new Error("database unavailable");
     });
     const selection = downloadedSelection();
 
     await expect(
-      completeExportPackage(selection, options(recordBatch)),
+      completeExportPackage(selection, options(commitPackage)),
     ).rejects.toThrow("database unavailable");
 
     expect(selection[0]?.status).toBe("ready_for_export");
@@ -113,27 +114,30 @@ describe("submission export workflow", () => {
   });
 
   test("fails closed when exported snapshot persistence fails after batch record", async () => {
-    const recordBatch = vi.fn<ExportBatchRecorder>(async (batch) => ({
-      ...batch,
-      id: "00000000-0000-4000-8000-000000000777",
-      createdAt: serverCreatedAt,
-      createdBy: serverCreatedBy,
-    }));
-    const persistExportedSubmissions = vi.fn<ExportedSubmissionPersister>(
-      async () => {
-        throw new Error("snapshot save failed");
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+      batch: {
+        ...batch,
+        id: "00000000-0000-4000-8000-000000000777",
+        createdAt: serverCreatedAt,
+        createdBy: serverCreatedBy,
       },
-    );
+      changedSubmissions: 1,
+      duplicate: false,
+      statusHistory: 1,
+    }));
+    const persistExportedSubmissions = vi.fn<ExportedSubmissionPersister>(async () => {
+      throw new Error("snapshot save failed");
+    });
     const selection = downloadedSelection();
 
     await expect(
       completeExportPackage(
         selection,
-        options(recordBatch, persistExportedSubmissions),
+        options(commitPackage, persistExportedSubmissions),
       ),
     ).rejects.toThrow("snapshot save failed");
 
-    expect(recordBatch).toHaveBeenCalledTimes(1);
+    expect(commitPackage).toHaveBeenCalledTimes(1);
     expect(persistExportedSubmissions).toHaveBeenCalledTimes(1);
     expect(selection[0]?.status).toBe("ready_for_export");
     expect(selection[0]?.exportState).toBe("file_downloaded");

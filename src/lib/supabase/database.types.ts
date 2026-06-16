@@ -239,6 +239,7 @@ export interface ExportBatchRow extends DbRecord {
   created_at: string;
   file_name: string | null;
   format: "xlsx" | "csv";
+  content_fingerprint: string | null;
   idempotency_key: string | null;
   row_count: number;
   submission_ids: string[];
@@ -246,11 +247,17 @@ export interface ExportBatchRow extends DbRecord {
 
 export type ExportBatchInsert = Omit<
   ExportBatchRow,
-  "id" | "created_by" | "created_at" | "file_name" | "idempotency_key"
+  | "id"
+  | "created_by"
+  | "created_at"
+  | "content_fingerprint"
+  | "file_name"
+  | "idempotency_key"
 > & {
   id?: string;
   created_by?: string;
   created_at?: string;
+  content_fingerprint?: string | null;
   file_name?: string | null;
   idempotency_key?: string | null;
 };
@@ -259,8 +266,9 @@ export interface ExportPackageCommitPayload extends DbRecord {
   batch: {
     id?: string;
     format: "xlsx" | "csv";
-    idempotency_key: string | null;
-    file_name: string | null;
+    content_fingerprint: string;
+    idempotency_key: string;
+    file_name: string;
     row_count: number;
     submission_ids: string[];
   };
