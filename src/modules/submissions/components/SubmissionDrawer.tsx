@@ -83,6 +83,13 @@ export function SubmissionDrawer({
   const [issueComposerOpen, setIssueComposerOpen] = useState(false);
   const canOpenIssueComposer =
     surface === "review" && canAddAdminIssue(submission, role);
+  const contentCanBeEdited =
+    role === "agent" && canAgentEditSubmissionContent(submission);
+  const footerHint =
+    primaryAction.reason ??
+    (contentCanBeEdited
+      ? "Изменения сохраняются внутри подачи"
+      : "Проверьте данные и выберите действие по подаче");
   const activeTabButtonRef = useRef<HTMLButtonElement | null>(null);
   const tabButtonsRef = useRef<Partial<Record<DrawerTab, HTMLButtonElement | null>>>(
     {},
@@ -158,12 +165,11 @@ export function SubmissionDrawer({
     >
       <header className="drawer-header">
         <div className="drawer-title-block">
-          <p className="kicker">{submission.id}</p>
-          <h2 id="drawer-title">{submission.title}</h2>
-          <p>
-            Испания · {submission.city} · {typeLabels[submission.type]} ·{" "}
-            {applicantCountLabel(submission.applicants.length)}
+          <p className="kicker">
+            {submission.id} · {statusLabels[submission.status]}
           </p>
+          <h2 id="drawer-title">{submission.title}</h2>
+          <p>{drawerMetaLine(submission)}</p>
         </div>
         <button
           className="icon-button"
@@ -173,24 +179,6 @@ export function SubmissionDrawer({
         >
           ×
         </button>
-        <div className="drawer-summary-strip" aria-label="Сводка подачи">
-          <article>
-            <span>Статус</span>
-            <strong>{statusLabels[submission.status]}</strong>
-          </article>
-          <article>
-            <span>Готовность</span>
-            <strong>{submission.completeness.total}%</strong>
-          </article>
-          <article>
-            <span>Заявители</span>
-            <strong>{submission.applicants.length}</strong>
-          </article>
-          <article>
-            <span>Замечания</span>
-            <strong>{openIssueCount(submission) + fixedIssueCount(submission)}</strong>
-          </article>
-        </div>
       </header>
 
       <div className="drawer-tabs" role="tablist" aria-label="Разделы подачи">
@@ -282,7 +270,7 @@ export function SubmissionDrawer({
         <span>
           {issueComposerOpen
             ? "Сначала создайте или отмените новое замечание"
-            : (primaryAction.reason ?? "Изменения сохраняются внутри подачи")}
+            : footerHint}
         </span>
         {canOpenIssueComposer && !issueComposerOpen ? (
           <button
@@ -579,6 +567,7 @@ function DrawerQuestionnaire({
 }) {
   const canEdit = role === "agent" && canAgentEditSubmissionContent(submission);
   const problemCount = questionnaireProblemCount(submission);
+  const isSingleApplicant = submission.applicants.length === 1;
 
   function scrollToApplicant(applicantId: string) {
     document.getElementById(`questionnaire-applicant-${applicantId}`)?.scrollIntoView({
@@ -590,20 +579,20 @@ function DrawerQuestionnaire({
   }
 
   return (
-    <section className="drawer-section">
-      <div className="section-heading">
+    <section className="drawer-section questionnaire-screen">
+      <div className="questionnaire-form-intro">
         <div>
           <p className="kicker">Анкета</p>
-          <h3>Поля анкеты</h3>
+          <h3>Данные для консульской анкеты</h3>
           <p className="drawer-muted">
             {canEdit
-              ? "Поля сохраняются сразу внутри подачи."
-              : "Анкета доступна только для просмотра в текущем статусе."}
+              ? "Заполняйте по порядку: запись, заявитель, паспорт, адрес, работа, поездка."
+              : "Проверьте поля по порядку перед решением по подаче."}
           </p>
         </div>
-        <span className={problemCount ? "status-pill warning" : "status-pill ready"}>
-          {problemCount ? `${problemCount} проблем` : "Анкета готова"}
-        </span>
+        {problemCount ? (
+          <span className="status-pill warning">{problemCount} проблем</span>
+        ) : null}
       </div>
       {submission.applicants.length > 1 ? (
         <div
@@ -655,19 +644,24 @@ function DrawerQuestionnaire({
       <div className="questionnaire-workspace">
         {submission.applicants.map((applicant) => (
           <article
-            className="questionnaire-card"
+            className={`questionnaire-card ${isSingleApplicant ? "is-single" : ""}`}
             id={`questionnaire-applicant-${applicant.id}`}
             key={applicant.id}
           >
-            <header>
-              <div>
-                <strong>{applicant.fullName}</strong>
-                <p>{applicantRoleLabel(applicant.role)}</p>
-              </div>
-              <span className={statusPillClass(applicant.questionnaireStatus)}>
-                {questionnaireLabel(applicant.questionnaireStatus)}
-              </span>
-            </header>
+            {!isSingleApplicant ? (
+              <header className="questionnaire-card-header">
+                <div>
+                  <strong>{applicant.fullName}</strong>
+                  <p>{applicantRoleLabel(applicant.role)}</p>
+                </div>
+                <div className="questionnaire-card-status">
+                  <span>{questionnaireProgressForApplicant(applicant)}%</span>
+                  <em className={statusPillClass(applicant.questionnaireStatus)}>
+                    {questionnaireLabel(applicant.questionnaireStatus)}
+                  </em>
+                </div>
+              </header>
+            ) : null}
             <div className="questionnaire-section-list">
               {applicant.sections.map((section) => {
                 const issue = sectionIssue(submission, applicant.id, section.title);
@@ -682,19 +676,22 @@ function DrawerQuestionnaire({
                       <div>
                         <span className="row-dot" aria-hidden="true" />
                         <div>
-                          <strong>{section.title}</strong>
+                          {section.stepLabel ? (
+                            <p className="consular-step-label">{section.stepLabel}</p>
+                          ) : null}
+                          <h4>{section.title}</h4>
                           {issue ? (
                             <p>{issue.reason}</p>
                           ) : section.missing ? (
                             <p>{section.missing}</p>
-                          ) : (
-                            <p>Обязательные поля заполнены</p>
-                          )}
+                          ) : null}
                         </div>
                       </div>
-                      <span className={statusPillClass(section.status)}>
-                        {questionnaireLabel(section.status)}
-                      </span>
+                      {issue || section.status !== "complete" ? (
+                        <span className={statusPillClass(section.status)}>
+                          {questionnaireLabel(section.status)}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="questionnaire-fields">
                       {section.fields.map((field) => {
@@ -711,29 +708,58 @@ function DrawerQuestionnaire({
 
                         return (
                           <label
-                            className={`questionnaire-field ${error ? "has-error" : ""}`}
+                            className={`questionnaire-field ${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`}
                             key={field.id}
                           >
                             <span>
                               {field.label}
-                              {field.required ? <em>обязательно</em> : null}
+                              {field.required ? <em aria-hidden="true">*</em> : null}
                             </span>
-                            <input
-                              aria-describedby={describedBy}
-                              aria-invalid={Boolean(error)}
-                              aria-label={`${applicant.fullName} · ${section.title} · ${field.label}`}
-                              disabled={!canEdit}
-                              placeholder={field.placeholder}
-                              value={field.value}
-                              onChange={(event) =>
-                                onFieldChange({
-                                  applicantId: applicant.id,
-                                  sectionId: section.id,
-                                  fieldId: field.id,
-                                  value: event.target.value,
-                                })
-                              }
-                            />
+                            {field.control === "select" ? (
+                              <select
+                                aria-describedby={describedBy}
+                                aria-invalid={Boolean(error)}
+                                aria-label={`${applicant.fullName} · ${section.title} · ${field.label}`}
+                                aria-required={field.required}
+                                disabled={!canEdit}
+                                value={field.value}
+                                onChange={(event) =>
+                                  onFieldChange({
+                                    applicantId: applicant.id,
+                                    sectionId: section.id,
+                                    fieldId: field.id,
+                                    value: event.target.value,
+                                  })
+                                }
+                              >
+                                <option value="">
+                                  {field.placeholder ?? "Выберите"}
+                                </option>
+                                {(field.options ?? []).map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                aria-describedby={describedBy}
+                                aria-invalid={Boolean(error)}
+                                aria-label={`${applicant.fullName} · ${section.title} · ${field.label}`}
+                                aria-required={field.required}
+                                disabled={!canEdit}
+                                placeholder={field.placeholder}
+                                value={field.value}
+                                onChange={(event) =>
+                                  onFieldChange({
+                                    applicantId: applicant.id,
+                                    sectionId: section.id,
+                                    fieldId: field.id,
+                                    value: event.target.value,
+                                  })
+                                }
+                              />
+                            )}
                             {error ? <small id={describedBy}>{error}</small> : null}
                           </label>
                         );
@@ -748,6 +774,17 @@ function DrawerQuestionnaire({
       </div>
     </section>
   );
+}
+
+function drawerMetaLine(submission: Submission) {
+  const parts = [
+    "Испания",
+    submission.city,
+    submission.type === "family" ? typeLabels[submission.type] : undefined,
+    applicantCountLabel(submission.applicants.length),
+  ];
+
+  return parts.filter(Boolean).join(" · ");
 }
 
 function DrawerFiles({

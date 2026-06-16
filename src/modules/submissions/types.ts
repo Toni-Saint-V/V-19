@@ -83,13 +83,17 @@ export type QuestionnaireField = {
   label: string;
   value: string;
   required: boolean;
+  control?: "text" | "select";
+  options?: string[];
   placeholder?: string;
+  span?: "full";
   error?: string;
 };
 
 export type QuestionnaireSection = {
   id: string;
   title: string;
+  stepLabel?: string;
   status: QuestionnaireStatus;
   missing?: string;
   fields: QuestionnaireField[];

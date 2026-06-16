@@ -30,6 +30,18 @@ export function matchesReviewTab(tab: ReviewTab) {
 
 export function surfaceTitle(surface: Surface) {
   if (surface === "agent-submissions") return "Мои подачи";
-  if (surface === "admin-review") return "Проверка";
-  return "Выгрузка";
+  if (surface === "admin-review") return "Проверка подач";
+  return "Выгрузка пакетов";
+}
+
+export function surfaceDescription(surface: Surface) {
+  if (surface === "agent-submissions") {
+    return "Держите в фокусе подачи, где нужно дозаполнить анкету, файлы или ответить на замечания.";
+  }
+
+  if (surface === "admin-review") {
+    return "Сначала верхняя подача: проверьте пакет, примите или верните с точным замечанием.";
+  }
+
+  return "Соберите принятые подачи, проверьте состав пакета и зафиксируйте выгрузку.";
 }

@@ -1,4 +1,5 @@
 import { applicantCountLabel, nextAuditLine, tripDates } from "../selectors";
+import type { KeyboardEvent } from "react";
 import {
   blockerCount,
   fileTypeLabels,
@@ -65,11 +66,25 @@ function SubmissionCard({
   const blockers = blockerCount(submission);
   const issueLines = cardIssueLines(submission);
   const fileSlots = fileSlotSummary(submission);
+  const submissionTypeFact =
+    submission.type === "family" ? typeLabels[submission.type] : null;
+
+  function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (event.target !== event.currentTarget) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    onSelect(submission);
+  }
 
   return (
     <article
+      aria-current={active ? "true" : undefined}
+      aria-label={`Выбрать подачу ${submission.id}: ${submission.title}`}
       className={`submission-card ${active ? "is-selected" : ""}`}
+      tabIndex={0}
       onClick={() => onSelect(submission)}
+      onKeyDown={handleCardKeyDown}
     >
       <div className="card-main">
         <div className="card-topline">
@@ -81,11 +96,11 @@ function SubmissionCard({
         </div>
         <h3>{submission.title}</h3>
         <p className="meta-line">
-          {typeLabels[submission.type]} ·{" "}
-          {applicantCountLabel(submission.applicants.length)} · Испания ·{" "}
-          {submission.city} · {tripDates(submission)}
+          Испания · {submission.city} · {tripDates(submission)}
         </p>
         <div className="card-facts" aria-label="Операционная сводка">
+          {submissionTypeFact ? <span>{submissionTypeFact}</span> : null}
+          <span>{applicantCountLabel(submission.applicants.length)}</span>
           <span>Анкета {submission.completeness.questionnaire}%</span>
           <span>
             Файлы {fileSlots.ready}/{fileSlots.total}
@@ -101,7 +116,8 @@ function SubmissionCard({
         <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
           <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
           <p>
-            <strong>Следующее:</strong> {cardNextActionLine(submission, role)}
+            <strong>{role === "admin" ? "Проверка:" : "Дальше:"}</strong>{" "}
+            {cardNextActionLine(submission, role)}
           </p>
         </div>
         <div
@@ -116,7 +132,10 @@ function SubmissionCard({
         </div>
       </div>
       <div className="card-side">
-        <span className="owner-pill">{responsibleRole(submission)}</span>
+        <div className="card-side-head">
+          <small>Ответственный</small>
+          <span className="owner-pill">{responsibleRole(submission)}</span>
+        </div>
         <p>{nextAuditLine(submission)}</p>
         <button
           className={

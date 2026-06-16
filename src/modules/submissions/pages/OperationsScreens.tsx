@@ -1,13 +1,7 @@
 import type { ReactNode } from "react";
 import type { ExportSummary } from "../exportRules";
 import { counts, nextAuditLine, tripDates } from "../selectors";
-import {
-  canAddAdminIssue,
-  getCardActionLabel,
-  nextProblem,
-  responsibleRole,
-  typeLabels,
-} from "../status";
+import { canAddAdminIssue, nextProblem, responsibleRole, typeLabels } from "../status";
 import type { DrawerTab, Submission } from "../types";
 import type { AgentTab, ExportTab, ReviewTab } from "../uiTypes";
 import {
@@ -52,6 +46,7 @@ export function AgentSubmissionsScreen({
         <section className="submission-panel" aria-labelledby="agent-title">
           <PanelHeader
             eyebrow="Очередь действий"
+            titleId="agent-title"
             title="Где агент должен действовать"
             tabs={[
               ["action", "Требуют действия"],
@@ -108,27 +103,32 @@ export function AdminReviewScreen({
   summary: ReturnType<typeof counts>;
 }) {
   const canAddIssue = canAddAdminIssue(activeSubmission, "admin");
+  const firstReview = reviewList[0];
+  const activeIsFirst = firstReview?.id === activeSubmission.id;
 
   return (
     <>
-      <div className="main-grid">
+      <div className="main-grid admin-review-grid">
         <section className="submission-panel" aria-labelledby="review-title">
           <PanelHeader
             action={
-              <button
-                className="primary-button"
-                type="button"
-                onClick={() => reviewList[0] && onOpen(reviewList[0])}
-              >
-                Открыть первую
-              </button>
+              activeIsFirst ? null : (
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => firstReview && onOpen(firstReview)}
+                >
+                  Открыть первую
+                </button>
+              )
             }
             eyebrow="Очередь проверки"
-            title="Что администратор должен проверить первым"
+            titleId="review-title"
+            title="Кого проверить сейчас"
             tabs={[
               ["review", "На проверке"],
-              ["corrections", "Исправления получены"],
-              ["ready", "Готово к выгрузке"],
+              ["corrections", "Исправления"],
+              ["ready", "К выгрузке"],
             ]}
             search={searchControl}
             value={reviewTab}
@@ -144,23 +144,18 @@ export function AdminReviewScreen({
           />
         </section>
         <aside className="right-rail" aria-label="Контекст проверки">
-          <section className="rail-panel rail-summary">
-            <p className="kicker">Сводка проверки</p>
-            <SummaryRow
-              chips={[
-                ["blue", String(summary.inReview), "на проверке"],
-                ["amber", String(summary.corrections), "исправления получены"],
-                ["teal", String(summary.ready), "к выгрузке"],
-              ]}
-            />
-          </section>
           <section className="rail-panel selected-context">
-            <p className="kicker">Выбранная подача</p>
-            <h2>{activeSubmission.title}</h2>
-            <StatusChip submission={activeSubmission} />
+            <div className="selected-context-head">
+              <div>
+                <p className="kicker">Выбранная подача</p>
+                <h2>{activeSubmission.title}</h2>
+                <span>{activeSubmission.id}</span>
+              </div>
+              <StatusChip submission={activeSubmission} />
+            </div>
             <dl>
               <div>
-                <dt>Что проверить</dt>
+                <dt>Решение сейчас</dt>
                 <dd>{nextAuditLine(activeSubmission)}</dd>
               </div>
               <div>
@@ -178,7 +173,7 @@ export function AdminReviewScreen({
                 type="button"
                 onClick={() => onOpen(activeSubmission)}
               >
-                {getCardActionLabel(activeSubmission, "admin")}
+                Открыть проверку
               </button>
               <button
                 className="secondary-button wide"
@@ -186,15 +181,25 @@ export function AdminReviewScreen({
                 type="button"
                 onClick={onAddIssue}
               >
-                Добавить замечание
+                Вернуть с замечанием
               </button>
             </div>
           </section>
-          <section className="rail-panel">
+          <section className="rail-panel rail-summary">
+            <p className="kicker">Сводка проверки</p>
+            <SummaryRow
+              chips={[
+                ["blue", String(summary.inReview), "на проверке"],
+                ["amber", String(summary.corrections), "исправления"],
+                ["teal", String(summary.ready), "к выгрузке"],
+              ]}
+            />
+          </section>
+          <section className="rail-panel rail-rule">
             <p className="kicker">Правило проверки</p>
             <p className="rail-copy">
-              Вернуть можно только с точной целью. Принять можно только без открытых
-              блокеров.
+              Решение принимается после проверки пакета. Возврат только с конкретным
+              замечанием.
             </p>
           </section>
         </aside>
@@ -239,6 +244,7 @@ export function ExportScreen({
         <section className="submission-panel" aria-labelledby="export-title">
           <PanelHeader
             eyebrow="Выгрузка"
+            titleId="export-title"
             title="Что можно безопасно выгрузить"
             tabs={[
               ["ready", "Готовы"],
