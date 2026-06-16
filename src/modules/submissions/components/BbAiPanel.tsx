@@ -1,6 +1,7 @@
 import { activeAiSuggestions, canManageAiSuggestions } from "../aiSuggestions";
 import { fileTypeLabels } from "../status";
 import type { AiReviewState, AiSuggestion, Role, Submission } from "../types";
+import { Badge, Button, CardComponent } from "./magicpathPrimitives";
 import { EmptyState } from "./Primitives";
 
 export function BbAiPanel({
@@ -26,31 +27,29 @@ export function BbAiPanel({
   return (
     <section
       className={`bb-panel ${compact ? "compact" : ""}`}
-      aria-label="ББ-помощник"
+      aria-label="Панель подсказок ББ"
     >
       <div className="bb-panel-header">
         <div>
-          <p className="kicker">ББ-помощник</p>
+          <p className="kicker">ББ</p>
           <h3>{compact ? "Подсказки для проверки" : "Возможные проблемы"}</h3>
           <p>
-            ББ-помощник может подсветить возможную проблему, но не принимает визовое
-            решение.
+            Подсвечивает возможные проблемы; решение остаётся за администратором.
           </p>
         </div>
-        <span className={`status-chip ${suggestions.length ? "amber" : "muted"}`}>
+        <Badge tone={suggestions.length ? "amber" : "muted"}>
           {stateLabel(state, suggestions.length)}
-        </span>
+        </Badge>
       </div>
 
       <div className="bb-actions">
-        <button
-          className="secondary-button"
+        <Button
+          variant="secondary"
           disabled={state === "checking"}
-          type="button"
           onClick={onRun}
         >
-          {hasRun ? "Проверить снова" : "Проверить ББ"}
-        </button>
+          {hasRun ? "Проверить снова" : "Запустить проверку"}
+        </Button>
         <span>Повторы скрываются. Решение принимает администратор.</span>
       </div>
 
@@ -88,7 +87,7 @@ function AiSuggestionCard({
   suggestion: AiSuggestion;
 }) {
   return (
-    <article className={`bb-suggestion ${suggestion.severity}`}>
+    <CardComponent as="article" className={`bb-suggestion ${suggestion.severity}`}>
       <span>{severityLabel(suggestion.severity)}</span>
       <div>
         <strong>{suggestionTarget(suggestion)}</strong>
@@ -97,27 +96,19 @@ function AiSuggestionCard({
       </div>
       {canManage ? (
         <div className="bb-suggestion-actions">
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => onAccept(suggestion.id)}
-          >
+          <Button variant="secondary" onClick={() => onAccept(suggestion.id)}>
             Добавить как замечание
-          </button>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => onDismiss(suggestion.id)}
-          >
+          </Button>
+          <Button variant="ghost" onClick={() => onDismiss(suggestion.id)}>
             Отклонить
-          </button>
+          </Button>
         </div>
       ) : (
         <em>
           {role === "admin" ? "Доступно только на проверке" : "Проверит администратор"}
         </em>
       )}
-    </article>
+    </CardComponent>
   );
 }
 

@@ -1,4 +1,10 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
+import {
+  Badge,
+  Button,
+  CardComponent,
+  SegmentedTabs,
+} from "./magicpathPrimitives";
 import { statusLabels, statusTone } from "../status";
 import type { Submission } from "../types";
 
@@ -23,37 +29,6 @@ export function PanelHeader<T extends string>({
   titleId?: string;
   value: T;
 }) {
-  const tabRefs = useRef(new Map<T, HTMLButtonElement>());
-
-  function focusTab(index: number) {
-    const [id] = tabs[index];
-    onTab(id);
-    requestAnimationFrame(() => {
-      tabRefs.current.get(id)?.focus({ preventScroll: true });
-    });
-  }
-
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const lastIndex = tabs.length - 1;
-    let nextIndex: number | null = null;
-
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = index === lastIndex ? 0 : index + 1;
-    }
-
-    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = index === 0 ? lastIndex : index - 1;
-    }
-
-    if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = lastIndex;
-
-    if (nextIndex === null) return;
-
-    event.preventDefault();
-    focusTab(nextIndex);
-  }
-
   return (
     <div className="panel-header">
       <div className="panel-header-title">
@@ -63,30 +38,12 @@ export function PanelHeader<T extends string>({
       {side ? <div className="panel-header-side">{side}</div> : null}
       <div className="panel-controls">
         <div className="panel-tabs-group">
-          <div className="tabs" role="tablist" aria-label={title}>
-            {tabs.map(([id, label], index) => {
-              const selected = value === id;
-
-              return (
-                <button
-                  className={selected ? "is-active" : ""}
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  ref={(node) => {
-                    if (node) tabRefs.current.set(id, node);
-                    else tabRefs.current.delete(id);
-                  }}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => focusTab(index)}
-                  onKeyDown={(event) => handleTabKeyDown(event, index)}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          <SegmentedTabs
+            ariaLabel={title}
+            tabs={tabs}
+            value={value}
+            onValueChange={onTab}
+          />
           {action}
         </div>
         {search ? <div className="panel-search-slot">{search}</div> : null}
@@ -99,14 +56,15 @@ export function SummaryRow({ chips }: { chips: Array<[string, string, string]> }
   return (
     <section className="summary-row" aria-label="Сводка">
       {chips.map(([tone, value, label]) => (
-        <article
+        <CardComponent
+          as="article"
           className={`summary-chip ${tone}`}
           key={`${value}-${label}`}
           aria-label={`${value} ${label}`}
         >
           <span>{value}</span>
           <strong>{label}</strong>
-        </article>
+        </CardComponent>
       ))}
     </section>
   );
@@ -114,9 +72,9 @@ export function SummaryRow({ chips }: { chips: Array<[string, string, string]> }
 
 export function StatusChip({ submission }: { submission: Submission }) {
   return (
-    <span className={`status-chip ${statusTone[submission.status]}`}>
+    <Badge tone={statusTone[submission.status]}>
       {statusLabels[submission.status]}
-    </span>
+    </Badge>
   );
 }
 
@@ -154,21 +112,12 @@ export function ConfirmationDialog({
         <h2 id="confirm-title">Закрыть панель?</h2>
         <p>Черновик изменён. Закрытие без сохранения потребует подтверждения.</p>
         <div className="dialog-actions">
-          <button
-            className="secondary-button"
-            type="button"
-            ref={cancelButtonRef}
-            onClick={onCancel}
-          >
+          <Button variant="secondary" ref={cancelButtonRef} onClick={onCancel}>
             Остаться
-          </button>
-          <button
-            className="primary-button danger-action"
-            type="button"
-            onClick={onConfirm}
-          >
+          </Button>
+          <Button danger onClick={onConfirm}>
             Закрыть без сохранения
-          </button>
+          </Button>
         </div>
       </section>
     </div>

@@ -1,10 +1,13 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  type KeyboardEvent,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+  Badge,
+  Button,
+  CardComponent,
+  DrawerTabs,
+  Select,
+  SheetFrame,
+  TextInputField,
+} from "./magicpathPrimitives";
 import { applicantCountLabel, tripDates } from "../selectors";
 import {
   fileStatusLabels,
@@ -96,15 +99,6 @@ export function SubmissionDrawer({
     (contentCanBeEdited
       ? "Изменения сохраняются внутри подачи"
       : "Проверьте данные и выберите действие по подаче");
-  const activeTabButtonRef = useRef<HTMLButtonElement | null>(null);
-  const tabButtonsRef = useRef<Partial<Record<DrawerTab, HTMLButtonElement | null>>>(
-    {},
-  );
-
-  useEffect(() => {
-    activeTabButtonRef.current?.focus({ preventScroll: true });
-  }, [activeTab, submission.id]);
-
   useEffect(() => {
     setIssueComposerOpen(false);
   }, [submission.id]);
@@ -125,40 +119,10 @@ export function SubmissionDrawer({
     if (!canOpenIssueComposer) setIssueComposerOpen(false);
   }, [canOpenIssueComposer]);
 
-  function focusTab(tab: DrawerTab) {
-    onTab(tab);
-    requestAnimationFrame(() => {
-      tabButtonsRef.current[tab]?.focus({ preventScroll: true });
-    });
-  }
-
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const lastIndex = drawerTabs.length - 1;
-    let nextIndex: number | null = null;
-
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = index === lastIndex ? 0 : index + 1;
-    }
-
-    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = index === 0 ? lastIndex : index - 1;
-    }
-
-    if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = lastIndex;
-
-    if (nextIndex === null) return;
-
-    event.preventDefault();
-    focusTab(drawerTabs[nextIndex].id);
-  }
-
   return (
-    <div
+    <SheetFrame
       className="submission-drawer"
-      role="dialog"
-      aria-modal="false"
-      aria-labelledby="drawer-title"
+      labelledBy="drawer-title"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
         event.stopPropagation();
@@ -177,44 +141,20 @@ export function SubmissionDrawer({
           <h2 id="drawer-title">{submission.title}</h2>
           <p>{drawerMetaLine(submission)}</p>
         </div>
-        <button
-          className="icon-button"
-          type="button"
-          aria-label="Закрыть подачу"
-          onClick={onClose}
-        >
+        <Button variant="icon" aria-label="Закрыть подачу" onClick={onClose}>
           ×
-        </button>
+        </Button>
       </header>
 
-      <div className="drawer-tabs" role="tablist" aria-label="Разделы подачи">
-        {drawerTabs.map((tab, index) => {
-          const meta = drawerTabValue(submission, tab.id);
-          const selected = activeTab === tab.id;
-
-          return (
-            <button
-              className={selected ? "is-active" : ""}
-              id={`drawer-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-controls={`drawer-panel-${tab.id}`}
-              aria-selected={selected}
-              key={tab.id}
-              ref={(node) => {
-                tabButtonsRef.current[tab.id] = node;
-                if (selected) activeTabButtonRef.current = node;
-              }}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => focusTab(tab.id)}
-              onKeyDown={(event) => handleTabKeyDown(event, index)}
-            >
-              <span>{tab.label}</span>
-              <em>{meta}</em>
-            </button>
-          );
-        })}
-      </div>
+      <DrawerTabs
+        ariaLabel="Разделы подачи"
+        tabs={drawerTabs.map((tab) => ({
+          ...tab,
+          meta: drawerTabValue(submission, tab.id),
+        }))}
+        value={activeTab}
+        onValueChange={onTab}
+      />
 
       <div
         className="drawer-body"
@@ -279,28 +219,22 @@ export function SubmissionDrawer({
             : footerHint}
         </span>
         {canOpenIssueComposer && !issueComposerOpen ? (
-          <button
-            className="secondary-button"
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => setIssueComposerOpen(true)}
           >
             Добавить замечание
-          </button>
+          </Button>
         ) : null}
-        <button
-          className={
-            primaryAction.action === "return_with_issues"
-              ? "primary-button danger-action"
-              : "primary-button"
-          }
+        <Button
+          danger={primaryAction.action === "return_with_issues"}
           disabled={primaryAction.disabled || issueComposerOpen}
-          type="button"
           onClick={() => onAction(primaryAction.action)}
         >
           {primaryAction.label}
-        </button>
+        </Button>
       </footer>
-    </div>
+    </SheetFrame>
   );
 }
 
@@ -325,6 +259,11 @@ function IssueComposer({
   const [comment, setComment] = useState(
     "Проверьте целевое поле и отправьте исправление.",
   );
+  const reasonInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    reasonInputRef.current?.focus({ preventScroll: true });
+  }, []);
 
   const applicant =
     submission.applicants.find((item) => item.id === applicantId) ??
@@ -359,24 +298,27 @@ function IssueComposer({
         <h3>Точная цель возврата</h3>
       </div>
       <div className="issue-composer-grid">
-        <label>
-          <span>Заявитель</span>
-          <select
-            value={applicant?.id ?? ""}
-            onChange={(event) => setApplicantId(event.target.value)}
-          >
-            {submission.applicants.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.fullName}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Раздел</span>
-          <select
-            value={targetKind}
-            onChange={(event) => {
+        <Select
+          containerClassName=""
+          fieldClassName=""
+          label="Заявитель"
+          options={submission.applicants.map((item) => ({
+            label: item.fullName,
+            value: item.id,
+          }))}
+          value={applicant?.id ?? ""}
+          onChange={(event) => setApplicantId(event.target.value)}
+        />
+        <Select
+          containerClassName=""
+          fieldClassName=""
+          label="Раздел"
+          options={[
+            { label: "Анкета", value: "questionnaire" },
+            { label: "Файлы", value: "files" },
+          ]}
+          value={targetKind}
+          onChange={(event) => {
               const nextKind = event.target.value as "questionnaire" | "files";
               setTargetKind(nextKind);
               setReason(
@@ -385,72 +327,65 @@ function IssueComposer({
                   : "Нужно уточнить маршрут поездки",
               );
             }}
-          >
-            <option value="questionnaire">Анкета</option>
-            <option value="files">Файлы</option>
-          </select>
-        </label>
+        />
         {targetKind === "questionnaire" ? (
-          <label>
-            <span>Поле</span>
-            <select
-              value={selectedField}
-              onChange={(event) => setFieldLabel(event.target.value)}
-            >
-              {fields.map((field) => (
-                <option key={field.id} value={field.label}>
-                  {field.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select
+            containerClassName=""
+            fieldClassName=""
+            label="Поле"
+            options={fields.map((field) => ({
+              label: field.label,
+              value: field.label,
+            }))}
+            value={selectedField}
+            onChange={(event) => setFieldLabel(event.target.value)}
+          />
         ) : (
-          <label>
-            <span>Файл</span>
-            <select
-              value={fileType}
-              onChange={(event) => setFileType(event.target.value as typeof fileType)}
-            >
-              {(["photo", "selfie", "video"] as const).map((type) => (
-                <option key={type} value={type}>
-                  {fileTypeLabels[type]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select
+            containerClassName=""
+            fieldClassName=""
+            label="Файл"
+            options={(["photo", "selfie", "video"] as const).map((type) => ({
+              label: fileTypeLabels[type],
+              value: type,
+            }))}
+            value={fileType}
+            onChange={(event) => setFileType(event.target.value as typeof fileType)}
+          />
         )}
-        <label>
-          <span>Критичность</span>
-          <select
-            value={severity}
-            onChange={(event) => setSeverity(event.target.value as typeof severity)}
-          >
-            <option value="blocker">Блокер</option>
-            <option value="warning">Проверить</option>
-            <option value="info">Инфо</option>
-          </select>
-        </label>
-        <label>
-          <span>Причина</span>
-          <input value={reason} onChange={(event) => setReason(event.target.value)} />
-        </label>
-        <label>
-          <span>Комментарий агенту</span>
-          <input value={comment} onChange={(event) => setComment(event.target.value)} />
-        </label>
+        <Select
+          containerClassName=""
+          fieldClassName=""
+          label="Критичность"
+          options={[
+            { label: "Блокер", value: "blocker" },
+            { label: "Проверить", value: "warning" },
+            { label: "Инфо", value: "info" },
+          ]}
+          value={severity}
+          onChange={(event) => setSeverity(event.target.value as typeof severity)}
+        />
+        <TextInputField
+          containerClassName=""
+          label="Причина"
+          ref={reasonInputRef}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <TextInputField
+          containerClassName=""
+          label="Комментарий агенту"
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+        />
       </div>
       <div className="issue-composer-actions">
-        <button className="ghost-button" type="button" onClick={onCancel}>
+        <Button variant="ghost" onClick={onCancel}>
           Отмена
-        </button>
-        <button
-          className="primary-button"
-          disabled={!canSubmit}
-          type="button"
-          onClick={submit}
-        >
+        </Button>
+        <Button disabled={!canSubmit} onClick={submit}>
           Создать замечание
-        </button>
+        </Button>
       </div>
     </section>
   );
@@ -479,19 +414,22 @@ function DrawerOverview({
 
   return (
     <section className="drawer-section">
-      <article className={`decision-card ${needsAttention ? "needs-attention" : ""}`}>
+      <CardComponent
+        as="article"
+        className={`decision-card ${needsAttention ? "needs-attention" : ""}`}
+      >
         <div>
           <p className="kicker">Решение</p>
           <h3>{decisionTitle(submission, primaryAction)}</h3>
           <p>{nextLine}</p>
         </div>
-        <span
+        <Badge
           className={`decision-card-badge ${
             needsAttention ? "is-attention" : "is-clear"
           }`}
         >
           {decisionBadge(submission, primaryAction)}
-        </span>
+        </Badge>
         <dl>
           <div>
             <dt>Статус</dt>
@@ -508,20 +446,20 @@ function DrawerOverview({
             <dd>{primaryAction.label}</dd>
           </div>
         </dl>
-      </article>
+      </CardComponent>
       <div className="drawer-metrics">
-        <article>
+        <CardComponent as="article">
           <span>{submission.completeness.questionnaire}%</span>
           <p>Анкета</p>
-        </article>
-        <article>
+        </CardComponent>
+        <CardComponent as="article">
           <span>{submission.completeness.files}%</span>
           <p>Файлы</p>
-        </article>
-        <article>
+        </CardComponent>
+        <CardComponent as="article">
           <span>{openIssueCount(submission)}</span>
           <p>Открытые замечания</p>
-        </article>
+        </CardComponent>
       </div>
       <div className="blocker-box muted-box">
         <p>
@@ -546,7 +484,7 @@ function DrawerApplicants({ submission }: { submission: Submission }) {
       <p className="kicker">Заявители внутри подачи</p>
       <div className="drawer-list">
         {submission.applicants.map((applicant) => (
-          <article className="drawer-row" key={applicant.id}>
+          <CardComponent as="article" className="drawer-row" key={applicant.id}>
             <div>
               <strong>{applicant.fullName}</strong>
               <p>{applicantRoleLabel(applicant.role)}</p>
@@ -555,7 +493,7 @@ function DrawerApplicants({ submission }: { submission: Submission }) {
               анкета {questionnaireLabel(applicant.questionnaireStatus)} · файлы{" "}
               {questionnaireLabel(applicant.fileStatus)}
             </span>
-          </article>
+          </CardComponent>
         ))}
       </div>
     </section>
@@ -647,9 +585,9 @@ function DrawerQuestionnaire({
           </p>
         </div>
         {questionnaireReady ? (
-          <span className="status-pill ready">Анкета готова</span>
+          <Badge className="status-pill ready">Анкета готова</Badge>
         ) : problemCount ? (
-          <span className="status-pill warning">{problemCount} проблем</span>
+          <Badge className="status-pill warning">{problemCount} проблем</Badge>
         ) : null}
       </div>
       {submission.applicants.length > 1 ? (
@@ -666,9 +604,10 @@ function DrawerQuestionnaire({
             ).length;
 
             return (
-              <button
+              <Button
                 className="questionnaire-applicant-card"
                 key={applicant.id}
+                variant="plain"
                 type="button"
                 onClick={() => scrollToApplicant(applicant.id)}
               >
@@ -679,11 +618,11 @@ function DrawerQuestionnaire({
                     <p>{applicantRoleLabel(applicant.role)}</p>
                   </div>
                 </div>
-                <span
+                <Badge
                   className={openForApplicant ? "status-pill warning" : "status-pill"}
                 >
                   {openForApplicant ? `${openForApplicant} замеч.` : `${percent}%`}
-                </span>
+                </Badge>
                 <div
                   className="inline-progress"
                   role="progressbar"
@@ -694,14 +633,15 @@ function DrawerQuestionnaire({
                 >
                   <i style={{ width: `${percent}%` }} />
                 </div>
-              </button>
+              </Button>
             );
           })}
         </div>
       ) : null}
       <div className="questionnaire-workspace">
         {submission.applicants.map((applicant) => (
-          <article
+          <CardComponent
+            as="article"
             className={`questionnaire-card ${isSingleApplicant ? "is-single" : ""}`}
             id={`questionnaire-applicant-${applicant.id}`}
             key={applicant.id}
@@ -714,9 +654,9 @@ function DrawerQuestionnaire({
                 </div>
                 <div className="questionnaire-card-status">
                   <span>{questionnaireProgressForApplicant(applicant)}%</span>
-                  <em className={statusPillClass(applicant.questionnaireStatus)}>
+                  <Badge className={statusPillClass(applicant.questionnaireStatus)}>
                     {questionnaireLabel(applicant.questionnaireStatus)}
-                  </em>
+                  </Badge>
                 </div>
               </header>
             ) : null}
@@ -729,14 +669,16 @@ function DrawerQuestionnaire({
                 const expanded = openSectionKey === sectionKey;
 
                 return (
-                  <section
+                  <CardComponent
+                    as="section"
                     className={`questionnaire-edit-section ${issue ? "has-issue" : ""} ${expanded ? "is-expanded" : "is-collapsed"}`}
                     id={sectionElementId}
                     key={section.id}
                     aria-label={`${applicant.fullName}: ${section.title}`}
                   >
-                    <button
+                    <Button
                       className="questionnaire-section-heading"
+                      variant="plain"
                       type="button"
                       aria-controls={fieldsId}
                       aria-expanded={expanded}
@@ -763,13 +705,13 @@ function DrawerQuestionnaire({
                       </div>
                       <span className="questionnaire-section-side">
                         {issue || section.status !== "complete" ? (
-                          <span className={statusPillClass(section.status)}>
+                          <Badge className={statusPillClass(section.status)}>
                             {questionnaireLabel(section.status)}
-                          </span>
+                          </Badge>
                         ) : null}
                         <span className="accordion-chevron" aria-hidden="true" />
                       </span>
-                    </button>
+                    </Button>
                     <div
                       className="questionnaire-fields"
                       hidden={!expanded}
@@ -783,74 +725,65 @@ function DrawerQuestionnaire({
                           field.label,
                         );
                         const error = field.error ?? fieldIssue?.reason;
-                        const describedBy = error
-                          ? `${section.id}-${field.id}-error`
-                          : undefined;
+                        const fieldClassName = `${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`;
+                        const fieldAriaLabel = `${applicant.fullName} · ${section.title} · ${field.label}`;
+
+                        if (field.control === "select") {
+                          return (
+                            <Select
+                              aria-label={fieldAriaLabel}
+                              containerClassName={fieldClassName}
+                              disabled={!canEdit}
+                              errorMessage={error}
+                              key={field.id}
+                              label={field.label}
+                              options={(field.options ?? []).map((option) => ({
+                                label: option,
+                                value: option,
+                              }))}
+                              placeholder={field.placeholder ?? "Выберите"}
+                              required={field.required}
+                              value={field.value}
+                              onChange={(event) =>
+                                onFieldChange({
+                                  applicantId: applicant.id,
+                                  sectionId: section.id,
+                                  fieldId: field.id,
+                                  value: event.target.value,
+                                })
+                              }
+                            />
+                          );
+                        }
 
                         return (
-                          <label
-                            className={`questionnaire-field ${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`}
+                          <TextInputField
+                            aria-label={fieldAriaLabel}
+                            containerClassName={fieldClassName}
+                            disabled={!canEdit}
+                            errorMessage={error}
                             key={field.id}
-                          >
-                            <span>
-                              {field.label}
-                              {field.required ? <em aria-hidden="true">*</em> : null}
-                            </span>
-                            {field.control === "select" ? (
-                              <select
-                                aria-describedby={describedBy}
-                                aria-invalid={Boolean(error)}
-                                aria-label={`${applicant.fullName} · ${section.title} · ${field.label}`}
-                                aria-required={field.required}
-                                disabled={!canEdit}
-                                value={field.value}
-                                onChange={(event) =>
-                                  onFieldChange({
-                                    applicantId: applicant.id,
-                                    sectionId: section.id,
-                                    fieldId: field.id,
-                                    value: event.target.value,
-                                  })
-                                }
-                              >
-                                <option value="">
-                                  {field.placeholder ?? "Выберите"}
-                                </option>
-                                {(field.options ?? []).map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                aria-describedby={describedBy}
-                                aria-invalid={Boolean(error)}
-                                aria-label={`${applicant.fullName} · ${section.title} · ${field.label}`}
-                                aria-required={field.required}
-                                disabled={!canEdit}
-                                placeholder={field.placeholder}
-                                value={field.value}
-                                onChange={(event) =>
-                                  onFieldChange({
-                                    applicantId: applicant.id,
-                                    sectionId: section.id,
-                                    fieldId: field.id,
-                                    value: event.target.value,
-                                  })
-                                }
-                              />
-                            )}
-                            {error ? <small id={describedBy}>{error}</small> : null}
-                          </label>
+                            label={field.label}
+                            placeholder={field.placeholder}
+                            required={field.required}
+                            value={field.value}
+                            onChange={(event) =>
+                              onFieldChange({
+                                applicantId: applicant.id,
+                                sectionId: section.id,
+                                fieldId: field.id,
+                                value: event.target.value,
+                              })
+                            }
+                          />
                         );
                       })}
                     </div>
-                  </section>
+                  </CardComponent>
                 );
               })}
             </div>
-          </article>
+          </CardComponent>
         ))}
       </div>
     </section>
@@ -952,7 +885,8 @@ function DrawerFiles({
               canEditFiles &&
               (file.status === "missing" || file.status === "needs_replacement");
             return (
-              <article
+              <CardComponent
+                as="article"
                 className={`drawer-row file-row ${issue ? "has-issue" : ""}`}
                 key={file.id}
               >
@@ -963,21 +897,21 @@ function DrawerFiles({
                   {issue ? <small>{issue.reason}</small> : null}
                 </div>
                 <div className="file-row-actions">
-                  <span className={fileStatusPillClass(file.status)}>
+                  <Badge className={fileStatusPillClass(file.status)}>
                     {fileStatusLabels[file.status]}
-                  </span>
+                  </Badge>
                   {canUploadFile ? (
-                    <button
-                      className="secondary-button compact-button"
-                      type="button"
+                    <Button
+                      className="compact-button"
+                      variant="secondary"
                       aria-label={`${file.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileTypeLabels[file.type]}: ${applicantName}`}
                       onClick={() => onUploadFile(file.id)}
                     >
                       {file.status === "needs_replacement" ? "Заменить" : "Загрузить"}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
-              </article>
+              </CardComponent>
             );
           })
         ) : (
@@ -1018,7 +952,11 @@ function DrawerIssues({
       <div className="drawer-list">
         {submission.issues.length ? (
           submission.issues.map((issue) => (
-            <article className={`issue-row ${issue.severity}`} key={issue.id}>
+            <CardComponent
+              as="article"
+              className={`issue-row ${issue.severity}`}
+              key={issue.id}
+            >
               <span>{issueSeverityLabel(issue.severity)}</span>
               <div>
                 <strong>{issueTarget(issue)}</strong>
@@ -1026,7 +964,7 @@ function DrawerIssues({
                 <small>{issue.comment}</small>
               </div>
               <em>{issueStatusLabel(issue.status)}</em>
-            </article>
+            </CardComponent>
           ))
         ) : (
           <EmptyState text="Открытых замечаний нет." />
@@ -1053,28 +991,28 @@ function DrawerHistory({ submission }: { submission: Submission }) {
           <h3>Журнал действий</h3>
         </div>
         <div className="history-filter" role="group" aria-label="Фильтр истории">
-          <button
+          <Button
             className={filter === "all" ? "is-active" : ""}
-            type="button"
             aria-pressed={filter === "all"}
+            variant="ghost"
             onClick={() => setFilter("all")}
           >
             Все
-          </button>
-          <button
+          </Button>
+          <Button
             className={filter === "bb" ? "is-active" : ""}
-            type="button"
             aria-pressed={filter === "bb"}
+            variant="ghost"
             onClick={() => setFilter("bb")}
           >
             ББ
-          </button>
+          </Button>
         </div>
       </div>
       <div className="drawer-list">
         {events.length ? (
           events.map((event) => (
-            <article className="drawer-row history-row" key={event.id}>
+            <CardComponent as="article" className="drawer-row history-row" key={event.id}>
               <div>
                 <strong>{event.text}</strong>
                 {event.detail ? (
@@ -1087,7 +1025,7 @@ function DrawerHistory({ submission }: { submission: Submission }) {
                 )}
               </div>
               <span>{historySourceLabel(event.source)}</span>
-            </article>
+            </CardComponent>
           ))
         ) : (
           <EmptyState text="Событий ББ пока нет." />
@@ -1098,7 +1036,7 @@ function DrawerHistory({ submission }: { submission: Submission }) {
 }
 
 function historySourceLabel(source: Submission["history"][number]["source"]) {
-  if (source === "bb") return "ББ-помощник";
+  if (source === "bb") return "ББ";
   if (source === "admin") return "Администратор";
   if (source === "agent") return "Агент";
   if (source === "system") return "Система";

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button, CardComponent } from "../components/magicpathPrimitives";
 import type { ExportSummary } from "../exportRules";
 import { counts, nextAuditLine, tripDates } from "../selectors";
 import {
@@ -59,7 +60,11 @@ export function AgentSubmissionsScreen({
   return (
     <>
       <div className="main-grid">
-        <section className="submission-panel" aria-labelledby="agent-title">
+        <CardComponent
+          as="section"
+          className="submission-panel"
+          aria-labelledby="agent-title"
+        >
           <PanelHeader
             eyebrow="Очередь действий"
             titleId="agent-title"
@@ -83,7 +88,7 @@ export function AgentSubmissionsScreen({
             role="agent"
             submissions={agentList}
           />
-        </section>
+        </CardComponent>
         <RightRail
           activeSubmission={activeSubmission}
           onOpen={onOpen}
@@ -129,17 +134,20 @@ export function AdminReviewScreen({
   return (
     <>
       <div className="main-grid admin-review-grid">
-        <section className="submission-panel" aria-labelledby="review-title">
+        <CardComponent
+          as="section"
+          className="submission-panel"
+          aria-labelledby="review-title"
+        >
           <PanelHeader
             action={
               activeIsFirst ? null : (
-                <button
-                  className="secondary-button"
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => firstReview && onOpen(firstReview)}
                 >
                   Открыть первую
-                </button>
+                </Button>
               )
             }
             eyebrow="Очередь проверки"
@@ -163,9 +171,10 @@ export function AdminReviewScreen({
             role="admin"
             submissions={reviewList}
           />
-        </section>
-        <aside className="right-rail" aria-label="Контекст проверки">
-          <section
+        </CardComponent>
+        <CardComponent as="aside" className="right-rail" aria-label="Контекст проверки">
+          <CardComponent
+            as="section"
             className={`rail-panel selected-context tone-${statusTone[activeSubmission.status]}`}
           >
             <div className="selected-context-head">
@@ -191,39 +200,35 @@ export function AdminReviewScreen({
               </div>
             </dl>
             <div className="stacked-actions">
-              <button
-                className="primary-button wide"
-                type="button"
-                onClick={() => onOpen(activeSubmission)}
-              >
+              <Button wide onClick={() => onOpen(activeSubmission)}>
                 Открыть проверку
-              </button>
-              <button
-                className="secondary-button wide"
+              </Button>
+              <Button
                 aria-describedby={
                   !canAddIssue ? "admin-return-disabled-note" : undefined
                 }
                 disabled={!canAddIssue}
-                type="button"
+                variant="secondary"
+                wide
                 onClick={onAddIssue}
               >
                 Вернуть с замечанием
-              </button>
+              </Button>
             </div>
             {!canAddIssue ? (
               <p className="action-disabled-note" id="admin-return-disabled-note">
                 {addIssueReason}
               </p>
             ) : null}
-          </section>
-          <section className="rail-panel rail-rule">
+          </CardComponent>
+          <CardComponent as="section" className="rail-panel rail-rule">
             <p className="kicker">Правило проверки</p>
             <p className="rail-copy">
               Решение принимается после проверки пакета. Возврат только с конкретным
               замечанием.
             </p>
-          </section>
-        </aside>
+          </CardComponent>
+        </CardComponent>
       </div>
     </>
   );
