@@ -29,10 +29,10 @@ import {
   applyActionToSubmissionList,
   applyExportStateToSelection,
   createDraftSubmission,
-  markSelectedExported,
   updateQuestionnaireField,
   uploadRequiredFile,
 } from "./modules/submissions/submissionActions";
+import { completeExportPackage } from "./modules/submissions/exportWorkflow";
 import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
 import { CreateSubmissionDrawer } from "./modules/submissions/components/CreateSubmissionDrawer";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
@@ -195,6 +195,8 @@ function App() {
   const [reviewTab, setReviewTab] = useState<ReviewTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
   const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState("");
   const [issueComposerRequest, setIssueComposerRequest] =
     useState<IssueComposerRequest | null>(null);
   const [createStep, setCreateStep] = useState<CreateStep>("params");
@@ -556,12 +558,73 @@ function App() {
     );
   }
 
-  function markExported() {
-    if (!exportPlan.canMarkExported) return;
-    setSubmissions((current) =>
-      markSelectedExported(current, selectedVisibleExportIds),
+  async function markExported() {
+    if (!exportPlan.canMarkExported || exportBusy) return;
+    const selectedIds = new Set(selectedVisibleExportIds);
+    const selectedSubmissions = submissions.filter((submission) =>
+      selectedIds.has(submission.id),
     );
-    setSelectedExportIds([]);
+
+    setExportBusy(true);
+    setExportError("");
+    if (isSupabaseMode) {
+      setRemoteSaveState("saving");
+      setRemoteSaveError("");
+    }
+
+    try {
+      const result = await completeExportPackage(selectedSubmissions, {
+        createdAt: new Date().toISOString(),
+        createdBy: remoteProfile?.id ?? "local-admin",
+        format: "xlsx",
+        persistExportedSubmissions:
+          isSupabaseMode && remoteProfile
+            ? async (exportedSubmissions) => {
+                remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
+                  remoteProfile,
+                  exportedSubmissions,
+                  remoteOwnerIdsRef.current,
+                );
+                remoteSubmissionFingerprintsRef.current = new Map(
+                  remoteSubmissionFingerprintsRef.current,
+                );
+                for (const submission of exportedSubmissions) {
+                  remoteSubmissionFingerprintsRef.current.set(
+                    submission.id,
+                    cockpitSubmissionFingerprint(submission),
+                  );
+                }
+              }
+            : undefined,
+      });
+
+      if (result.status === "blocked") {
+        setExportError(result.blockers[0] ?? "Выгрузка заблокирована.");
+        if (isSupabaseMode) setRemoteSaveState("idle");
+        return;
+      }
+
+      const exportedById = new Map(
+        result.submissions.map((submission) => [submission.id, submission]),
+      );
+      setSubmissions((current) =>
+        current.map((submission) => exportedById.get(submission.id) ?? submission),
+      );
+      setSelectedExportIds([]);
+      if (isSupabaseMode) setRemoteSaveState("idle");
+    } catch (error) {
+      const message = formatPersistenceFailureForUser(
+        error,
+        "Не удалось безопасно зафиксировать выгрузку. Повторите после синхронизации.",
+      );
+      setExportError(message);
+      if (isSupabaseMode) {
+        setRemoteSaveState("error");
+        setRemoteSaveError(message);
+      }
+    } finally {
+      setExportBusy(false);
+    }
   }
 
   function applyRemoteWorkspace(
@@ -896,6 +959,8 @@ function App() {
           <ExportScreen
             exportPlan={exportPlan}
             exportTab={exportTab}
+            exportBusy={exportBusy}
+            exportError={exportError}
             filterControl={cityFilterControl}
             historyList={historyList}
             onDownload={downloadExport}

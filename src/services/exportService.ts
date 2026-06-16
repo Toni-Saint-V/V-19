@@ -299,13 +299,29 @@ function appendExportBatchOnce(
   changedAt: string,
 ): Submission {
   const normalized = normalizeSubmission(submission);
-  if (
-    normalized.exportHistory?.some((existing) => exportBatchMatches(existing, batch))
-  ) {
+  const existingBatch = normalized.exportHistory?.find((existing) =>
+    exportBatchMatches(existing, batch),
+  );
+
+  if (existingBatch && normalized.status === "exported") {
     return normalized;
   }
 
-  return appendExportBatch(normalized, batch, changedBy, changedAt);
+  if (!existingBatch) {
+    return appendExportBatch(normalized, batch, changedBy, changedAt);
+  }
+
+  return appendExportBatch(
+    {
+      ...normalized,
+      exportHistory: normalized.exportHistory?.filter(
+        (existing) => !exportBatchMatches(existing, batch),
+      ),
+    },
+    existingBatch,
+    changedBy,
+    changedAt,
+  );
 }
 
 function findExistingExportBatch(

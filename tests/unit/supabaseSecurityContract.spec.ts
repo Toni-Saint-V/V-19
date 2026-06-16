@@ -135,6 +135,37 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("keeps export package completion server-authoritative and atomic", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260616001000_complete_export_package_rpc.sql",
+    );
+
+    expect(migration).toContain(
+      "create or replace function public.complete_export_package(payload jsonb)",
+    );
+    expect(migration).toContain("actor_role <> 'admin'");
+    expect(migration).toContain("for update");
+    expect(migration).toContain(
+      "Only accepted or Excel-ready submissions can be exported",
+    );
+    expect(migration).toContain("status in ('accepted', 'ready_for_excel')");
+    expect(migration).toContain(
+      "Duplicate export packages can only converge accepted, Excel-ready, or exported submissions",
+    );
+    expect(migration).toContain(
+      "Export package row count does not match current applicants",
+    );
+    expect(migration).toContain("Blocking corrections must be closed before export");
+    expect(migration).toContain("All applicant media must be accepted before export");
+    expect(migration).toContain("Family submissions must be confirmed before export");
+    expect(migration).toContain("on conflict (idempotency_key)");
+    expect(migration).toContain("update public.submissions");
+    expect(migration).toContain("insert into public.status_history");
+    expect(migration).toContain(
+      "grant execute on function public.complete_export_package(jsonb) to authenticated",
+    );
+  });
+
   test("keeps corrections scoped to applicants in the same submission", () => {
     const foundationMigration = readProjectFile(
       "supabase/migrations/20260611000000_visaflow_mvp_foundation.sql",
