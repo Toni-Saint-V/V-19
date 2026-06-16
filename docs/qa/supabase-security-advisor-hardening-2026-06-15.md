@@ -41,6 +41,12 @@ Safety verifier note:
 
 ## Production Boundary
 
-This migration was not applied to production in this task.
+This original task produced the local migration only.
 
-Production activation remains `NO_GO` until the pending security hardening migration is owner-approved, applied to production, and followed by advisor/schema verification plus the existing backup/restore and post-activation checks.
+Follow-up on 2026-06-16:
+
+- applied to production project `tsymifccglpepvbmrcgh` as remote migration `20260616001949_ai_helper_security_advisor_hardening`;
+- closed the SQL/RLS/RPC security advisor findings for AI helper quota/audit surfaces;
+- left `auth_leaked_password_protection` open because it is a Supabase Auth project setting, not a SQL migration.
+
+Production activation remains `NO_GO` until plan eligibility for leaked password protection is confirmed, Auth leaked password protection is enabled, advisors are rechecked clean, and the existing backup/restore and post-activation checks are complete.

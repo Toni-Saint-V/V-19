@@ -2,7 +2,7 @@
 
 Do not apply these migrations to production from Codex without explicit owner approval.
 
-This runbook promotes the task-first workspace persistence boundary from the proven sandbox contract to a production Supabase project. It is intentionally fail-closed: production activation is blocked until migration, RLS, Storage, browser QA, key audit, and owner approval evidence all exist.
+This runbook promotes the task-first workspace persistence boundary from the proven sandbox contract to a production Supabase project. It is intentionally fail-closed: production activation is blocked until migration, RLS, Storage, Auth security advisor, Auth plan eligibility, browser QA, key audit, and owner approval evidence all exist.
 
 Related release artifacts:
 
@@ -35,14 +35,15 @@ Dry-run checklist before production:
 4. Confirm `npm run verify:supabase-release` passes locally.
 5. Confirm `npm run test:supabase-live` passes against the allow-listed sandbox.
 6. Confirm `npm run verify:full` passes after the release gate is included.
+7. Confirm Supabase plan eligibility supports leaked password protection, Supabase security advisors have no activation-blocking warnings, and Auth leaked password protection is enabled.
 
-Current production state as of 2026-06-15:
+Current production state as of 2026-06-16:
 
 - target project: `tsymifccglpepvbmrcgh`;
-- production migration history matches the order above through `20260614000000_ai_helper_audit_quota.sql`;
-- `20260615000000_ai_helper_security_advisor_hardening.sql` is local-only until explicitly applied to production;
+- Supabase organization plan: `free`;
+- production migration history includes remote `20260616001949_ai_helper_security_advisor_hardening`, which applies local contract `20260615000000_ai_helper_security_advisor_hardening.sql`;
 - schema/RLS/Storage evidence for the applied production set is recorded in `docs/qa/supabase-production-migration-2026-06-15.md`;
-- client production activation remains blocked until backup/restore, role-verified smoke accounts, production browser QA, logs, and post-activation checks are complete.
+- client production activation remains blocked until the Supabase plan can enable Auth leaked password protection, Auth leaked password protection is enabled, auth users have matching profiles, backup/restore, role-verified smoke accounts, production browser QA, logs, and post-activation checks are complete.
 
 ## Final Sandbox RLS And Storage Smoke
 
@@ -95,6 +96,32 @@ VITE_SUPABASE_EDGE_FUNCTIONS_URL=
 
 Never expose service-role keys, model provider keys, private tokens, or smoke account passwords through `VITE_` variables.
 
+## Auth Security Advisor Gate
+
+Run Supabase security advisors immediately before production activation.
+
+Production activation is blocked while `auth_leaked_password_protection` is reported as disabled.
+
+Current live org check: `Supabase _get_organization(hsolrwjysdlmyqopryon)` returned `plan: free` on 2026-06-16. Treat plan eligibility as blocked until the owner moves the project or organization to a plan that supports leaked password protection or obtains explicit Supabase eligibility confirmation.
+
+After the plan supports it, enable leaked password protection in Supabase Auth password security settings, rerun advisors, and record the clean evidence in `docs/release/supabase-production-readiness.json`.
+
+## Auth/Profile Repair Gate
+
+Production activation is blocked while an intended production auth user has no matching `public.profiles` row.
+
+Production read-only auth/profile discovery must prove:
+
+- production auth users intended for activation have matching `public.profiles` rows;
+- no production auth user is orphaned without a matching profile.
+
+Do not auto-create production profiles or assign roles from user-controlled metadata. Each profile repair requires owner-approved role assignment:
+
+- `agent` for agency users who can create and manage their own cases;
+- `admin` only for trusted operators who can review, return, accept, export, and move cases through handoff.
+
+Use aggregate discovery for repo evidence. Do not commit emails, passwords, auth ids, or other direct personal identifiers. After owner-approved repair, rerun aggregate discovery and record only counts in `docs/release/supabase-production-readiness.json`.
+
 ## Rollback Boundary
 
 Preferred rollback is application-level:
@@ -123,6 +150,10 @@ Stop before production activation if any item is true:
 - `npm run test:supabase-live` fails in sandbox;
 - `npm run verify:full` fails;
 - any smoke account has elevated permissions beyond the intended role;
+- any production auth user intended for activation lacks a matching `public.profiles` row;
+- Supabase plan eligibility for leaked password protection is not confirmed;
+- Supabase Auth leaked password protection is disabled;
+- Supabase security advisors show activation-blocking warnings;
 - browser key audit finds a secret or service-role key;
 - agent can mutate applicant, media, correction, or storage after accepted;
 - readiness can be bypassed with incomplete applicant data, missing media, or open blocking corrections;
@@ -137,6 +168,7 @@ Sandbox RLS smoke:
 Storage smoke:
 Browser QA:
 Key audit:
+Auth advisor:
 Rollback path:
 Production approval:
 Verdict:

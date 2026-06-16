@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "BLOCKED",
   "scope": "supabase-production-activation",
-  "updatedAt": "2026-06-15T15:40:29+03:00",
+  "updatedAt": "2026-06-16T04:17:20+03:00",
   "supabaseDiscovery": {
     "checkedAt": "2026-06-15T15:40:29+03:00",
     "organization": {
@@ -77,7 +77,17 @@
       "20260612001000_visaflow_rpc_corrections_persistence.sql",
       "20260613005039_visaflow_runtime_write_guards.sql",
       "20260613010029_visaflow_rpc_submit_boundary.sql",
-      "20260614000000_ai_helper_audit_quota.sql"
+      "20260614000000_ai_helper_audit_quota.sql",
+      "20260615000000_ai_helper_security_advisor_hardening.sql"
+    ],
+    "appliedRemoteOrder": [
+      "20260611000000_visaflow_mvp_foundation",
+      "20260612000000_visaflow_rls_performance_hardening",
+      "20260612001000_visaflow_rpc_corrections_persistence",
+      "20260613005039_visaflow_runtime_write_guards",
+      "20260613010029_visaflow_rpc_submit_boundary",
+      "20260614000000_ai_helper_audit_quota",
+      "20260616001949_ai_helper_security_advisor_hardening"
     ]
   },
   "smokeAccounts": {
@@ -97,6 +107,18 @@
       "identifierRecorded": false
     }
   },
+  "smokeAccountDiscovery": {
+    "checked": true,
+    "checkedAt": "2026-06-16T04:17:20+03:00",
+    "projectId": "tsymifccglpepvbmrcgh",
+    "authUserCount": 1,
+    "confirmedAuthUserCount": 1,
+    "profileCount": 0,
+    "profileRoleCounts": [],
+    "orphanAuthUsersWithoutProfileCount": 1,
+    "evidenceArtifact": "docs/qa/supabase-production-migration-2026-06-15.md",
+    "notes": "Read-only production SQL discovery used aggregate counts only; no email or direct personal identifier was recorded."
+  },
   "backupRestore": {
     "backupOwner": "single project owner/operator (user-stated 2026-06-15)",
     "backupMechanism": "",
@@ -107,11 +129,39 @@
     "rollbackCommunicationOwner": "single project owner/operator (user-stated 2026-06-15)"
   },
   "preActivationVerification": {
+    "readinessContractVersion": "2026-06-16-production-readiness-v2",
+    "readinessVerifierSha256": "f4c34d7baec29ccc7c7deb457e8ec45f352d4a64bce6d46c56af8c9e0737192b",
+    "checkedAt": "2026-06-16T05:26:36+03:00",
+    "gitHead": "ea0820c",
+    "scopedDiffSha256": "45f1e101faf6c7485fde85ca80d29a0febfb1d10f4e79c454f8eeb2b34687ce4",
+    "verificationScope": "targeted backend/security verifier refresh; verify:full, test:e2e:supabase, and final diff review must be rerun after the current readiness-contract diff",
     "verifySupabaseReleasePassed": true,
+    "verifySupabaseRelease": {
+      "checkedAt": "2026-06-16T05:26:36+03:00",
+      "command": "npm run verify:supabase-release",
+      "exitCode": 0,
+      "result": "Supabase release verification passed: 75 checks.",
+      "gitHead": "ea0820c",
+      "scopedDiffSha256": "45f1e101faf6c7485fde85ca80d29a0febfb1d10f4e79c454f8eeb2b34687ce4",
+      "evidenceArtifact": "docs/qa/supabase-production-migration-2026-06-15.md",
+      "readinessContractVersion": "2026-06-16-production-readiness-v2",
+      "readinessVerifierSha256": "f4c34d7baec29ccc7c7deb457e8ec45f352d4a64bce6d46c56af8c9e0737192b"
+    },
     "testSupabaseLivePassed": true,
-    "testE2eSupabasePassed": true,
-    "verifyFullPassed": true,
-    "finalDiffReviewed": true,
+    "testSupabaseLive": {
+      "checkedAt": "2026-06-16T05:27:53+03:00",
+      "command": "npm run test:supabase-live",
+      "exitCode": 0,
+      "result": "passed, 1 test",
+      "gitHead": "ea0820c",
+      "scopedDiffSha256": "45f1e101faf6c7485fde85ca80d29a0febfb1d10f4e79c454f8eeb2b34687ce4",
+      "evidenceArtifact": "docs/qa/supabase-production-migration-2026-06-15.md",
+      "readinessContractVersion": "2026-06-16-production-readiness-v2",
+      "readinessVerifierSha256": "f4c34d7baec29ccc7c7deb457e8ec45f352d4a64bce6d46c56af8c9e0737192b"
+    },
+    "testE2eSupabasePassed": false,
+    "verifyFullPassed": false,
+    "finalDiffReviewed": false,
     "evidenceArtifact": "docs/qa/pre-production-local-proof-2026-06-15.md"
   },
   "productionEnvEvidence": {
@@ -130,6 +180,36 @@
     "publicConfigRecorded": true,
     "productionMigrationEvidenceArtifact": "docs/qa/supabase-production-migration-2026-06-15.md"
   },
+  "authSecurity": {
+    "securityAdvisorsChecked": true,
+    "checkedAt": "2026-06-16T03:45:53+03:00",
+    "projectId": "tsymifccglpepvbmrcgh",
+    "organizationId": "hsolrwjysdlmyqopryon",
+    "organizationName": "Toni-Saint-V's Org",
+    "organizationPlan": "free",
+    "evidenceArtifact": "docs/qa/supabase-production-migration-2026-06-15.md",
+    "planEligibilityChecked": true,
+    "leakedPasswordProtectionPlanEligible": false,
+    "leakedPasswordProtectionEnabled": false,
+    "noBlockingSecurityAdvisorWarnings": false,
+    "advisorSnapshot": {
+      "checkedAt": "2026-06-16T03:45:53+03:00",
+      "projectId": "tsymifccglpepvbmrcgh",
+      "advisorType": "security",
+      "source": "Supabase _get_advisors(type=security)",
+      "warningCount": 1
+    },
+    "requiredPlanAction": "Move the Supabase organization/project to a plan that supports leaked password protection, then enable the Auth password security setting and rerun security advisors.",
+    "openWarnings": [
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "title": "Leaked Password Protection Disabled",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+        "manualActionRequired": "Enable leaked password protection in Supabase Auth password security settings; this is a project Auth setting, not a SQL migration."
+      }
+    ]
+  },
   "postActivationChecks": {
     "agentSignInWorks": false,
     "adminSignInWorks": false,
@@ -145,6 +225,6 @@
   "goNoGo": {
     "decision": "NO_GO",
     "approvalTime": "",
-    "reason": "Production project identity is recorded and committed local migrations were applied to the production project on 2026-06-15. Production activation remains blocked until the promotion window, role-verified smoke accounts, backup/restore evidence, production env activation flags, browser QA, logs, and post-activation checks are complete."
+    "reason": "Production project identity is recorded, committed local migrations through the AI helper security advisor hardening contract have been applied, and the latest sandbox live smoke passed. Production activation remains blocked until the Supabase plan can enable Auth leaked password protection, Auth leaked password protection is enabled, the production auth user without a matching profile is resolved, the promotion window, role-verified smoke accounts, backup/restore evidence, production env activation flags, browser QA, logs, and post-activation checks are complete."
   }
 }

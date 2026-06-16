@@ -28,6 +28,8 @@ Required migration order:
 3. `20260612001000_visaflow_rpc_corrections_persistence.sql`
 4. `20260613005039_visaflow_runtime_write_guards.sql`
 5. `20260613010029_visaflow_rpc_submit_boundary.sql`
+6. `20260614000000_ai_helper_audit_quota.sql`
+7. `20260615000000_ai_helper_security_advisor_hardening.sql`
 
 Approval:
 
@@ -63,6 +65,7 @@ Required smoke roles:
   - email / identifier:
   - `public.profiles.role`: `admin`
   - organization:
+- [ ] No production auth user intended for activation is missing a matching `public.profiles` row.
 
 Permission confirmation:
 
@@ -119,6 +122,14 @@ Browser/key audit:
 - [ ] No model provider key is present in browser env.
 - [ ] No smoke account password is present in browser env.
 
+Supabase Auth/security advisors:
+
+- [ ] Supabase security advisors were checked immediately before production activation.
+- [ ] Supabase organization/project plan supports leaked password protection.
+- [ ] Auth leaked password protection is enabled.
+- [ ] No activation-blocking Supabase security advisor warnings remain.
+- [ ] Advisor evidence timestamp:
+
 ## 6. Production Env Evidence
 
 Set these only after migrations and approval are complete:
@@ -155,10 +166,13 @@ Go only if every item is true:
 - [ ] Rollout owner is confirmed.
 - [ ] Backup and restore path are confirmed.
 - [ ] Required smoke accounts are ready.
+- [ ] Production auth/profile discovery has no orphan auth users.
 - [ ] Migration history is checked.
 - [ ] Sandbox smoke passed immediately before approval.
 - [ ] Full local verification passed after final diff.
 - [ ] Production env evidence flags are intentionally set.
+- [ ] Supabase plan eligibility for leaked password protection is confirmed.
+- [ ] Supabase Auth leaked password protection is enabled.
 - [ ] Rollback path is accepted by owner.
 - [ ] No critical, serious, or medium findings remain.
 
@@ -193,8 +207,12 @@ Stop immediately if:
 - target project id is ambiguous;
 - backup/restore path is missing;
 - smoke accounts are not role-correct;
+- any production auth user intended for activation lacks a matching `public.profiles` row;
 - any Supabase release verifier check fails;
 - live sandbox smoke fails;
 - production env contains any secret;
+- Supabase plan eligibility for leaked password protection is not confirmed;
+- Supabase Auth leaked password protection is disabled;
+- Supabase security advisors show activation-blocking warnings;
 - owner approval is missing;
 - a case can bypass readiness or mutate after handoff.
