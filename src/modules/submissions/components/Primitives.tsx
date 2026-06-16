@@ -9,6 +9,7 @@ export function PanelHeader<T extends string>({
   search,
   tabs,
   title,
+  titleId,
   value,
 }: {
   action?: ReactNode;
@@ -17,6 +18,7 @@ export function PanelHeader<T extends string>({
   search?: ReactNode;
   tabs: Array<[T, string]>;
   title: string;
+  titleId?: string;
   value: T;
 }) {
   const tabRefs = useRef(new Map<T, HTMLButtonElement>());
@@ -52,9 +54,9 @@ export function PanelHeader<T extends string>({
 
   return (
     <div className="panel-header">
-      <div>
+      <div className="panel-header-title">
         <p className="kicker">{eyebrow}</p>
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
       </div>
       <div className="panel-controls">
         {search ? <div className="panel-search-slot">{search}</div> : null}

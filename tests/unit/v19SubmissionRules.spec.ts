@@ -106,6 +106,17 @@ function readyClone(patch: Partial<Submission>): Submission {
   };
 }
 
+function questionnaireCompleteness(submission: Submission) {
+  const fields = submission.applicants.flatMap((applicant) =>
+    applicant.sections.flatMap((section) => section.fields),
+  );
+  const ready = fields.filter(
+    (field) => !field.required || Boolean(field.value.trim() && !field.error),
+  );
+
+  return fields.length ? Math.round((ready.length / fields.length) * 100) : 0;
+}
+
 describe("V-19 submission status rules", () => {
   it("keeps the exact centralized transition matrix", () => {
     const expected = {
@@ -373,7 +384,7 @@ describe("V-19 submission actions", () => {
     expect(updated.applicants[0]?.sections[0]?.fields[0]?.value).toBe("Иван Иванов");
     expect(updated.applicants[0]?.sections[0]?.status).toBe("partial");
     expect(updated.applicants[0]?.questionnaireStatus).toBe("partial");
-    expect(updated.completeness.questionnaire).toBe(17);
+    expect(updated.completeness.questionnaire).toBe(questionnaireCompleteness(updated));
     expect(canPerformAction(updated, "submit_for_review", "agent").ok).toBe(false);
   });
 
@@ -448,7 +459,7 @@ describe("V-19 submission actions", () => {
       applicantId: applicant.id,
       sectionId: tripSection.id,
       fieldId: routeField.id,
-      value: "Москва, Барселона, Москва",
+      value: "Москва, Барселона, Мадрид, Москва",
     });
 
     expect(edited.issues[0]?.status).toBe("open");

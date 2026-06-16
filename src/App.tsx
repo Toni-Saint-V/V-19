@@ -58,6 +58,7 @@ import {
   type ExportTab,
   matchesAgentTab,
   matchesReviewTab,
+  surfaceDescription,
   type ReviewTab,
   surfaceTitle,
 } from "./modules/submissions/uiTypes";
@@ -798,23 +799,27 @@ function App() {
                 : "Рабочее место администратора"}
             </p>
             <h1>{surfaceTitle(surface)}</h1>
+            <p className="topbar-copy">{surfaceDescription(surface)}</p>
           </div>
           <div className="topbar-actions">
-            <select
-              className="select-control"
-              aria-label="Фильтр по городу"
-              value={cityFilter}
-              onChange={(event) =>
-                setCityFilter(event.target.value as City | "Все города")
-              }
-            >
-              {cities.map((city) => (
-                <option key={city}>{city}</option>
-              ))}
-            </select>
-            <div className="service-logo" aria-label="Версия девятнадцать">
-              <span aria-hidden="true">В</span>
-              <strong>19</strong>
+            <label className="topbar-filter">
+              <span>Город</span>
+              <select
+                className="select-control"
+                aria-label="Фильтр по городу"
+                value={cityFilter}
+                onChange={(event) =>
+                  setCityFilter(event.target.value as City | "Все города")
+                }
+              >
+                {cities.map((city) => (
+                  <option key={city}>{city}</option>
+                ))}
+              </select>
+            </label>
+            <div className="service-logo" aria-label="Версия V-19">
+              <span>Версия</span>
+              <strong>V-19</strong>
             </div>
             {isSupabaseMode ? (
               <p
@@ -1009,22 +1014,31 @@ function WorkspaceAccessGate({
   requiresPassword?: boolean;
 }) {
   return (
-    <main className="access-shell" aria-label="Служебный вход">
-      <section className="access-card">
-        <p className="kicker">Служебный вход</p>
-        <h1>Войдите по заранее созданной почте</h1>
-        <p>
-          Администратор попадает в проверку и выгрузку. Агент попадает в свои подачи.
+    <main className="access-shell" aria-label="Вход в рабочий кабинет">
+      <section
+        className="access-card"
+        aria-labelledby="workspace-access-title"
+        aria-describedby="workspace-access-copy"
+      >
+        <div className="access-card-header">
+          <div>
+            <h1 id="workspace-access-title">Вход в рабочий кабинет</h1>
+          </div>
+          <span className="access-badge">Закрытый доступ</span>
+        </div>
+        <p className="access-intro" id="workspace-access-copy">
+          Введите рабочую почту, чтобы открыть свой рабочий стол.
         </p>
         <form onSubmit={onSubmit}>
           <label>
-            <span>Почта</span>
+            <span>Рабочая почта</span>
             <input
+              aria-describedby="workspace-access-note"
               autoComplete="email"
               id="workspace-email"
               inputMode="email"
               name="email"
-              placeholder="admin@visaflow.local"
+              placeholder="name@visaflow.local"
               type="email"
               value={email}
               onChange={(event) => onEmail(event.target.value)}
@@ -1049,12 +1063,12 @@ function WorkspaceAccessGate({
               {error}
             </p>
           ) : (
-            <p className="access-note">
+            <p className="access-note" id="workspace-access-note">
               {busy
                 ? "Проверяем текущую сессию."
                 : requiresPassword
                   ? "Вход идёт через Supabase Auth."
-                  : "Список почты задаётся в окружении приложения."}
+                  : "Доступ откроется после проверки почты."}
             </p>
           )}
           <button className="primary-button" type="submit" disabled={busy}>

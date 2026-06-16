@@ -10,65 +10,416 @@ type FieldSeed = {
   id: string;
   label: string;
   placeholder: string;
+  control?: QuestionnaireField["control"];
+  options?: string[];
+  required?: boolean;
+  span?: QuestionnaireField["span"];
   completeValue: (applicantName: string) => string;
 };
 
 const questionnaireBlueprint: Array<{
   id: string;
   title: string;
+  stepLabel?: string;
   fields: FieldSeed[];
 }> = [
   {
-    id: "personal",
-    title: "Личные данные",
+    id: "appointment",
+    title: "Запись",
+    stepLabel: "1 из 6",
     fields: [
       {
-        id: "full-name",
-        label: "ФИО заявителя",
-        placeholder: "Иванов Иван Иванович",
-        completeValue: (applicantName) => applicantName,
+        id: "appointment-city",
+        label: "Город подачи",
+        placeholder: "Выберите город",
+        control: "select",
+        options: ["Москва", "Санкт-Петербург", "Казань", "Екатеринбург"],
+        completeValue: () => "Москва",
+      },
+      {
+        id: "visa-type",
+        label: "Тип визы",
+        placeholder: "Выберите тип визы",
+        control: "select",
+        options: ["Шенгенская", "Национальная"],
+        completeValue: () => "Шенгенская",
+      },
+      {
+        id: "category",
+        label: "Категория",
+        placeholder: "Выберите категорию",
+        control: "select",
+        options: ["Normal (Нормал)", "Premium", "Family"],
+        completeValue: () => "Normal (Нормал)",
+      },
+      {
+        id: "desired-date-1",
+        label: "Желаемая дата 1",
+        placeholder: "ДД.ММ.ГГГГ",
+        completeValue: () => "16.06.2026",
+      },
+      {
+        id: "desired-date-2",
+        label: "Желаемая дата 2",
+        placeholder: "ДД.ММ.ГГГГ",
+        required: false,
+        completeValue: () => "18.06.2026",
+      },
+      {
+        id: "desired-date-3",
+        label: "Желаемая дата 3",
+        placeholder: "ДД.ММ.ГГГГ",
+        required: false,
+        completeValue: () => "22.06.2026",
+      },
+      {
+        id: "appointment-note",
+        label: "Примечание",
+        placeholder: "Комментарий к записи",
+        required: false,
+        span: "full",
+        completeValue: () => "",
+      },
+    ],
+  },
+  {
+    id: "personal",
+    title: "Личные данные",
+    stepLabel: "2 из 6",
+    fields: [
+      {
+        id: "first-name",
+        label: "Имя (First Name)",
+        placeholder: "IVAN",
+        completeValue: (applicantName) => applicantNameParts(applicantName).first,
+      },
+      {
+        id: "surname",
+        label: "Фамилия (Surname)",
+        placeholder: "IVANOV",
+        completeValue: (applicantName) => applicantNameParts(applicantName).surname,
+      },
+      {
+        id: "maiden-name",
+        label: "Девичья / прежняя фамилия",
+        placeholder: "Если нет - повторите фамилию",
+        completeValue: (applicantName) => applicantNameParts(applicantName).surname,
+      },
+      {
+        id: "surname-at-birth",
+        label: "Фамилия при рождении",
+        placeholder: "Фамилия при рождении",
+        completeValue: (applicantName) => applicantNameParts(applicantName).surname,
       },
       {
         id: "birth-date",
         label: "Дата рождения",
-        placeholder: "01.01.1990",
+        placeholder: "ДД.ММ.ГГГГ",
         completeValue: () => "01.01.1990",
+      },
+      {
+        id: "birth-place",
+        label: "Место рождения",
+        placeholder: "MOSCOW",
+        completeValue: () => "MOSCOW",
+      },
+      {
+        id: "birth-country",
+        label: "Страна рождения",
+        placeholder: "Выберите страну",
+        control: "select",
+        options: ["Russian Federation", "USSR", "Spain"],
+        completeValue: () => "USSR",
+      },
+      {
+        id: "nationality",
+        label: "Гражданство",
+        placeholder: "Выберите гражданство",
+        control: "select",
+        options: ["Russian Federation", "Spain", "Other"],
+        completeValue: () => "Russian Federation",
+      },
+      {
+        id: "gender",
+        label: "Пол",
+        placeholder: "Выберите пол",
+        control: "select",
+        options: ["Male - Мужской", "Female - Женский"],
+        completeValue: () => "Male - Мужской",
+      },
+      {
+        id: "marital-status",
+        label: "Семейное положение",
+        placeholder: "Выберите статус",
+        control: "select",
+        options: [
+          "Single - Холост/не замужем",
+          "Married - Женат/замужем",
+          "Divorced - Разведен(а)",
+        ],
+        completeValue: () => "Single - Холост/не замужем",
+      },
+    ],
+  },
+  {
+    id: "passport",
+    title: "Паспорт",
+    stepLabel: "3 из 6",
+    fields: [
+      {
+        id: "passport-type",
+        label: "Тип паспорта",
+        placeholder: "Выберите тип паспорта",
+        control: "select",
+        options: [
+          "Ordinary Passport",
+          "Diplomatic Passport",
+          "Service Passport",
+          "Official Passport",
+          "Travel Document",
+        ],
+        completeValue: () => "Ordinary Passport",
+      },
+      {
+        id: "passport-no",
+        label: "Номер паспорта",
+        placeholder: "123456789",
+        completeValue: () => "778194570",
+      },
+      {
+        id: "passport-issue-date",
+        label: "Дата выдачи паспорта",
+        placeholder: "ДД.ММ.ГГГГ",
+        completeValue: () => "10.02.2026",
+      },
+      {
+        id: "passport-expiry-date",
+        label: "Дата окончания паспорта",
+        placeholder: "ДД.ММ.ГГГГ",
+        completeValue: () => "10.02.2036",
+      },
+      {
+        id: "travel-date",
+        label: "Дата поездки",
+        placeholder: "ДД.ММ.ГГГГ",
+        completeValue: () => "19.08.2026",
+      },
+    ],
+  },
+  {
+    id: "contacts",
+    title: "Адрес и контакты",
+    stepLabel: "4 из 6",
+    fields: [
+      {
+        id: "home-address",
+        label: "Домашний адрес",
+        placeholder: "AKADEMIKA KOROLEVA STREET 4 1 149",
+        completeValue: () => "AKADEMIKA KOROLEVA STREET 4 1 149",
+      },
+      {
+        id: "home-country",
+        label: "Страна проживания",
+        placeholder: "Выберите страну",
+        control: "select",
+        options: ["Russian Federation", "Spain", "Other"],
+        completeValue: () => "Russian Federation",
+      },
+      {
+        id: "home-city",
+        label: "Город проживания",
+        placeholder: "MOSCOW",
+        completeValue: () => "MOSCOW",
+      },
+      {
+        id: "postal-code",
+        label: "Почтовый индекс",
+        placeholder: "129515",
+        completeValue: () => "129515",
+      },
+      {
+        id: "contact-number",
+        label: "Контактный телефон",
+        placeholder: "79151590999",
+        completeValue: () => "79151590999",
+      },
+      {
+        id: "email",
+        label: "Email",
+        placeholder: "name@example.com",
+        completeValue: () => "applicant@example.com",
+      },
+    ],
+  },
+  {
+    id: "employment",
+    title: "Работа / учёба",
+    stepLabel: "5 из 6",
+    fields: [
+      {
+        id: "employer-name",
+        label: "Работодатель",
+        placeholder: "JSC VTB LEASING",
+        completeValue: () => "JSC VTB LEASING",
+      },
+      {
+        id: "occupation",
+        label: "Профессия",
+        placeholder: "Выберите профессию",
+        control: "select",
+        options: [
+          "MANAGER",
+          "ENGINEER",
+          "STUDENT",
+          "TEACHER",
+          "SELF EMPLOYED",
+          "OTHER",
+        ],
+        completeValue: () => "OTHER",
+      },
+      {
+        id: "occupation-specify",
+        label: "Уточнение профессии",
+        placeholder: "LEAD SPECIALIST",
+        completeValue: () => "LEAD SPECIALIST",
+      },
+      {
+        id: "employer-contact",
+        label: "Телефон работодателя",
+        placeholder: "74957376553",
+        completeValue: () => "74957376553",
+      },
+      {
+        id: "employer-address",
+        label: "Адрес работодателя",
+        placeholder: "VORONTSOVSKAYA STREET 43 1, MOSCOW",
+        span: "full",
+        completeValue: () => "VORONTSOVSKAYA STREET 43 1, 109147, MOSCOW",
       },
     ],
   },
   {
     id: "trip",
     title: "Поездка",
+    stepLabel: "6 из 6",
     fields: [
+      {
+        id: "purpose",
+        label: "Цель поездки",
+        placeholder: "Выберите цель",
+        control: "select",
+        options: ["TOURISM", "BUSINESS", "VISIT FAMILY OR FRIENDS", "OTHER"],
+        completeValue: () => "TOURISM",
+      },
+      {
+        id: "stay-duration",
+        label: "Длительность, дней",
+        placeholder: "9",
+        completeValue: () => "9",
+      },
+      {
+        id: "entry-count",
+        label: "Количество въездов",
+        placeholder: "Выберите количество въездов",
+        control: "select",
+        options: [
+          "Single Entry - Однократный",
+          "Two Entry - Двукратный",
+          "Multiple Entry - Многократный",
+        ],
+        completeValue: () => "Multiple Entry - Многократный",
+      },
+      {
+        id: "arrival-date",
+        label: "Дата въезда",
+        placeholder: "ДД.ММ.ГГГГ",
+        completeValue: () => "19.08.2026",
+      },
+      {
+        id: "departure-date",
+        label: "Дата выезда",
+        placeholder: "ДД.ММ.ГГГГ",
+        completeValue: () => "27.08.2026",
+      },
+      {
+        id: "inviting-party-type",
+        label: "Тип принимающей стороны",
+        placeholder: "Выберите тип",
+        control: "select",
+        options: ["Гостиница/временное жильё", "Частное лицо", "Компания"],
+        completeValue: () => "Гостиница/временное жильё",
+      },
+      {
+        id: "hotel-name",
+        label: "Название отеля",
+        placeholder: "HOTEL ILUNION BARCELONA",
+        completeValue: () => "HOTEL ILUNION BARCELONA",
+      },
+      {
+        id: "hotel-country",
+        label: "Страна отеля",
+        placeholder: "Spain",
+        control: "select",
+        options: ["Spain", "France", "Italy", "Other"],
+        completeValue: () => "Spain",
+      },
+      {
+        id: "hotel-city",
+        label: "Город отеля",
+        placeholder: "BARCELONA",
+        completeValue: () => "BARCELONA",
+      },
+      {
+        id: "hotel-postal-code",
+        label: "Почтовый индекс отеля",
+        placeholder: "08005",
+        completeValue: () => "08005",
+      },
+      {
+        id: "hotel-address",
+        label: "Адрес отеля",
+        placeholder: "CALLE RAMON TUR 196-198",
+        completeValue: () => "CALLE RAMON TUR 196-198",
+      },
+      {
+        id: "hotel-email",
+        label: "Email отеля",
+        placeholder: "contactcenter@ilunionhotels.com",
+        completeValue: () => "contactcenter@ilunionhotels.com",
+      },
+      {
+        id: "hotel-contact",
+        label: "Телефон отеля",
+        placeholder: "34932438800",
+        completeValue: () => "34932438800",
+      },
+      {
+        id: "cost-covered-by",
+        label: "Кто оплачивает поездку",
+        placeholder: "Выберите источник оплаты",
+        control: "select",
+        options: ["By the applicant - Самим заявителем", "By a Sponsor - Спонсором"],
+        completeValue: () => "By the applicant - Самим заявителем",
+      },
+      {
+        id: "means-of-support",
+        label: "Средства обеспечения",
+        placeholder: "Выберите средство",
+        control: "select",
+        options: [
+          "Cash - Наличные",
+          "Credit card - Кредитная карта",
+          "Prepaid accommodation - Оплаченное жильё",
+          "Other - Другое",
+        ],
+        completeValue: () => "Cash - Наличные",
+      },
       {
         id: "route",
         label: "Маршрут поездки",
-        placeholder: "Москва, Мадрид, Москва",
-        completeValue: () => "Москва, Мадрид, Москва",
-      },
-      {
-        id: "address",
-        label: "Адрес проживания",
-        placeholder: "Отель или адрес проживания",
-        completeValue: () => "Отель подтвержден",
-      },
-    ],
-  },
-  {
-    id: "contacts",
-    title: "Контакты",
-    fields: [
-      {
-        id: "phone",
-        label: "Телефон",
-        placeholder: "+7 900 000 00 00",
-        completeValue: () => "+7 900 000 00 00",
-      },
-      {
-        id: "mail",
-        label: "Почта",
-        placeholder: "Почта заявителя",
-        completeValue: () => "почта указана",
+        placeholder: "Москва, Барселона, Москва",
+        span: "full",
+        completeValue: () => "Москва, Барселона, Москва",
       },
     ],
   },
@@ -91,6 +442,7 @@ export function createQuestionnaireSections(
     normalizeSection({
       id: `${applicantId}-${section.id}`,
       title: section.title,
+      stepLabel: section.stepLabel,
       status,
       missing,
       fields: section.fields.map((field, index) =>
@@ -279,20 +631,74 @@ function hasOpenQuestionnaireFieldIssue(
 }
 
 function normalizeApplicantSections(applicant: Applicant): QuestionnaireSection[] {
-  const sourceSections = applicant.sections.length
-    ? applicant.sections
-    : createQuestionnaireSections(
-        applicant.id,
-        applicant.fullName,
-        applicant.questionnaireStatus,
-      );
-
-  return sourceSections.map((section) =>
-    normalizeSection({
-      ...section,
-      fields: normalizeFields(section, applicant.fullName, section.title),
-    }),
+  return questionnaireBlueprint.map((blueprint) =>
+    normalizeBlueprintSection(applicant, blueprint),
   );
+}
+
+function normalizeBlueprintSection(
+  applicant: Applicant,
+  blueprint: (typeof questionnaireBlueprint)[number],
+): QuestionnaireSection {
+  const existingSection = findExistingSection(applicant, blueprint);
+  const existingStatus = existingSection?.status ?? applicant.questionnaireStatus;
+  const existingMissing = existingSection?.missing;
+
+  return normalizeSection({
+    id: existingSection?.id ?? `${applicant.id}-${blueprint.id}`,
+    title: blueprint.title,
+    stepLabel: blueprint.stepLabel,
+    status: existingStatus,
+    missing: existingMissing,
+    fields: blueprint.fields.map((field, index) =>
+      mergeSeedField(
+        field,
+        existingSection?.fields ?? [],
+        applicant.fullName,
+        existingStatus,
+        blueprint.id,
+        index,
+        existingMissing,
+      ),
+    ),
+  });
+}
+
+function findExistingSection(
+  applicant: Applicant,
+  blueprint: (typeof questionnaireBlueprint)[number],
+) {
+  return applicant.sections.find((section) => {
+    if (section.id === `${applicant.id}-${blueprint.id}`) return true;
+    if (section.id.endsWith(`-${blueprint.id}`)) return true;
+    if (section.title === blueprint.title) return true;
+
+    const blueprintLabels = new Set(blueprint.fields.map((field) => field.label));
+    return section.fields.some((field) => blueprintLabels.has(field.label));
+  });
+}
+
+function mergeSeedField(
+  field: FieldSeed,
+  existingFields: QuestionnaireField[],
+  applicantName: string,
+  status: QuestionnaireStatus,
+  sectionId: string,
+  index: number,
+  missing?: string,
+): QuestionnaireField {
+  const seeded = seedField(field, applicantName, status, sectionId, index, missing);
+  const existing = existingFields.find(
+    (item) => item.id === field.id || item.label === field.label,
+  );
+
+  if (!existing) return seeded;
+
+  return {
+    ...seeded,
+    value: existing.value,
+    error: existing.error,
+  };
 }
 
 function normalizeFields(
@@ -335,13 +741,17 @@ function seedField(
         ? sectionId !== "trip"
         : !(sectionId === "trip" && index === 1)));
 
-  const shouldFlag = status === "needs_fix" && sectionId === "trip" && index === 1;
+  const shouldFlag =
+    status === "needs_fix" && sectionId === "trip" && field.id === "route";
 
   return {
     id: field.id,
     label: field.label,
     value: shouldFill ? field.completeValue(applicantName) : "",
-    required: true,
+    required: field.required ?? true,
+    control: field.control,
+    options: field.options,
+    span: field.span,
     placeholder: field.placeholder,
     error: shouldFlag ? (missing ?? "Нужно уточнить значение") : undefined,
   };
@@ -410,4 +820,60 @@ function applicantStatus(sections: QuestionnaireSection[]): QuestionnaireStatus 
 
 function isFieldReady(field: QuestionnaireField) {
   return !field.required || Boolean(field.value.trim() && !field.error);
+}
+
+function applicantNameParts(applicantName: string) {
+  const parts = applicantName.trim().split(/\s+/).filter(Boolean);
+  const first = transliterate(parts[0] ?? applicantName).toUpperCase();
+  const surname = transliterate(parts.at(-1) ?? applicantName).toUpperCase();
+
+  return { first, surname };
+}
+
+function transliterate(input: string) {
+  const map: Record<string, string> = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "i",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "kh",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "shch",
+    ы: "y",
+    э: "e",
+    ю: "yu",
+    я: "ya",
+    ь: "",
+    ъ: "",
+  };
+
+  return input
+    .split("")
+    .map((char) => {
+      const lower = char.toLowerCase();
+      const value = map[lower];
+      if (value === undefined) return char;
+      return char === lower ? value : value.toUpperCase();
+    })
+    .join("");
 }
