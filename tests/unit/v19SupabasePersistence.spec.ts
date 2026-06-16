@@ -56,6 +56,7 @@ import {
   cockpitSubmissionFingerprintMap,
   loadCockpitSubmissionsForProfile,
   saveCockpitSubmissionsForProfile,
+  toCockpitDraftPersistencePayload,
 } from "../../src/modules/submissions/supabasePersistence";
 
 const agentProfile: AppProfile = {
@@ -153,5 +154,41 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(nextOwnerIds.get(untouchedSubmission.id)).toBe(
       "00000000-0000-4000-8000-000000000222",
     );
+  });
+
+  it("reconciles a stale cockpit snapshot after atomic export completion", async () => {
+    const staleSnapshot = {
+      ...(initialSubmissions.find(
+        (submission) => submission.id === "ПД-1056",
+      ) as Submission),
+      exportState: "file_downloaded" as const,
+      status: "ready_for_export" as const,
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      staleSnapshot,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        exported_at: "2026-06-16T09:01:00.000Z",
+        status: "exported",
+        updated_at: "2026-06-16T09:01:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      exportState: "marked_exported",
+      status: "exported",
+      updatedAt: "2026-06-16T09:01:00.000Z",
+    });
+    expect(loaded.submissions[0]?.history[0]).toMatchObject({
+      source: "system",
+      text: "Подача синхронизирована с завершенной выгрузкой",
+    });
   });
 });

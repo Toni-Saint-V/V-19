@@ -70,6 +70,12 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      complete_export_package: {
+        Args: {
+          payload: ExportPackageCommitPayload;
+        };
+        Returns: ExportPackageCommitResult;
+      };
       save_submission_draft: {
         Args: {
           payload: SubmissionDraftPersistencePayload;
@@ -248,6 +254,24 @@ export type ExportBatchInsert = Omit<
   file_name?: string | null;
   idempotency_key?: string | null;
 };
+
+export interface ExportPackageCommitPayload extends DbRecord {
+  batch: {
+    id?: string;
+    format: "xlsx" | "csv";
+    idempotency_key: string | null;
+    file_name: string | null;
+    row_count: number;
+    submission_ids: string[];
+  };
+}
+
+export interface ExportPackageCommitResult extends DbRecord {
+  exportBatch: ExportBatchRow;
+  submissions: number;
+  statusHistory: number;
+  duplicate: boolean;
+}
 
 export interface AppointmentRow extends DbRecord {
   id: string;

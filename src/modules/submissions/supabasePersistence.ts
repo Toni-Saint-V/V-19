@@ -104,6 +104,38 @@ export function readCockpitSnapshot(value: Json | null): Submission | null {
   return isCockpitSubmission(envelope.submission) ? envelope.submission : null;
 }
 
+function reconcileCockpitSnapshotWithSubmissionRow(
+  row: Pick<SubmissionRow, "exported_at" | "status" | "updated_at">,
+  snapshot: Submission,
+): Submission {
+  if (row.status !== "exported") return snapshot;
+  if (snapshot.status === "exported" && snapshot.exportState === "marked_exported") {
+    return snapshot;
+  }
+
+  const syncedAt = row.exported_at ?? row.updated_at;
+  const historyId = `и-${snapshot.id}-sync-exported`;
+  const syncedHistory = snapshot.history.some((item) => item.id === historyId)
+    ? snapshot.history
+    : [
+        {
+          id: historyId,
+          text: "Подача синхронизирована с завершенной выгрузкой",
+          at: syncedAt,
+          source: "system" as const,
+        },
+        ...snapshot.history,
+      ];
+
+  return {
+    ...snapshot,
+    status: "exported",
+    exportState: "marked_exported",
+    updatedAt: syncedAt,
+    history: syncedHistory,
+  };
+}
+
 function cockpitSnapshotFamilyIntelligence(submission: Submission): Json {
   // The normalized tables are a query projection; this snapshot owns the full cockpit UI model.
   return {
@@ -420,7 +452,7 @@ export async function loadCockpitSubmissionsForProfile(
   const submissions = rows.map((row) => {
     ownerIdsBySubmissionId.set(row.id, row.agent_id);
     const snapshot = readCockpitSnapshot(row.family_intelligence);
-    if (snapshot) return snapshot;
+    if (snapshot) return reconcileCockpitSnapshotWithSubmissionRow(row, snapshot);
 
     return fallbackSubmissionFromRows(
       row,

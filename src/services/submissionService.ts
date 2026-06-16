@@ -18,6 +18,8 @@ import type {
   CorrectionRow,
   ExportBatchInsert,
   ExportBatchRow,
+  ExportPackageCommitPayload,
+  ExportPackageCommitResult,
   MediaAssetInsert,
   MediaAssetRow,
   StatusHistoryInsert,
@@ -425,7 +427,7 @@ export function toExportBatchInserts(submission: Submission): ExportBatchInsert[
   }));
 }
 
-type ExportBatchWriteInsert = Omit<ExportBatchInsert, "created_by" | "created_at">;
+type ExportBatchWriteInsert = ExportPackageCommitPayload["batch"];
 
 function toExportBatchWriteInsert(batch: ExportBatch): ExportBatchWriteInsert {
   return {
@@ -436,6 +438,16 @@ function toExportBatchWriteInsert(batch: ExportBatch): ExportBatchWriteInsert {
     row_count: batch.rowCount,
     submission_ids: batch.submissionIds,
   };
+}
+
+function toExportPackageCommitPayload(batch: ExportBatch): ExportPackageCommitPayload {
+  return {
+    batch: toExportBatchWriteInsert(batch),
+  };
+}
+
+function mapExportPackageCommitResult(result: ExportPackageCommitResult): ExportBatch {
+  return mapExportBatchRow(result.exportBatch);
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -479,6 +491,26 @@ export async function recordExportBatch(
     operation: "export_batches.insert",
     fallbackKind: "database",
   });
+}
+
+export async function commitExportPackage(
+  batch: ExportBatch,
+): Promise<ExportBatch | null> {
+  const client = getSupabaseClient();
+  if (!client) return batch;
+
+  const { data, error } = await client.rpc("complete_export_package", {
+    payload: toExportPackageCommitPayload(batch),
+  });
+
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "rpc.complete_export_package",
+      fallbackKind: "rpc",
+    });
+  }
+
+  return data ? mapExportPackageCommitResult(data) : null;
 }
 
 export function toAppointmentInsert(

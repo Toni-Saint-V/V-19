@@ -230,6 +230,8 @@ export function AdminReviewScreen({
 }
 
 export function ExportScreen({
+  exportBusy = false,
+  exportError = "",
   exportPlan,
   exportTab,
   filterControl,
@@ -244,6 +246,8 @@ export function ExportScreen({
   searchControl,
   selectedExportIds,
 }: {
+  exportBusy?: boolean;
+  exportError?: string;
   exportPlan: ExportSummary;
   exportTab: ExportTab;
   filterControl?: ReactNode;
@@ -258,7 +262,9 @@ export function ExportScreen({
   searchControl: ReactNode;
   selectedExportIds: string[];
 }) {
-  const actionHint = exportActionHint(exportPlan);
+  const actionHint =
+    exportError ||
+    (exportBusy ? "Фиксируем выгрузку..." : exportActionHint(exportPlan));
   const packageFacts = exportPackageFacts(exportPlan);
 
   return (
@@ -417,22 +423,27 @@ export function ExportScreen({
                 </div>
               ))}
             </div>
-            <div className="export-actions" aria-describedby="export-action-hint">
+            <div
+              className="export-actions"
+              aria-busy={exportBusy}
+              aria-describedby="export-action-hint"
+            >
               <Button
-                disabled={!exportPlan.canGenerate}
+                disabled={exportBusy || !exportPlan.canGenerate}
                 onClick={onGenerate}
               >
                 Сформировать Эксель
               </Button>
               <Button
-                disabled={!exportPlan.canDownload}
+                disabled={exportBusy || !exportPlan.canDownload}
                 variant="secondary"
                 onClick={onDownload}
               >
                 Скачать
               </Button>
               <Button
-                disabled={!exportPlan.canMarkExported}
+                disabled={exportBusy || !exportPlan.canMarkExported}
+                loading={exportBusy}
                 variant="secondary"
                 onClick={onMarkExported}
               >
