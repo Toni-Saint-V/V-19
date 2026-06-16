@@ -44,6 +44,17 @@ function requiredSmokeValue(env: Record<string, string>, name: string): string {
   return value;
 }
 
+function expectBundleDoesNotContainSecretValue(
+  browserBundle: string,
+  name: string,
+  value: string,
+): void {
+  if (!value.trim()) return;
+  if (browserBundle.includes(value)) {
+    throw new Error(`${name} leaked into browser bundle.`);
+  }
+}
+
 test("exposes only browser-safe Supabase sandbox values", async ({ page }) => {
   const smokeEnv = loadSmokeEnv();
   const projectId = requiredSmokeValue(smokeEnv, "VITE_SUPABASE_PROJECT_ID");
@@ -70,13 +81,12 @@ test("exposes only browser-safe Supabase sandbox values", async ({ page }) => {
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("main", { name: "Рабочая область подач" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();
-  await page.screenshot({
-    fullPage: true,
-    path: "docs/qa/supabase-browser-key-audit-desktop.png",
-  });
+  await expect(
+    page.getByRole("main", { name: "Вход в рабочий кабинет" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Вход в рабочий кабинет" }))
+    .toBeVisible();
+  await expect(page.getByText("Вход идёт через Supabase Auth.")).toBeVisible();
 
   const scriptBodies = await Promise.all(scriptBodyReads);
   expect(scriptBodies.length).toBeGreaterThan(0);
@@ -92,7 +102,42 @@ test("exposes only browser-safe Supabase sandbox values", async ({ page }) => {
 
   for (const [name, value] of Object.entries(smokeEnv)) {
     if (name.startsWith("VITE_")) continue;
-    if (!value.trim()) continue;
-    expect(browserBundle).not.toContain(value);
+    expectBundleDoesNotContainSecretValue(browserBundle, name, value);
   }
+});
+
+test.describe("Supabase sandbox auth smoke", () => {
+  test("opens the workspace with a smoke agent without retained traces", async ({
+    page,
+  }) => {
+    const smokeEnv = loadSmokeEnv();
+    const smokeAgentEmail = requiredSmokeValue(
+      smokeEnv,
+      "SUPABASE_SMOKE_AGENT_EMAIL",
+    );
+    const smokeAgentPassword = requiredSmokeValue(
+      smokeEnv,
+      "SUPABASE_SMOKE_AGENT_PASSWORD",
+    );
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await expect(
+      page.getByRole("main", { name: "Вход в рабочий кабинет" }),
+    ).toBeVisible();
+
+    await page.getByLabel("Рабочая почта").fill(smokeAgentEmail);
+    await page.getByLabel("Пароль").fill(smokeAgentPassword);
+    await page.getByRole("button", { name: "Войти" }).click();
+
+    await expect(
+      page.getByRole("main", { name: "Рабочая область подач" }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();
+    await page.screenshot({
+      fullPage: true,
+      path: "docs/qa/supabase-browser-key-audit-desktop.png",
+    });
+  });
 });

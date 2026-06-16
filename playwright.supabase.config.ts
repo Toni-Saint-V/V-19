@@ -68,7 +68,18 @@ export default defineConfig({
   projects: [
     {
       name: "supabase-sandbox-browser-key-audit",
+      grep: /browser-safe Supabase sandbox values/,
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "supabase-sandbox-auth-smoke",
+      grep: /opens the workspace with a smoke agent/,
+      use: {
+        ...devices["Desktop Chrome"],
+        screenshot: "off",
+        trace: "off",
+        video: "off",
+      },
     },
   ],
 });

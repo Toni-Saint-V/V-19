@@ -61,27 +61,42 @@ Post-push read-only schema verification:
 
 - `npm run format:check`: passed
 - `npm run verify:supabase-release`: passed, 75 checks
-- `node scripts/verify-production-readiness.mjs --expect-blocked`: passed fail-closed, 41 blockers remain
-- `npm run test:e2e:supabase`: passed, 1 Playwright browser key audit
+- `node scripts/verify-production-readiness.mjs --expect-blocked`: passed fail-closed, 39 blockers remain
+- `npm run test:e2e:supabase`: passed, 2 Playwright Supabase browser checks
 - `npm run test:supabase-live`: passed, 1 test
+- `npm run verify:full`: passed
 - `git diff --check`: passed
 
 Structured pre-activation command evidence:
 
 - command: `npm run verify:supabase-release`
-  - checkedAt: `2026-06-16T05:26:36+03:00`
+  - checkedAt: `2026-06-16T10:13:48+03:00`
   - exitCode: `0`
   - result: Supabase release verification passed: 75 checks.
-  - gitHead: `ea0820c`
-  - scopedDiffSha256: `45f1e101faf6c7485fde85ca80d29a0febfb1d10f4e79c454f8eeb2b34687ce4`
-  - readinessVerifierSha256: `f4c34d7baec29ccc7c7deb457e8ec45f352d4a64bce6d46c56af8c9e0737192b`
+  - gitHead: `1a214a4`
+  - scopedDiffSha256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  - readinessVerifierSha256: `d1d1a6cb94b1300f99dc889588342eea42ad15b44dc736f57012ae2809de581f`
 - command: `npm run test:supabase-live`
-  - checkedAt: `2026-06-16T05:27:53+03:00`
+  - checkedAt: `2026-06-16T10:13:48+03:00`
   - exitCode: `0`
   - result: passed, 1 test
-  - gitHead: `ea0820c`
-  - scopedDiffSha256: `45f1e101faf6c7485fde85ca80d29a0febfb1d10f4e79c454f8eeb2b34687ce4`
-  - readinessVerifierSha256: `f4c34d7baec29ccc7c7deb457e8ec45f352d4a64bce6d46c56af8c9e0737192b`
+  - gitHead: `1a214a4`
+  - scopedDiffSha256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  - readinessVerifierSha256: `d1d1a6cb94b1300f99dc889588342eea42ad15b44dc736f57012ae2809de581f`
+- command: `npm run test:e2e:supabase`
+  - checkedAt: `2026-06-16T10:55:56+03:00`
+  - exitCode: `0`
+  - result: passed, 2 tests
+  - gitHead: `1a214a4`
+  - scopedDiffSha256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  - readinessVerifierSha256: `d1d1a6cb94b1300f99dc889588342eea42ad15b44dc736f57012ae2809de581f`
+- command: `npm run verify:full`
+  - checkedAt: `2026-06-16T10:58:32+03:00`
+  - exitCode: `0`
+  - result: passed
+  - gitHead: `1a214a4`
+  - scopedDiffSha256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  - readinessVerifierSha256: `d1d1a6cb94b1300f99dc889588342eea42ad15b44dc736f57012ae2809de581f`
 
 ## Remaining Blockers
 
