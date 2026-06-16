@@ -231,14 +231,22 @@ export interface ExportBatchRow extends DbRecord {
   id: string;
   created_by: string;
   created_at: string;
+  file_name: string | null;
   format: "xlsx" | "csv";
+  idempotency_key: string | null;
   row_count: number;
   submission_ids: string[];
 }
 
-export type ExportBatchInsert = Omit<ExportBatchRow, "id" | "created_at"> & {
+export type ExportBatchInsert = Omit<
+  ExportBatchRow,
+  "id" | "created_by" | "created_at" | "file_name" | "idempotency_key"
+> & {
   id?: string;
+  created_by?: string;
   created_at?: string;
+  file_name?: string | null;
+  idempotency_key?: string | null;
 };
 
 export interface AppointmentRow extends DbRecord {

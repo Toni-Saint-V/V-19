@@ -100,7 +100,7 @@ async function fillQuestionnaire(page: Page) {
   }
 
   expect(filledCount).toBeGreaterThan(0);
-  await expect(drawer(page).getByText("Анкета готова").first()).toBeVisible();
+  await expect(drawer(page).getByText("Готово к решению").first()).toBeVisible();
 }
 
 async function uploadAllVisibleFiles(page: Page) {

@@ -1,7 +1,7 @@
 import { activeAiSuggestions, canManageAiSuggestions } from "../aiSuggestions";
 import { fileTypeLabels } from "../status";
 import type { AiReviewState, AiSuggestion, Role, Submission } from "../types";
-import { Badge, Button, CardComponent } from "./magicpathPrimitives";
+import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import { EmptyState } from "./Primitives";
 
 export function BbAiPanel({

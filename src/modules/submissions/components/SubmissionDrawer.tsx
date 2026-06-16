@@ -7,7 +7,7 @@ import {
   Select,
   SheetFrame,
   TextInputField,
-} from "./magicpathPrimitives";
+} from "../../../shared/ui/primitives";
 import { applicantCountLabel, tripDates } from "../selectors";
 import {
   fileStatusLabels,
@@ -570,30 +570,32 @@ function DrawerQuestionnaire({
 
   return (
     <section
-      className={`drawer-section questionnaire-screen ${
+      className={`drawer-section questionnaire-screen visa-form-screen ${
         canEdit ? "is-editable" : "is-read-only"
       }`}
     >
-      <div className="questionnaire-form-intro">
+      <div className="questionnaire-form-intro visa-form-hero">
         <div>
-          <p className="kicker">Анкета</p>
-          <h3>Данные для консульской анкеты</h3>
-          <p className="drawer-muted">
+          <p className="kicker">DS-пакет</p>
+          <h3>Матрица визовой анкеты</h3>
+          <p className="drawer-muted visa-form-hero-copy">
             {canEdit
-              ? "Заполняйте по порядку: запись, заявитель, паспорт, адрес, работа, поездка."
-              : "Сверьте раскрытый раздел. Если данные не сходятся с пакетом, добавьте точное замечание."}
+              ? "Соберите поля в том порядке, в котором администратор сверяет пакет: личность, паспорт, адрес, работа, маршрут."
+              : "Проверяйте один раскрытый блок за раз. Несовпадения фиксируются точным замечанием к полю или документу."}
           </p>
         </div>
         {questionnaireReady ? (
-          <Badge className="status-pill ready">Анкета готова</Badge>
+          <Badge className="visa-tag visa-tag-ready">Готово к решению</Badge>
         ) : problemCount ? (
-          <Badge className="status-pill warning">{problemCount} проблем</Badge>
+          <Badge className="visa-tag visa-tag-attention">
+            Уточнить {problemCount}
+          </Badge>
         ) : null}
       </div>
       {submission.applicants.length > 1 ? (
         <div
-          className="questionnaire-progress-grid"
-          aria-label="Готовность анкет по заявителям"
+          className="questionnaire-progress-grid visa-applicant-strip"
+          aria-label="Готовность визовых профилей по заявителям"
         >
           {submission.applicants.map((applicant) => {
             const percent = questionnaireProgressForApplicant(applicant);
@@ -605,28 +607,32 @@ function DrawerQuestionnaire({
 
             return (
               <Button
-                className="questionnaire-applicant-card"
+                className="questionnaire-applicant-card visa-applicant-tile"
                 key={applicant.id}
                 variant="plain"
                 type="button"
                 onClick={() => scrollToApplicant(applicant.id)}
               >
                 <div>
-                  <span className="row-dot" aria-hidden="true" />
+                  <span className="visa-avatar-dot" aria-hidden="true" />
                   <div>
                     <strong>{applicant.fullName}</strong>
-                    <p>{applicantRoleLabel(applicant.role)}</p>
+                    <p>{applicantRoleLabel(applicant.role)} · профиль DS</p>
                   </div>
                 </div>
                 <Badge
-                  className={openForApplicant ? "status-pill warning" : "status-pill"}
+                  className={
+                    openForApplicant
+                      ? "visa-tag visa-tag-attention"
+                      : "visa-tag visa-tag-progress"
+                  }
                 >
-                  {openForApplicant ? `${openForApplicant} замеч.` : `${percent}%`}
+                  {openForApplicant ? `${openForApplicant} замечания` : `${percent}%`}
                 </Badge>
                 <div
-                  className="inline-progress"
+                  className="inline-progress visa-progress-line"
                   role="progressbar"
-                  aria-label={`Анкета заполнена на ${percent}%`}
+                  aria-label={`Визовый профиль заполнен на ${percent}%`}
                   aria-valuemax={100}
                   aria-valuemin={0}
                   aria-valuenow={percent}
@@ -638,19 +644,21 @@ function DrawerQuestionnaire({
           })}
         </div>
       ) : null}
-      <div className="questionnaire-workspace">
+      <div className="questionnaire-workspace visa-form-workspace">
         {submission.applicants.map((applicant) => (
           <CardComponent
             as="article"
-            className={`questionnaire-card ${isSingleApplicant ? "is-single" : ""}`}
+            className={`questionnaire-card visa-applicant-sheet ${
+              isSingleApplicant ? "is-single" : ""
+            }`}
             id={`questionnaire-applicant-${applicant.id}`}
             key={applicant.id}
           >
             {!isSingleApplicant ? (
-              <header className="questionnaire-card-header">
+              <header className="questionnaire-card-header visa-applicant-header">
                 <div>
                   <strong>{applicant.fullName}</strong>
-                  <p>{applicantRoleLabel(applicant.role)}</p>
+                  <p>{applicantRoleLabel(applicant.role)} · консульский профиль</p>
                 </div>
                 <div className="questionnaire-card-status">
                   <span>{questionnaireProgressForApplicant(applicant)}%</span>
@@ -660,7 +668,7 @@ function DrawerQuestionnaire({
                 </div>
               </header>
             ) : null}
-            <div className="questionnaire-section-list">
+            <div className="questionnaire-section-list visa-section-stack">
               {applicant.sections.map((section) => {
                 const issue = sectionIssue(submission, applicant.id, section.title);
                 const sectionKey = questionnaireSectionKey(applicant.id, section.id);
@@ -671,13 +679,15 @@ function DrawerQuestionnaire({
                 return (
                   <CardComponent
                     as="section"
-                    className={`questionnaire-edit-section ${issue ? "has-issue" : ""} ${expanded ? "is-expanded" : "is-collapsed"}`}
+                    className={`questionnaire-edit-section visa-section-card ${
+                      issue ? "has-issue" : ""
+                    } ${expanded ? "is-expanded" : "is-collapsed"}`}
                     id={sectionElementId}
                     key={section.id}
                     aria-label={`${applicant.fullName}: ${section.title}`}
                   >
                     <Button
-                      className="questionnaire-section-heading"
+                      className="questionnaire-section-heading visa-section-trigger"
                       variant="plain"
                       type="button"
                       aria-controls={fieldsId}
@@ -690,16 +700,18 @@ function DrawerQuestionnaire({
                       }
                     >
                       <div>
-                        <span className="row-dot" aria-hidden="true" />
+                        <span className="visa-step-dot" aria-hidden="true" />
                         <div>
                           {section.stepLabel ? (
-                            <p className="consular-step-label">{section.stepLabel}</p>
+                            <p className="consular-step-label visa-step-label">
+                              {section.stepLabel}
+                            </p>
                           ) : null}
                           <h4>{section.title}</h4>
                           {issue ? (
-                            <p>{issue.reason}</p>
+                            <p className="visa-section-note">{issue.reason}</p>
                           ) : section.missing ? (
-                            <p>{section.missing}</p>
+                            <p className="visa-section-note">{section.missing}</p>
                           ) : null}
                         </div>
                       </div>
@@ -713,7 +725,7 @@ function DrawerQuestionnaire({
                       </span>
                     </Button>
                     <div
-                      className="questionnaire-fields"
+                      className="questionnaire-fields visa-field-grid"
                       hidden={!expanded}
                       id={fieldsId}
                     >
@@ -725,7 +737,7 @@ function DrawerQuestionnaire({
                           field.label,
                         );
                         const error = field.error ?? fieldIssue?.reason;
-                        const fieldClassName = `${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`;
+                        const fieldClassName = `visa-field ${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`;
                         const fieldAriaLabel = `${applicant.fullName} · ${section.title} · ${field.label}`;
 
                         if (field.control === "select") {
@@ -1053,10 +1065,10 @@ function applicantRoleLabel(role: Submission["applicants"][number]["role"]) {
 function questionnaireLabel(
   status: Submission["applicants"][number]["questionnaireStatus"],
 ) {
-  if (status === "empty") return "пусто";
-  if (status === "partial") return "частично";
-  if (status === "complete") return "готово";
-  return "нужно исправить";
+  if (status === "empty") return "Нет данных";
+  if (status === "partial") return "В работе";
+  if (status === "complete") return "Сверено";
+  return "На правку";
 }
 
 function issueSeverityLabel(severity: Issue["severity"]) {
@@ -1182,10 +1194,10 @@ function fieldIssueFor(
 }
 
 function statusPillClass(status: QuestionnaireStatus) {
-  if (status === "complete") return "status-pill ready";
-  if (status === "partial") return "status-pill warning";
-  if (status === "needs_fix") return "status-pill danger";
-  return "status-pill muted";
+  if (status === "complete") return "visa-tag visa-tag-ready";
+  if (status === "partial") return "visa-tag visa-tag-attention";
+  if (status === "needs_fix") return "visa-tag visa-tag-danger";
+  return "visa-tag visa-tag-muted";
 }
 
 function fileStatusPillClass(status: SubmissionFileStatus) {

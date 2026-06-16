@@ -4,7 +4,7 @@ import {
   Button,
   CardComponent,
   SegmentedTabs,
-} from "./magicpathPrimitives";
+} from "../../../shared/ui/primitives";
 import { statusLabels, statusTone } from "../status";
 import type { Submission } from "../types";
 

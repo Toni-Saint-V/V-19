@@ -94,6 +94,45 @@ describe("Supabase security contract", () => {
     expect(profileService).not.toContain('.select("*")');
     expect(submissionService).toContain("const submissionSelect =");
     expect(submissionService).toContain("const statusHistorySelect =");
+    expect(submissionService).toContain(
+      "id,created_by,created_at,format,idempotency_key,file_name,row_count,submission_ids",
+    );
+  });
+
+  test("keeps export batch identity migration additive for legacy batches", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260616000000_export_batch_identity.sql",
+    );
+
+    expectSqlStatement(
+      migration,
+      "alter table public.export_batches add column if not exists idempotency_key text, add column if not exists file_name text",
+    );
+    expectSqlStatement(
+      migration,
+      "create unique index if not exists export_batches_idempotency_key_uidx on public.export_batches (idempotency_key) where idempotency_key is not null",
+    );
+    expect(normalizeSql(migration)).not.toContain("idempotency_key text not null");
+    expect(normalizeSql(migration)).not.toContain("file_name text not null");
+    expect(migration).toContain("export_batches_idempotency_key_not_blank");
+    expect(migration).toContain("export_batches_file_name_safe");
+    expect(normalizeSql(migration)).toContain(
+      "check (idempotency_key is null or btrim(idempotency_key) <> '')",
+    );
+    expect(normalizeSql(migration)).toContain("chr(92)");
+    expect(migration).toContain(
+      "create or replace function app_private.enforce_export_batch_actor()",
+    );
+    expect(migration).toContain(
+      "raise exception 'Authenticated user required to write export batches'",
+    );
+    expect(migration).toContain("new.created_by := auth.uid()");
+    expect(migration).toContain("new.created_at := now()");
+    expect(migration).toContain("new.created_by := old.created_by");
+    expect(migration).toContain("new.created_at := old.created_at");
+    expect(migration).toContain(
+      "create trigger export_batches_actor_guard\nbefore insert or update on public.export_batches",
+    );
   });
 
   test("keeps corrections scoped to applicants in the same submission", () => {

@@ -1,6 +1,6 @@
 import { applicantCountLabel, nextAuditLine, tripDates } from "../selectors";
 import { type KeyboardEvent, useRef } from "react";
-import { Badge, Button, CardComponent } from "./magicpathPrimitives";
+import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import {
   blockerCount,
   fileTypeLabels,
