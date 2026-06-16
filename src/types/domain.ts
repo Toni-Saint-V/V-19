@@ -152,6 +152,8 @@ export interface ExportBatch {
   createdBy: string;
   createdAt: string;
   format: "csv" | "xlsx";
+  idempotencyKey?: string;
+  fileName?: string;
   rowCount: number;
   submissionIds: string[];
 }

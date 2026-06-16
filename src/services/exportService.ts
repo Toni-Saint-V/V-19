@@ -1,5 +1,11 @@
-import type { Applicant, MediaSlotType, Submission } from "../types/domain";
+import type {
+  Applicant,
+  ExportBatch,
+  MediaSlotType,
+  Submission,
+} from "../types/domain";
 import {
+  appendExportBatch,
   appointmentMeta,
   blockers,
   ensureMediaSlots,
@@ -54,7 +60,52 @@ export interface ExportPlan {
   familySubmissionCount: number;
 }
 
-const exportableStatuses = new Set(["accepted", "ready_for_excel"]);
+export type ExportPackageFormat = ExportBatch["format"];
+
+export interface ExportPackageOptions {
+  batchId?: string;
+  createdAt: string;
+  createdBy: string;
+  format: ExportPackageFormat;
+}
+
+export interface ExportPackageArtifact {
+  blob: Blob;
+  contentType: string;
+  fileName: string;
+}
+
+export interface ExportPackageBlocked {
+  status: "blocked";
+  blockers: ExportBlocker[];
+  idempotencyKey: string;
+  plan: ExportPlan;
+}
+
+export interface ExportPackageDuplicate {
+  status: "duplicate";
+  artifact: ExportPackageArtifact;
+  batch: ExportBatch;
+  idempotencyKey: string;
+  plan: ExportPlan;
+  rows: ExportRow[];
+}
+
+export interface ExportPackageReady {
+  status: "ready";
+  artifact: ExportPackageArtifact;
+  batch: ExportBatch;
+  idempotencyKey: string;
+  plan: ExportPlan;
+  rows: ExportRow[];
+}
+
+export type ExportPackageDraft =
+  | ExportPackageBlocked
+  | ExportPackageDuplicate
+  | ExportPackageReady;
+
+const exportableStatuses = new Set(["accepted"]);
 
 const agentEmails: Record<string, string> = {
   "agent-1": "nord@travel.example",
@@ -84,7 +135,8 @@ export function buildExportPlan(submissions: Submission[]): ExportPlan {
     readySubmissions.push(submission);
   }
 
-  const rows = readySubmissions.flatMap((submission) =>
+  const orderedReadySubmissions = sortSubmissionsForExport(readySubmissions);
+  const rows = orderedReadySubmissions.flatMap((submission) =>
     submission.applicants.map((applicant, index) =>
       buildExportRow(submission, applicant, index),
     ),
@@ -92,13 +144,98 @@ export function buildExportPlan(submissions: Submission[]): ExportPlan {
 
   return {
     rows,
-    readySubmissions,
+    readySubmissions: orderedReadySubmissions,
     blocked,
     applicantRowCount: rows.length,
-    familySubmissionCount: readySubmissions.filter(
+    familySubmissionCount: orderedReadySubmissions.filter(
       (submission) => submission.type === "family",
     ).length,
   };
+}
+
+export function buildExportPackageDraft(
+  submissions: Submission[],
+  options: ExportPackageOptions,
+): ExportPackageDraft {
+  const plan = buildExportPlan(submissions);
+  const idempotencyKey = exportPackageIdempotencyKey(plan, options.format);
+
+  if (plan.blocked.length > 0 || plan.readySubmissions.length === 0) {
+    return {
+      status: "blocked",
+      blockers:
+        plan.blocked.length > 0
+          ? plan.blocked
+          : [{ submissionId: "", title: "", reason: "нет заявок для выгрузки" }],
+      idempotencyKey,
+      plan,
+    };
+  }
+
+  const artifact = buildExportPackageArtifact(
+    plan.rows,
+    options.format,
+    idempotencyKey,
+  );
+  const duplicate = findExistingExportBatch(
+    plan.readySubmissions,
+    options.format,
+    plan.rows.length,
+    idempotencyKey,
+  );
+
+  if (duplicate) {
+    return {
+      status: "duplicate",
+      artifact,
+      batch: duplicate,
+      idempotencyKey,
+      plan,
+      rows: plan.rows,
+    };
+  }
+
+  return {
+    status: "ready",
+    artifact,
+    batch: {
+      id: options.batchId ?? crypto.randomUUID(),
+      createdBy: options.createdBy,
+      createdAt: options.createdAt,
+      format: options.format,
+      idempotencyKey,
+      fileName: artifact.fileName,
+      rowCount: plan.rows.length,
+      submissionIds: sortedSubmissionIds(plan.readySubmissions),
+    },
+    idempotencyKey,
+    plan,
+    rows: plan.rows,
+  };
+}
+
+export function applyExportPackageDraft(
+  submissions: Submission[],
+  draft: ExportPackageDraft,
+): Submission[] {
+  if (draft.status !== "ready") return submissions;
+
+  const ids = new Set(draft.batch.submissionIds);
+  const selected = submissions.filter((submission) => ids.has(submission.id));
+  const currentPlan = buildExportPlan(selected);
+
+  if (!exportPlanMatchesDraft(currentPlan, draft)) return submissions;
+
+  return submissions.map((submission) =>
+    ids.has(submission.id)
+      ? appendExportBatchOnce(
+          submission,
+          draft.batch,
+          draft.batch.createdBy,
+          draft.batch.createdAt,
+        )
+      : submission,
+  );
 }
 
 export function exportBlockers(submission: Submission): string[] {
@@ -136,6 +273,126 @@ export function exportBlockers(submission: Submission): string[] {
   }
 
   return Array.from(new Set(reasons));
+}
+
+function buildExportPackageArtifact(
+  rows: ExportRow[],
+  format: ExportPackageFormat,
+  idempotencyKey: string,
+): ExportPackageArtifact {
+  const contentType =
+    format === "csv"
+      ? "text/csv;charset=utf-8"
+      : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+  return {
+    blob: format === "csv" ? createCsvBlob(rows) : createXlsxBlob(rows),
+    contentType,
+    fileName: `visaflow-export-${idempotencyKey}.${format}`,
+  };
+}
+
+function appendExportBatchOnce(
+  submission: Submission,
+  batch: ExportBatch,
+  changedBy: string,
+  changedAt: string,
+): Submission {
+  const normalized = normalizeSubmission(submission);
+  if (
+    normalized.exportHistory?.some((existing) => exportBatchMatches(existing, batch))
+  ) {
+    return normalized;
+  }
+
+  return appendExportBatch(normalized, batch, changedBy, changedAt);
+}
+
+function findExistingExportBatch(
+  submissions: Submission[],
+  format: ExportPackageFormat,
+  rowCount: number,
+  idempotencyKey: string,
+): ExportBatch | undefined {
+  const ids = sortedSubmissionIds(submissions);
+  const [first] = submissions;
+
+  return first?.exportHistory?.find(
+    (batch) =>
+      batch.format === format &&
+      batch.rowCount === rowCount &&
+      batch.idempotencyKey === idempotencyKey &&
+      sameStringSet(batch.submissionIds, ids) &&
+      submissions.every((submission) =>
+        submission.exportHistory?.some((existing) =>
+          exportBatchMatches(existing, batch),
+        ),
+      ),
+  );
+}
+
+function exportBatchMatches(left: ExportBatch, right: ExportBatch): boolean {
+  if (left.idempotencyKey && right.idempotencyKey) {
+    return left.idempotencyKey === right.idempotencyKey;
+  }
+
+  return (
+    left.id === right.id &&
+    left.format === right.format &&
+    left.rowCount === right.rowCount &&
+    sameStringSet(left.submissionIds, right.submissionIds)
+  );
+}
+
+function exportPlanMatchesDraft(plan: ExportPlan, draft: ExportPackageReady): boolean {
+  if (plan.blocked.length > 0) return false;
+  if (plan.rows.length !== draft.batch.rowCount) return false;
+  if (
+    !sameStringSet(
+      sortedSubmissionIds(plan.readySubmissions),
+      draft.batch.submissionIds,
+    )
+  ) {
+    return false;
+  }
+
+  return exportPackageIdempotencyKey(plan, draft.batch.format) === draft.idempotencyKey;
+}
+
+function exportPackageIdempotencyKey(
+  plan: ExportPlan,
+  format: ExportPackageFormat,
+): string {
+  const source = plan.rows
+    .map((row) => exportColumns.map((column) => row[column]).join("\u001f"))
+    .join("|");
+
+  return stableKey([format, plan.rows.length, source].join("|"));
+}
+
+function sortedSubmissionIds(submissions: Submission[]): string[] {
+  return submissions.map((submission) => submission.id).sort();
+}
+
+function sortSubmissionsForExport(submissions: Submission[]): Submission[] {
+  return [...submissions].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function sameStringSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const normalizedLeft = [...left].sort();
+  const normalizedRight = [...right].sort();
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+
+function stableKey(value: string): string {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+
+  return (hash >>> 0).toString(36).padStart(7, "0");
 }
 
 export function createCsvBlob(rows: ExportRow[]): Blob {
