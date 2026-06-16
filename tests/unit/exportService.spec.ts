@@ -144,6 +144,7 @@ describe("durable export package service", () => {
     ]);
     expect(draft.batch).toMatchObject({
       idempotencyKey: draft.idempotencyKey,
+      contentFingerprint: expect.stringContaining("VF-1001"),
       fileName: draft.artifact.fileName,
     });
   });

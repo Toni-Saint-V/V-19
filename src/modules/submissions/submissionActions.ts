@@ -10,7 +10,11 @@ import {
   updateQuestionnaireField as updateQuestionnaireFieldInSubmission,
   type QuestionnaireFieldUpdate,
 } from "./questionnaire";
-import { exportSummary } from "./exportRules";
+import {
+  buildExportPackageIdentity,
+  exportPackageIdentityMatches,
+  exportSummary,
+} from "./exportRules";
 import type {
   City,
   ExportState,
@@ -254,9 +258,23 @@ export function applyExportStateToSelection(
     return submissions;
   }
 
-  return submissions.map((submission) =>
-    selectedIds.includes(submission.id) ? { ...submission, exportState } : submission,
+  const selected = submissions.filter((submission) =>
+    selectedIds.includes(submission.id),
   );
+  const exportPackage = buildExportPackageIdentity(selected);
+
+  return submissions.map((submission) => {
+    if (!selectedIds.includes(submission.id)) return submission;
+    if (exportState === "file_generated" || exportState === "file_downloaded") {
+      return { ...submission, exportPackage: exportPackage ?? undefined, exportState };
+    }
+    if (exportState === "ready" || exportState === "not_ready") {
+      const nextSubmission = { ...submission };
+      delete nextSubmission.exportPackage;
+      return { ...nextSubmission, exportState };
+    }
+    return { ...submission, exportState };
+  });
 }
 
 function canApplyExportStateToSelection(
@@ -273,7 +291,17 @@ function canApplyExportStateToSelection(
   const plan = exportSummary(selected);
 
   if (exportState === "file_generated") return plan.canGenerate;
-  if (exportState === "file_downloaded") return plan.canDownload;
+  if (exportState === "file_downloaded") {
+    const exportPackage = buildExportPackageIdentity(selected);
+    return (
+      plan.canDownload &&
+      selected.every(
+        (submission) =>
+          submission.exportPackage &&
+          exportPackageIdentityMatches(submission.exportPackage, exportPackage),
+      )
+    );
+  }
   if (exportState === "marked_exported") return plan.canMarkExported;
 
   return plan.ready;

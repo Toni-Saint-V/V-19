@@ -1,4 +1,11 @@
-import type { ExportBlocker, ExportRow, ExportState, Submission } from "./types";
+import type {
+  ExportBlocker,
+  ExportPackageFormat,
+  ExportPackageIdentity,
+  ExportRow,
+  ExportState,
+  Submission,
+} from "./types";
 import { tripDates } from "./selectors";
 import { typeLabels } from "./status";
 
@@ -13,6 +20,20 @@ export type ExportSummary = {
   canDownload: boolean;
   canMarkExported: boolean;
 };
+
+const exportRowColumns: Array<keyof ExportRow> = [
+  "submissionCode",
+  "submissionId",
+  "submissionTitle",
+  "applicantName",
+  "city",
+  "tripDates",
+  "type",
+  "groupKey",
+  "groupLabel",
+  "applicantIndex",
+  "applicantCount",
+];
 
 export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   if (submissions.length === 0) return [{ reason: "Выберите хотя бы одну подачу" }];
@@ -71,22 +92,75 @@ export function buildExportRows(submissions: Submission[]): ExportRow[] {
   );
 }
 
-export function exportSummary(submissions: Submission[]): ExportSummary {
+export function exportSummary(
+  submissions: Submission[],
+  format: ExportPackageFormat = "xlsx",
+): ExportSummary {
   const rows = buildExportRows(submissions);
   const blockers = getExportBlockers(submissions);
   const exportState = getExportSelectionState(submissions);
+  const packageIdentity = buildExportPackageIdentity(submissions, format);
+  const packageStale =
+    Boolean(packageIdentity) &&
+    (exportState === "file_generated" || exportState === "file_downloaded") &&
+    !submissions.every(
+      (submission) =>
+        submission.exportPackage &&
+        exportPackageIdentityMatches(submission.exportPackage, packageIdentity),
+    );
+  const effectiveBlockers = packageStale
+    ? [
+        ...blockers,
+        { reason: "Состав выгрузки изменился после формирования файла" },
+      ]
+    : blockers;
   const ready = blockers.length === 0;
 
   return {
     rows,
-    blockers,
+    blockers: effectiveBlockers,
     rowCount: rows.length,
-    ready,
+    ready: ready && !packageStale,
     exportState,
-    canGenerate: ready && exportState === "ready",
-    canDownload: ready && exportState === "file_generated",
-    canMarkExported: ready && exportState === "file_downloaded",
+    canGenerate: ready && (exportState === "ready" || packageStale),
+    canDownload: ready && !packageStale && exportState === "file_generated",
+    canMarkExported: ready && !packageStale && exportState === "file_downloaded",
   };
+}
+
+export function buildExportPackageIdentity(
+  submissions: Submission[],
+  format: ExportPackageFormat = "xlsx",
+): ExportPackageIdentity | null {
+  const rows = buildExportRows(submissions);
+  if (rows.length === 0) return null;
+
+  const contentFingerprint = exportPackageContentFingerprint(rows, format);
+  const idempotencyKey = stableKey(contentFingerprint);
+  return {
+    contentFingerprint,
+    fileName: `visaflow-export-${idempotencyKey}.${format}`,
+    format,
+    idempotencyKey,
+    rowCount: rows.length,
+    submissionIds: sortedSubmissionIds(submissions),
+  };
+}
+
+export function exportPackageIdentityMatches(
+  left: ExportPackageIdentity,
+  right: ExportPackageIdentity | null,
+): right is ExportPackageIdentity {
+  if (!right) return false;
+
+  return (
+    left.contentFingerprint === right.contentFingerprint &&
+    left.fileName === right.fileName &&
+    left.format === right.format &&
+    left.idempotencyKey === right.idempotencyKey &&
+    left.rowCount === right.rowCount &&
+    sameStringArray(left.submissionIds, right.submissionIds)
+  );
 }
 
 export function getExportSelectionState(
@@ -108,4 +182,40 @@ function inferExportState(submission: Submission): ExportState {
   if (submission.status === "exported") return "marked_exported";
   if (submission.status === "ready_for_export") return "ready";
   return "not_ready";
+}
+
+function exportPackageContentFingerprint(
+  rows: ExportRow[],
+  format: ExportPackageFormat,
+): string {
+  const orderedRows = [...rows].sort(
+    (left, right) =>
+      left.submissionId.localeCompare(right.submissionId) ||
+      left.applicantIndex - right.applicantIndex,
+  );
+  const source = orderedRows
+    .map((row) => exportRowColumns.map((column) => String(row[column])).join("\u001f"))
+    .join("|");
+
+  return [format, orderedRows.length, source].join("|");
+}
+
+function sortedSubmissionIds(submissions: Submission[]): string[] {
+  return submissions.map((submission) => submission.id).sort();
+}
+
+function sameStringArray(left: string[], right: string[]): boolean {
+  return (
+    left.length === right.length && left.every((value, index) => value === right[index])
+  );
+}
+
+function stableKey(value: string): string {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+
+  return (hash >>> 0).toString(36).padStart(7, "0");
 }

@@ -1,3 +1,23 @@
+alter table public.export_batches
+  add column if not exists content_fingerprint text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'export_batches_content_fingerprint_not_blank'
+  ) then
+    alter table public.export_batches
+      add constraint export_batches_content_fingerprint_not_blank
+      check (content_fingerprint is null or btrim(content_fingerprint) <> '');
+  end if;
+end
+$$;
+
+create unique index if not exists export_batches_content_fingerprint_uidx
+on public.export_batches (content_fingerprint)
+where content_fingerprint is not null;
+
 create or replace function public.complete_export_package(payload jsonb)
 returns jsonb
 language plpgsql
@@ -13,7 +33,9 @@ declare
   expected_submission_count integer := 0;
   current_submission_count integer := 0;
   current_applicant_count integer := 0;
+  cockpit_snapshot_count integer := 0;
   changed_submission_count integer := 0;
+  expected_content_fingerprint text;
   status_history_count integer := 0;
   duplicate_batch boolean := false;
 begin
@@ -32,6 +54,7 @@ begin
   from jsonb_to_record(payload -> 'batch') as batch_payload (
     id uuid,
     format text,
+    content_fingerprint text,
     idempotency_key text,
     file_name text,
     row_count integer,
@@ -44,6 +67,10 @@ begin
 
   if batch_record.idempotency_key is null or btrim(batch_record.idempotency_key) = '' then
     raise exception 'Export package idempotency key is required';
+  end if;
+
+  if batch_record.content_fingerprint is null or btrim(batch_record.content_fingerprint) = '' then
+    raise exception 'Export package content fingerprint is required';
   end if;
 
   if batch_record.file_name is null or btrim(batch_record.file_name) = '' then
@@ -88,15 +115,6 @@ begin
     raise exception 'Export package contains unknown submissions';
   end if;
 
-  select count(*)
-  into current_applicant_count
-  from public.applicants
-  where submission_id = any(submission_ids);
-
-  if current_applicant_count <> batch_record.row_count then
-    raise exception 'Export package row count does not match current applicants';
-  end if;
-
   select *
   into persisted_batch
   from public.export_batches
@@ -124,49 +142,202 @@ begin
 
   if exists (
     select 1
-    from public.corrections
-    where submission_id = any(submission_ids)
-      and severity = 'blocking'
-      and status = 'open'
+    from (
+      select
+        count(distinct city) as city_count,
+        count(distinct travel_date) as travel_date_count,
+        count(distinct type) as type_count
+      from public.submissions
+      where id = any(submission_ids)
+    ) as group_shape
+    where group_shape.city_count <> 1
+      or group_shape.travel_date_count <> 1
+      or group_shape.type_count <> 1
   ) then
-    raise exception 'Blocking corrections must be closed before export';
+    raise exception 'Export package cannot mix city, travel date, or submission type';
   end if;
 
-  if exists (
-    select 1
-    from public.applicants a
-    where a.submission_id = any(submission_ids)
-      and (
-        select count(distinct m.type)
-        from public.media_assets m
-        where m.submission_id = a.submission_id
-          and m.applicant_id = a.id
-          and m.review_status = 'accepted'
-          and m.type in ('photo_white', 'selfie', 'video')
-      ) <> 3
-  ) then
-    raise exception 'All applicant media must be accepted before export';
+  select count(*)
+  into cockpit_snapshot_count
+  from public.submissions s
+  where s.id = any(submission_ids)
+    and s.family_intelligence ? 'v19CockpitSnapshot';
+
+  if cockpit_snapshot_count not in (0, current_submission_count) then
+    raise exception 'Export package cannot mix cockpit snapshot and normalized submissions';
   end if;
 
-  if exists (
-    select 1
+  if cockpit_snapshot_count = current_submission_count then
+    select count(*)
+    into current_applicant_count
     from public.submissions s
-    where s.id = any(submission_ids)
-      and s.type = 'family'
-      and (
-        select count(*)
-        from public.applicants a
-        where a.submission_id = s.id
-      ) > 1
-      and coalesce(s.family_intelligence ->> 'status', '') <> 'confirmed'
-  ) then
-    raise exception 'Family submissions must be confirmed before export';
+    cross join lateral (
+      select s.family_intelligence -> 'v19CockpitSnapshot' -> 'submission' as snapshot
+    ) as cockpit
+    cross join lateral jsonb_array_elements(
+      coalesce(cockpit.snapshot -> 'applicants', '[]'::jsonb)
+    ) as applicant(value)
+    where s.id = any(submission_ids);
+
+    if current_applicant_count <> batch_record.row_count then
+      raise exception 'Export package row count does not match current cockpit applicants';
+    end if;
+
+    if exists (
+      select 1
+      from public.submissions s
+      cross join lateral (
+        select s.family_intelligence -> 'v19CockpitSnapshot' -> 'submission' as snapshot
+      ) as cockpit
+      where s.id = any(submission_ids)
+        and (
+          cockpit.snapshot is null
+          or cockpit.snapshot ->> 'status' not in ('ready_for_export', 'exported')
+          or coalesce(cockpit.snapshot ->> 'exportState', '') not in ('file_downloaded', 'marked_exported')
+        )
+    ) then
+      raise exception 'Cockpit snapshot is not ready for export completion';
+    end if;
+
+    if exists (
+      select 1
+      from public.submissions s
+      cross join lateral (
+        select s.family_intelligence -> 'v19CockpitSnapshot' -> 'submission' as snapshot
+      ) as cockpit
+      cross join lateral jsonb_array_elements(
+        coalesce(cockpit.snapshot -> 'issues', '[]'::jsonb)
+      ) as issue(value)
+      where s.id = any(submission_ids)
+        and issue.value ->> 'severity' = 'blocker'
+        and issue.value ->> 'status' = 'open'
+    ) then
+      raise exception 'Blocking cockpit issues must be closed before export';
+    end if;
+
+    if exists (
+      select 1
+      from public.submissions s
+      cross join lateral (
+        select s.family_intelligence -> 'v19CockpitSnapshot' -> 'submission' as snapshot
+      ) as cockpit
+      cross join lateral jsonb_array_elements(
+        coalesce(cockpit.snapshot -> 'applicants', '[]'::jsonb)
+      ) as applicant(value)
+      where s.id = any(submission_ids)
+        and (
+          select count(distinct file.value ->> 'type')
+          from jsonb_array_elements(
+            coalesce(cockpit.snapshot -> 'files', '[]'::jsonb)
+          ) as file(value)
+          where file.value ->> 'applicantId' = applicant.value ->> 'id'
+            and file.value ->> 'status' = 'accepted'
+            and file.value ->> 'type' in ('photo', 'selfie', 'video')
+        ) <> 3
+    ) then
+      raise exception 'All cockpit applicant files must be accepted before export';
+    end if;
+
+    select batch_record.format || '|' || batch_record.row_count::text || '|' || coalesce(string_agg(row_source, '|' order by submission_id, applicant_index), '')
+    into expected_content_fingerprint
+    from (
+      select
+        s.id as submission_id,
+        applicant.ordinality as applicant_index,
+        concat_ws(
+          chr(31),
+          case
+            when cockpit.snapshot ->> 'type' = 'family'
+              then s.id || '-' || applicant.ordinality::text
+            else s.id
+          end,
+          s.id,
+          cockpit.snapshot ->> 'title',
+          applicant.value ->> 'fullName',
+          cockpit.snapshot ->> 'city',
+          (cockpit.snapshot ->> 'tripDateFrom') || '-' || (cockpit.snapshot ->> 'tripDateTo'),
+          case
+            when cockpit.snapshot ->> 'type' = 'family' then 'Семья'
+            else 'Один заявитель'
+          end,
+          s.id,
+          case
+            when cockpit.snapshot ->> 'type' = 'family' then 'Семья'
+            else 'Один заявитель'
+          end,
+          applicant.ordinality::text,
+          jsonb_array_length(coalesce(cockpit.snapshot -> 'applicants', '[]'::jsonb))::text
+        ) as row_source
+      from public.submissions s
+      cross join lateral (
+        select s.family_intelligence -> 'v19CockpitSnapshot' -> 'submission' as snapshot
+      ) as cockpit
+      cross join lateral jsonb_array_elements(
+        coalesce(cockpit.snapshot -> 'applicants', '[]'::jsonb)
+      ) with ordinality as applicant(value, ordinality)
+      where s.id = any(submission_ids)
+    ) as cockpit_rows;
+
+    if expected_content_fingerprint is distinct from batch_record.content_fingerprint then
+      raise exception 'Export package content fingerprint does not match current cockpit snapshot';
+    end if;
+  else
+    select count(*)
+    into current_applicant_count
+    from public.applicants
+    where submission_id = any(submission_ids);
+
+    if current_applicant_count <> batch_record.row_count then
+      raise exception 'Export package row count does not match current applicants';
+    end if;
+
+    if exists (
+      select 1
+      from public.corrections
+      where submission_id = any(submission_ids)
+        and severity = 'blocking'
+        and status = 'open'
+    ) then
+      raise exception 'Blocking corrections must be closed before export';
+    end if;
+
+    if exists (
+      select 1
+      from public.applicants a
+      where a.submission_id = any(submission_ids)
+        and (
+          select count(distinct m.type)
+          from public.media_assets m
+          where m.submission_id = a.submission_id
+            and m.applicant_id = a.id
+            and m.review_status = 'accepted'
+            and m.type in ('photo_white', 'selfie', 'video')
+        ) <> 3
+    ) then
+      raise exception 'All applicant media must be accepted before export';
+    end if;
+
+    if exists (
+      select 1
+      from public.submissions s
+      where s.id = any(submission_ids)
+        and s.type = 'family'
+        and (
+          select count(*)
+          from public.applicants a
+          where a.submission_id = s.id
+        ) > 1
+        and coalesce(s.family_intelligence ->> 'status', '') <> 'confirmed'
+    ) then
+      raise exception 'Family submissions must be confirmed before export';
+    end if;
   end if;
 
   if not duplicate_batch then
     insert into public.export_batches (
       id,
       format,
+      content_fingerprint,
       idempotency_key,
       file_name,
       row_count,
@@ -175,6 +346,7 @@ begin
     values (
       coalesce(batch_record.id, gen_random_uuid()),
       batch_record.format,
+      batch_record.content_fingerprint,
       batch_record.idempotency_key,
       batch_record.file_name,
       batch_record.row_count,
@@ -200,6 +372,7 @@ begin
   end if;
 
   if persisted_batch.format <> batch_record.format
+    or persisted_batch.content_fingerprint is distinct from batch_record.content_fingerprint
     or persisted_batch.row_count <> batch_record.row_count
     or persisted_batch.file_name is distinct from batch_record.file_name
     or (
@@ -255,6 +428,7 @@ begin
       'created_by', persisted_batch.created_by,
       'created_at', persisted_batch.created_at,
       'format', persisted_batch.format,
+      'content_fingerprint', persisted_batch.content_fingerprint,
       'idempotency_key', persisted_batch.idempotency_key,
       'file_name', persisted_batch.file_name,
       'row_count', persisted_batch.row_count,

@@ -265,6 +265,13 @@ describe("V-19 export rules", () => {
       "file_generated",
     );
 
+    expect(generated[0]?.exportPackage).toMatchObject({
+      contentFingerprint: expect.stringContaining("ПД-1056"),
+      fileName: expect.stringMatching(/^visaflow-export-.+\.xlsx$/),
+      format: "xlsx",
+      rowCount: 1,
+      submissionIds: ["ПД-1056"],
+    });
     expect(exportSummary([generated[0]])).toMatchObject({
       canDownload: true,
       canGenerate: false,
@@ -316,6 +323,48 @@ describe("V-19 export rules", () => {
       applyExportStateToSelection(generated, ["ПД-1056"], "file_downloaded")[0]
         ?.exportState,
     ).toBe("file_downloaded");
+    expect(
+      applyExportStateToSelection(generated, ["ПД-1056"], "file_downloaded")[0]
+        ?.exportPackage,
+    ).toEqual(generated[0]?.exportPackage);
+  });
+
+  it("blocks download and export when generated package content becomes stale", () => {
+    const generated = applyExportStateToSelection(
+      [byId("ПД-1056")],
+      ["ПД-1056"],
+      "file_generated",
+    );
+    const generatedSubmission = generated[0];
+    if (!generatedSubmission) throw new Error("Missing generated submission");
+    const staleGenerated = [
+      { ...generatedSubmission, title: "Изменено после генерации" },
+    ];
+
+    expect(exportSummary(staleGenerated)).toMatchObject({
+      canDownload: false,
+      canGenerate: true,
+      canMarkExported: false,
+    });
+    expect(
+      exportSummary(staleGenerated).blockers.map((blocker) => blocker.reason),
+    ).toContain("Состав выгрузки изменился после формирования файла");
+    expect(
+      applyExportStateToSelection(staleGenerated, ["ПД-1056"], "file_downloaded"),
+    ).toBe(staleGenerated);
+
+    const downloaded = applyExportStateToSelection(
+      generated,
+      ["ПД-1056"],
+      "file_downloaded",
+    );
+    const downloadedSubmission = downloaded[0];
+    if (!downloadedSubmission) throw new Error("Missing downloaded submission");
+    const staleDownloaded = [
+      { ...downloadedSubmission, title: "Изменено после скачивания" },
+    ];
+
+    expect(markSelectedExported(staleDownloaded, ["ПД-1056"])).toBe(staleDownloaded);
   });
 
   it("keeps exported state locked until the selected package is downloaded", () => {

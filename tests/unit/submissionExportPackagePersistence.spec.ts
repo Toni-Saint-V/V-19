@@ -1,6 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { commitSubmissionExportPackage } from "../../src/modules/submissions/exportPackagePersistence";
-import type { ExportBatch } from "../../src/types/domain";
+import {
+  commitSubmissionExportPackage,
+  type ExportPackageCommitBatch,
+} from "../../src/modules/submissions/exportPackagePersistence";
 
 const supabaseMock = vi.hoisted(() => ({
   client: null as null | Record<string, unknown>,
@@ -10,11 +12,12 @@ vi.mock("../../src/lib/supabase/client", () => ({
   getSupabaseClient: () => supabaseMock.client,
 }));
 
-const batch: ExportBatch = {
+const batch: ExportPackageCommitBatch = {
   id: "00000000-0000-4000-8000-000000000301",
   createdBy: "00000000-0000-4000-8000-000000000999",
   createdAt: "2026-06-16T08:00:00.000Z",
   format: "xlsx",
+  contentFingerprint: "xlsx|2|ПД-1056",
   idempotencyKey: "export-content-1",
   fileName: "visaflow-export-export-content-1.xlsx",
   rowCount: 2,
@@ -26,6 +29,7 @@ function row(overrides: Record<string, unknown> = {}) {
     id: batch.id,
     created_by: "00000000-0000-4000-8000-000000000001",
     created_at: "2026-06-16T08:01:00.000Z",
+    content_fingerprint: batch.contentFingerprint ?? null,
     file_name: batch.fileName,
     format: batch.format,
     idempotency_key: batch.idempotencyKey,
@@ -44,6 +48,7 @@ describe("V-19 submission export package persistence", () => {
           batch: {
             file_name: "visaflow-export-export-content-1.xlsx",
             format: "xlsx",
+            content_fingerprint: "xlsx|2|ПД-1056",
             id: batch.id,
             idempotency_key: "export-content-1",
             row_count: 2,
@@ -69,10 +74,16 @@ describe("V-19 submission export package persistence", () => {
     const committed = await commitSubmissionExportPackage(batch);
 
     expect(committed).toMatchObject({
-      id: "00000000-0000-4000-8000-000000000888",
-      createdAt: "2026-06-16T08:01:00.000Z",
-      createdBy: "00000000-0000-4000-8000-000000000001",
-      idempotencyKey: "export-content-1",
+      changedSubmissions: 2,
+      duplicate: false,
+      statusHistory: 2,
+      batch: {
+        id: "00000000-0000-4000-8000-000000000888",
+        createdAt: "2026-06-16T08:01:00.000Z",
+        createdBy: "00000000-0000-4000-8000-000000000001",
+        contentFingerprint: "xlsx|2|ПД-1056",
+        idempotencyKey: "export-content-1",
+      },
     });
   });
 

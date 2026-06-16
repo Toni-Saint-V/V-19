@@ -95,7 +95,7 @@ describe("Supabase security contract", () => {
     expect(submissionService).toContain("const submissionSelect =");
     expect(submissionService).toContain("const statusHistorySelect =");
     expect(submissionService).toContain(
-      "id,created_by,created_at,format,idempotency_key,file_name,row_count,submission_ids",
+      "id,created_by,created_at,format,content_fingerprint,idempotency_key,file_name,row_count,submission_ids",
     );
   });
 
@@ -145,6 +145,22 @@ describe("Supabase security contract", () => {
     );
     expect(migration).toContain("actor_role <> 'admin'");
     expect(migration).toContain("for update");
+    expect(migration).toContain("add column if not exists content_fingerprint text");
+    expect(migration).toContain("export_batches_content_fingerprint_uidx");
+    expect(migration).toContain("Export package content fingerprint is required");
+    expect(migration).toContain(
+      "Export package cannot mix cockpit snapshot and normalized submissions",
+    );
+    expect(migration).toContain("Cockpit snapshot is not ready for export completion");
+    expect(migration).toContain(
+      "All cockpit applicant files must be accepted before export",
+    );
+    expect(migration).toContain(
+      "Export package content fingerprint does not match current cockpit snapshot",
+    );
+    expect(migration).toContain(
+      "(cockpit.snapshot ->> 'tripDateFrom') || '-' || (cockpit.snapshot ->> 'tripDateTo')",
+    );
     expect(migration).toContain(
       "Only accepted or Excel-ready submissions can be exported",
     );
@@ -152,6 +168,12 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(
       "Duplicate export packages can only converge accepted, Excel-ready, or exported submissions",
     );
+    expect(migration).toContain(
+      "Export package cannot mix city, travel date, or submission type",
+    );
+    expect(migration).toContain("count(distinct city) as city_count");
+    expect(migration).toContain("count(distinct travel_date) as travel_date_count");
+    expect(migration).toContain("count(distinct type) as type_count");
     expect(migration).toContain(
       "Export package row count does not match current applicants",
     );
@@ -164,6 +186,24 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(
       "grant execute on function public.complete_export_package(jsonb) to authenticated",
     );
+  });
+
+  test("prevents stale draft saves from downgrading exported submissions", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260616002000_prevent_export_regression.sql",
+    );
+
+    expect(migration).toContain(
+      "create or replace function app_private.prevent_submission_export_regression()",
+    );
+    expect(migration).toContain("old.status = 'exported' and new.status <> 'exported'");
+    expect(migration).toContain("Exported submissions cannot be downgraded");
+    expect(migration).toContain("old.exported_at is not null");
+    expect(migration).toContain("new.exported_at is null");
+    expect(migration).toContain("new.exported_at < old.exported_at");
+    expect(migration).toContain("Exported timestamp cannot move backwards");
+    expect(migration).toContain("create trigger submissions_export_regression_guard");
+    expect(migration).toContain("before update of status, exported_at on public.submissions");
   });
 
   test("keeps corrections scoped to applicants in the same submission", () => {

@@ -1,22 +1,26 @@
 import type { ExportBatch } from "../../types/domain";
-import { commitSubmissionExportPackage } from "./exportPackagePersistence";
-import { exportSummary } from "./exportRules";
+import {
+  commitSubmissionExportPackage,
+  type ExportPackageCommitBatch,
+  type ExportPackageCommitOutcome,
+} from "./exportPackagePersistence";
+import { buildExportPackageIdentity, exportSummary } from "./exportRules";
 import { tripDates } from "./selectors";
 import { typeLabels } from "./status";
-import type { ExportRow, Submission } from "./types";
+import type { Submission } from "./types";
 
-export type ExportBatchRecorder = (batch: ExportBatch) => Promise<ExportBatch | null>;
-export type ExportedSubmissionPersister = (
-  submissions: Submission[],
-) => Promise<void>;
+export type ExportPackageCommitter = (
+  batch: ExportPackageCommitBatch,
+) => Promise<ExportPackageCommitOutcome | null>;
+export type ExportedSubmissionPersister = (submissions: Submission[]) => Promise<void>;
 
 export interface CompleteExportPackageOptions {
   batchId?: string;
   createdAt: string;
   createdBy: string;
   format: ExportBatch["format"];
+  commitPackage?: ExportPackageCommitter;
   persistExportedSubmissions?: ExportedSubmissionPersister;
-  recordBatch?: ExportBatchRecorder;
 }
 
 export interface CompleteExportPackageBlocked {
@@ -27,7 +31,8 @@ export interface CompleteExportPackageBlocked {
 
 export interface CompleteExportPackageExported {
   status: "exported";
-  batch: ExportBatch;
+  batch: ExportPackageCommitBatch;
+  commit: ExportPackageCommitOutcome;
   submissions: Submission[];
 }
 
@@ -35,25 +40,11 @@ export type CompleteExportPackageResult =
   | CompleteExportPackageBlocked
   | CompleteExportPackageExported;
 
-const exportRowColumns: Array<keyof ExportRow> = [
-  "submissionCode",
-  "submissionId",
-  "submissionTitle",
-  "applicantName",
-  "city",
-  "tripDates",
-  "type",
-  "groupKey",
-  "groupLabel",
-  "applicantIndex",
-  "applicantCount",
-];
-
 export async function completeExportPackage(
   submissions: Submission[],
   options: CompleteExportPackageOptions,
 ): Promise<CompleteExportPackageResult> {
-  const plan = exportSummary(submissions);
+  const plan = exportSummary(submissions, options.format);
   if (!plan.canMarkExported) {
     return {
       status: "blocked",
@@ -64,25 +55,29 @@ export async function completeExportPackage(
     };
   }
 
-  const idempotencyKey = exportPackageIdempotencyKey(plan.rows, options.format);
-  const batch: ExportBatch = {
+  const packageIdentity = buildExportPackageIdentity(submissions, options.format);
+  if (!packageIdentity) {
+    return {
+      status: "blocked",
+      blockers: ["Пакет выгрузки пуст."],
+      submissions,
+    };
+  }
+
+  const batch: ExportPackageCommitBatch = {
     id: options.batchId ?? crypto.randomUUID(),
     createdAt: options.createdAt,
     createdBy: options.createdBy,
-    fileName: `visaflow-export-${idempotencyKey}.${options.format}`,
-    format: options.format,
-    idempotencyKey,
-    rowCount: plan.rowCount,
-    submissionIds: sortedSubmissionIds(submissions),
+    ...packageIdentity,
   };
-  const recorder = options.recordBatch ?? commitSubmissionExportPackage;
-  const recordedBatch = await recorder(batch);
-  if (!recordedBatch) {
-    throw new Error("Export batch persistence did not return a recorded batch.");
+  const committer = options.commitPackage ?? commitSubmissionExportPackage;
+  const commit = await committer(batch);
+  if (!commit) {
+    throw new Error("Export package persistence did not return a commit result.");
   }
 
-  const exportedSubmissions = markSubmissionsExported(submissions, recordedBatch);
-  if (!allSubmissionsContainRecordedBatch(exportedSubmissions, recordedBatch)) {
+  const exportedSubmissions = markSubmissionsExported(submissions, commit.batch);
+  if (!allSubmissionsContainRecordedBatch(exportedSubmissions, commit.batch)) {
     throw new Error(
       "Export package was recorded, but exported submissions no longer match the batch.",
     );
@@ -92,7 +87,8 @@ export async function completeExportPackage(
 
   return {
     status: "exported",
-    batch: recordedBatch,
+    batch: commit.batch,
+    commit,
     submissions: exportedSubmissions,
   };
 }
@@ -149,43 +145,18 @@ function allSubmissionsContainRecordedBatch(
       (submission) =>
         submission.status === "exported" &&
         submission.exportState === "marked_exported" &&
-        submission.history.some((item) => item.text.includes(batch.fileName ?? batch.id)),
+        submission.history.some((item) =>
+          item.text.includes(batch.fileName ?? batch.id),
+        ),
     )
   );
-}
-
-function exportPackageIdempotencyKey(
-  rows: ExportRow[],
-  format: ExportBatch["format"],
-): string {
-  const source = rows
-    .map((row) => exportRowColumns.map((column) => String(row[column])).join("\u001f"))
-    .join("|");
-
-  return stableKey([format, rows.length, source].join("|"));
-}
-
-function sortedSubmissionIds(submissions: Submission[]): string[] {
-  return submissions.map((submission) => submission.id).sort();
-}
-
-function stableKey(value: string): string {
-  let hash = 2_166_136_261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-
-  return (hash >>> 0).toString(36).padStart(7, "0");
 }
 
 export function exportPackagePreviewName(
   submissions: Submission[],
   format: ExportBatch["format"],
 ): string | null {
-  const plan = exportSummary(submissions);
-  if (plan.rowCount === 0) return null;
-  return `visaflow-export-${exportPackageIdempotencyKey(plan.rows, format)}.${format}`;
+  return buildExportPackageIdentity(submissions, format)?.fileName ?? null;
 }
 
 export function exportPackageLabel(submission: Submission): string {
