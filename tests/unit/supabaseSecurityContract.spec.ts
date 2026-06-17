@@ -304,6 +304,53 @@ describe("Supabase security contract", () => {
     expect(rpcBoundary).toContain("insert into public.status_history");
   });
 
+  test("keeps correction handoff server-authoritative and atomic", () => {
+    const handoffMigration = readProjectFile(
+      "supabase/migrations/20260617001000_submit_corrections_handoff_rpc.sql",
+    );
+
+    expect(handoffMigration).toContain(
+      "create or replace function public.submit_corrections_handoff(payload jsonb)",
+    );
+    expect(handoffMigration).toContain("for update");
+    expect(handoffMigration).toContain("perform public.save_submission_draft");
+    expect(handoffMigration).toContain("result := public.save_submission_draft(payload)");
+    expect(handoffMigration).toContain(
+      "Correction handoff requires an existing returned submission",
+    );
+    expect(handoffMigration).toContain(
+      "Only the assigned agent can submit corrections",
+    );
+    expect(handoffMigration).toContain(
+      "grant execute on function public.submit_corrections_handoff(jsonb) to authenticated",
+    );
+  });
+
+  test("keeps cockpit saves from overwriting normalized applicant profile fields", () => {
+    const profilePreservationMigration = readProjectFile(
+      "supabase/migrations/20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
+    );
+
+    expect(profilePreservationMigration).toContain(
+      "create or replace function public.save_submission_draft(payload jsonb)",
+    );
+    expect(profilePreservationMigration).toContain(
+      "full_name = excluded.full_name",
+    );
+    expect(profilePreservationMigration).toContain(
+      "questionnaire_percent = excluded.questionnaire_percent",
+    );
+    expect(profilePreservationMigration).not.toContain(
+      "passport_number = excluded.passport_number",
+    );
+    expect(profilePreservationMigration).not.toContain("email = excluded.email");
+    expect(profilePreservationMigration).not.toContain("phone = excluded.phone");
+    expect(profilePreservationMigration).not.toContain("address = excluded.address");
+    expect(profilePreservationMigration).not.toContain(
+      "birth_date = excluded.birth_date",
+    );
+  });
+
   test("keeps AI helper quota surfaces service-role only", () => {
     const quotaMigration = readProjectFile(
       "supabase/migrations/20260614000000_ai_helper_audit_quota.sql",
