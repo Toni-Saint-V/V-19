@@ -10,6 +10,7 @@ import type { Submission } from "../types";
 
 export function PanelHeader<T extends string>({
   action,
+  description,
   eyebrow,
   onTab,
   search,
@@ -20,34 +21,49 @@ export function PanelHeader<T extends string>({
   value,
 }: {
   action?: ReactNode;
-  eyebrow: string;
-  onTab: (tab: T) => void;
+  description?: string;
+  eyebrow?: string;
+  onTab?: (tab: T) => void;
   search?: ReactNode;
   side?: ReactNode;
-  tabs: Array<[T, string]>;
+  tabs?: Array<[T, string]>;
   title: string;
   titleId?: string;
-  value: T;
+  value?: T;
 }) {
+  const renderTabs =
+    tabs && tabs.length > 0 && value !== undefined && onTab !== undefined;
+  const hasTabs = Boolean(renderTabs);
+
   return (
     <div className="panel-header">
       <div className="panel-header-title">
-        <p className="kicker">{eyebrow}</p>
+        {eyebrow ? <p className="kicker">{eyebrow}</p> : null}
         <h2 id={titleId}>{title}</h2>
+        {description ? <p>{description}</p> : null}
       </div>
-      {side ? <div className="panel-header-side">{side}</div> : null}
-      <div className="panel-controls">
-        <div className="panel-tabs-group">
-          <SegmentedTabs
-            ariaLabel={title}
-            tabs={tabs}
-            value={value}
-            onValueChange={onTab}
-          />
-          {action}
+      {side && hasTabs ? <div className="panel-header-side">{side}</div> : null}
+      {hasTabs || side || search || action ? (
+        <div className={`panel-controls ${hasTabs ? "" : "is-filter-search"}`}>
+          {renderTabs ? (
+            <div className="panel-tabs-group">
+              <SegmentedTabs
+                ariaLabel={title}
+                tabs={tabs}
+                value={value}
+                onValueChange={onTab}
+              />
+              {action}
+            </div>
+          ) : side ? (
+            <div className="panel-filter-slot">{side}</div>
+          ) : null}
+          {search ? <div className="panel-search-slot">{search}</div> : null}
+          {!hasTabs && action ? (
+            <div className="panel-action-slot">{action}</div>
+          ) : null}
         </div>
-        {search ? <div className="panel-search-slot">{search}</div> : null}
-      </div>
+      ) : null}
     </div>
   );
 }

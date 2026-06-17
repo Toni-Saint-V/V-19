@@ -87,6 +87,18 @@ export type Database = {
           statusHistory: number;
         };
       };
+      submit_corrections_handoff: {
+        Args: {
+          payload: SubmissionDraftPersistencePayload;
+        };
+        Returns: {
+          submissionId: string;
+          applicants: number;
+          mediaAssets: number;
+          statusHistory: number;
+          idempotent?: boolean;
+        };
+      };
     };
     Enums: {
       profile_role: Role;

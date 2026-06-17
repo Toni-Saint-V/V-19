@@ -38,6 +38,7 @@ import type {
   SubmissionAction,
   SubmissionFileStatus,
 } from "../types";
+import { AiHelperSurfacePanel } from "./AiHelperSurfacePanel";
 import { BbAiPanel } from "./BbAiPanel";
 import { EmptyState } from "./Primitives";
 
@@ -174,6 +175,7 @@ export function SubmissionDrawer({
             primaryAction={primaryAction}
             role={role}
             submission={submission}
+            surface={surface}
           />
         ) : null}
         {activeTab === "applicants" ? (
@@ -401,6 +403,7 @@ function DrawerOverview({
   primaryAction,
   role,
   submission,
+  surface,
 }: {
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onDismissAiSuggestion: (suggestionId: string) => void;
@@ -408,6 +411,7 @@ function DrawerOverview({
   primaryAction: ActionDecision;
   role: Role;
   submission: Submission;
+  surface: "agent" | "review" | "export";
 }) {
   const blockers = blockerCount(submission);
   const openIssues = openIssueCount(submission);
@@ -470,6 +474,7 @@ function DrawerOverview({
           внутренней проверке.
         </p>
       </div>
+      <AiHelperSurfacePanel role={role} submission={submission} surface={surface} />
       <BbAiPanel
         onAccept={onAcceptAiSuggestion}
         onDismiss={onDismissAiSuggestion}

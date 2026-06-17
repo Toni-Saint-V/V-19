@@ -15,6 +15,7 @@ export type SupabasePersistenceOperation =
   | "status_history.list"
   | "status_history.insert"
   | "rpc.save_submission_draft"
+  | "rpc.submit_corrections_handoff"
   | "storage.upload_media"
   | "storage.delete_media"
   | "storage.create_signed_url";

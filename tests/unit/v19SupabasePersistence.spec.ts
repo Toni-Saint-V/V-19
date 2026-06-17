@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { AppProfile } from "../../src/types/session";
+import type { Json } from "../../src/lib/supabase/database.types";
 
 const mockState = vi.hoisted(() => ({
   applicantRows: [] as unknown[],
@@ -55,6 +56,7 @@ import {
   changedCockpitSubmissions,
   cockpitSubmissionFingerprintMap,
   loadCockpitSubmissionsForProfile,
+  readCockpitSnapshot,
   saveCockpitSubmissionsForProfile,
   toCockpitDraftPersistencePayload,
 } from "../../src/modules/submissions/supabasePersistence";
@@ -133,6 +135,116 @@ describe("V-19 Supabase cockpit persistence", () => {
       agent_id: agentProfile.id,
       id: changedSubmission.id,
       title: changedSubmission.title,
+    });
+  });
+
+  it("uses one atomic RPC when submitting fixed corrections for review", async () => {
+    const returnedSubmission = initialSubmissions.find(
+      (submission) => submission.status === "returned",
+    ) as Submission;
+    const correctedSubmission: Submission = {
+      ...returnedSubmission,
+      status: "corrections_received",
+      issues: returnedSubmission.issues.map((issue) =>
+        issue.status === "open" ? { ...issue, status: "fixed_by_manager" } : issue,
+      ),
+    };
+
+    await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [correctedSubmission],
+      new Map(),
+    );
+
+    expect(mockState.rpcCalls).toHaveLength(1);
+    expect(mockState.rpcCalls[0]?.name).toBe("submit_corrections_handoff");
+    expect(
+      (
+        mockState.rpcCalls[0]?.args.payload as {
+          submission: { status: string };
+        }
+      ).submission.status,
+    ).toBe("waiting_review");
+  });
+
+  it("keeps normalized applicant projection out of the cockpit payload and snapshot", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.applicantRows = [
+      {
+        id: submission.applicants[0].id,
+        submission_id: submission.id,
+        full_name: submission.applicants[0].fullName,
+        questionnaire_percent: 100,
+        media_percent: 100,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const savedPayload = toCockpitDraftPersistencePayload(
+      loaded.submissions[0] as Submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    const savedSnapshot = readCockpitSnapshot(
+      savedPayload.submission.family_intelligence as Json,
+    );
+
+    expect(savedPayload.applicants[0]).toMatchObject({
+      birth_date: null,
+      email: null,
+      passport_number: "",
+      phone: null,
+    });
+    expect(savedSnapshot?.applicants[0]).not.toHaveProperty("normalizedProfile");
+  });
+
+  it("does not reuse normalized applicant rows after loading remote data", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.applicantRows = [
+      {
+        id: submission.applicants[0].id,
+        submission_id: submission.id,
+        full_name: submission.applicants[0].fullName,
+        questionnaire_percent: 100,
+        media_percent: 100,
+      },
+    ];
+
+    await loadCockpitSubmissionsForProfile(agentProfile);
+    const unscopedPayload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    expect(unscopedPayload.applicants[0]).toMatchObject({
+      birth_date: null,
+      email: null,
+      passport_number: "",
     });
   });
 

@@ -34,7 +34,7 @@ const submissionListLimit = 100;
 const submissionSelect =
   "id,agent_id,type,title,country,city,travel_date,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const applicantSelect =
-  "id,submission_id,full_name,role,questionnaire_percent,media_percent,created_at,updated_at" as const;
+  "id,submission_id,full_name,questionnaire_percent,media_percent,created_at,updated_at" as const;
 
 export interface CockpitLoadResult {
   ownerIdsBySubmissionId: Map<string, string>;
@@ -47,7 +47,11 @@ type SnapshotEnvelope = {
 };
 type CockpitApplicantRow = Pick<
   ApplicantRow,
-  "id" | "submission_id" | "full_name" | "questionnaire_percent" | "media_percent"
+  | "full_name"
+  | "id"
+  | "media_percent"
+  | "questionnaire_percent"
+  | "submission_id"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -106,19 +110,47 @@ export function readCockpitSnapshot(value: Json | null): Submission | null {
   return isCockpitSubmission(envelope.submission) ? envelope.submission : null;
 }
 
+function attachNormalizedApplicantRows(
+  submission: Submission,
+  applicants: CockpitApplicantRow[],
+): Submission {
+  if (!applicants.length) return submission;
+
+  const rowsById = new Map(applicants.map((applicant) => [applicant.id, applicant]));
+
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => {
+      const row = rowsById.get(applicant.id);
+      if (!row) return applicant;
+
+      return {
+        ...applicant,
+        fullName: applicant.fullName || row.full_name,
+      };
+    }),
+  };
+}
+
 function reconcileCockpitSnapshotWithSubmissionRow(
   row: Pick<SubmissionRow, "exported_at" | "status" | "updated_at">,
   snapshot: Submission,
+  applicants: CockpitApplicantRow[],
 ): Submission {
-  if (row.status !== "exported") return snapshot;
-  if (snapshot.status === "exported" && snapshot.exportState === "marked_exported") {
-    return snapshot;
+  const normalizedSnapshot = attachNormalizedApplicantRows(snapshot, applicants);
+
+  if (row.status !== "exported") return normalizedSnapshot;
+  if (
+    normalizedSnapshot.status === "exported" &&
+    normalizedSnapshot.exportState === "marked_exported"
+  ) {
+    return normalizedSnapshot;
   }
 
   const syncedAt = row.exported_at ?? row.updated_at;
-  const historyId = `и-${snapshot.id}-sync-exported`;
-  const syncedHistory = snapshot.history.some((item) => item.id === historyId)
-    ? snapshot.history
+  const historyId = `и-${normalizedSnapshot.id}-sync-exported`;
+  const syncedHistory = normalizedSnapshot.history.some((item) => item.id === historyId)
+    ? normalizedSnapshot.history
     : [
         {
           id: historyId,
@@ -126,11 +158,11 @@ function reconcileCockpitSnapshotWithSubmissionRow(
           at: syncedAt,
           source: "system" as const,
         },
-        ...snapshot.history,
+        ...normalizedSnapshot.history,
       ];
 
   return {
-    ...snapshot,
+    ...normalizedSnapshot,
     status: "exported",
     exportState: "marked_exported",
     updatedAt: syncedAt,
@@ -418,6 +450,13 @@ export function toCockpitDraftPersistencePayload(
   };
 }
 
+function requiresCorrectionHandoff(submission: Submission): boolean {
+  return (
+    submission.status === "corrections_received" &&
+    submission.issues.some((issue) => issue.status === "fixed_by_manager")
+  );
+}
+
 function fallbackSubmissionFromRows(
   row: SubmissionRow,
   applicants: CockpitApplicantRow[],
@@ -463,7 +502,12 @@ export async function loadCockpitSubmissionsForProfile(
   profile: AppProfile,
 ): Promise<CockpitLoadResult> {
   const client = getSupabaseClient();
-  if (!client) return { ownerIdsBySubmissionId: new Map(), submissions: [] };
+  if (!client) {
+    return {
+      ownerIdsBySubmissionId: new Map(),
+      submissions: [],
+    };
+  }
 
   const query = client
     .from("submissions")
@@ -480,7 +524,12 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
-  if (!rows?.length) return { ownerIdsBySubmissionId: new Map(), submissions: [] };
+  if (!rows?.length) {
+    return {
+      ownerIdsBySubmissionId: new Map(),
+      submissions: [],
+    };
+  }
 
   const submissionIds = rows.map((row) => row.id);
   const { data: applicantRows, error: applicantError } = await client
@@ -498,16 +547,25 @@ export async function loadCockpitSubmissionsForProfile(
   const ownerIdsBySubmissionId = new Map<string, string>();
   const submissions = rows.map((row) => {
     ownerIdsBySubmissionId.set(row.id, row.agent_id);
-    const snapshot = readCockpitSnapshot(row.family_intelligence);
-    if (snapshot) return reconcileCockpitSnapshotWithSubmissionRow(row, snapshot);
-
-    return fallbackSubmissionFromRows(
-      row,
-      (applicantRows ?? []).filter((applicant) => applicant.submission_id === row.id),
+    const submissionApplicants = (applicantRows ?? []).filter(
+      (applicant) => applicant.submission_id === row.id,
     );
+    const snapshot = readCockpitSnapshot(row.family_intelligence);
+    if (snapshot) {
+      return reconcileCockpitSnapshotWithSubmissionRow(
+        row,
+        snapshot,
+        submissionApplicants,
+      );
+    }
+
+    return fallbackSubmissionFromRows(row, submissionApplicants);
   });
 
-  return { ownerIdsBySubmissionId, submissions };
+  return {
+    ownerIdsBySubmissionId,
+    submissions,
+  };
 }
 
 export async function saveCockpitSubmissionsForProfile(
@@ -525,12 +583,20 @@ export async function saveCockpitSubmissionsForProfile(
       profile.role === "admin"
         ? (nextOwnerIds.get(submission.id) ?? profile.id)
         : profile.id;
-    const payload = toCockpitDraftPersistencePayload(submission, profile.id, ownerId);
-    const { error } = await client.rpc("save_submission_draft", { payload });
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      profile.id,
+      ownerId,
+    );
+    const { error } = requiresCorrectionHandoff(submission)
+      ? await client.rpc("submit_corrections_handoff", { payload })
+      : await client.rpc("save_submission_draft", { payload });
 
     if (error) {
       throw mapSupabasePersistenceError(error, {
-        operation: "rpc.save_submission_draft",
+        operation: requiresCorrectionHandoff(submission)
+          ? "rpc.submit_corrections_handoff"
+          : "rpc.save_submission_draft",
         fallbackKind: "save",
       });
     }
