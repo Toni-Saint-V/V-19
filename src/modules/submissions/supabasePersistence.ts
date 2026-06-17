@@ -4,6 +4,7 @@ import type {
   ApplicantRow,
   CorrectionInsert,
   Json,
+  MediaAssetInsert,
   StatusHistoryInsert,
   SubmissionDraftPersistencePayload,
   SubmissionRow,
@@ -19,6 +20,7 @@ import type {
   Issue,
   IssueStatus,
   Submission,
+  SubmissionFile,
   SubmissionFileType,
   SubmissionStatus,
 } from "./types";
@@ -243,6 +245,12 @@ function mediaTypeForIssue(type: SubmissionFileType | undefined) {
   return null;
 }
 
+function mediaTypeForFile(type: SubmissionFileType): MediaAssetInsert["type"] {
+  if (type === "photo") return "photo_white";
+  if (type === "selfie") return "selfie";
+  return "video";
+}
+
 function applicantRoleLabel(role: Applicant["role"]): string {
   if (role === "main") return "Основной заявитель";
   if (role === "spouse") return "Супруг";
@@ -321,6 +329,47 @@ function toStatusHistoryInsert(
   };
 }
 
+function reviewStatusForFile(file: SubmissionFile): MediaAssetInsert["review_status"] {
+  if (file.status === "accepted") return "accepted";
+  if (file.status === "needs_replacement") {
+    return file.reviewStatus === "poor_quality" ? "poor_quality" : "replace_required";
+  }
+  return file.reviewStatus ?? "not_reviewed";
+}
+
+function toCockpitMediaAssetInserts(submission: Submission): MediaAssetInsert[] {
+  return submission.files.flatMap((file) => {
+    if (
+      !file.generatedFileName ||
+      !file.storageBucket ||
+      !file.storagePath ||
+      file.status === "missing"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        id: stableUuid(`media:${submission.id}:${file.applicantId}:${file.type}`),
+        applicant_id: file.applicantId,
+        submission_id: submission.id,
+        type: mediaTypeForFile(file.type),
+        original_file_name: file.originalFileName ?? null,
+        generated_file_name: file.generatedFileName,
+        storage_bucket: file.storageBucket,
+        storage_path: file.storagePath,
+        mime_type: file.mimeType ?? null,
+        size_bytes: file.sizeBytes ?? null,
+        upload_status: file.uploadStatus ?? "uploaded",
+        review_status: reviewStatusForFile(file),
+        uploaded_at: timestampOrNow(file.uploadedAtIso ?? file.uploadedAt),
+        reviewed_at: file.reviewedAtIso ? timestampOrNow(file.reviewedAtIso) : null,
+        reviewed_by: file.reviewedBy ?? null,
+      },
+    ];
+  });
+}
+
 export function toCockpitDraftPersistencePayload(
   submission: Submission,
   actorId: string,
@@ -359,9 +408,7 @@ export function toCockpitDraftPersistencePayload(
     applicants: submission.applicants.map((applicant) =>
       toApplicantInsert(submission, applicant),
     ),
-    // The current cockpit has file states but no real file blobs or storage paths.
-    // Keep the exact UI state in the snapshot and avoid faking Supabase uploads.
-    media_assets: [],
+    media_assets: toCockpitMediaAssetInserts(submission),
     corrections: submission.issues.map((issue) =>
       toCorrectionInsert(submission, issue, actorId),
     ),

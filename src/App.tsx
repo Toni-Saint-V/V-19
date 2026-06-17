@@ -26,10 +26,15 @@ import {
 } from "./modules/submissions/selectors";
 import {
   addPreciseAdminIssue,
+  applyUploadedFileMetadata,
   applyActionToSubmissionList,
   applyExportStateToSelection,
   createDraftSubmission,
+  generatedCockpitMediaFileName,
+  mergeUploadedFileMetadataIntoSubmissions,
+  mediaSlotTypeForSubmissionFileType,
   updateQuestionnaireField,
+  type UploadedFileMetadata,
   uploadRequiredFile,
 } from "./modules/submissions/submissionActions";
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
@@ -69,6 +74,13 @@ import {
   signOutCurrentSession,
 } from "./services/authService";
 import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
+import {
+  buildMediaStoragePath,
+  deleteMediaFromStorage,
+  mediaStorageBucket,
+  uploadMediaToStorage,
+  type MediaStorageTarget,
+} from "./modules/submissions/mediaStorage";
 import type { AppProfile } from "./types/session";
 
 const cities: Array<City | "Все города"> = [
@@ -137,6 +149,10 @@ function clearWorkspaceEmail() {
   } catch {
     // Хранилище может быть недоступно в приватном режиме.
   }
+}
+
+function createMediaUploadNonce(uploadedAtIso: string) {
+  return `${uploadedAtIso}:${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
 }
 
 function normalizeCreateApplicantNames(names: string[], count: number) {
@@ -215,6 +231,11 @@ function App() {
   const skipNextRemoteSaveRef = useRef(false);
   const remoteSaveTimerRef = useRef<number | null>(null);
   const remoteSavePromiseRef = useRef<Promise<void> | null>(null);
+  const submissionsRef = useRef<Submission[]>(submissions);
+  const uploadQueuesRef = useRef<Map<string, Promise<void>>>(new Map());
+  const [uploadingSubmissionIds, setUploadingSubmissionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const activeSubmission =
     submissions.find((submission) => submission.id === selectedSubmissionId) ??
@@ -322,6 +343,10 @@ function App() {
       }
     }
   }
+
+  useEffect(() => {
+    submissionsRef.current = submissions;
+  }, [submissions]);
 
   useEffect(() => {
     if (isSupabaseMode) return;
@@ -503,11 +528,60 @@ function App() {
 
   function updateActiveSubmission(transform: (submission: Submission) => Submission) {
     if (!activeSubmission) return;
-    setSubmissions((current) =>
-      current.map((submission) =>
+    setSubmissions((current) => {
+      const next = current.map((submission) =>
         submission.id === activeSubmission.id ? transform(submission) : submission,
-      ),
+      );
+      submissionsRef.current = next;
+      return next;
+    });
+  }
+
+  function setSubmissionUploadBusy(submissionId: string, busy: boolean) {
+    setUploadingSubmissionIds((current) => {
+      const next = new Set(current);
+      if (busy) next.add(submissionId);
+      else next.delete(submissionId);
+      return next;
+    });
+  }
+
+  function commitUploadedSubmissionAfterRemoteSave(
+    savedSubmission: Submission,
+    fileId: string,
+    metadata: UploadedFileMetadata,
+  ) {
+    const { submissions: nextSubmissions } = mergeUploadedFileMetadataIntoSubmissions(
+      submissionsRef.current,
+      savedSubmission.id,
+      fileId,
+      metadata,
     );
+    submissionsRef.current = nextSubmissions;
+    remoteSubmissionFingerprintsRef.current = new Map(
+      remoteSubmissionFingerprintsRef.current,
+    );
+    remoteSubmissionFingerprintsRef.current.set(
+      savedSubmission.id,
+      cockpitSubmissionFingerprint(savedSubmission),
+    );
+    setSubmissions(nextSubmissions);
+  }
+
+  function enqueueSupabaseMediaUpload(submissionId: string, job: () => Promise<void>) {
+    const previous = uploadQueuesRef.current.get(submissionId) ?? Promise.resolve();
+    setSubmissionUploadBusy(submissionId, true);
+
+    const queued = previous.catch(() => undefined).then(job);
+    uploadQueuesRef.current.set(submissionId, queued);
+
+    void queued.finally(() => {
+      if (uploadQueuesRef.current.get(submissionId) !== queued) return;
+      uploadQueuesRef.current.delete(submissionId);
+      setSubmissionUploadBusy(submissionId, false);
+    });
+
+    return queued;
   }
 
   function updateSubmission(action: SubmissionAction) {
@@ -517,7 +591,9 @@ function App() {
       activeSubmission.id,
       action,
       role,
+      remoteProfile?.id,
     );
+    submissionsRef.current = nextSubmissions;
     setSubmissions(nextSubmissions);
     const updated = nextSubmissions.find(
       (submission) => submission.id === activeSubmission.id,
@@ -541,12 +617,190 @@ function App() {
   }
 
   function addAdminIssue(input: IssueInput) {
-    updateActiveSubmission((submission) => addPreciseAdminIssue(submission, input));
+    updateActiveSubmission((submission) =>
+      addPreciseAdminIssue(submission, input, remoteProfile?.id),
+    );
     setActiveDrawerTab("issues");
     setDrawerMode("detail");
   }
 
-  function uploadActiveFile(fileId: string) {
+  async function performSupabaseMediaUpload(
+    submissionId: string,
+    fileId: string,
+    selectedFile: File,
+    activeRemoteProfile: AppProfile,
+  ) {
+    setRemoteSaveState("saving");
+    setRemoteSaveError("");
+    let uploadedStorageTarget: MediaStorageTarget | null = null;
+    let previousStorageTarget: MediaStorageTarget | null = null;
+
+    try {
+      await drainRemoteSavesBeforeExport(activeRemoteProfile, submissionsRef.current);
+
+      const latestSubmission = submissionsRef.current.find(
+        (submission) => submission.id === submissionId,
+      );
+      if (!latestSubmission) {
+        throw new Error("Submission no longer exists for this media upload.");
+      }
+
+      const targetFile = latestSubmission.files.find((file) => file.id === fileId);
+      if (!targetFile) {
+        throw new Error("Media slot no longer exists for this upload.");
+      }
+      if (
+        targetFile.status !== "missing" &&
+        targetFile.status !== "needs_replacement"
+      ) {
+        setRemoteSaveState("idle");
+        return;
+      }
+      const applicant = latestSubmission.applicants.find(
+        (item) => item.id === targetFile.applicantId,
+      );
+      if (!applicant) {
+        throw new Error("Applicant no longer exists for this media upload.");
+      }
+
+      const uploadedAtIso = new Date().toISOString();
+      const mediaSlotType = mediaSlotTypeForSubmissionFileType(targetFile.type);
+      const generatedFileName = generatedCockpitMediaFileName({
+        applicantId: applicant.id,
+        fileType: targetFile.type,
+        mimeType: selectedFile.type,
+        submissionId: latestSubmission.id,
+        uploadNonce: createMediaUploadNonce(uploadedAtIso),
+      });
+      const storageTarget = buildMediaStoragePath(
+        latestSubmission.id,
+        applicant.id,
+        mediaSlotType,
+        generatedFileName,
+      );
+
+      remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
+        activeRemoteProfile,
+        [latestSubmission],
+        remoteOwnerIdsRef.current,
+      );
+      const uploaded = await uploadMediaToStorage(storageTarget, selectedFile);
+      if (!uploaded) {
+        throw new Error("Supabase Storage upload did not return an object path.");
+      }
+
+      uploadedStorageTarget = storageTarget;
+      if (
+        targetFile.storageBucket === mediaStorageBucket &&
+        targetFile.storagePath &&
+        targetFile.storagePath !== uploaded.path
+      ) {
+        previousStorageTarget = {
+          bucket: mediaStorageBucket,
+          path: targetFile.storagePath,
+        };
+      }
+
+      const uploadMetadata = {
+        generatedFileName,
+        mimeType: selectedFile.type,
+        originalFileName: selectedFile.name,
+        sizeBytes: selectedFile.size,
+        storageBucket: mediaStorageBucket,
+        storagePath: uploaded.path,
+        uploadedAtIso,
+      };
+      const currentSubmission = submissionsRef.current.find(
+        (submission) => submission.id === submissionId,
+      );
+      if (!currentSubmission) {
+        throw new Error("Submission no longer exists after media upload.");
+      }
+      const updatedSubmission = applyUploadedFileMetadata(
+        currentSubmission,
+        fileId,
+        uploadMetadata,
+      );
+      if (updatedSubmission === currentSubmission) {
+        throw new Error("Media upload no longer applies to the current submission.");
+      }
+
+      remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
+        activeRemoteProfile,
+        [updatedSubmission],
+        remoteOwnerIdsRef.current,
+      );
+      uploadedStorageTarget = null;
+      commitUploadedSubmissionAfterRemoteSave(
+        updatedSubmission,
+        fileId,
+        uploadMetadata,
+      );
+
+      if (previousStorageTarget) {
+        try {
+          await deleteMediaFromStorage(previousStorageTarget);
+        } catch (error) {
+          setRemoteSaveState("error");
+          setRemoteSaveError(
+            formatPersistenceFailureForUser(
+              error,
+              "Новая загрузка сохранена, но старый приватный файл не удалён. Повторите проверку Storage перед пилотом.",
+            ),
+          );
+          return;
+        }
+      }
+      setRemoteSaveState("idle");
+    } catch (error) {
+      let cleanupFailed = false;
+      if (uploadedStorageTarget) {
+        try {
+          await deleteMediaFromStorage(uploadedStorageTarget);
+        } catch {
+          cleanupFailed = true;
+        }
+      }
+      setRemoteSaveState("error");
+      const message = formatPersistenceFailureForUser(
+        error,
+        "Приватная загрузка не сохранена. Файл удалён из Storage, повторите попытку.",
+      );
+      setRemoteSaveError(
+        cleanupFailed
+          ? `${message} Загруженный файл не удалось удалить из Storage; нужна проверка оператора перед пилотом.`
+          : message,
+      );
+    }
+  }
+
+  async function uploadActiveFile(fileId: string, selectedFile?: File) {
+    if (!activeSubmission) return;
+
+    if (isSupabaseMode) {
+      if (!remoteProfile) {
+        setRemoteSaveState("error");
+        setRemoteSaveError("Сначала войдите в Supabase.");
+        return;
+      }
+      if (!selectedFile) {
+        setRemoteSaveState("error");
+        setRemoteSaveError("Выберите файл для приватной загрузки.");
+        return;
+      }
+
+      await enqueueSupabaseMediaUpload(activeSubmission.id, () =>
+        performSupabaseMediaUpload(
+          activeSubmission.id,
+          fileId,
+          selectedFile,
+          remoteProfile,
+        ),
+      );
+      setActiveDrawerTab("files");
+      return;
+    }
+
     updateActiveSubmission((submission) => uploadRequiredFile(submission, fileId));
     setActiveDrawerTab("files");
   }
@@ -585,10 +839,15 @@ function App() {
       applicantNames: createApplicantNames,
       city: createCity,
       familyCount: createFamilyCount,
+      idScheme: isSupabaseMode ? "supabase" : "local",
       submissions,
       type: createType,
     });
-    setSubmissions((current) => [newSubmission, ...current]);
+    setSubmissions((current) => {
+      const next = [newSubmission, ...current];
+      submissionsRef.current = next;
+      return next;
+    });
     setSelectedSubmissionId(newSubmission.id);
     setDrawerMode("detail");
     setActiveDrawerTab("overview");
@@ -603,16 +862,28 @@ function App() {
 
   function generateExport() {
     if (!exportPlan.canGenerate) return;
-    setSubmissions((current) =>
-      applyExportStateToSelection(current, selectedVisibleExportIds, "file_generated"),
-    );
+    setSubmissions((current) => {
+      const next = applyExportStateToSelection(
+        current,
+        selectedVisibleExportIds,
+        "file_generated",
+      );
+      submissionsRef.current = next;
+      return next;
+    });
   }
 
   function downloadExport() {
     if (!exportPlan.canDownload) return;
-    setSubmissions((current) =>
-      applyExportStateToSelection(current, selectedVisibleExportIds, "file_downloaded"),
-    );
+    setSubmissions((current) => {
+      const next = applyExportStateToSelection(
+        current,
+        selectedVisibleExportIds,
+        "file_downloaded",
+      );
+      submissionsRef.current = next;
+      return next;
+    });
   }
 
   async function markExported() {
@@ -668,9 +939,13 @@ function App() {
       const exportedById = new Map(
         result.submissions.map((submission) => [submission.id, submission]),
       );
-      setSubmissions((current) =>
-        current.map((submission) => exportedById.get(submission.id) ?? submission),
-      );
+      setSubmissions((current) => {
+        const next = current.map(
+          (submission) => exportedById.get(submission.id) ?? submission,
+        );
+        submissionsRef.current = next;
+        return next;
+      });
       setSelectedExportIds([]);
       if (isSupabaseMode) setRemoteSaveState("idle");
     } catch (error) {
@@ -700,6 +975,7 @@ function App() {
     remoteOwnerIdsRef.current = ownerIdsBySubmissionId;
     remoteSubmissionFingerprintsRef.current =
       cockpitSubmissionFingerprintMap(nextSubmissions);
+    submissionsRef.current = nextSubmissions;
     skipNextRemoteSaveRef.current = true;
     setRemoteProfile(profile);
     setRole(nextRole);
@@ -771,6 +1047,7 @@ function App() {
       setWorkspacePasswordDraft("");
       setWorkspaceAccessError("");
       const localSubmissions = loadSubmissions();
+      submissionsRef.current = localSubmissions;
       setSubmissions(localSubmissions);
       setSelectedSubmissionId(
         firstSubmissionForRole(localSubmissions, "agent")?.id ?? "",
@@ -807,9 +1084,7 @@ function App() {
       options={cities.map((city) => ({ label: city, value: city }))}
       selectClassName="select-control"
       value={cityFilter}
-      onChange={(event) =>
-        setCityFilter(event.target.value as City | "Все города")
-      }
+      onChange={(event) => setCityFilter(event.target.value as City | "Все города")}
     />
   );
 
@@ -1051,6 +1326,8 @@ function App() {
           onTab={setActiveDrawerTab}
           onQuestionnaireField={updateActiveQuestionnaireField}
           onUploadFile={uploadActiveFile}
+          fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
+          requireSelectedFile={isSupabaseMode}
           role={role}
           surface={
             surface === "export"
@@ -1230,11 +1507,7 @@ function RemoteWorkspaceEmptyState({
           ? "Создайте первую подачу: она будет сохранена в вашем Supabase-профиле без подмешивания локальных демо-данных."
           : "Администратор увидит реальные подачи после того, как агент создаст или отправит их на проверку."}
       </p>
-      {onCreate ? (
-        <Button onClick={onCreate}>
-          Новая подача
-        </Button>
-      ) : null}
+      {onCreate ? <Button onClick={onCreate}>Новая подача</Button> : null}
     </section>
   );
 }

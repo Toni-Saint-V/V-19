@@ -13,6 +13,7 @@ import { signInSupabaseWithPassword } from "../../src/services/authService";
 import { saveSubmissionDraft } from "../../src/services/submissionService";
 import {
   buildMediaStoragePath,
+  deleteMediaFromStorage,
   uploadMediaToStorage,
 } from "../../src/services/storageService";
 
@@ -53,6 +54,35 @@ function makeSubmission(): Submission {
 }
 
 describe("Supabase persistence failure paths", () => {
+  test("does not overwrite an existing Storage object during media upload", async () => {
+    const upload = vi.fn(async () => ({
+      data: { path: "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg" },
+      error: null,
+    }));
+    supabaseMock.client = {
+      storage: {
+        from: () => ({
+          upload,
+        }),
+      },
+    };
+    const target = buildMediaStoragePath(
+      "VF-1044",
+      "applicant-1",
+      "photo_white",
+      "751234567_photo_white.jpg",
+    );
+    const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
+
+    await expect(uploadMediaToStorage(target, file)).resolves.toEqual({
+      path: target.path,
+    });
+    expect(upload).toHaveBeenCalledWith(target.path, file, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+  });
+
   test("wraps Storage upload failures with safe diagnostics", async () => {
     supabaseMock.client = {
       storage: {
@@ -90,6 +120,41 @@ describe("Supabase persistence failure paths", () => {
         retryable: true,
       },
       userMessage: "Media upload failed. No uploaded file was marked complete.",
+    });
+  });
+
+  test("wraps Storage cleanup failures with safe diagnostics", async () => {
+    supabaseMock.client = {
+      storage: {
+        from: () => ({
+          remove: async () => ({
+            data: null,
+            error: {
+              name: "StorageApiError",
+              code: "S3Error",
+              statusCode: 500,
+              message: "remove backend stack trace",
+            },
+          }),
+        }),
+      },
+    };
+
+    const target = buildMediaStoragePath(
+      "VF-1044",
+      "applicant-1",
+      "photo_white",
+      "751234567_photo_white.jpg",
+    );
+
+    await expect(deleteMediaFromStorage(target)).rejects.toMatchObject({
+      diagnostics: {
+        operation: "storage.delete_media",
+        kind: "storage",
+        safeCode: "storage.delete_media:storage:S3Error",
+        retryable: true,
+      },
+      userMessage: "Supabase storage could not complete the file action.",
     });
   });
 
