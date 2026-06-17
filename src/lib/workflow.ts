@@ -82,8 +82,9 @@ export const mediaSlotTypes: Array<{
   suffix: string;
 }> = [
   { type: "photo_white", label: "Фото на белом фоне", suffix: "photo_white.jpg" },
-  { type: "selfie", label: "Селфи", suffix: "selfie.jpg" },
-  { type: "video", label: "Видео", suffix: "video.mp4" },
+  { type: "selfie", label: "Селфи N1", suffix: "selfie.jpg" },
+  { type: "selfie_2", label: "Селфи N2", suffix: "selfie_2.jpg" },
+  { type: "passport_scan", label: "Загранпаспорт", suffix: "passport_scan.jpg" },
 ];
 
 export const requiredApplicantFields: Array<{
@@ -419,6 +420,8 @@ export function getGeneratedFileName(
 
   if (mediaType === "photo_white") return `${passport}_photo_white.jpg`;
   if (mediaType === "selfie") return `${passport}_selfie.jpg`;
+  if (mediaType === "selfie_2") return `${passport}_selfie_2.jpg`;
+  if (mediaType === "passport_scan") return `${passport}_passport_scan.jpg`;
   return `${passport}_video.mp4`;
 }
 

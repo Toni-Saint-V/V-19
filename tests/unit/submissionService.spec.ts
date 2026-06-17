@@ -322,9 +322,10 @@ describe("Supabase submission mapping", () => {
     expect(payload.submission.id).toBe("VF-1044");
     expect(payload.applicants).toHaveLength(1);
     expect(payload.media_assets.map((item) => item.type).sort()).toEqual([
+      "passport_scan",
       "photo_white",
       "selfie",
-      "video",
+      "selfie_2",
     ]);
     expect(payload.status_history).toHaveLength(0);
     expect(payload.corrections).toHaveLength(1);

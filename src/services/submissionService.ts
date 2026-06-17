@@ -51,6 +51,7 @@ const exportBatchSelect =
 const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at" as const;
 const submissionListLimit = 100;
+const requiredMediaSlotsPerApplicant = 4;
 
 function mapSubmissionRow(
   row: SubmissionRow,
@@ -77,7 +78,7 @@ function mapSubmissionRow(
     priority: row.priority,
     fields: row.readiness_percent,
     media: 0,
-    mediaRequired: applicants.length * 3,
+    mediaRequired: applicants.length * requiredMediaSlotsPerApplicant,
     applicants,
     mediaRows: [],
     notes: options.notes ?? [],
@@ -111,7 +112,7 @@ function mapApplicantRow(row: ApplicantRow): Applicant {
     passport: row.passport_number,
     form: row.questionnaire_percent,
     media: 0,
-    mediaRequired: 3,
+    mediaRequired: requiredMediaSlotsPerApplicant,
     birthDate: row.birth_date ?? undefined,
     patronymic: row.patronymic ?? undefined,
     citizenship: row.citizenship ?? undefined,
@@ -140,16 +141,19 @@ function mediaStateFromRow(row: MediaAssetRow): MediaSlot["state"] {
 }
 
 function mapMediaAssetRow(row: MediaAssetRow): MediaSlot {
+  const labelByType: Record<MediaSlot["type"], string> = {
+    photo_white: "Фото на белом фоне",
+    selfie: "Селфи N1",
+    selfie_2: "Селфи N2",
+    passport_scan: "Загранпаспорт",
+    video: "Видео",
+  };
+
   return {
     id: row.id,
     applicantId: row.applicant_id,
     type: row.type,
-    label:
-      row.type === "photo_white"
-        ? "Фото на белом фоне"
-        : row.type === "selfie"
-          ? "Селфи"
-          : "Видео",
+    label: labelByType[row.type],
     state: mediaStateFromRow(row),
     originalFileName: row.original_file_name ?? undefined,
     generatedFileName: row.generated_file_name ?? undefined,
@@ -362,9 +366,11 @@ export function toMediaAssetInserts(submission: Submission): MediaAssetInsert[] 
             slot.mimeType ??
             (slot.type === "video"
               ? "video/mp4"
-              : slot.generatedFileName.endsWith(".png")
-                ? "image/png"
-                : "image/jpeg"),
+              : slot.generatedFileName.endsWith(".pdf")
+                ? "application/pdf"
+                : slot.generatedFileName.endsWith(".png")
+                  ? "image/png"
+                  : "image/jpeg"),
           size_bytes: slot.sizeBytes ?? null,
           upload_status: uploadStatusForSlot(slot),
           review_status: reviewStatusForSlot(slot),

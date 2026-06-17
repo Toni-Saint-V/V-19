@@ -58,7 +58,12 @@ export type MediaReviewStatus =
 
 export type CorrectionStatus = "open" | "fixed" | "closed";
 
-export type MediaSlotType = "photo_white" | "selfie" | "video";
+export type MediaSlotType =
+  | "photo_white"
+  | "selfie"
+  | "selfie_2"
+  | "passport_scan"
+  | "video";
 
 export type Tone =
   | "neutral"

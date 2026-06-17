@@ -30,6 +30,32 @@ describe("media storage contract", () => {
     });
   });
 
+  test("accepts passport scans and second selfie slot with generated names only", () => {
+    expect(() =>
+      validateMediaStorageTarget({
+        file: new File(["x"], "passport.pdf", { type: "application/pdf" }),
+        target: buildMediaStoragePath(
+          "VF-1044",
+          "applicant-1",
+          "passport_scan",
+          "v19passport_passport_scan.pdf",
+        ),
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      validateMediaStorageTarget({
+        file: new File(["x"], "selfie-2.jpg", { type: "image/jpeg" }),
+        target: buildMediaStoragePath(
+          "VF-1044",
+          "applicant-1",
+          "selfie_2",
+          "v19selfie2_selfie_2.jpg",
+        ),
+      }),
+    ).not.toThrow();
+  });
+
   test("rejects unsafe path segments", () => {
     expect(() =>
       buildMediaStoragePath(

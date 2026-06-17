@@ -2,7 +2,13 @@ import type { MediaSlot, MediaSlotType } from "../../types/domain";
 
 export const mediaStorageBucket = "submission-media";
 
-const mediaSlotTypes = new Set<MediaSlotType>(["photo_white", "selfie", "video"]);
+const mediaSlotTypes = new Set<MediaSlotType>([
+  "photo_white",
+  "selfie",
+  "selfie_2",
+  "passport_scan",
+  "video",
+]);
 
 export interface MediaStorageTarget {
   bucket: typeof mediaStorageBucket;
@@ -43,10 +49,13 @@ function extensionForFileName(fileName: string): string {
 }
 
 function allowedExtensions(type: MediaSlotType): Set<string> {
+  if (type === "passport_scan") return new Set(["jpg", "jpeg", "png", "pdf"]);
   return type === "video" ? new Set(["mp4"]) : new Set(["jpg", "jpeg", "png"]);
 }
 
 function allowedMimeTypes(type: MediaSlotType): Set<string> {
+  if (type === "passport_scan")
+    return new Set(["image/jpeg", "image/png", "application/pdf"]);
   return type === "video"
     ? new Set(["video/mp4"])
     : new Set(["image/jpeg", "image/png"]);
@@ -56,6 +65,7 @@ function mimeTypeForExtension(extension: string): string | null {
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
   if (extension === "png") return "image/png";
   if (extension === "mp4") return "video/mp4";
+  if (extension === "pdf") return "application/pdf";
   return null;
 }
 
@@ -95,6 +105,10 @@ function hasExpectedGeneratedSuffix(type: MediaSlotType, fileName: string): bool
   if (type === "photo_white")
     return /^[a-zA-Z0-9]+_photo_white\.(jpg|jpeg|png)$/.test(fileName);
   if (type === "selfie") return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png)$/.test(fileName);
+  if (type === "selfie_2")
+    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png)$/.test(fileName);
+  if (type === "passport_scan")
+    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|pdf)$/.test(fileName);
   return /^[a-zA-Z0-9]+_video\.mp4$/.test(fileName);
 }
 

@@ -956,12 +956,12 @@ function App() {
           remoteProfile,
         ),
       );
-      setActiveDrawerTab("files");
+      setActiveDrawerTab("media");
       return;
     }
 
     updateActiveSubmission((submission) => uploadRequiredFile(submission, fileId));
-    setActiveDrawerTab("files");
+    setActiveDrawerTab("media");
   }
 
   function updateActiveQuestionnaireField(input: {
@@ -1001,6 +1001,30 @@ function App() {
       idScheme: isSupabaseMode ? "supabase" : "local",
       submissions,
       type: createType,
+    });
+    setSubmissions((current) => {
+      const next = [newSubmission, ...current];
+      submissionsRef.current = next;
+      return next;
+    });
+    setSelectedSubmissionId(newSubmission.id);
+    setDrawerMode("detail");
+    setActiveDrawerTab("overview");
+    setDirty(false);
+  }
+
+  function createDraftFromPreset(input: {
+    applicantNames: string[];
+    familyCount: number;
+    type: Submission["type"];
+  }) {
+    const newSubmission = createDraftSubmission({
+      applicantNames: input.applicantNames,
+      city: createCity,
+      familyCount: input.familyCount,
+      idScheme: isSupabaseMode ? "supabase" : "local",
+      submissions,
+      type: input.type,
     });
     setSubmissions((current) => {
       const next = [newSubmission, ...current];
@@ -1434,12 +1458,16 @@ function App() {
           }}
           onClose={closeDrawer}
           onCreate={createDraft}
+          onCreatePreset={createDraftFromPreset}
           onFamilyCount={(count) => {
             const safeCount = Math.max(2, Math.min(6, count || 2));
             setCreateFamilyCount(safeCount);
             setCreateApplicantNames((current) =>
               normalizeCreateApplicantNames(current, safeCount),
             );
+            setDirty(true);
+          }}
+          onPassportFilesSelected={() => {
             setDirty(true);
           }}
           onApplicantName={(index, name) => {

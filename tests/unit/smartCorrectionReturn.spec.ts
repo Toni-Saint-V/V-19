@@ -15,14 +15,21 @@ function acceptedMediaSlots(applicantId: string): MediaSlot[] {
       id: `${applicantId}-selfie`,
       applicantId,
       type: "selfie",
-      label: "Селфи",
+      label: "Селфи N1",
       state: "accepted",
     },
     {
-      id: `${applicantId}-video`,
+      id: `${applicantId}-selfie_2`,
       applicantId,
-      type: "video",
-      label: "Видео",
+      type: "selfie_2",
+      label: "Селфи N2",
+      state: "accepted",
+    },
+    {
+      id: `${applicantId}-passport_scan`,
+      applicantId,
+      type: "passport_scan",
+      label: "Загранпаспорт",
       state: "accepted",
     },
   ];
@@ -42,8 +49,8 @@ function applicant(overrides: Partial<Applicant> = {}): Applicant {
     role: "Заявитель",
     passport: "72 1190482",
     form: 100,
-    media: 3,
-    mediaRequired: 3,
+    media: 4,
+    mediaRequired: 4,
     birthDate: "1988-05-12",
     citizenship: "Russian Federation",
     address: "Moscow Test Street 1",
@@ -169,7 +176,7 @@ describe("smart correction return package", () => {
 
   test("does not replace already-open fallback blockers with a generic note", () => {
     const existingText =
-      "Исправьте перед повторной передачей: Artem Sokolov: добавить селфи";
+      "Исправьте перед повторной передачей: Artem Sokolov: добавить селфи n1";
     const result = buildSmartCorrectionReturnPackage(
       submission({
         applicants: [

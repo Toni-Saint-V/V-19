@@ -43,8 +43,10 @@ export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
 export const fileTypeLabels = {
   photo: "Фото",
   selfie: "Селфи",
+  selfie_2: "Селфи N2",
+  passport_scan: "Загранпаспорт",
   video: "Видео",
-};
+} satisfies Record<Submission["files"][number]["type"], string>;
 
 export const typeLabels = {
   single: "Один заявитель",
@@ -172,14 +174,14 @@ export function defaultDrawerTab(submission: Submission): DrawerTab {
       (file) => file.status === "needs_replacement" || file.status === "missing",
     )
   ) {
-    return "files";
+    return "media";
   }
   if (
     submission.applicants.some(
       (applicant) => applicant.questionnaireStatus === "needs_fix",
     )
   ) {
-    return "questionnaire";
+    return "data";
   }
   return "overview";
 }
