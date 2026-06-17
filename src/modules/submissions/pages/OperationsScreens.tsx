@@ -10,7 +10,7 @@ import {
   typeLabels,
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
-import type { AgentTab, ExportTab, ReviewTab } from "../uiTypes";
+import type { ExportTab, ReviewTab } from "../uiTypes";
 import {
   EmptyState,
   PanelHeader,
@@ -39,23 +39,17 @@ function adminIssueUnavailableReason(submission: Submission) {
 export function AgentSubmissionsScreen({
   activeSubmission,
   agentList,
-  agentTab,
-  agentTabCounts,
   filterControl,
   onOpen,
   onSelect,
-  onTab,
   searchControl,
   summary,
 }: {
   activeSubmission: Submission;
   agentList: Submission[];
-  agentTab: AgentTab;
-  agentTabCounts: Record<AgentTab, number>;
   filterControl?: ReactNode;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
-  onTab: (tab: AgentTab) => void;
   searchControl: ReactNode;
   summary: ReturnType<typeof counts>;
 }) {
@@ -68,21 +62,10 @@ export function AgentSubmissionsScreen({
           aria-labelledby="agent-title"
         >
           <PanelHeader
-            eyebrow="Рабочая очередь"
             titleId="agent-title"
             title="Очередь действий"
-            description="Подачи, где нужны исправления"
-            tabs={[
-              ["all", `Все ${agentTabCounts.all}`],
-              ["action", `Требуют действия ${agentTabCounts.action}`],
-              ["progress", `В работе ${agentTabCounts.progress}`],
-              ["review", `Проверка ${agentTabCounts.review}`],
-              ["done", `Готово ${agentTabCounts.done}`],
-            ]}
             search={searchControl}
             side={filterControl}
-            value={agentTab}
-            onTab={onTab}
           />
           <SubmissionList
             activeSubmission={activeSubmission}
@@ -150,7 +133,8 @@ export function AdminReviewScreen({
             <p className="kicker">Фокус проверки</p>
             <h2>{activeSubmission.title}</h2>
             <p>
-              {activeSubmission.id} · {activeSubmission.city} · {tripDates(activeSubmission)}
+              {activeSubmission.id} · {activeSubmission.city} ·{" "}
+              {tripDates(activeSubmission)}
             </p>
             <div className="magic-admin-decision-chips" aria-label="Сводка подачи">
               {activeSubmission.type === "family" ? (
@@ -250,7 +234,11 @@ export function AdminReviewScreen({
             submissions={reviewList}
           />
         </CardComponent>
-        <CardComponent as="aside" className="right-rail magic-admin-aside" aria-label="Контекст проверки">
+        <CardComponent
+          as="aside"
+          className="right-rail magic-admin-aside"
+          aria-label="Контекст проверки"
+        >
           <CardComponent as="section" className="rail-panel rail-rule magic-admin-rule">
             <p className="kicker">Правило проверки</p>
             <p className="rail-copy">
@@ -327,7 +315,11 @@ export function ExportScreen({
           {exportTab === "ready" ? (
             <div className="submission-list magic-export-list">
               {readyList.map((submission) => (
-                <CardComponent as="article" className="export-row magic-export-row" key={submission.id}>
+                <CardComponent
+                  as="article"
+                  className="export-row magic-export-row"
+                  key={submission.id}
+                >
                   <label className="export-check">
                     <input
                       checked={selectedExportIds.includes(submission.id)}
@@ -359,7 +351,11 @@ export function ExportScreen({
           ) : (
             <div className="submission-list magic-export-list">
               {historyList.map((submission) => (
-                <CardComponent as="article" className="export-row magic-export-row" key={submission.id}>
+                <CardComponent
+                  as="article"
+                  className="export-row magic-export-row"
+                  key={submission.id}
+                >
                   <div>
                     <strong>{submission.title}</strong>
                     <p>
@@ -373,8 +369,15 @@ export function ExportScreen({
           )}
         </CardComponent>
 
-        <CardComponent as="aside" className="export-side magic-export-side" aria-label="Информация и предпросмотр выгрузки">
-          <CardComponent as="section" className="rail-panel rail-summary magic-export-summary">
+        <CardComponent
+          as="aside"
+          className="export-side magic-export-side"
+          aria-label="Информация и предпросмотр выгрузки"
+        >
+          <CardComponent
+            as="section"
+            className="rail-panel rail-summary magic-export-summary"
+          >
             <p className="kicker">Сводка выгрузки</p>
             <SummaryRow
               chips={[
@@ -392,14 +395,24 @@ export function ExportScreen({
               ]}
             />
           </CardComponent>
-          <CardComponent as="section" className="export-preview magic-export-preview" aria-label="Предпросмотр Эксель">
+          <CardComponent
+            as="section"
+            className="export-preview magic-export-preview"
+            aria-label="Предпросмотр Эксель"
+          >
             <div className="preview-header">
               <div>
                 <p className="kicker">Пакет выгрузки</p>
                 <h2>{exportPackageTitle(exportPlan)}</h2>
                 <p className="export-package-line">{exportPackageLine(exportPlan)}</p>
               </div>
-              <Badge className={exportPlan.ready ? "visa-tag visa-tag-ready" : "visa-tag visa-tag-danger"}>
+              <Badge
+                className={
+                  exportPlan.ready
+                    ? "visa-tag visa-tag-ready"
+                    : "visa-tag visa-tag-danger"
+                }
+              >
                 {exportPlan.ready
                   ? exportStateLabel(exportPlan.exportState)
                   : "Блокировано"}

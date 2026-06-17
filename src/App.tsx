@@ -67,12 +67,10 @@ import type {
 } from "./modules/submissions/types";
 import {
   type AgentTab,
-  type CreateStep,
   type DrawerMode,
   type ExportTab,
   matchesAgentTab,
   matchesReviewTab,
-  surfaceDescription,
   type ReviewTab,
   surfaceTitle,
 } from "./modules/submissions/uiTypes";
@@ -223,7 +221,6 @@ function App() {
   const [exportError, setExportError] = useState("");
   const [issueComposerRequest, setIssueComposerRequest] =
     useState<IssueComposerRequest | null>(null);
-  const [createStep, setCreateStep] = useState<CreateStep>("params");
   const [createType, setCreateType] = useState<Submission["type"]>("single");
   const [createCity, setCreateCity] = useState<City>("Москва");
   const [createFamilyCount, setCreateFamilyCount] = useState(2);
@@ -264,13 +261,6 @@ function App() {
   const agentList = highestPriorityFirst(
     searchedAgentQueue.filter(matchesAgentTab(agentTab)),
   );
-  const agentTabCounts = {
-    action: searchedAgentQueue.filter(matchesAgentTab("action")).length,
-    all: searchedAgentQueue.length,
-    done: searchedAgentQueue.filter(matchesAgentTab("done")).length,
-    progress: searchedAgentQueue.filter(matchesAgentTab("progress")).length,
-    review: searchedAgentQueue.filter(matchesAgentTab("review")).length,
-  };
   const reviewList = highestPriorityFirst(
     searchedReviewQueue.filter(matchesReviewTab(reviewTab)),
   );
@@ -601,13 +591,14 @@ function App() {
       activeElement instanceof HTMLElement ? activeElement : null;
   }
 
-  function focusActiveDrawerTab() {
+  function focusDrawerRecoveryTarget() {
     requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLElement>(
-          ".submission-drawer [role='tab'][aria-selected='true']",
-        )
-        ?.focus({ preventScroll: true });
+      const selector =
+        drawerMode === "create"
+          ? ".create-drawer [aria-label='Закрыть создание'], .create-drawer select, .create-drawer input, .create-drawer button"
+          : ".submission-drawer [role='tab'][aria-selected='true'], .submission-drawer [aria-label='Закрыть подачу']";
+
+      document.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true });
     });
   }
 
@@ -668,15 +659,9 @@ function App() {
   function openCreateSubmissionDrawer() {
     rememberReturnFocus();
     setDrawerMode("create");
-    setCreateStep("params");
     setCreateType("single");
     setCreateFamilyCount(2);
-    setCreateApplicantNames([
-      "Новый заявитель",
-      "Супруг",
-      "Ребёнок 1",
-      "Ребёнок 2",
-    ]);
+    setCreateApplicantNames(["Новый заявитель", "Супруг", "Ребёнок 1", "Ребёнок 2"]);
     setDirty(false);
   }
 
@@ -1330,13 +1315,7 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="kicker">
-              {role === "agent"
-                ? "Рабочее место агента"
-                : "Рабочее место администратора"}
-            </p>
             <h1>{surfaceTitle(surface)}</h1>
-            <p className="topbar-copy">{surfaceDescription(surface)}</p>
           </div>
           <div className="topbar-actions">
             <div className="service-logo" aria-label="VisaFlow V-19">
@@ -1372,12 +1351,9 @@ function App() {
           <AgentSubmissionsScreen
             activeSubmission={activeSubmission}
             agentList={agentList}
-            agentTab={agentTab}
-            agentTabCounts={agentTabCounts}
             filterControl={cityFilterControl}
             onOpen={openSubmission}
             onSelect={selectSubmission}
-            onTab={setAgentTab}
             searchControl={searchControl}
             summary={summary}
           />
@@ -1474,7 +1450,6 @@ function App() {
             });
             setDirty(true);
           }}
-          onStep={setCreateStep}
           onType={(type) => {
             setCreateType(type);
             if (type === "single") {
@@ -1489,7 +1464,6 @@ function App() {
             }
             setDirty(true);
           }}
-          step={createStep}
           type={createType}
         />
       ) : null}
@@ -1498,7 +1472,7 @@ function App() {
         <ConfirmationDialog
           onCancel={() => {
             setConfirmClose(false);
-            focusActiveDrawerTab();
+            focusDrawerRecoveryTarget();
           }}
           onConfirm={() => {
             setConfirmClose(false);

@@ -17,6 +17,22 @@ type FieldSeed = {
   completeValue: (applicantName: string) => string;
 };
 
+export type QuestionnaireSectionPreview = {
+  id: string;
+  number: string;
+  title: string;
+  summary: string;
+};
+
+const questionnaireSectionSummaries: Record<string, string> = {
+  appointment: "Страна, город подачи и параметры записи",
+  personal: "Имя заявителя и базовые личные данные",
+  passport: "Паспорт и дата поездки заполняются отдельно",
+  contacts: "Адрес и контакты каждого заявителя",
+  employment: "Работа или учеба каждого заявителя",
+  trip: "Даты, маршрут и принимающая сторона",
+};
+
 const questionnaireBlueprint: Array<{
   id: string;
   title: string;
@@ -431,6 +447,17 @@ export type QuestionnaireFieldUpdate = {
   fieldId: string;
   value: string;
 };
+
+export function questionnaireSectionPreviews(): QuestionnaireSectionPreview[] {
+  return questionnaireBlueprint.map((section) => ({
+    id: section.id,
+    number: section.stepLabel ?? "",
+    summary:
+      questionnaireSectionSummaries[section.id] ??
+      `${section.fields.length} полей после сохранения черновика`,
+    title: section.title,
+  }));
+}
 
 export function createQuestionnaireSections(
   applicantId: string,

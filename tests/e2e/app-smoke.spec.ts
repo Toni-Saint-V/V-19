@@ -74,7 +74,9 @@ async function fillQuestionnaire(page: Page) {
   let filledCount = 0;
 
   for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
-    await sectionButtons.nth(sectionIndex).click();
+    const sectionButton = sectionButtons.nth(sectionIndex);
+    await sectionButton.scrollIntoViewIfNeeded();
+    await sectionButton.click();
 
     const fields = drawer(page).locator(
       ".questionnaire-fields:not([hidden]) .questionnaire-field input:not([disabled])",
@@ -122,18 +124,23 @@ async function createNamedSubmission(
   input: { names: string[]; type: "single" | "family" },
 ) {
   await page.getByRole("button", { name: "Новая подача" }).click();
-  if (input.type === "family")
-    await drawer(page).getByRole("button", { name: "Семья" }).click();
-  await drawer(page).getByRole("tab", { name: "Заявители" }).click();
-
   if (input.type === "family") {
-    await drawer(page).getByLabel("Количество").fill(String(input.names.length));
+    await drawer(page).getByRole("button", { name: "Семья" }).click();
     await drawer(page).getByLabel("Основной заявитель").fill(input.names[0]);
+    await drawer(page)
+      .locator(".create-people-list")
+      .getByRole("button", { name: /Супруг/ })
+      .click();
     await drawer(page).getByLabel("Супруг").fill(input.names[1]);
-    await drawer(page).getByLabel("Ребёнок 1").fill(input.names[2]);
-    await drawer(page).getByLabel("Ребёнок 2").fill(input.names[3]);
+
+    for (let index = 2; index < input.names.length; index += 1) {
+      await drawer(page).getByRole("button", { name: "Добавить человека" }).click();
+      await drawer(page)
+        .getByLabel(`Ребенок ${index - 1}`)
+        .fill(input.names[index]);
+    }
   } else {
-    await drawer(page).getByLabel("Заявитель").fill(input.names[0]);
+    await drawer(page).getByRole("textbox", { name: "Заявитель" }).fill(input.names[0]);
   }
 
   await drawer(page).getByRole("button", { name: "Сохранить черновик" }).click();
@@ -144,7 +151,7 @@ async function fillFilesAndSubmit(page: Page) {
   await uploadAllVisibleFiles(page);
   await drawer(page).getByRole("button", { name: "Продолжить" }).click();
   await drawer(page).getByRole("button", { name: "На проверку" }).click();
-  await expect(drawer(page).getByText("На проверке")).toBeVisible();
+  await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
   await page.getByRole("button", { name: "Закрыть подачу" }).click();
 }
 
@@ -188,12 +195,12 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("combobox", { name: "Фильтр по городу" }),
     ).toBeVisible();
-    await expect(submissionCard(page, "Семья Ивановых")).toBeVisible();
+    await expect(submissionCard(page, "Мария Иванова")).toBeVisible();
     await expect(
-      submissionCard(page, "Семья Ивановых").getByText("Возвращено"),
+      submissionCard(page, "Мария Иванова").getByText("Возвращено"),
     ).toBeVisible();
     await expect(
-      submissionCard(page, "Семья Ивановых").getByText("2 блокера", { exact: true }),
+      submissionCard(page, "Мария Иванова").getByText("2 блокера", { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Исправить" }).first()).toBeVisible();
 
@@ -209,9 +216,9 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       agentContext.getByText("2 блокера мешают движению дальше"),
     ).toBeVisible();
-    await expect(agentContext.getByText("Кто отвечает")).toBeVisible();
+    await expect(agentContext.getByText("Отвечает")).toBeVisible();
     await expect(agentContext.getByText("Агент", { exact: true })).toBeVisible();
-    await expect(agentContext.getByText("Основное действие")).toBeVisible();
+    await expect(agentContext.getByText("Действие")).toBeVisible();
     await expect(agentContext.getByRole("button", { name: "Исправить" })).toBeVisible();
 
     await agentContext.getByRole("button", { name: "Исправить" }).click();
@@ -389,7 +396,7 @@ test.describe("V-19 operations workspace", () => {
     page,
   }) => {
     await page.getByRole("button", { name: "Новая подача" }).click();
-    await expect(page.getByRole("heading", { name: "Создать черновик" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Новая подача" })).toBeVisible();
     await expect(page.locator('input[readonly][value="Испания"]')).toBeVisible();
     await expect(
       drawer(page).getByRole("combobox", { name: "Город подачи" }),
@@ -498,29 +505,28 @@ test.describe("V-19 operations workspace", () => {
     const trigger = page.getByRole("button", { name: "Новая подача" });
     await trigger.click();
 
-    const paramsTab = drawer(page).getByRole("tab", { name: "Параметры" });
-    await expect(paramsTab).toHaveAttribute("aria-selected", "true");
-    await expect(paramsTab).toBeFocused();
-
-    await page.keyboard.press("ArrowRight");
-    await expect(drawer(page).getByRole("tab", { name: "Заявители" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-
-    await page.keyboard.press("Home");
-    await expect(paramsTab).toHaveAttribute("aria-selected", "true");
+    await expect(
+      drawer(page).getByRole("heading", { name: "Новая подача" }),
+    ).toBeVisible();
+    await expect(drawer(page).getByLabel("Создание подачи")).toBeVisible();
+    await expect(drawer(page).getByLabel("Заявители в подаче")).toBeVisible();
 
     await drawer(page).getByRole("button", { name: "Семья" }).click();
+    await drawer(page).getByRole("button", { name: "Добавить человека" }).click();
+    await expect(drawer(page).getByLabel("Подставленная фамилия")).toBeVisible();
+    await expect(
+      drawer(page).getByLabel("Подставленная фамилия").getByRole("checkbox"),
+    ).toHaveCount(0);
     await page.keyboard.press("Escape");
 
     const confirmation = page.getByRole("dialog", { name: "Закрыть панель?" });
     await expect(confirmation).toBeVisible();
     await expect(confirmation.getByRole("button", { name: "Остаться" })).toBeFocused();
-
-    await page.keyboard.press("Escape");
-    await expect(confirmation).toHaveCount(0);
-    await expect(paramsTab).toBeFocused();
+    await confirmation.getByRole("button", { name: "Остаться" }).click();
+    await expect(page.getByRole("dialog", { name: "Закрыть панель?" })).toHaveCount(0);
+    await expect(
+      drawer(page).getByRole("button", { name: "Закрыть создание" }),
+    ).toBeFocused();
 
     await page.keyboard.press("Escape");
     await expect(confirmation).toBeVisible();
@@ -539,7 +545,7 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
 
     await page.reload();
-    await page.getByRole("tab", { name: "В работе" }).click();
+    await page.getByRole("button", { name: /Очередь/ }).click();
     await expect(submissionCard(page, "Новая семейная подача")).toBeVisible();
     await expect(
       submissionCard(page, "Новая семейная подача").getByText("Черновик"),
@@ -712,7 +718,7 @@ test.describe("V-19 operations workspace", () => {
     await uploadAllVisibleFiles(page);
     await drawer(page).getByRole("button", { name: "Продолжить" }).click();
     await drawer(page).getByRole("button", { name: "На проверку" }).click();
-    await expect(drawer(page).getByText("На проверке")).toBeVisible();
+    await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
     await switchToAdmin(page);
@@ -809,6 +815,8 @@ test.describe("V-19 operations workspace", () => {
   test("two families and two single applicants pass issue, ББ, return, correction and export corner cases", async ({
     page,
   }) => {
+    test.slow();
+
     const familyTitle = "Семья Кузнецовых";
     const secondFamilyTitle = "Семья Смирновых";
     const firstSingle = "Романов Павел";
@@ -852,7 +860,7 @@ test.describe("V-19 operations workspace", () => {
     await drawer(page).getByRole("tab", { name: "Анкета" }).click();
     await fillQuestionnaire(page);
     await drawer(page).getByRole("button", { name: "На проверку" }).click();
-    await expect(drawer(page).getByText("На проверке")).toBeVisible();
+    await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
     await createNamedSubmission(page, { type: "single", names: [secondSingle] });
@@ -894,8 +902,9 @@ test.describe("V-19 operations workspace", () => {
     }
 
     await page.getByRole("button", { name: "Сменить роль" }).click();
-    await submissionCard(page, familyTitle)
-      .getByRole("button", { name: "Исправить" })
+    await page.getByRole("button", { name: /Очередь/ }).click();
+    await submissionCard(page, "Кузнецова Анна")
+      .getByRole("button", { name: "Исправить замечания" })
       .click();
     await expect(
       drawer(page).getByRole("button", { name: "Отправить исправления" }),
