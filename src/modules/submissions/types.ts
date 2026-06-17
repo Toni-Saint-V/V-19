@@ -163,6 +163,17 @@ export type SubmissionFile = {
   applicantId: string;
   type: SubmissionFileType;
   status: SubmissionFileStatus;
+  generatedFileName?: string;
+  mimeType?: string;
+  originalFileName?: string;
+  reviewedAtIso?: string;
+  reviewedBy?: string;
+  reviewStatus?: "not_reviewed" | "accepted" | "replace_required" | "poor_quality";
+  sizeBytes?: number;
+  storageBucket?: string;
+  storagePath?: string;
+  uploadedAtIso?: string;
+  uploadStatus?: "none" | "uploaded";
   uploadedBy?: string;
   uploadedAt?: string;
   linkedIssueId?: string;

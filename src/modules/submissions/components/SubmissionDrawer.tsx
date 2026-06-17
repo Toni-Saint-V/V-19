@@ -52,6 +52,7 @@ const drawerTabs: Array<{ id: DrawerTab; label: string }> = [
 
 export function SubmissionDrawer({
   activeTab,
+  fileUploadBusy = false,
   issueComposerRequest,
   onAction,
   onAddIssue,
@@ -63,11 +64,13 @@ export function SubmissionDrawer({
   onRunAiReview,
   onQuestionnaireField,
   onUploadFile,
+  requireSelectedFile,
   role,
   submission,
   surface,
 }: {
   activeTab: DrawerTab;
+  fileUploadBusy?: boolean;
   issueComposerRequest: { submissionId: string; token: number } | null;
   onAction: (action: SubmissionAction) => void;
   onAddIssue: (input: IssueInput) => void;
@@ -83,7 +86,8 @@ export function SubmissionDrawer({
     value: string;
   }) => void;
   onTab: (tab: DrawerTab) => void;
-  onUploadFile: (fileId: string) => void;
+  onUploadFile: (fileId: string, file?: File) => void;
+  requireSelectedFile?: boolean;
   role: Role;
   submission: Submission;
   surface: "agent" | "review" | "export";
@@ -184,7 +188,9 @@ export function SubmissionDrawer({
         ) : null}
         {activeTab === "files" ? (
           <DrawerFiles
+            fileUploadBusy={fileUploadBusy}
             onUploadFile={onUploadFile}
+            requireSelectedFile={requireSelectedFile}
             role={role}
             submission={submission}
           />
@@ -219,10 +225,7 @@ export function SubmissionDrawer({
             : footerHint}
         </span>
         {canOpenIssueComposer && !issueComposerOpen ? (
-          <Button
-            variant="secondary"
-            onClick={() => setIssueComposerOpen(true)}
-          >
+          <Button variant="secondary" onClick={() => setIssueComposerOpen(true)}>
             Добавить замечание
           </Button>
         ) : null}
@@ -319,14 +322,14 @@ function IssueComposer({
           ]}
           value={targetKind}
           onChange={(event) => {
-              const nextKind = event.target.value as "questionnaire" | "files";
-              setTargetKind(nextKind);
-              setReason(
-                nextKind === "files"
-                  ? "Файл требует замены"
-                  : "Нужно уточнить маршрут поездки",
-              );
-            }}
+            const nextKind = event.target.value as "questionnaire" | "files";
+            setTargetKind(nextKind);
+            setReason(
+              nextKind === "files"
+                ? "Файл требует замены"
+                : "Нужно уточнить маршрут поездки",
+            );
+          }}
         />
         {targetKind === "questionnaire" ? (
           <Select
@@ -587,9 +590,7 @@ function DrawerQuestionnaire({
         {questionnaireReady ? (
           <Badge className="visa-tag visa-tag-ready">Готово к решению</Badge>
         ) : problemCount ? (
-          <Badge className="visa-tag visa-tag-attention">
-            Уточнить {problemCount}
-          </Badge>
+          <Badge className="visa-tag visa-tag-attention">Уточнить {problemCount}</Badge>
         ) : null}
       </div>
       {submission.applicants.length > 1 ? (
@@ -860,11 +861,15 @@ function defaultQuestionnaireSectionKey(submission: Submission) {
 }
 
 function DrawerFiles({
+  fileUploadBusy = false,
   onUploadFile,
+  requireSelectedFile = false,
   role,
   submission,
 }: {
-  onUploadFile: (fileId: string) => void;
+  fileUploadBusy?: boolean;
+  onUploadFile: (fileId: string, file?: File) => void;
+  requireSelectedFile?: boolean;
   role: Role;
   submission: Submission;
 }) {
@@ -896,6 +901,9 @@ function DrawerFiles({
             const canUploadFile =
               canEditFiles &&
               (file.status === "missing" || file.status === "needs_replacement");
+            const uploadDisabled = fileUploadBusy;
+            const inputId = `file-upload-${submission.id}-${file.id}`;
+            const uploadLabel = `${file.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileTypeLabels[file.type]}: ${applicantName}`;
             return (
               <CardComponent
                 as="article"
@@ -913,14 +921,58 @@ function DrawerFiles({
                     {fileStatusLabels[file.status]}
                   </Badge>
                   {canUploadFile ? (
-                    <Button
-                      className="compact-button"
-                      variant="secondary"
-                      aria-label={`${file.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileTypeLabels[file.type]}: ${applicantName}`}
-                      onClick={() => onUploadFile(file.id)}
-                    >
-                      {file.status === "needs_replacement" ? "Заменить" : "Загрузить"}
-                    </Button>
+                    requireSelectedFile ? (
+                      <>
+                        <input
+                          accept={
+                            file.type === "video" ? "video/mp4" : "image/jpeg,image/png"
+                          }
+                          aria-label={`Выбрать файл: ${uploadLabel}`}
+                          className="sr-only"
+                          disabled={uploadDisabled}
+                          id={inputId}
+                          type="file"
+                          onChange={(event) => {
+                            const selectedFile = event.currentTarget.files?.[0];
+                            if (selectedFile) onUploadFile(file.id, selectedFile);
+                            event.currentTarget.value = "";
+                          }}
+                        />
+                        <label
+                          className="mp-button secondary-button compact-button"
+                          htmlFor={inputId}
+                          aria-disabled={uploadDisabled || undefined}
+                          role="button"
+                          tabIndex={0}
+                          onClick={(event) => {
+                            if (!uploadDisabled) return;
+                            event.preventDefault();
+                          }}
+                          onKeyDown={(event) => {
+                            if (uploadDisabled) return;
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            event.currentTarget.click();
+                          }}
+                        >
+                          {uploadDisabled
+                            ? "Сохранение"
+                            : file.status === "needs_replacement"
+                              ? "Заменить"
+                              : "Загрузить"}
+                        </label>
+                      </>
+                    ) : (
+                      <Button
+                        className="compact-button"
+                        disabled={uploadDisabled}
+                        variant="secondary"
+                        aria-label={uploadLabel}
+                        onClick={() => onUploadFile(file.id)}
+                      >
+                        {file.status === "needs_replacement" ? "Заменить" : "Загрузить"}
+                      </Button>
+                    )
                   ) : null}
                 </div>
               </CardComponent>
@@ -1024,7 +1076,11 @@ function DrawerHistory({ submission }: { submission: Submission }) {
       <div className="drawer-list">
         {events.length ? (
           events.map((event) => (
-            <CardComponent as="article" className="drawer-row history-row" key={event.id}>
+            <CardComponent
+              as="article"
+              className="drawer-row history-row"
+              key={event.id}
+            >
               <div>
                 <strong>{event.text}</strong>
                 {event.detail ? (

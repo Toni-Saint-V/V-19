@@ -25,28 +25,136 @@ import type {
   Role,
   SubmissionFile,
   SubmissionFileStatus,
+  SubmissionFileType,
 } from "./types";
 
 export type CreateDraftInput = {
   city: City;
   applicantNames?: string[];
   familyCount: number;
+  idScheme?: "local" | "supabase";
   submissions: Submission[];
   type: Submission["type"];
 };
+
+export type UploadedFileMetadata = {
+  generatedFileName: string;
+  mimeType: string;
+  originalFileName: string;
+  sizeBytes: number;
+  storageBucket: string;
+  storagePath: string;
+  uploadedAtIso: string;
+};
+
+export function applyUploadedFileMetadata(
+  submission: Submission,
+  fileId: string,
+  metadata: UploadedFileMetadata,
+): Submission {
+  return uploadRequiredFile(submission, fileId, metadata);
+}
+
+export function mergeUploadedFileMetadataIntoSubmissions(
+  submissions: Submission[],
+  submissionId: string,
+  fileId: string,
+  metadata: UploadedFileMetadata,
+): { submission: Submission | null; submissions: Submission[] } {
+  let mergedSubmission: Submission | null = null;
+
+  const nextSubmissions = submissions.map((submission) => {
+    if (submission.id !== submissionId) return submission;
+
+    const updated = applyUploadedFileMetadata(submission, fileId, metadata);
+    if (updated !== submission) {
+      mergedSubmission = updated;
+      return updated;
+    }
+
+    if (!submission.files.some((file) => file.id === fileId)) {
+      mergedSubmission = submission;
+      return submission;
+    }
+
+    const files = submission.files.map((file) =>
+      file.id === fileId ? mergeUploadedStorageFields(file, metadata) : file,
+    );
+    const filePercent = fileCompleteness(files);
+    const withStorageMetadata = {
+      ...submission,
+      applicants: submission.applicants.map((applicant) => ({
+        ...applicant,
+        fileStatus: applicantFileStatus(
+          files.filter((file) => file.applicantId === applicant.id),
+        ),
+      })),
+      completeness: {
+        ...submission.completeness,
+        files: filePercent,
+        total: Math.round((submission.completeness.questionnaire + filePercent) / 2),
+      },
+      files,
+    };
+    mergedSubmission = withStorageMetadata;
+    return withStorageMetadata;
+  });
+
+  return {
+    submission: mergedSubmission,
+    submissions: nextSubmissions,
+  };
+}
+
+export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
+  if (type === "photo") return "photo_white" as const;
+  if (type === "selfie") return "selfie" as const;
+  return "video" as const;
+}
+
+export function cockpitUploadExtensionForMimeType(
+  mimeType: string,
+  fileType: SubmissionFileType,
+): "jpg" | "png" | "mp4" {
+  if (fileType === "video" && mimeType === "video/mp4") return "mp4";
+  if (fileType !== "video" && mimeType === "image/png") return "png";
+  if (fileType !== "video" && mimeType === "image/jpeg") return "jpg";
+  throw new Error("Unsupported media MIME type for this upload slot.");
+}
+
+export function generatedCockpitMediaFileName({
+  applicantId,
+  fileType,
+  mimeType,
+  submissionId,
+  uploadNonce,
+}: {
+  applicantId: string;
+  fileType: SubmissionFileType;
+  mimeType: string;
+  submissionId: string;
+  uploadNonce?: string;
+}): string {
+  const slotType = mediaSlotTypeForSubmissionFileType(fileType);
+  const extension = cockpitUploadExtensionForMimeType(mimeType, fileType);
+  const nonceSegment = uploadNonce ? `:${uploadNonce}` : "";
+  return `${stableAsciiToken(`${submissionId}:${applicantId}:${slotType}${nonceSegment}`)}_${slotType}.${extension}`;
+}
 
 export function createDraftSubmission({
   applicantNames = [],
   city,
   familyCount,
+  idScheme = "local",
   submissions,
   type,
 }: CreateDraftInput): Submission {
   const nextIndex = nextSubmissionIndex(submissions);
   const applicantTotal = type === "family" ? familyCount : 1;
+  const submissionId = submissionIdForScheme(nextIndex, idScheme);
 
   const applicants = Array.from({ length: applicantTotal }, (_, index) => {
-    const id = `з-${nextIndex}-${index + 1}`;
+    const id = applicantIdForScheme(nextIndex, index, idScheme);
     const fullName = draftApplicantName(index, type, applicantNames[index]);
 
     return {
@@ -60,7 +168,7 @@ export function createDraftSubmission({
   }) satisfies Submission["applicants"];
 
   return {
-    id: `ПД-${nextIndex}`,
+    id: submissionId,
     title: draftTitle(type, applicants[0]?.fullName),
     type,
     country: "Испания",
@@ -70,7 +178,7 @@ export function createDraftSubmission({
     status: "draft",
     applicants,
     issues: [],
-    files: requiredFilesForApplicants(applicants, nextIndex),
+    files: requiredFilesForApplicants(applicants, nextIndex, idScheme),
     completeness: { questionnaire: 0, files: 0, total: 0 },
     aiSuggestions: [],
     aiReviewState: "idle",
@@ -116,7 +224,8 @@ export function uploadRequiredFiles(submission: Submission): Submission {
     ? submission.files
     : requiredFilesForApplicants(
         submission.applicants,
-        Number(submission.id.replace("ПД-", "")),
+        submissionIndexFromId(submission.id),
+        submission.id.startsWith("VF-") ? "supabase" : "local",
       );
   const withFiles = { ...submission, files };
 
@@ -126,7 +235,11 @@ export function uploadRequiredFiles(submission: Submission): Submission {
   );
 }
 
-export function uploadRequiredFile(submission: Submission, fileId: string): Submission {
+export function uploadRequiredFile(
+  submission: Submission,
+  fileId: string,
+  metadata?: UploadedFileMetadata,
+): Submission {
   if (!canAgentEditSubmissionContent(submission)) return submission;
 
   const targetFile = submission.files.find((file) => file.id === fileId);
@@ -137,6 +250,17 @@ export function uploadRequiredFile(submission: Submission, fileId: string): Subm
       ? {
           ...file,
           status: "uploaded" as const,
+          generatedFileName: metadata?.generatedFileName ?? file.generatedFileName,
+          mimeType: metadata?.mimeType ?? file.mimeType,
+          originalFileName: metadata?.originalFileName ?? file.originalFileName,
+          reviewedAtIso: undefined,
+          reviewedBy: undefined,
+          reviewStatus: "not_reviewed" as const,
+          sizeBytes: metadata?.sizeBytes ?? file.sizeBytes,
+          storageBucket: metadata?.storageBucket ?? file.storageBucket,
+          storagePath: metadata?.storagePath ?? file.storagePath,
+          uploadedAtIso: metadata?.uploadedAtIso ?? file.uploadedAtIso,
+          uploadStatus: "uploaded" as const,
           uploadedBy: file.uploadedBy ?? "Агент",
           uploadedAt: "сейчас",
         }
@@ -177,6 +301,7 @@ export function uploadRequiredFile(submission: Submission, fileId: string): Subm
 export function addPreciseAdminIssue(
   submission: Submission,
   input: IssueInput,
+  actorId?: string,
 ): Submission {
   if (!canAddAdminIssue(submission, "admin")) return submission;
 
@@ -212,7 +337,7 @@ export function addPreciseAdminIssue(
 
   const withTargetFlag =
     newIssue.target.fileType && newIssue.target.section === "Файлы"
-      ? markIssueFileForReplacement(submission, newIssue)
+      ? markIssueFileForReplacement(submission, newIssue, actorId)
       : flagQuestionnaireField(
           submission,
           applicant.id,
@@ -241,10 +366,11 @@ export function applyActionToSubmissionList(
   submissionId: string,
   action: SubmissionAction,
   role: Role,
+  actorId?: string,
 ) {
   return submissions.map((submission) =>
     submission.id === submissionId
-      ? applySubmissionAction(submission, action, role)
+      ? applySubmissionAction(submission, action, role, actorId)
       : submission,
   );
 }
@@ -321,9 +447,30 @@ export function markSelectedExported(submissions: Submission[], selectedIds: str
 
 function nextSubmissionIndex(submissions: Submission[]) {
   const indexes = submissions
-    .map((submission) => Number(submission.id.replace("ПД-", "")))
+    .map((submission) => submissionIndexFromId(submission.id))
     .filter(Number.isFinite);
   return Math.max(1058, ...indexes) + 1;
+}
+
+function submissionIndexFromId(id: string): number {
+  return Number(id.match(/\d+/)?.[0]);
+}
+
+function submissionIdForScheme(
+  nextIndex: number,
+  idScheme: NonNullable<CreateDraftInput["idScheme"]>,
+) {
+  return idScheme === "supabase" ? `VF-${nextIndex}` : `ПД-${nextIndex}`;
+}
+
+function applicantIdForScheme(
+  nextIndex: number,
+  applicantIndex: number,
+  idScheme: NonNullable<CreateDraftInput["idScheme"]>,
+) {
+  return idScheme === "supabase"
+    ? `app-${nextIndex}-${applicantIndex + 1}`
+    : `з-${nextIndex}-${applicantIndex + 1}`;
 }
 
 function draftApplicantName(index: number, type: Submission["type"], input?: string) {
@@ -354,6 +501,35 @@ function draftTitle(type: Submission["type"], firstApplicantName?: string) {
 
 function isFileUploadable(status: SubmissionFileStatus) {
   return status === "missing" || status === "needs_replacement";
+}
+
+function mergeUploadedStorageFields(
+  file: SubmissionFile,
+  metadata: UploadedFileMetadata,
+): SubmissionFile {
+  return {
+    ...file,
+    generatedFileName: metadata.generatedFileName,
+    mimeType: metadata.mimeType,
+    originalFileName: metadata.originalFileName,
+    sizeBytes: metadata.sizeBytes,
+    storageBucket: metadata.storageBucket,
+    storagePath: metadata.storagePath,
+    uploadedAtIso: metadata.uploadedAtIso,
+    uploadedAt: file.uploadedAt ?? "сейчас",
+    uploadedBy: file.uploadedBy ?? "Агент",
+    uploadStatus: "uploaded",
+  };
+}
+
+function stableAsciiToken(value: string): string {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+
+  return `v19${(hash >>> 0).toString(36).padStart(7, "0")}`;
 }
 
 function fileCompleteness(files: SubmissionFile[]) {
@@ -389,13 +565,20 @@ function issueSnapshot(submission: Submission, input: IssueInput) {
   return fields.find((field) => field.label === input.field)?.value;
 }
 
-function markIssueFileForReplacement(submission: Submission, issue: Issue): Submission {
+function markIssueFileForReplacement(
+  submission: Submission,
+  issue: Issue,
+  reviewedBy?: string,
+): Submission {
   const files = submission.files.map((file) =>
     file.applicantId === issue.target.applicantId && file.type === issue.target.fileType
       ? {
           ...file,
           status: "needs_replacement" as const,
           linkedIssueId: issue.id,
+          reviewedAtIso: new Date().toISOString(),
+          reviewedBy: reviewedBy ?? file.reviewedBy,
+          reviewStatus: "replace_required" as const,
         }
       : file,
   );
@@ -425,10 +608,14 @@ function markIssueFileForReplacement(submission: Submission, issue: Issue): Subm
 function requiredFilesForApplicants(
   applicants: Submission["applicants"],
   submissionIndex: number,
+  idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
     (["photo", "selfie", "video"] as const).map((type, fileIndex) => ({
-      id: `ф-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`,
+      id:
+        idScheme === "supabase"
+          ? `file-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`
+          : `ф-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`,
       applicantId: applicant.id,
       type,
       status: "missing" as const,

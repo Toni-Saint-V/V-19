@@ -30,10 +30,7 @@ export const statusTone = {
   corrections_received: "amber",
   ready_for_export: "teal",
   exported: "muted",
-} satisfies Record<
-  SubmissionStatus,
-  "amber" | "blue" | "danger" | "muted" | "teal"
->;
+} satisfies Record<SubmissionStatus, "amber" | "blue" | "danger" | "muted" | "teal">;
 
 export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
   missing: "Нет файла",
@@ -348,6 +345,7 @@ export function applySubmissionAction(
   submission: Submission,
   action: SubmissionAction,
   role: Role,
+  actorId?: string,
 ): Submission {
   const guard = canPerformAction(submission, action, role);
   if (!guard.ok) return submission;
@@ -375,10 +373,12 @@ export function applySubmissionAction(
   }
 
   if (action === "close_issues_accept") {
+    const reviewedAtIso = new Date().toISOString();
     return {
       ...submission,
       status: "ready_for_export",
       exportState: "ready",
+      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
       issues: submission.issues.map((issue) =>
         issue.status === "fixed_by_manager"
           ? { ...issue, status: "closed_by_admin" }
@@ -398,10 +398,12 @@ export function applySubmissionAction(
   }
 
   if (action === "accept") {
+    const reviewedAtIso = new Date().toISOString();
     return {
       ...submission,
       status: "ready_for_export",
       exportState: "ready",
+      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
       updatedAt: "сейчас",
       history: [
         {
@@ -468,6 +470,30 @@ export function applySubmissionAction(
       ...submission.history,
     ],
   };
+}
+
+function markReviewFilesAccepted(
+  files: Submission["files"],
+  reviewedAtIso: string,
+  reviewedBy?: string,
+): Submission["files"] {
+  return files.map((file) => {
+    if (
+      file.status !== "uploaded" &&
+      file.status !== "pending_review" &&
+      file.status !== "accepted"
+    ) {
+      return file;
+    }
+
+    return {
+      ...file,
+      status: "accepted" as const,
+      reviewedAtIso: file.reviewedAtIso ?? reviewedAtIso,
+      reviewedBy: file.reviewedBy ?? reviewedBy,
+      reviewStatus: "accepted" as const,
+    };
+  });
 }
 
 function isIssueResolved(submission: Submission, issue: Issue) {

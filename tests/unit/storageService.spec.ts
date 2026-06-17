@@ -41,6 +41,20 @@ describe("media storage contract", () => {
     ).toThrow(/submissionId/);
   });
 
+  test("accepts existing cockpit Cyrillic ids without allowing path escapes", () => {
+    expect(
+      buildMediaStoragePath(
+        "ПД-1052",
+        "з-1052-1",
+        "photo_white",
+        "v1900abcde_photo_white.jpg",
+      ),
+    ).toEqual({
+      bucket: mediaStorageBucket,
+      path: "ПД-1052/з-1052-1/photo_white/v1900abcde_photo_white.jpg",
+    });
+  });
+
   test("rejects wrong MIME type", () => {
     const target = buildMediaStoragePath(
       "VF-1044",

@@ -73,7 +73,7 @@ export default defineConfig({
     },
     {
       name: "supabase-sandbox-auth-smoke",
-      grep: /opens the workspace with a smoke agent/,
+      grep: /opens the workspace with a smoke agent|uploads private media/,
       use: {
         ...devices["Desktop Chrome"],
         screenshot: "off",

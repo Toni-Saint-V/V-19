@@ -28,10 +28,13 @@ import {
 } from "../../src/modules/submissions/supabasePersistence";
 import {
   addPreciseAdminIssue,
+  applyUploadedFileMetadata,
   applyExportStateToSelection,
   completeQuestionnaire,
   createDraftSubmission,
+  generatedCockpitMediaFileName,
   markSelectedExported,
+  mergeUploadedFileMetadataIntoSubmissions,
   uploadRequiredFile,
   uploadRequiredFiles,
   updateQuestionnaireField,
@@ -406,6 +409,41 @@ describe("V-19 submission actions", () => {
     expect(draft.history[0].source).toBe("agent");
   });
 
+  it("creates ASCII ids for Supabase cockpit drafts and storage paths", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "supabase",
+      submissions: initialSubmissions,
+      type: "single",
+    });
+
+    expect(draft.id).toMatch(/^VF-\d+$/);
+    expect(draft.applicants[0]?.id).toMatch(/^app-\d+-1$/);
+    expect(draft.files[0]?.id).toMatch(/^file-\d+-1-1$/);
+  });
+
+  it("generates a new safe storage file name for each Supabase upload attempt", () => {
+    const first = generatedCockpitMediaFileName({
+      applicantId: "app-1059-1",
+      fileType: "photo",
+      mimeType: "image/jpeg",
+      submissionId: "VF-1059",
+      uploadNonce: "2026-06-17T10:00:00.000Z:first",
+    });
+    const second = generatedCockpitMediaFileName({
+      applicantId: "app-1059-1",
+      fileType: "photo",
+      mimeType: "image/jpeg",
+      submissionId: "VF-1059",
+      uploadNonce: "2026-06-17T10:00:01.000Z:second",
+    });
+
+    expect(first).toMatch(/^v19[a-z0-9]+_photo_white\.jpg$/);
+    expect(second).toMatch(/^v19[a-z0-9]+_photo_white\.jpg$/);
+    expect(second).not.toBe(first);
+  });
+
   it("fills a draft enough to submit it for review", () => {
     const draft = createDraftSubmission({
       city: "Москва",
@@ -447,6 +485,87 @@ describe("V-19 submission actions", () => {
     expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
       ok: false,
       reason: "Есть незаполненные поля или недостающие файлы",
+    });
+  });
+
+  it("merges uploaded media metadata without dropping concurrent submission edits", () => {
+    const draft = completeQuestionnaire(
+      createDraftSubmission({
+        city: "Москва",
+        familyCount: 1,
+        submissions: initialSubmissions,
+        type: "single",
+      }),
+    );
+    const firstFile = draft.files[0];
+    if (!firstFile) throw new Error("Missing draft file");
+    const editedDuringUpload = {
+      ...draft,
+      title: "Edited while upload was in flight",
+    };
+
+    const updated = applyUploadedFileMetadata(editedDuringUpload, firstFile.id, {
+      generatedFileName: "v19abc123_photo_white.jpg",
+      mimeType: "image/jpeg",
+      originalFileName: "phone-photo.jpg",
+      sizeBytes: 2048,
+      storageBucket: "submission-media",
+      storagePath: `${draft.id}/${firstFile.applicantId}/photo_white/v19abc123_photo_white.jpg`,
+      uploadedAtIso: "2026-06-17T10:00:00.000Z",
+    });
+
+    expect(updated.title).toBe("Edited while upload was in flight");
+    expect(updated.files[0]).toMatchObject({
+      generatedFileName: "v19abc123_photo_white.jpg",
+      originalFileName: "phone-photo.jpg",
+      status: "uploaded",
+      storageBucket: "submission-media",
+      uploadStatus: "uploaded",
+    });
+  });
+
+  it("commits uploaded media metadata into the latest submission after remote save resolves", () => {
+    const draft = completeQuestionnaire(
+      createDraftSubmission({
+        city: "Москва",
+        familyCount: 1,
+        submissions: initialSubmissions,
+        type: "single",
+      }),
+    );
+    const firstFile = draft.files[0];
+    if (!firstFile) throw new Error("Missing draft file");
+    const metadata = {
+      generatedFileName: "v19late01_photo_white.jpg",
+      mimeType: "image/jpeg",
+      originalFileName: "late-edit-photo.jpg",
+      sizeBytes: 4096,
+      storageBucket: "submission-media",
+      storagePath: `${draft.id}/${firstFile.applicantId}/photo_white/v19late01_photo_white.jpg`,
+      uploadedAtIso: "2026-06-17T11:00:00.000Z",
+    };
+    const savedBeforeLateEdit = applyUploadedFileMetadata(draft, firstFile.id, metadata);
+    const editedWhileSaveWasPending = {
+      ...draft,
+      title: "Edited while remote save was pending",
+    };
+
+    const result = mergeUploadedFileMetadataIntoSubmissions(
+      [editedWhileSaveWasPending],
+      savedBeforeLateEdit.id,
+      firstFile.id,
+      metadata,
+    );
+
+    expect(result.submission?.title).toBe("Edited while remote save was pending");
+    expect(result.submissions[0]).toBe(result.submission);
+    expect(result.submission?.files[0]).toMatchObject({
+      generatedFileName: "v19late01_photo_white.jpg",
+      originalFileName: "late-edit-photo.jpg",
+      status: "uploaded",
+      storageBucket: "submission-media",
+      storagePath: `${draft.id}/${firstFile.applicantId}/photo_white/v19late01_photo_white.jpg`,
+      uploadStatus: "uploaded",
     });
   });
 
@@ -510,6 +629,30 @@ describe("V-19 submission actions", () => {
     expect(updated.history[0].source).toBe("admin");
   });
 
+  it("records the admin reviewer when accepting uploaded media", () => {
+    const adminProfileId = "00000000-0000-4000-8000-000000000002";
+    const submission = byId("ПД-1053");
+    const reviewableFiles = submission.files.filter((file) =>
+      ["uploaded", "pending_review", "accepted"].includes(file.status),
+    );
+
+    const accepted = applySubmissionAction(
+      submission,
+      "accept",
+      "admin",
+      adminProfileId,
+    );
+
+    expect(reviewableFiles.length).toBeGreaterThan(0);
+    for (const file of reviewableFiles) {
+      expect(accepted.files.find((item) => item.id === file.id)).toMatchObject({
+        reviewStatus: "accepted",
+        reviewedBy: adminProfileId,
+        status: "accepted",
+      });
+    }
+  });
+
   it("does not add issues to export-ready submissions", () => {
     const submission = byId("ПД-1056");
     const updated = addPreciseAdminIssue(submission, routeIssueInput(submission));
@@ -534,19 +677,32 @@ describe("V-19 submission actions", () => {
     const applicant = submitted.applicants[0];
     if (!applicant) throw new Error("Missing applicant");
 
-    const withIssue = addPreciseAdminIssue(submitted, {
-      applicantId: applicant.id,
-      comment: "Замените фото и отправьте исправление.",
-      fileType: "photo",
-      reason: "Файл требует замены",
-      section: "Файлы",
-      severity: "blocker",
-      type: "file",
-    });
+    const withIssue = addPreciseAdminIssue(
+      submitted,
+      {
+        applicantId: applicant.id,
+        comment: "Замените фото и отправьте исправление.",
+        fileType: "photo",
+        reason: "Файл требует замены",
+        section: "Файлы",
+        severity: "blocker",
+        type: "file",
+      },
+      "00000000-0000-4000-8000-000000000002",
+    );
 
     expect(withIssue.files).toHaveLength(12);
     expect(withIssue.completeness.files).toBe(92);
     expect(withIssue.completeness.total).toBe(96);
+    expect(
+      withIssue.files.find(
+        (file) => file.applicantId === applicant.id && file.type === "photo",
+      ),
+    ).toMatchObject({
+      reviewStatus: "replace_required",
+      reviewedBy: "00000000-0000-4000-8000-000000000002",
+      status: "needs_replacement",
+    });
   });
 
   it("keeps a field issue open until the agent submits corrections", () => {
