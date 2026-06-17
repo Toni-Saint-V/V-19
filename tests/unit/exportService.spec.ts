@@ -16,8 +16,8 @@ function applicant(overrides: Partial<Applicant> = {}): Applicant {
     role: "Заявитель",
     passport: "75 1234567",
     form: 100,
-    media: 3,
-    mediaRequired: 3,
+    media: 4,
+    mediaRequired: 4,
     birthDate: "1990-02-10",
     citizenship: "РФ",
     address: "Moscow",
@@ -38,7 +38,8 @@ function applicant(overrides: Partial<Applicant> = {}): Applicant {
     mediaSlots: [
       buildMediaSlot(base, "photo_white", "accepted"),
       buildMediaSlot(base, "selfie", "accepted"),
-      buildMediaSlot(base, "video", "accepted"),
+      buildMediaSlot(base, "selfie_2", "accepted"),
+      buildMediaSlot(base, "passport_scan", "accepted"),
     ],
   };
 }
@@ -60,8 +61,8 @@ function acceptedSubmission(overrides: Partial<Submission> = {}): Submission {
     appointment: "not_started",
     priority: "Средний",
     fields: 100,
-    media: 3,
-    mediaRequired: 3,
+    media: 4,
+    mediaRequired: 4,
     applicants,
     mediaRows: [],
     notes: [],

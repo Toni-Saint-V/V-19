@@ -630,6 +630,7 @@ export function questionnaireProblemCount(submission: Submission) {
     if (issue.status !== "open") continue;
     if (
       issue.target.section === "Анкета" ||
+      issue.target.section === "Данные" ||
       issue.type === "field" ||
       issue.type === "section"
     ) {
@@ -653,7 +654,9 @@ function hasOpenQuestionnaireFieldIssue(
       issue.status === "open" &&
       issue.target.applicantId === applicantId &&
       issue.target.field === fieldLabel &&
-      (issue.target.section === sectionTitle || issue.target.section === "Анкета"),
+      (issue.target.section === sectionTitle ||
+        issue.target.section === "Анкета" ||
+        issue.target.section === "Данные"),
   );
 }
 

@@ -77,6 +77,13 @@ const adminProfile: AppProfile = {
   role: "admin",
 };
 
+const otherAgentProfile: AppProfile = {
+  ...agentProfile,
+  displayName: "Second Agent",
+  email: "second-agent@visaflow.local",
+  id: "00000000-0000-4000-8000-000000000003",
+};
+
 function payloadSubmission(callIndex = 0) {
   return (
     mockState.rpcCalls[callIndex]?.args.payload as {
@@ -135,6 +142,42 @@ describe("V-19 Supabase cockpit persistence", () => {
       agent_id: agentProfile.id,
       id: changedSubmission.id,
       title: changedSubmission.title,
+    });
+  });
+
+  it("keeps submissions created by different agents under their own owners", async () => {
+    const firstAgentSubmission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-MULTI-1",
+      title: "Первый агент создал семью",
+    };
+    const secondAgentSubmission = {
+      ...(initialSubmissions[1] as Submission),
+      id: "ПД-MULTI-2",
+      title: "Второй агент создал заявителя",
+    };
+
+    await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [firstAgentSubmission],
+      new Map(),
+    );
+    await saveCockpitSubmissionsForProfile(
+      otherAgentProfile,
+      [secondAgentSubmission],
+      new Map(),
+    );
+
+    expect(mockState.rpcCalls).toHaveLength(2);
+    expect(payloadSubmission(0)).toMatchObject({
+      agent_id: agentProfile.id,
+      id: firstAgentSubmission.id,
+      title: firstAgentSubmission.title,
+    });
+    expect(payloadSubmission(1)).toMatchObject({
+      agent_id: otherAgentProfile.id,
+      id: secondAgentSubmission.id,
+      title: secondAgentSubmission.title,
     });
   });
 

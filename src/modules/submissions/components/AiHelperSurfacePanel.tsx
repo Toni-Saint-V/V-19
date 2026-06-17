@@ -27,7 +27,7 @@ export function AiHelperSurfacePanel({
     >
       <div className="ai-helper-surface-header">
         <div>
-          <p className="kicker">AI helper</p>
+          <p className="kicker">ИИ-помощник</p>
           <h3>{helper.title}</h3>
           <p>{helper.summary}</p>
         </div>

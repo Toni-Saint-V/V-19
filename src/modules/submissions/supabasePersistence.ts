@@ -47,11 +47,7 @@ type SnapshotEnvelope = {
 };
 type CockpitApplicantRow = Pick<
   ApplicantRow,
-  | "full_name"
-  | "id"
-  | "media_percent"
-  | "questionnaire_percent"
-  | "submission_id"
+  "full_name" | "id" | "media_percent" | "questionnaire_percent" | "submission_id"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -273,6 +269,8 @@ function issueStatusToCorrectionStatus(
 function mediaTypeForIssue(type: SubmissionFileType | undefined) {
   if (type === "photo") return "photo_white";
   if (type === "selfie") return "selfie";
+  if (type === "selfie_2") return "selfie_2";
+  if (type === "passport_scan") return "passport_scan";
   if (type === "video") return "video";
   return null;
 }
@@ -280,6 +278,8 @@ function mediaTypeForIssue(type: SubmissionFileType | undefined) {
 function mediaTypeForFile(type: SubmissionFileType): MediaAssetInsert["type"] {
   if (type === "photo") return "photo_white";
   if (type === "selfie") return "selfie";
+  if (type === "selfie_2") return "selfie_2";
+  if (type === "passport_scan") return "passport_scan";
   return "video";
 }
 
@@ -583,11 +583,7 @@ export async function saveCockpitSubmissionsForProfile(
       profile.role === "admin"
         ? (nextOwnerIds.get(submission.id) ?? profile.id)
         : profile.id;
-    const payload = toCockpitDraftPersistencePayload(
-      submission,
-      profile.id,
-      ownerId,
-    );
+    const payload = toCockpitDraftPersistencePayload(submission, profile.id, ownerId);
     const { error } = requiresCorrectionHandoff(submission)
       ? await client.rpc("submit_corrections_handoff", { payload })
       : await client.rpc("save_submission_draft", { payload });

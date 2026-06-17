@@ -109,13 +109,16 @@ export function mergeUploadedFileMetadataIntoSubmissions(
 export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
   if (type === "photo") return "photo_white" as const;
   if (type === "selfie") return "selfie" as const;
+  if (type === "selfie_2") return "selfie_2" as const;
+  if (type === "passport_scan") return "passport_scan" as const;
   return "video" as const;
 }
 
 export function cockpitUploadExtensionForMimeType(
   mimeType: string,
   fileType: SubmissionFileType,
-): "jpg" | "png" | "mp4" {
+): "jpg" | "png" | "mp4" | "pdf" {
+  if (fileType === "passport_scan" && mimeType === "application/pdf") return "pdf";
   if (fileType === "video" && mimeType === "video/mp4") return "mp4";
   if (fileType !== "video" && mimeType === "image/png") return "png";
   if (fileType !== "video" && mimeType === "image/jpeg") return "jpg";
@@ -336,7 +339,8 @@ export function addPreciseAdminIssue(
   };
 
   const withTargetFlag =
-    newIssue.target.fileType && newIssue.target.section === "Файлы"
+    newIssue.target.fileType &&
+    (newIssue.target.section === "Файлы" || newIssue.target.section === "Медиа")
       ? markIssueFileForReplacement(submission, newIssue, actorId)
       : flagQuestionnaireField(
           submission,
@@ -549,7 +553,9 @@ function applicantFileStatus(files: SubmissionFile[]) {
 
 function fileTypeName(type: SubmissionFile["type"]) {
   if (type === "photo") return "Фото";
-  if (type === "selfie") return "Селфи";
+  if (type === "selfie") return "Селфи N1";
+  if (type === "selfie_2") return "Селфи N2";
+  if (type === "passport_scan") return "Загранпаспорт";
   return "Видео";
 }
 
@@ -611,14 +617,16 @@ function requiredFilesForApplicants(
   idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
-    (["photo", "selfie", "video"] as const).map((type, fileIndex) => ({
-      id:
-        idScheme === "supabase"
-          ? `file-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`
-          : `ф-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`,
-      applicantId: applicant.id,
-      type,
-      status: "missing" as const,
-    })),
+    (["photo", "selfie", "selfie_2", "passport_scan"] as const).map(
+      (type, fileIndex) => ({
+        id:
+          idScheme === "supabase"
+            ? `file-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`
+            : `ф-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`,
+        applicantId: applicant.id,
+        type,
+        status: "missing" as const,
+      }),
+    ),
   );
 }

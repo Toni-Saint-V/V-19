@@ -22,7 +22,7 @@ function questionnaireSuggestions(submission: Submission): AiSuggestion[] {
         target: {
           applicantId: applicant.id,
           applicantName: applicant.fullName,
-          section: "Анкета",
+          section: "Данные",
           field: section.title,
         },
         title: "Проверить раздел анкеты",
@@ -54,7 +54,7 @@ function fileSuggestions(submission: Submission): AiSuggestion[] {
         target: {
           applicantId: applicant.id,
           applicantName: applicant.fullName,
-          section: "Файлы",
+          section: "Медиа",
           fileType: file.type,
         },
       },
@@ -113,11 +113,18 @@ function hasMatchingIssue(submission: Submission, suggestion: AiSuggestion) {
   return submission.issues.some(
     (issue) =>
       issue.target.applicantId === suggestion.target.applicantId &&
-      issue.target.section === suggestion.target.section &&
+      normalizedIssueSection(issue.target.section) ===
+        normalizedIssueSection(suggestion.target.section) &&
       issue.target.field === suggestion.target.field &&
       issue.target.fileType === suggestion.target.fileType &&
       issue.status !== "closed_by_admin",
   );
+}
+
+function normalizedIssueSection(section: string | undefined) {
+  if (section === "Файлы") return "Медиа";
+  if (section === "Анкета") return "Данные";
+  return section ?? "";
 }
 
 function suggestionId(

@@ -25,7 +25,12 @@ export type SubmissionFileStatus =
   | "pending_review"
   | "accepted";
 
-export type SubmissionFileType = "photo" | "selfie" | "video";
+export type SubmissionFileType =
+  | "photo"
+  | "selfie"
+  | "selfie_2"
+  | "passport_scan"
+  | "video";
 
 export type IssueSeverity = "blocker" | "warning" | "info";
 
@@ -58,13 +63,48 @@ export type AiReviewState = "idle" | "checking" | "ready" | "failed";
 
 export type SubmissionHistorySource = "agent" | "admin" | "bb" | "system";
 
-export type DrawerTab =
-  | "overview"
-  | "applicants"
-  | "questionnaire"
-  | "files"
-  | "issues"
-  | "history";
+export type DrawerTab = "overview" | "data" | "media" | "issues" | "history";
+
+export type PassportExtractionStatus =
+  | "idle"
+  | "selected"
+  | "uploaded"
+  | "extracting"
+  | "ready"
+  | "failed"
+  | "unavailable";
+
+export type PassportExtractedFieldKey =
+  | "firstName"
+  | "surname"
+  | "birthDate"
+  | "birthPlace"
+  | "birthCountry"
+  | "citizenship"
+  | "gender"
+  | "passportType"
+  | "passportNumber"
+  | "passportIssuePlace"
+  | "passportIssueCountry"
+  | "passportIssuedAt"
+  | "passportExpiresAt";
+
+export type PassportExtractedField = {
+  confidence: "low" | "medium" | "high";
+  key: PassportExtractedFieldKey;
+  needsManualReview: boolean;
+  source: "passport_scan";
+  value: string;
+  verified?: boolean;
+};
+
+export type PassportUploadDraft = {
+  applicantIndex: number;
+  extractedFields: PassportExtractedField[];
+  fileName: string;
+  id: string;
+  status: PassportExtractionStatus;
+};
 
 export type SubmissionAction =
   | "save_progress"

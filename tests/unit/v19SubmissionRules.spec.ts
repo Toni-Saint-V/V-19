@@ -405,7 +405,7 @@ describe("V-19 submission actions", () => {
     expect(draft.type).toBe("family");
     expect(draft.status).toBe("draft");
     expect(draft.applicants).toHaveLength(3);
-    expect(draft.files).toHaveLength(9);
+    expect(draft.files).toHaveLength(12);
     expect(draft.history[0].source).toBe("agent");
   });
 
@@ -478,7 +478,7 @@ describe("V-19 submission actions", () => {
     const updated = uploadRequiredFile(completeQuestionnaire(draft), firstFile.id);
 
     expect(updated.files[0]?.status).toBe("uploaded");
-    expect(updated.completeness.files).toBe(33);
+    expect(updated.completeness.files).toBe(25);
     expect(updated.applicants[0]?.fileStatus).toBe("partial");
     const inProgress = applySubmissionAction(updated, "save_progress", "agent");
 
@@ -544,7 +544,11 @@ describe("V-19 submission actions", () => {
       storagePath: `${draft.id}/${firstFile.applicantId}/photo_white/v19late01_photo_white.jpg`,
       uploadedAtIso: "2026-06-17T11:00:00.000Z",
     };
-    const savedBeforeLateEdit = applyUploadedFileMetadata(draft, firstFile.id, metadata);
+    const savedBeforeLateEdit = applyUploadedFileMetadata(
+      draft,
+      firstFile.id,
+      metadata,
+    );
     const editedWhileSaveWasPending = {
       ...draft,
       title: "Edited while remote save was pending",
@@ -691,9 +695,9 @@ describe("V-19 submission actions", () => {
       "00000000-0000-4000-8000-000000000002",
     );
 
-    expect(withIssue.files).toHaveLength(12);
-    expect(withIssue.completeness.files).toBe(92);
-    expect(withIssue.completeness.total).toBe(96);
+    expect(withIssue.files).toHaveLength(16);
+    expect(withIssue.completeness.files).toBe(94);
+    expect(withIssue.completeness.total).toBe(97);
     expect(
       withIssue.files.find(
         (file) => file.applicantId === applicant.id && file.type === "photo",
@@ -791,7 +795,7 @@ describe("V-19 ББ helper suggestions", () => {
       target: {
         applicantId: "з-1051-1",
         applicantName: "Артём Соколов",
-        section: "Файлы",
+        section: "Медиа",
         fileType: "selfie",
       },
     });
@@ -804,7 +808,7 @@ describe("V-19 ББ helper suggestions", () => {
       suggestions.some(
         (suggestion) =>
           suggestion.target.applicantName === "Мария Иванова" &&
-          suggestion.target.section === "Файлы" &&
+          suggestion.target.section === "Медиа" &&
           suggestion.target.fileType === "photo",
       ),
     ).toBe(false);
@@ -852,7 +856,7 @@ describe("V-19 ББ helper suggestions", () => {
       severity: "warning",
       target: {
         applicantName: "Нина Волкова",
-        section: "Файлы",
+        section: "Медиа",
         fileType: "photo",
       },
     });
@@ -863,7 +867,7 @@ describe("V-19 ББ helper suggestions", () => {
     ).toBe(false);
     expect(next.history[0]).toMatchObject({
       text: "Подсказка ББ принята администратором",
-      detail: "Нина Волкова · Файлы · Фото",
+      detail: "Нина Волкова · Медиа · Фото",
       source: "bb",
     });
   });
