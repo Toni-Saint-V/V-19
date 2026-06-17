@@ -1,16 +1,16 @@
-import { applicantCountLabel, nextAuditLine, tripDates } from "../selectors";
 import { type KeyboardEvent, useRef } from "react";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import {
   blockerCount,
   fileTypeLabels,
   getCardActionLabel,
-  getPrimaryAction,
   nextProblem,
+  openIssueCount,
   responsibleRole,
   statusTone,
   typeLabels,
 } from "../status";
+import { applicantCountLabel, tripDates } from "../selectors";
 import type { DrawerTab, Issue, Role, Submission } from "../types";
 import { EmptyState, StatusChip, SummaryRow } from "./Primitives";
 
@@ -87,10 +87,16 @@ function SubmissionCard({
 }) {
   const isAdminCard = role === "admin";
   const blockers = blockerCount(submission);
+  const openIssues = openIssueCount(submission);
   const issueLines = cardIssueLines(submission);
   const fileSlots = fileSlotSummary(submission);
   const submissionTypeFact =
     submission.type === "family" ? typeLabels[submission.type] : null;
+  const compactAgentCard = role === "agent";
+  const cardTitle =
+    compactAgentCard && submission.type === "family" && issueLines[0]?.applicantName
+      ? issueLines[0].applicantName
+      : submission.title;
   const cardSide = isAdminCard ? null : (
     <AgentCardSide onOpen={onOpen} role={role} submission={submission} />
   );
@@ -157,45 +163,70 @@ function SubmissionCard({
             {blockers > 0 ? (
               <Badge className="blocker-count">{blockers} блокера</Badge>
             ) : null}
+            {compactAgentCard && submissionTypeFact ? (
+              <Badge className="family-fact">{submissionTypeFact}</Badge>
+            ) : null}
           </div>
-          <h3>{submission.title}</h3>
-          <p className="meta-line">
-            Испания · {submission.city} · {tripDates(submission)}
-          </p>
+          <h3>{cardTitle}</h3>
+          {compactAgentCard ? null : (
+            <p className="meta-line">
+              Испания · {submission.city} · {tripDates(submission)}
+            </p>
+          )}
         </div>
         <div className="card-summary">
           <div className="card-facts" aria-label="Операционная сводка">
-            {submissionTypeFact ? <span>{submissionTypeFact}</span> : null}
-            <span>{applicantCountLabel(submission.applicants.length)}</span>
-            <span>Анкета {submission.completeness.questionnaire}%</span>
-            <span>
-              Файлы {fileSlots.ready}/{fileSlots.total}
-            </span>
+            {!compactAgentCard && submissionTypeFact ? (
+              <span className="family-fact">{submissionTypeFact}</span>
+            ) : null}
+            {compactAgentCard ? null : (
+              <>
+                <span>{applicantCountLabel(submission.applicants.length)}</span>
+                <span>Анкета {submission.completeness.questionnaire}%</span>
+                <span>
+                  Файлы {fileSlots.ready}/{fileSlots.total}
+                </span>
+              </>
+            )}
           </div>
-          {issueLines.length ? (
-            <p className={`card-issue-summary is-${issueLines[0].severity}`}>
-              <strong>{issueLines[0].target}</strong>
-              <span>{issueLines[0].text}</span>
-              {issueLines.length > 1 ? <em>+{issueLines.length - 1}</em> : null}
-            </p>
-          ) : null}
         </div>
-        <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
-          <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
-          <p>
-            <strong>{role === "admin" ? "Проверка:" : "Дальше:"}</strong>{" "}
-            {cardNextActionLine(submission, role)}
+        {compactAgentCard && openIssues > 0 ? (
+          <p className="card-action-summary">
+            Нужно исправить: <strong>{issueCountLabel(openIssues)}</strong>
           </p>
-        </div>
-        <div
-          className="progress-line"
-          role="progressbar"
-          aria-label="Готовность подачи"
-          aria-valuemax={100}
-          aria-valuemin={0}
-          aria-valuenow={submission.completeness.total}
-        >
-          <span style={{ width: `${submission.completeness.total}%` }} />
+        ) : issueLines.length ? (
+          <p className={`card-issue-summary is-${issueLines[0].severity}`}>
+            <strong>
+              {issueLines[0].target}
+            </strong>
+            <span>{issueLines[0].text}</span>
+            {issueLines.length > 1 ? <em>+{issueLines.length - 1}</em> : null}
+          </p>
+        ) : null}
+        {!compactAgentCard || !issueLines.length ? (
+          <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
+            <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
+            <p>
+              <strong>{role === "admin" ? "Проверка:" : "Дальше:"}</strong>{" "}
+              {cardNextActionLine(submission, role)}
+            </p>
+          </div>
+        ) : null}
+        <div className="progress-strip">
+          <div
+            className="progress-line"
+            role="progressbar"
+            aria-label="Готовность подачи"
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={submission.completeness.total}
+          >
+            <span style={{ width: `${submission.completeness.total}%` }} />
+          </div>
+          <span className="progress-value">
+            <em>Заполнено</em>
+            <strong>{submission.completeness.total}%</strong>
+          </span>
         </div>
       </div>
       {cardSide}
@@ -212,25 +243,22 @@ function AgentCardSide({
   role: Role;
   submission: Submission;
 }) {
-  const action = getPrimaryAction(submission, role, "agent");
-  const cardLabel = getCardActionLabel(submission, role);
+  const detailLabel =
+    submission.status === "requires_action" || submission.status === "returned"
+      ? "Исправить замечания"
+      : getCardActionLabel(submission, role);
 
   return (
-    <div className="card-side">
-      <div className="card-side-head">
-        <small>Ответственный</small>
-        <span className="owner-pill">{responsibleRole(submission)}</span>
-      </div>
-      <p>{nextAuditLine(submission)}</p>
+    <div className="card-side is-action-only">
       <Button
-        danger={action.action === "return_with_issues"}
-        variant={action.action === "return_with_issues" ? "primary" : "secondary"}
+        className="card-detail-button"
+        variant="primary"
         onClick={(event) => {
           event.stopPropagation();
           onOpen(submission);
         }}
       >
-        {cardLabel}
+        {detailLabel}
       </Button>
     </div>
   );
@@ -246,6 +274,18 @@ export function RightRail({
   summaryChips?: Array<[string, string, string]>;
 }) {
   const steps = agentNextSteps(activeSubmission);
+  const hasProblemAction =
+    ["requires_action", "returned"].includes(activeSubmission.status) ||
+    blockerCount(activeSubmission) > 0;
+  const selectedActionLabel = hasProblemAction
+    ? "Исправить замечания"
+    : getCardActionLabel(activeSubmission, "agent");
+  const selectedBlockers = activeSubmission.issues
+    .filter((issue) => issue.status === "open" && issue.severity === "blocker")
+    .slice(0, 2);
+  const selectedIssueApplicant = activeSubmission.issues.find(
+    (issue) => issue.status === "open" && issue.target.applicantName,
+  )?.target.applicantName;
 
   return (
     <CardComponent
@@ -263,26 +303,65 @@ export function RightRail({
         as="section"
         className={`rail-panel selected-context tone-${statusTone[activeSubmission.status]}`}
       >
-        <p className="kicker">Выбранная подача</p>
-        <h2>{activeSubmission.title}</h2>
-        <StatusChip submission={activeSubmission} />
-        <dl>
+        <div className="selected-context-head">
           <div>
-            <dt>Проблема</dt>
-            <dd>{nextProblem(activeSubmission)}</dd>
+            <p className="kicker">Выбранная подача</p>
+            <h2>{activeSubmission.title}</h2>
+            <span>{activeSubmission.id}</span>
+            {activeSubmission.type === "family" && selectedIssueApplicant ? (
+              <span className="selected-context-applicant">
+                Заявитель с замечанием: {selectedIssueApplicant}
+              </span>
+            ) : null}
           </div>
-          <div>
-            <dt>Кто отвечает</dt>
-            <dd>{responsibleRole(activeSubmission)}</dd>
+          <StatusChip submission={activeSubmission} />
+        </div>
+        <div className="selected-context-body">
+          <div className="selected-context-problem">
+            <p>Проблема</p>
+            <strong className="selected-context-problem-title">
+              {nextProblem(activeSubmission)}
+            </strong>
+            {selectedBlockers.length ? (
+              <ul>
+                {selectedBlockers.map((issue) => (
+                  <li
+                    aria-label={`${issueShortTarget(issue)}: ${issueShortText(issue)}`}
+                    key={issue.id}
+                  >
+                    <i aria-hidden="true" />
+                    <span>
+                      <strong>{issueShortTarget(issue)}</strong>{" "}
+                      <small>{issueShortText(issue)}</small>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
-          <div>
-            <dt>Основное действие</dt>
-            <dd>{getCardActionLabel(activeSubmission, "agent")}</dd>
-          </div>
-        </dl>
-        <Button wide onClick={() => onOpen(activeSubmission)}>
-          {getCardActionLabel(activeSubmission, "agent")}
+          <dl className="selected-context-meta">
+            <div>
+              <dt>Блокеры</dt>
+              <dd>{blockerCount(activeSubmission)}</dd>
+            </div>
+            <div>
+              <dt>Отвечает</dt>
+              <dd>{responsibleRole(activeSubmission)}</dd>
+            </div>
+            <div>
+              <dt>Действие</dt>
+              <dd>{selectedActionLabel}</dd>
+            </div>
+          </dl>
+        </div>
+        <Button className="selected-context-action" wide onClick={() => onOpen(activeSubmission)}>
+          {selectedActionLabel}
         </Button>
+        {hasProblemAction ? (
+          <p className="selected-context-next-step">
+            Шаг 1: {nextAgentRepairStep(activeSubmission)}
+          </p>
+        ) : null}
       </CardComponent>
       <CardComponent as="section" className="rail-panel">
         <p className="kicker">Следующие действия</p>
@@ -306,12 +385,18 @@ function cardIssueLines(submission: Submission) {
     .slice(0, 2)
     .map((issue) => ({
       id: issue.id,
+      applicantName: issue.target.applicantName,
       severity: issue.severity,
       target: issueTarget(issue),
+      shortTarget: issueShortTarget(issue),
       text:
         issue.status === "fixed_by_manager"
           ? `${issue.reason}: исправлено агентом`
           : issue.reason,
+      shortText:
+        issue.status === "fixed_by_manager"
+          ? `${issueShortText(issue)}: исправлено агентом`
+          : issueShortText(issue),
     }));
 }
 
@@ -331,6 +416,56 @@ function issueTarget(issue: Issue) {
   ];
 
   return parts.filter(Boolean).join(" · ");
+}
+
+function issueShortTarget(issue: Issue) {
+  return issue.target.fileType
+    ? fileTypeLabels[issue.target.fileType]
+    : issue.target.field || issue.target.section || "Замечание";
+}
+
+function issueShortText(issue: Issue) {
+  const target = issueShortTarget(issue).trim();
+  const reason = issue.reason.trim();
+  const normalizedReason = reason.toLocaleLowerCase("ru-RU");
+  const normalizedTarget = target.toLocaleLowerCase("ru-RU");
+
+  if (
+    issue.target.fileType === "photo" &&
+    normalizedReason.includes("не подходит")
+  ) {
+    return "Нужно заменить фото для внутренней проверки";
+  }
+
+  if (normalizedReason.startsWith(`${normalizedTarget} `)) {
+    return reason.slice(target.length).trim();
+  }
+
+  return reason;
+}
+
+function issueCountLabel(count: number) {
+  if (count === 1) return "1 замечание";
+  if (count > 1 && count < 5) return `${count} замечания`;
+  return `${count} замечаний`;
+}
+
+function nextAgentRepairStep(submission: Submission) {
+  const blockerTargets = submission.issues
+    .filter((issue) => issue.status === "open" && issue.severity === "blocker")
+    .map(issueShortTarget);
+
+  if (blockerTargets.length) {
+    return `заменить ${formatTargetList(blockerTargets).toLocaleLowerCase("ru-RU")}, затем отправить на проверку`;
+  }
+
+  return "закрыть открытые замечания и отправить подачу на проверку";
+}
+
+function formatTargetList(targets: string[]) {
+  const uniqueTargets = [...new Set(targets)];
+  if (uniqueTargets.length <= 1) return uniqueTargets[0] ?? "замечания";
+  return `${uniqueTargets.slice(0, -1).join(", ")} и ${uniqueTargets.at(-1)}`;
 }
 
 function fileSlotSummary(submission: Submission) {

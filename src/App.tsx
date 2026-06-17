@@ -38,8 +38,16 @@ import {
   uploadRequiredFile,
 } from "./modules/submissions/submissionActions";
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
-import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
+import {
+  blockerCount,
+  canAddAdminIssue,
+  defaultDrawerTab,
+} from "./modules/submissions/status";
 import { CreateSubmissionDrawer } from "./modules/submissions/components/CreateSubmissionDrawer";
+import {
+  OperationalSidebar,
+  type OperationalNavItem,
+} from "./modules/submissions/components/OperationalNavigation";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
@@ -241,6 +249,9 @@ function App() {
     submissions.find((submission) => submission.id === selectedSubmissionId) ??
     submissions[0];
   const summary = counts(submissions);
+  const blockerSubmissionCount = submissions.filter(
+    (submission) => blockerCount(submission) > 0,
+  ).length;
 
   const searchedAgentQueue = useMemo(
     () => searchSubmissions(agentQueue(submissions), query, cityFilter),
@@ -253,6 +264,13 @@ function App() {
   const agentList = highestPriorityFirst(
     searchedAgentQueue.filter(matchesAgentTab(agentTab)),
   );
+  const agentTabCounts = {
+    action: searchedAgentQueue.filter(matchesAgentTab("action")).length,
+    all: searchedAgentQueue.length,
+    done: searchedAgentQueue.filter(matchesAgentTab("done")).length,
+    progress: searchedAgentQueue.filter(matchesAgentTab("progress")).length,
+    review: searchedAgentQueue.filter(matchesAgentTab("review")).length,
+  };
   const reviewList = highestPriorityFirst(
     searchedReviewQueue.filter(matchesReviewTab(reviewTab)),
   );
@@ -276,6 +294,108 @@ function App() {
     : showRoleSwitcher || Boolean(resolvedWorkspaceRole);
   const emptyRemoteWorkspace =
     isSupabaseMode && Boolean(remoteProfile) && authChecked && submissions.length === 0;
+  const operationalNavItems: OperationalNavItem[] =
+    role === "agent"
+      ? [
+          {
+            active: surface === "agent-submissions" && agentTab === "action",
+            count: summary.requiresAction,
+            icon: "М",
+            id: "agent-actions",
+            label: "Мои действия",
+            meta: "замечания и возвраты",
+            onClick: () => showAgentTab("action"),
+            quickAction: "Открыть",
+            tone: summary.requiresAction > 0 ? "danger" : "default",
+          },
+          {
+            active: surface === "agent-submissions" && agentTab === "all",
+            count: searchedAgentQueue.length,
+            icon: "О",
+            id: "agent-queue",
+            label: "Очередь",
+            meta: "все мои подачи",
+            onClick: () => showAgentTab("all"),
+          },
+          {
+            active: surface === "agent-submissions" && agentTab === "review",
+            count: summary.inReview + summary.corrections,
+            icon: "П",
+            id: "agent-review",
+            label: "Проверка",
+            meta: "ждут администратора",
+            onClick: () => showAgentTab("review"),
+            tone: summary.corrections > 0 ? "warning" : "default",
+          },
+          {
+            active: surface === "agent-submissions" && agentTab === "done",
+            count: summary.ready + summary.exported,
+            icon: "Г",
+            id: "agent-done",
+            label: "Готово",
+            meta: "принято и выгружено",
+            onClick: () => showAgentTab("done"),
+            tone: summary.ready > 0 ? "success" : "default",
+          },
+          {
+            disabled: true,
+            icon: "Н",
+            id: "agent-settings",
+            label: "Настройки",
+            meta: "профиль и шаблоны",
+            onClick: () => undefined,
+          },
+        ]
+      : [
+          {
+            active: surface === "admin-review" && reviewTab === "review",
+            count: summary.inReview,
+            icon: "П",
+            id: "admin-review",
+            label: "Проверка",
+            meta: "пакеты на решении",
+            onClick: () => showReviewTab("review"),
+            quickAction: "Первая",
+            tone: blockerSubmissionCount > 0 ? "danger" : "default",
+          },
+          {
+            active: surface === "admin-review" && reviewTab === "corrections",
+            count: summary.corrections,
+            icon: "И",
+            id: "admin-corrections",
+            label: "Исправления",
+            meta: "агент внёс правки",
+            onClick: () => showReviewTab("corrections"),
+            tone: summary.corrections > 0 ? "warning" : "default",
+          },
+          {
+            active: surface === "export",
+            count: summary.ready,
+            icon: "В",
+            id: "admin-export",
+            label: "Выгрузка",
+            meta: "готово к Excel",
+            onClick: showExportSurface,
+            tone: summary.ready > 0 ? "success" : "default",
+          },
+          {
+            active: surface === "admin-review" && reviewTab === "all",
+            count: searchedReviewQueue.length,
+            icon: "О",
+            id: "admin-queue",
+            label: "Очередь",
+            meta: "все рабочие статусы",
+            onClick: () => showReviewTab("all"),
+          },
+          {
+            disabled: true,
+            icon: "Н",
+            id: "admin-settings",
+            label: "Настройки",
+            meta: "роли и правила",
+            onClick: () => undefined,
+          },
+        ];
 
   async function saveRemoteWorkspaceSnapshot(
     activeRemoteProfile: AppProfile,
@@ -498,12 +618,66 @@ function App() {
     setDirty(false);
     if (nextRole === "agent") {
       setSurface("agent-submissions");
+      setAgentTab("action");
       setSelectedSubmissionId(submissions[0]?.id ?? "");
     } else {
       setSurface("admin-review");
+      setReviewTab("review");
       const firstReview = reviewQueue(submissions)[0] ?? submissions[0];
       setSelectedSubmissionId(firstReview?.id ?? "");
     }
+  }
+
+  function firstAgentSubmissionForTab(tab: AgentTab) {
+    return (
+      highestPriorityFirst(searchedAgentQueue.filter(matchesAgentTab(tab)))[0] ??
+      searchedAgentQueue[0]
+    );
+  }
+
+  function firstReviewSubmissionForTab(tab: ReviewTab) {
+    return (
+      highestPriorityFirst(searchedReviewQueue.filter(matchesReviewTab(tab)))[0] ??
+      searchedReviewQueue[0]
+    );
+  }
+
+  function showAgentTab(tab: AgentTab) {
+    setSurface("agent-submissions");
+    setAgentTab(tab);
+    setDrawerMode("closed");
+    const nextSubmission = firstAgentSubmissionForTab(tab);
+    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+  }
+
+  function showReviewTab(tab: ReviewTab) {
+    setSurface("admin-review");
+    setReviewTab(tab);
+    setDrawerMode("closed");
+    const nextSubmission = firstReviewSubmissionForTab(tab);
+    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+  }
+
+  function showExportSurface() {
+    setSurface("export");
+    setDrawerMode("closed");
+    const nextSubmission = readyList[0] ?? historyList[0];
+    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+  }
+
+  function openCreateSubmissionDrawer() {
+    rememberReturnFocus();
+    setDrawerMode("create");
+    setCreateStep("params");
+    setCreateType("single");
+    setCreateFamilyCount(2);
+    setCreateApplicantNames([
+      "Новый заявитель",
+      "Супруг",
+      "Ребёнок 1",
+      "Ребёнок 2",
+    ]);
+    setDirty(false);
   }
 
   function openSubmission(submission: Submission, tab = defaultDrawerTab(submission)) {
@@ -1070,7 +1244,7 @@ function App() {
   const searchControl = (
     <SearchBar
       label="Поиск в текущем списке"
-      placeholder="имя, номер, заявитель, статус"
+      placeholder="Поиск по имени, ID или статусу"
       value={query}
       onChange={setQuery}
     />
@@ -1108,102 +1282,50 @@ function App() {
       className={`ops-shell ${drawerMode !== "closed" ? "has-open-drawer" : ""}`}
       aria-label="Рабочая область подач"
     >
-      <aside className="left-rail" aria-label="Основная навигация">
-        <div className="rail-mark" aria-label="VisaFlow">
-          <span>VF</span>
-          <strong>VisaFlow</strong>
-        </div>
-        <nav className="rail-nav" aria-label="Навигация">
-          {role === "agent" ? (
-            <>
+      <OperationalSidebar
+        items={operationalNavItems}
+        footer={
+          <>
+            {role === "agent" ? (
               <Button
-                className="rail-item is-active"
-                aria-current="page"
-                variant="ghost"
-                onClick={() => setSurface("agent-submissions")}
-              >
-                <span className="rail-icon" aria-hidden="true">
-                  П
-                </span>
-                <span>Мои подачи</span>
-              </Button>
-              <Button
-                className="rail-item rail-create"
+                className="rail-item ops-nav-item ops-create-item"
                 aria-label="Новая подача"
                 variant="ghost"
-                onClick={() => {
-                  rememberReturnFocus();
-                  setDrawerMode("create");
-                  setCreateStep("params");
-                  setCreateType("single");
-                  setCreateFamilyCount(2);
-                  setCreateApplicantNames([
-                    "Новый заявитель",
-                    "Супруг",
-                    "Ребёнок 1",
-                    "Ребёнок 2",
-                  ]);
-                  setDirty(false);
-                }}
+                onClick={openCreateSubmissionDrawer}
               >
-                <span className="rail-icon" aria-hidden="true">
+                <span className="rail-icon ops-nav-icon" aria-hidden="true">
                   +
                 </span>
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                className={`rail-item ${surface === "admin-review" ? "is-active" : ""}`}
-                aria-current={surface === "admin-review" ? "page" : undefined}
-                variant="ghost"
-                onClick={() => {
-                  setSurface("admin-review");
-                  const firstReview = reviewList[0] ?? reviewQueue(submissions)[0];
-                  if (firstReview) setSelectedSubmissionId(firstReview.id);
-                }}
-              >
-                <span className="rail-icon" aria-hidden="true">
-                  П
+                <span className="ops-nav-copy">
+                  <strong>Новая подача</strong>
+                  <small>черновик заявки</small>
                 </span>
-                <span>Проверка</span>
               </Button>
+            ) : null}
+            {showRoleSwitcher ? (
               <Button
-                className={`rail-item ${surface === "export" ? "is-active" : ""}`}
-                aria-current={surface === "export" ? "page" : undefined}
+                className="rail-user ops-session"
+                aria-label="Сменить роль"
                 variant="ghost"
-                onClick={() => setSurface("export")}
+                onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
               >
-                <span className="rail-icon" aria-hidden="true">
-                  Э
-                </span>
-                <span>Выгрузка</span>
+                <span>{role === "agent" ? "АГ" : "АД"}</span>
+                <small>Демо</small>
               </Button>
-            </>
-          )}
-        </nav>
-        {showRoleSwitcher ? (
-          <Button
-            className="rail-user"
-            aria-label="Сменить роль"
-            variant="ghost"
-            onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
-          >
-            <span>{role === "agent" ? "АГ" : "АД"}</span>
-            <small>Демо</small>
-          </Button>
-        ) : (
-          <Button
-            className="rail-user"
-            aria-label="Выйти из рабочей области"
-            variant="ghost"
-            onClick={resetWorkspaceEmail}
-          >
-            <span>ВЫХ</span>
-            <small>Выход</small>
-          </Button>
-        )}
-      </aside>
+            ) : (
+              <Button
+                className="rail-user ops-session"
+                aria-label="Выйти из рабочей области"
+                variant="ghost"
+                onClick={resetWorkspaceEmail}
+              >
+                <span>ВЫХ</span>
+                <small>Выход</small>
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <section className="workspace">
         <header className="topbar">
@@ -1244,30 +1366,14 @@ function App() {
         {emptyRemoteWorkspace ? (
           <RemoteWorkspaceEmptyState
             role={role}
-            onCreate={
-              role === "agent"
-                ? () => {
-                    rememberReturnFocus();
-                    setDrawerMode("create");
-                    setCreateStep("params");
-                    setCreateType("single");
-                    setCreateFamilyCount(2);
-                    setCreateApplicantNames([
-                      "Новый заявитель",
-                      "Супруг",
-                      "Ребёнок 1",
-                      "Ребёнок 2",
-                    ]);
-                    setDirty(false);
-                  }
-                : undefined
-            }
+            onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
         ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
             activeSubmission={activeSubmission}
             agentList={agentList}
             agentTab={agentTab}
+            agentTabCounts={agentTabCounts}
             filterControl={cityFilterControl}
             onOpen={openSubmission}
             onSelect={selectSubmission}
