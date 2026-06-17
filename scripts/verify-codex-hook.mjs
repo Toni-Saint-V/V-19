@@ -8,9 +8,19 @@ const expectedHookMatcher = "Edit|Write|MultiEdit|apply_patch";
 const expectedHookCommand = "node scripts/codex-quality-radar.mjs";
 
 const requiredFiles = [
+  "AGENTS.md",
   ".codex/hooks.json",
   "scripts/codex-quality-radar.mjs",
   "scripts/verify-codex-hook.mjs",
+];
+
+const requiredAgentInstructions = [
+  "## 0. Operating Contract",
+  "smallest valid stack",
+  "Plugin-first means conditional routing, not plugin sprawl.",
+  "Use at most one task-specific helper and one verifier",
+  "Before repo edits, inspect branch/status",
+  "Do not expand scope silently.",
 ];
 
 const forbiddenPromptPatterns = [
@@ -124,6 +134,18 @@ function verifyPromptFiles(findings) {
   }
 }
 
+function verifyAgentInstructions(findings) {
+  const agentsText = readText("AGENTS.md");
+
+  for (const requiredInstruction of requiredAgentInstructions) {
+    if (!agentsText.includes(requiredInstruction)) {
+      findings.push(
+        `AGENTS.md: missing required skill-routing instruction "${requiredInstruction}"`,
+      );
+    }
+  }
+}
+
 export function verifyCodexHook() {
   const findings = [];
 
@@ -135,6 +157,10 @@ export function verifyCodexHook() {
 
   if (fileExists(".codex/hooks.json")) {
     verifyHookConfig(findings);
+  }
+
+  if (fileExists("AGENTS.md")) {
+    verifyAgentInstructions(findings);
   }
 
   verifyPromptFiles(findings);

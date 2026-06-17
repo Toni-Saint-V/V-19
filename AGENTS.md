@@ -1,5 +1,17 @@
 # V-19 Production Codex
 
+## 0. Operating Contract
+
+- Move the product toward the stated goal using the smallest valid stack, the smallest safe change, and fresh evidence.
+- Optimize for product outcomes, not process.
+- Never fake completion, readiness, OCR, uploads, AI decisions, official verification, production proof, or verification results.
+- Public control stays simple and plugin-neutral: `-go`, `-next`, `-pick N`, `-check`, `-ship`, and explicit merge/push/deploy requests.
+- Plugin-first means conditional routing, not plugin sprawl. Use a plugin, skill, MCP server, connector, browser, DevTools, reviewer, or live service only when it has a concrete source-truth, risk, or deliverable reason.
+- Default escalation order: files, targeted tests, browser proof, DevTools, domain plugin, review skill, heavy multi-provider review.
+- Use at most one task-specific helper and one verifier unless the risk clearly requires more or the user explicitly asks for more.
+- Before repo edits, inspect branch/status and the relevant source truth. Before commit, push, merge, rebase, or destructive git steps, inspect the current diff and preserve unrelated dirty work.
+- Do not expand scope silently. Stop and ask before touching auth, database, schema, deployment, production, admin, secrets, payments, or user data outside the declared scope.
+
 ## 1. Mission
 
 - Build premium, secure, fast, production-grade VisaFlow software with clean architecture and excellent UX.
@@ -35,6 +47,13 @@ Forbidden legacy modes: `$product`, `$engineer`, `$reviewer`, `$qa`, `-logic`, `
 - Use only relevant skills/tools; never activate every available skill or plugin blindly.
 - Prefer repo files, exact code inspection, and current runtime evidence over memory or generic assumptions.
 - State applied and skipped skills when the choice affects risk, speed, or verification.
+- Requirements/spec/task breakdown can use the available spec or planning surface only when acceptance criteria are the deliverable.
+- Product design, UX research, flow audit, prototype, or visual direction can use product-design, stark, universal-design, or browser evidence only when there is a real design target.
+- Implementation, debugging, tests, and refactors should usually use repo files and the relevant test command first; add development skills only for a concrete language/framework need.
+- Browser, Chrome DevTools, GitHub, Vercel, Supabase, database, document, spreadsheet, analytics, or live connectors are activated only when that source truth or deliverable is in scope.
+- Final review, architecture risk, debt, test-health, or release readiness can use one review surface when risk justifies it.
+- If helpers overlap, choose the one with stronger local source truth, lower noise, clearer rollback, and better verification.
+- If a named helper is unavailable, disabled, unauthenticated, or irrelevant, say so briefly and continue with the smallest safe fallback.
 - Fast Fix budget: 0-1 extra skills, targeted file read, targeted proof.
 - Standard Feature budget: Architect plus Builder, optional Auditor, focused tests.
 - Premium Feature budget: Architect plus Builder plus runtime QA, screenshots, accessibility and mobile proof.
