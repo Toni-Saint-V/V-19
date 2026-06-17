@@ -40,6 +40,7 @@ export function AgentSubmissionsScreen({
   activeSubmission,
   agentList,
   agentTab,
+  agentTabCounts,
   filterControl,
   onOpen,
   onSelect,
@@ -50,6 +51,7 @@ export function AgentSubmissionsScreen({
   activeSubmission: Submission;
   agentList: Submission[];
   agentTab: AgentTab;
+  agentTabCounts: Record<AgentTab, number>;
   filterControl?: ReactNode;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
@@ -66,14 +68,16 @@ export function AgentSubmissionsScreen({
           aria-labelledby="agent-title"
         >
           <PanelHeader
-            eyebrow="Очередь действий"
+            eyebrow="Рабочая очередь"
             titleId="agent-title"
-            title="Где агент должен действовать"
+            title="Очередь действий"
+            description="Подачи, где нужны исправления"
             tabs={[
-              ["action", "Требуют действия"],
-              ["progress", "В работе"],
-              ["review", "На проверке"],
-              ["done", "Готово"],
+              ["all", `Все ${agentTabCounts.all}`],
+              ["action", `Требуют действия ${agentTabCounts.action}`],
+              ["progress", `В работе ${agentTabCounts.progress}`],
+              ["review", `Проверка ${agentTabCounts.review}`],
+              ["done", `Готово ${agentTabCounts.done}`],
             ]}
             search={searchControl}
             side={filterControl}
@@ -130,6 +134,9 @@ export function AdminReviewScreen({
     : adminIssueUnavailableReason(activeSubmission);
   const firstReview = reviewList[0];
   const activeIsFirst = firstReview?.id === activeSubmission.id;
+  const readyFiles = activeSubmission.files.filter(
+    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  ).length;
 
   return (
     <>
@@ -145,12 +152,38 @@ export function AdminReviewScreen({
             <p>
               {activeSubmission.id} · {activeSubmission.city} · {tripDates(activeSubmission)}
             </p>
+            <div className="magic-admin-decision-chips" aria-label="Сводка подачи">
+              {activeSubmission.type === "family" ? (
+                <span>{typeLabels[activeSubmission.type]}</span>
+              ) : null}
+              <span>
+                {activeSubmission.applicants.length}{" "}
+                {pluralRu(
+                  activeSubmission.applicants.length,
+                  "заявитель",
+                  "заявителя",
+                  "заявителей",
+                )}
+              </span>
+              <span>Анкета {activeSubmission.completeness.questionnaire}%</span>
+              <span>
+                Файлы {readyFiles}/{activeSubmission.files.length}
+              </span>
+            </div>
           </div>
           <div className="magic-admin-decision-facts">
-            <StatusChip submission={activeSubmission} />
-            <span>{nextAuditLine(activeSubmission)}</span>
-            <strong>{nextProblem(activeSubmission)}</strong>
-            <dl>
+            <div className="magic-admin-decision-status">
+              <StatusChip submission={activeSubmission} />
+            </div>
+            <dl className="magic-admin-decision-meta">
+              <div>
+                <dt>Следующий шаг</dt>
+                <dd>{nextAuditLine(activeSubmission)}</dd>
+              </div>
+              <div>
+                <dt>Проверка</dt>
+                <dd>{nextProblem(activeSubmission)}</dd>
+              </div>
               <div>
                 <dt>Ответственный</dt>
                 <dd>{responsibleRole(activeSubmission)}</dd>
@@ -196,7 +229,9 @@ export function AdminReviewScreen({
             eyebrow="Очередь проверки"
             titleId="review-title"
             title="Кого проверить сейчас"
+            description="Подачи, ожидающие решения администратора"
             tabs={[
+              ["all", "Все"],
               ["review", "На проверке"],
               ["corrections", "Исправления"],
               ["ready", "К выгрузке"],
@@ -279,6 +314,7 @@ export function ExportScreen({
             eyebrow="Выгрузка"
             titleId="export-title"
             title="Пакеты для Excel"
+            description="Готовые пакеты и история выгрузки"
             tabs={[
               ["ready", "Готовы"],
               ["history", "История"],

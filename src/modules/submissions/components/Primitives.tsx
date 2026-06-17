@@ -10,6 +10,7 @@ import type { Submission } from "../types";
 
 export function PanelHeader<T extends string>({
   action,
+  description,
   eyebrow,
   onTab,
   search,
@@ -20,6 +21,7 @@ export function PanelHeader<T extends string>({
   value,
 }: {
   action?: ReactNode;
+  description?: string;
   eyebrow: string;
   onTab: (tab: T) => void;
   search?: ReactNode;
@@ -34,6 +36,7 @@ export function PanelHeader<T extends string>({
       <div className="panel-header-title">
         <p className="kicker">{eyebrow}</p>
         <h2 id={titleId}>{title}</h2>
+        {description ? <p>{description}</p> : null}
       </div>
       {side ? <div className="panel-header-side">{side}</div> : null}
       <div className="panel-controls">
