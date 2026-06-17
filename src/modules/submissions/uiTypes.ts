@@ -3,7 +3,6 @@ import type { Submission, Surface } from "./types";
 export type AgentTab = "all" | "action" | "progress" | "review" | "done";
 export type ReviewTab = "all" | "review" | "corrections" | "ready";
 export type ExportTab = "ready" | "history";
-export type CreateStep = "params" | "applicants" | "questionnaire" | "files";
 export type DrawerMode = "closed" | "detail" | "create";
 
 export function matchesAgentTab(tab: AgentTab) {
@@ -24,8 +23,11 @@ export function matchesAgentTab(tab: AgentTab) {
 export function matchesReviewTab(tab: ReviewTab) {
   return (submission: Submission) => {
     if (tab === "all") {
-      return ["submitted_for_review", "corrections_received", "ready_for_export"]
-        .includes(submission.status);
+      return [
+        "submitted_for_review",
+        "corrections_received",
+        "ready_for_export",
+      ].includes(submission.status);
     }
     if (tab === "review") return submission.status === "submitted_for_review";
     if (tab === "corrections") return submission.status === "corrections_received";
