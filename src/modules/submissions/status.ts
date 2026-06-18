@@ -9,6 +9,7 @@ import type {
   SubmissionStatus,
 } from "./types";
 import { clearOpenQuestionnaireIssueErrors } from "./questionnaire";
+import { requiresPassportExtractionReviewBeforeAction } from "./passportExtractionGuards";
 
 export const statusLabels: Record<SubmissionStatus, string> = {
   draft: "Черновик",
@@ -236,6 +237,13 @@ export function canPerformAction(
 
   if (action === "submit_for_review" && hasMissingRequiredWork(submission)) {
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
+  }
+
+  if (requiresPassportExtractionReviewBeforeAction(submission, action)) {
+    return {
+      ok: false,
+      reason: "Проверьте распознанные паспортные данные перед отправкой",
+    };
   }
 
   if (action === "submit_corrections" && openIssueCount(submission) === 0) {

@@ -16,6 +16,7 @@ import {
   uploadRequiredFile,
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
+import { canPerformAction } from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import { parsePassportMrzText } from "../../src/modules/submissions/passportExtractionService";
@@ -233,6 +234,33 @@ describe("passport extraction state", () => {
     expect(
       requiresPassportExtractionReviewBeforeAction(reviewed, "submit_corrections"),
     ).toBe(false);
+  });
+
+  test("blocks domain submit actions until passport extraction review is explicit", () => {
+    const draft = {
+      ...draftSubmission(),
+      completeness: { questionnaire: 100, files: 100, total: 100 },
+      files: draftSubmission().files.map((file) => ({
+        ...file,
+        status: "accepted" as const,
+      })),
+      status: "in_progress" as const,
+    };
+    const ready = finishPassportExtraction(
+      draft,
+      passportFile(draft),
+      extractedPassportNumber,
+    );
+
+    expect(canPerformAction(ready, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Проверьте распознанные паспортные данные перед отправкой",
+    });
+
+    const reviewed = markPassportExtractionReviewed(ready, "verified");
+    expect(canPerformAction(reviewed, "submit_for_review", "agent")).toEqual({
+      ok: true,
+    });
   });
 
   test("clears stale passport extraction review when the passport scan changes", () => {
