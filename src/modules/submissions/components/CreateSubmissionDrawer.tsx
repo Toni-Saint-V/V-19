@@ -146,6 +146,24 @@ export function CreateSubmissionDrawer({
               Семья
             </button>
           </div>
+          <ol className="create-flow-steps" aria-label="Шаги создания подачи">
+            <li className="is-active">
+              <span>1</span>
+              <strong>Паспорт</strong>
+            </li>
+            <li>
+              <span>2</span>
+              <strong>Поля</strong>
+            </li>
+            <li>
+              <span>3</span>
+              <strong>Анкета</strong>
+            </li>
+            <li>
+              <span>4</span>
+              <strong>Файлы</strong>
+            </li>
+          </ol>
 
           <section className="preintake-create-fields" aria-label="Создание подачи">
             <label>
@@ -169,12 +187,12 @@ export function CreateSubmissionDrawer({
             {type === "family" ? (
               <div className="create-people-list" aria-label="Заявители">
                 {Array.from({ length: applicantCount }, (_, index) => (
-                  <button key={index} type="button">
+                  <div className="create-person-preview" key={index}>
                     <span>{applicantFieldLabel(index, type)}</span>
                     <strong>
                       {applicantNames?.[index] || defaultApplicantName(index, type)}
                     </strong>
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : null}
@@ -256,17 +274,17 @@ export function CreateSubmissionDrawer({
             <p className="kicker">Паспортная точка входа</p>
             <h3 id="passport-intake-title">Сначала скан паспорта</h3>
             <p>
-              Загрузка скана паспорта сейчас и ответ на пару вопросов позволят вам легче
-              и быстрее пройти создание заявки.
+              Сохраните скан паспорта первым. Если подключено извлечение данных,
+              поля появятся ниже как черновик для ручной проверки.
             </p>
             <div className="preintake-upload-rules" aria-label="Как загрузить паспорт">
-              <strong>Как загрузить для распознавания</strong>
+              <strong>Как загрузить паспорт</strong>
               <span>
                 Разворот горизонтально, MRZ-строки внизу, текст читается слева направо.
               </span>
               <span>
-                Если фото повернуто, система попробует 90/180/270 градусов
-                автоматически.
+                Извлечённые поля не считаются проверенными, пока агент не сверит их
+                вручную.
               </span>
             </div>
 
@@ -521,6 +539,86 @@ export function CreateSubmissionDrawer({
                 ))}
               </div>
             ) : null}
+          </section>
+
+          <section className="create-flow-grid" aria-label="Следующие шаги анкеты">
+            <article className="create-flow-panel extraction-review-placeholder">
+              <div className="create-panel-head">
+                <div>
+                  <p className="kicker">Проверка полей</p>
+                  <h3>Извлечённые данные паспорта</h3>
+                </div>
+                <span>{passportUploads.length ? "Ожидает сверки" : "Нет файла"}</span>
+              </div>
+              <div className="extracted-field-preview">
+                {["Фамилия", "Имя", "Дата рождения", "Номер паспорта"].map(
+                  (label) => (
+                    <label key={label}>
+                      <span>{label}</span>
+                      <input
+                        readOnly
+                        value={
+                          passportUploads.length
+                            ? "Заполнится после обработки"
+                            : "Сначала загрузите паспорт"
+                        }
+                      />
+                    </label>
+                  ),
+                )}
+              </div>
+              <p>
+                Это placeholder для ручной сверки. Извлечённые данные требуют
+                проверки агентом перед отправкой.
+              </p>
+            </article>
+
+            <article className="create-flow-panel">
+              <div className="create-panel-head">
+                <div>
+                  <p className="kicker">Анкета</p>
+                  <h3>Разделы questionnaire</h3>
+                </div>
+                <span>Черновик</span>
+              </div>
+              <div className="questionnaire-section-preview">
+                {[
+                  "Личные данные",
+                  "Паспорт",
+                  "Адрес и контакты",
+                  "Работа и занятость",
+                  "Маршрут и проживание",
+                ].map((section) => (
+                  <div className="questionnaire-section-item" key={section}>
+                    <strong>{section}</strong>
+                    <span>Заполнить после сохранения</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="create-flow-panel media-requirements">
+              <div className="create-panel-head">
+                <div>
+                  <p className="kicker">Файлы</p>
+                  <h3>Обязательные media slots</h3>
+                </div>
+                <span>{applicantCount} заяв.</span>
+              </div>
+              <div className="media-requirement-list">
+                {[
+                  ["Загранпаспорт", "первый шаг"],
+                  ["Фото на белом фоне", "35x45"],
+                  ["Селфи", "для внутренней сверки"],
+                  ["Видео 1 минута", "короткое обращение"],
+                ].map(([title, meta]) => (
+                  <div key={title}>
+                    <strong>{title}</strong>
+                    <span>{meta}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
           </section>
         </section>
       </div>

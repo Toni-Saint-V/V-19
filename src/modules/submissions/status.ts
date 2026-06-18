@@ -41,11 +41,11 @@ export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
 };
 
 export const fileTypeLabels = {
-  photo: "Фото",
+  photo: "Фото на белом фоне",
   selfie: "Селфи",
   selfie_2: "Селфи N2",
   passport_scan: "Загранпаспорт",
-  video: "Видео",
+  video: "Видео 1 минута",
 } satisfies Record<Submission["files"][number]["type"], string>;
 
 export const typeLabels = {
@@ -271,8 +271,8 @@ export function canPerformAction(
 export function getCardActionLabel(submission: Submission, role: Role) {
   if (role === "agent") {
     const labels: Record<SubmissionStatus, string> = {
-      draft: "Продолжить",
-      in_progress: "Продолжить",
+      draft: "Дозаполнить",
+      in_progress: "Дозаполнить",
       requires_action: "Исправить",
       submitted_for_review: "Смотреть статус",
       returned: "Исправить",
@@ -304,9 +304,9 @@ export function getPrimaryAction(
 
   if (role === "agent") {
     const byStatus: Record<SubmissionStatus, ActionDecision> = {
-      draft: { action: "save_progress", label: "Продолжить" },
-      in_progress: { action: "submit_for_review", label: "На проверку" },
-      requires_action: { action: "submit_corrections", label: "Исправить" },
+      draft: { action: "save_progress", label: "Сохранить черновик" },
+      in_progress: { action: "submit_for_review", label: "Отправить" },
+      requires_action: { action: "submit_corrections", label: "Отправить исправления" },
       returned: { action: "submit_corrections", label: "Отправить исправления" },
       submitted_for_review: { action: "open_history", label: "Смотреть статус" },
       corrections_received: { action: "open_history", label: "Смотреть статус" },
@@ -337,7 +337,7 @@ export function getPrimaryAction(
   }
 
   if (submission.status === "ready_for_export") {
-    return { action: "generate_export", label: "К выгрузке" };
+    return { action: "generate_export", label: "Готово к выгрузке" };
   }
 
   return { action: "open_history", label: "Смотреть статус", disabled: false };

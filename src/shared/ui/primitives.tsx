@@ -214,6 +214,9 @@ export function SearchBar({
   placeholder = "Search",
   value,
 }: SearchBarProps) {
+  const generatedId = useId();
+  const inputId = `search-${generatedId}`;
+
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     onChange(event.target.value);
   }
@@ -223,6 +226,8 @@ export function SearchBar({
       <span aria-hidden="true">⌕</span>
       <input
         aria-label={label}
+        id={inputId}
+        name={inputId}
         placeholder={placeholder}
         value={value}
         onChange={handleChange}

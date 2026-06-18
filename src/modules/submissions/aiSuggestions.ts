@@ -2,13 +2,34 @@ import { generateAiSuggestions } from "./aiRules";
 import { fileTypeLabels } from "./status";
 import type { AiSuggestion, Issue, Role, Submission, SubmissionFile } from "./types";
 
+export type AiReviewSurface = "agent" | "review" | "export";
+
 const manageableAiStatuses = new Set<Submission["status"]>([
   "submitted_for_review",
   "corrections_received",
 ]);
 
+const agentRunnableAiStatuses = new Set<Submission["status"]>([
+  "draft",
+  "in_progress",
+  "requires_action",
+  "returned",
+]);
+
 export function canManageAiSuggestions(submission: Submission, role: Role) {
   return role === "admin" && manageableAiStatuses.has(submission.status);
+}
+
+export function canRunAiReview(
+  submission: Submission,
+  role: Role,
+  surface: AiReviewSurface,
+) {
+  if (surface === "export") return false;
+  if (role === "admin") {
+    return surface === "review" && manageableAiStatuses.has(submission.status);
+  }
+  return surface === "agent" && agentRunnableAiStatuses.has(submission.status);
 }
 
 export function runAiReview(submission: Submission): Submission {

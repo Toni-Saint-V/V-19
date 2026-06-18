@@ -754,7 +754,7 @@ function requiredFilesForApplicants(
   idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
-    (["photo", "selfie", "selfie_2", "passport_scan"] as const).map(
+    (["passport_scan", "photo", "selfie", "video"] as const).map(
       (type, fileIndex) => ({
         id:
           idScheme === "supabase"

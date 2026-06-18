@@ -1,4 +1,9 @@
-import { activeAiSuggestions, canManageAiSuggestions } from "../aiSuggestions";
+import {
+  activeAiSuggestions,
+  canManageAiSuggestions,
+  canRunAiReview,
+  type AiReviewSurface,
+} from "../aiSuggestions";
 import { fileTypeLabels } from "../status";
 import type { AiReviewState, AiSuggestion, Role, Submission } from "../types";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
@@ -11,6 +16,7 @@ export function BbAiPanel({
   onRun,
   role,
   submission,
+  surface,
 }: {
   compact?: boolean;
   onAccept: (suggestionId: string) => void;
@@ -18,10 +24,12 @@ export function BbAiPanel({
   onRun: () => void;
   role: Role;
   submission: Submission;
+  surface: AiReviewSurface;
 }) {
   const suggestions = activeAiSuggestions(submission);
   const state = submission.aiReviewState ?? "idle";
   const canManage = canManageAiSuggestions(submission, role);
+  const canRun = canRunAiReview(submission, role, surface);
   const hasRun = state === "ready";
 
   return (
@@ -45,12 +53,16 @@ export function BbAiPanel({
       <div className="bb-actions">
         <Button
           variant="secondary"
-          disabled={state === "checking"}
+          disabled={state === "checking" || !canRun}
           onClick={onRun}
         >
           {hasRun ? "Проверить снова" : "Запустить проверку"}
         </Button>
-        <span>Повторы скрываются. Решение принимает администратор.</span>
+        <span>
+          {canRun
+            ? "Повторы скрываются. Решение принимает администратор."
+            : "Проверка ББ недоступна в этом статусе."}
+        </span>
       </div>
 
       {suggestions.length ? (

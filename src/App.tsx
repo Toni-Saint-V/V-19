@@ -3,6 +3,7 @@ import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchBar, Select } from "./shared/ui/primitives";
 import {
   acceptAiSuggestionAsIssue,
+  canRunAiReview,
   dismissAiSuggestion,
   runAiReview,
 } from "./modules/submissions/aiSuggestions";
@@ -63,6 +64,7 @@ import { ConfirmationDialog } from "./modules/submissions/components/Primitives"
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
   AdminReviewScreen,
+  AgentInboxScreen,
   AgentSubmissionsScreen,
   ExportScreen,
 } from "./modules/submissions/pages/OperationsScreens";
@@ -221,7 +223,7 @@ function App() {
   >("idle");
   const [remoteSaveError, setRemoteSaveError] = useState("");
   const [surface, setSurface] = useState<Surface>(
-    initialWorkspaceRole === "admin" ? "admin-review" : "agent-submissions",
+    initialWorkspaceRole === "admin" ? "admin-review" : "agent-inbox",
   );
   const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(() => {
@@ -291,6 +293,14 @@ function App() {
   const reviewList = highestPriorityFirst(
     searchedReviewQueue.filter(matchesReviewTab(reviewTab)),
   );
+  const visibleAgentSubmission =
+    agentList.find((submission) => submission.id === selectedSubmissionId) ??
+    agentList[0] ??
+    null;
+  const visibleReviewSubmission =
+    reviewList.find((submission) => submission.id === selectedSubmissionId) ??
+    reviewList[0] ??
+    null;
   const searchedExportSubmissions = useMemo(
     () => searchSubmissions(submissions, query, cityFilter),
     [cityFilter, query, submissions],
@@ -305,6 +315,7 @@ function App() {
   const showRoleSwitcher =
     !isSupabaseMode &&
     (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
+  const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
   const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
   const hasWorkspaceAccess = isSupabaseMode
     ? Boolean(remoteProfile)
@@ -315,44 +326,32 @@ function App() {
     role === "agent"
       ? [
           {
-            active: surface === "agent-submissions" && agentTab === "action",
-            count: summary.requiresAction,
-            icon: "М",
+            active: surface === "agent-inbox",
+            count: agentInboxUnreadCount,
+            icon: "В",
+            id: "agent-inbox",
+            label: "Входящие",
+            meta: "новые события",
+            onClick: showAgentInbox,
+            tone: agentInboxUnreadCount > 0 ? "danger" : "default",
+          },
+          {
+            active: surface === "agent-submissions" && agentTab === "progress",
+            count: searchedAgentQueue.length,
+            icon: "Д",
             id: "agent-actions",
             label: "Мои действия",
-            meta: "замечания и возвраты",
-            onClick: () => showAgentTab("action"),
-            quickAction: "Открыть",
-            tone: summary.requiresAction > 0 ? "danger" : "default",
+            meta: "черновики и дозагрузка",
+            onClick: () => showAgentTab("progress"),
+            tone: searchedAgentQueue.length > 0 ? "warning" : "default",
           },
           {
             active: surface === "agent-submissions" && agentTab === "all",
-            count: searchedAgentQueue.length,
-            icon: "О",
-            id: "agent-queue",
-            label: "Очередь",
-            meta: "все мои подачи",
-            onClick: () => showAgentTab("all"),
-          },
-          {
-            active: surface === "agent-submissions" && agentTab === "review",
-            count: summary.inReview + summary.corrections,
             icon: "П",
-            id: "agent-review",
-            label: "Проверка",
-            meta: "ждут администратора",
-            onClick: () => showAgentTab("review"),
-            tone: summary.corrections > 0 ? "warning" : "default",
-          },
-          {
-            active: surface === "agent-submissions" && agentTab === "done",
-            count: summary.ready + summary.exported,
-            icon: "Г",
-            id: "agent-done",
-            label: "Готово",
-            meta: "принято и выгружено",
-            onClick: () => showAgentTab("done"),
-            tone: summary.ready > 0 ? "success" : "default",
+            id: "agent-submissions",
+            label: "Мои подачи",
+            meta: "все рабочие подачи",
+            onClick: () => showAgentTab("all"),
           },
           {
             disabled: true,
@@ -367,42 +366,41 @@ function App() {
           {
             active: surface === "admin-review" && reviewTab === "review",
             count: summary.inReview,
-            icon: "П",
-            id: "admin-review",
-            label: "Проверка",
-            meta: "пакеты на решении",
+            icon: "В",
+            id: "admin-inbox",
+            label: "Входящие",
+            meta: "новые на проверке",
             onClick: () => showReviewTab("review"),
-            quickAction: "Первая",
             tone: blockerSubmissionCount > 0 ? "danger" : "default",
           },
           {
             active: surface === "admin-review" && reviewTab === "corrections",
             count: summary.corrections,
-            icon: "И",
-            id: "admin-corrections",
-            label: "Исправления",
-            meta: "агент внёс правки",
+            icon: "Д",
+            id: "admin-actions",
+            label: "Мои действия",
+            meta: "исправления агента",
             onClick: () => showReviewTab("corrections"),
             tone: summary.corrections > 0 ? "warning" : "default",
           },
           {
+            active: surface === "admin-review" && reviewTab === "all",
+            count: searchedReviewQueue.length,
+            icon: "П",
+            id: "admin-review",
+            label: "Проверка",
+            meta: "все рабочие статусы",
+            onClick: () => showReviewTab("all"),
+          },
+          {
             active: surface === "export",
             count: summary.ready,
-            icon: "В",
+            icon: "Э",
             id: "admin-export",
             label: "Выгрузка",
             meta: "готово к Excel",
             onClick: showExportSurface,
             tone: summary.ready > 0 ? "success" : "default",
-          },
-          {
-            active: surface === "admin-review" && reviewTab === "all",
-            count: searchedReviewQueue.length,
-            icon: "О",
-            id: "admin-queue",
-            label: "Очередь",
-            meta: "все рабочие статусы",
-            onClick: () => showReviewTab("all"),
           },
           {
             disabled: true,
@@ -582,7 +580,7 @@ function App() {
     const visibleList =
       surface === "admin-review"
         ? reviewList
-        : surface === "agent-submissions"
+        : surface === "agent-submissions" || surface === "agent-inbox"
           ? agentList
           : [];
 
@@ -635,7 +633,7 @@ function App() {
     setDrawerMode("closed");
     setDirty(false);
     if (nextRole === "agent") {
-      setSurface("agent-submissions");
+      setSurface("agent-inbox");
       setAgentTab("action");
       setSelectedSubmissionId(submissions[0]?.id ?? "");
     } else {
@@ -658,6 +656,13 @@ function App() {
       highestPriorityFirst(searchedReviewQueue.filter(matchesReviewTab(tab)))[0] ??
       searchedReviewQueue[0]
     );
+  }
+
+  function showAgentInbox() {
+    setSurface("agent-inbox");
+    setDrawerMode("closed");
+    const nextSubmission = firstAgentSubmissionForTab("action") ?? searchedAgentQueue[0];
+    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
   }
 
   function showAgentTab(tab: AgentTab) {
@@ -1139,6 +1144,9 @@ function App() {
 
   function runAiReviewForActiveSubmission() {
     if (!activeSubmission) return;
+    const reviewSurface =
+      surface === "export" ? "export" : surface === "admin-review" ? "review" : "agent";
+    if (!canRunAiReview(activeSubmission, role, reviewSurface)) return;
     updateActiveSubmission(runAiReview);
   }
 
@@ -1408,7 +1416,7 @@ function App() {
     skipNextRemoteSaveRef.current = true;
     setRemoteProfile(profile);
     setRole(nextRole);
-    setSurface(nextRole === "admin" ? "admin-review" : "agent-submissions");
+    setSurface(nextRole === "admin" ? "admin-review" : "agent-inbox");
     setSubmissions(nextSubmissions);
     setSelectedSubmissionId(firstSubmission?.id ?? "");
     if (firstSubmission) setActiveDrawerTab(defaultDrawerTab(firstSubmission));
@@ -1482,7 +1490,7 @@ function App() {
         firstSubmissionForRole(localSubmissions, "agent")?.id ?? "",
       );
       setRole("agent");
-      setSurface("agent-submissions");
+      setSurface("agent-inbox");
       clearWorkspaceEmail();
       setWorkspaceEmail("");
       setWorkspaceEmailDraft("");
@@ -1516,6 +1524,14 @@ function App() {
       onChange={(event) => setCityFilter(event.target.value as City | "Все города")}
     />
   );
+  const inboxSearchControl = (
+    <SearchBar
+      label="Поиск по входящим"
+      placeholder="Поиск по входящим"
+      value={query}
+      onChange={setQuery}
+    />
+  );
 
   if (!hasWorkspaceAccess) {
     return (
@@ -1534,11 +1550,14 @@ function App() {
 
   return (
     <main
-      className={`ops-shell ${drawerMode !== "closed" ? "has-open-drawer" : ""}`}
+      className={`ops-shell surface-${surface} ${
+        drawerMode !== "closed" ? "has-open-drawer" : ""
+      }`}
       aria-label="Рабочая область подач"
     >
       <OperationalSidebar
         items={operationalNavItems}
+        roleLabel={role === "agent" ? "Агент" : "Админ"}
         footer={
           <>
             {role === "agent" ? (
@@ -1564,8 +1583,11 @@ function App() {
                 variant="ghost"
                 onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
               >
-                <span>{role === "agent" ? "АГ" : "АД"}</span>
-                <small>Демо</small>
+                <span>{role === "agent" ? "ТП" : "АД"}</span>
+                <div>
+                  <strong>{role === "agent" ? "Тони" : "Админ"}</strong>
+                  <small>Workspace owner</small>
+                </div>
               </Button>
             ) : (
               <Button
@@ -1574,8 +1596,11 @@ function App() {
                 variant="ghost"
                 onClick={resetWorkspaceEmail}
               >
-                <span>ВЫХ</span>
-                <small>Выход</small>
+                <span>ТП</span>
+                <div>
+                  <strong>Тони</strong>
+                  <small>Workspace owner</small>
+                </div>
               </Button>
             )}
           </>
@@ -1587,17 +1612,20 @@ function App() {
           <div>
             <h1>{surfaceTitle(surface)}</h1>
           </div>
-          <div className="topbar-actions">
-            <div className="service-logo" aria-label="VisaFlow V-19">
-              <span className="service-logo-mark" aria-hidden="true">
-                VF
-              </span>
-              <span className="service-logo-copy">
-                <span>VisaFlow</span>
-                <strong>V-19</strong>
-              </span>
-            </div>
-            {isSupabaseMode ? (
+          {surface !== "agent-inbox" || isSupabaseMode ? (
+            <div className="topbar-actions">
+              {surface !== "agent-inbox" ? (
+                <div className="service-logo" aria-label="VisaFlow V-19">
+                  <span className="service-logo-mark" aria-hidden="true">
+                    VF
+                  </span>
+                  <span className="service-logo-copy">
+                    <span>VisaFlow</span>
+                    <strong>V-19</strong>
+                  </span>
+                </div>
+              ) : null}
+              {isSupabaseMode ? (
               <p
                 className="save-status"
                 role={remoteSaveState === "error" ? "alert" : "status"}
@@ -1606,10 +1634,11 @@ function App() {
                   ? "Сохранение"
                   : remoteSaveState === "error"
                     ? remoteSaveError
-                    : "Supabase"}
+                  : "Supabase"}
               </p>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         {emptyRemoteWorkspace ? (
@@ -1617,29 +1646,36 @@ function App() {
             role={role}
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
+        ) : surface === "agent-inbox" ? (
+          <AgentInboxScreen
+            onOpen={openSubmission}
+            searchControl={inboxSearchControl}
+            submissions={searchedAgentQueue}
+            summary={summary}
+          />
         ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
-            activeSubmission={activeSubmission}
             agentList={agentList}
             filterControl={cityFilterControl}
             onOpen={openSubmission}
             onSelect={selectSubmission}
             searchControl={searchControl}
+            visibleSubmission={visibleAgentSubmission}
             summary={summary}
           />
         ) : null}
 
         {surface === "admin-review" && activeSubmission ? (
           <AdminReviewScreen
-            activeSubmission={activeSubmission}
             filterControl={cityFilterControl}
-            onAddIssue={() => openIssueComposer(activeSubmission)}
+            onAddIssue={openIssueComposer}
             onOpen={openSubmission}
             onSelect={selectSubmission}
             onTab={setReviewTab}
             reviewList={reviewList}
             reviewTab={reviewTab}
             searchControl={searchControl}
+            visibleSubmission={visibleReviewSubmission}
           />
         ) : null}
 

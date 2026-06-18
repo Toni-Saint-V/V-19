@@ -1,12 +1,9 @@
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import type { ExportSummary } from "../exportRules";
-import { counts, nextAuditLine, tripDates } from "../selectors";
+import { counts, tripDates } from "../selectors";
 import {
   canAddAdminIssue,
-  nextProblem,
-  responsibleRole,
-  statusTone,
   typeLabels,
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
@@ -14,10 +11,9 @@ import type { ExportTab, ReviewTab } from "../uiTypes";
 import {
   EmptyState,
   PanelHeader,
-  StatusChip,
   SummaryRow,
 } from "../components/Primitives";
-import { RightRail, SubmissionList } from "../components/SubmissionList";
+import { SubmissionList } from "../components/SubmissionList";
 
 function pluralRu(count: number, one: string, few: string, many: string) {
   const mod10 = Math.abs(count) % 10;
@@ -36,62 +32,519 @@ function adminIssueUnavailableReason(submission: Submission) {
   return "Возврат доступен только для подач на проверке или после исправлений.";
 }
 
+type InboxEvent = {
+  action: string;
+  badge: string;
+  context: string;
+  icon: string;
+  id: string;
+  needsAction: boolean;
+  read: boolean;
+  submission: Submission;
+  tab: DrawerTab;
+  time: string;
+  title: string;
+  tone: "amber" | "blue" | "danger" | "muted" | "teal";
+};
+
+export function AgentInboxScreen({
+  onOpen,
+  searchControl,
+  submissions,
+  summary,
+}: {
+  onOpen: (submission: Submission, tab?: DrawerTab) => void;
+  searchControl: ReactNode;
+  submissions: Submission[];
+  summary: ReturnType<typeof counts>;
+}) {
+  const [activeTab, setActiveTab] = useState<"unread" | "all">("unread");
+  const [actionOnly, setActionOnly] = useState(false);
+  const [comfortableView, setComfortableView] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [readEventIds, setReadEventIds] = useState<Set<string>>(() => new Set());
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const events = useMemo(
+    () =>
+      buildAgentInboxEvents(submissions).map((event) => ({
+        ...event,
+        read: event.read || readEventIds.has(event.id),
+      })),
+    [readEventIds, submissions],
+  );
+  const visibleEvents = useMemo(() => {
+    const tabEvents =
+      activeTab === "unread"
+        ? [
+            ...events.filter((event) => !event.read),
+            ...events.filter((event) => event.read).slice(0, 1),
+          ]
+        : events;
+    const filteredEvents = actionOnly
+      ? tabEvents.filter((event) => event.needsAction)
+      : tabEvents;
+
+    return sortOrder === "oldest" ? [...filteredEvents].reverse() : filteredEvents;
+  }, [actionOnly, activeTab, events, sortOrder]);
+  const unreadCount = events.filter((event) => !event.read).length;
+  const unreadActionCount = events.filter(
+    (event) => !event.read && event.needsAction,
+  ).length;
+  const actionEventCount = events.length
+    ? unreadActionCount
+    : Math.min(summary.requiresAction, unreadCount);
+  const informationalEventCount = Math.max(unreadCount - actionEventCount, 0);
+  const nextEvent = visibleEvents[0] ?? events[0];
+  const eventGroups = [
+    {
+      events: visibleEvents.filter((event) => !event.time.startsWith("вчера")),
+      label: "Сегодня",
+    },
+    {
+      events: visibleEvents.filter((event) => event.time.startsWith("вчера")),
+      label: "Ранее",
+    },
+  ].filter((group) => group.events.length);
+  const activeFilterLabels: string[] = [
+    actionOnly ? "Требуют действия" : null,
+    sortOrder === "oldest" ? "Старые сверху" : null,
+    comfortableView ? null : "Компактный вид",
+  ].filter((label): label is string => Boolean(label));
+
+  function openEvent(event: InboxEvent) {
+    setReadEventIds((current) => new Set(current).add(event.id));
+    onOpen(event.submission, event.tab);
+  }
+
+  return (
+    <div
+      className={`v19-screen-grid v19-inbox-screen ${
+        panelOpen ? "" : "is-panel-closed"
+      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+    >
+      <CardComponent
+        as="section"
+        className="v19-collection-panel"
+        aria-labelledby="agent-inbox-title"
+      >
+        <h2 id="agent-inbox-title" className="sr-only">
+          Входящие
+        </h2>
+
+        <div className="v19-collection-toolbar" aria-label="Инструменты входящих">
+          <div className="v19-state-tabs" role="tablist" aria-label="Состояние событий">
+            <button
+              aria-selected={activeTab === "unread"}
+              className={activeTab === "unread" ? "is-active" : ""}
+              role="tab"
+              type="button"
+              onClick={() => setActiveTab("unread")}
+            >
+              Непрочитанные
+              <span>{unreadCount}</span>
+            </button>
+            <button
+              aria-selected={activeTab === "all"}
+              className={activeTab === "all" ? "is-active" : ""}
+              role="tab"
+              type="button"
+              onClick={() => setActiveTab("all")}
+            >
+              Все
+            </button>
+          </div>
+          {searchControl}
+          <div className="v19-toolbar-tools">
+            <InboxToolButton
+              label={
+                actionOnly
+                  ? "Фильтр: только требующие действия"
+                  : "Фильтр: все события"
+              }
+              icon="filter"
+              pressed={actionOnly}
+              onClick={() => setActionOnly((value) => !value)}
+            />
+            <InboxToolButton
+              label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+              icon="view"
+              pressed={!comfortableView}
+              onClick={() => setComfortableView((value) => !value)}
+            />
+            <InboxToolButton
+              label={
+                sortOrder === "newest"
+                  ? "Сортировка: новые сверху"
+                  : "Сортировка: старые сверху"
+              }
+              icon="sort"
+              pressed={sortOrder === "oldest"}
+              onClick={() =>
+                setSortOrder((value) => (value === "newest" ? "oldest" : "newest"))
+              }
+            />
+            <InboxToolButton
+              label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
+              icon="panel"
+              pressed={panelOpen}
+              onClick={() => setPanelOpen((value) => !value)}
+            />
+          </div>
+        </div>
+
+        {activeFilterLabels.length ? (
+          <div className="v19-active-filters" aria-label="Активные фильтры">
+            {activeFilterLabels.map((label) => (
+              <span key={label}>{label}</span>
+            ))}
+          </div>
+        ) : null}
+
+        {visibleEvents.length ? (
+          <div className="v19-event-list" aria-label="Список входящих событий">
+            {eventGroups.map((group) => (
+              <div className="v19-event-group" key={group.label}>
+                <div className="v19-group-label">{group.label}</div>
+                {group.events.map((event) => (
+                  <button
+                    className={`v19-event-row ${
+                      event.read ? "is-read" : "is-unread"
+                    }`}
+                    key={event.id}
+                    type="button"
+                    onClick={() => openEvent(event)}
+                  >
+                    <span className="v19-unread-dot" aria-hidden="true" />
+                    <span
+                      className={`v19-event-icon tone-${event.tone}`}
+                      aria-hidden="true"
+                    >
+                      <InboxEventIcon icon={event.icon} />
+                    </span>
+                    <span className="v19-event-main">
+                      <strong>{event.title}</strong>
+                      <em>
+                        {event.context} · {event.time}
+                      </em>
+                    </span>
+                    <Badge tone={event.tone}>{event.badge}</Badge>
+                    <span className="v19-event-action">{event.action}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="v19-empty-state">
+            <h3>Новых событий нет</h3>
+            <p>Здесь появятся изменения, которые требуют вашего внимания.</p>
+            <Button variant="secondary" onClick={() => setActiveTab("all")}>
+              Показать все
+            </Button>
+          </div>
+        )}
+      </CardComponent>
+
+      {panelOpen ? (
+        <CardComponent
+          as="aside"
+          className="v19-context-panel"
+          aria-label="Сводка входящих"
+        >
+          <p className="kicker">Сводка</p>
+          <div className="v19-unread-summary">
+            <strong>{unreadCount}</strong>
+            <span>
+              {pluralRu(
+                unreadCount,
+                "непрочитанное событие",
+                "непрочитанных события",
+                "непрочитанных событий",
+              )}
+            </span>
+          </div>
+          <div className="v19-panel-metrics">
+            <span>
+              Требуют действия
+              <strong>{actionEventCount}</strong>
+            </span>
+            <span>
+              Информационные
+              <strong>{informationalEventCount}</strong>
+            </span>
+          </div>
+          {nextEvent ? (
+            <div className="v19-next-card">
+              <span>Следующее действие</span>
+              <strong>{nextEvent.action}</strong>
+              <p>{nextEvent.submission.title}</p>
+              <Button variant="primary" onClick={() => openEvent(nextEvent)}>
+                {nextEvent.action}
+              </Button>
+            </div>
+          ) : null}
+        </CardComponent>
+      ) : null}
+    </div>
+  );
+}
+
+function InboxToolButton({
+  icon,
+  label,
+  onClick,
+  pressed,
+}: {
+  icon: "filter" | "panel" | "sort" | "view";
+  label: string;
+  onClick: () => void;
+  pressed: boolean;
+}) {
+  return (
+    <Button
+      className="v19-toolbar-icon"
+      variant="icon"
+      aria-label={label}
+      aria-pressed={pressed}
+      title={label}
+      onClick={onClick}
+    >
+      <ToolbarIcon icon={icon} />
+    </Button>
+  );
+}
+
+function SvgIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      focusable="false"
+      height="16"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+      width="16"
+    >
+      {children}
+    </svg>
+  );
+}
+
+function ToolbarIcon({ icon }: { icon: "filter" | "panel" | "sort" | "view" }) {
+  if (icon === "filter") {
+    return (
+      <SvgIcon>
+        <path d="M4 6h16" />
+        <path d="M7 12h10" />
+        <path d="M10 18h4" />
+      </SvgIcon>
+    );
+  }
+
+  if (icon === "view") {
+    return (
+      <SvgIcon>
+        <path d="M4 6.5h16" />
+        <path d="M4 12h16" />
+        <path d="M4 17.5h16" />
+      </SvgIcon>
+    );
+  }
+
+  if (icon === "sort") {
+    return (
+      <SvgIcon>
+        <path d="M8 5v14" />
+        <path d="m5 8 3-3 3 3" />
+        <path d="M16 19V5" />
+        <path d="m13 16 3 3 3-3" />
+      </SvgIcon>
+    );
+  }
+
+  return (
+    <SvgIcon>
+      <path d="M5 5h14v14H5V5Z" />
+      <path d="M14 5v14" />
+    </SvgIcon>
+  );
+}
+
+function InboxEventIcon({ icon }: { icon: string }) {
+  if (icon === "issue") {
+    return (
+      <SvgIcon>
+        <path d="M12 8v5" />
+        <path d="M12 17h.01" />
+        <path d="M10.3 4.8h3.4l6.5 11.4-1.7 3H5.5l-1.7-3 6.5-11.4Z" />
+      </SvgIcon>
+    );
+  }
+
+  if (icon === "file") {
+    return (
+      <SvgIcon>
+        <path d="M7 4.5h7l3 3V19.5H7V4.5Z" />
+        <path d="M14 4.5v4h4" />
+        <path d="M9.5 13h5" />
+      </SvgIcon>
+    );
+  }
+
+  if (icon === "accepted") {
+    return (
+      <SvgIcon>
+        <path d="m5 12 4 4L19 6" />
+      </SvgIcon>
+    );
+  }
+
+  return (
+    <SvgIcon>
+      <path d="M12 6v6l4 2" />
+      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+    </SvgIcon>
+  );
+}
+
+function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
+  const fallback = submissions[0];
+  if (!fallback) return [];
+  const returned =
+    submissions.find((submission) =>
+      ["returned", "requires_action"].includes(submission.status),
+    ) ?? fallback;
+  const videoIssue =
+    submissions.find((submission) =>
+      submission.files.some((file) => file.status === "needs_replacement"),
+    ) ?? returned;
+  const accepted =
+    submissions.find((submission) => submission.status === "ready_for_export") ??
+    submissions[2] ??
+    returned;
+  const draft =
+    submissions.find((submission) => submission.status === "draft") ??
+    submissions[3] ??
+    fallback;
+
+  return [
+    {
+      action: "Открыть",
+      badge: "Возвращено",
+      context: "2 блокера",
+      icon: "issue",
+      id: `agent-inbox-reference-returned-${returned.id}`,
+      needsAction: true,
+      read: false,
+      submission: returned,
+      tab: "issues",
+      time: "12 мин назад",
+      title: "Подачу «Семья Петровых» вернули на исправление",
+      tone: "danger",
+    },
+    {
+      action: "Открыть",
+      badge: "Видео",
+      context: "Пётр Петров",
+      icon: "file",
+      id: `agent-inbox-reference-video-${videoIssue.id}`,
+      needsAction: true,
+      read: false,
+      submission: videoIssue,
+      tab: "media",
+      time: "34 мин назад",
+      title: "Администратор уточнил замечание по видео",
+      tone: "amber",
+    },
+    {
+      action: "Открыть",
+      badge: "Принято",
+      context: "Готово к выгрузке",
+      icon: "accepted",
+      id: `agent-inbox-reference-accepted-${accepted.id}`,
+      needsAction: false,
+      read: false,
+      submission: accepted,
+      tab: "overview",
+      time: "1 ч назад",
+      title: "Подача «Анна Смирнова» принята",
+      tone: "teal",
+    },
+    {
+      action: "Открыть",
+      badge: "Черновик",
+      context: "Семья Орловых",
+      icon: "status",
+      id: `agent-inbox-reference-draft-${draft.id}`,
+      needsAction: false,
+      read: true,
+      submission: draft,
+      tab: "overview",
+      time: "вчера, 18:42",
+      title: "Черновик автоматически сохранён",
+      tone: "muted",
+    },
+  ];
+}
+
 export function AgentSubmissionsScreen({
-  activeSubmission,
   agentList,
   filterControl,
   onOpen,
   onSelect,
   searchControl,
+  visibleSubmission,
   summary,
 }: {
-  activeSubmission: Submission;
   agentList: Submission[];
   filterControl?: ReactNode;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
   searchControl: ReactNode;
+  visibleSubmission: Submission | null;
   summary: ReturnType<typeof counts>;
 }) {
   return (
-    <>
-      <div className="main-grid">
-        <CardComponent
-          as="section"
-          className="submission-panel"
-          aria-labelledby="agent-title"
-        >
-          <PanelHeader
-            titleId="agent-title"
-            title="Очередь действий"
-            search={searchControl}
-            side={filterControl}
-          />
-          <SubmissionList
-            activeSubmission={activeSubmission}
-            empty="В этой вкладке нет подач."
-            onOpen={onOpen}
-            onSelect={onSelect}
-            role="agent"
-            submissions={agentList}
-          />
-        </CardComponent>
-        <RightRail
-          activeSubmission={activeSubmission}
-          onOpen={onOpen}
-          summaryChips={[
-            ["danger", String(summary.requiresAction), "требуют действия"],
-            ["blue", String(summary.inReview), "на проверке"],
-            ["teal", String(summary.ready), "к выгрузке"],
-          ]}
+    <div className="main-grid core-list-grid">
+      <CardComponent
+        as="section"
+        className="submission-panel"
+        aria-labelledby="agent-title"
+      >
+        <PanelHeader
+          action={
+            <Button
+              disabled={!visibleSubmission}
+              variant="secondary"
+              onClick={() => visibleSubmission && onOpen(visibleSubmission)}
+            >
+              Открыть выбранную
+            </Button>
+          }
+          eyebrow="Подачи"
+          titleId="agent-title"
+          title="Рабочий список"
+          description={`${summary.requiresAction} требуют действия · ${summary.inReview} на проверке`}
+          search={searchControl}
+          side={filterControl}
         />
-      </div>
-    </>
+        <SubmissionList
+          activeSubmission={visibleSubmission}
+          empty="В этой вкладке нет подач."
+          onOpen={onOpen}
+          onSelect={onSelect}
+          role="agent"
+          submissions={agentList}
+        />
+      </CardComponent>
+    </div>
   );
 }
 
 export function AdminReviewScreen({
-  activeSubmission,
   filterControl,
   onAddIssue,
   onOpen,
@@ -100,155 +553,83 @@ export function AdminReviewScreen({
   reviewList,
   reviewTab,
   searchControl,
+  visibleSubmission,
 }: {
-  activeSubmission: Submission;
   filterControl?: ReactNode;
-  onAddIssue: () => void;
+  onAddIssue: (submission: Submission) => void;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: ReviewTab) => void;
   reviewList: Submission[];
   reviewTab: ReviewTab;
   searchControl: ReactNode;
+  visibleSubmission: Submission | null;
 }) {
-  const canAddIssue = canAddAdminIssue(activeSubmission, "admin");
+  const canAddIssue = Boolean(
+    visibleSubmission && canAddAdminIssue(visibleSubmission, "admin"),
+  );
   const addIssueReason = canAddIssue
     ? ""
-    : adminIssueUnavailableReason(activeSubmission);
-  const firstReview = reviewList[0];
-  const activeIsFirst = firstReview?.id === activeSubmission.id;
-  const readyFiles = activeSubmission.files.filter(
-    (file) => file.status !== "missing" && file.status !== "needs_replacement",
-  ).length;
-
+    : visibleSubmission
+      ? adminIssueUnavailableReason(visibleSubmission)
+      : "В этой вкладке нет видимой подачи для действия.";
   return (
-    <>
-      <div className="main-grid admin-review-grid magic-admin-stage">
-        <CardComponent
-          as="section"
-          className={`selected-context magic-admin-decision tone-${statusTone[activeSubmission.status]}`}
-          aria-label="Текущее решение администратора"
-        >
-          <div className="magic-admin-decision-copy">
-            <p className="kicker">Фокус проверки</p>
-            <h2>{activeSubmission.title}</h2>
-            <p>
-              {activeSubmission.id} · {activeSubmission.city} ·{" "}
-              {tripDates(activeSubmission)}
-            </p>
-            <div className="magic-admin-decision-chips" aria-label="Сводка подачи">
-              {activeSubmission.type === "family" ? (
-                <span>{typeLabels[activeSubmission.type]}</span>
-              ) : null}
-              <span>
-                {activeSubmission.applicants.length}{" "}
-                {pluralRu(
-                  activeSubmission.applicants.length,
-                  "заявитель",
-                  "заявителя",
-                  "заявителей",
-                )}
-              </span>
-              <span>Анкета {activeSubmission.completeness.questionnaire}%</span>
-              <span>
-                Файлы {readyFiles}/{activeSubmission.files.length}
-              </span>
+    <div className="main-grid core-list-grid admin-review-grid">
+      <CardComponent
+        as="section"
+        className="submission-panel magic-admin-queue"
+        aria-labelledby="review-title"
+      >
+        <PanelHeader
+          action={
+            <div className="core-header-actions">
+              <Button
+                disabled={!visibleSubmission}
+                variant="secondary"
+                onClick={() => visibleSubmission && onOpen(visibleSubmission)}
+              >
+                Открыть выбранную
+              </Button>
+              <Button
+                aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
+                disabled={!canAddIssue}
+                variant="secondary"
+                onClick={() => visibleSubmission && onAddIssue(visibleSubmission)}
+              >
+                Вернуть
+              </Button>
             </div>
-          </div>
-          <div className="magic-admin-decision-facts">
-            <div className="magic-admin-decision-status">
-              <StatusChip submission={activeSubmission} />
-            </div>
-            <dl className="magic-admin-decision-meta">
-              <div>
-                <dt>Следующий шаг</dt>
-                <dd>{nextAuditLine(activeSubmission)}</dd>
-              </div>
-              <div>
-                <dt>Проверка</dt>
-                <dd>{nextProblem(activeSubmission)}</dd>
-              </div>
-              <div>
-                <dt>Ответственный</dt>
-                <dd>{responsibleRole(activeSubmission)}</dd>
-              </div>
-            </dl>
-          </div>
-          <div className="magic-admin-decision-actions">
-            <Button wide onClick={() => onOpen(activeSubmission)}>
-              Открыть проверку
-            </Button>
-            <Button
-              aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
-              disabled={!canAddIssue}
-              variant="secondary"
-              wide
-              onClick={onAddIssue}
-            >
-              Вернуть с замечанием
-            </Button>
-          </div>
-          {!canAddIssue ? (
-            <p className="action-disabled-note" id="admin-return-disabled-note">
-              {addIssueReason}
-            </p>
-          ) : null}
-        </CardComponent>
-        <CardComponent
-          as="section"
-          className="submission-panel magic-admin-queue"
-          aria-labelledby="review-title"
-        >
-          <PanelHeader
-            action={
-              activeIsFirst ? null : (
-                <Button
-                  variant="secondary"
-                  onClick={() => firstReview && onOpen(firstReview)}
-                >
-                  Открыть первую
-                </Button>
-              )
-            }
-            eyebrow="Очередь проверки"
-            titleId="review-title"
-            title="Кого проверить сейчас"
-            description="Подачи, ожидающие решения администратора"
-            tabs={[
-              ["all", "Все"],
-              ["review", "На проверке"],
-              ["corrections", "Исправления"],
-              ["ready", "К выгрузке"],
-            ]}
-            search={searchControl}
-            side={filterControl}
-            value={reviewTab}
-            onTab={onTab}
-          />
-          <SubmissionList
-            activeSubmission={activeSubmission}
-            empty="Очередь проверки пуста."
-            onOpen={onOpen}
-            onSelect={onSelect}
-            role="admin"
-            submissions={reviewList}
-          />
-        </CardComponent>
-        <CardComponent
-          as="aside"
-          className="right-rail magic-admin-aside"
-          aria-label="Контекст проверки"
-        >
-          <CardComponent as="section" className="rail-panel rail-rule magic-admin-rule">
-            <p className="kicker">Правило проверки</p>
-            <p className="rail-copy">
-              Решение принимается после проверки пакета. Возврат только с конкретным
-              замечанием.
-            </p>
-          </CardComponent>
-        </CardComponent>
-      </div>
-    </>
+          }
+          eyebrow="Проверка"
+          titleId="review-title"
+          title="Рабочий список"
+          description={canAddIssue ? "Возврат только с точным замечанием" : addIssueReason}
+          tabs={[
+            ["all", "Все"],
+            ["review", "На проверке"],
+            ["corrections", "Исправления"],
+            ["ready", "К выгрузке"],
+          ]}
+          search={searchControl}
+          side={filterControl}
+          value={reviewTab}
+          onTab={onTab}
+        />
+        {!canAddIssue ? (
+          <p className="action-disabled-note" id="admin-return-disabled-note">
+            {addIssueReason}
+          </p>
+        ) : null}
+        <SubmissionList
+          activeSubmission={visibleSubmission}
+          empty="Очередь проверки пуста."
+          onOpen={onOpen}
+          onSelect={onSelect}
+          role="admin"
+          submissions={reviewList}
+        />
+      </CardComponent>
+    </div>
   );
 }
 
