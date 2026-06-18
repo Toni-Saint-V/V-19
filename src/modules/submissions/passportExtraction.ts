@@ -5,10 +5,13 @@ import type {
   PassportExtractedFieldKey,
   PassportExtractionReviewState,
   Submission,
-  SubmissionAction,
   SubmissionFile,
 } from "./types";
 import type { PassportExtractionResult } from "./passportExtractionContract";
+export {
+  hasPassportExtractionReviewPending,
+  requiresPassportExtractionReviewBeforeAction,
+} from "./passportExtractionGuards";
 
 export type PassportFieldApplyMode = "safe" | "replace";
 
@@ -289,28 +292,6 @@ export function applyPassportExtractionField(
     extractedFields: state?.extractedFields ?? [],
     status: state?.status ?? "ready",
   }));
-}
-
-export function hasPassportExtractionReviewPending(submission: Submission) {
-  return submission.applicants.some((applicant) => {
-    const state = applicant.passportExtraction;
-    return (
-      state?.status === "ready" &&
-      state.extractedFields.length > 0 &&
-      !state.verifiedAtIso &&
-      !state.dismissedAtIso
-    );
-  });
-}
-
-export function requiresPassportExtractionReviewBeforeAction(
-  submission: Submission,
-  action: SubmissionAction,
-) {
-  return (
-    (action === "submit_for_review" || action === "submit_corrections") &&
-    hasPassportExtractionReviewPending(submission)
-  );
 }
 
 export function markPassportExtractionReviewed(
