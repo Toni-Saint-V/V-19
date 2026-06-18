@@ -1,6 +1,6 @@
 export type Role = "agent" | "admin";
 
-export type Surface = "agent-submissions" | "admin-review" | "export";
+export type Surface = "agent-inbox" | "agent-submissions" | "admin-review" | "export";
 
 export type SubmissionType = "single" | "family";
 

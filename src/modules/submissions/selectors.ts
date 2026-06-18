@@ -38,6 +38,9 @@ export function exportedHistory(submissions: Submission[]) {
 
 export function counts(submissions: Submission[]) {
   return {
+    draft: submissions.filter((submission) => submission.status === "draft").length,
+    inProgress: submissions.filter((submission) => submission.status === "in_progress")
+      .length,
     requiresAction: submissions.filter((submission) =>
       ["requires_action", "returned"].includes(submission.status),
     ).length,

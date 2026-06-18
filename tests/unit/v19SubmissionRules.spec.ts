@@ -4,6 +4,7 @@ import { generateAiSuggestions } from "../../src/modules/submissions/aiRules";
 import {
   acceptAiSuggestionAsIssue,
   activeAiSuggestions,
+  canRunAiReview,
   dismissAiSuggestion,
   runAiReview,
 } from "../../src/modules/submissions/aiSuggestions";
@@ -893,6 +894,16 @@ describe("V-19 ББ helper suggestions", () => {
     expect(dismissAiSuggestion(reviewed, suggestionId, "admin")).toBe(reviewed);
   });
 
+  it("allows ББ runs only in role-owned active work surfaces", () => {
+    expect(canRunAiReview(byId("ПД-1048"), "agent", "agent")).toBe(true);
+    expect(canRunAiReview(byId("ПД-1053"), "admin", "review")).toBe(true);
+
+    expect(canRunAiReview(byId("ПД-1056"), "admin", "export")).toBe(false);
+    expect(canRunAiReview(byId("ПД-1056"), "admin", "review")).toBe(false);
+    expect(canRunAiReview(byId("ПД-1057"), "admin", "review")).toBe(false);
+    expect(canRunAiReview(byId("ПД-1053"), "agent", "agent")).toBe(false);
+  });
+
   it("lets admins convert a suggestion into a precise issue", () => {
     const reviewed = runAiReview(byId("ПД-1053"));
     const fileSuggestion = activeAiSuggestions(reviewed).find(
@@ -920,7 +931,7 @@ describe("V-19 ББ helper suggestions", () => {
     ).toBe(false);
     expect(next.history[0]).toMatchObject({
       text: "Подсказка ББ принята администратором",
-      detail: "Нина Волкова · Медиа · Фото",
+      detail: "Нина Волкова · Медиа · Фото на белом фоне",
       source: "bb",
     });
   });

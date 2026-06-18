@@ -41,7 +41,6 @@ import {
   tabForTarget,
   targetElementId,
   targetForIssue,
-  workspaceSummary,
   workspaceTabs,
   type ReadinessQueueItem,
   type WorkspaceTarget,
@@ -74,9 +73,9 @@ export function SubmissionDrawer({
   onIssueComposerConsumed,
   onClose,
   onAcceptAiSuggestion,
-  onTab,
   onDismissAiSuggestion,
   onRunAiReview,
+  onTab,
   onQuestionnaireField,
   onApplyPassportField,
   onExtractPassport,
@@ -201,8 +200,8 @@ export function SubmissionDrawer({
           <div className="workspace-header-status" aria-label="Статус подачи">
             <span>Готовность {submission.completeness.total}%</span>
             <span>{blockerCount(submission)} блокера</span>
-            <span>{activeAiSuggestionsCount(submission)} ИИ</span>
             <span>Анкета {submission.completeness.questionnaire}%</span>
+            <span>Файлы {submission.completeness.files}%</span>
           </div>
         </div>
         <Button variant="icon" aria-label="Закрыть подачу" onClick={onClose}>
@@ -274,17 +273,11 @@ export function SubmissionDrawer({
               onRunAiReview={onRunAiReview}
               role={role}
               submission={submission}
+              surface={surface}
             />
           ) : null}
           {activeTab === "history" ? <DrawerHistory submission={submission} /> : null}
         </main>
-        <WorkspaceRightRail
-          onOpenTarget={openTarget}
-          onRunAiReview={onRunAiReview}
-          role={role}
-          submission={submission}
-          surface={surface}
-        />
       </div>
 
       {canOpenIssueComposer && issueComposerOpen ? (
@@ -573,78 +566,6 @@ function WorkspaceNavigation({
   );
 }
 
-function WorkspaceRightRail({
-  onOpenTarget,
-  onRunAiReview,
-  role,
-  submission,
-  surface,
-}: {
-  onOpenTarget: (target: WorkspaceTarget) => void;
-  onRunAiReview: () => void;
-  role: Role;
-  submission: Submission;
-  surface: "agent" | "review" | "export";
-}) {
-  const summary = workspaceSummary(submission);
-  const queuePreview = summary.queue.slice(0, 3);
-
-  return (
-    <aside className="workspace-right-rail" aria-label="Статус и ИИ-помощник">
-      <section className="workspace-status-card">
-        <p className="kicker">Состояние</p>
-        <h3>{nextProblem(submission)}</h3>
-        <dl>
-          <div>
-            <dt>Блокеры</dt>
-            <dd>{blockerCount(submission)}</dd>
-          </div>
-          <div>
-            <dt>ИИ</dt>
-            <dd>{summary.aiCount}</dd>
-          </div>
-          <div>
-            <dt>Ждёт админа</dt>
-            <dd>{summary.waitingAdminCount}</dd>
-          </div>
-        </dl>
-      </section>
-      <AiHelperSurfacePanel
-        compact
-        role={role}
-        submission={submission}
-        surface={surface}
-      />
-      <section className="workspace-rail-queue">
-        <div className="section-heading">
-          <div>
-            <p className="kicker">Что проверить</p>
-            <h3>
-              {queuePreview.length ? "Очередь готовности" : "Активных пунктов нет"}
-            </h3>
-          </div>
-          <Button variant="secondary" onClick={onRunAiReview}>
-            Проверить ИИ
-          </Button>
-        </div>
-        <div className="workspace-queue-list">
-          {queuePreview.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onOpenTarget(item.target)}
-            >
-              <span>{queueSourceLabel(item)}</span>
-              <strong>{item.title}</strong>
-              <em>{item.actionLabel}</em>
-            </button>
-          ))}
-        </div>
-      </section>
-    </aside>
-  );
-}
-
 function DrawerOverview({
   onAcceptAiSuggestion,
   onDismissAiSuggestion,
@@ -723,19 +644,10 @@ function DrawerOverview({
           )}
         </div>
       </section>
-      <div className="drawer-metrics">
-        <CardComponent as="article">
-          <span>{submission.completeness.questionnaire}%</span>
-          <p>Анкета</p>
-        </CardComponent>
-        <CardComponent as="article">
-          <span>{submission.completeness.files}%</span>
-          <p>Файлы</p>
-        </CardComponent>
-        <CardComponent as="article">
-          <span>{openIssueCount(submission)}</span>
-          <p>Открытые замечания</p>
-        </CardComponent>
+      <div className="detail-progress-summary" aria-label="Прогресс подачи">
+        <span>Анкета {submission.completeness.questionnaire}%</span>
+        <span>Файлы {submission.completeness.files}%</span>
+        <span>{openIssueCount(submission)} открытых замечаний</span>
       </div>
       <div className="blocker-box muted-box">
         <p>
@@ -750,6 +662,7 @@ function DrawerOverview({
         onRun={onRunAiReview}
         role={role}
         submission={submission}
+        surface={surface}
       />
     </section>
   );
@@ -1215,6 +1128,7 @@ function drawerMetaLine(submission: Submission) {
   const parts = [
     "Испания",
     submission.city,
+    "Туризм C",
     tripDates(submission),
     submission.type === "family" ? typeLabels[submission.type] : undefined,
     applicantCountLabel(submission.applicants.length),
@@ -1289,19 +1203,14 @@ function DrawerFiles({
 }) {
   const progress = fileReadyCount(submission);
   const canEditFiles = role === "agent" && canAgentEditSubmissionContent(submission);
-  const fileTypes = [
-    ...activeMediaFileTypes,
-    ...(submission.files.some((file) => file.type === "video")
-      ? (["video"] as const)
-      : []),
-  ];
+  const fileTypes = activeMediaFileTypes;
 
   return (
     <section className="drawer-section">
       <div className="section-heading">
         <div>
-          <p className="kicker">Медиа</p>
-          <h3>Матрица документов семьи</h3>
+          <p className="kicker">Файлы</p>
+          <h3>Паспорт, фото, селфи и видео</h3>
           <p className="drawer-muted">
             {progress.ready}/{progress.total} слотов загружены или ожидают проверки.
           </p>
@@ -1464,6 +1373,7 @@ function DrawerIssues({
   onRunAiReview,
   role,
   submission,
+  surface,
 }: {
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onDismissAiSuggestion: (suggestionId: string) => void;
@@ -1471,6 +1381,7 @@ function DrawerIssues({
   onRunAiReview: () => void;
   role: Role;
   submission: Submission;
+  surface: "agent" | "review" | "export";
 }) {
   return (
     <section className="drawer-section">
@@ -1485,6 +1396,7 @@ function DrawerIssues({
         onRun={onRunAiReview}
         role={role}
         submission={submission}
+        surface={surface}
       />
       <div className="drawer-list">
         {submission.issues.length ? (
@@ -1756,10 +1668,4 @@ function queueSourceLabel(item: ReadinessQueueItem) {
   if (item.type === "ai_suggestion") return "ИИ";
   if (item.type === "fixed_waiting_admin") return "Проверка";
   return "Система";
-}
-
-function activeAiSuggestionsCount(submission: Submission) {
-  return (submission.aiSuggestions ?? []).filter(
-    (suggestion) => suggestion.status === "suggested",
-  ).length;
 }

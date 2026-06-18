@@ -45,17 +45,17 @@ export type ReadinessQueueItem = {
 
 export const workspaceTabs: Array<{ id: DrawerTab; label: string }> = [
   { id: "overview", label: "Обзор" },
-  { id: "data", label: "Данные" },
-  { id: "media", label: "Медиа" },
+  { id: "data", label: "Анкета" },
+  { id: "media", label: "Файлы" },
   { id: "issues", label: "Замечания" },
   { id: "history", label: "История" },
 ];
 
 export const activeMediaFileTypes: SubmissionFileType[] = [
+  "passport_scan",
   "photo",
   "selfie",
-  "selfie_2",
-  "passport_scan",
+  "video",
 ];
 
 export function buildReadinessQueue(submission: Submission): ReadinessQueueItem[] {
@@ -96,11 +96,11 @@ export function fileLabel(type: SubmissionFileType) {
 }
 
 export function fileShortLabel(type: SubmissionFileType) {
-  if (type === "photo") return "Фото 35x45";
-  if (type === "selfie") return "Селфи 1";
+  if (type === "photo") return "Фото";
+  if (type === "selfie") return "Селфи";
   if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";
-  return "Видео";
+  return "Видео 1 мин";
 }
 
 export function fileStatusLabel(file: SubmissionFile | undefined) {

@@ -4,15 +4,13 @@ import {
   blockerCount,
   fileTypeLabels,
   getCardActionLabel,
-  nextProblem,
   openIssueCount,
-  responsibleRole,
   statusTone,
   typeLabels,
 } from "../status";
 import { applicantCountLabel, tripDates } from "../selectors";
 import type { DrawerTab, Issue, Role, Submission } from "../types";
-import { EmptyState, StatusChip, SummaryRow } from "./Primitives";
+import { EmptyState, StatusChip } from "./Primitives";
 
 export function SubmissionList({
   activeSubmission,
@@ -22,7 +20,7 @@ export function SubmissionList({
   role,
   submissions,
 }: {
-  activeSubmission: Submission;
+  activeSubmission: Submission | null;
   empty: string;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
@@ -47,7 +45,7 @@ export function SubmissionList({
     <div className="submission-list">
       {submissions.map((submission, index) => (
         <SubmissionCard
-          active={submission.id === activeSubmission.id}
+          active={submission.id === activeSubmission?.id}
           cardRef={(node) => {
             if (node) cardRefs.current.set(submission.id, node);
             else cardRefs.current.delete(submission.id);
@@ -88,16 +86,13 @@ function SubmissionCard({
   const isAdminCard = role === "admin";
   const blockers = blockerCount(submission);
   const openIssues = openIssueCount(submission);
-  const issueLines = cardIssueLines(submission);
   const fileSlots = fileSlotSummary(submission);
-  const submissionTypeFact =
-    submission.type === "family" ? typeLabels[submission.type] : null;
-  const compactAgentCard = role === "agent";
-  const cardTitle =
-    compactAgentCard && submission.type === "family" && issueLines[0]?.applicantName
-      ? issueLines[0].applicantName
-      : submission.title;
-  const cardSide = isAdminCard ? null : (
+  const issueLines = cardIssueLines(submission);
+  const familyFact =
+    submission.type === "family"
+      ? `${typeLabels[submission.type]} · ${applicantCountLabel(submission.applicants.length)}`
+      : typeLabels[submission.type];
+  const cardSide = (
     <AgentCardSide onOpen={onOpen} role={role} submission={submission} />
   );
 
@@ -163,38 +158,25 @@ function SubmissionCard({
             {blockers > 0 ? (
               <Badge className="blocker-count">{blockers} блокера</Badge>
             ) : null}
-            {compactAgentCard && submissionTypeFact ? (
-              <Badge className="family-fact">{submissionTypeFact}</Badge>
-            ) : null}
           </div>
-          <h3>{cardTitle}</h3>
-          {compactAgentCard ? null : (
-            <p className="meta-line">
-              Испания · {submission.city} · {tripDates(submission)}
-            </p>
-          )}
+          <h3>{submission.title}</h3>
+          <p className="meta-line">
+            {submission.city} · Туризм C · {familyFact} · {tripDates(submission)}
+          </p>
         </div>
         <div className="card-summary">
           <div className="card-facts" aria-label="Операционная сводка">
-            {!compactAgentCard && submissionTypeFact ? (
-              <span className="family-fact">{submissionTypeFact}</span>
-            ) : null}
-            {compactAgentCard ? null : (
-              <>
-                <span>{applicantCountLabel(submission.applicants.length)}</span>
-                <span>Анкета {submission.completeness.questionnaire}%</span>
-                <span>
-                  Файлы {fileSlots.ready}/{fileSlots.total}
-                </span>
-              </>
-            )}
+            <span className={submission.type === "family" ? "family-fact" : ""}>
+              {applicantCountLabel(submission.applicants.length)}
+            </span>
+            <span>Анкета {submission.completeness.questionnaire}%</span>
+            <span>
+              Файлы {fileSlots.ready}/{fileSlots.total}
+            </span>
+            <span>Дата {submission.updatedAt}</span>
           </div>
         </div>
-        {compactAgentCard && openIssues > 0 ? (
-          <p className="card-action-summary">
-            Нужно исправить: <strong>{issueCountLabel(openIssues)}</strong>
-          </p>
-        ) : issueLines.length ? (
+        {issueLines.length ? (
           <p className={`card-issue-summary is-${issueLines[0].severity}`}>
             <strong>
               {issueLines[0].target}
@@ -202,30 +184,46 @@ function SubmissionCard({
             <span>{issueLines[0].text}</span>
             {issueLines.length > 1 ? <em>+{issueLines.length - 1}</em> : null}
           </p>
+        ) : openIssues > 0 ? (
+          <p className="card-action-summary">
+            Нужно исправить: <strong>{issueCountLabel(openIssues)}</strong>
+          </p>
         ) : null}
-        {!compactAgentCard || !issueLines.length ? (
-          <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
-            <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
-            <p>
-              <strong>{role === "admin" ? "Проверка:" : "Дальше:"}</strong>{" "}
-              {cardNextActionLine(submission, role)}
-            </p>
-          </div>
-        ) : null}
+        <div className={`problem-line ${blockers > 0 ? "is-danger" : ""}`}>
+          <span aria-hidden="true">{blockers > 0 ? "!" : "→"}</span>
+          <p>
+            <strong>{role === "admin" ? "Проверка:" : "Дальше:"}</strong>{" "}
+            {cardNextActionLine(submission, role)}
+          </p>
+        </div>
         <div className="progress-strip">
-          <div
-            className="progress-line"
-            role="progressbar"
-            aria-label="Готовность подачи"
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={submission.completeness.total}
-          >
-            <span style={{ width: `${submission.completeness.total}%` }} />
+          <div className="row-progress-metrics">
+            <div
+              className="progress-line"
+              role="progressbar"
+              aria-label="Готовность анкеты"
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={submission.completeness.questionnaire}
+            >
+              <span style={{ width: `${submission.completeness.questionnaire}%` }} />
+            </div>
+            <div
+              className="progress-line is-files"
+              role="progressbar"
+              aria-label="Готовность файлов"
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={submission.completeness.files}
+            >
+              <span style={{ width: `${submission.completeness.files}%` }} />
+            </div>
           </div>
           <span className="progress-value">
-            <em>Заполнено</em>
-            <strong>{submission.completeness.total}%</strong>
+            <em>Анкета</em>
+            <strong>{submission.completeness.questionnaire}%</strong>
+            <em>Файлы</em>
+            <strong>{submission.completeness.files}%</strong>
           </span>
         </div>
       </div>
@@ -261,120 +259,6 @@ function AgentCardSide({
         {detailLabel}
       </Button>
     </div>
-  );
-}
-
-export function RightRail({
-  activeSubmission,
-  onOpen,
-  summaryChips,
-}: {
-  activeSubmission: Submission;
-  onOpen: (submission: Submission, tab?: DrawerTab) => void;
-  summaryChips?: Array<[string, string, string]>;
-}) {
-  const steps = agentNextSteps(activeSubmission);
-  const hasProblemAction =
-    ["requires_action", "returned"].includes(activeSubmission.status) ||
-    blockerCount(activeSubmission) > 0;
-  const selectedActionLabel = hasProblemAction
-    ? "Исправить замечания"
-    : getCardActionLabel(activeSubmission, "agent");
-  const selectedBlockers = activeSubmission.issues
-    .filter((issue) => issue.status === "open" && issue.severity === "blocker")
-    .slice(0, 2);
-  const selectedIssueApplicant = activeSubmission.issues.find(
-    (issue) => issue.status === "open" && issue.target.applicantName,
-  )?.target.applicantName;
-
-  return (
-    <CardComponent
-      as="aside"
-      className="right-rail"
-      aria-label="Контекст выбранной подачи"
-    >
-      {summaryChips ? (
-        <CardComponent as="section" className="rail-panel rail-summary">
-          <p className="kicker">Сводка подач</p>
-          <SummaryRow chips={summaryChips} />
-        </CardComponent>
-      ) : null}
-      <CardComponent
-        as="section"
-        className={`rail-panel selected-context tone-${statusTone[activeSubmission.status]}`}
-      >
-        <div className="selected-context-head">
-          <div>
-            <p className="kicker">Выбранная подача</p>
-            <h2>{activeSubmission.title}</h2>
-            <span>{activeSubmission.id}</span>
-            {activeSubmission.type === "family" && selectedIssueApplicant ? (
-              <span className="selected-context-applicant">
-                Заявитель с замечанием: {selectedIssueApplicant}
-              </span>
-            ) : null}
-          </div>
-          <StatusChip submission={activeSubmission} />
-        </div>
-        <div className="selected-context-body">
-          <div className="selected-context-problem">
-            <p>Проблема</p>
-            <strong className="selected-context-problem-title">
-              {nextProblem(activeSubmission)}
-            </strong>
-            {selectedBlockers.length ? (
-              <ul>
-                {selectedBlockers.map((issue) => (
-                  <li
-                    aria-label={`${issueShortTarget(issue)}: ${issueShortText(issue)}`}
-                    key={issue.id}
-                  >
-                    <i aria-hidden="true" />
-                    <span>
-                      <strong>{issueShortTarget(issue)}</strong>{" "}
-                      <small>{issueShortText(issue)}</small>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-          <dl className="selected-context-meta">
-            <div>
-              <dt>Блокеры</dt>
-              <dd>{blockerCount(activeSubmission)}</dd>
-            </div>
-            <div>
-              <dt>Отвечает</dt>
-              <dd>{responsibleRole(activeSubmission)}</dd>
-            </div>
-            <div>
-              <dt>Действие</dt>
-              <dd>{selectedActionLabel}</dd>
-            </div>
-          </dl>
-        </div>
-        <Button className="selected-context-action" wide onClick={() => onOpen(activeSubmission)}>
-          {selectedActionLabel}
-        </Button>
-        {hasProblemAction ? (
-          <p className="selected-context-next-step">
-            Шаг 1: {nextAgentRepairStep(activeSubmission)}
-          </p>
-        ) : null}
-      </CardComponent>
-      <CardComponent as="section" className="rail-panel">
-        <p className="kicker">Следующие действия</p>
-        <ul className="next-list">
-          {steps.map((step, index) => (
-            <li key={step}>
-              <span>{index + 1}</span>
-              <p>{step}</p>
-            </li>
-          ))}
-        </ul>
-      </CardComponent>
-    </CardComponent>
   );
 }
 
@@ -450,24 +334,6 @@ function issueCountLabel(count: number) {
   return `${count} замечаний`;
 }
 
-function nextAgentRepairStep(submission: Submission) {
-  const blockerTargets = submission.issues
-    .filter((issue) => issue.status === "open" && issue.severity === "blocker")
-    .map(issueShortTarget);
-
-  if (blockerTargets.length) {
-    return `заменить ${formatTargetList(blockerTargets).toLocaleLowerCase("ru-RU")}, затем отправить на проверку`;
-  }
-
-  return "закрыть открытые замечания и отправить подачу на проверку";
-}
-
-function formatTargetList(targets: string[]) {
-  const uniqueTargets = [...new Set(targets)];
-  if (uniqueTargets.length <= 1) return uniqueTargets[0] ?? "замечания";
-  return `${uniqueTargets.slice(0, -1).join(", ")} и ${uniqueTargets.at(-1)}`;
-}
-
 function fileSlotSummary(submission: Submission) {
   return {
     ready: submission.files.filter(
@@ -502,35 +368,4 @@ function cardNextActionLine(submission: Submission, role: Role) {
   if (submission.status === "exported") return "Открыть историю";
 
   return "Продолжить подготовку подачи";
-}
-
-function agentNextSteps(submission: Submission) {
-  if (submission.status === "returned" || submission.status === "requires_action") {
-    return [
-      "Перейти к замечаниям выбранной подачи",
-      "Исправить анкету или файлы внутри панели",
-      "Отправить исправления на проверку",
-    ];
-  }
-
-  if (submission.status === "draft" || submission.status === "in_progress") {
-    return [
-      "Заполнить анкету",
-      "Загрузить обязательные файлы",
-      "Отправить на проверку",
-    ];
-  }
-
-  if (
-    submission.status === "submitted_for_review" ||
-    submission.status === "corrections_received"
-  ) {
-    return ["Смотреть статус проверки", "Ждать действия администратора"];
-  }
-
-  if (submission.status === "ready_for_export") {
-    return ["Подача принята", "Администратор выполнит выгрузку"];
-  }
-
-  return ["Смотреть историю подачи"];
 }
