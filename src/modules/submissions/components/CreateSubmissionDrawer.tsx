@@ -1,23 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
-import { questionnaireSectionPreviews } from "../questionnaire";
-import type { City, PassportUploadDraft, Submission } from "../types";
+import { useRef, useState, type ReactNode } from "react";
+import type {
+  City,
+  PassportUploadDraft,
+  PreliminaryIntakeDraft,
+  Submission,
+} from "../types";
 
 const maxFamilyApplicants = 6;
-const questionnaireSections = questionnaireSectionPreviews();
-const createSteps = [
-  "Паспорта",
-  "Заявители",
-  "Запись",
-  "Личные данные",
-  "Паспортные данные",
-  "Адрес и контакты",
-  "Работа / образование",
-  "Поездка",
-  "Принимающая сторона",
-  "Оплата",
-  "Медиа",
-  "Проверка",
-];
+
+const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
+  arrivalPlace: "",
+  homeAddress: "",
+  sameArrivalPlace: false,
+  sameHomeAddress: false,
+  sameSpainStay: false,
+  sameTripDates: false,
+  spainStayAddress: "",
+  spainStayCity: "",
+  spainStayName: "",
+  tripDateFrom: "",
+  tripDateTo: "",
+};
 
 export function CreateSubmissionDrawer({
   applicantNames,
@@ -28,79 +31,48 @@ export function CreateSubmissionDrawer({
   onCity,
   onClose,
   onCreate,
-  onCreatePreset,
   onFamilyCount,
   onPassportFilesSelected,
   onType,
   type,
 }: {
-  applicantNames: string[];
+  applicantNames?: string[];
   city: City;
   dirty: boolean;
   familyCount: number;
-  onApplicantName: (index: number, name: string) => void;
+  onApplicantName?: (index: number, name: string) => void;
   onCity: (city: City) => void;
   onClose: () => void;
-  onCreate: () => void;
-  onCreatePreset: (input: {
-    applicantNames: string[];
-    familyCount: number;
-    type: Submission["type"];
-  }) => void;
+  onCreate: (
+    passportUploads?: PassportUploadDraft[],
+    preliminaryIntake?: PreliminaryIntakeDraft,
+  ) => void;
   onFamilyCount: (count: number) => void;
   onPassportFilesSelected: () => void;
   onType: (type: Submission["type"]) => void;
   type: Submission["type"];
 }) {
   const applicantCount = type === "family" ? familyCount : 1;
-  const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
-  const [activeSectionId, setActiveSectionId] =
-    useState<(typeof questionnaireSections)[number]["id"]>("appointment");
-  const [copyPromptIndex, setCopyPromptIndex] = useState<number | null>(null);
+  const passportFileInputRef = useRef<HTMLInputElement | null>(null);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
-  const activeApplicantName =
-    applicantNames[activeApplicantIndex] ||
-    defaultApplicantName(activeApplicantIndex, type);
-  const primaryFamilyName = useMemo(
-    () => familyNameFromFullName(applicantNames[0]),
-    [applicantNames],
+  const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
+    emptyPreliminaryIntakeDraft,
   );
-
-  useEffect(() => {
-    setActiveApplicantIndex((current) => Math.min(current, applicantCount - 1));
-  }, [applicantCount]);
 
   function selectType(nextType: Submission["type"]) {
     onType(nextType);
-    setActiveApplicantIndex(0);
-    setActiveSectionId("appointment");
-    setCopyPromptIndex(null);
   }
 
   function addFamilyApplicant() {
-    const currentCount = type === "family" ? familyCount : 1;
-    const nextCount = Math.min(maxFamilyApplicants, Math.max(2, currentCount + 1));
-    const nextIndex = nextCount - 1;
-
     if (type !== "family") onType("family");
-    onFamilyCount(nextCount);
-    setActiveApplicantIndex(nextIndex);
-    setActiveSectionId("personal");
-    setCopyPromptIndex(nextIndex);
-
-    if (primaryFamilyName) {
-      onApplicantName(nextIndex, `${primaryFamilyName} `);
-    }
+    onFamilyCount(Math.min(maxFamilyApplicants, applicantCount + 1));
   }
 
-  function removeLastFamilyApplicant() {
-    if (type !== "family" || applicantCount <= 2) return;
-    const nextCount = applicantCount - 1;
-    onFamilyCount(nextCount);
-    setActiveApplicantIndex((current) => Math.min(current, nextCount - 1));
-    setCopyPromptIndex((current) =>
-      current !== null && current >= nextCount ? null : current,
-    );
+  function updatePreliminaryIntake<Key extends keyof PreliminaryIntakeDraft>(
+    key: Key,
+    value: PreliminaryIntakeDraft[Key],
+  ) {
+    setPreliminaryIntake((current) => ({ ...current, [key]: value }));
   }
 
   function addPassportFiles(files: FileList | null) {
@@ -111,6 +83,7 @@ export function CreateSubmissionDrawer({
       .map((file, index) => ({
         applicantIndex: Math.min(index, applicantCount - 1),
         extractedFields: [],
+        file,
         fileName: file.name,
         id: `passport-${Date.now()}-${index}`,
         status: "selected" as const,
@@ -119,22 +92,6 @@ export function CreateSubmissionDrawer({
       [...current, ...nextUploads].slice(0, maxFamilyApplicants),
     );
     onPassportFilesSelected();
-  }
-
-  function createSingleApplicantDraft() {
-    onCreatePreset({
-      applicantNames: ["Иванов Иван"],
-      familyCount: 1,
-      type: "single",
-    });
-  }
-
-  function createFamilyDraft() {
-    onCreatePreset({
-      applicantNames: ["Иванова Мария", "Иванов Антон", "Иванова София", "Иванов Марк"],
-      familyCount: 4,
-      type: "family",
-    });
   }
 
   return (
@@ -151,11 +108,10 @@ export function CreateSubmissionDrawer({
     >
       <header className="drawer-header create-drawer-header">
         <div>
-          <p className="kicker">Черновик</p>
+          <p className="kicker">Предварительный черновик</p>
           <h2 id="create-title">Новая подача</h2>
           <p>
-            {type === "family" ? "Семейная заявка" : "Один заявитель"} · Испания ·{" "}
-            {city}
+            {type === "family" ? "Семья / группа" : "Один заявитель"} · Испания · {city}
           </p>
         </div>
         <div className="drawer-header-actions">
@@ -173,335 +129,441 @@ export function CreateSubmissionDrawer({
         </div>
       </header>
       <div className="drawer-body create-drawer-body">
-        <section className="create-workspace" aria-label="Создание подачи">
-          <aside className="create-stepper" aria-label="Шаги создания">
-            <div>
-              <p className="kicker">Создание заявки</p>
-              <strong>
-                {passportUploads.length ? "Паспорта выбраны" : "Начните с паспортов"}
-              </strong>
-            </div>
-            {createSteps.map((step, index) => (
-              <button
-                className={index === 0 ? "is-active" : ""}
-                key={step}
-                type="button"
-                onClick={() => {
-                  if (index === 0) return;
-                  if (index === 1) setActiveSectionId("personal");
-                }}
-              >
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{step}</strong>
-                <em>{index === 0 ? `${passportUploads.length}` : ""}</em>
-              </button>
-            ))}
-          </aside>
-          <div className="create-main">
-            <section
-              className="passport-intake"
-              aria-labelledby="passport-intake-title"
+        <section className="preintake-board" aria-label="Предварительная заявка">
+          <div className="preintake-mode-tags" aria-label="Тип подачи">
+            <button
+              className={type === "single" ? "is-active" : ""}
+              type="button"
+              onClick={() => selectType("single")}
             >
-              <div>
-                <p className="kicker">Шаг 1 · Паспорта</p>
-                <h3 id="passport-intake-title">Загрузите загранпаспорт</h3>
-                <p>
-                  Документ станет входной точкой заявки. Распознанные поля всегда
-                  требуют ручной проверки оператором.
-                </p>
-              </div>
-              <div className="create-autostart-grid" aria-label="Быстрое создание">
-                <article>
-                  <div>
-                    <p className="kicker">Один заявитель</p>
-                    <h4>Создать заявку самому</h4>
-                    <span>Иванов Иван · Москва · черновик с 4 медиа-слотами</span>
-                  </div>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={createSingleApplicantDraft}
-                  >
-                    Создать заявителя
-                  </button>
-                </article>
-                <article>
-                  <div>
-                    <p className="kicker">Семья / группа</p>
-                    <h4>Создать семейную заявку</h4>
-                    <span>Ивановы · 4 заявителя · паспортная точка входа</span>
-                  </div>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={createFamilyDraft}
-                  >
-                    Создать семью
-                  </button>
-                </article>
-              </div>
-              <label className="passport-dropzone">
-                <input
-                  accept="image/jpeg,image/png,application/pdf"
-                  multiple={type === "family"}
-                  type="file"
-                  onChange={(event) => {
-                    addPassportFiles(event.currentTarget.files);
-                    event.currentTarget.value = "";
-                  }}
-                />
-                <span>Перетащите или выберите скан / фото паспорта</span>
-                <em>
-                  Для семьи можно загрузить паспорта всех заявителей. Реальное
-                  распознавание выполняется только через серверный contract.
-                </em>
-              </label>
-              <div className="passport-upload-list" aria-label="Загруженные паспорта">
-                {passportUploads.length ? (
-                  passportUploads.map((upload, index) => (
-                    <article key={upload.id}>
-                      <div>
-                        <strong>
-                          {applicantNames[upload.applicantIndex] ||
-                            defaultApplicantName(upload.applicantIndex, type)}
-                        </strong>
-                        <p>{upload.fileName}</p>
-                      </div>
-                      <span>
-                        {upload.status === "ready"
-                          ? "Заполнено автоматически · требуется проверка"
-                          : "Выбрано локально · загрузите после сохранения"}
-                      </span>
-                      {index === 0 ? <em>Основной заявитель</em> : null}
-                    </article>
-                  ))
-                ) : (
-                  <p className="create-section-note">Выбрано: 0 паспортов</p>
-                )}
-              </div>
-            </section>
-            <section className="create-flow" aria-label="Параметры и заявители">
-              <div className="create-flow-row">
-                <label>
-                  <span>Страна</span>
-                  <input readOnly value="Испания" />
-                </label>
-                <label>
-                  <span>Город подачи</span>
-                  <select
-                    value={city}
-                    onChange={(event) => onCity(event.target.value as City)}
-                  >
-                    <option>Москва</option>
-                    <option>Санкт-Петербург</option>
-                    <option>Казань</option>
-                  </select>
-                </label>
-                <div className="segmented create-type-toggle" aria-label="Тип подачи">
-                  <button
-                    className={type === "single" ? "is-active" : ""}
-                    type="button"
-                    onClick={() => selectType("single")}
-                  >
-                    Один человек
-                  </button>
-                  <button
-                    className={type === "family" ? "is-active" : ""}
-                    type="button"
-                    onClick={() => selectType("family")}
-                  >
-                    Семья
-                  </button>
-                </div>
-              </div>
+              Заявитель
+            </button>
+            <button
+              className={type === "family" ? "is-active" : ""}
+              type="button"
+              onClick={() => selectType("family")}
+            >
+              Семья
+            </button>
+          </div>
 
-              <div className="create-family-workspace">
-                <section
-                  className="create-people-panel"
-                  aria-labelledby="create-people-title"
+          <section className="preintake-create-fields" aria-label="Создание подачи">
+            <label>
+              <span>Страна</span>
+              <input readOnly value="Испания" />
+            </label>
+            <label>
+              <span>Город подачи</span>
+              <select
+                value={city}
+                onChange={(event) => onCity(event.target.value as City)}
+              >
+                <option>Москва</option>
+                <option>Санкт-Петербург</option>
+                <option>Казань</option>
+              </select>
+            </label>
+          </section>
+
+          <section className="preintake-applicants" aria-label="Заявители в подаче">
+            {type === "family" ? (
+              <div className="create-people-list" aria-label="Заявители">
+                {Array.from({ length: applicantCount }, (_, index) => (
+                  <button key={index} type="button">
+                    <span>{applicantFieldLabel(index, type)}</span>
+                    <strong>
+                      {applicantNames?.[index] || defaultApplicantName(index, type)}
+                    </strong>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {Array.from({ length: applicantCount }, (_, index) => {
+              const label = applicantFieldLabel(index, type);
+              return (
+                <label key={index}>
+                  <span>{label}</span>
+                  <input
+                    aria-label={label}
+                    value={applicantNames?.[index] ?? defaultApplicantName(index, type)}
+                    onChange={(event) => onApplicantName?.(index, event.target.value)}
+                  />
+                </label>
+              );
+            })}
+            {type === "family" ? (
+              <div className="preintake-family-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={applicantCount >= maxFamilyApplicants}
+                  onClick={addFamilyApplicant}
                 >
-                  <div className="create-panel-head">
-                    <div>
-                      <p className="kicker">Заявители</p>
-                      <h3 id="create-people-title">
-                        {type === "family"
-                          ? `Заявители ${applicantCount}/6`
-                          : "Заявитель"}
-                      </h3>
-                    </div>
-                    <div className="create-people-actions">
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        disabled={
-                          type === "family" && applicantCount >= maxFamilyApplicants
-                        }
-                        onClick={addFamilyApplicant}
-                      >
-                        Добавить человека
-                      </button>
-                      {type === "family" ? (
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          disabled={applicantCount <= 2}
-                          onClick={removeLastFamilyApplicant}
-                        >
-                          Убрать последнего
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
+                  Добавить человека
+                </button>
+                {applicantCount > 2 ? (
+                  <div aria-label="Подставленная фамилия">Подставленная фамилия</div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
 
-                  <div className="create-people-list" aria-label="Заявители в подаче">
-                    {Array.from({ length: applicantCount }, (_, index) => {
-                      const selected = activeApplicantIndex === index;
+          <section
+            className="preintake-empty-state"
+            aria-labelledby="passport-intake-title"
+          >
+            <div className="preintake-document-visual" aria-hidden="true">
+              <svg viewBox="0 0 180 150" role="img">
+                <defs>
+                  <linearGradient
+                    id="preintake-page-fill"
+                    x1="42"
+                    x2="126"
+                    y1="24"
+                    y2="120"
+                  >
+                    <stop offset="0" stopColor="rgba(255,255,255,0.10)" />
+                    <stop offset="1" stopColor="rgba(255,255,255,0.01)" />
+                  </linearGradient>
+                  <linearGradient
+                    id="preintake-scan-fill"
+                    x1="38"
+                    x2="142"
+                    y1="0"
+                    y2="0"
+                  >
+                    <stop offset="0" stopColor="rgba(255,255,255,0)" />
+                    <stop offset="0.5" stopColor="rgba(235,241,255,0.92)" />
+                    <stop offset="1" stopColor="rgba(255,255,255,0)" />
+                  </linearGradient>
+                </defs>
+                <g className="preintake-visual-stack">
+                  <path d="M58 100 L118 88 Q129 86 132 96 L133 104 Q135 114 124 117 L65 129 Q55 131 53 120 L52 112 Q50 103 58 100Z" />
+                  <path d="M57 78 L123 66 Q133 64 135 75 L136 83 Q138 93 127 96 L62 108 Q52 110 50 99 L49 91 Q47 81 57 78Z" />
+                </g>
+                <path
+                  className="preintake-visual-page"
+                  d="M54 35 L120 23 Q132 21 135 33 L137 65 Q139 77 127 80 L59 93 Q47 95 45 83 L43 52 Q41 38 54 35Z"
+                />
+                <path
+                  className="preintake-visual-page-edge"
+                  d="M47 76 Q69 69 94 66 Q119 63 137 68"
+                />
+                <path className="preintake-visual-passport-line" d="M63 49 L113 40" />
+                <path className="preintake-visual-scan" d="M35 72 H146" />
+              </svg>
+            </div>
+            <p className="kicker">Паспортная точка входа</p>
+            <h3 id="passport-intake-title">Сначала скан паспорта</h3>
+            <p>
+              Загрузка скана паспорта сейчас и ответ на пару вопросов позволят вам легче
+              и быстрее пройти создание заявки.
+            </p>
+            <div className="preintake-upload-rules" aria-label="Как загрузить паспорт">
+              <strong>Как загрузить для распознавания</strong>
+              <span>
+                Разворот горизонтально, MRZ-строки внизу, текст читается слева направо.
+              </span>
+              <span>
+                Если фото повернуто, система попробует 90/180/270 градусов
+                автоматически.
+              </span>
+            </div>
 
-                      return (
-                        <button
-                          className={selected ? "is-active" : ""}
-                          key={index}
-                          type="button"
-                          aria-current={selected ? "true" : undefined}
-                          onClick={() => {
-                            setActiveApplicantIndex(index);
-                            setCopyPromptIndex(null);
-                          }}
-                        >
-                          <span>{applicantRoleLabel(index, type)}</span>
-                          <strong>
-                            {applicantNames[index] || defaultApplicantName(index, type)}
-                          </strong>
-                          {selected ? <em>Открыт</em> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <label className="create-name-field">
-                    <span>{applicantRoleLabel(activeApplicantIndex, type)}</span>
-                    <input
-                      value={applicantNames[activeApplicantIndex] ?? ""}
-                      placeholder={
-                        activeApplicantIndex === 0
-                          ? "Фамилия Имя"
-                          : "Фамилия Имя заявителя"
-                      }
-                      onChange={(event) =>
-                        onApplicantName(activeApplicantIndex, event.target.value)
-                      }
-                    />
+            <div className="preintake-actions passport-dropzone">
+              <input
+                ref={passportFileInputRef}
+                className="preintake-file-input"
+                aria-hidden="true"
+                accept="image/jpeg,image/png,application/pdf"
+                multiple={type === "family"}
+                name="preintakePassportScans"
+                tabIndex={-1}
+                type="file"
+                onChange={(event) => {
+                  addPassportFiles(event.currentTarget.files);
+                  event.currentTarget.value = "";
+                }}
+              />
+              <button
+                className="primary-button preintake-upload-button"
+                type="button"
+                onClick={() => passportFileInputRef.current?.click()}
+              >
+                Загрузить скан
+              </button>
+              <details className="preintake-question-details">
+                <summary>Пара вопросов</summary>
+                <div className="preintake-question-panel">
+                  <label>
+                    <span>Город подачи</span>
+                    <select
+                      name="preintakeCity"
+                      value={city}
+                      onChange={(event) => onCity(event.target.value as City)}
+                    >
+                      <option>Москва</option>
+                      <option>Санкт-Петербург</option>
+                      <option>Казань</option>
+                    </select>
                   </label>
 
-                  {type === "family" && copyPromptIndex === activeApplicantIndex ? (
-                    <section
-                      className="create-copy-card"
-                      aria-label="Подставленная фамилия"
-                    >
-                      <div>
-                        <p className="kicker">Новый человек</p>
-                        <h3>
-                          {primaryFamilyName ? "Фамилия подставлена" : "Введите имя"}
-                        </h3>
-                      </div>
-                      <p className="create-section-note">
-                        {primaryFamilyName
-                          ? "Фамилия основного заявителя уже добавлена в поле имени. Измените поле вручную, если она не подходит."
-                          : "У основного заявителя пока нет фамилии для подстановки."}
-                      </p>
-                    </section>
-                  ) : null}
-                </section>
-
-                <section
-                  className="create-sections-panel"
-                  aria-labelledby="create-sections-title"
-                >
-                  <div className="create-panel-head">
-                    <div>
-                      <p className="kicker">Анкета</p>
-                      <h3 id="create-sections-title">6 секций для заявителя</h3>
-                    </div>
-                    <span>{activeApplicantName}</span>
-                  </div>
-
-                  <div className="create-section-list">
-                    {questionnaireSections.map((section) => {
-                      const expanded = activeSectionId === section.id;
-
-                      return (
-                        <article
-                          className={`create-section-card ${expanded ? "is-expanded" : ""}`}
-                          key={section.id}
-                        >
+                  {type === "family" ? (
+                    <>
+                      <div className="preintake-family-count" aria-label="Размер семьи">
+                        <div>
+                          <p className="kicker">Заявители</p>
+                          <strong>{applicantCount} человек</strong>
+                        </div>
+                        <div>
                           <button
+                            className="ghost-button"
                             type="button"
-                            aria-expanded={expanded}
-                            onClick={() => setActiveSectionId(section.id)}
+                            aria-label="Уменьшить количество заявителей"
+                            disabled={applicantCount <= 2}
+                            onClick={() => onFamilyCount(applicantCount - 1)}
                           >
-                            <span>{section.number}</span>
-                            <strong>{section.title}</strong>
-                            <em aria-hidden="true">{expanded ? "⌄" : "›"}</em>
+                            −
                           </button>
-                          {expanded ? (
-                            <div className="create-section-body">
-                              <p>{section.summary}</p>
-                              {section.id === "appointment" ? (
-                                <dl>
-                                  <div>
-                                    <dt>Страна</dt>
-                                    <dd>Испания</dd>
-                                  </div>
-                                  <div>
-                                    <dt>Город подачи</dt>
-                                    <dd>{city}</dd>
-                                  </div>
-                                </dl>
-                              ) : null}
-                              {section.id === "personal" ? (
-                                <p className="create-section-note">
-                                  Имя редактируется слева. Остальные поля откроются в
-                                  анкете после сохранения черновика.
-                                </p>
-                              ) : null}
-                              {section.id === "contacts" || section.id === "trip" ? (
-                                <p className="create-section-note">
-                                  Эти поля заполняются в анкете после сохранения
-                                  черновика.
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
+                          <span>{applicantCount}</span>
+                          <button
+                            className="ghost-button"
+                            type="button"
+                            aria-label="Увеличить количество заявителей"
+                            disabled={applicantCount >= maxFamilyApplicants}
+                            onClick={() => onFamilyCount(applicantCount + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <section
+                        className="preintake-shared-panel"
+                        aria-labelledby="preintake-shared-title"
+                      >
+                        <div className="create-panel-head">
+                          <div>
+                            <p className="kicker">Семейные совпадения</p>
+                            <h3 id="preintake-shared-title">
+                              Общее для всех заявителей
+                            </h3>
+                          </div>
+                        </div>
+
+                        <PreintakeCheckCard
+                          checked={preliminaryIntake.sameHomeAddress}
+                          label="Один адрес проживания"
+                          name="preintakeSameHomeAddress"
+                          onChecked={(checked) =>
+                            updatePreliminaryIntake("sameHomeAddress", checked)
+                          }
+                        >
+                          <label>
+                            <span>Адрес проживания</span>
+                            <input
+                              name="preintakeHomeAddress"
+                              value={preliminaryIntake.homeAddress}
+                              placeholder="AKADEMIKA KOROLEVA STREET 4 1 149"
+                              onChange={(event) =>
+                                updatePreliminaryIntake(
+                                  "homeAddress",
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </label>
+                        </PreintakeCheckCard>
+
+                        <PreintakeCheckCard
+                          checked={preliminaryIntake.sameTripDates}
+                          label="Одинаковые даты поездки"
+                          name="preintakeSameTripDates"
+                          onChecked={(checked) =>
+                            updatePreliminaryIntake("sameTripDates", checked)
+                          }
+                        >
+                          <div className="preintake-two-columns">
+                            <label>
+                              <span>Въезд</span>
+                              <input
+                                name="preintakeTripDateFrom"
+                                value={preliminaryIntake.tripDateFrom}
+                                placeholder="19.08.2026"
+                                onChange={(event) =>
+                                  updatePreliminaryIntake(
+                                    "tripDateFrom",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+                            <label>
+                              <span>Выезд</span>
+                              <input
+                                name="preintakeTripDateTo"
+                                value={preliminaryIntake.tripDateTo}
+                                placeholder="27.08.2026"
+                                onChange={(event) =>
+                                  updatePreliminaryIntake(
+                                    "tripDateTo",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+                          </div>
+                        </PreintakeCheckCard>
+
+                        <PreintakeCheckCard
+                          checked={preliminaryIntake.sameSpainStay}
+                          label="Одно проживание в Испании"
+                          name="preintakeSameSpainStay"
+                          onChecked={(checked) =>
+                            updatePreliminaryIntake("sameSpainStay", checked)
+                          }
+                        >
+                          <div className="preintake-three-columns">
+                            <label>
+                              <span>Название</span>
+                              <input
+                                name="preintakeSpainStayName"
+                                value={preliminaryIntake.spainStayName}
+                                placeholder="HOTEL ILUNION BARCELONA"
+                                onChange={(event) =>
+                                  updatePreliminaryIntake(
+                                    "spainStayName",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+                            <label>
+                              <span>Город</span>
+                              <input
+                                name="preintakeSpainStayCity"
+                                value={preliminaryIntake.spainStayCity}
+                                placeholder="BARCELONA"
+                                onChange={(event) =>
+                                  updatePreliminaryIntake(
+                                    "spainStayCity",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+                            <label>
+                              <span>Адрес</span>
+                              <input
+                                name="preintakeSpainStayAddress"
+                                value={preliminaryIntake.spainStayAddress}
+                                placeholder="CALLE RAMON TUR 196-198"
+                                onChange={(event) =>
+                                  updatePreliminaryIntake(
+                                    "spainStayAddress",
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+                          </div>
+                        </PreintakeCheckCard>
+
+                        <PreintakeCheckCard
+                          checked={preliminaryIntake.sameArrivalPlace}
+                          label="Одно место прибытия"
+                          name="preintakeSameArrivalPlace"
+                          onChecked={(checked) =>
+                            updatePreliminaryIntake("sameArrivalPlace", checked)
+                          }
+                        >
+                          <label>
+                            <span>Маршрут / место прибытия</span>
+                            <input
+                              name="preintakeArrivalPlace"
+                              value={preliminaryIntake.arrivalPlace}
+                              placeholder="Москва, Барселона, Москва"
+                              onChange={(event) =>
+                                updatePreliminaryIntake(
+                                  "arrivalPlace",
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </label>
+                        </PreintakeCheckCard>
+                      </section>
+                    </>
+                  ) : null}
+                </div>
+              </details>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => onCreate(passportUploads, preliminaryIntake)}
+              >
+                Сохранить черновик
+              </button>
+            </div>
+
+            {passportUploads.length ? (
+              <div className="passport-upload-list" aria-label="Загруженные паспорта">
+                <p>{`Выбрано локально: ${passportUploads.length} паспортов`}</p>
+                {passportUploads.map((upload, index) => (
+                  <article key={upload.id}>
+                    <div>
+                      <strong>{applicantLabel(upload.applicantIndex, type)}</strong>
+                      <p>{upload.fileName}</p>
+                    </div>
+                    <span>Выбрано локально · загрузите после сохранения</span>
+                    {index === 0 ? <em>Основной</em> : null}
+                  </article>
+                ))}
               </div>
-            </section>
-          </div>
+            ) : null}
+          </section>
         </section>
       </div>
-      <footer className="drawer-footer">
-        <span>
-          {passportUploads.length
-            ? `Выбрано локально: ${passportUploads.length} паспортов · файлы не сохранятся в черновик автоматически`
-            : dirty
-              ? "Закрытие потребует подтверждения"
-              : "Загрузите паспорт или сохраните черновик вручную"}
-        </span>
-        <button className="secondary-button" type="button" onClick={onClose}>
-          Закрыть
-        </button>
-        <button className="primary-button" type="button" onClick={onCreate}>
-          Сохранить черновик
-        </button>
-      </footer>
     </div>
   );
 }
 
-function applicantRoleLabel(index: number, type: Submission["type"]) {
+function PreintakeCheckCard({
+  checked,
+  children,
+  label,
+  name,
+  onChecked,
+}: {
+  checked: boolean;
+  children: ReactNode;
+  label: string;
+  name: string;
+  onChecked: (checked: boolean) => void;
+}) {
+  return (
+    <article className={`preintake-check-card ${checked ? "is-active" : ""}`}>
+      <label className="preintake-check-row">
+        <input
+          checked={checked}
+          name={name}
+          type="checkbox"
+          onChange={(event) => onChecked(event.target.checked)}
+        />
+        <span>{label}</span>
+      </label>
+      {checked ? <div className="preintake-check-fields">{children}</div> : null}
+    </article>
+  );
+}
+
+function applicantLabel(index: number, type: Submission["type"]) {
+  if (type === "single") return "Заявитель";
+  if (index === 0) return "Основной заявитель";
+  return `Заявитель ${index + 1}`;
+}
+
+function applicantFieldLabel(index: number, type: Submission["type"]) {
   if (type === "single") return "Заявитель";
   if (index === 0) return "Основной заявитель";
   if (index === 1) return "Супруг";
@@ -509,13 +571,8 @@ function applicantRoleLabel(index: number, type: Submission["type"]) {
 }
 
 function defaultApplicantName(index: number, type: Submission["type"]) {
-  if (type === "single" || index === 0) return "Новый заявитель";
+  if (type === "single") return "Новый заявитель";
+  if (index === 0) return "Новый заявитель";
   if (index === 1) return "Супруг";
   return `Ребенок ${index - 1}`;
-}
-
-function familyNameFromFullName(value: string | undefined) {
-  const trimmed = value?.trim() ?? "";
-  if (!trimmed || trimmed === "Новый заявитель") return "";
-  return trimmed.split(/\s+/)[0] ?? "";
 }

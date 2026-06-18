@@ -1,6 +1,5 @@
 import {
   evaluatePassportExtractionAccess,
-  evaluatePassportExtractionRateLimit,
   parsePassportExtractionRequest,
   parsePassportExtractionResult,
   parsePassportDocumentPath,
@@ -12,7 +11,6 @@ import {
   type PassportExtractionClientRequest,
   type PassportExtractionContractResult,
   type PassportExtractionProvider,
-  type PassportExtractionQuotaStore,
   type PassportExtractionRequest,
 } from "./passport-extraction-contract.ts";
 
@@ -26,7 +24,6 @@ export interface PassportExtractionHandlerOptions {
   authorizer?: PassportExtractionAuthorizer;
   now?: () => string;
   provider?: PassportExtractionProvider;
-  quotaStore?: PassportExtractionQuotaStore;
   requestIdFactory?: () => string;
 }
 
@@ -188,57 +185,6 @@ export async function handlePassportExtractionRequest(
     return jsonResponse({ error: access.safeMessage }, access.status);
   }
 
-  if (!options.quotaStore) {
-    const reason = "Passport extraction quota store is not configured.";
-    const audit = await recordAudit(
-      options.auditStore,
-      passportExtractionAuditEvent(
-        "passport_extraction_denied",
-        reason,
-        extractionRequest,
-        options.now?.(),
-      ),
-    );
-    if (!audit.ok) return audit.response;
-    return jsonResponse({ error: reason }, 503);
-  }
-
-  let quotaState;
-  try {
-    quotaState = await options.quotaStore.consume(extractionRequest);
-  } catch {
-    const reason = "Passport extraction quota check failed.";
-    const audit = await recordAudit(
-      options.auditStore,
-      passportExtractionAuditEvent(
-        "passport_extraction_quota_failed",
-        reason,
-        extractionRequest,
-        options.now?.(),
-      ),
-    );
-    if (!audit.ok) return audit.response;
-    return jsonResponse({ error: reason }, 503);
-  }
-
-  const rateLimit = evaluatePassportExtractionRateLimit(
-    extractionRequest,
-    quotaState,
-  );
-  if (!rateLimit.ok) {
-    const audit = await recordAudit(
-      options.auditStore,
-      passportExtractionAuditEvent(
-        "passport_extraction_rate_limited",
-        rateLimit.safeMessage,
-        extractionRequest,
-        options.now?.(),
-      ),
-    );
-    if (!audit.ok) return audit.response;
-    return jsonResponse({ error: rateLimit.safeMessage }, rateLimit.status);
-  }
-
   if (!options.provider) {
     const unavailable = safeUnavailablePassportExtractionResult(
       extractionRequest.applicantIndex,
@@ -304,19 +250,15 @@ export async function handlePassportExtractionRequest(
 interface SupabaseRestPassportExtractionEnv {
   PASSPORT_EXTRACTION_PROVIDER_ENABLED?: string;
   PASSPORT_EXTRACTION_AUDIT_TABLE?: string;
-  PASSPORT_EXTRACTION_QUOTA_RPC?: string;
-  AI_HELPER_QUOTA_RPC?: string;
   SUPABASE_FUNCTION_ADMIN_KEY?: string;
   SUPABASE_URL?: string;
 }
 
 interface SupabaseAuthUserResponse {
-  app_metadata?: unknown;
   id?: unknown;
 }
 
 interface AuthenticatedUser {
-  canUseAI: boolean;
   id: string;
 }
 
@@ -349,13 +291,6 @@ function restEq(value: string): string {
   return encodeURIComponent(`eq.${value}`);
 }
 
-function parseQuotaRow(value: unknown) {
-  const row = Array.isArray(value) ? value[0] : value;
-  return typeof row === "object" && row !== null
-    ? (row as { remaining?: unknown; reset_at?: unknown; resetAt?: unknown })
-    : {};
-}
-
 async function readFirstRestRow<T>(
   fetchFn: typeof fetch,
   url: string,
@@ -369,16 +304,6 @@ async function readFirstRestRow<T>(
 
   const rows = (await response.json()) as unknown;
   return Array.isArray(rows) && rows.length ? (rows[0] as T) : null;
-}
-
-function authMetadataCanUseAI(value: unknown): boolean {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    ((value as { can_use_ai?: unknown }).can_use_ai === true ||
-      (value as { canUseAI?: unknown }).canUseAI === true)
-  );
 }
 
 async function authenticatedUser(
@@ -403,7 +328,6 @@ async function authenticatedUser(
   if (!id) return null;
 
   return {
-    canUseAI: authMetadataCanUseAI(body.app_metadata),
     id,
   };
 }
@@ -417,9 +341,14 @@ export function createSupabaseRestPassportExtractionDependencies(
   if (!supabaseUrl || !adminKey) return {};
 
   const auditTable = env.PASSPORT_EXTRACTION_AUDIT_TABLE ?? "ai_helper_audit_events";
-  const quotaRpc =
-    env.PASSPORT_EXTRACTION_QUOTA_RPC ?? env.AI_HELPER_QUOTA_RPC;
   const providerEnabled = env.PASSPORT_EXTRACTION_PROVIDER_ENABLED === "true";
+  const provider = providerEnabled
+    ? ({
+        async extract(request) {
+          return safeUnavailablePassportExtractionResult(request.applicantIndex);
+        },
+      } satisfies PassportExtractionProvider)
+    : undefined;
 
   return {
     authorizer: {
@@ -504,7 +433,6 @@ export function createSupabaseRestPassportExtractionDependencies(
         return {
           ok: true,
           actor: {
-            canUseAI: authUser.canUseAI,
             id: authUser.id,
             role,
           },
@@ -532,43 +460,6 @@ export function createSupabaseRestPassportExtractionDependencies(
         if (!response.ok) throw new Error("Passport extraction audit insert failed.");
       },
     },
-    quotaStore: quotaRpc
-      ? {
-          async consume(extractionRequest) {
-            const response = await fetchFn(`${supabaseUrl}/rest/v1/rpc/${quotaRpc}`, {
-              body: JSON.stringify({
-                p_actor_id: extractionRequest.actor.id,
-                p_actor_role: extractionRequest.actor.role,
-                p_intent: "passport_extraction",
-                p_request_id: extractionRequest.requestId,
-              }),
-              headers: authHeaders(adminKey),
-              method: "POST",
-            });
-            if (!response.ok) throw new Error("Passport extraction quota RPC failed.");
-
-            const row = parseQuotaRow(await response.json().catch(() => undefined));
-            const remaining =
-              typeof row.remaining === "number" && Number.isFinite(row.remaining)
-                ? row.remaining
-                : 0;
-            const resetAt =
-              typeof row.resetAt === "string"
-                ? row.resetAt
-                : typeof row.reset_at === "string"
-                  ? row.reset_at
-                  : undefined;
-
-            return { remaining, resetAt };
-          },
-        }
-      : undefined,
-    provider: providerEnabled
-      ? {
-          async extract(request) {
-            return safeUnavailablePassportExtractionResult(request.applicantIndex);
-          },
-        }
-      : undefined,
+    provider,
   };
 }

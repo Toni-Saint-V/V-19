@@ -7,6 +7,7 @@ import {
   completeQuestionnaireSections,
   createQuestionnaireSections,
   flagQuestionnaireField,
+  normalizeSubmissionQuestionnaire,
   updateQuestionnaireField as updateQuestionnaireFieldInSubmission,
   type QuestionnaireFieldUpdate,
 } from "./questionnaire";
@@ -20,6 +21,8 @@ import type {
   ExportState,
   Issue,
   IssueInput,
+  PreliminaryIntakeDraft,
+  QuestionnaireSection,
   Submission,
   SubmissionAction,
   Role,
@@ -33,6 +36,7 @@ export type CreateDraftInput = {
   applicantNames?: string[];
   familyCount: number;
   idScheme?: "local" | "supabase";
+  preliminaryIntake?: PreliminaryIntakeDraft;
   submissions: Submission[];
   type: Submission["type"];
 };
@@ -42,8 +46,8 @@ export type UploadedFileMetadata = {
   mimeType: string;
   originalFileName: string;
   sizeBytes: number;
-  storageBucket: string;
-  storagePath: string;
+  storageBucket?: string;
+  storagePath?: string;
   uploadedAtIso: string;
 };
 
@@ -149,6 +153,7 @@ export function createDraftSubmission({
   city,
   familyCount,
   idScheme = "local",
+  preliminaryIntake,
   submissions,
   type,
 }: CreateDraftInput): Submission {
@@ -170,16 +175,22 @@ export function createDraftSubmission({
     };
   }) satisfies Submission["applicants"];
 
-  return {
+  const submission: Submission = {
     id: submissionId,
     title: draftTitle(type, applicants[0]?.fullName),
     type,
     country: "Испания",
     city,
-    tripDateFrom: "не указано",
-    tripDateTo: "не указано",
+    tripDateFrom:
+      preliminaryIntake?.sameTripDates && preliminaryIntake.tripDateFrom.trim()
+        ? preliminaryIntake.tripDateFrom.trim()
+        : "не указано",
+    tripDateTo:
+      preliminaryIntake?.sameTripDates && preliminaryIntake.tripDateTo.trim()
+        ? preliminaryIntake.tripDateTo.trim()
+        : "не указано",
     status: "draft",
-    applicants,
+    applicants: applyPreliminaryIntakeToApplicants(applicants, preliminaryIntake),
     issues: [],
     files: requiredFilesForApplicants(applicants, nextIndex, idScheme),
     completeness: { questionnaire: 0, files: 0, total: 0 },
@@ -197,6 +208,128 @@ export function createDraftSubmission({
       },
     ],
   };
+
+  return preliminaryIntake ? normalizeSubmissionQuestionnaire(submission) : submission;
+}
+
+function applyPreliminaryIntakeToApplicants(
+  applicants: Submission["applicants"],
+  intake: PreliminaryIntakeDraft | undefined,
+) {
+  if (!intake) return applicants;
+
+  return applicants.map((applicant) => ({
+    ...applicant,
+    sections: applicant.sections.map((section) =>
+      applyPreliminaryIntakeToSection(section, intake),
+    ),
+  }));
+}
+
+function applyPreliminaryIntakeToSection(
+  section: QuestionnaireSection,
+  intake: PreliminaryIntakeDraft,
+): QuestionnaireSection {
+  if (section.id.endsWith("-contacts")) {
+    return {
+      ...section,
+      fields: section.fields.map((field) => {
+        if (
+          intake.sameHomeAddress &&
+          field.id === "home-address" &&
+          intake.homeAddress.trim()
+        ) {
+          return { ...field, value: intake.homeAddress.trim() };
+        }
+
+        return field;
+      }),
+    };
+  }
+
+  if (section.id.endsWith("-trip")) {
+    return {
+      ...section,
+      fields: section.fields.map((field) => applyPreliminaryTripField(field, intake)),
+    };
+  }
+
+  return section;
+}
+
+function applyPreliminaryTripField(
+  field: QuestionnaireSection["fields"][number],
+  intake: PreliminaryIntakeDraft,
+) {
+  if (
+    intake.sameTripDates &&
+    field.id === "arrival-date" &&
+    intake.tripDateFrom.trim()
+  ) {
+    return { ...field, value: intake.tripDateFrom.trim() };
+  }
+
+  if (
+    intake.sameTripDates &&
+    field.id === "departure-date" &&
+    intake.tripDateTo.trim()
+  ) {
+    return { ...field, value: intake.tripDateTo.trim() };
+  }
+
+  if (
+    intake.sameSpainStay &&
+    field.id === "inviting-party-type" &&
+    hasSpainStayInput(intake)
+  ) {
+    return { ...field, value: "Гостиница/временное жильё" };
+  }
+
+  if (
+    intake.sameSpainStay &&
+    field.id === "hotel-country" &&
+    hasSpainStayInput(intake)
+  ) {
+    return { ...field, value: "Spain" };
+  }
+
+  if (
+    intake.sameSpainStay &&
+    field.id === "hotel-name" &&
+    intake.spainStayName.trim()
+  ) {
+    return { ...field, value: intake.spainStayName.trim() };
+  }
+
+  if (
+    intake.sameSpainStay &&
+    field.id === "hotel-city" &&
+    intake.spainStayCity.trim()
+  ) {
+    return { ...field, value: intake.spainStayCity.trim() };
+  }
+
+  if (
+    intake.sameSpainStay &&
+    field.id === "hotel-address" &&
+    intake.spainStayAddress.trim()
+  ) {
+    return { ...field, value: intake.spainStayAddress.trim() };
+  }
+
+  if (intake.sameArrivalPlace && field.id === "route" && intake.arrivalPlace.trim()) {
+    return { ...field, value: intake.arrivalPlace.trim() };
+  }
+
+  return field;
+}
+
+function hasSpainStayInput(intake: PreliminaryIntakeDraft) {
+  return Boolean(
+    intake.spainStayName.trim() ||
+    intake.spainStayCity.trim() ||
+    intake.spainStayAddress.trim(),
+  );
 }
 
 export function completeQuestionnaire(submission: Submission): Submission {
@@ -281,6 +414,10 @@ export function uploadRequiredFile(
       fileStatus: applicantFileStatus(
         files.filter((file) => file.applicantId === item.id),
       ),
+      passportExtraction:
+        targetFile.type === "passport_scan" && item.id === targetFile.applicantId
+          ? undefined
+          : item.passportExtraction,
     })),
     files,
     completeness: {

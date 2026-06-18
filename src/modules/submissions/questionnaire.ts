@@ -203,6 +203,20 @@ const questionnaireBlueprint: Array<{
         completeValue: () => "778194570",
       },
       {
+        id: "passport-issue-place",
+        label: "Место выдачи паспорта",
+        placeholder: "FMS 77001",
+        completeValue: () => "FMS 77001",
+      },
+      {
+        id: "passport-issue-country",
+        label: "Страна выдачи паспорта",
+        placeholder: "Russian Federation",
+        control: "select",
+        options: ["Russian Federation", "Spain", "Other"],
+        completeValue: () => "Russian Federation",
+      },
+      {
         id: "passport-issue-date",
         label: "Дата выдачи паспорта",
         placeholder: "ДД.ММ.ГГГГ",

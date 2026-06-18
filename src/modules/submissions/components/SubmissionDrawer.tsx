@@ -26,12 +26,18 @@ import {
   questionnaireProgressForApplicant,
 } from "../questionnaire";
 import {
+  canStartPassportExtraction,
+  passportExtractionRows,
+  type PassportFieldApplyMode,
+} from "../passportExtraction";
+import {
   activeMediaFileTypes,
   buildReadinessQueue,
   fileLabel,
   fileShortLabel,
   fileStatusLabel,
   firstActionableQueueItem,
+  sectionNavigationTarget,
   tabForTarget,
   targetElementId,
   targetForIssue,
@@ -42,9 +48,11 @@ import {
 } from "../workspaceModel";
 import type {
   ActionDecision,
+  Applicant,
   DrawerTab,
   Issue,
   IssueInput,
+  PassportExtractedFieldKey,
   QuestionnaireField,
   QuestionnaireStatus,
   Role,
@@ -60,6 +68,7 @@ export function SubmissionDrawer({
   activeTab,
   fileUploadBusy = false,
   issueComposerRequest,
+  localPassportFileIds = [],
   onAction,
   onAddIssue,
   onIssueComposerConsumed,
@@ -69,7 +78,10 @@ export function SubmissionDrawer({
   onDismissAiSuggestion,
   onRunAiReview,
   onQuestionnaireField,
+  onApplyPassportField,
+  onExtractPassport,
   onUploadFile,
+  passportExtractionEnabled = false,
   requireSelectedFile,
   role,
   submission,
@@ -78,6 +90,7 @@ export function SubmissionDrawer({
   activeTab: DrawerTab;
   fileUploadBusy?: boolean;
   issueComposerRequest: { submissionId: string; token: number } | null;
+  localPassportFileIds?: string[];
   onAction: (action: SubmissionAction) => void;
   onAddIssue: (input: IssueInput) => void;
   onIssueComposerConsumed: () => void;
@@ -91,8 +104,15 @@ export function SubmissionDrawer({
     fieldId: QuestionnaireField["id"];
     value: string;
   }) => void;
+  onApplyPassportField: (
+    applicantId: string,
+    key: PassportExtractedFieldKey,
+    mode: PassportFieldApplyMode,
+  ) => void;
+  onExtractPassport: (fileId: string) => void;
   onTab: (tab: DrawerTab) => void;
   onUploadFile: (fileId: string, file?: File) => void;
+  passportExtractionEnabled?: boolean;
   requireSelectedFile?: boolean;
   role: Role;
   submission: Submission;
@@ -227,7 +247,9 @@ export function SubmissionDrawer({
           ) : null}
           {activeTab === "data" ? (
             <DrawerQuestionnaire
+              onApplyPassportField={onApplyPassportField}
               onFieldChange={onQuestionnaireField}
+              passportExtractionEnabled={passportExtractionEnabled}
               role={role}
               submission={submission}
             />
@@ -235,7 +257,10 @@ export function SubmissionDrawer({
           {activeTab === "media" ? (
             <DrawerFiles
               fileUploadBusy={fileUploadBusy}
+              localPassportFileIds={localPassportFileIds}
+              onExtractPassport={onExtractPassport}
               onUploadFile={onUploadFile}
+              passportExtractionEnabled={passportExtractionEnabled}
               requireSelectedFile={requireSelectedFile}
               role={role}
               submission={submission}
@@ -531,11 +556,7 @@ function WorkspaceNavigation({
               key={section.id}
               type="button"
               onClick={() =>
-                onOpenTarget({
-                  applicantId: submission.applicants[0]?.id ?? "",
-                  section: section.title,
-                  tab: "data",
-                })
+                onOpenTarget(sectionNavigationTarget(submission, section.title))
               }
             >
               <span>{section.title}</span>
@@ -748,7 +769,11 @@ function QueueItemCard({
         <strong>{item.title}</strong>
         <p>{item.body}</p>
       </div>
-      <Button variant="secondary" onClick={() => onOpenTarget(item.target)}>
+      <Button
+        aria-label={item.actionLabel}
+        variant="secondary"
+        onClick={() => onOpenTarget(item.target)}
+      >
         {item.actionLabel}
       </Button>
     </CardComponent>
@@ -756,16 +781,24 @@ function QueueItemCard({
 }
 
 function DrawerQuestionnaire({
+  onApplyPassportField,
   onFieldChange,
+  passportExtractionEnabled,
   role,
   submission,
 }: {
+  onApplyPassportField: (
+    applicantId: string,
+    key: PassportExtractedFieldKey,
+    mode: PassportFieldApplyMode,
+  ) => void;
   onFieldChange: (input: {
     applicantId: string;
     sectionId: string;
     fieldId: QuestionnaireField["id"];
     value: string;
   }) => void;
+  passportExtractionEnabled: boolean;
   role: Role;
   submission: Submission;
 }) {
@@ -921,6 +954,12 @@ function DrawerQuestionnaire({
                 </div>
               </header>
             ) : null}
+            <PassportExtractionReviewPanel
+              applicant={applicant}
+              canEdit={canEdit}
+              enabled={passportExtractionEnabled}
+              onApplyField={onApplyPassportField}
+            />
             <div className="questionnaire-section-list visa-section-stack">
               {applicant.sections.map((section) => {
                 const issue = sectionIssue(submission, applicant.id, section.title);
@@ -1066,6 +1105,112 @@ function DrawerQuestionnaire({
   );
 }
 
+function PassportExtractionReviewPanel({
+  applicant,
+  canEdit,
+  enabled,
+  onApplyField,
+}: {
+  applicant: Applicant;
+  canEdit: boolean;
+  enabled: boolean;
+  onApplyField: (
+    applicantId: string,
+    key: PassportExtractedFieldKey,
+    mode: PassportFieldApplyMode,
+  ) => void;
+}) {
+  if (!enabled) return null;
+
+  const state = applicant.passportExtraction;
+  if (!state) return null;
+
+  const rows = passportExtractionRows(applicant);
+  const source = state.sourceFileName ?? "Загранпаспорт";
+
+  if (state.status === "extracting") {
+    return (
+      <CardComponent as="section" className="passport-extraction-panel is-busy">
+        <div>
+          <p className="kicker">Паспорт</p>
+          <h4>Распознавание выполняется</h4>
+          <p>{source} · данные появятся здесь после проверки server contract.</p>
+        </div>
+      </CardComponent>
+    );
+  }
+
+  if (state.status === "failed" || state.status === "unavailable") {
+    return (
+      <CardComponent as="section" className="passport-extraction-panel">
+        <div>
+          <p className="kicker">Паспорт</p>
+          <h4>Автозаполнение недоступно</h4>
+          <p>{state.error ?? state.summary ?? "Заполните паспортные поля вручную."}</p>
+        </div>
+      </CardComponent>
+    );
+  }
+
+  if (!rows.length) return null;
+
+  return (
+    <CardComponent as="section" className="passport-extraction-panel">
+      <div className="passport-extraction-head">
+        <div>
+          <p className="kicker">Паспорт · требуется проверка</p>
+          <h4>{source}</h4>
+          <p>
+            {state.summary ?? "Поля из документа подготовлены для ручного применения."}
+          </p>
+          {state.orientation?.corrected ? (
+            <p className="passport-extraction-orientation">
+              Паспорт повернут автоматически на {state.orientation.rotation}° по MRZ.
+            </p>
+          ) : null}
+        </div>
+        <Badge className="visa-tag visa-tag-attention">
+          {rows.filter((row) => !row.applied).length} к проверке
+        </Badge>
+      </div>
+      <div className="passport-extraction-rows">
+        {rows.map((row) => (
+          <article className={row.conflict ? "has-conflict" : ""} key={row.key}>
+            <div>
+              <strong>{row.fieldLabel}</strong>
+              <p>
+                {row.conflict && row.currentValue
+                  ? `Сейчас: ${row.currentValue}`
+                  : row.sectionTitle}
+              </p>
+            </div>
+            <span>{row.extractedValue}</span>
+            <Badge
+              className={row.conflict ? "visa-tag visa-tag-attention" : "visa-tag"}
+            >
+              {row.conflict ? "Конфликт" : row.confidence}
+            </Badge>
+            {row.applied ? (
+              <Badge className="visa-tag visa-tag-ready">Применено</Badge>
+            ) : (
+              <Button
+                className="compact-button"
+                disabled={!canEdit}
+                variant={row.conflict ? "secondary" : "primary"}
+                onClick={() =>
+                  onApplyField(applicant.id, row.key, row.conflict ? "replace" : "safe")
+                }
+              >
+                {row.conflict ? "Заменить" : "Применить"}
+              </Button>
+            )}
+          </article>
+        ))}
+      </div>
+    </CardComponent>
+  );
+}
+
 function drawerMetaLine(submission: Submission) {
   const parts = [
     "Испания",
@@ -1125,13 +1270,19 @@ function defaultQuestionnaireSectionKey(submission: Submission) {
 
 function DrawerFiles({
   fileUploadBusy = false,
+  localPassportFileIds = [],
+  onExtractPassport,
   onUploadFile,
+  passportExtractionEnabled = false,
   requireSelectedFile = false,
   role,
   submission,
 }: {
   fileUploadBusy?: boolean;
+  localPassportFileIds?: string[];
+  onExtractPassport: (fileId: string) => void;
   onUploadFile: (fileId: string, file?: File) => void;
+  passportExtractionEnabled?: boolean;
   requireSelectedFile?: boolean;
   role: Role;
   submission: Submission;
@@ -1187,6 +1338,20 @@ function DrawerFiles({
                 canEditFiles &&
                 (file?.status === "missing" || file?.status === "needs_replacement");
               const uploadDisabled = fileUploadBusy || !file;
+              const extractionState = applicant.passportExtraction;
+              const hasLocalPassportFile = file
+                ? localPassportFileIds.includes(file.id)
+                : false;
+              const canExtractPassport =
+                passportExtractionEnabled &&
+                canEditFiles &&
+                Boolean(file) &&
+                file?.type === "passport_scan" &&
+                (Boolean(file.storagePath) || hasLocalPassportFile) &&
+                (file.status === "uploaded" ||
+                  file.status === "pending_review" ||
+                  file.status === "accepted") &&
+                canStartPassportExtraction(applicant);
               const inputId = file ? `file-upload-${submission.id}-${file.id}` : "";
               const uploadLabel = `${file?.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileLabel(type)}: ${applicant.fullName}`;
 
@@ -1268,6 +1433,20 @@ function DrawerFiles({
                       </Button>
                     )
                   ) : null}
+                  {canExtractPassport && file ? (
+                    <Button
+                      className="compact-button"
+                      variant="secondary"
+                      onClick={() => onExtractPassport(file.id)}
+                    >
+                      {extractionState?.status === "ready"
+                        ? "Распознать снова"
+                        : "Распознать"}
+                    </Button>
+                  ) : extractionState?.status === "extracting" &&
+                    file?.type === "passport_scan" ? (
+                    <Badge className="visa-tag">Распознавание</Badge>
+                  ) : null}
                 </div>
               );
             })}
@@ -1327,6 +1506,7 @@ function DrawerIssues({
                 <em>{issueStatusLabel(issue.status)}</em>
                 {issue.status === "open" ? (
                   <Button
+                    aria-label="Открыть место исправления"
                     variant="secondary"
                     onClick={() => onOpenTarget(targetForIssue(issue))}
                   >

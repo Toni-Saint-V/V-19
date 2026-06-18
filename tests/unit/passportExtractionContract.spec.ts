@@ -42,13 +42,10 @@ function durableOptions(
       authorize: () =>
         Promise.resolve({
           ok: true,
-          actor: { canUseAI: true, id: "agent-1", role: "agent" },
+          actor: { id: "agent-1", role: "agent" },
         }),
     },
     now: () => "2026-06-17T12:00:00.000Z",
-    quotaStore: {
-      consume: () => Promise.resolve({ remaining: 4 }),
-    },
     requestIdFactory: () => "server-request-id",
     ...overrides,
   };
@@ -118,7 +115,9 @@ describe("passport extraction contract", () => {
     );
 
     const response = await handlePassportExtractionRequest(
-      extractionRequest({ actor: { canUseAI: true, id: "forged-admin", role: "admin" } }),
+      extractionRequest({
+        actor: { canUseAI: true, id: "forged-admin", role: "admin" },
+      }),
       durableOptions({
         auditStore: {
           record: (event) => {
@@ -130,7 +129,7 @@ describe("passport extraction contract", () => {
           authorize: () =>
             Promise.resolve({
               ok: true,
-              actor: { canUseAI: true, id: "agent-real", role: "agent" },
+              actor: { id: "agent-real", role: "agent" },
             }),
         },
         provider: { extract: provider },
@@ -140,7 +139,7 @@ describe("passport extraction contract", () => {
     expect(response.status).toBe(200);
     expect(provider).toHaveBeenCalledWith(
       expect.objectContaining({
-        actor: { canUseAI: true, id: "agent-real", role: "agent" },
+        actor: { id: "agent-real", role: "agent" },
         requestId: "server-request-id",
       }),
     );
@@ -153,10 +152,18 @@ describe("passport extraction contract", () => {
     ]);
   });
 
-  test("denies disabled AI access before quota and provider", async () => {
+  test("does not require AI access or quota for free passport extraction", async () => {
     const auditEvents: unknown[] = [];
-    const provider = { extract: vi.fn(() => Promise.resolve({})) };
-    const quotaStore = { consume: vi.fn() };
+    const provider = {
+      extract: vi.fn(() =>
+        Promise.resolve({
+          fields: [],
+          source: "edge-provider",
+          status: "unavailable",
+          summary: "No data.",
+        }),
+      ),
+    };
 
     const response = await handlePassportExtractionRequest(
       extractionRequest(),
@@ -171,66 +178,19 @@ describe("passport extraction contract", () => {
           authorize: () =>
             Promise.resolve({
               ok: true,
-              actor: { canUseAI: false, id: "agent-1", role: "agent" },
+              actor: { id: "agent-1", role: "agent" },
             }),
         },
         provider,
-        quotaStore,
       }),
     );
 
-    expect(response.status).toBe(403);
-    expect(await json(response)).toEqual({
-      error: "Passport extraction AI access is disabled.",
-    });
+    expect(response.status).toBe(200);
     expect(auditEvents.at(-1)).toMatchObject({
       actorId: "agent-1",
-      event: "passport_extraction_denied",
-      reason: "Passport extraction AI access is disabled.",
+      event: "passport_extraction_invoked",
     });
-    expect(quotaStore.consume).not.toHaveBeenCalled();
-    expect(provider.extract).not.toHaveBeenCalled();
-  });
-
-  test("fails closed without quota storage before provider", async () => {
-    const provider = { extract: vi.fn(() => Promise.resolve({})) };
-    const response = await handlePassportExtractionRequest(
-      extractionRequest(),
-      durableOptions({
-        provider,
-        quotaStore: undefined,
-      }),
-    );
-
-    expect(response.status).toBe(503);
-    expect(await json(response)).toEqual({
-      error: "Passport extraction quota store is not configured.",
-    });
-    expect(provider.extract).not.toHaveBeenCalled();
-  });
-
-  test("rate-limits passport extraction before provider", async () => {
-    const provider = { extract: vi.fn(() => Promise.resolve({})) };
-    const response = await handlePassportExtractionRequest(
-      extractionRequest(),
-      durableOptions({
-        provider,
-        quotaStore: {
-          consume: () =>
-            Promise.resolve({
-              remaining: 0,
-              resetAt: "2026-06-17T13:00:00.000Z",
-            }),
-        },
-      }),
-    );
-
-    expect(response.status).toBe(429);
-    expect(await json(response)).toEqual({
-      error:
-        "Passport extraction quota is exhausted until 2026-06-17T13:00:00.000Z.",
-    });
-    expect(provider.extract).not.toHaveBeenCalled();
+    expect(provider.extract).toHaveBeenCalledOnce();
   });
 
   test("authorizes passport extraction through Supabase auth and media ownership", async () => {
@@ -238,7 +198,6 @@ describe("passport extraction contract", () => {
       const url = String(input);
       if (url.endsWith("/auth/v1/user")) {
         return Response.json({
-          app_metadata: { can_use_ai: true },
           id: "agent-1",
         });
       }
@@ -260,7 +219,7 @@ describe("passport extraction contract", () => {
         return Response.json([{ agent_id: "agent-1" }]);
       }
       if (url.includes("/rest/v1/rpc/consume_ai_helper_quota")) {
-        return Response.json({ remaining: 3 });
+        throw new Error("Passport extraction must not consume AI helper quota.");
       }
       if (url.includes("/rest/v1/ai_helper_audit_events")) {
         return new Response(null, { status: 201 });
@@ -271,7 +230,6 @@ describe("passport extraction contract", () => {
       {
         SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
         SUPABASE_URL: "https://project.supabase.co",
-        PASSPORT_EXTRACTION_QUOTA_RPC: "consume_ai_helper_quota",
       },
       fetchMock as unknown as typeof fetch,
     );
@@ -296,12 +254,69 @@ describe("passport extraction contract", () => {
     });
   });
 
+  test("returns unavailable without calling external OCR when no free provider is wired", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) {
+        return Response.json({
+          id: "agent-1",
+        });
+      }
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            storage_bucket: "submission-media",
+            storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/rest/v1/rpc/consume_ai_helper_quota")) {
+        throw new Error("Passport extraction must not consume AI helper quota.");
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ applicantIndex: 0 }),
+      createSupabaseRestPassportExtractionDependencies(
+        {
+          PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
+          SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+          SUPABASE_URL: "https://project.supabase.co",
+        },
+        fetchMock as unknown as typeof fetch,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "https://external-ocr.local/extract",
+      expect.anything(),
+    );
+    expect(await json(response)).toMatchObject({
+      fields: [],
+      source: "edge-stub",
+      status: "unavailable",
+    });
+  });
+
   test("denies Supabase extraction when media belongs to another agent", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
       if (url.endsWith("/auth/v1/user")) {
         return Response.json({
-          app_metadata: { can_use_ai: true },
           id: "agent-1",
         });
       }
@@ -373,6 +388,11 @@ describe("passport extraction contract", () => {
       source: "edge-provider",
       status: "extracted",
       summary: "Данные подготовлены.",
+      orientation: {
+        corrected: true,
+        reason: "mrz_detected",
+        rotation: 270,
+      },
     });
 
     expect(parsed.ok).toBe(true);
@@ -380,6 +400,11 @@ describe("passport extraction contract", () => {
       expect(parsed.data.fields[0]).toMatchObject({
         key: "passportNumber",
         needsManualReview: true,
+      });
+      expect(parsed.data.orientation).toEqual({
+        corrected: true,
+        reason: "mrz_detected",
+        rotation: 270,
       });
       expect(parsed.data.guardrails.join(" ")).toContain("проверить вручную");
     }

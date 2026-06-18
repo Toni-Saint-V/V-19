@@ -43,6 +43,17 @@ import {
   canAddAdminIssue,
   defaultDrawerTab,
 } from "./modules/submissions/status";
+import {
+  applyPassportExtractionField,
+  canStartPassportExtraction,
+  failPassportExtraction,
+  finishPassportExtraction,
+  markPassportExtractionReviewed,
+  passportExtractionEnabledFromEnv,
+  requiresPassportExtractionReviewBeforeAction,
+  startPassportExtraction,
+  type PassportFieldApplyMode,
+} from "./modules/submissions/passportExtraction";
 import { CreateSubmissionDrawer } from "./modules/submissions/components/CreateSubmissionDrawer";
 import {
   OperationalSidebar,
@@ -59,9 +70,12 @@ import type {
   City,
   DrawerTab,
   IssueInput,
+  PassportUploadDraft,
+  PreliminaryIntakeDraft,
   Role,
   Submission,
   SubmissionAction,
+  SubmissionFile,
   Surface,
   QuestionnaireField,
 } from "./modules/submissions/types";
@@ -80,6 +94,7 @@ import {
   signOutCurrentSession,
 } from "./services/authService";
 import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
+import { invokePassportExtraction } from "./modules/submissions/passportExtractionService";
 import {
   buildMediaStoragePath,
   deleteMediaFromStorage,
@@ -102,6 +117,11 @@ const fallbackAgentEmails = ["agent@visaflow.local"];
 type IssueComposerRequest = {
   submissionId: string;
   token: number;
+};
+
+type PassportReviewRequest = {
+  action: SubmissionAction;
+  submissionId: string;
 };
 
 function parseWorkspaceEmails(input: unknown, fallback: string[]) {
@@ -184,6 +204,9 @@ function firstSubmissionForRole(submissions: Submission[], role: Role) {
 
 function App() {
   const isSupabaseMode = supabaseRuntimeConfig.selected === "supabase";
+  const passportExtractionEnabled = passportExtractionEnabledFromEnv(
+    import.meta.env as { readonly VITE_PASSPORT_EXTRACTION_ENABLED?: string },
+  );
   const [workspaceEmail, setWorkspaceEmail] = useState(loadWorkspaceEmail);
   const initialWorkspaceRole = resolveWorkspaceRole(workspaceEmail) ?? "agent";
   const [role, setRole] = useState<Role>(initialWorkspaceRole);
@@ -221,6 +244,8 @@ function App() {
   const [exportError, setExportError] = useState("");
   const [issueComposerRequest, setIssueComposerRequest] =
     useState<IssueComposerRequest | null>(null);
+  const [passportReviewRequest, setPassportReviewRequest] =
+    useState<PassportReviewRequest | null>(null);
   const [createType, setCreateType] = useState<Submission["type"]>("single");
   const [createCity, setCreateCity] = useState<City>("Москва");
   const [createFamilyCount, setCreateFamilyCount] = useState(2);
@@ -237,7 +262,9 @@ function App() {
   const remoteSaveTimerRef = useRef<number | null>(null);
   const remoteSavePromiseRef = useRef<Promise<void> | null>(null);
   const submissionsRef = useRef<Submission[]>(submissions);
+  const localPassportFilesRef = useRef<Map<string, File>>(new Map());
   const uploadQueuesRef = useRef<Map<string, Promise<void>>>(new Map());
+  const [localPassportFileIds, setLocalPassportFileIds] = useState<string[]>([]);
   const [uploadingSubmissionIds, setUploadingSubmissionIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -743,21 +770,53 @@ function App() {
     return queued;
   }
 
-  function updateSubmission(action: SubmissionAction) {
-    if (!activeSubmission) return;
+  function commitSubmissionAction(submission: Submission, action: SubmissionAction) {
     const nextSubmissions = applyActionToSubmissionList(
-      submissions,
-      activeSubmission.id,
+      submissionsRef.current,
+      submission.id,
       action,
       role,
       remoteProfile?.id,
     );
     submissionsRef.current = nextSubmissions;
     setSubmissions(nextSubmissions);
-    const updated = nextSubmissions.find(
-      (submission) => submission.id === activeSubmission.id,
-    );
+    const updated = nextSubmissions.find((candidate) => candidate.id === submission.id);
     if (updated) setActiveDrawerTab(defaultDrawerTab(updated));
+  }
+
+  function updateSubmission(action: SubmissionAction) {
+    if (!activeSubmission) return;
+    if (
+      passportExtractionEnabled &&
+      requiresPassportExtractionReviewBeforeAction(activeSubmission, action)
+    ) {
+      setPassportReviewRequest({ action, submissionId: activeSubmission.id });
+      return;
+    }
+
+    commitSubmissionAction(activeSubmission, action);
+  }
+
+  function rememberLocalPassportFile(fileId: string, file: File) {
+    localPassportFilesRef.current.set(fileId, file);
+    setLocalPassportFileIds((current) =>
+      current.includes(fileId) ? current : [...current, fileId],
+    );
+  }
+
+  function passportSourceFingerprint(file: SubmissionFile, localFile?: File) {
+    return [
+      file.id,
+      file.status,
+      file.storageBucket ?? "",
+      file.storagePath ?? "",
+      file.uploadedAtIso ?? "",
+      file.mimeType ?? "",
+      file.sizeBytes ?? "",
+      localFile?.name ?? "",
+      localFile?.size ?? "",
+      localFile?.lastModified ?? "",
+    ].join("|");
   }
 
   function openIssueComposer(submission: Submission) {
@@ -788,7 +847,7 @@ function App() {
     fileId: string,
     selectedFile: File,
     activeRemoteProfile: AppProfile,
-  ) {
+  ): Promise<Submission | null> {
     setRemoteSaveState("saving");
     setRemoteSaveError("");
     let uploadedStorageTarget: MediaStorageTarget | null = null;
@@ -813,7 +872,7 @@ function App() {
         targetFile.status !== "needs_replacement"
       ) {
         setRemoteSaveState("idle");
-        return;
+        return null;
       }
       const applicant = latestSubmission.applicants.find(
         (item) => item.id === targetFile.applicantId,
@@ -895,6 +954,9 @@ function App() {
         fileId,
         uploadMetadata,
       );
+      if (targetFile.type === "passport_scan") {
+        rememberLocalPassportFile(fileId, selectedFile);
+      }
 
       if (previousStorageTarget) {
         try {
@@ -907,10 +969,11 @@ function App() {
               "Новая загрузка сохранена, но старый приватный файл не удалён. Повторите проверку Storage перед пилотом.",
             ),
           );
-          return;
+          return null;
         }
       }
       setRemoteSaveState("idle");
+      return updatedSubmission;
     } catch (error) {
       let cleanupFailed = false;
       if (uploadedStorageTarget) {
@@ -930,6 +993,7 @@ function App() {
           ? `${message} Загруженный файл не удалось удалить из Storage; нужна проверка оператора перед пилотом.`
           : message,
       );
+      return null;
     }
   }
 
@@ -954,14 +1018,114 @@ function App() {
           fileId,
           selectedFile,
           remoteProfile,
-        ),
+        ).then(() => undefined),
       );
       setActiveDrawerTab("media");
       return;
     }
 
-    updateActiveSubmission((submission) => uploadRequiredFile(submission, fileId));
+    if (selectedFile) rememberLocalPassportFile(fileId, selectedFile);
+    updateActiveSubmission((submission) =>
+      uploadRequiredFile(
+        submission,
+        fileId,
+        selectedFile
+          ? {
+              generatedFileName: selectedFile.name,
+              mimeType: selectedFile.type,
+              originalFileName: selectedFile.name,
+              sizeBytes: selectedFile.size,
+              storageBucket: "",
+              storagePath: "",
+              uploadedAtIso: new Date().toISOString(),
+            }
+          : undefined,
+      ),
+    );
     setActiveDrawerTab("media");
+  }
+
+  function updateSubmissionById(
+    submissionId: string,
+    transform: (submission: Submission) => Submission,
+  ) {
+    setSubmissions((current) => {
+      const next = current.map((submission) =>
+        submission.id === submissionId ? transform(submission) : submission,
+      );
+      submissionsRef.current = next;
+      return next;
+    });
+  }
+
+  async function extractPassportForActiveSubmission(fileId: string) {
+    if (!passportExtractionEnabled || role !== "agent") return;
+
+    const submission = submissionsRef.current.find(
+      (candidate) => candidate.id === selectedSubmissionId,
+    );
+    const file = submission?.files.find((candidate) => candidate.id === fileId);
+    if (!submission || !file || file.type !== "passport_scan") return;
+    const applicant = submission.applicants.find(
+      (candidate) => candidate.id === file.applicantId,
+    );
+    if (!applicant || !canStartPassportExtraction(applicant)) return;
+
+    const applicantIndex = submission.applicants.findIndex(
+      (candidate) => candidate.id === file.applicantId,
+    );
+    const localFile = localPassportFilesRef.current.get(file.id);
+    const requestedFingerprint = passportSourceFingerprint(file, localFile);
+    updateSubmissionById(submission.id, (current) =>
+      startPassportExtraction(current, file),
+    );
+
+    try {
+      const result = await invokePassportExtraction({
+        applicantIndex: applicantIndex >= 0 ? applicantIndex : undefined,
+        file,
+        localFile,
+        submission,
+      });
+      updateSubmissionById(submission.id, (current) => {
+        const latestFile = current.files.find((candidate) => candidate.id === fileId);
+        if (!latestFile) return current;
+        const latestLocalFile = localPassportFilesRef.current.get(latestFile.id);
+        if (
+          passportSourceFingerprint(latestFile, latestLocalFile) !==
+          requestedFingerprint
+        ) {
+          return failPassportExtraction(
+            current,
+            latestFile,
+            "Файл паспорта изменился во время распознавания. Запустите проверку снова.",
+          );
+        }
+        return finishPassportExtraction(current, latestFile, result);
+      });
+      setActiveDrawerTab("data");
+    } catch {
+      updateSubmissionById(submission.id, (current) => {
+        const latestFile = current.files.find((candidate) => candidate.id === fileId);
+        return failPassportExtraction(
+          current,
+          latestFile ?? file,
+          "Распознавание паспорта недоступно. Проверьте данные вручную.",
+        );
+      });
+      setActiveDrawerTab("media");
+    }
+  }
+
+  function applyPassportFieldForActiveSubmission(
+    applicantId: string,
+    key: Parameters<typeof applyPassportExtractionField>[2],
+    mode: PassportFieldApplyMode,
+  ) {
+    updateActiveSubmission((submission) =>
+      applyPassportExtractionField(submission, applicantId, key, mode),
+    );
+    setActiveDrawerTab("data");
   }
 
   function updateActiveQuestionnaireField(input: {
@@ -993,48 +1157,130 @@ function App() {
     );
   }
 
-  function createDraft() {
+  function passportSlotForUpload(submission: Submission, upload: PassportUploadDraft) {
+    const applicant =
+      submission.applicants[
+        Math.min(upload.applicantIndex, submission.applicants.length - 1)
+      ];
+    if (!applicant) return null;
+    return (
+      submission.files.find(
+        (file) => file.applicantId === applicant.id && file.type === "passport_scan",
+      ) ?? null
+    );
+  }
+
+  function prepareInitialPassportUploads(
+    submission: Submission,
+    passportUploads: PassportUploadDraft[],
+  ) {
+    const uploadsWithFiles = passportUploads.filter((upload) => upload.file);
+    if (!uploadsWithFiles.length) return submission;
+
+    if (!isSupabaseMode) {
+      return uploadsWithFiles.reduce((current, upload) => {
+        const slot = passportSlotForUpload(current, upload);
+        if (!slot || !upload.file) return current;
+        rememberLocalPassportFile(slot.id, upload.file);
+        return uploadRequiredFile(current, slot.id, {
+          generatedFileName: upload.file.name,
+          mimeType: upload.file.type,
+          originalFileName: upload.file.name,
+          sizeBytes: upload.file.size,
+          storageBucket: "",
+          storagePath: "",
+          uploadedAtIso: new Date().toISOString(),
+        });
+      }, submission);
+    }
+
+    return submission;
+  }
+
+  function enqueueSupabaseInitialPassportUploads(
+    submission: Submission,
+    passportUploads: PassportUploadDraft[],
+  ) {
+    const uploadsWithFiles = passportUploads.filter((upload) => upload.file);
+    if (!isSupabaseMode || !uploadsWithFiles.length) return;
+
+    if (!remoteProfile) {
+      setRemoteSaveState("error");
+      setRemoteSaveError("Сначала войдите в Supabase, чтобы сохранить паспорта.");
+      return;
+    }
+
+    for (const upload of uploadsWithFiles) {
+      const selectedFile = upload.file;
+      const slot = passportSlotForUpload(submission, upload);
+      if (!slot || !selectedFile) continue;
+      void enqueueSupabaseMediaUpload(submission.id, () =>
+        performSupabaseMediaUpload(
+          submission.id,
+          slot.id,
+          selectedFile,
+          remoteProfile,
+        ).then(() => undefined),
+      );
+    }
+  }
+
+  function createDraft(
+    passportUploads: PassportUploadDraft[] = [],
+    preliminaryIntake?: PreliminaryIntakeDraft,
+  ) {
     const newSubmission = createDraftSubmission({
       applicantNames: createApplicantNames,
       city: createCity,
       familyCount: createFamilyCount,
       idScheme: isSupabaseMode ? "supabase" : "local",
+      preliminaryIntake,
       submissions,
       type: createType,
     });
-    setSubmissions((current) => {
-      const next = [newSubmission, ...current];
-      submissionsRef.current = next;
-      return next;
-    });
-    setSelectedSubmissionId(newSubmission.id);
+    const preparedSubmission = prepareInitialPassportUploads(
+      newSubmission,
+      passportUploads,
+    );
+    const nextSubmissions = [preparedSubmission, ...submissionsRef.current];
+    submissionsRef.current = nextSubmissions;
+    setSubmissions(nextSubmissions);
+    enqueueSupabaseInitialPassportUploads(preparedSubmission, passportUploads);
+    setSelectedSubmissionId(preparedSubmission.id);
     setDrawerMode("detail");
-    setActiveDrawerTab("overview");
+    setActiveDrawerTab(passportUploads.length ? "media" : "overview");
     setDirty(false);
   }
 
-  function createDraftFromPreset(input: {
-    applicantNames: string[];
-    familyCount: number;
-    type: Submission["type"];
-  }) {
-    const newSubmission = createDraftSubmission({
-      applicantNames: input.applicantNames,
-      city: createCity,
-      familyCount: input.familyCount,
-      idScheme: isSupabaseMode ? "supabase" : "local",
-      submissions,
-      type: input.type,
-    });
-    setSubmissions((current) => {
-      const next = [newSubmission, ...current];
-      submissionsRef.current = next;
-      return next;
-    });
-    setSelectedSubmissionId(newSubmission.id);
+  function resolvePassportReviewRequest(mode: "verified" | "dismissed") {
+    const request = passportReviewRequest;
+    if (!request) return;
+
+    const submission = submissionsRef.current.find(
+      (candidate) => candidate.id === request.submissionId,
+    );
+    if (!submission) {
+      setPassportReviewRequest(null);
+      return;
+    }
+
+    const reviewedSubmission = markPassportExtractionReviewed(submission, mode);
+    const reviewedSubmissions = submissionsRef.current.map((candidate) =>
+      candidate.id === reviewedSubmission.id ? reviewedSubmission : candidate,
+    );
+    submissionsRef.current = reviewedSubmissions;
+    setSubmissions(reviewedSubmissions);
+    setPassportReviewRequest(null);
+    commitSubmissionAction(reviewedSubmission, request.action);
+  }
+
+  function returnToPassportReviewFields() {
+    const request = passportReviewRequest;
+    setPassportReviewRequest(null);
+    if (!request) return;
+    setSelectedSubmissionId(request.submissionId);
     setDrawerMode("detail");
-    setActiveDrawerTab("overview");
-    setDirty(false);
+    setActiveDrawerTab("data");
   }
 
   function toggleExportSelection(id: string) {
@@ -1428,11 +1674,15 @@ function App() {
           onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
           onClose={closeDrawer}
           onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
+          onApplyPassportField={applyPassportFieldForActiveSubmission}
+          onExtractPassport={extractPassportForActiveSubmission}
           onRunAiReview={runAiReviewForActiveSubmission}
           onTab={setActiveDrawerTab}
           onQuestionnaireField={updateActiveQuestionnaireField}
           onUploadFile={uploadActiveFile}
           fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
+          localPassportFileIds={localPassportFileIds}
+          passportExtractionEnabled={passportExtractionEnabled}
           requireSelectedFile={isSupabaseMode}
           role={role}
           surface={
@@ -1448,17 +1698,24 @@ function App() {
 
       {drawerMode === "create" ? (
         <CreateSubmissionDrawer
-          city={createCity}
           applicantNames={createApplicantNames}
+          city={createCity}
           dirty={dirty}
           familyCount={createFamilyCount}
+          onApplicantName={(index, name) => {
+            setCreateApplicantNames((current) => {
+              const next = normalizeCreateApplicantNames(current, createFamilyCount);
+              next[index] = name;
+              return next;
+            });
+            setDirty(true);
+          }}
           onCity={(city) => {
             setCreateCity(city);
             setDirty(true);
           }}
           onClose={closeDrawer}
           onCreate={createDraft}
-          onCreatePreset={createDraftFromPreset}
           onFamilyCount={(count) => {
             const safeCount = Math.max(2, Math.min(6, count || 2));
             setCreateFamilyCount(safeCount);
@@ -1468,14 +1725,6 @@ function App() {
             setDirty(true);
           }}
           onPassportFilesSelected={() => {
-            setDirty(true);
-          }}
-          onApplicantName={(index, name) => {
-            setCreateApplicantNames((current) => {
-              const next = normalizeCreateApplicantNames(current, createFamilyCount);
-              next[index] = name;
-              return next;
-            });
             setDirty(true);
           }}
           onType={(type) => {
@@ -1496,6 +1745,14 @@ function App() {
         />
       ) : null}
 
+      {passportReviewRequest ? (
+        <PassportExtractionReviewDialog
+          onCancel={returnToPassportReviewFields}
+          onDismiss={() => resolvePassportReviewRequest("dismissed")}
+          onVerified={() => resolvePassportReviewRequest("verified")}
+        />
+      ) : null}
+
       {confirmClose ? (
         <ConfirmationDialog
           onCancel={() => {
@@ -1510,6 +1767,56 @@ function App() {
         />
       ) : null}
     </main>
+  );
+}
+
+function PassportExtractionReviewDialog({
+  onCancel,
+  onDismiss,
+  onVerified,
+}: {
+  onCancel: () => void;
+  onDismiss: () => void;
+  onVerified: () => void;
+}) {
+  const verifyButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    verifyButtonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="confirmation-dialog passport-review-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="passport-review-title"
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.stopPropagation();
+          onCancel();
+        }}
+      >
+        <p className="kicker">Паспортные данные</p>
+        <h2 id="passport-review-title">Проверить распознанные поля?</h2>
+        <p>
+          Помощник подготовил данные из паспорта. Перед отправкой администратору агент
+          может один раз сверить их вручную или явно отправить без этой проверки.
+        </p>
+        <div className="dialog-actions">
+          <Button variant="secondary" onClick={onCancel}>
+            Открыть поля
+          </Button>
+          <Button danger onClick={onDismiss}>
+            Отправить без проверки
+          </Button>
+          <Button ref={verifyButtonRef} onClick={onVerified}>
+            Проверил, отправить
+          </Button>
+        </div>
+      </section>
+    </div>
   );
 }
 

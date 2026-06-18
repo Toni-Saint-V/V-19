@@ -120,6 +120,18 @@ function questionnaireCompleteness(submission: Submission) {
   return fields.length ? Math.round((ready.length / fields.length) * 100) : 0;
 }
 
+function questionnaireValue(
+  submission: Submission,
+  fieldId: string,
+  applicantIndex = 0,
+) {
+  return (
+    submission.applicants[applicantIndex]?.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === fieldId)?.value ?? ""
+  );
+}
+
 describe("V-19 submission status rules", () => {
   it("keeps the exact centralized transition matrix", () => {
     const expected = {
@@ -407,6 +419,47 @@ describe("V-19 submission actions", () => {
     expect(draft.applicants).toHaveLength(3);
     expect(draft.files).toHaveLength(12);
     expect(draft.history[0].source).toBe("agent");
+  });
+
+  it("applies preliminary family intake to the detailed questionnaire", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 3,
+      preliminaryIntake: {
+        arrivalPlace: "Москва, Барселона, Москва",
+        homeAddress: "AKADEMIKA KOROLEVA STREET 4 1 149",
+        sameArrivalPlace: true,
+        sameHomeAddress: true,
+        sameSpainStay: true,
+        sameTripDates: true,
+        spainStayAddress: "CALLE RAMON TUR 196-198",
+        spainStayCity: "BARCELONA",
+        spainStayName: "HOTEL ILUNION BARCELONA",
+        tripDateFrom: "19.08.2026",
+        tripDateTo: "27.08.2026",
+      },
+      submissions: initialSubmissions,
+      type: "family",
+    });
+
+    expect(draft.tripDateFrom).toBe("19.08.2026");
+    expect(draft.tripDateTo).toBe("27.08.2026");
+    expect(questionnaireValue(draft, "home-address", 2)).toBe(
+      "AKADEMIKA KOROLEVA STREET 4 1 149",
+    );
+    expect(questionnaireValue(draft, "arrival-date", 1)).toBe("19.08.2026");
+    expect(questionnaireValue(draft, "departure-date", 1)).toBe("27.08.2026");
+    expect(questionnaireValue(draft, "hotel-name", 2)).toBe(
+      "HOTEL ILUNION BARCELONA",
+    );
+    expect(questionnaireValue(draft, "hotel-city", 2)).toBe("BARCELONA");
+    expect(questionnaireValue(draft, "hotel-address", 2)).toBe(
+      "CALLE RAMON TUR 196-198",
+    );
+    expect(questionnaireValue(draft, "route", 2)).toBe(
+      "Москва, Барселона, Москва",
+    );
+    expect(draft.applicants[0]?.questionnaireStatus).toBe("partial");
   });
 
   it("creates ASCII ids for Supabase cockpit drafts and storage paths", () => {

@@ -107,6 +107,31 @@ export function fileStatusLabel(file: SubmissionFile | undefined) {
   return file ? fileStatusLabels[file.status] : "Нет файла";
 }
 
+export function sectionNavigationTarget(
+  submission: Submission,
+  sectionTitle: string,
+): WorkspaceTarget {
+  const issueTarget = submission.issues.find(
+    (issue) =>
+      issue.status === "open" &&
+      !issue.target.fileType &&
+      (issue.target.section === sectionTitle || issue.target.field === sectionTitle),
+  );
+  if (issueTarget) return targetForIssue(issueTarget);
+
+  const applicantWithWork = submission.applicants.find((applicant) =>
+    applicant.sections.some(
+      (section) => section.title === sectionTitle && section.status !== "complete",
+    ),
+  );
+
+  return {
+    applicantId: applicantWithWork?.id ?? submission.applicants[0]?.id ?? "",
+    section: sectionTitle,
+    tab: "data",
+  };
+}
+
 function issueQueueItem(issue: Issue): ReadinessQueueItem {
   const target = targetForIssue(issue);
   const blocker = issue.severity === "blocker";

@@ -247,7 +247,9 @@ test.describe("V-19 operations workspace", () => {
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
     await expect(drawer(page).getByText("Возвращено")).toBeVisible();
-    await expect(drawer(page).getByText("Мария Иванова · Медиа · Фото")).toBeVisible();
+    await expect(
+      drawer(page).getByText("Мария Иванова · Медиа · Фото").first(),
+    ).toBeVisible();
     await expect(
       drawer(page).getByRole("button", { name: "Отправить исправления" }),
     ).toBeVisible();
@@ -270,7 +272,7 @@ test.describe("V-19 operations workspace", () => {
     await returnSelectedWithIssue(page);
     await expect(drawer(page).getByLabel("Новое замечание")).toBeVisible();
     await expect(
-      drawer(page).getByText("Нина Волкова · Данные · Маршрут поездки"),
+      drawer(page).getByText("Нина Волкова · Данные · Маршрут поездки").first(),
     ).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(drawer(page).getByLabel("Новое замечание")).toHaveCount(0);
@@ -624,7 +626,9 @@ test.describe("V-19 operations workspace", () => {
       .first()
       .click();
 
-    await expect(drawer(page).getByText("Нина Волкова · Медиа · Фото")).toBeVisible();
+    await expect(
+      drawer(page).getByText("Нина Волкова · Медиа · Фото").first(),
+    ).toBeVisible();
     await expect(
       drawer(page)
         .getByText("Рекомендация требует человеческого подтверждения.")
@@ -639,7 +643,9 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       drawer(page).getByText("Подсказка ББ принята администратором"),
     ).toBeVisible();
-    await expect(drawer(page).getByText("Нина Волкова · Медиа · Фото")).toBeVisible();
+    await expect(
+      drawer(page).getByText("Нина Волкова · Медиа · Фото").first(),
+    ).toBeVisible();
     await expect(
       drawer(page).getByText("Агент отправил подачу на проверку"),
     ).toHaveCount(0);
@@ -666,7 +672,7 @@ test.describe("V-19 operations workspace", () => {
       "true",
     );
     await expect(
-      drawer(page).getByText("Нина Волкова · Данные · Маршрут поездки"),
+      drawer(page).getByText("Нина Волкова · Данные · Маршрут поездки").first(),
     ).toBeVisible();
     await page.getByRole("button", { name: "Вернуть", exact: true }).click();
     await expect(drawer(page).getByText("Возвращено")).toBeVisible();
