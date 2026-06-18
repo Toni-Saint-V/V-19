@@ -98,12 +98,48 @@ export type PassportExtractedField = {
   verified?: boolean;
 };
 
+export type PassportExtractionReviewState = {
+  appliedFieldKeys: PassportExtractedFieldKey[];
+  attemptCount?: number;
+  dismissedAtIso?: string;
+  error?: string;
+  extractedFields: PassportExtractedField[];
+  lastAttemptAtIso?: string;
+  orientation?: {
+    corrected: boolean;
+    reason: "mrz_detected";
+    rotation: 0 | 90 | 180 | 270;
+  };
+  requestId?: string;
+  sourceFileId?: string;
+  sourceFileName?: string;
+  sourceStoragePath?: string;
+  status: PassportExtractionStatus;
+  summary?: string;
+  verifiedAtIso?: string;
+};
+
 export type PassportUploadDraft = {
   applicantIndex: number;
   extractedFields: PassportExtractedField[];
+  file?: File;
   fileName: string;
   id: string;
   status: PassportExtractionStatus;
+};
+
+export type PreliminaryIntakeDraft = {
+  arrivalPlace: string;
+  homeAddress: string;
+  sameArrivalPlace: boolean;
+  sameHomeAddress: boolean;
+  sameSpainStay: boolean;
+  sameTripDates: boolean;
+  spainStayAddress: string;
+  spainStayCity: string;
+  spainStayName: string;
+  tripDateFrom: string;
+  tripDateTo: string;
 };
 
 export type SubmissionAction =
@@ -126,6 +162,7 @@ export type Applicant = {
   role?: ApplicantRole;
   questionnaireStatus: QuestionnaireStatus;
   fileStatus: QuestionnaireStatus;
+  passportExtraction?: PassportExtractionReviewState;
   sections: QuestionnaireSection[];
 };
 

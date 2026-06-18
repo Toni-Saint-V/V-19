@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildReadinessQueue,
   fileLabel,
+  sectionNavigationTarget,
   targetElementId,
 } from "../../src/modules/submissions/workspaceModel";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
@@ -22,5 +23,34 @@ describe("operator workspace model", () => {
   test("keeps passport and second selfie labels explicit", () => {
     expect(fileLabel("passport_scan")).toBe("Загранпаспорт");
     expect(fileLabel("selfie_2")).toBe("Селфи N2");
+  });
+
+  test("opens section navigation on the applicant that actually has work", () => {
+    const submission = initialSubmissions.find((item) => item.id === "ПД-1048");
+    if (!submission) throw new Error("expected demo submission");
+    const targetApplicant = submission.applicants.at(1);
+    if (!targetApplicant) throw new Error("expected second applicant");
+    const targetSection = targetApplicant.sections[0];
+
+    const adjusted = {
+      ...submission,
+      applicants: submission.applicants.map((applicant, index) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          status:
+            section.title === targetSection.title && index === 1
+              ? ("partial" as const)
+              : ("complete" as const),
+        })),
+      })),
+      issues: [],
+    };
+
+    expect(sectionNavigationTarget(adjusted, targetSection.title)).toEqual({
+      applicantId: targetApplicant.id,
+      section: targetSection.title,
+      tab: "data",
+    });
   });
 });
