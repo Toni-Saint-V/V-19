@@ -238,4 +238,170 @@ describe("submission next-step engine", () => {
       submissionAction: "generate_export",
     });
   });
+
+  test("treats agent submitted review as waiting for admin, not an action", () => {
+    const submitted = applySubmissionAction(
+      readyForReviewSubmission(),
+      "submit_for_review",
+      "agent",
+    );
+
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: submitted,
+      surface: "agent",
+    });
+
+    expect(brief.status).toBe("waiting");
+    expect(brief.owner).toBe("admin");
+    expect(brief.primaryAction).toMatchObject({
+      disabled: true,
+      id: "wait_admin_review",
+      kind: "wait",
+    });
+    expect(visibleCopy(brief)).not.toMatch(forbiddenTrustCopy);
+  });
+
+  test("keeps agent waiting after review handoff even when passport rows need review", () => {
+    const ready = readyForReviewSubmission();
+    const withExistingPassport = updateQuestionnaireField(ready, {
+      applicantId: applicantId(ready),
+      fieldId: "passport-no",
+      sectionId: sectionIdForField(ready, "passport-no"),
+      value: "OLD-PASSPORT",
+    });
+    const submitted = applySubmissionAction(
+      withExistingPassport,
+      "submit_for_review",
+      "agent",
+    );
+    const withPassport = finishPassportExtraction(
+      submitted,
+      passportFile(submitted),
+      extractedPassport,
+    );
+
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: withPassport,
+      surface: "agent",
+    });
+
+    expect(brief.status).toBe("waiting");
+    expect(brief.owner).toBe("admin");
+    expect(brief.primaryAction).toMatchObject({
+      disabled: true,
+      id: "wait_admin_review",
+      kind: "wait",
+    });
+  });
+
+  test("keeps agent waiting after review handoff even when queue blockers exist", () => {
+    const ready = readyForReviewSubmission();
+    const submitted = applySubmissionAction(ready, "submit_for_review", "agent");
+    const issue: Issue = {
+      id: "issue-email-after-handoff",
+      type: "field",
+      target: {
+        applicantId: applicantId(ready),
+        applicantName: "Мария Иванова",
+        section: "Анкета",
+        field: "Email",
+      },
+      reason: "Email требует проверки",
+      comment: "Введите корректный email.",
+      severity: "blocker",
+      status: "open",
+      createdBy: "admin",
+      createdAt: "сейчас",
+    };
+
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: { ...submitted, issues: [issue] },
+      surface: "agent",
+    });
+
+    expect(brief.status).toBe("waiting");
+    expect(brief.owner).toBe("admin");
+    expect(brief.primaryAction).toMatchObject({
+      disabled: true,
+      id: "wait_admin_review",
+      kind: "wait",
+    });
+  });
+
+  test("treats agent correction review as waiting for admin", () => {
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: { ...readyForReviewSubmission(), status: "corrections_received" },
+      surface: "agent",
+    });
+
+    expect(brief.status).toBe("waiting");
+    expect(brief.owner).toBe("admin");
+    expect(brief.primaryAction).toMatchObject({
+      disabled: true,
+      id: "wait_admin_corrections_review",
+      kind: "wait",
+    });
+  });
+
+  test("treats accepted package as waiting for admin export on agent surface", () => {
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: {
+        ...readyForReviewSubmission(),
+        exportState: "ready",
+        status: "ready_for_export",
+      },
+      surface: "agent",
+    });
+
+    expect(brief.status).toBe("waiting");
+    expect(brief.owner).toBe("admin");
+    expect(brief.primaryAction).toMatchObject({
+      disabled: true,
+      id: "wait_admin_export",
+      kind: "wait",
+    });
+  });
+
+  test("treats fixed corrections as admin-ready action, not an agent blocker", () => {
+    const ready = readyForReviewSubmission();
+    const fixedIssue: Issue = {
+      id: "issue-fixed-email",
+      type: "field",
+      target: {
+        applicantId: applicantId(ready),
+        applicantName: "Мария Иванова",
+        section: "Анкета",
+        field: "Email",
+      },
+      reason: "Email исправлен агентом",
+      comment: "Проверьте новое значение.",
+      severity: "blocker",
+      status: "fixed_by_manager",
+      createdBy: "admin",
+      createdAt: "сейчас",
+    };
+
+    const brief = buildSubmissionNextStepBrief({
+      role: "admin",
+      submission: {
+        ...ready,
+        issues: [fixedIssue],
+        status: "corrections_received",
+      },
+      surface: "review",
+    });
+
+    expect(brief.status).toBe("ready_for_action");
+    expect(brief.owner).toBe("admin");
+    expect(brief.blockers).not.toContain("1 исправлений ждут закрытия администратором");
+    expect(brief.primaryAction).toMatchObject({
+      kind: "submission_action",
+      submissionAction: "close_issues_accept",
+    });
+  });
 });

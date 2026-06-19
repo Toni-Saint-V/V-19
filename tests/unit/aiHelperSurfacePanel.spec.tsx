@@ -296,7 +296,7 @@ describe("AI helper surface panel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+    fireEvent.click(screen.getByRole("button", { name: "Выполнить ИИ-шаг" }));
 
     expect(onPrimaryAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -327,7 +327,7 @@ describe("AI helper surface panel", () => {
       />,
     );
 
-    const button = screen.getByRole("button", { name: "Открыть историю" });
+    const button = screen.getByRole("button", { name: "ИИ-шаг недоступен" });
     expect(button).toBeDisabled();
     fireEvent.click(button);
 

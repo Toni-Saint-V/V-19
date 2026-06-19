@@ -275,6 +275,7 @@ export type Submission = {
   id: string;
   agentId: AgentOwnerId;
   title: string;
+  listTitle?: string;
   type: SubmissionType;
   country: "Испания";
   city: City;

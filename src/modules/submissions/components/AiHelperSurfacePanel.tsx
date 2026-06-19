@@ -25,6 +25,9 @@ export function AiHelperSurfacePanel({
     helper.primaryAction.disabled ||
     helper.primaryAction.kind === "wait" ||
     helper.primaryAction.kind === "none";
+  const actionButtonLabel = primaryActionDisabled
+    ? "ИИ-шаг недоступен"
+    : "Выполнить ИИ-шаг";
 
   return (
     <CardComponent
@@ -41,6 +44,7 @@ export function AiHelperSurfacePanel({
         <div>
           <Badge tone="muted">Локальная проверка</Badge>
           <Button
+            aria-label={actionButtonLabel}
             disabled={primaryActionDisabled}
             variant="secondary"
             onClick={() => {
@@ -48,7 +52,7 @@ export function AiHelperSurfacePanel({
               onPrimaryAction?.(helper.primaryAction);
             }}
           >
-            {helper.primaryAction.label}
+            {actionButtonLabel}
           </Button>
         </div>
       </div>

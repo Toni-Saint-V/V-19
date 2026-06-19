@@ -16,6 +16,7 @@ import {
   exportPackageIdentityMatches,
   exportSummary,
 } from "./exportRules";
+import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { defaultLocalAgentOwnerId } from "./ownership";
 import type {
   City,
@@ -183,6 +184,10 @@ export function createDraftSubmission({
     id: submissionId,
     agentId,
     title: draftTitle(type, applicants[0]?.fullName),
+    listTitle:
+      type === "family"
+        ? familyListTitleFromMainApplicantName(applicants[0]?.fullName)
+        : undefined,
     type,
     country: "Испания",
     city,

@@ -11,15 +11,36 @@ import type {
 import { clearOpenQuestionnaireIssueErrors } from "./questionnaire";
 import { requiresPassportExtractionReviewBeforeAction } from "./passportExtractionGuards";
 
+const statusLabelVariants = {
+  draft: { compact: "Черновик", full: "Черновик" },
+  in_progress: { compact: "В работе", full: "В работе" },
+  requires_action: { compact: "Возвращено", full: "Действие" },
+  submitted_for_review: { compact: "Проверка", full: "На проверке" },
+  returned: { compact: "Возвращено", full: "Возвращено" },
+  corrections_received: {
+    compact: "Исправление",
+    full: "Исправления получены",
+  },
+  ready_for_export: { compact: "Готово", full: "Готово к выгрузке" },
+  exported: { compact: "Выгружено", full: "Выгружено" },
+} satisfies Record<SubmissionStatus, { compact: string; full: string }>;
+
+export function statusLabelFor(
+  status: SubmissionStatus,
+  variant: "compact" | "full" = "full",
+) {
+  return statusLabelVariants[status][variant];
+}
+
 export const statusLabels: Record<SubmissionStatus, string> = {
-  draft: "Черновик",
-  in_progress: "В работе",
-  requires_action: "Действие",
-  submitted_for_review: "Проверка",
-  returned: "Возвращено",
-  corrections_received: "Исправления",
-  ready_for_export: "Готово",
-  exported: "Выгружено",
+  draft: statusLabelFor("draft"),
+  in_progress: statusLabelFor("in_progress"),
+  requires_action: statusLabelFor("requires_action"),
+  submitted_for_review: statusLabelFor("submitted_for_review"),
+  returned: statusLabelFor("returned"),
+  corrections_received: statusLabelFor("corrections_received"),
+  ready_for_export: statusLabelFor("ready_for_export"),
+  exported: statusLabelFor("exported"),
 };
 
 export const statusTone = {
@@ -223,8 +244,6 @@ export function canPerformAction(
   action: SubmissionAction,
   role: Role,
 ): { ok: boolean; reason?: string } {
-  if (action === "open_history") return { ok: true };
-
   const transition = transitionMatrix[action];
   if (transition.role !== role) return { ok: false, reason: "Недостаточно прав" };
   if (!transition.from.includes(submission.status)) {
@@ -348,7 +367,9 @@ export function getPrimaryAction(
     return { action: "generate_export", label: "Готово к выгрузке" };
   }
 
-  return { action: "open_history", label: "Смотреть статус", disabled: false };
+  const decision = { action: "open_history", label: "Смотреть статус" } as const;
+  const guard = canPerformAction(submission, decision.action, role);
+  return { ...decision, disabled: !guard.ok, reason: guard.reason };
 }
 
 export function applySubmissionAction(
@@ -359,6 +380,7 @@ export function applySubmissionAction(
 ): Submission {
   const guard = canPerformAction(submission, action, role);
   if (!guard.ok) return submission;
+  if (action === "open_history") return submission;
 
   if (action === "submit_corrections") {
     const corrected = clearOpenQuestionnaireIssueErrors(submission);

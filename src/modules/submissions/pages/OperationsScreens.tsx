@@ -2,6 +2,10 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import type { AgentActionItem, AgentActionSummary } from "../agentActions";
 import type { ExportSummary } from "../exportRules";
+import {
+  formatSubmissionListStatus,
+  formatSubmissionListTitle,
+} from "../listFormatters";
 import { counts, tripDates } from "../selectors";
 import {
   blockerCount,
@@ -659,7 +663,7 @@ export function AgentSubmissionsScreen({
         aria-labelledby="agent-title"
       >
         <h2 id="agent-title" className="sr-only">
-          Мои подачи
+          Рабочая область подач агента
         </h2>
 
         <CollectionToolbar
@@ -720,17 +724,14 @@ export function AgentSubmissionsScreen({
                   action={submissionActionLabel(submission)}
                   completeness={`${submission.completeness.total}%`}
                   extraTagCount={submissionExtraTagCount(submission)}
+                  extraTagLabel={submissionExtraTagLabel(submission)}
                   fileState={submissionFileStateLabel(submission)}
                   fileTone={submissionFileStateTone(submission)}
                   key={submission.id}
-                  meta={
-                    <>
-                      {submission.city} · {tripDates(submission)}
-                    </>
-                  }
                   status={submission.status}
-                  statusLabel={statusLabels[submission.status]}
-                  title={submission.title}
+                  statusLabel={formatSubmissionListStatus(submission)}
+                  submissionId={submission.id}
+                  title={formatSubmissionListTitle(submission)}
                   onOpen={() => {
                     onSelect(submission);
                     onOpen(submission, defaultDrawerTab(submission));
@@ -814,6 +815,10 @@ function submissionFileStateTone(submission: Submission): "amber" | "muted" | "t
 }
 
 function submissionExtraTagCount(submission: Submission) {
+  if (submission.status === "returned" || submission.status === "requires_action") {
+    return 0;
+  }
+
   const openIssues = openIssueCount(submission);
   const blockers = blockerCount(submission);
   const statusTags = [statusLabels[submission.status]];
@@ -822,6 +827,16 @@ function submissionExtraTagCount(submission: Submission) {
   if (openIssues > blockers) statusTags.push("Замечания");
 
   return Math.max(statusTags.length - 1, 0);
+}
+
+function submissionExtraTagLabel(submission: Submission) {
+  const blockers = blockerCount(submission);
+  if (blockers > 0) return `${blockers} блокера`;
+
+  const openIssues = openIssueCount(submission);
+  if (openIssues > 0) return `${openIssues} замечания`;
+
+  return undefined;
 }
 
 function submissionActionLabel(submission: Submission) {

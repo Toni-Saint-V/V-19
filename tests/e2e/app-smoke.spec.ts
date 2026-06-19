@@ -25,7 +25,14 @@ async function switchToAdmin(page: Page) {
 }
 
 function submissionCard(page: Page, name: string) {
-  return page.locator(".submission-card").filter({ hasText: name }).first();
+  return page
+    .locator(".submission-card, [data-submission-card]")
+    .filter({ hasText: name })
+    .first();
+}
+
+function submissionCardById(page: Page, id: string) {
+  return page.locator(`[data-submission-id="${id}"]`).first();
 }
 
 function drawer(page: Page) {
@@ -215,13 +222,13 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("combobox", { name: "Фильтр по городу" }),
     ).toBeVisible();
-    await expect(submissionCard(page, "Мария Иванова")).toBeVisible();
+    await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
     await expect(
-      submissionCard(page, "Мария Иванова").getByText("Возвращено"),
+      submissionCardById(page, "ПД-1048").getByText("Возвращено 2", { exact: true }),
     ).toBeVisible();
     await expect(
-      submissionCard(page, "Мария Иванова").getByText("2 блокера", { exact: true }),
-    ).toBeVisible();
+      submissionCardById(page, "ПД-1048").getByText("2 блокера", { exact: true }),
+    ).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Исправить" }).first()).toBeVisible();
     await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
 
@@ -246,24 +253,24 @@ test.describe("V-19 operations workspace", () => {
   test("primary surfaces expose the 3-second decision frame", async ({ page }) => {
     await page.getByRole("button", { name: "Мои подачи" }).click();
     await expect(
-      submissionCard(page, "Семья Ивановых").getByText("Возвращено"),
+      submissionCardById(page, "ПД-1048").getByText("Возвращено 2", { exact: true }),
     ).toBeVisible();
     await expect(
-      submissionCard(page, "Семья Ивановых").getByText("2 блокера", { exact: true }),
-    ).toBeVisible();
+      submissionCardById(page, "ПД-1048").getByText("2 блокера", { exact: true }),
+    ).toHaveCount(0);
+    await expect(submissionCardById(page, "ПД-1048").getByText("Дальше:")).toHaveCount(
+      0,
+    );
+    await expect(submissionCardById(page, "ПД-1048").getByText(/Анкета \d+%/)).toHaveCount(
+      0,
+    );
     await expect(
-      submissionCard(page, "Семья Ивановых").getByText("Дальше:"),
-    ).toBeVisible();
-    await expect(
-      submissionCard(page, "Семья Ивановых").getByText("Анкета 96%"),
-    ).toBeVisible();
-    await expect(
-      submissionCard(page, "Семья Ивановых").getByText("Файлы 4/6"),
+      submissionCardById(page, "ПД-1048").locator(".v19-submission-file-tag", {
+        hasText: "Файлы 4/6",
+      }),
     ).toBeVisible();
 
-    await submissionCard(page, "Семья Ивановых")
-      .getByRole("button", { name: /Исправить/ })
-      .click();
+    await submissionCardById(page, "ПД-1048").click();
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
@@ -822,9 +829,7 @@ test.describe("V-19 operations workspace", () => {
 
     await page.getByRole("button", { name: "Сменить роль" }).click();
     await page.getByRole("button", { name: "Мои подачи" }).click();
-    await submissionCard(page, "Новая подача")
-      .getByRole("button", { name: "Исправить" })
-      .click();
+    await submissionCard(page, "Новая подача").click();
     await expect(page.getByRole("tab", { name: "Замечания" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -907,6 +912,7 @@ test.describe("V-19 operations workspace", () => {
     const browserProblems = collectBrowserProblems(page);
 
     const familyTitle = "Семья Кузнецовых";
+    const familyListTitle = "Кузнецовы";
     const secondFamilyTitle = "Семья Смирновых";
     const firstSingle = "Романов Павел";
     const secondSingle = "Белова Ольга";
@@ -1008,9 +1014,7 @@ test.describe("V-19 operations workspace", () => {
     await test.step("agent fixes returned family blockers and resubmits", async () => {
       await page.getByRole("button", { name: "Сменить роль" }).click();
       await page.getByRole("button", { name: "Мои подачи" }).click();
-      await submissionCard(page, "Кузнецова Анна")
-        .getByRole("button", { name: "Исправить замечания" })
-        .click();
+      await submissionCard(page, familyListTitle).click();
       await expect(
         drawer(page).getByRole("button", { name: "Отправить исправления" }),
       ).toBeDisabled();
