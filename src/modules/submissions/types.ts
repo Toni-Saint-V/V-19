@@ -1,6 +1,13 @@
 export type Role = "agent" | "admin";
 
-export type Surface = "agent-inbox" | "agent-submissions" | "admin-review" | "export";
+export type Surface =
+  | "agent-actions"
+  | "agent-inbox"
+  | "agent-submissions"
+  | "admin-review"
+  | "export";
+
+export type AgentOwnerId = string;
 
 export type SubmissionType = "single" | "family";
 
@@ -266,6 +273,7 @@ export type SubmissionHistoryItem = {
 
 export type Submission = {
   id: string;
+  agentId: AgentOwnerId;
   title: string;
   type: SubmissionType;
   country: "Испания";

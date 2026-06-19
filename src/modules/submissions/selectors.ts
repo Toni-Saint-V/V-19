@@ -1,12 +1,20 @@
-import type { Submission, SubmissionStatus } from "./types";
+import { submissionBelongsToAgent } from "./ownership";
+import type { AgentOwnerId, Submission, SubmissionStatus } from "./types";
 import { blockerCount, fixedIssueCount, openIssueCount } from "./status";
 
 export function byStatus(submissions: Submission[], statuses: SubmissionStatus[]) {
   return submissions.filter((submission) => statuses.includes(submission.status));
 }
 
-export function agentQueue(submissions: Submission[]) {
-  return submissions.filter((submission) =>
+export function ownedSubmissions(
+  submissions: Submission[],
+  agentId: AgentOwnerId,
+) {
+  return submissions.filter((submission) => submissionBelongsToAgent(submission, agentId));
+}
+
+export function agentQueue(submissions: Submission[], agentId?: AgentOwnerId) {
+  const queue = submissions.filter((submission) =>
     [
       "draft",
       "in_progress",
@@ -18,6 +26,8 @@ export function agentQueue(submissions: Submission[]) {
       "exported",
     ].includes(submission.status),
   );
+
+  return agentId ? ownedSubmissions(queue, agentId) : queue;
 }
 
 export function reviewQueue(submissions: Submission[]) {

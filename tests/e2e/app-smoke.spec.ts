@@ -223,8 +223,24 @@ test.describe("V-19 operations workspace", () => {
       submissionCard(page, "Мария Иванова").getByText("2 блокера", { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Исправить" }).first()).toBeVisible();
+    await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
 
     await expectNoRetiredNavigation(page);
+  });
+
+  test("local cockpit keeps another agent submission out of the agent workspace", async ({
+    page,
+  }) => {
+    await page.getByRole("button", { name: "Мои подачи" }).click();
+    await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
+
+    await switchToAdmin(page);
+    await page.getByRole("button", { name: "Выгрузка" }).click();
+    await page.getByRole("tab", { name: "История" }).click();
+
+    await expect(
+      page.locator(".export-row").filter({ hasText: "Ольга Морозова" }),
+    ).toBeVisible();
   });
 
   test("primary surfaces expose the 3-second decision frame", async ({ page }) => {

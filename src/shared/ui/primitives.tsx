@@ -12,10 +12,7 @@ import {
   useId,
   useRef,
 } from "react";
-
-function cn(...values: Array<string | false | null | undefined>): string {
-  return values.filter(Boolean).join(" ");
-}
+import { cn } from "./cn";
 
 function mergeAriaIds(
   ...values: Array<string | false | null | undefined>
@@ -78,6 +75,39 @@ export function Button({
   );
 }
 
+interface IconButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+  icon: ReactNode;
+  label: string;
+  pressed?: boolean;
+  ref?: Ref<HTMLButtonElement>;
+  tooltip?: string;
+}
+
+export function IconButton({
+  className,
+  icon,
+  label,
+  pressed,
+  ref,
+  tooltip,
+  ...props
+}: IconButtonProps) {
+  return (
+    <Button
+      {...props}
+      ref={ref}
+      aria-label={label}
+      aria-pressed={typeof pressed === "boolean" ? pressed : undefined}
+      className={className}
+      title={tooltip ?? label}
+      variant="icon"
+    >
+      {icon}
+    </Button>
+  );
+}
+
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   children: ReactNode;
   tone?: "danger" | "amber" | "blue" | "teal" | "muted" | "default";
@@ -101,6 +131,24 @@ export function Badge({
     >
       {children}
     </span>
+  );
+}
+
+interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
+  label: string;
+  tone?: BadgeProps["tone"];
+}
+
+export function StatusBadge({
+  className,
+  label,
+  tone = "default",
+  ...props
+}: StatusBadgeProps) {
+  return (
+    <Badge {...props} className={className} tone={tone}>
+      {label}
+    </Badge>
   );
 }
 
@@ -311,6 +359,103 @@ export function SegmentedTabs<T extends string>({
         );
       })}
     </div>
+  );
+}
+
+interface StateTabsProps<T extends string> {
+  ariaLabel: string;
+  className?: string;
+  onValueChange: (value: T) => void;
+  tabs: Array<{ count?: number; id: T; label: string }>;
+  value: T;
+}
+
+export function StateTabs<T extends string>({
+  ariaLabel,
+  className,
+  onValueChange,
+  tabs,
+  value,
+}: StateTabsProps<T>) {
+  const tabRefs = useRef(new Map<T, HTMLButtonElement>());
+
+  function focusTab(index: number) {
+    const tab = tabs[index];
+    onValueChange(tab.id);
+    requestAnimationFrame(() => {
+      tabRefs.current.get(tab.id)?.focus({ preventScroll: true });
+    });
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const lastIndex = tabs.length - 1;
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = index === lastIndex ? 0 : index + 1;
+    }
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = index === 0 ? lastIndex : index - 1;
+    }
+
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = lastIndex;
+
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    focusTab(nextIndex);
+  }
+
+  return (
+    <div
+      className={cn("v19-state-tabs", className)}
+      role="tablist"
+      aria-label={ariaLabel}
+    >
+      {tabs.map((tab, index) => {
+        const selected = value === tab.id;
+
+        return (
+          <button
+            aria-selected={selected}
+            className={selected ? "is-active" : ""}
+            key={tab.id}
+            ref={(node) => {
+              if (node) tabRefs.current.set(tab.id, node);
+              else tabRefs.current.delete(tab.id);
+            }}
+            role="tab"
+            tabIndex={selected ? 0 : -1}
+            type="button"
+            onClick={() => focusTab(index)}
+            onKeyDown={(event) => handleKeyDown(event, index)}
+          >
+            {tab.label}
+            {typeof tab.count === "number" ? <TabCount>{tab.count}</TabCount> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function TabCount({ children }: { children: ReactNode }) {
+  return <span className="v19-tab-count">{children}</span>;
+}
+
+export function NavCount({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label?: string;
+}) {
+  return (
+    <span className="ops-nav-count" aria-label={label}>
+      {children}
+    </span>
   );
 }
 

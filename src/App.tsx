@@ -7,8 +7,13 @@ import {
   dismissAiSuggestion,
   runAiReview,
 } from "./modules/submissions/aiSuggestions";
+import { agentActionQueue, searchAgentActions } from "./modules/submissions/agentActions";
 import { exportSummary } from "./modules/submissions/exportRules";
 import { loadSubmissions, saveSubmissions } from "./modules/submissions/persistence";
+import {
+  defaultLocalAgentOwnerId,
+  ensureSubmissionOwner,
+} from "./modules/submissions/ownership";
 import {
   changedCockpitSubmissions,
   cockpitSubmissionFingerprint,
@@ -21,6 +26,7 @@ import {
   counts,
   exportedHistory,
   highestPriorityFirst,
+  ownedSubmissions,
   readyForExport,
   reviewQueue,
   searchSubmissions,
@@ -64,6 +70,7 @@ import { ConfirmationDialog } from "./modules/submissions/components/Primitives"
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
   AdminReviewScreen,
+  AgentActionsScreen,
   AgentInboxScreen,
   AgentSubmissionsScreen,
   ExportScreen,
@@ -199,9 +206,13 @@ function normalizeCreateApplicantNames(names: string[], count: number) {
   );
 }
 
-function firstSubmissionForRole(submissions: Submission[], role: Role) {
+function firstSubmissionForRole(
+  submissions: Submission[],
+  role: Role,
+  agentId = defaultLocalAgentOwnerId,
+) {
   if (role === "admin") return reviewQueue(submissions)[0] ?? submissions[0];
-  return agentQueue(submissions)[0] ?? submissions[0];
+  return agentQueue(submissions, agentId)[0] ?? ownedSubmissions(submissions, agentId)[0];
 }
 
 function App() {
@@ -271,17 +282,52 @@ function App() {
     () => new Set(),
   );
 
+  const currentAgentOwnerId =
+    role === "agent" && remoteProfile?.role === "agent"
+      ? remoteProfile.id
+      : defaultLocalAgentOwnerId;
+  const visibleSubmissionsForRole =
+    role === "agent"
+      ? ownedSubmissions(submissions, currentAgentOwnerId)
+      : submissions;
   const activeSubmission =
-    submissions.find((submission) => submission.id === selectedSubmissionId) ??
-    submissions[0];
-  const summary = counts(submissions);
-  const blockerSubmissionCount = submissions.filter(
+    visibleSubmissionsForRole.find(
+      (submission) => submission.id === selectedSubmissionId,
+    ) ?? visibleSubmissionsForRole[0];
+  const summary = counts(visibleSubmissionsForRole);
+  const blockerSubmissionCount = visibleSubmissionsForRole.filter(
     (submission) => blockerCount(submission) > 0,
   ).length;
 
   const searchedAgentQueue = useMemo(
-    () => searchSubmissions(agentQueue(submissions), query, cityFilter),
-    [cityFilter, query, submissions],
+    () =>
+      searchSubmissions(
+        agentQueue(submissions, currentAgentOwnerId),
+        query,
+        cityFilter,
+      ),
+    [cityFilter, currentAgentOwnerId, query, submissions],
+  );
+  const agentActionSource = useMemo(
+    () =>
+      searchSubmissions(
+        agentQueue(submissions, currentAgentOwnerId),
+        "",
+        cityFilter,
+      ),
+    [cityFilter, currentAgentOwnerId, submissions],
+  );
+  const agentActions = useMemo(
+    () => agentActionQueue(agentActionSource),
+    [agentActionSource],
+  );
+  const searchedOpenAgentActions = useMemo(
+    () => searchAgentActions(agentActions.open, query),
+    [agentActions.open, query],
+  );
+  const searchedCompletedAgentActions = useMemo(
+    () => searchAgentActions(agentActions.completed, query),
+    [agentActions.completed, query],
   );
   const searchedReviewQueue = useMemo(
     () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
@@ -315,6 +361,10 @@ function App() {
   const showRoleSwitcher =
     !isSupabaseMode &&
     (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
+  const isV11AgentCollectionSurface =
+    surface === "agent-inbox" ||
+    surface === "agent-actions" ||
+    surface === "agent-submissions";
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
   const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
   const hasWorkspaceAccess = isSupabaseMode
@@ -336,14 +386,14 @@ function App() {
             tone: agentInboxUnreadCount > 0 ? "danger" : "default",
           },
           {
-            active: surface === "agent-submissions" && agentTab === "progress",
-            count: searchedAgentQueue.length,
+            active: surface === "agent-actions",
+            count: agentActions.summary.open,
             icon: "Д",
             id: "agent-actions",
             label: "Мои действия",
-            meta: "черновики и дозагрузка",
-            onClick: () => showAgentTab("progress"),
-            tone: searchedAgentQueue.length > 0 ? "warning" : "default",
+            meta: "точные шаги",
+            onClick: showAgentActions,
+            tone: agentActions.summary.open > 0 ? "warning" : "default",
           },
           {
             active: surface === "agent-submissions" && agentTab === "all",
@@ -635,7 +685,10 @@ function App() {
     if (nextRole === "agent") {
       setSurface("agent-inbox");
       setAgentTab("action");
-      setSelectedSubmissionId(submissions[0]?.id ?? "");
+      setSelectedSubmissionId(
+        firstSubmissionForRole(submissions, "agent", defaultLocalAgentOwnerId)?.id ??
+          "",
+      );
     } else {
       setSurface("admin-review");
       setReviewTab("review");
@@ -651,6 +704,10 @@ function App() {
     );
   }
 
+  function firstAgentActionSubmission() {
+    return searchedOpenAgentActions[0]?.submission ?? searchedAgentQueue[0];
+  }
+
   function firstReviewSubmissionForTab(tab: ReviewTab) {
     return (
       highestPriorityFirst(searchedReviewQueue.filter(matchesReviewTab(tab)))[0] ??
@@ -662,6 +719,13 @@ function App() {
     setSurface("agent-inbox");
     setDrawerMode("closed");
     const nextSubmission = firstAgentSubmissionForTab("action") ?? searchedAgentQueue[0];
+    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+  }
+
+  function showAgentActions() {
+    setSurface("agent-actions");
+    setDrawerMode("closed");
+    const nextSubmission = firstAgentActionSubmission();
     if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
   }
 
@@ -1238,6 +1302,7 @@ function App() {
     preliminaryIntake?: PreliminaryIntakeDraft,
   ) {
     const newSubmission = createDraftSubmission({
+      agentId: currentAgentOwnerId,
       applicantNames: createApplicantNames,
       city: createCity,
       familyCount: createFamilyCount,
@@ -1405,9 +1470,18 @@ function App() {
     remoteSubmissions: Submission[],
     ownerIdsBySubmissionId: Map<string, string>,
   ) {
-    const nextSubmissions = remoteSubmissions;
+    const nextSubmissions = remoteSubmissions.map((submission) =>
+      ensureSubmissionOwner(
+        submission,
+        ownerIdsBySubmissionId.get(submission.id) ?? profile.id,
+      ),
+    );
     const nextRole = profile.role;
-    const firstSubmission = firstSubmissionForRole(nextSubmissions, nextRole);
+    const firstSubmission = firstSubmissionForRole(
+      nextSubmissions,
+      nextRole,
+      profile.id,
+    );
 
     remoteOwnerIdsRef.current = ownerIdsBySubmissionId;
     remoteSubmissionFingerprintsRef.current =
@@ -1487,7 +1561,11 @@ function App() {
       submissionsRef.current = localSubmissions;
       setSubmissions(localSubmissions);
       setSelectedSubmissionId(
-        firstSubmissionForRole(localSubmissions, "agent")?.id ?? "",
+        firstSubmissionForRole(
+          localSubmissions,
+          "agent",
+          defaultLocalAgentOwnerId,
+        )?.id ?? "",
       );
       setRole("agent");
       setSurface("agent-inbox");
@@ -1532,6 +1610,22 @@ function App() {
       onChange={setQuery}
     />
   );
+  const agentActionsSearchControl = (
+    <SearchBar
+      label="Поиск по действиям"
+      placeholder="Поиск по действиям"
+      value={query}
+      onChange={setQuery}
+    />
+  );
+  const agentSubmissionsSearchControl = (
+    <SearchBar
+      label="Поиск по подачам"
+      placeholder="Поиск по подачам"
+      value={query}
+      onChange={setQuery}
+    />
+  );
 
   if (!hasWorkspaceAccess) {
     return (
@@ -1560,7 +1654,7 @@ function App() {
         roleLabel={role === "agent" ? "Агент" : "Админ"}
         footer={
           <>
-            {role === "agent" ? (
+            {role === "agent" && surface !== "agent-submissions" ? (
               <Button
                 className="rail-item ops-nav-item ops-create-item"
                 aria-label="Новая подача"
@@ -1612,9 +1706,17 @@ function App() {
           <div>
             <h1>{surfaceTitle(surface)}</h1>
           </div>
-          {surface !== "agent-inbox" || isSupabaseMode ? (
+          {surface === "agent-submissions" ? (
+            <Button
+              className="v19-topbar-cta"
+              variant="primary"
+              onClick={openCreateSubmissionDrawer}
+            >
+              Новая подача
+            </Button>
+          ) : !isV11AgentCollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
-              {surface !== "agent-inbox" ? (
+              {!isV11AgentCollectionSurface ? (
                 <div className="service-logo" aria-label="VisaFlow V-19">
                   <span className="service-logo-mark" aria-hidden="true">
                     VF
@@ -1653,13 +1755,23 @@ function App() {
             submissions={searchedAgentQueue}
             summary={summary}
           />
+        ) : surface === "agent-actions" ? (
+          <AgentActionsScreen
+            completedActions={searchedCompletedAgentActions}
+            onOpen={openSubmission}
+            openActions={searchedOpenAgentActions}
+            searchControl={agentActionsSearchControl}
+            summary={agentActions.summary}
+          />
         ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
+            activeTab={agentTab}
             agentList={agentList}
-            filterControl={cityFilterControl}
+            onCreate={openCreateSubmissionDrawer}
             onOpen={openSubmission}
             onSelect={selectSubmission}
-            searchControl={searchControl}
+            onTab={showAgentTab}
+            searchControl={agentSubmissionsSearchControl}
             visibleSubmission={visibleAgentSubmission}
             summary={summary}
           />

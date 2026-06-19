@@ -1,18 +1,35 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
+import type { AgentActionItem, AgentActionSummary } from "../agentActions";
 import type { ExportSummary } from "../exportRules";
 import { counts, tripDates } from "../selectors";
 import {
+  blockerCount,
   canAddAdminIssue,
+  defaultDrawerTab,
+  openIssueCount,
+  statusLabels,
   typeLabels,
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
-import type { ExportTab, ReviewTab } from "../uiTypes";
+import type { AgentTab, ExportTab, ReviewTab } from "../uiTypes";
 import {
   EmptyState,
   PanelHeader,
   SummaryRow,
 } from "../components/Primitives";
+import {
+  ActionRow,
+  CollectionGroupLabel,
+  CollectionRow,
+  CollectionToolbar,
+  ContextPanel,
+  SubmissionCollectionRow,
+  SvgIcon,
+  SummaryFilterTabs,
+  ToolbarIconButton,
+  ToolbarTools,
+} from "../components/CollectionPrimitives";
 import { SubmissionList } from "../components/SubmissionList";
 
 function pluralRu(count: number, one: string, few: string, many: string) {
@@ -46,6 +63,199 @@ type InboxEvent = {
   title: string;
   tone: "amber" | "blue" | "danger" | "muted" | "teal";
 };
+
+export function AgentActionsScreen({
+  completedActions,
+  onOpen,
+  openActions,
+  searchControl,
+  summary,
+}: {
+  completedActions: AgentActionItem[];
+  onOpen: (submission: Submission, tab?: DrawerTab) => void;
+  openActions: AgentActionItem[];
+  searchControl: ReactNode;
+  summary: AgentActionSummary;
+}) {
+  const [activeTab, setActiveTab] = useState<"open" | "completed">("open");
+  const [comfortableView, setComfortableView] = useState(true);
+  const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "today" | "week">(
+    "all",
+  );
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [sortOldest, setSortOldest] = useState(false);
+
+  const baseActions = activeTab === "open" ? openActions : completedActions;
+  const filteredActions =
+    activeTab === "open" && dueFilter !== "all"
+      ? baseActions.filter((action) => {
+          if (dueFilter === "week")
+            return action.due === "today" || action.due === "week";
+          return action.due === dueFilter;
+        })
+      : baseActions;
+  const orderedActions = sortOldest ? [...filteredActions].reverse() : filteredActions;
+  const visibleActions = orderedActions;
+  const upcomingDeadlines = openActions
+    .filter((action) => action.due !== "completed")
+    .slice(0, 3);
+  const actionGroupLabel =
+    activeTab === "completed"
+      ? "Выполненные действия"
+      : dueFilter === "overdue"
+        ? "Просрочено"
+        : dueFilter === "today"
+          ? "Сегодня"
+          : dueFilter === "week"
+            ? "На неделе"
+            : "Открытые действия";
+
+  return (
+    <div
+      className={`v19-screen-grid v19-inbox-screen v19-actions-screen ${
+        panelOpen ? "" : "is-panel-closed"
+      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+    >
+      <CardComponent
+        as="section"
+        className="v19-collection-panel"
+        aria-labelledby="agent-actions-title"
+      >
+        <h2 id="agent-actions-title" className="sr-only">
+          Мои действия
+        </h2>
+
+        <CollectionToolbar
+          ariaLabel="Инструменты действий"
+          onTabChange={setActiveTab}
+          search={searchControl}
+          tabs={[
+            { count: summary.open, id: "open", label: "Открытые" },
+            { count: summary.completed || undefined, id: "completed", label: "Выполненные" },
+          ]}
+          tools={
+            <ToolbarTools>
+              <ToolbarIconButton
+                label={
+                  dueFilter === "all"
+                    ? "Фильтр: все действия"
+                    : "Фильтр: активен"
+                }
+                icon="filter"
+                pressed={dueFilter !== "all"}
+                onClick={() =>
+                  setDueFilter((value) => (value === "all" ? "overdue" : "all"))
+                }
+              />
+              <ToolbarIconButton
+                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+                icon="view"
+                pressed={!comfortableView}
+                onClick={() => setComfortableView((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={
+                  sortOldest
+                    ? "Сортировка: поздние ниже"
+                    : "Сортировка: важные сверху"
+                }
+                icon="sort"
+                pressed={sortOldest}
+                onClick={() => setSortOldest((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
+                icon="panel"
+                pressed={panelOpen}
+                onClick={() => setPanelOpen((value) => !value)}
+              />
+            </ToolbarTools>
+          }
+          value={activeTab}
+        />
+
+        {activeTab === "open" ? (
+          <SummaryFilterTabs
+            ariaLabel="Сроки действий"
+            onValueChange={(nextFilter) =>
+              setDueFilter((value) => (value === nextFilter ? "all" : nextFilter))
+            }
+            tabs={[
+              { count: summary.overdue, id: "overdue", label: "Просрочено", tone: "danger" },
+              { count: summary.today, id: "today", label: "Сегодня", tone: "amber" },
+              { count: summary.week, id: "week", label: "На неделе", tone: "neutral" },
+            ]}
+            value={dueFilter === "all" ? null : dueFilter}
+          />
+        ) : null}
+
+        {visibleActions.length ? (
+          <div className="v19-event-list v19-action-list" aria-label="Список действий">
+            <CollectionGroupLabel className="v19-action-group-label">
+              {actionGroupLabel}
+            </CollectionGroupLabel>
+            {visibleActions.map((action) => (
+              <ActionRow
+                badges={action.badges}
+                context={`${action.context}`}
+                cta={action.cta}
+                key={action.id}
+                severity={action.severity}
+                title={action.title}
+                onOpen={() => onOpen(action.submission, action.tab)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="v19-empty-state">
+            <h3>Открытых действий нет</h3>
+            <p>
+              Все текущие шаги выполнены. Новые действия появятся после изменений в
+              подачах.
+            </p>
+            <Button variant="secondary" onClick={() => setActiveTab("open")}>
+              Показать открытые
+            </Button>
+          </div>
+        )}
+      </CardComponent>
+
+      {panelOpen ? (
+        <ContextPanel label="Нагрузка по действиям">
+          <p className="kicker">Нагрузка</p>
+          <div className="v19-unread-summary">
+            <strong>{summary.open}</strong>
+            <span>
+              {pluralRu(
+                summary.open,
+                "открытое действие",
+                "открытых действия",
+                "открытых действий",
+              )}
+            </span>
+          </div>
+          <div className="v19-panel-metrics v19-actions-metrics">
+            <span>
+              <em>{summary.overdue} просрочено</em>
+            </span>
+            <span>
+              <strong>{summary.today} на сегодня</strong>
+            </span>
+          </div>
+          <div className="v19-next-card v19-deadline-list">
+            <span>Следующие сроки</span>
+            {upcomingDeadlines.map((action) => (
+              <p key={action.id}>
+                <strong>{action.submission.title}</strong>
+                <em>{action.dueLabel}</em>
+              </p>
+            ))}
+          </div>
+        </ContextPanel>
+      ) : null}
+    </div>
+  );
+}
 
 export function AgentInboxScreen({
   onOpen,
@@ -95,6 +305,8 @@ export function AgentInboxScreen({
     : Math.min(summary.requiresAction, unreadCount);
   const informationalEventCount = Math.max(unreadCount - actionEventCount, 0);
   const nextEvent = visibleEvents[0] ?? events[0];
+  const panelNextEvent =
+    events.find((event) => event.id.includes("reference-video")) ?? nextEvent;
   const eventGroups = [
     {
       events: visibleEvents.filter((event) => !event.time.startsWith("вчера")),
@@ -116,6 +328,11 @@ export function AgentInboxScreen({
     onOpen(event.submission, event.tab);
   }
 
+  function openPanelNextEvent(event: InboxEvent) {
+    setReadEventIds((current) => new Set(current).add(event.id));
+    onOpen(event.submission, event.tab);
+  }
+
   return (
     <div
       className={`v19-screen-grid v19-inbox-screen ${
@@ -131,105 +348,79 @@ export function AgentInboxScreen({
           Входящие
         </h2>
 
-        <div className="v19-collection-toolbar" aria-label="Инструменты входящих">
-          <div className="v19-state-tabs" role="tablist" aria-label="Состояние событий">
-            <button
-              aria-selected={activeTab === "unread"}
-              className={activeTab === "unread" ? "is-active" : ""}
-              role="tab"
-              type="button"
-              onClick={() => setActiveTab("unread")}
-            >
-              Непрочитанные
-              <span>{unreadCount}</span>
-            </button>
-            <button
-              aria-selected={activeTab === "all"}
-              className={activeTab === "all" ? "is-active" : ""}
-              role="tab"
-              type="button"
-              onClick={() => setActiveTab("all")}
-            >
-              Все
-            </button>
-          </div>
-          {searchControl}
-          <div className="v19-toolbar-tools">
-            <InboxToolButton
-              label={
-                actionOnly
-                  ? "Фильтр: только требующие действия"
-                  : "Фильтр: все события"
-              }
-              icon="filter"
-              pressed={actionOnly}
-              onClick={() => setActionOnly((value) => !value)}
-            />
-            <InboxToolButton
-              label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
-              icon="view"
-              pressed={!comfortableView}
-              onClick={() => setComfortableView((value) => !value)}
-            />
-            <InboxToolButton
-              label={
-                sortOrder === "newest"
-                  ? "Сортировка: новые сверху"
-                  : "Сортировка: старые сверху"
-              }
-              icon="sort"
-              pressed={sortOrder === "oldest"}
-              onClick={() =>
-                setSortOrder((value) => (value === "newest" ? "oldest" : "newest"))
-              }
-            />
-            <InboxToolButton
-              label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
-              icon="panel"
-              pressed={panelOpen}
-              onClick={() => setPanelOpen((value) => !value)}
-            />
-          </div>
-        </div>
-
-        {activeFilterLabels.length ? (
-          <div className="v19-active-filters" aria-label="Активные фильтры">
-            {activeFilterLabels.map((label) => (
-              <span key={label}>{label}</span>
-            ))}
-          </div>
-        ) : null}
+        <CollectionToolbar
+          activeFilters={activeFilterLabels}
+          ariaLabel="Инструменты входящих"
+          onTabChange={setActiveTab}
+          search={searchControl}
+          tabs={[
+            { count: unreadCount, id: "unread", label: "Непрочитанные" },
+            { id: "all", label: "Все" },
+          ]}
+          tools={
+            <ToolbarTools>
+              <ToolbarIconButton
+                label={
+                  actionOnly
+                    ? "Фильтр: только требующие действия"
+                    : "Фильтр: все события"
+                }
+                icon="filter"
+                pressed={actionOnly}
+                onClick={() => setActionOnly((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+                icon="view"
+                pressed={!comfortableView}
+                onClick={() => setComfortableView((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={
+                  sortOrder === "newest"
+                    ? "Сортировка: новые сверху"
+                    : "Сортировка: старые сверху"
+                }
+                icon="sort"
+                pressed={sortOrder === "oldest"}
+                onClick={() =>
+                  setSortOrder((value) =>
+                    value === "newest" ? "oldest" : "newest",
+                  )
+                }
+              />
+              <ToolbarIconButton
+                label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
+                icon="panel"
+                pressed={panelOpen}
+                onClick={() => setPanelOpen((value) => !value)}
+              />
+            </ToolbarTools>
+          }
+          value={activeTab}
+        />
 
         {visibleEvents.length ? (
           <div className="v19-event-list" aria-label="Список входящих событий">
             {eventGroups.map((group) => (
               <div className="v19-event-group" key={group.label}>
-                <div className="v19-group-label">{group.label}</div>
+                <CollectionGroupLabel>{group.label}</CollectionGroupLabel>
                 {group.events.map((event) => (
-                  <button
-                    className={`v19-event-row ${
-                      event.read ? "is-read" : "is-unread"
-                    }`}
+                  <CollectionRow
+                    action={event.action}
+                    badge={event.badge}
+                    icon={<InboxEventIcon icon={event.icon} />}
                     key={event.id}
-                    type="button"
-                    onClick={() => openEvent(event)}
-                  >
-                    <span className="v19-unread-dot" aria-hidden="true" />
-                    <span
-                      className={`v19-event-icon tone-${event.tone}`}
-                      aria-hidden="true"
-                    >
-                      <InboxEventIcon icon={event.icon} />
-                    </span>
-                    <span className="v19-event-main">
-                      <strong>{event.title}</strong>
-                      <em>
+                    meta={
+                      <>
                         {event.context} · {event.time}
-                      </em>
-                    </span>
-                    <Badge tone={event.tone}>{event.badge}</Badge>
-                    <span className="v19-event-action">{event.action}</span>
-                  </button>
+                      </>
+                    }
+                    read={event.read}
+                    title={event.title}
+                    tone={event.tone}
+                    onOpen={() => openEvent(event)}
+                  />
                 ))}
               </div>
             ))}
@@ -246,11 +437,7 @@ export function AgentInboxScreen({
       </CardComponent>
 
       {panelOpen ? (
-        <CardComponent
-          as="aside"
-          className="v19-context-panel"
-          aria-label="Сводка входящих"
-        >
+        <ContextPanel label="Сводка входящих">
           <p className="kicker">Сводка</p>
           <div className="v19-unread-summary">
             <strong>{unreadCount}</strong>
@@ -273,103 +460,22 @@ export function AgentInboxScreen({
               <strong>{informationalEventCount}</strong>
             </span>
           </div>
-          {nextEvent ? (
+          {panelNextEvent ? (
             <div className="v19-next-card">
               <span>Следующее действие</span>
-              <strong>{nextEvent.action}</strong>
-              <p>{nextEvent.submission.title}</p>
-              <Button variant="primary" onClick={() => openEvent(nextEvent)}>
-                {nextEvent.action}
+              <strong>{panelNextEvent.title}</strong>
+              <p>{panelNextEvent.context}</p>
+              <Button
+                variant="primary"
+                onClick={() => openPanelNextEvent(panelNextEvent)}
+              >
+                {panelNextEvent.action}
               </Button>
             </div>
           ) : null}
-        </CardComponent>
+        </ContextPanel>
       ) : null}
     </div>
-  );
-}
-
-function InboxToolButton({
-  icon,
-  label,
-  onClick,
-  pressed,
-}: {
-  icon: "filter" | "panel" | "sort" | "view";
-  label: string;
-  onClick: () => void;
-  pressed: boolean;
-}) {
-  return (
-    <Button
-      className="v19-toolbar-icon"
-      variant="icon"
-      aria-label={label}
-      aria-pressed={pressed}
-      title={label}
-      onClick={onClick}
-    >
-      <ToolbarIcon icon={icon} />
-    </Button>
-  );
-}
-
-function SvgIcon({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      focusable="false"
-      height="16"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-      width="16"
-    >
-      {children}
-    </svg>
-  );
-}
-
-function ToolbarIcon({ icon }: { icon: "filter" | "panel" | "sort" | "view" }) {
-  if (icon === "filter") {
-    return (
-      <SvgIcon>
-        <path d="M4 6h16" />
-        <path d="M7 12h10" />
-        <path d="M10 18h4" />
-      </SvgIcon>
-    );
-  }
-
-  if (icon === "view") {
-    return (
-      <SvgIcon>
-        <path d="M4 6.5h16" />
-        <path d="M4 12h16" />
-        <path d="M4 17.5h16" />
-      </SvgIcon>
-    );
-  }
-
-  if (icon === "sort") {
-    return (
-      <SvgIcon>
-        <path d="M8 5v14" />
-        <path d="m5 8 3-3 3 3" />
-        <path d="M16 19V5" />
-        <path d="m13 16 3 3 3-3" />
-      </SvgIcon>
-    );
-  }
-
-  return (
-    <SvgIcon>
-      <path d="M5 5h14v14H5V5Z" />
-      <path d="M14 5v14" />
-    </SvgIcon>
   );
 }
 
@@ -491,57 +597,255 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
 }
 
 export function AgentSubmissionsScreen({
+  activeTab,
   agentList,
-  filterControl,
+  onCreate,
   onOpen,
   onSelect,
+  onTab,
   searchControl,
   visibleSubmission,
   summary,
 }: {
+  activeTab: AgentTab;
   agentList: Submission[];
-  filterControl?: ReactNode;
+  onCreate: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
+  onTab: (tab: AgentTab) => void;
   searchControl: ReactNode;
   visibleSubmission: Submission | null;
   summary: ReturnType<typeof counts>;
 }) {
+  const [blockersOnly, setBlockersOnly] = useState(false);
+  const [comfortableView, setComfortableView] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [sortNewest, setSortNewest] = useState(true);
+
+  const filteredSubmissions = useMemo(
+    () =>
+      blockersOnly
+        ? agentList.filter((submission) => blockerCount(submission) > 0)
+        : agentList,
+    [agentList, blockersOnly],
+  );
+  const orderedSubmissions = useMemo(
+    () => (sortNewest ? filteredSubmissions : [...filteredSubmissions].reverse()),
+    [filteredSubmissions, sortNewest],
+  );
+  const prioritySubmission = visibleSubmission ?? orderedSubmissions[0] ?? null;
+  const tabCounts = {
+    action: summary.requiresAction,
+    done: summary.ready + summary.exported,
+    progress: summary.draft + summary.inProgress,
+    review: summary.inReview + summary.corrections,
+  };
+  const visibleTab: Exclude<AgentTab, "all"> =
+    activeTab === "all" ? "action" : activeTab;
+  const activeFilterLabels: string[] = [
+    blockersOnly ? "Только блокеры" : null,
+    sortNewest ? null : "Обратный порядок",
+    comfortableView ? null : "Компактный вид",
+  ].filter((label): label is string => Boolean(label));
   return (
-    <div className="main-grid core-list-grid">
+    <div
+      className={`v19-screen-grid v19-inbox-screen v19-submissions-screen ${
+        panelOpen ? "" : "is-panel-closed"
+      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+    >
       <CardComponent
         as="section"
-        className="submission-panel"
+        className="v19-collection-panel"
         aria-labelledby="agent-title"
       >
-        <PanelHeader
-          action={
-            <Button
-              disabled={!visibleSubmission}
-              variant="secondary"
-              onClick={() => visibleSubmission && onOpen(visibleSubmission)}
-            >
-              Открыть выбранную
-            </Button>
-          }
-          eyebrow="Подачи"
-          titleId="agent-title"
-          title="Рабочий список"
-          description={`${summary.requiresAction} требуют действия · ${summary.inReview} на проверке`}
+        <h2 id="agent-title" className="sr-only">
+          Мои подачи
+        </h2>
+
+        <CollectionToolbar
+          activeFilters={activeFilterLabels}
+          ariaLabel="Инструменты подач"
+          onTabChange={onTab}
           search={searchControl}
-          side={filterControl}
+          tabs={[
+            { count: tabCounts.action, id: "action", label: "Действия" },
+            { count: tabCounts.progress, id: "progress", label: "В работе" },
+            { count: tabCounts.review, id: "review", label: "Проверка" },
+            { count: tabCounts.done, id: "done", label: "Готово" },
+          ]}
+          tools={
+            <ToolbarTools>
+              <ToolbarIconButton
+                label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
+                icon="filter"
+                pressed={blockersOnly}
+                onClick={() => setBlockersOnly((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+                icon="view"
+                pressed={!comfortableView}
+                onClick={() => setComfortableView((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
+                icon="sort"
+                pressed={!sortNewest}
+                onClick={() => setSortNewest((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
+                icon="panel"
+                pressed={panelOpen}
+                onClick={() => setPanelOpen((value) => !value)}
+              />
+            </ToolbarTools>
+          }
+          value={visibleTab}
         />
-        <SubmissionList
-          activeSubmission={visibleSubmission}
-          empty="В этой вкладке нет подач."
-          onOpen={onOpen}
-          onSelect={onSelect}
-          role="agent"
-          submissions={agentList}
-        />
+
+        {orderedSubmissions.length ? (
+          <>
+            <div className="v19-submission-list-head" aria-hidden="true">
+              <span />
+              <span>Подача</span>
+              <span>Статус</span>
+              <span>Файлы</span>
+              <span>%</span>
+              <span />
+            </div>
+            <div className="v19-event-list v19-submission-list">
+              {orderedSubmissions.map((submission) => (
+                <SubmissionCollectionRow
+                  action={submissionActionLabel(submission)}
+                  completeness={`${submission.completeness.total}%`}
+                  extraTagCount={submissionExtraTagCount(submission)}
+                  fileState={submissionFileStateLabel(submission)}
+                  fileTone={submissionFileStateTone(submission)}
+                  key={submission.id}
+                  meta={
+                    <>
+                      {submission.city} · {tripDates(submission)}
+                    </>
+                  }
+                  status={submission.status}
+                  statusLabel={statusLabels[submission.status]}
+                  title={submission.title}
+                  onOpen={() => {
+                    onSelect(submission);
+                    onOpen(submission, defaultDrawerTab(submission));
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="v19-empty-state">
+            <h3>В этой вкладке нет подач</h3>
+            <p>Список обновится после создания или изменения статуса подачи.</p>
+            <Button variant="secondary" onClick={onCreate}>
+              Новая подача
+            </Button>
+          </div>
+        )}
       </CardComponent>
+
+      {panelOpen ? (
+        <ContextPanel className="v19-submissions-context" label="Сводка подач">
+          <p className="kicker">Сводка</p>
+          <div className="v19-panel-metrics v19-submission-status-metrics">
+            <span>
+              Требуют действия
+              <strong>{tabCounts.action}</strong>
+            </span>
+            <span>
+              В работе
+              <strong>{tabCounts.progress}</strong>
+            </span>
+            <span>
+              На проверке
+              <strong>{tabCounts.review}</strong>
+            </span>
+            <span>
+              Готово
+              <strong>{tabCounts.done}</strong>
+            </span>
+          </div>
+          {prioritySubmission ? (
+            <div className="v19-next-card">
+              <span>Приоритет</span>
+              <strong>{prioritySubmission.title}</strong>
+              <p>
+                {submissionPriorityLine(prioritySubmission)}
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  onSelect(prioritySubmission);
+                  onOpen(prioritySubmission, defaultDrawerTab(prioritySubmission));
+                }}
+              >
+                {submissionActionLabel(prioritySubmission)}
+              </Button>
+            </div>
+          ) : null}
+        </ContextPanel>
+      ) : null}
     </div>
   );
+}
+
+function submissionFileStateLabel(submission: Submission) {
+  const ready = submission.files.filter(
+    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  ).length;
+
+  return `Файлы ${ready}/${submission.files.length}`;
+}
+
+function submissionFileStateTone(submission: Submission): "amber" | "muted" | "teal" {
+  const ready = submission.files.filter(
+    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  ).length;
+
+  if (ready === 0) return "muted";
+  if (ready === submission.files.length) return "teal";
+  return "amber";
+}
+
+function submissionExtraTagCount(submission: Submission) {
+  const openIssues = openIssueCount(submission);
+  const blockers = blockerCount(submission);
+  const statusTags = [statusLabels[submission.status]];
+
+  if (blockers > 0) statusTags.push("Блокер");
+  if (openIssues > blockers) statusTags.push("Замечания");
+
+  return Math.max(statusTags.length - 1, 0);
+}
+
+function submissionActionLabel(submission: Submission) {
+  if (submission.status === "requires_action" || submission.status === "returned") {
+    return "Исправить";
+  }
+  if (submission.status === "draft" || submission.status === "in_progress") {
+    return "Продолжить";
+  }
+  if (
+    submission.status === "submitted_for_review" ||
+    submission.status === "corrections_received"
+  ) {
+    return "Статус";
+  }
+  return "Открыть";
+}
+
+function submissionPriorityLine(submission: Submission) {
+  const blockers = blockerCount(submission);
+  if (blockers > 0) return `${blockers} блокера · обновлено ${submission.updatedAt}`;
+  const open = openIssueCount(submission);
+  if (open > 0) return `${open} замечания · обновлено ${submission.updatedAt}`;
+  return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
 }
 
 export function AdminReviewScreen({

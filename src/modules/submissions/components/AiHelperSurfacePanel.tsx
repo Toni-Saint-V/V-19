@@ -1,14 +1,17 @@
-import { Badge, CardComponent } from "../../../shared/ui/primitives";
+import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import { buildSubmissionAiHelperSurface } from "../aiHelperSurface";
+import type { SubmissionNextStepAction } from "../submissionNextStepEngine";
 import type { Role, Submission } from "../types";
 
 export function AiHelperSurfacePanel({
   compact = false,
+  onPrimaryAction,
   role,
   submission,
   surface,
 }: {
   compact?: boolean;
+  onPrimaryAction?: (action: SubmissionNextStepAction) => void;
   role: Role;
   submission: Submission;
   surface: "agent" | "review" | "export";
@@ -18,6 +21,10 @@ export function AiHelperSurfacePanel({
     submission,
     surface,
   });
+  const primaryActionDisabled =
+    helper.primaryAction.disabled ||
+    helper.primaryAction.kind === "wait" ||
+    helper.primaryAction.kind === "none";
 
   return (
     <CardComponent
@@ -31,7 +38,19 @@ export function AiHelperSurfacePanel({
           <h3>{helper.title}</h3>
           <p>{helper.summary}</p>
         </div>
-        <Badge tone="muted">Локальная проверка</Badge>
+        <div>
+          <Badge tone="muted">Локальная проверка</Badge>
+          <Button
+            disabled={primaryActionDisabled}
+            variant="secondary"
+            onClick={() => {
+              if (primaryActionDisabled) return;
+              onPrimaryAction?.(helper.primaryAction);
+            }}
+          >
+            {helper.primaryAction.label}
+          </Button>
+        </div>
       </div>
       <div className="ai-helper-surface-sections">
         {helper.sections.map((section) => (

@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, test } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { AiHelperSurfacePanel } from "../../src/modules/submissions/components/AiHelperSurfacePanel";
 import type { Submission } from "../../src/modules/submissions/types";
 
@@ -82,6 +82,24 @@ function submission(overrides: Partial<Submission> = {}): Submission {
   };
 }
 
+function completedApplicants() {
+  return submission().applicants.map((applicant) => ({
+    ...applicant,
+    fileStatus: "complete" as const,
+    questionnaireStatus: "complete" as const,
+    sections: applicant.sections.map((section) => ({
+      ...section,
+      missing: undefined,
+      status: "complete" as const,
+      fields: section.fields.map((field) => ({
+        ...field,
+        error: undefined,
+        value: field.value || "ok",
+      })),
+    })),
+  }));
+}
+
 describe("AI helper surface panel", () => {
   test("renders a local readiness helper for agents without unsafe trust copy", () => {
     render(
@@ -121,6 +139,7 @@ describe("AI helper surface panel", () => {
         role="agent"
         submission={submission({
           completeness: { questionnaire: 100, files: 100, total: 100 },
+          applicants: completedApplicants(),
           files: [
             { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
             { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
@@ -144,6 +163,7 @@ describe("AI helper surface panel", () => {
       <AiHelperSurfacePanel
         role="agent"
         submission={submission({
+          applicants: completedApplicants(),
           completeness: { questionnaire: 100, files: 100, total: 100 },
           files: [
             { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
@@ -187,6 +207,7 @@ describe("AI helper surface panel", () => {
       <AiHelperSurfacePanel
         role="agent"
         submission={submission({
+          applicants: completedApplicants(),
           completeness: { questionnaire: 100, files: 100, total: 100 },
           files: [
             { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
@@ -252,5 +273,64 @@ describe("AI helper surface panel", () => {
     expect(screen.getByLabelText("Фокус выгрузки администратора")).toBeVisible();
     expect(screen.getByText("Пакет уже выгружен")).toBeVisible();
     expect(screen.queryByLabelText("Локальная подсказка агента")).toBeNull();
+  });
+
+  test("emits structured primary action clicks for future drawer routing", () => {
+    const onPrimaryAction = vi.fn();
+    render(
+      <AiHelperSurfacePanel
+        role="agent"
+        submission={submission({
+          applicants: completedApplicants(),
+          completeness: { questionnaire: 100, files: 100, total: 100 },
+          files: [
+            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
+            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
+            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
+          ],
+          issues: [],
+          status: "in_progress",
+        })}
+        surface="agent"
+        onPrimaryAction={onPrimaryAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+
+    expect(onPrimaryAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "submission_action",
+        submissionAction: "submit_for_review",
+      }),
+    );
+  });
+
+  test("does not emit disabled primary actions", () => {
+    const onPrimaryAction = vi.fn();
+    render(
+      <AiHelperSurfacePanel
+        role="admin"
+        submission={submission({
+          applicants: completedApplicants(),
+          completeness: { questionnaire: 100, files: 100, total: 100 },
+          files: [
+            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
+            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
+            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
+          ],
+          issues: [],
+          status: "submitted_for_review",
+        })}
+        surface="export"
+        onPrimaryAction={onPrimaryAction}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Открыть историю" });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+
+    expect(onPrimaryAction).not.toHaveBeenCalled();
   });
 });

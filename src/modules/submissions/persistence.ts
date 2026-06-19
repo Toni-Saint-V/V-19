@@ -1,4 +1,5 @@
 import { initialSubmissions } from "./mockData";
+import { defaultLocalAgentOwnerId, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
 import type { Submission } from "./types";
 
@@ -25,7 +26,11 @@ export function loadSubmissions(): Submission[] {
     ) {
       return initialSubmissions;
     }
-    return parsed.map(normalizeSubmissionQuestionnaire);
+    return parsed.map((submission) =>
+      normalizeSubmissionQuestionnaire(
+        ensureSubmissionOwner(submission, defaultLocalAgentOwnerId),
+      ),
+    );
   } catch {
     return initialSubmissions;
   }
