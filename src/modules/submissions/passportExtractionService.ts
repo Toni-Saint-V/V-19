@@ -7,6 +7,11 @@ import {
   type PassportExtractionField,
   type PassportExtractionResult,
 } from "./passportExtractionContract";
+import {
+  analyzePassportImageQuality,
+  passportImageQualitySummary,
+  type PassportImageQualityReport,
+} from "./passportImageQuality";
 import type { Submission, SubmissionFile } from "./types";
 
 const supportedPassportMimeTypes = new Set<PassportDocumentRef["mimeType"]>([
@@ -23,6 +28,12 @@ const mrzCountryNames: Record<string, string> = {
 type BrowserCanvas = {
   getContext(type: "2d"): {
     drawImage(image: BrowserImageBitmap, offsetX: number, offsetY: number): void;
+    getImageData(
+      offsetX: number,
+      offsetY: number,
+      width: number,
+      height: number,
+    ): { data: Uint8ClampedArray };
     rotate(angle: number): void;
     translate(x: number, y: number): void;
   } | null;
@@ -269,6 +280,41 @@ async function passportCanvasFromFile(file: File, rotationDegrees: 0 | 90 | 180 
   return canvas;
 }
 
+async function passportImageQualityFromFile(file: File) {
+  const canvas = await passportCanvasFromFile(file, 0);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Browser image canvas context is unavailable.");
+
+  return analyzePassportImageQuality({
+    data: context.getImageData(0, 0, canvas.width, canvas.height).data,
+    height: canvas.height,
+    mimeType: file.type,
+    sizeBytes: file.size,
+    width: canvas.width,
+  });
+}
+
+async function safePassportImageQualityFromFile(file: File) {
+  try {
+    return await passportImageQualityFromFile(file);
+  } catch {
+    return null;
+  }
+}
+
+function unavailableWithQuality(
+  applicantIndex: number | undefined,
+  quality: PassportImageQualityReport | null,
+) {
+  const unavailable = safeUnavailablePassportExtractionResult(applicantIndex);
+  if (!quality || quality.status === "pass") return unavailable;
+
+  return {
+    ...unavailable,
+    summary: `${unavailable.summary} ${passportImageQualitySummary(quality)}`,
+  };
+}
+
 async function invokeLocalPassportExtraction(input: {
   applicantIndex?: number;
   localFile: File;
@@ -276,6 +322,8 @@ async function invokeLocalPassportExtraction(input: {
   if (!["image/jpeg", "image/png"].includes(input.localFile.type)) {
     return safeUnavailablePassportExtractionResult(input.applicantIndex);
   }
+
+  const quality = await safePassportImageQualityFromFile(input.localFile);
 
   const tesseract = await import("tesseract.js");
   const recognize = tesseract.recognize ?? tesseract.default.recognize;
@@ -304,8 +352,8 @@ async function invokeLocalPassportExtraction(input: {
       status: "extracted",
       summary:
         rotation === 0
-          ? `Локальный OCR нашёл ${fields.length} полей MRZ. Проверьте их вручную перед отправкой.`
-          : `Локальный OCR повернул паспорт на ${rotation}° и нашёл ${fields.length} полей MRZ. Проверьте их вручную перед отправкой.`,
+          ? localOcrSummary(fields.length, quality)
+          : `${localOcrSummary(fields.length, quality)} Паспорт был повернут на ${rotation}° по MRZ.`,
     };
 
     const parsed = parsePassportExtractionResult(result);
@@ -313,7 +361,13 @@ async function invokeLocalPassportExtraction(input: {
     return parsed.data;
   }
 
-  return safeUnavailablePassportExtractionResult(input.applicantIndex);
+  return unavailableWithQuality(input.applicantIndex, quality);
+}
+
+function localOcrSummary(fields: number, quality: PassportImageQualityReport | null) {
+  const qualityNote =
+    quality && quality.status !== "pass" ? ` ${passportImageQualitySummary(quality)}` : "";
+  return `Локальный OCR нашёл ${fields} полей MRZ. Проверьте их вручную перед отправкой.${qualityNote}`;
 }
 
 export async function invokePassportExtraction(input: {
