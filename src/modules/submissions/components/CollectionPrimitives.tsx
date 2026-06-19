@@ -238,31 +238,44 @@ export function SubmissionCollectionRow({
   action,
   completeness,
   extraTagCount = 0,
+  extraTagLabel,
   fileState,
   fileTone,
   meta,
   onOpen,
+  searchText,
   status,
   statusLabel,
+  submissionId,
   title,
 }: {
   action: string;
   completeness: string;
   extraTagCount?: number;
+  extraTagLabel?: string;
   fileState: string;
   fileTone: "amber" | "muted" | "teal";
-  meta: ReactNode;
+  meta?: ReactNode;
   onOpen: () => void;
+  searchText?: string;
   status: SubmissionStatus;
   statusLabel: string;
+  submissionId: string;
   title: string;
 }) {
   return (
-    <button className="v19-submission-row" type="button" onClick={onOpen}>
+    <button
+      className="v19-submission-row"
+      data-submission-card=""
+      data-submission-id={submissionId}
+      type="button"
+      onClick={onOpen}
+    >
       <span className={cn("v19-submission-dot", `status-${status}`)} aria-hidden="true" />
       <span className="v19-event-main">
         <strong title={title}>{title}</strong>
-        <em>{meta}</em>
+        {searchText ? <span className="sr-only">{searchText}</span> : null}
+        {meta ? <em>{meta}</em> : null}
       </span>
       <span className="v19-submission-status-tag" aria-label={`Статус: ${statusLabel}`}>
         <Badge
@@ -271,7 +284,9 @@ export function SubmissionCollectionRow({
         >
           {statusLabel}
           {extraTagCount > 0 ? (
-            <span className="v19-status-chip-suffix">+{extraTagCount}</span>
+            <span className="v19-status-chip-suffix">
+              {extraTagLabel ?? `+${extraTagCount}`}
+            </span>
           ) : null}
         </Badge>
       </span>

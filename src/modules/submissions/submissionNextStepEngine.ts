@@ -75,8 +75,9 @@ export function buildSubmissionNextStepBrief({
 }): SubmissionNextStepBrief {
   const queue = buildReadinessQueue(submission);
   const passportBrief = buildPassportExtractionBrief(submission);
-  const blockers = readinessBlockers(submission);
+  const blockers = readinessBlockers(submission, role);
   const primaryAction =
+    agentWaitingPrimaryAction(submission, role, surface) ??
     passportPrimaryAction(submission, passportBrief) ??
     queuePrimaryAction(submission) ??
     lifecyclePrimaryAction(submission, role, surface);
@@ -184,6 +185,46 @@ function queuePrimaryAction(submission: Submission): SubmissionNextStepAction | 
   };
 }
 
+function agentWaitingPrimaryAction(
+  submission: Submission,
+  role: Role,
+  surface: "agent" | "review" | "export",
+): SubmissionNextStepAction | null {
+  if (role !== "agent" || surface !== "agent") return null;
+
+  if (submission.status === "submitted_for_review") {
+    return {
+      disabled: true,
+      id: "wait_admin_review",
+      kind: "wait",
+      label: "Дождитесь ручной проверки администратора",
+      reason: "Заявка уже отправлена на проверку.",
+    };
+  }
+
+  if (submission.status === "corrections_received") {
+    return {
+      disabled: true,
+      id: "wait_admin_corrections_review",
+      kind: "wait",
+      label: "Дождитесь закрытия исправлений администратором",
+      reason: "Исправления уже отправлены.",
+    };
+  }
+
+  if (submission.status === "ready_for_export") {
+    return {
+      disabled: true,
+      id: "wait_admin_export",
+      kind: "wait",
+      label: "Дождитесь выгрузки администратором",
+      reason: "Пакет принят к выгрузке.",
+    };
+  }
+
+  return null;
+}
+
 function lifecyclePrimaryAction(
   submission: Submission,
   role: Role,
@@ -241,7 +282,6 @@ function nextOwner(
   role: Role,
   primaryAction: SubmissionNextStepAction,
 ): Role | "system" {
-  if (primaryAction.kind === "wait") return "system";
   if (
     submission.status === "submitted_for_review" ||
     submission.status === "corrections_received" ||
@@ -250,6 +290,7 @@ function nextOwner(
   ) {
     return "admin";
   }
+  if (primaryAction.kind === "wait") return "system";
   return role;
 }
 
@@ -380,7 +421,7 @@ function agentReadinessActions(
   return ["Сверьте текущий статус и продолжите работу в доступном действии."];
 }
 
-function readinessBlockers(submission: Submission): string[] {
+function readinessBlockers(submission: Submission, role: Role): string[] {
   const blockers: string[] = [];
   const blockerTotal = blockerCount(submission);
   const unresolvedTotal = unresolvedOpenIssueCount(submission);
@@ -399,7 +440,7 @@ function readinessBlockers(submission: Submission): string[] {
       `${openTotal - blockerTotal} замечаний ожидают закрытия администратором`,
     );
   }
-  if (fixedTotal && submission.status === "corrections_received") {
+  if (role === "agent" && fixedTotal && submission.status === "corrections_received") {
     blockers.push(`${fixedTotal} исправлений ждут закрытия администратором`);
   }
   if (submission.completeness.questionnaire < 100) {

@@ -15,6 +15,7 @@ import type {
 } from "../../types/domain";
 import { mapSupabasePersistenceError } from "../../services/persistenceObservability";
 import type { AppProfile } from "../../types/session";
+import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import type {
   Applicant,
@@ -488,6 +489,10 @@ function fallbackSubmissionFromRows(
     id: row.id,
     agentId: row.agent_id,
     title: row.title,
+    listTitle:
+      row.type === "family"
+        ? familyListTitleFromMainApplicantName(applicantItems[0]?.fullName)
+        : undefined,
     type: row.type,
     country: "Испания",
     city:

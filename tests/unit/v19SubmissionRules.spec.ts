@@ -427,8 +427,11 @@ describe("V-19 submission actions", () => {
       severity: "blocker",
       tab: "media",
     });
-    expect(queue.open.some((action) => action.title.includes("Заполнить"))).toBe(
+    expect(queue.open.some((action) => action.context.includes("Заполнить"))).toBe(
       true,
+    );
+    expect(queue.open.some((action) => action.title.includes("Заполнить"))).toBe(
+      false,
     );
     expect(queue.open.some((action) => action.cta === "Добавить")).toBe(true);
   });
@@ -446,9 +449,10 @@ describe("V-19 submission actions", () => {
     });
     expect(queue.open).toHaveLength(1);
     expect(queue.open[0]).toMatchObject({
+      context: "Отправить исправления",
       cta: "Отправить",
       tab: "issues",
-      title: "Отправить исправления на проверку",
+      title: "Ивановы",
     });
   });
 

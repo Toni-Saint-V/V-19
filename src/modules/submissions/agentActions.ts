@@ -1,8 +1,8 @@
 import {
   canPerformAction,
-  fileTypeLabels,
   unresolvedOpenIssueCount,
 } from "./status";
+import { formatAgentActionRowText } from "./listFormatters";
 import type { DrawerTab, Submission, SubmissionFile } from "./types";
 
 export type AgentActionDue = "overdue" | "today" | "week" | "completed";
@@ -65,13 +65,18 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
   );
   if (replacementFile) {
     const applicantName = applicantNameForFile(submission, replacementFile);
+    const rowText = formatAgentActionRowText({
+      applicantName,
+      fileType: replacementFile.type,
+      kind: "replace_file",
+    });
     actions.push({
       badges: [
         { label: "Блокер", tone: "danger" },
         { label: shortFileTypeLabel(replacementFile.type), tone: "amber" },
       ],
       completed: false,
-      context: `${submission.title} · заменить файл`,
+      context: rowText.subtitle,
       cta: "Исправить",
       due: "overdue",
       dueLabel: "Требует исправления",
@@ -80,7 +85,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
       severity: "blocker",
       submission,
       tab: "media",
-      title: `Заменить ${shortFileTypeName(replacementFile.type)} ${applicantName}`,
+      title: rowText.title,
     });
   }
 
@@ -88,11 +93,15 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
     canPerformAction(submission, "submit_corrections", "agent").ok &&
     unresolvedOpenIssueCount(submission) === 0;
   if (readyToSubmitCorrections && !replacementFile) {
+    const rowText = formatAgentActionRowText({
+      kind: "submit_corrections",
+      submission,
+    });
     return [
       {
         badges: [{ label: "Готово", tone: "teal" }],
         completed: false,
-        context: `${submission.title} · все замечания отмечены`,
+        context: rowText.subtitle,
         cta: "Отправить",
         due: "week",
         dueLabel: "Готово к отправке",
@@ -101,7 +110,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
         severity: "ready",
         submission,
         tab: "issues",
-        title: "Отправить исправления на проверку",
+        title: rowText.title,
       },
     ];
   }
@@ -110,14 +119,22 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
     ["empty", "partial", "needs_fix"].includes(applicant.questionnaireStatus),
   );
   if (questionnaireApplicant) {
-    const missing = questionnaireApplicant.sections.find((section) => section.missing)
-      ?.missing;
+    const missingSection = questionnaireApplicant.sections.find(
+      (section) => section.missing,
+    );
+    const missing = missingSection?.missing;
+    const rowText = formatAgentActionRowText({
+      applicantName: questionnaireApplicant.fullName,
+      fieldSummary: questionnaireMissingLabel(missing),
+      kind: "fill_questionnaire",
+      sectionTitle: missing?.toLowerCase().includes("поезд")
+        ? missingSection?.title
+        : undefined,
+    });
     actions.push({
       badges: [{ label: "Анкета", tone: "blue" }],
       completed: false,
-      context: `${questionnaireApplicant.fullName} · ${questionnaireMissingLabel(
-        missing,
-      )}`,
+      context: rowText.subtitle,
       cta: "Продолжить",
       due: "today",
       dueLabel: "Нужно заполнить",
@@ -126,9 +143,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
       severity: "warning",
       submission,
       tab: "data",
-      title: missing?.toLowerCase().includes("поезд")
-        ? "Заполнить раздел «Поездка»"
-        : `Заполнить анкету ${questionnaireApplicant.fullName}`,
+      title: rowText.title,
     });
   }
 
@@ -137,10 +152,15 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
     submission.status === "draft" ? missingFiles.slice(0, 1) : missingFiles;
   for (const file of visibleMissingFiles) {
     const applicantName = applicantNameForFile(submission, file);
+    const rowText = formatAgentActionRowText({
+      applicantName,
+      fileType: file.type,
+      kind: "add_file",
+    });
     actions.push({
       badges: [{ label: "Файлы", tone: "amber" }],
       completed: false,
-      context: `${submission.title} · добавить файл`,
+      context: rowText.subtitle,
       cta: "Добавить",
       due: "week",
       dueLabel: "Нужно добавить",
@@ -149,7 +169,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
       severity: "warning",
       submission,
       tab: "media",
-      title: `Добавить ${shortFileTypeName(file.type)} ${applicantName}`,
+      title: rowText.title,
     });
   }
 
@@ -163,11 +183,17 @@ function agentCompletedActions(submission: Submission): AgentActionItem[] {
     return [];
   }
 
+  const rowText = formatAgentActionRowText({
+    kind: "completed",
+    status: submission.status,
+    submission,
+  });
+
   return [
     {
       badges: [{ label: "Выполнено", tone: "teal" }],
       completed: true,
-      context: `${submission.title} · доменный переход выполнен`,
+      context: rowText.subtitle,
       cta: "Смотреть",
       due: "completed",
       dueLabel: "Выполнено",
@@ -176,10 +202,7 @@ function agentCompletedActions(submission: Submission): AgentActionItem[] {
       severity: "info",
       submission,
       tab: "history",
-      title:
-        submission.status === "corrections_received"
-          ? "Исправления отправлены на проверку"
-          : "Подача передана дальше",
+      title: rowText.title,
     },
   ];
 }
@@ -248,12 +271,12 @@ function dueRank(due: AgentActionDue) {
 function applicantNameForFile(submission: Submission, file: SubmissionFile) {
   return (
     submission.applicants.find((applicant) => applicant.id === file.applicantId)
-      ?.fullName ?? "заявителя"
+      ?.fullName ?? "Новый заявитель"
   );
 }
 
 function questionnaireMissingLabel(missing?: string) {
-  if (!missing) return "нужно заполнить";
+  if (!missing) return "4 поля";
   if (missing.includes("поля")) return missing;
   return "4 поля";
 }
@@ -270,12 +293,4 @@ function shortFileTypeLabel(type: SubmissionFile["type"]) {
   if (type === "passport_scan") return "Паспорт";
   if (type === "photo") return "Фото";
   return "Файлы";
-}
-
-function shortFileTypeName(type: SubmissionFile["type"]) {
-  if (type === "video") return "видео";
-  if (type === "passport_scan") return "загранпаспорт";
-  if (type === "selfie") return "селфи";
-  if (type === "selfie_2") return "селфи";
-  return fileTypeLabels[type].toLowerCase();
 }
