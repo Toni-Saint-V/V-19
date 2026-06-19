@@ -15,6 +15,7 @@ import type {
 } from "../../types/domain";
 import { mapSupabasePersistenceError } from "../../services/persistenceObservability";
 import type { AppProfile } from "../../types/session";
+import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import type {
   Applicant,
   Issue,
@@ -129,11 +130,14 @@ function attachNormalizedApplicantRows(
 }
 
 function reconcileCockpitSnapshotWithSubmissionRow(
-  row: Pick<SubmissionRow, "exported_at" | "status" | "updated_at">,
+  row: Pick<SubmissionRow, "agent_id" | "exported_at" | "status" | "updated_at">,
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
 ): Submission {
-  const normalizedSnapshot = attachNormalizedApplicantRows(snapshot, applicants);
+  const normalizedSnapshot = attachNormalizedApplicantRows(
+    ensureSubmissionOwner(snapshot, row.agent_id),
+    applicants,
+  );
 
   if (row.status !== "exported") return normalizedSnapshot;
   if (
@@ -407,45 +411,54 @@ export function toCockpitDraftPersistencePayload(
   actorId: string,
   ownerId: string,
 ): SubmissionDraftPersistencePayload {
+  const ownedSubmission = assignSubmissionOwner(
+    ensureSubmissionOwner(submission, ownerId),
+    ownerId,
+  );
+
   return {
     submission: {
-      id: submission.id,
+      id: ownedSubmission.id,
       agent_id: ownerId,
-      type: submission.type,
-      title: submission.title,
-      country: submission.country,
-      city: submission.city,
-      travel_date: tripDate(submission),
-      status: toSupabaseStatus(submission.status),
+      type: ownedSubmission.type,
+      title: ownedSubmission.title,
+      country: ownedSubmission.country,
+      city: ownedSubmission.city,
+      travel_date: tripDate(ownedSubmission),
+      status: toSupabaseStatus(ownedSubmission.status),
       priority:
-        submission.status === "returned" || submission.status === "requires_action"
+        ownedSubmission.status === "returned" ||
+        ownedSubmission.status === "requires_action"
           ? "Высокий"
           : "Средний",
-      readiness_percent: submission.completeness.total,
-      family_intelligence: cockpitSnapshotFamilyIntelligence(submission),
-      appointment_status: appointmentStatusForSubmission(submission),
+      readiness_percent: ownedSubmission.completeness.total,
+      family_intelligence: cockpitSnapshotFamilyIntelligence(ownedSubmission),
+      appointment_status: appointmentStatusForSubmission(ownedSubmission),
       submitted_at:
-        submission.status === "submitted_for_review"
-          ? timestampOrNow(submission.updatedAt)
+        ownedSubmission.status === "submitted_for_review"
+          ? timestampOrNow(ownedSubmission.updatedAt)
           : null,
       review_started_at: null,
       accepted_at:
-        submission.status === "ready_for_export" || submission.status === "exported"
-          ? timestampOrNow(submission.updatedAt)
+        ownedSubmission.status === "ready_for_export" ||
+        ownedSubmission.status === "exported"
+          ? timestampOrNow(ownedSubmission.updatedAt)
           : null,
       exported_at:
-        submission.status === "exported" ? timestampOrNow(submission.updatedAt) : null,
-      updated_at: timestampOrNow(submission.updatedAt),
+        ownedSubmission.status === "exported"
+          ? timestampOrNow(ownedSubmission.updatedAt)
+          : null,
+      updated_at: timestampOrNow(ownedSubmission.updatedAt),
     },
-    applicants: submission.applicants.map((applicant) =>
-      toApplicantInsert(submission, applicant),
+    applicants: ownedSubmission.applicants.map((applicant) =>
+      toApplicantInsert(ownedSubmission, applicant),
     ),
-    media_assets: toCockpitMediaAssetInserts(submission),
-    corrections: submission.issues.map((issue) =>
-      toCorrectionInsert(submission, issue, actorId),
+    media_assets: toCockpitMediaAssetInserts(ownedSubmission),
+    corrections: ownedSubmission.issues.map((issue) =>
+      toCorrectionInsert(ownedSubmission, issue, actorId),
     ),
-    status_history: submission.history.map((item) =>
-      toStatusHistoryInsert(submission, item, actorId),
+    status_history: ownedSubmission.history.map((item) =>
+      toStatusHistoryInsert(ownedSubmission, item, actorId),
     ),
   };
 }
@@ -473,6 +486,7 @@ function fallbackSubmissionFromRows(
 
   return {
     id: row.id,
+    agentId: row.agent_id,
     title: row.title,
     type: row.type,
     country: "Испания",
@@ -581,7 +595,7 @@ export async function saveCockpitSubmissionsForProfile(
   for (const submission of submissions) {
     const ownerId =
       profile.role === "admin"
-        ? (nextOwnerIds.get(submission.id) ?? profile.id)
+        ? (nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id)
         : profile.id;
     const payload = toCockpitDraftPersistencePayload(submission, profile.id, ownerId);
     const { error } = requiresCorrectionHandoff(submission)

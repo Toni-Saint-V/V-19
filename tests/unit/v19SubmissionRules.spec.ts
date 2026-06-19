@@ -8,6 +8,7 @@ import {
   dismissAiSuggestion,
   runAiReview,
 } from "../../src/modules/submissions/aiSuggestions";
+import { agentActionQueue } from "../../src/modules/submissions/agentActions";
 import {
   buildExportRows,
   exportSummary,
@@ -15,10 +16,15 @@ import {
 } from "../../src/modules/submissions/exportRules";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
+  alternateLocalAgentOwnerId,
+  defaultLocalAgentOwnerId,
+} from "../../src/modules/submissions/ownership";
+import {
   clearSubmissions,
   loadSubmissions,
   saveSubmissions,
 } from "../../src/modules/submissions/persistence";
+import { agentQueue } from "../../src/modules/submissions/selectors";
 import {
   cockpitSnapshotKey,
   cockpitSnapshotStatus,
@@ -405,6 +411,62 @@ describe("V-19 export rules", () => {
 });
 
 describe("V-19 submission actions", () => {
+  it("derives agent action queue from submission state", () => {
+    const queue = agentActionQueue(
+      agentQueue(initialSubmissions, defaultLocalAgentOwnerId),
+    );
+
+    expect(queue.summary).toMatchObject({
+      open: 7,
+      overdue: 1,
+      today: 3,
+      week: 4,
+    });
+    expect(queue.open[0]).toMatchObject({
+      cta: "Исправить",
+      severity: "blocker",
+      tab: "media",
+    });
+    expect(queue.open.some((action) => action.title.includes("Заполнить"))).toBe(
+      true,
+    );
+    expect(queue.open.some((action) => action.cta === "Добавить")).toBe(true);
+  });
+
+  it("derives submit corrections action only after domain fixes exist", () => {
+    const returnedWithFixes: Submission = {
+      ...byId("ПД-1048"),
+      files: byId("ПД-1048").files.map((file) => ({ ...file, status: "accepted" })),
+      issues: byId("ПД-1048").issues.map((issue) => ({ ...issue, status: "open" })),
+    };
+    const queue = agentActionQueue([returnedWithFixes]);
+
+    expect(canPerformAction(returnedWithFixes, "submit_corrections", "agent")).toEqual({
+      ok: true,
+    });
+    expect(queue.open).toHaveLength(1);
+    expect(queue.open[0]).toMatchObject({
+      cta: "Отправить",
+      tab: "issues",
+      title: "Отправить исправления на проверку",
+    });
+  });
+
+  it("keeps the local agent queue scoped to the current owner", () => {
+    const defaultAgentTitles = agentQueue(
+      initialSubmissions,
+      defaultLocalAgentOwnerId,
+    ).map((submission) => submission.title);
+    const alternateAgentTitles = agentQueue(
+      initialSubmissions,
+      alternateLocalAgentOwnerId,
+    ).map((submission) => submission.title);
+
+    expect(defaultAgentTitles).toContain("Семья Ивановых");
+    expect(defaultAgentTitles).not.toContain("Ольга Морозова");
+    expect(alternateAgentTitles).toEqual(["Ольга Морозова"]);
+  });
+
   it("creates a Spain-only family draft inside the submission model", () => {
     const draft = createDraftSubmission({
       city: "Казань",
@@ -414,12 +476,25 @@ describe("V-19 submission actions", () => {
     });
 
     expect(draft.country).toBe("Испания");
+    expect(draft.agentId).toBe(defaultLocalAgentOwnerId);
     expect(draft.city).toBe("Казань");
     expect(draft.type).toBe("family");
     expect(draft.status).toBe("draft");
     expect(draft.applicants).toHaveLength(3);
     expect(draft.files).toHaveLength(12);
     expect(draft.history[0].source).toBe("agent");
+  });
+
+  it("assigns a draft to the explicit current agent owner", () => {
+    const draft = createDraftSubmission({
+      agentId: alternateLocalAgentOwnerId,
+      city: "Москва",
+      familyCount: 1,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+
+    expect(draft.agentId).toBe(alternateLocalAgentOwnerId);
   });
 
   it("applies preliminary family intake to the detailed questionnaire", () => {
@@ -978,6 +1053,24 @@ describe("V-19 persistence boundary", () => {
     expect(loadSubmissions()[0].id).toBe(initialSubmissions[0].id);
   });
 
+  it("normalizes legacy local submissions without an agent owner", () => {
+    installStorageStub();
+    const legacySubmission = { ...byId("ПД-1051") } as Omit<
+      Submission,
+      "agentId"
+    > & {
+      agentId?: string;
+    };
+    delete legacySubmission.agentId;
+
+    testStorage().setItem(
+      "visaflow.v19.submissions.v1",
+      JSON.stringify([legacySubmission]),
+    );
+
+    expect(loadSubmissions()[0]?.agentId).toBe(defaultLocalAgentOwnerId);
+  });
+
   it("builds a Supabase draft payload from the current cockpit model", () => {
     const submission = byId("ПД-1048");
     const payload = toCockpitDraftPersistencePayload(
@@ -1006,9 +1099,10 @@ describe("V-19 persistence boundary", () => {
       "00000000-0000-4000-8000-000000000001",
     );
 
-    expect(readCockpitSnapshot(payload.submission.family_intelligence as Json)).toEqual(
-      submission,
-    );
+    expect(readCockpitSnapshot(payload.submission.family_intelligence as Json)).toEqual({
+      ...submission,
+      agentId: "00000000-0000-4000-8000-000000000001",
+    });
   });
 
   it("keeps the cockpit snapshot storage contract explicit", () => {

@@ -1,4 +1,4 @@
-import { Button } from "../../../shared/ui/primitives";
+import { Button, NavCount } from "../../../shared/ui/primitives";
 import type { ReactNode, SVGProps } from "react";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
@@ -73,9 +73,7 @@ export function OperationalSidebar({
               <small>{item.meta}</small>
             </span>
             {typeof item.count === "number" ? (
-              <span className="ops-nav-count" aria-label={`${item.count}`}>
-                {item.count}
-              </span>
+              <NavCount label={`${item.count}`}>{item.count}</NavCount>
             ) : null}
             {item.quickAction ? (
               <em className="ops-nav-action">{item.quickAction}</em>

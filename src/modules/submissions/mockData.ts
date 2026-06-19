@@ -1,4 +1,8 @@
 import { createQuestionnaireSections } from "./questionnaire";
+import {
+  alternateLocalAgentOwnerId,
+  defaultLocalAgentOwnerId,
+} from "./ownership";
 import type { Applicant, Issue, Submission, SubmissionFile } from "./types";
 
 function applicant(
@@ -69,6 +73,7 @@ function issue(
 export const initialSubmissions: Submission[] = [
   {
     id: "ПД-1048",
+    agentId: defaultLocalAgentOwnerId,
     title: "Семья Ивановых",
     type: "family",
     country: "Испания",
@@ -142,6 +147,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "ПД-1051",
+    agentId: defaultLocalAgentOwnerId,
     title: "Артём Соколов",
     type: "single",
     country: "Испания",
@@ -181,6 +187,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "ПД-1052",
+    agentId: defaultLocalAgentOwnerId,
     title: "Елена Смирнова",
     type: "single",
     country: "Испания",
@@ -214,6 +221,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "ПД-1053",
+    agentId: defaultLocalAgentOwnerId,
     title: "Нина Волкова",
     type: "single",
     country: "Испания",
@@ -249,6 +257,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "ПД-1054",
+    agentId: defaultLocalAgentOwnerId,
     title: "Семья Петровых",
     type: "family",
     country: "Испания",
@@ -301,6 +310,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "ПД-1056",
+    agentId: defaultLocalAgentOwnerId,
     title: "Дмитрий Орлов",
     type: "single",
     country: "Испания",
@@ -333,6 +343,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "ПД-1057",
+    agentId: alternateLocalAgentOwnerId,
     title: "Ольга Морозова",
     type: "single",
     country: "Испания",

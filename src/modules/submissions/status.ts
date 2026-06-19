@@ -14,11 +14,11 @@ import { requiresPassportExtractionReviewBeforeAction } from "./passportExtracti
 export const statusLabels: Record<SubmissionStatus, string> = {
   draft: "Черновик",
   in_progress: "В работе",
-  requires_action: "Требует действия",
-  submitted_for_review: "На проверке",
+  requires_action: "Действие",
+  submitted_for_review: "Проверка",
   returned: "Возвращено",
-  corrections_received: "Исправления получены",
-  ready_for_export: "Готово к выгрузке",
+  corrections_received: "Исправления",
+  ready_for_export: "Готово",
   exported: "Выгружено",
 };
 

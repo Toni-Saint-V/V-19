@@ -36,6 +36,7 @@ export function matchesReviewTab(tab: ReviewTab) {
 }
 
 export function surfaceTitle(surface: Surface) {
+  if (surface === "agent-actions") return "Мои действия";
   if (surface === "agent-inbox") return "Входящие";
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка подач";
@@ -43,6 +44,10 @@ export function surfaceTitle(surface: Surface) {
 }
 
 export function surfaceDescription(surface: Surface) {
+  if (surface === "agent-actions") {
+    return "Очередь точных действий по всем подачам агента.";
+  }
+
   if (surface === "agent-inbox") {
     return "Новые события по подачам и точный переход к месту, где нужно действие.";
   }

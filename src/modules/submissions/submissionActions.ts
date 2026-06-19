@@ -16,8 +16,10 @@ import {
   exportPackageIdentityMatches,
   exportSummary,
 } from "./exportRules";
+import { defaultLocalAgentOwnerId } from "./ownership";
 import type {
   City,
+  AgentOwnerId,
   ExportState,
   Issue,
   IssueInput,
@@ -32,6 +34,7 @@ import type {
 } from "./types";
 
 export type CreateDraftInput = {
+  agentId?: AgentOwnerId;
   city: City;
   applicantNames?: string[];
   familyCount: number;
@@ -149,6 +152,7 @@ export function generatedCockpitMediaFileName({
 }
 
 export function createDraftSubmission({
+  agentId = defaultLocalAgentOwnerId,
   applicantNames = [],
   city,
   familyCount,
@@ -177,6 +181,7 @@ export function createDraftSubmission({
 
   const submission: Submission = {
     id: submissionId,
+    agentId,
     title: draftTitle(type, applicants[0]?.fullName),
     type,
     country: "Испания",

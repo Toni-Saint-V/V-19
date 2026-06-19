@@ -13,9 +13,22 @@ const mockState = vi.hoisted(() => ({
 
 vi.mock("../../src/lib/supabase/client", () => {
   function queryResult(rows: unknown[]) {
+    const fieldValue = (row: unknown, column: string) =>
+      typeof row === "object" && row !== null
+        ? (row as Record<string, unknown>)[column]
+        : undefined;
+
     return {
-      eq: () => Promise.resolve({ data: rows, error: null }),
-      in: () => Promise.resolve({ data: rows, error: null }),
+      eq: (column: string, value: unknown) =>
+        Promise.resolve({
+          data: rows.filter((row) => fieldValue(row, column) === value),
+          error: null,
+        }),
+      in: (column: string, values: unknown[]) =>
+        Promise.resolve({
+          data: rows.filter((row) => values.includes(fieldValue(row, column))),
+          error: null,
+        }),
       limit() {
         return this;
       },
@@ -54,6 +67,9 @@ vi.mock("../../src/lib/supabase/client", () => {
 
 import {
   changedCockpitSubmissions,
+  cockpitSnapshotKey,
+  cockpitSnapshotStatus,
+  cockpitSnapshotVersion,
   cockpitSubmissionFingerprintMap,
   loadCockpitSubmissionsForProfile,
   readCockpitSnapshot,
@@ -289,6 +305,65 @@ describe("V-19 Supabase cockpit persistence", () => {
       email: null,
       passport_number: "",
     });
+  });
+
+  it("hydrates legacy cockpit snapshots with the row owner", async () => {
+    const submission = { ...(initialSubmissions[0] as Submission) } as Omit<
+      Submission,
+      "agentId"
+    > & {
+      agentId?: string;
+    };
+    delete submission.agentId;
+    const payload = toCockpitDraftPersistencePayload(
+      initialSubmissions[0] as Submission,
+      adminProfile.id,
+      otherAgentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        agent_id: otherAgentProfile.id,
+        family_intelligence: {
+          status: cockpitSnapshotStatus,
+          [cockpitSnapshotKey]: {
+            version: cockpitSnapshotVersion,
+            submission,
+          },
+        },
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]?.agentId).toBe(otherAgentProfile.id);
+    expect(loaded.ownerIdsBySubmissionId.get(submission.id)).toBe(
+      otherAgentProfile.id,
+    );
+  });
+
+  it("does not load another agent row for agent profile", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      otherAgentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        agent_id: otherAgentProfile.id,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions).toEqual([]);
+    expect(loaded.ownerIdsBySubmissionId.size).toBe(0);
   });
 
   it("persists cockpit media rows only after real private storage upload metadata exists", () => {

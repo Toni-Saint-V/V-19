@@ -59,6 +59,7 @@ import type {
   SubmissionAction,
   SubmissionFileStatus,
 } from "../types";
+import type { SubmissionNextStepAction } from "../submissionNextStepEngine";
 import { AiHelperSurfacePanel } from "./AiHelperSurfacePanel";
 import { BbAiPanel } from "./BbAiPanel";
 import { EmptyState } from "./Primitives";
@@ -176,6 +177,17 @@ export function SubmissionDrawer({
     if (first) openTarget(first.target);
   }
 
+  function handleAiPrimaryAction(action: SubmissionNextStepAction) {
+    if (action.disabled) return;
+    if (action.target) {
+      openTarget(action.target);
+      return;
+    }
+    if (action.submissionAction) {
+      onAction(action.submissionAction);
+    }
+  }
+
   return (
     <SheetFrame
       className="submission-drawer"
@@ -236,6 +248,7 @@ export function SubmissionDrawer({
             <DrawerOverview
               onAcceptAiSuggestion={onAcceptAiSuggestion}
               onDismissAiSuggestion={onDismissAiSuggestion}
+              onAiPrimaryAction={handleAiPrimaryAction}
               onOpenTarget={openTarget}
               onRunAiReview={onRunAiReview}
               primaryAction={primaryAction}
@@ -569,6 +582,7 @@ function WorkspaceNavigation({
 function DrawerOverview({
   onAcceptAiSuggestion,
   onDismissAiSuggestion,
+  onAiPrimaryAction,
   onOpenTarget,
   onRunAiReview,
   primaryAction,
@@ -578,6 +592,7 @@ function DrawerOverview({
 }: {
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onDismissAiSuggestion: (suggestionId: string) => void;
+  onAiPrimaryAction: (action: SubmissionNextStepAction) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
   onRunAiReview: () => void;
   primaryAction: ActionDecision;
@@ -655,7 +670,12 @@ function DrawerOverview({
           внутренней проверке.
         </p>
       </div>
-      <AiHelperSurfacePanel role={role} submission={submission} surface={surface} />
+      <AiHelperSurfacePanel
+        role={role}
+        submission={submission}
+        surface={surface}
+        onPrimaryAction={onAiPrimaryAction}
+      />
       <BbAiPanel
         onAccept={onAcceptAiSuggestion}
         onDismiss={onDismissAiSuggestion}
