@@ -44,7 +44,7 @@ export function buildSubmissionAiHelperSurface({
       {
         id: "actions",
         title: "Следующие действия",
-        items: brief.actions,
+        items: [brief.reason, ...brief.actions],
       },
       {
         id: "drafts",

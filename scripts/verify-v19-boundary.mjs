@@ -28,6 +28,7 @@ const promotedRuntimeFiles = [
   path.join(root, "src/services/profileService.ts"),
   path.join(root, "src/types/domain.ts"),
   path.join(root, "src/types/session.ts"),
+  path.join(root, "supabase/functions/_shared/ai-helper-guardrails.ts"),
 ];
 const forbiddenCopy = [
   "Люди",

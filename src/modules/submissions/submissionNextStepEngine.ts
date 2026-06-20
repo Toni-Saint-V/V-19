@@ -16,6 +16,7 @@ import {
   firstActionableQueueItem,
   type WorkspaceTarget,
 } from "./workspaceModel";
+import { aiHelperBaseGuardrails } from "../../../supabase/functions/_shared/ai-helper-guardrails";
 import type { Role, Submission, SubmissionAction } from "./types";
 
 export type SubmissionNextStepStatus =
@@ -58,12 +59,6 @@ export type SubmissionNextStepBrief = {
   title: string;
 };
 
-const guardrails = [
-  "Подсказка не является решением.",
-  "Детерминированные проверки остаются источником истины.",
-  "Оператор принимает медиа и заявку вручную.",
-];
-
 export function buildSubmissionNextStepBrief({
   role,
   submission,
@@ -94,7 +89,7 @@ export function buildSubmissionNextStepBrief({
     }),
     ariaLabel: ariaLabel(role, surface),
     blockers,
-    guardrails,
+    guardrails: [...aiHelperBaseGuardrails],
     metrics: {
       passportConflicts: passportBrief.metrics.conflicts,
       passportSafeFields: passportBrief.metrics.safeFieldsToApply,

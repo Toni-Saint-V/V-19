@@ -36,6 +36,15 @@ export type CaseCopilotHighlightKind =
   | "issues"
   | "export";
 
+export type CaseCopilotHighlightSource =
+  | "status"
+  | "ocr"
+  | "manual_review"
+  | "files"
+  | "questionnaire"
+  | "issues"
+  | "export";
+
 export type CaseCopilotDraft = {
   audience: Role;
   body: string;
@@ -47,6 +56,7 @@ export type CaseCopilotHighlight = {
   kind: CaseCopilotHighlightKind;
   label: string;
   owner?: CaseCopilotOwner;
+  source: CaseCopilotHighlightSource;
   status: CaseCopilotStatus;
   summary: string;
   target?: WorkspaceTarget;
@@ -59,18 +69,13 @@ export type CaseCopilotBrief = {
   highlights: CaseCopilotHighlight[];
   nextStep: SubmissionNextStepAction;
   owner: CaseCopilotOwner;
+  reason: string;
   status: CaseCopilotStatus;
   summary: string;
   title: string;
 };
 
-const guardrails = [
-  "Подсказка не принимает визовые решения.",
-  "Не оценивайте вероятность результата и не обещайте исход.",
-  "Паспортные поля требуют ручной сверки перед применением.",
-  "Детерминированные проверки остаются источником истины.",
-  "Ручная проверка остается обязательной для спорных данных.",
-];
+const whyNow = "Почему сейчас: ";
 
 export function buildCaseCopilotBrief({
   role,
@@ -102,10 +107,11 @@ export function buildCaseCopilotBrief({
   return {
     actions: nextStepBrief.actions,
     drafts: draftsFor(submission, role, surface, highlights, exportPlan.rowCount),
-    guardrails,
+    guardrails: nextStepBrief.guardrails,
     highlights,
     nextStep: nextStepBrief.primaryAction,
     owner: nextStepBrief.owner,
+    reason: reasonFor(status, nextStepBrief, highlights),
     status,
     summary: summaryFor(submission, nextStepBrief, surface),
     title: nextStepBrief.title,
@@ -176,8 +182,9 @@ function passportHighlight(
       kind: "passport",
       label: "Паспорт",
       owner: "admin",
+      source: "status",
       status: "waiting",
-      summary: "Заявка уже передана дальше; паспортные сигналы можно только смотреть до действия администратора.",
+      summary: "Паспорт только для просмотра до действия администратора.",
     };
   }
 
@@ -187,6 +194,7 @@ function passportHighlight(
       kind: "passport",
       label: "Паспорт",
       owner: "system",
+      source: "ocr",
       status: "waiting",
       summary: "Распознавание паспорта выполняется.",
     };
@@ -198,6 +206,7 @@ function passportHighlight(
       kind: "passport",
       label: "Паспорт",
       owner: "agent",
+      source: "ocr",
       status: "needs_review",
       summary: `${brief.metrics.conflicts} конфликтных паспортных полей нужно разобрать вручную.`,
     };
@@ -209,8 +218,9 @@ function passportHighlight(
       kind: "passport",
       label: "Паспорт",
       owner: "agent",
+      source: "ocr",
       status: "needs_review",
-      summary: `${brief.metrics.safeFieldsToApply} паспортных полей можно применить после ручной сверки.`,
+      summary: `${brief.metrics.safeFieldsToApply} паспортных полей можно сверить и применить.`,
     };
   }
 
@@ -220,8 +230,9 @@ function passportHighlight(
       kind: "passport",
       label: "Паспорт",
       owner: "agent",
+      source: "ocr",
       status: "blocked",
-      summary: "Паспортные данные нужно заполнить вручную.",
+      summary: "Паспорт нужно заполнить вручную.",
     };
   }
 
@@ -231,8 +242,9 @@ function passportHighlight(
       kind: "passport",
       label: "Паспорт",
       owner: "agent",
+      source: "ocr",
       status: "needs_review",
-      summary: "Паспортные поля ждут ручного подтверждения.",
+      summary: "Паспорт ждёт ручного подтверждения.",
     };
   }
 
@@ -242,8 +254,9 @@ function passportHighlight(
       kind: "passport",
       label: "Паспорт",
       owner: "agent",
+      source: "manual_review",
       status: "ready",
-      summary: "Паспортные поля сверены локальными правилами и ручным шагом.",
+      summary: "Паспорт вручную сверен.",
     };
   }
 
@@ -252,10 +265,11 @@ function passportHighlight(
     kind: "passport",
     label: "Паспорт",
     owner: "agent",
+    source: passportFilesMissing(submission) ? "files" : "manual_review",
     status: passportFilesMissing(submission) ? "blocked" : "ready",
     summary: passportFilesMissing(submission)
       ? "Скан паспорта еще не загружен для части заявителей."
-      : "Паспортные данные проверяются вручную без распознавания.",
+      : "Паспорт сверяется вручную без OCR.",
   };
 }
 
@@ -278,9 +292,10 @@ function questionnaireHighlight(
     kind: "questionnaire",
     label: "Анкета",
     owner: complete ? "admin" : "agent",
+    source: "questionnaire",
     status: complete ? (needsReview ? "needs_review" : "ready") : "blocked",
     summary: complete
-      ? "Анкетные поля заполнены, нужна обычная ручная сверка по процессу."
+      ? "Анкета заполнена, нужна ручная сверка."
       : `Анкета заполнена на ${submission.completeness.questionnaire}%.`,
   };
 }
@@ -298,11 +313,12 @@ function filesHighlight(
     kind: "files",
     label: "Файлы",
     owner: blocked ? "agent" : "admin",
+    source: "files",
     status: blocked ? "blocked" : pending || surface === "review" ? "needs_review" : "ready",
     summary: blocked
-      ? `Файлы готовы на ${submission.completeness.files}%; ${counts.missing} отсутствуют, ${counts.needs_replacement} требуют замены.`
+      ? `Файлы ${submission.completeness.files}%; нет ${counts.missing}, заменить ${counts.needs_replacement}.`
       : pending
-        ? `${counts.pending_review} файлов ждут ручной проверки администратора.`
+        ? `${counts.pending_review} файлов ждут проверки админа.`
         : `${counts.accepted}/${counts.required} файлов приняты.`,
   };
 }
@@ -331,6 +347,7 @@ function issuesHighlight(
       kind: "issues",
       label: "Замечания",
       owner: role === "admin" ? "admin" : "agent",
+      source: "issues",
       status: "blocked",
       summary,
     };
@@ -342,6 +359,7 @@ function issuesHighlight(
       kind: "issues",
       label: "Замечания",
       owner: "admin",
+      source: "issues",
       status: "waiting",
       summary: `${fixed} исправлений ждут закрытия администратором.`,
     };
@@ -351,6 +369,7 @@ function issuesHighlight(
     kind: "issues",
     label: "Замечания",
     owner: "system",
+    source: "issues",
     status: "ready",
     summary: "Открытых замечаний нет.",
   };
@@ -368,6 +387,7 @@ function exportHighlightForSurface(
       kind: "export",
       label: "Выгрузка",
       owner: "admin",
+      source: "export",
       status: "complete",
       summary: "Пакет уже выгружен, повторное действие не требуется.",
     };
@@ -379,6 +399,7 @@ function exportHighlightForSurface(
       kind: "export",
       label: "Выгрузка",
       owner: "admin",
+      source: "export",
       status: "blocked",
       summary: "Пакет не готов к выгрузке.",
     };
@@ -388,6 +409,7 @@ function exportHighlightForSurface(
     kind: "export",
     label: "Выгрузка",
     owner: "admin",
+    source: "export",
     status: "ready",
     summary: `${plan.rowCount} строк(и) готовы к Эксель-выгрузке.`,
   };
@@ -450,6 +472,92 @@ function summaryFor(
 
   if (surface === "export") return `${prefix} Экспорт: ${state}`;
   return `${prefix} ${state}`;
+}
+
+function reasonFor(
+  status: CaseCopilotStatus,
+  nextStepBrief: SubmissionNextStepBrief,
+  highlights: CaseCopilotHighlight[],
+) {
+  const priority =
+    actionPriorityTopic(nextStepBrief.primaryAction, highlights) ??
+    priorityHighlight(highlights)?.label.toLowerCase();
+
+  if (status === "complete") return `${whyNow}пакет завершен.`;
+  if (status === "waiting") return waitingReason(nextStepBrief.primaryAction);
+  if (nextStepBrief.primaryAction.kind === "passport_review") {
+    return `${whyNow}сначала сверить паспорт.`;
+  }
+  if (priority) {
+    return `${whyNow}${priority} - главный ограничитель.`;
+  }
+  if (status === "ready") return `${whyNow}блокеры закрыты.`;
+  return `${whyNow}нужен ручной разбор.`;
+}
+
+function waitingReason(action: SubmissionNextStepAction) {
+  const reason =
+    action.id === "wait_passport_extraction"
+      ? "OCR паспорта"
+      : action.id === "wait_admin_review"
+        ? "проверка админом"
+        : action.id === "wait_admin_corrections_review"
+          ? "админ закрывает правки"
+          : action.id === "wait_admin_export"
+            ? "выгрузка админом"
+            : "шаг у другой роли";
+
+  return `${whyNow}${reason}.`;
+}
+
+function actionPriorityTopic(
+  action: SubmissionNextStepAction,
+  highlights: CaseCopilotHighlight[],
+) {
+  if (action.submissionAction === "close_issues_accept") {
+    return "замечания";
+  }
+
+  if (action.kind !== "navigate_target") return null;
+
+  if (action.target?.tab === "data") {
+    return action.target.section === "Паспорт" ? "паспорт" : "анкета";
+  }
+
+  if (action.target?.tab === "media") {
+    return highlightByKind(highlights, "issues") ? "замечания" : "файлы";
+  }
+
+  return null;
+}
+
+function priorityHighlight(highlights: CaseCopilotHighlight[]) {
+  const statusOrder: CaseCopilotStatus[] = ["blocked", "needs_review", "waiting"];
+  const kindOrder: CaseCopilotHighlightKind[] = [
+    "issues",
+    "passport",
+    "files",
+    "questionnaire",
+    "export",
+  ];
+
+  for (const status of statusOrder) {
+    for (const kind of kindOrder) {
+      const highlight = highlights.find(
+        (item) => item.status === status && item.kind === kind,
+      );
+      if (highlight) return highlight;
+    }
+  }
+
+  return null;
+}
+
+function highlightByKind(
+  highlights: CaseCopilotHighlight[],
+  kind: CaseCopilotHighlightKind,
+) {
+  return highlights.find((item) => item.kind === kind && item.status !== "ready") ?? null;
 }
 
 function adminReviewDraft(
@@ -521,9 +629,23 @@ function applicantNames(submission: Submission) {
 }
 
 export function formatCaseCopilotHighlight(highlight: CaseCopilotHighlight) {
-  return [highlight.label, highlight.summary, highlight.detail]
+  return [
+    highlight.label,
+    highlight.summary,
+    highlight.detail,
+    `Источник: ${sourceLabel(highlight.source)}`,
+  ]
     .filter(Boolean)
     .join(": ");
+}
+
+function sourceLabel(source: CaseCopilotHighlightSource) {
+  if (source === "status") return "статус";
+  if (source === "ocr") return "OCR";
+  if (source === "manual_review") return "ручная сверка";
+  if (source === "issues") return "замечания";
+  if (source === "export") return "выгрузка";
+  return source === "files" ? "файлы" : "анкета";
 }
 
 function compactHighlights(

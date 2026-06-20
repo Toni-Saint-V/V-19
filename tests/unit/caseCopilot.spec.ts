@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
+  applyPassportExtractionField,
+  failPassportExtraction,
   finishPassportExtraction,
+  markPassportExtractionReviewed,
   startPassportExtraction,
 } from "../../src/modules/submissions/passportExtraction";
 import {
@@ -12,7 +15,10 @@ import {
 } from "../../src/modules/submissions/submissionActions";
 import { applySubmissionAction } from "../../src/modules/submissions/status";
 import { buildSubmissionAiHelperSurface } from "../../src/modules/submissions/aiHelperSurface";
-import { buildCaseCopilotBrief } from "../../src/modules/submissions/caseCopilot";
+import {
+  buildCaseCopilotBrief,
+  formatCaseCopilotHighlight,
+} from "../../src/modules/submissions/caseCopilot";
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import type { Issue, Submission } from "../../src/modules/submissions/types";
 
@@ -100,10 +106,12 @@ function visibleCopy(brief: ReturnType<typeof buildCaseCopilotBrief>) {
     ...brief.highlights.flatMap((item) => [
       item.kind,
       item.label,
+      item.source,
       item.status,
       item.summary,
       item.detail ?? "",
     ]),
+    brief.reason,
     ...brief.drafts.flatMap((item) => [item.title, item.body]),
     ...brief.guardrails,
   ].join(" ");
@@ -216,7 +224,7 @@ describe("local Case Copilot", () => {
     });
     expect(safeBrief.highlights.find((item) => item.kind === "passport")).toMatchObject({
       status: "needs_review",
-      summary: expect.stringContaining("можно применить"),
+      summary: expect.stringContaining("сверить и применить"),
     });
 
     const withExistingPassport = updateQuestionnaireField(draft, {
@@ -262,6 +270,84 @@ describe("local Case Copilot", () => {
       status: "waiting",
       summary: expect.stringContaining("выполняется"),
     });
+    expect(extractingBrief.reason).toContain("OCR паспорта");
+  });
+
+  test("keeps passport evidence sources explicit across extraction states", () => {
+    const draft = draftSubmission();
+    const withSafePassport = finishPassportExtraction(
+      draft,
+      passportFile(draft),
+      extractedPassport,
+    );
+    const withAppliedNumber = applyPassportExtractionField(
+      withSafePassport,
+      applicantId(withSafePassport),
+      "passportNumber",
+    );
+    const withAllFieldsApplied = applyPassportExtractionField(
+      withAppliedNumber,
+      applicantId(withAppliedNumber),
+      "surname",
+    );
+    const reviewRequired = buildCaseCopilotBrief({
+      role: "agent",
+      submission: withAllFieldsApplied,
+      surface: "agent",
+    });
+    const reviewed = buildCaseCopilotBrief({
+      role: "agent",
+      submission: markPassportExtractionReviewed(withAllFieldsApplied, "verified"),
+      surface: "agent",
+    });
+    const failed = buildCaseCopilotBrief({
+      role: "agent",
+      submission: failPassportExtraction(draft, passportFile(draft), "Не распознано"),
+      surface: "agent",
+    });
+    const notStartedMissing = buildCaseCopilotBrief({
+      role: "agent",
+      submission: draft,
+      surface: "agent",
+    });
+    const notStartedManual = buildCaseCopilotBrief({
+      role: "agent",
+      submission: reviewReadySubmission(),
+      surface: "agent",
+    });
+
+    const reviewRequiredPassport = reviewRequired.highlights.find(
+      (item) => item.kind === "passport",
+    );
+    const reviewedPassport = reviewed.highlights.find((item) => item.kind === "passport");
+    const failedPassport = failed.highlights.find((item) => item.kind === "passport");
+    const missingPassport = notStartedMissing.highlights.find(
+      (item) => item.kind === "passport",
+    );
+    const manualPassport = notStartedManual.highlights.find(
+      (item) => item.kind === "passport",
+    );
+
+    expect(reviewRequiredPassport).toMatchObject({
+      source: "ocr",
+      status: "needs_review",
+    });
+    expect(formatCaseCopilotHighlight(reviewRequiredPassport!)).toContain(
+      "Источник: OCR",
+    );
+    expect(reviewedPassport).toMatchObject({
+      source: "manual_review",
+      status: "ready",
+    });
+    expect(formatCaseCopilotHighlight(reviewedPassport!)).toContain(
+      "Источник: ручная сверка",
+    );
+    expect(failedPassport).toMatchObject({ source: "ocr", status: "blocked" });
+    expect(missingPassport).toMatchObject({ source: "files", status: "blocked" });
+    expect(manualPassport).toMatchObject({
+      source: "manual_review",
+      status: "ready",
+    });
   });
 
   test("summarizes questionnaire gaps, file gaps, and returned corrections", () => {
@@ -303,6 +389,52 @@ describe("local Case Copilot", () => {
     expect(brief.drafts.some((draft) => draft.audience === "agent")).toBe(true);
   });
 
+  test("explains why the next step matters and cites evidence for user trust", () => {
+    const brief = buildCaseCopilotBrief({
+      role: "agent",
+      submission: byId("ПД-1048"),
+      surface: "agent",
+    });
+    const surface = buildSubmissionAiHelperSurface({
+      role: "agent",
+      submission: byId("ПД-1048"),
+      surface: "agent",
+    });
+    const actions = surface.sections.find((section) => section.id === "actions");
+    const blockers = surface.sections.find((section) => section.id === "blockers");
+
+    expect(brief.reason).toContain("Почему сейчас");
+    expect(brief.reason).toContain("замечания");
+    expect(brief.reason).toContain("главный ограничитель");
+    expect(actions?.items[0]).toBe(brief.reason);
+    expect(blockers?.items.join(" ")).toContain("Источник: замечания");
+  });
+
+  test("aligns why-now copy with the actual executable next step", () => {
+    const draftBrief = buildCaseCopilotBrief({
+      role: "agent",
+      submission: draftSubmission(),
+      surface: "agent",
+    });
+    const inProgressBrief = buildCaseCopilotBrief({
+      role: "agent",
+      submission: byId("ПД-1051"),
+      surface: "agent",
+    });
+    const correctionsBrief = buildCaseCopilotBrief({
+      role: "admin",
+      submission: byId("ПД-1054"),
+      surface: "review",
+    });
+
+    expect(draftBrief.nextStep.target).toMatchObject({ tab: "data" });
+    expect(draftBrief.reason).toContain("анкета");
+    expect(inProgressBrief.nextStep.target).toMatchObject({ tab: "data" });
+    expect(inProgressBrief.reason).toContain("анкета");
+    expect(correctionsBrief.nextStep.submissionAction).toBe("close_issues_accept");
+    expect(correctionsBrief.reason).toContain("замечания");
+  });
+
   test("keeps agent waiting states read-only and not executable", () => {
     const waitingStates = [
       byId("ПД-1053"),
@@ -323,6 +455,7 @@ describe("local Case Copilot", () => {
       expect(brief.nextStep.disabled).toBe(true);
       expect(brief.nextStep.submissionAction).toBeUndefined();
       expect(brief.nextStep.target).toBeUndefined();
+      expect(brief.reason).not.toContain("действие не у текущей роли");
     }
   });
 
@@ -398,6 +531,7 @@ describe("local Case Copilot", () => {
     });
     expect(readyExport.status).toBe("ready");
     expect(readyExport.nextStep.submissionAction).toBe("generate_export");
+    expect(readyExport.reason).toContain("блокеры закрыты");
     expect(readyExport.highlights.find((item) => item.kind === "export")).toMatchObject({
       status: "ready",
       summary: expect.stringContaining("1 строк"),

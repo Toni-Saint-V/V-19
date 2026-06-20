@@ -512,6 +512,8 @@ test.describe("V-19 operations workspace", () => {
     );
     await expect(drawer(page).getByText("ИИ-помощник")).toBeVisible();
     await expect(drawer(page).getByText("Локальная проверка")).toBeVisible();
+    await expect(drawer(page).getByText(/Почему сейчас/).first()).toBeVisible();
+    await expect(drawer(page).getByText(/Источник:/).first()).toBeVisible();
     await expect(
       drawer(page).getByText("Черновик ответа по исправлениям").first(),
     ).toBeVisible();

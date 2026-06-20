@@ -1,3 +1,7 @@
+import { aiHelperBaseGuardrails } from "./ai-helper-guardrails";
+
+export { aiHelperBaseGuardrails };
+
 export const aiHelperIntents = [
   "readiness_summary",
   "text_intake_review",
@@ -72,12 +76,6 @@ export interface AiHelperQuotaStore {
 export interface AiHelperProvider {
   generate(request: AiHelperRequest): Promise<unknown>;
 }
-
-export const aiHelperBaseGuardrails = [
-  "Подсказка не является решением.",
-  "Детерминированные проверки остаются источником истины.",
-  "Оператор принимает медиа и заявку вручную.",
-] as const;
 
 const forbiddenOutputPatterns = [
   /approval\s+odds/i,

@@ -16,6 +16,20 @@ export function AiHelperSurfacePanel({
   submission: Submission;
   surface: "agent" | "review" | "export";
 }) {
+  if (import.meta.env.VITE_CASE_COPILOT_ENABLED === "false") {
+    return (
+      <CardComponent
+        as="section"
+        aria-label="Подсказка отключена"
+        className={`ai-helper-surface ${compact ? "compact" : ""}`}
+      >
+        <p className="kicker">ИИ-помощник</p>
+        <h3>Подсказка отключена</h3>
+        <p>Процесс доступен.</p>
+      </CardComponent>
+    );
+  }
+
   const helper = buildSubmissionAiHelperSurface({
     role,
     submission,

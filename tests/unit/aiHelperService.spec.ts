@@ -177,9 +177,9 @@ describe("AI helper service contract", () => {
       ).toBe(true);
       expect(result.guardrails).toEqual(
         expect.arrayContaining([
-          "Подсказка не является решением.",
+          "Подсказка не решает и не считает исход визы.",
           "Детерминированные проверки остаются источником истины.",
-          "Оператор принимает медиа и заявку вручную.",
+          "Нет гос-проверки или OCR-подтверждения; оператор сверяет вручную.",
         ]),
       );
       expect(visibleCopy(result)).not.toMatch(forbiddenTrustCopy);

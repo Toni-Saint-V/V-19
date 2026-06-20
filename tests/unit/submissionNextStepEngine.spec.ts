@@ -11,6 +11,7 @@ import {
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import { buildSubmissionNextStepBrief } from "../../src/modules/submissions/submissionNextStepEngine";
+import { aiHelperBaseGuardrails } from "../../supabase/functions/_shared/ai-helper-guardrails";
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import type { Issue, Submission } from "../../src/modules/submissions/types";
 
@@ -89,6 +90,16 @@ function visibleCopy(brief: ReturnType<typeof buildSubmissionNextStepBrief>) {
 }
 
 describe("submission next-step engine", () => {
+  test("uses the shared AI helper safety guardrails", () => {
+    const brief = buildSubmissionNextStepBrief({
+      role: "agent",
+      submission: draftSubmission(),
+      surface: "agent",
+    });
+
+    expect(brief.guardrails).toEqual([...aiHelperBaseGuardrails]);
+  });
+
   test("prioritizes safe passport field application before submit handoff", () => {
     const draft = draftSubmission();
     const withPassport = finishPassportExtraction(draft, passportFile(draft), extractedPassport);

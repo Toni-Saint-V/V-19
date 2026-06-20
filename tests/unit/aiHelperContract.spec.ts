@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import {
+  aiHelperBaseGuardrails,
   buildSafeAiHelperStubResult,
   type AiHelperRequest,
   evaluateAiHelperAccess,
@@ -9,6 +10,7 @@ import {
   type AiHelperAuditEvent,
   type AiHelperActor,
 } from "../../supabase/functions/_shared/ai-helper-contract";
+import { aiHelperBaseGuardrails as canonicalAiHelperBaseGuardrails } from "../../supabase/functions/_shared/ai-helper-guardrails";
 import {
   createSupabaseRestAiHelperDependencies,
   handleAiHelperRequest,
@@ -26,6 +28,10 @@ const agentActor: AiHelperActor = {
   role: "agent",
   canUseAI: true,
 };
+
+test("keeps edge and runtime AI helper guardrails in sync", () => {
+  expect(aiHelperBaseGuardrails).toBe(canonicalAiHelperBaseGuardrails);
+});
 
 async function json(response: Response): Promise<Record<string, unknown>> {
   return (await response.json()) as Record<string, unknown>;

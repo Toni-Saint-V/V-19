@@ -8,6 +8,7 @@ const forbiddenTrustCopy =
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
 });
 
 function submission(overrides: Partial<Submission> = {}): Submission {
@@ -112,6 +113,8 @@ describe("AI helper surface panel", () => {
 
     expect(screen.getByLabelText("Локальная подсказка агента")).toBeVisible();
     expect(screen.getByText("Локальная проверка")).toBeVisible();
+    expect(screen.getByText(/Почему сейчас/)).toBeVisible();
+    expect(screen.getAllByText(/Источник:/).length).toBeGreaterThan(0);
     expect(screen.getByText("Границы подсказки")).toBeVisible();
     expect(
       screen.getByText("Детерминированные проверки остаются источником истины."),
@@ -119,6 +122,23 @@ describe("AI helper surface panel", () => {
     expect(
       screen.getByLabelText("Локальная подсказка агента").textContent ?? "",
     ).not.toMatch(forbiddenTrustCopy);
+  });
+
+  test("renders a safe fallback when the local copilot is disabled", () => {
+    vi.stubEnv("VITE_CASE_COPILOT_ENABLED", "false");
+
+    render(
+      <AiHelperSurfacePanel
+        role="agent"
+        submission={submission({ status: "returned" })}
+        surface="agent"
+      />,
+    );
+
+    const fallback = screen.getByLabelText("Подсказка отключена");
+    expect(fallback).toBeVisible();
+    expect(fallback.textContent ?? "").toContain("Процесс доступен");
+    expect(screen.queryByRole("button", { name: "Выполнить ИИ-шаг" })).toBeNull();
   });
 
   test("renders the admin review helper for review surface", () => {
