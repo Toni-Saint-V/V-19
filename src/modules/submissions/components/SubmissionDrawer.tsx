@@ -259,23 +259,27 @@ export function SubmissionDrawer({
           ) : null}
           {activeTab === "data" ? (
             <DrawerQuestionnaire
+              onAiPrimaryAction={handleAiPrimaryAction}
               onApplyPassportField={onApplyPassportField}
               onFieldChange={onQuestionnaireField}
               passportExtractionEnabled={passportExtractionEnabled}
               role={role}
               submission={submission}
+              surface={surface}
             />
           ) : null}
           {activeTab === "media" ? (
             <DrawerFiles
               fileUploadBusy={fileUploadBusy}
               localPassportFileIds={localPassportFileIds}
+              onAiPrimaryAction={handleAiPrimaryAction}
               onExtractPassport={onExtractPassport}
               onUploadFile={onUploadFile}
               passportExtractionEnabled={passportExtractionEnabled}
               requireSelectedFile={requireSelectedFile}
               role={role}
               submission={submission}
+              surface={surface}
             />
           ) : null}
           {activeTab === "issues" ? (
@@ -715,12 +719,15 @@ function QueueItemCard({
 }
 
 function DrawerQuestionnaire({
+  onAiPrimaryAction,
   onApplyPassportField,
   onFieldChange,
   passportExtractionEnabled,
   role,
   submission,
+  surface,
 }: {
+  onAiPrimaryAction: (action: SubmissionNextStepAction) => void;
   onApplyPassportField: (
     applicantId: string,
     key: PassportExtractedFieldKey,
@@ -735,6 +742,7 @@ function DrawerQuestionnaire({
   passportExtractionEnabled: boolean;
   role: Role;
   submission: Submission;
+  surface: "agent" | "review" | "export";
 }) {
   const canEdit = role === "agent" && canAgentEditSubmissionContent(submission);
   const problemCount = questionnaireProblemCount(submission);
@@ -812,6 +820,13 @@ function DrawerQuestionnaire({
           <Badge className="visa-tag visa-tag-attention">Уточнить {problemCount}</Badge>
         ) : null}
       </div>
+      <AiHelperSurfacePanel
+        compact
+        role={role}
+        submission={submission}
+        surface={surface}
+        onPrimaryAction={onAiPrimaryAction}
+      />
       {submission.applicants.length > 1 ? (
         <div
           className="questionnaire-progress-grid visa-applicant-strip"
@@ -1206,21 +1221,25 @@ function defaultQuestionnaireSectionKey(submission: Submission) {
 function DrawerFiles({
   fileUploadBusy = false,
   localPassportFileIds = [],
+  onAiPrimaryAction,
   onExtractPassport,
   onUploadFile,
   passportExtractionEnabled = false,
   requireSelectedFile = false,
   role,
   submission,
+  surface,
 }: {
   fileUploadBusy?: boolean;
   localPassportFileIds?: string[];
+  onAiPrimaryAction: (action: SubmissionNextStepAction) => void;
   onExtractPassport: (fileId: string) => void;
   onUploadFile: (fileId: string, file?: File) => void;
   passportExtractionEnabled?: boolean;
   requireSelectedFile?: boolean;
   role: Role;
   submission: Submission;
+  surface: "agent" | "review" | "export";
 }) {
   const progress = fileReadyCount(submission);
   const canEditFiles = role === "agent" && canAgentEditSubmissionContent(submission);
@@ -1237,6 +1256,13 @@ function DrawerFiles({
           </p>
         </div>
       </div>
+      <AiHelperSurfacePanel
+        compact
+        role={role}
+        submission={submission}
+        surface={surface}
+        onPrimaryAction={onAiPrimaryAction}
+      />
       <div className="media-matrix" role="table" aria-label="Медиа по заявителям">
         <div className="media-matrix-row is-head" role="row">
           <span role="columnheader">Заявитель</span>

@@ -486,11 +486,15 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await expect(drawer(page).getByText(/ПД-\d+ · Черновик/)).toBeVisible();
     await openQuestionnaireTab(page);
+    await expect(drawer(page).getByText("ИИ-помощник")).toBeVisible();
+    await expect(drawer(page).getByText(/Почему сейчас/).first()).toBeVisible();
     await expect(
       drawer(page).getByRole("button", { name: "Заполнить анкету" }),
     ).toHaveCount(0);
     await fillQuestionnaire(page);
     await openMediaTab(page);
+    await expect(drawer(page).getByText("ИИ-помощник")).toBeVisible();
+    await expect(drawer(page).getByText(/Источник:/).first()).toBeVisible();
     await uploadAllVisibleFiles(page);
     await expect(
       drawer(page).getByRole("button", { name: /^(Загрузить|Заменить)/ }),
