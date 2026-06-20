@@ -1,10 +1,11 @@
 import {
-  buildSubmissionNextStepBrief,
-  type SubmissionNextStepAction,
-} from "./submissionNextStepEngine";
+  buildCaseCopilotBrief,
+  formatCaseCopilotHighlight,
+} from "./caseCopilot";
+import type { SubmissionNextStepAction } from "./submissionNextStepEngine";
 import type { Role, Submission } from "./types";
 
-type AiHelperSectionId = "blockers" | "actions" | "guardrails";
+type AiHelperSectionId = "blockers" | "actions" | "drafts" | "guardrails";
 
 export type AiHelperSurfaceModel = {
   ariaLabel: string;
@@ -27,23 +28,28 @@ export function buildSubmissionAiHelperSurface({
   submission: Submission;
   surface: "agent" | "review" | "export";
 }): AiHelperSurfaceModel {
-  const brief = buildSubmissionNextStepBrief({ role, submission, surface });
+  const brief = buildCaseCopilotBrief({ role, submission, surface });
 
   return {
-    ariaLabel: brief.ariaLabel,
-    primaryAction: brief.primaryAction,
+    ariaLabel: ariaLabel(role, surface),
+    primaryAction: brief.nextStep,
     summary: brief.summary,
     title: brief.title,
     sections: compactSections([
       {
         id: "blockers",
         title: role === "admin" ? "Что проверить" : "Что мешает движению",
-        items: brief.blockers,
+        items: brief.highlights.map(formatCaseCopilotHighlight),
       },
       {
         id: "actions",
         title: "Следующие действия",
         items: brief.actions,
+      },
+      {
+        id: "drafts",
+        title: "Черновики",
+        items: brief.drafts.map((draft) => `${draft.title}: ${draft.body}`),
       },
       {
         id: "guardrails",
@@ -52,6 +58,12 @@ export function buildSubmissionAiHelperSurface({
       },
     ]),
   };
+}
+
+function ariaLabel(role: Role, surface: "agent" | "review" | "export") {
+  if (role === "admin" && surface === "review") return "Фокус проверки администратора";
+  if (role === "admin" && surface === "export") return "Фокус выгрузки администратора";
+  return "Локальная подсказка агента";
 }
 
 function compactSections(

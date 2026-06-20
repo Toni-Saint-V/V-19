@@ -19,9 +19,26 @@ async function expectNoRetiredNavigation(page: Page) {
   }
 }
 
-async function switchToAdmin(page: Page) {
+async function switchToAdminViaUi(page: Page) {
   await page.getByRole("button", { name: "Сменить роль" }).click();
   await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
+}
+
+async function seedAdminRole(page: Page) {
+  await page.evaluate(() => {
+    (
+      globalThis as unknown as {
+        localStorage: { setItem(key: string, value: string): void };
+      }
+    ).localStorage.setItem("visaflow.workspaceEmail.v1", "admin@visaflow.local");
+  });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
+}
+
+async function openAgentSubmissions(page: Page) {
+  await page.getByRole("button", { name: "Мои подачи" }).click();
+  await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
 }
 
 function submissionCard(page: Page, name: string) {
@@ -235,13 +252,25 @@ test.describe("V-19 operations workspace", () => {
     await expectNoRetiredNavigation(page);
   });
 
+  test("role switch button changes workspace role through UI", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "chromium",
+      "Mobile flows seed role explicitly; desktop covers the visible role switch.",
+    );
+
+    await switchToAdminViaUi(page);
+    await expect(page.getByRole("button", { name: "Выгрузка" })).toBeVisible();
+  });
+
   test("local cockpit keeps another agent submission out of the agent workspace", async ({
     page,
   }) => {
     await page.getByRole("button", { name: "Мои подачи" }).click();
     await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
 
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await page.getByRole("button", { name: "Выгрузка" }).click();
     await page.getByRole("tab", { name: "История" }).click();
 
@@ -283,7 +312,7 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await expect(page.getByRole("button", { name: "Входящие" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Мои действия" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Проверка" })).toBeVisible();
@@ -346,7 +375,7 @@ test.describe("V-19 operations workspace", () => {
     const projectName = test.info().project.name;
 
     await page.reload();
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
     await expect(
       submissionCard(page, "Нина Волкова").getByText("Проверка:"),
@@ -442,6 +471,7 @@ test.describe("V-19 operations workspace", () => {
   test("agent creates a draft and opens returned issues in the drawer", async ({
     page,
   }) => {
+    await openAgentSubmissions(page);
     await page.getByRole("button", { name: "Новая подача" }).click();
     await expect(page.getByRole("heading", { name: "Новая подача" })).toBeVisible();
     await expect(page.locator('input[readonly][value="Испания"]')).toBeVisible();
@@ -628,7 +658,7 @@ test.describe("V-19 operations workspace", () => {
   test("header actions stay locked when the current list is filtered empty", async ({
     page,
   }) => {
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await page.getByLabel("Поиск в текущем списке").fill("нет такой подачи");
 
     await expect(page.getByText("Очередь проверки пуста.")).toBeVisible();
@@ -661,7 +691,7 @@ test.describe("V-19 operations workspace", () => {
   });
 
   test("admin converts a ББ suggestion into a precise issue", async ({ page }) => {
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await openSelectedReview(page);
     await expect(
       drawer(page).getByRole("heading", { name: "Нина Волкова" }),
@@ -703,7 +733,7 @@ test.describe("V-19 operations workspace", () => {
   });
 
   test("admin can add a precise issue and return a submission", async ({ page }) => {
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await expect(page.getByRole("button", { name: "Проверка" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Выгрузка" })).toBeVisible();
     await expect(page.getByText("Мои подачи", { exact: true })).toHaveCount(0);
@@ -730,7 +760,7 @@ test.describe("V-19 operations workspace", () => {
   test("admin accepts corrections and completes the export sequence", async ({
     page,
   }) => {
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await openCorrectionsTab(page);
     await expect(submissionCard(page, "Семья Петровых")).toBeVisible();
 
@@ -773,7 +803,7 @@ test.describe("V-19 operations workspace", () => {
   });
 
   test("export blocks mixed packages before file generation", async ({ page }) => {
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await openCorrectionsTab(page);
     await openAdminSubmission(page, "Семья Петровых");
     await page.getByRole("button", { name: "Закрыть и принять" }).click();
@@ -815,7 +845,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await page.getByRole("tab", { name: "На проверке" }).click();
     await openAdminSubmission(page, "Новая подача");
     await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
@@ -849,7 +879,7 @@ test.describe("V-19 operations workspace", () => {
     ).toHaveAttribute("aria-invalid", "false");
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
-    await switchToAdmin(page);
+    await seedAdminRole(page);
     await openCorrectionsTab(page);
     await openAdminSubmission(page, "Новая подача");
     await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
@@ -972,7 +1002,7 @@ test.describe("V-19 operations workspace", () => {
     });
 
     await test.step("admin returns first family with ББ and manual issues", async () => {
-      await switchToAdmin(page);
+      await seedAdminRole(page);
       await page.getByRole("tab", { name: "На проверке" }).click();
       await openAdminSubmission(page, familyTitle);
       await drawer(page).getByRole("button", { name: "Запустить проверку" }).click();
@@ -1032,7 +1062,7 @@ test.describe("V-19 operations workspace", () => {
     });
 
     await test.step("admin accepts returned family corrections", async () => {
-      await switchToAdmin(page);
+      await seedAdminRole(page);
       await openCorrectionsTab(page);
       await openAdminSubmission(page, familyTitle);
       await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
