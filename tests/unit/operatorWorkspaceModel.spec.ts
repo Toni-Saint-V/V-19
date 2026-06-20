@@ -15,7 +15,7 @@ describe("operator workspace model", () => {
     const queue = buildReadinessQueue(submission);
 
     expect(queue[0]?.type).toBe("admin_blocker");
-    expect(queue[0]?.target.tab).toBe("media");
+    expect(queue[0]?.target.tab).toBe("files");
     expect(queue[0]?.title).toContain("Мария Иванова");
     expect(targetElementId(queue[0].target)).toContain("workspace-media");
   });
@@ -50,7 +50,7 @@ describe("operator workspace model", () => {
     expect(sectionNavigationTarget(adjusted, targetSection.title)).toEqual({
       applicantId: targetApplicant.id,
       section: targetSection.title,
-      tab: "data",
+      tab: "questionnaire",
     });
   });
 });

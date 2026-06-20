@@ -25,9 +25,12 @@ export function AiHelperSurfacePanel({
     helper.primaryAction.disabled ||
     helper.primaryAction.kind === "wait" ||
     helper.primaryAction.kind === "none";
-  const actionButtonLabel = primaryActionDisabled
+  const actionButtonAriaLabel = primaryActionDisabled
     ? "ИИ-шаг недоступен"
     : "Выполнить ИИ-шаг";
+  const actionButtonLabel = primaryActionDisabled
+    ? "Недоступно"
+    : "Выполнить";
 
   return (
     <CardComponent
@@ -44,7 +47,7 @@ export function AiHelperSurfacePanel({
         <div>
           <Badge tone="muted">Локальная проверка</Badge>
           <Button
-            aria-label={actionButtonLabel}
+            aria-label={actionButtonAriaLabel}
             disabled={primaryActionDisabled}
             variant="secondary"
             onClick={() => {
@@ -57,16 +60,22 @@ export function AiHelperSurfacePanel({
         </div>
       </div>
       <div className="ai-helper-surface-sections">
-        {helper.sections.map((section) => (
+        {helper.sections.map((section) => {
+          const visibleItems = compact ? section.items.slice(0, 2) : section.items;
+          const hiddenCount = section.items.length - visibleItems.length;
+
+          return (
           <section key={section.id} className="ai-helper-surface-section">
             <h4>{section.title}</h4>
             <ul>
-              {section.items.map((item) => (
+              {visibleItems.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
+            {hiddenCount > 0 ? <small>+{hiddenCount}</small> : null}
           </section>
-        ))}
+          );
+        })}
       </div>
     </CardComponent>
   );

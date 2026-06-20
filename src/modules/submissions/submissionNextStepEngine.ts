@@ -164,7 +164,7 @@ function passportPrimaryAction(
         ? {
             applicantId: applicant.id,
             fileType: "passport_scan",
-            tab: "media",
+            tab: "files",
           }
         : undefined,
     };
@@ -256,7 +256,7 @@ function passportRowTarget(match: NonNullable<ReturnType<typeof firstPassportRow
   return {
     applicantId: match.applicantId,
     field: match.row.fieldLabel,
-    tab: "data" as const,
+    tab: "questionnaire" as const,
   };
 }
 

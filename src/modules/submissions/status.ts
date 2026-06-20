@@ -196,14 +196,14 @@ export function defaultDrawerTab(submission: Submission): DrawerTab {
       (file) => file.status === "needs_replacement" || file.status === "missing",
     )
   ) {
-    return "media";
+    return "files";
   }
   if (
     submission.applicants.some(
       (applicant) => applicant.questionnaireStatus === "needs_fix",
     )
   ) {
-    return "data";
+    return "questionnaire";
   }
   return "overview";
 }

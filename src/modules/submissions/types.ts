@@ -70,7 +70,13 @@ export type AiReviewState = "idle" | "checking" | "ready" | "failed";
 
 export type SubmissionHistorySource = "agent" | "admin" | "bb" | "system";
 
-export type DrawerTab = "overview" | "data" | "media" | "issues" | "history";
+export type DrawerTab =
+  | "overview"
+  | "applicants"
+  | "questionnaire"
+  | "files"
+  | "issues"
+  | "history";
 
 export type PassportExtractionStatus =
   | "idle"
