@@ -913,14 +913,6 @@ export function AdminReviewScreen({
   const [comfortableView, setComfortableView] = useState(true);
   const [panelOpen, setPanelOpen] = useState(true);
   const [sortNewest, setSortNewest] = useState(true);
-  const canAddIssue = Boolean(
-    visibleSubmission && canAddAdminIssue(visibleSubmission, "admin"),
-  );
-  const addIssueReason = canAddIssue
-    ? ""
-    : visibleSubmission
-      ? adminIssueUnavailableReason(visibleSubmission)
-      : "В этой вкладке нет видимой подачи для действия.";
   const tabCounts = {
     all: reviewSource.length,
     corrections: reviewSource.filter((submission) =>
@@ -947,8 +939,21 @@ export function AdminReviewScreen({
     () => (sortNewest ? filteredReviewList : [...filteredReviewList].reverse()),
     [filteredReviewList, sortNewest],
   );
+  const visibleSelectedSubmission =
+    visibleSubmission &&
+    visibleReviewList.some((submission) => submission.id === visibleSubmission.id)
+      ? visibleSubmission
+      : null;
   const prioritySubmission =
-    visibleSubmission ?? visibleReviewList[0] ?? reviewSource[0] ?? null;
+    visibleSelectedSubmission ?? visibleReviewList[0] ?? null;
+  const canAddIssue = Boolean(
+    prioritySubmission && canAddAdminIssue(prioritySubmission, "admin"),
+  );
+  const addIssueReason = canAddIssue
+    ? ""
+    : prioritySubmission
+      ? adminIssueUnavailableReason(prioritySubmission)
+      : "В этой вкладке нет видимой подачи для действия.";
   const activeFilterLabels: string[] = [
     blockersOnly ? "Только блокеры" : null,
     sortNewest ? null : "Обратный порядок",
@@ -1052,7 +1057,7 @@ export function AdminReviewScreen({
                   title={formatSubmissionListTitle(submission)}
                   onOpen={() => {
                     onSelect(submission);
-                    onOpen(submission, defaultDrawerTab(submission));
+                    onOpen(submission, "overview");
                   }}
                 />
               ))}
@@ -1107,7 +1112,7 @@ export function AdminReviewScreen({
                 variant="primary"
                 onClick={() => {
                   onSelect(prioritySubmission);
-                  onOpen(prioritySubmission, defaultDrawerTab(prioritySubmission));
+                  onOpen(prioritySubmission, "overview");
                 }}
               >
                 {adminReviewActionLabel(prioritySubmission)}
@@ -1116,7 +1121,7 @@ export function AdminReviewScreen({
                 aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
                 disabled={!canAddIssue}
                 variant="secondary"
-                onClick={() => visibleSubmission && onAddIssue(visibleSubmission)}
+                onClick={() => prioritySubmission && onAddIssue(prioritySubmission)}
               >
                 Вернуть с замечанием
               </Button>

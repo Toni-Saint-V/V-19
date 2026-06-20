@@ -715,6 +715,9 @@ function DrawerOverview({
     (item) => !(item.type === "admin_blocker" && item.status === "open"),
   );
   const openIssueList = submission.issues.filter((issue) => issue.status === "open");
+  const fixedIssueList = submission.issues.filter(
+    (issue) => issue.status === "fixed_by_agent",
+  );
   const [focus, setFocus] = useState<OverviewFocus>(() =>
     openIssueList.length ? "issues" : "queue",
   );
@@ -722,6 +725,22 @@ function DrawerOverview({
   useEffect(() => {
     setFocus(openIssueList.length ? "issues" : "queue");
   }, [openIssueList.length, submission.id]);
+
+  if (surface === "review") {
+    return (
+      <AdminReviewOverview
+        fileProgress={fileProgress}
+        fixedIssueList={fixedIssueList}
+        needsAttention={needsAttention}
+        nextLine={nextLine}
+        onOpenTarget={onOpenTarget}
+        openIssueList={openIssueList}
+        primaryAction={primaryAction}
+        queue={queue}
+        submission={submission}
+      />
+    );
+  }
 
   return (
     <section className="drawer-section drawer-overview">
@@ -819,6 +838,223 @@ function DrawerOverview({
         )}
       </section>
     </section>
+  );
+}
+
+function AdminReviewOverview({
+  fileProgress,
+  fixedIssueList,
+  needsAttention,
+  nextLine,
+  onOpenTarget,
+  openIssueList,
+  primaryAction,
+  queue,
+  submission,
+}: {
+  fileProgress: { ready: number; total: number };
+  fixedIssueList: Issue[];
+  needsAttention: boolean;
+  nextLine: string;
+  onOpenTarget: (target: WorkspaceTarget) => void;
+  openIssueList: Issue[];
+  primaryAction: ActionDecision;
+  queue: ReadinessQueueItem[];
+  submission: Submission;
+}) {
+  const nextQueueItems = queue.slice(0, 4);
+  const questionnaireTarget = reviewQuestionnaireTarget(submission, queue);
+  const fileTarget = reviewFileTarget(submission, queue);
+  const evidenceReady = submission.completeness.total >= 100 && fileProgress.ready === fileProgress.total;
+
+  return (
+    <section className="drawer-section admin-review-overview">
+      <aside className="admin-review-spine" aria-label="Карта проверки">
+        <div>
+          <p className="kicker">Карта</p>
+          <strong>{submission.id}</strong>
+          <span>{reviewStageLabel(submission.status)}</span>
+        </div>
+        <ol>
+          <li className={openIssueList.length ? "is-alert" : "is-clear"}>
+            <span>01</span>
+            <strong>Блокеры</strong>
+            <em>{openIssueList.length ? `${openIssueList.length} открыто` : "чисто"}</em>
+          </li>
+          <li className={evidenceReady ? "is-clear" : "is-alert"}>
+            <span>02</span>
+            <strong>Доказательства</strong>
+            <em>{fileProgress.ready}/{fileProgress.total} файлов</em>
+          </li>
+          <li className={primaryAction.disabled ? "is-alert" : "is-clear"}>
+            <span>03</span>
+            <strong>Решение</strong>
+            <em>{primaryAction.label}</em>
+          </li>
+        </ol>
+      </aside>
+
+      <div className="admin-review-board">
+        <CardComponent
+          as="article"
+          className={`admin-review-command ${needsAttention ? "needs-attention" : ""}`}
+        >
+          <div className="admin-review-command-copy">
+            <p className="kicker">Решение администратора</p>
+            <h3>{decisionTitle(submission, primaryAction)}</h3>
+            <p>{nextLine}</p>
+          </div>
+          <Badge
+            className={`decision-card-badge ${
+              needsAttention ? "is-attention" : "is-clear"
+            }`}
+          >
+            {decisionBadge(submission, primaryAction)}
+          </Badge>
+          <dl className="admin-review-command-metrics">
+            <div>
+              <dt>Блокеры</dt>
+              <dd>{openIssueList.length ? `${openIssueList.length} открыто` : "нет"}</dd>
+            </div>
+            <div>
+              <dt>Доказательства</dt>
+              <dd>
+                {fileProgress.ready}/{fileProgress.total}
+              </dd>
+            </div>
+            <div>
+              <dt>Действие</dt>
+              <dd>{primaryAction.label}</dd>
+            </div>
+          </dl>
+        </CardComponent>
+
+        <div className="admin-review-workspace">
+          <section className="admin-review-lane is-primary" aria-label="Что проверить">
+            <DrawerSectionHeader
+              title={openIssueList.length ? "Препятствия" : "Следующая проверка"}
+              badge={
+                <Badge className={openIssueList.length ? "visa-tag-danger" : "visa-tag-muted"}>
+                  {openIssueList.length || nextQueueItems.length}
+                </Badge>
+              }
+            />
+            {openIssueList.length ? (
+              <div className="compact-issue-list">
+                {openIssueList.map((issue) => (
+                  <CompactIssueRow
+                    issue={issue}
+                    key={issue.id}
+                    onOpenTarget={onOpenTarget}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="workspace-queue-list">
+                {nextQueueItems.length ? (
+                  nextQueueItems.map((item) => (
+                    <QueueItemCard item={item} key={item.id} onOpenTarget={onOpenTarget} />
+                  ))
+                ) : (
+                  <div className="admin-review-clear-state">
+                    <strong>Активных препятствий нет</strong>
+                    <p>Проверьте доказательства справа и выберите итоговое действие.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="admin-review-lane" aria-label="Доказательства">
+            <DrawerSectionHeader title="Доказательства" />
+            <div className="admin-review-evidence-grid">
+              <ReviewEvidenceTile
+                actionLabel={`Открыть анкету: ${submission.title}`}
+                ctaLabel="Анкета"
+                detail={`${submission.completeness.questionnaire}% заполнено`}
+                label="Анкета"
+                value={`${submission.applicants.length} заявит.`}
+                onOpen={questionnaireTarget ? () => onOpenTarget(questionnaireTarget) : undefined}
+              />
+              <ReviewEvidenceTile
+                actionLabel={`Открыть файлы: ${submission.title}`}
+                ctaLabel="Файлы"
+                detail={`${submission.completeness.files}% готовность`}
+                label="Файлы"
+                value={`${fileProgress.ready}/${fileProgress.total}`}
+                onOpen={fileTarget ? () => onOpenTarget(fileTarget) : undefined}
+              />
+              <ReviewEvidenceTile
+                actionLabel={`Проверить исправления: ${submission.title}`}
+                ctaLabel="Проверить"
+                detail={fixedIssueList.length ? "Есть исправления агента" : "Нет ожидания"}
+                label="Исправления"
+                value={String(fixedIssueList.length)}
+                onOpen={
+                  fixedIssueList[0]
+                    ? () => onOpenTarget(targetForIssue(fixedIssueList[0]))
+                    : undefined
+                }
+              />
+            </div>
+            <div className="admin-review-fixed-list">
+              {fixedIssueList.slice(0, 3).map((issue) => (
+                <article className="admin-review-fixed-row" key={issue.id}>
+                  <div>
+                    <strong>{drawerIssueTitle(issue)}</strong>
+                    <p>Исправлено агентом · {issue.target.applicantName}</p>
+                  </div>
+                  <Button
+                    aria-label={`Проверить исправление: ${drawerIssueTitle(issue)}`}
+                    className="compact-button"
+                    variant="secondary"
+                    onClick={() => onOpenTarget(targetForIssue(issue))}
+                  >
+                    Проверить
+                  </Button>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ReviewEvidenceTile({
+  actionLabel,
+  ctaLabel = "Открыть",
+  detail,
+  label,
+  onOpen,
+  value,
+}: {
+  actionLabel?: string;
+  ctaLabel?: string;
+  detail: string;
+  label: string;
+  onOpen?: () => void;
+  value: string;
+}) {
+  return (
+    <article className="admin-review-evidence-tile">
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <p>{detail}</p>
+      </div>
+      {onOpen ? (
+        <Button
+          aria-label={actionLabel ?? `Открыть: ${label}`}
+          className="compact-button"
+          variant="secondary"
+          onClick={onOpen}
+        >
+          {ctaLabel}
+        </Button>
+      ) : null}
+    </article>
   );
 }
 
@@ -1802,20 +2038,32 @@ function DrawerIssues({
                   key={issue.id}
                   tabIndex={-1}
                 >
-                  <Button
-                    aria-controls={detailsId}
-                    aria-expanded={expanded}
-                    className="issue-row-summary"
-                    variant="plain"
-                    onClick={() => toggleIssue(issue.id)}
-                  >
-                    <div>
-                      <strong>{drawerIssueTitle(issue)}</strong>
-                      <IssueCategoryTag issue={issue} />
-                    </div>
-                    <p>{drawerIssueSummary(issue)}</p>
-                    <span className="accordion-chevron" aria-hidden="true" />
-                  </Button>
+                  <div className="issue-row-main">
+                    <Button
+                      aria-controls={detailsId}
+                      aria-expanded={expanded}
+                      className="issue-row-summary"
+                      variant="plain"
+                      onClick={() => toggleIssue(issue.id)}
+                    >
+                      <div>
+                        <strong>{drawerIssueTitle(issue)}</strong>
+                        <IssueCategoryTag issue={issue} />
+                      </div>
+                      <p>{drawerIssueSummary(issue)}</p>
+                      <span className="accordion-chevron" aria-hidden="true" />
+                    </Button>
+                    {issue.status !== "closed_by_admin" ? (
+                      <Button
+                        aria-label={`${issue.status === "fixed_by_agent" ? "Проверить исправление" : "Открыть место исправления"}: ${drawerIssueTitle(issue)}`}
+                        className="issue-row-target"
+                        variant="secondary"
+                        onClick={() => onOpenTarget(targetForIssue(issue))}
+                      >
+                        {issue.status === "fixed_by_agent" ? "Проверить" : "Перейти"}
+                      </Button>
+                    ) : null}
+                  </div>
                   <div className="issue-row-details" hidden={!expanded} id={detailsId}>
                     <p>{issue.comment}</p>
                     <div className="issue-row-meta">
@@ -1825,15 +2073,6 @@ function DrawerIssues({
                       <span>{issueStatusLabel(issue.status)}</span>
                       <span>{issueTarget(issue)}</span>
                     </div>
-                    {issue.status === "open" ? (
-                      <Button
-                        aria-label="Открыть место исправления"
-                        variant="secondary"
-                        onClick={() => onOpenTarget(targetForIssue(issue))}
-                      >
-                        Перейти
-                      </Button>
-                    ) : null}
                   </div>
                 </CardComponent>
               );
@@ -2241,6 +2480,46 @@ function firstWorkLine(submission: Submission) {
   }
 
   return nextProblem(submission);
+}
+
+function reviewQuestionnaireTarget(
+  submission: Submission,
+  queue: ReadinessQueueItem[],
+): WorkspaceTarget | null {
+  const queuedTarget = queue.find((item) => item.target.tab === "questionnaire")?.target;
+  if (queuedTarget) return queuedTarget;
+
+  const applicant = submission.applicants[0];
+  if (!applicant) return null;
+
+  const section =
+    applicant.sections.find((item) => item.status !== "complete") ?? applicant.sections[0];
+
+  return {
+    applicantId: applicant.id,
+    section: section?.title,
+    tab: "questionnaire",
+  };
+}
+
+function reviewFileTarget(
+  submission: Submission,
+  queue: ReadinessQueueItem[],
+): WorkspaceTarget | null {
+  const queuedTarget = queue.find((item) => item.target.tab === "files")?.target;
+  if (queuedTarget) return queuedTarget;
+
+  const file =
+    submission.files.find((item) => item.status === "needs_replacement") ??
+    submission.files.find((item) => item.status === "missing") ??
+    submission.files[0];
+  if (!file) return null;
+
+  return {
+    applicantId: file.applicantId,
+    fileType: file.type,
+    tab: "files",
+  };
 }
 
 function sectionIssue(
