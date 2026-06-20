@@ -1086,12 +1086,13 @@ p {
 }
 
 .v19-event-row {
+  position: relative;
   display: grid;
-  grid-template-columns: 8px 10px minmax(0, 1fr) auto auto;
-  gap: 10px;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 12px;
   align-items: center;
   min-height: var(--v19-row-height);
-  padding: 9px 16px 9px 12px;
+  padding: 9px 16px 9px 20px;
 }
 
 .v19-action-row {
@@ -1159,10 +1160,14 @@ p {
 }
 
 .v19-unread-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
+  position: absolute;
+  top: 50%;
+  left: -1px;
+  width: 2px;
+  height: 32px;
+  border-radius: 0 var(--v19-radius-pill) var(--v19-radius-pill) 0;
   background: var(--v19-accent);
+  transform: translateY(-50%);
 }
 
 .v19-event-row.is-read .v19-unread-dot {
@@ -7844,23 +7849,21 @@ p {
   }
 
   .v19-event-row:not(.v19-action-row) {
-    grid-template-columns: 26px minmax(0, 1fr);
+    grid-template-columns: 10px minmax(0, 1fr);
     column-gap: 12px;
     row-gap: 10px;
     align-items: start;
     min-height: 0;
-    padding: 14px 16px;
+    padding: 14px 16px 14px 20px;
   }
 
-  .v19-event-row:not(.v19-action-row) .v19-unread-dot,
   .v19-event-row:not(.v19-action-row) .v19-event-icon {
     grid-row: 1;
-    margin-top: 8px;
+    margin-top: 7px;
   }
 
   .v19-event-row:not(.v19-action-row) .v19-unread-dot {
-    grid-column: 1;
-    justify-self: start;
+    height: 34px;
   }
 
   .v19-event-row:not(.v19-action-row) .v19-event-icon {
