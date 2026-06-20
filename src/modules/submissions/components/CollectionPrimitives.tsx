@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import {
   Badge,
   CardComponent,
@@ -91,7 +91,11 @@ export function SummaryFilterTabs<T extends string>({
         return (
           <button
             aria-pressed={selected}
-            className={cn("v19-summary-filter-tab", `tone-${tone}`, selected && "is-active")}
+            className={cn(
+              "v19-summary-filter-tab",
+              `tone-${tone}`,
+              selected && "is-active",
+            )}
             key={tab.id}
             type="button"
             onClick={() => onValueChange(tab.id)}
@@ -133,6 +137,7 @@ export function ToolbarIconButton({
       icon={<ToolbarIcon icon={icon} />}
       label={label}
       pressed={pressed}
+      tooltip={label}
     />
   );
 }
@@ -204,7 +209,10 @@ export function ActionRow({
   severity,
   title,
 }: {
-  badges: Array<{ label: string; tone: "amber" | "blue" | "danger" | "muted" | "teal" }>;
+  badges: Array<{
+    label: string;
+    tone: "amber" | "blue" | "danger" | "muted" | "teal";
+  }>;
   context: ReactNode;
   cta: string;
   onOpen: () => void;
@@ -265,13 +273,15 @@ export function SubmissionCollectionRow({
 }) {
   return (
     <button
-      className="v19-submission-row"
+      className={cn(
+        "v19-submission-row",
+        (status === "returned" || status === "requires_action") && "is-attention",
+      )}
       data-submission-card=""
       data-submission-id={submissionId}
       type="button"
       onClick={onOpen}
     >
-      <span className={cn("v19-submission-dot", `status-${status}`)} aria-hidden="true" />
       <span className="v19-event-main">
         <strong title={title}>{title}</strong>
         {searchText ? <span className="sr-only">{searchText}</span> : null}
@@ -293,17 +303,47 @@ export function SubmissionCollectionRow({
       <span className="v19-submission-file-tag" aria-label={`Файлы: ${fileState}`}>
         <Badge tone={fileTone}>{fileState}</Badge>
       </span>
-      <span className="v19-submission-percent-tag" aria-label={`Готовность: ${completeness}`}>
-        <Badge tone={completeness === "100%" ? "teal" : "muted"}>
-          {completeness}
-        </Badge>
+      <span
+        className="v19-submission-percent-tag"
+        aria-label={`Готовность: ${completeness}`}
+      >
+        <ProgressCell value={completeness} />
       </span>
-      <span className="v19-event-action" aria-label={`${action}: ${title}`} title={action}>
+      <span
+        className="v19-event-action"
+        aria-label={`${action}: ${title}`}
+        title={action}
+      >
+        <span className="v19-event-action-label">{action}</span>
         <SvgIcon>
           <path d="M9 6l6 6-6 6" />
         </SvgIcon>
       </span>
     </button>
+  );
+}
+
+function ProgressCell({ value }: { value: string }) {
+  const percent = Number.parseInt(value.replace("%", ""), 10);
+  const safePercent = Number.isFinite(percent)
+    ? Math.min(Math.max(percent, 0), 100)
+    : 0;
+
+  return (
+    <span
+      className={cn(
+        "v19-progress-cell",
+        safePercent === 100
+          ? "is-complete"
+          : safePercent <= 5
+            ? "is-empty"
+            : "is-partial",
+      )}
+      style={{ "--progress": `${safePercent}%` } as CSSProperties}
+    >
+      <span className="v19-progress-value">{value}</span>
+      <span className="v19-progress-track" aria-hidden="true" />
+    </span>
   );
 }
 

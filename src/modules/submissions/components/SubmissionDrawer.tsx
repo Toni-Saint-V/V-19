@@ -1,4 +1,11 @@
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Badge,
   Button,
@@ -240,6 +247,9 @@ export function SubmissionDrawer({
       <header className="drawer-header">
         <div className="drawer-title-block">
           <h2 id="drawer-title">{submission.title}</h2>
+          <p>
+            {submission.id} · {statusLabels[submission.status]}
+          </p>
         </div>
         <Button variant="icon" aria-label="Закрыть подачу" onClick={onClose}>
           ×
@@ -264,7 +274,7 @@ export function SubmissionDrawer({
         role="tabpanel"
         aria-labelledby={`drawer-tab-${activeTab}`}
       >
-        <main className="workspace-main">
+        <div className="workspace-main">
           {activeTab === "overview" ? (
             <DrawerOverview
               onAiPrimaryAction={handleAiPrimaryAction}
@@ -313,7 +323,7 @@ export function SubmissionDrawer({
             />
           ) : null}
           {activeTab === "history" ? <DrawerHistory submission={submission} /> : null}
-        </main>
+        </div>
       </div>
 
       {canOpenIssueComposer && issueComposerOpen ? (
@@ -822,7 +832,7 @@ function CompactIssueRow({
   return (
     <CardComponent as="article" className={`compact-issue-row ${issue.severity}`}>
       <div>
-        <strong>{issue.target.applicantName}</strong>
+        <strong>{drawerIssueTitle(issue)}</strong>
         <p>{drawerIssueSummary(issue)}</p>
       </div>
       <IssueCategoryTag issue={issue} />
@@ -975,11 +985,7 @@ function DrawerQuestionnaire({
       submission.applicants[0];
     if (!applicant) return;
 
-    if (activeApplicant?.id === applicant.id) {
-      setOpenSectionState({ sectionKey: null, submissionId: submission.id });
-      setPendingSectionScrollId(null);
-      return;
-    }
+    if (activeApplicant?.id === applicant.id) return;
 
     const issue = submission.issues.find(
       (item) =>
@@ -1003,6 +1009,58 @@ function DrawerQuestionnaire({
     });
     openQuestionnaireSection(sectionKey, sectionElementId);
   }
+
+  const activeApplicantPanelId = activeApplicant
+    ? `questionnaire-applicant-${activeApplicant.id}`
+    : undefined;
+  const activeApplicantPrioritySections = useMemo(() => {
+    if (!activeApplicant) return [];
+
+    return activeApplicant.sections.filter(
+      (section) =>
+        section.status !== "complete" ||
+        Boolean(sectionIssue(submission, activeApplicant.id, section.title)),
+    );
+  }, [activeApplicant, submission]);
+  const activeApplicantReviewSections = useMemo(() => {
+    if (!activeApplicant) return [];
+
+    return activeApplicant.sections;
+  }, [activeApplicant]);
+  const activeApplicantCompletedSectionCount = activeApplicant
+    ? activeApplicant.sections.length - activeApplicantPrioritySections.length
+    : 0;
+  const activeApplicantReviewSectionKeys = useMemo(() => {
+    if (!activeApplicant) return [];
+
+    return activeApplicantReviewSections.map((section) =>
+      questionnaireSectionKey(activeApplicant.id, section.id),
+    );
+  }, [activeApplicant, activeApplicantReviewSections]);
+  const activeApplicantReviewSignature = activeApplicantReviewSectionKeys.join("|");
+
+  useEffect(() => {
+    if (!activeApplicant || !activeApplicantReviewSections.length) return;
+    if (openSectionKey && activeApplicantReviewSectionKeys.includes(openSectionKey)) {
+      return;
+    }
+
+    const nextSection =
+      activeApplicantPrioritySections[0] ?? activeApplicantReviewSections[0];
+
+    setOpenSectionState({
+      sectionKey: questionnaireSectionKey(activeApplicant.id, nextSection.id),
+      submissionId: submission.id,
+    });
+  }, [
+    activeApplicant,
+    activeApplicantPrioritySections,
+    activeApplicantReviewSections,
+    activeApplicantReviewSectionKeys,
+    activeApplicantReviewSignature,
+    openSectionKey,
+    submission.id,
+  ]);
 
   return (
     <section
@@ -1028,13 +1086,12 @@ function DrawerQuestionnaire({
       </div>
       <div className="questionnaire-focus-layout">
         <div
-          className="questionnaire-workspace visa-form-workspace"
+          className="questionnaire-workspace visa-form-workspace questionnaire-applicant-rail"
           aria-label="Заявители семьи"
         >
           {submission.applicants.map((applicant) => {
             const visualState = applicantVisualState(submission, applicant);
             const expandedApplicant = activeApplicant?.id === applicant.id;
-            const applicantPanelId = `questionnaire-applicant-${applicant.id}`;
 
             return (
               <CardComponent
@@ -1045,7 +1102,7 @@ function DrawerQuestionnaire({
                 key={applicant.id}
               >
                 <Button
-                  aria-controls={applicantPanelId}
+                  aria-controls={expandedApplicant ? activeApplicantPanelId : undefined}
                   aria-expanded={expandedApplicant}
                   className="questionnaire-applicant-trigger visa-applicant-header"
                   title={applicant.fullName}
@@ -1060,180 +1117,205 @@ function DrawerQuestionnaire({
                     </span>
                   </span>
                   <span className="questionnaire-card-status">
-                    <Badge tone="blue">
+                    <Badge className="questionnaire-progress-tag">
                       {questionnaireProgressForApplicant(applicant)}%
                     </Badge>
-                    {shouldShowApplicantStateBadge(submission, applicant) ? (
-                      <Badge tone={visualState.tone}>{visualState.label}</Badge>
-                    ) : null}
                     <span className="accordion-chevron" aria-hidden="true" />
                   </span>
                 </Button>
-                {expandedApplicant ? (
-                  <div className="questionnaire-applicant-panel" id={applicantPanelId}>
-                    <PassportExtractionReviewPanel
-                      applicant={applicant}
-                      canEdit={canEdit}
-                      enabled={passportExtractionEnabled}
-                      onApplyField={onApplyPassportField}
-                    />
-                    <div className="questionnaire-section-list visa-section-stack">
-                      {applicant.sections.map((section) => {
-                        const issue = sectionIssue(
-                          submission,
-                          applicant.id,
-                          section.title,
-                        );
-                        const sectionKey = questionnaireSectionKey(
-                          applicant.id,
-                          section.id,
-                        );
-                        const sectionElementId = targetElementId({
-                          applicantId: applicant.id,
-                          section: section.title,
-                          tab: "questionnaire",
-                        });
-                        const fieldsId = `questionnaire-fields-${applicant.id}-${section.id}`;
-                        const expanded = openSectionKey === sectionKey;
-
-                        return (
-                          <CardComponent
-                            as="section"
-                            className={`questionnaire-edit-section visa-section-card ${
-                              issue ? "has-issue" : ""
-                            } ${expanded ? "is-expanded" : "is-collapsed"}`}
-                            id={sectionElementId}
-                            key={section.id}
-                            aria-label={`${applicant.fullName}: ${section.title}`}
-                          >
-                            <Button
-                              className="questionnaire-section-heading visa-section-trigger"
-                              variant="plain"
-                              type="button"
-                              aria-controls={fieldsId}
-                              aria-expanded={expanded}
-                              onClick={() =>
-                                openQuestionnaireSection(sectionKey, sectionElementId)
-                              }
-                              onFocus={() =>
-                                openQuestionnaireSection(sectionKey, sectionElementId)
-                              }
-                            >
-                              <div>
-                                <div>
-                                  {section.stepLabel ? (
-                                    <p className="consular-step-label visa-step-label">
-                                      {section.stepLabel}
-                                    </p>
-                                  ) : null}
-                                  <h4>{section.title}</h4>
-                                  {issue ? (
-                                    <p className="visa-section-note">
-                                      {drawerIssueSummary(issue)}
-                                    </p>
-                                  ) : section.missing ? (
-                                    <p className="visa-section-note">
-                                      {section.missing}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              </div>
-                              <span className="questionnaire-section-side">
-                                {issue || section.status !== "complete" ? (
-                                  <Badge tone={questionnaireTone(section.status)}>
-                                    {questionnaireLabel(section.status)}
-                                  </Badge>
-                                ) : null}
-                                <span
-                                  className="accordion-chevron"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            </Button>
-                            <div
-                              className="questionnaire-fields visa-field-grid"
-                              hidden={!expanded}
-                              id={fieldsId}
-                            >
-                              {section.fields.map((field) => {
-                                const fieldIssue = fieldIssueFor(
-                                  submission,
-                                  applicant.id,
-                                  section.title,
-                                  field.label,
-                                );
-                                const error = field.error ?? fieldIssue?.reason;
-                                const fieldClassName = `visa-field ${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`;
-                                const fieldAriaLabel = `${applicant.fullName} · ${section.title} · ${field.label}`;
-                                const fieldElementId = targetElementId({
-                                  applicantId: applicant.id,
-                                  field: field.label,
-                                  tab: "questionnaire",
-                                });
-
-                                if (field.control === "select") {
-                                  return (
-                                    <Select
-                                      aria-label={fieldAriaLabel}
-                                      containerClassName={fieldClassName}
-                                      disabled={!canEdit}
-                                      errorMessage={error}
-                                      id={fieldElementId}
-                                      key={field.id}
-                                      label={field.label}
-                                      options={(field.options ?? []).map((option) => ({
-                                        label: option,
-                                        value: option,
-                                      }))}
-                                      placeholder={field.placeholder ?? "Выберите"}
-                                      required={field.required}
-                                      value={field.value}
-                                      onChange={(event) =>
-                                        onFieldChange({
-                                          applicantId: applicant.id,
-                                          sectionId: section.id,
-                                          fieldId: field.id,
-                                          value: event.target.value,
-                                        })
-                                      }
-                                    />
-                                  );
-                                }
-
-                                return (
-                                  <TextInputField
-                                    aria-label={fieldAriaLabel}
-                                    containerClassName={fieldClassName}
-                                    disabled={!canEdit}
-                                    errorMessage={error}
-                                    id={fieldElementId}
-                                    key={field.id}
-                                    label={field.label}
-                                    placeholder={field.placeholder}
-                                    required={field.required}
-                                    value={field.value}
-                                    onChange={(event) =>
-                                      onFieldChange({
-                                        applicantId: applicant.id,
-                                        sectionId: section.id,
-                                        fieldId: field.id,
-                                        value: event.target.value,
-                                      })
-                                    }
-                                  />
-                                );
-                              })}
-                            </div>
-                          </CardComponent>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
               </CardComponent>
             );
           })}
         </div>
+        {activeApplicant ? (
+          <div
+            className="questionnaire-applicant-panel visa-questionnaire-deck"
+            id={activeApplicantPanelId}
+            aria-label={`Анкета: ${activeApplicant.fullName}`}
+          >
+            <PassportExtractionReviewPanel
+              applicant={activeApplicant}
+              canEdit={canEdit}
+              enabled={passportExtractionEnabled}
+              onApplyField={onApplyPassportField}
+            />
+            <div className="questionnaire-section-list visa-section-stack visa-section-deck">
+              {!activeApplicantPrioritySections.length &&
+              activeApplicantReviewSections.length ? (
+                <CardComponent
+                  as="section"
+                  className="questionnaire-deck-empty visa-answer-card"
+                >
+                  <p className="kicker">Фокус</p>
+                  <h4>Все разделы заполнены</h4>
+                  <p>
+                    {activeApplicantCompletedSectionCount} из{" "}
+                    {activeApplicant.sections.length} секций доступны ниже для проверки.
+                  </p>
+                </CardComponent>
+              ) : null}
+              {activeApplicantReviewSections.length ? (
+                activeApplicantReviewSections.map((section) => {
+                  const issue = sectionIssue(
+                    submission,
+                    activeApplicant.id,
+                    section.title,
+                  );
+                  const sectionKey = questionnaireSectionKey(
+                    activeApplicant.id,
+                    section.id,
+                  );
+                  const sectionElementId = targetElementId({
+                    applicantId: activeApplicant.id,
+                    section: section.title,
+                    tab: "questionnaire",
+                  });
+                  const fieldsId = `questionnaire-fields-${activeApplicant.id}-${section.id}`;
+                  const expanded = openSectionKey === sectionKey;
+                  const prioritySection =
+                    activeApplicantPrioritySections.includes(section);
+
+                  return (
+                    <CardComponent
+                      as="section"
+                      className={`questionnaire-edit-section visa-section-card visa-answer-card ${
+                        issue ? "has-issue" : ""
+                      } ${prioritySection ? "is-priority" : "is-complete-section"} ${
+                        expanded ? "is-expanded" : "is-collapsed"
+                      }`}
+                      id={sectionElementId}
+                      key={section.id}
+                      aria-label={`${activeApplicant.fullName}: ${section.title}`}
+                    >
+                      <Button
+                        className="questionnaire-section-heading visa-section-trigger"
+                        variant="plain"
+                        type="button"
+                        aria-controls={fieldsId}
+                        aria-expanded={expanded}
+                        onClick={() =>
+                          openQuestionnaireSection(sectionKey, sectionElementId)
+                        }
+                        onFocus={() =>
+                          openQuestionnaireSection(sectionKey, sectionElementId)
+                        }
+                      >
+                        <div>
+                          <div>
+                            {section.stepLabel ? (
+                              <p className="consular-step-label visa-step-label">
+                                {section.stepLabel}
+                              </p>
+                            ) : null}
+                            <h4>{section.title}</h4>
+                            {issue ? (
+                              <p className="visa-section-note">
+                                {drawerIssueSummary(issue)}
+                              </p>
+                            ) : section.missing ? (
+                              <p className="visa-section-note">{section.missing}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <span className="questionnaire-section-side">
+                          {issue || section.status !== "complete" ? (
+                            <Badge tone={questionnaireTone(section.status)}>
+                              {questionnaireLabel(section.status)}
+                            </Badge>
+                          ) : null}
+                          <span className="accordion-chevron" aria-hidden="true" />
+                        </span>
+                      </Button>
+                      <div
+                        className="questionnaire-fields visa-field-grid"
+                        hidden={!expanded}
+                        id={fieldsId}
+                      >
+                        {section.fields.map((field) => {
+                          const fieldIssue = fieldIssueFor(
+                            submission,
+                            activeApplicant.id,
+                            section.title,
+                            field.label,
+                          );
+                          const error = field.error ?? fieldIssue?.reason;
+                          const fieldClassName = `visa-field ${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`;
+                          const fieldAriaLabel = `${activeApplicant.fullName} · ${section.title} · ${field.label}`;
+                          const fieldElementId = targetElementId({
+                            applicantId: activeApplicant.id,
+                            field: field.label,
+                            tab: "questionnaire",
+                          });
+
+                          if (field.control === "select") {
+                            return (
+                              <Select
+                                aria-label={fieldAriaLabel}
+                                containerClassName={fieldClassName}
+                                disabled={!canEdit}
+                                errorMessage={error}
+                                id={fieldElementId}
+                                key={field.id}
+                                label={field.label}
+                                options={(field.options ?? []).map((option) => ({
+                                  label: option,
+                                  value: option,
+                                }))}
+                                placeholder={field.placeholder ?? "Выберите"}
+                                required={field.required}
+                                value={field.value}
+                                onChange={(event) =>
+                                  onFieldChange({
+                                    applicantId: activeApplicant.id,
+                                    sectionId: section.id,
+                                    fieldId: field.id,
+                                    value: event.target.value,
+                                  })
+                                }
+                              />
+                            );
+                          }
+
+                          return (
+                            <TextInputField
+                              aria-label={fieldAriaLabel}
+                              containerClassName={fieldClassName}
+                              disabled={!canEdit}
+                              errorMessage={error}
+                              id={fieldElementId}
+                              key={field.id}
+                              label={field.label}
+                              placeholder={field.placeholder}
+                              required={field.required}
+                              value={field.value}
+                              onChange={(event) =>
+                                onFieldChange({
+                                  applicantId: activeApplicant.id,
+                                  sectionId: section.id,
+                                  fieldId: field.id,
+                                  value: event.target.value,
+                                })
+                              }
+                            />
+                          );
+                        })}
+                      </div>
+                    </CardComponent>
+                  );
+                })
+              ) : (
+                <CardComponent
+                  as="section"
+                  className="questionnaire-deck-empty visa-answer-card"
+                >
+                  <p className="kicker">Анкета</p>
+                  <h4>Разделы не найдены</h4>
+                  <p>Для этого заявителя пока нет полей анкеты.</p>
+                </CardComponent>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -1728,7 +1810,7 @@ function DrawerIssues({
                     onClick={() => toggleIssue(issue.id)}
                   >
                     <div>
-                      <strong>{issue.target.applicantName}</strong>
+                      <strong>{drawerIssueTitle(issue)}</strong>
                       <IssueCategoryTag issue={issue} />
                     </div>
                     <p>{drawerIssueSummary(issue)}</p>
@@ -1914,11 +1996,6 @@ function applicantVisualState(
   return { label: "Нет данных", tone: "muted" };
 }
 
-function shouldShowApplicantStateBadge(submission: Submission, applicant: Applicant) {
-  const state = applicantVisualState(submission, applicant);
-  return state.tone === "danger" || questionnaireProgressForApplicant(applicant) < 100;
-}
-
 function questionnaireTone(
   status: QuestionnaireStatus,
 ): "amber" | "danger" | "muted" | "teal" {
@@ -1944,11 +2021,20 @@ function issueCategoryLabel(issue: Issue) {
 
 function drawerIssueSummary(issue: Issue) {
   if (issue.target.fileType || issue.type === "file" || issue.type === "media") {
-    return "Проверить файл";
+    return issue.reason || "Проверить файл";
   }
-  if (issue.target.field) return `Проверить поле «${issue.target.field}»`;
-  if (issue.target.section) return `Проверить раздел «${issue.target.section}»`;
+  if (issue.target.field)
+    return issue.reason || `Проверить поле «${issue.target.field}»`;
+  if (issue.target.section)
+    return issue.reason || `Проверить раздел «${issue.target.section}»`;
   return "Проверить данные";
+}
+
+function drawerIssueTitle(issue: Issue) {
+  const target = issue.target.fileType
+    ? fileLabel(issue.target.fileType)
+    : (issue.target.field ?? issue.target.section ?? "Данные");
+  return `${issue.target.applicantName} · ${target}`;
 }
 
 function mediaFileRowSubtitle(applicant: Applicant, issue?: Issue) {

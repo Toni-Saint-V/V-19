@@ -75,8 +75,10 @@ export function Button({
   );
 }
 
-interface IconButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+interface IconButtonProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+> {
   icon: ReactNode;
   label: string;
   pressed?: boolean;
@@ -104,6 +106,11 @@ export function IconButton({
       variant="icon"
     >
       {icon}
+      {tooltip ? (
+        <span className="mp-icon-tooltip" aria-hidden="true">
+          {tooltip}
+        </span>
+      ) : null}
     </Button>
   );
 }
@@ -113,21 +120,11 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: "danger" | "amber" | "blue" | "teal" | "muted" | "default";
 }
 
-export function Badge({
-  children,
-  className,
-  tone = "default",
-  ...props
-}: BadgeProps) {
+export function Badge({ children, className, tone = "default", ...props }: BadgeProps) {
   return (
     <span
       {...props}
-      className={cn(
-        "mp-badge",
-        "status-chip",
-        tone !== "default" && tone,
-        className,
-      )}
+      className={cn("mp-badge", "status-chip", tone !== "default" && tone, className)}
     >
       {children}
     </span>
@@ -180,8 +177,10 @@ export interface SelectOption {
   value: string;
 }
 
-interface SelectProps
-  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "className"> {
+interface SelectProps extends Omit<
+  SelectHTMLAttributes<HTMLSelectElement>,
+  "className"
+> {
   containerClassName?: string;
   errorMessage?: string;
   fieldClassName?: string;
@@ -445,13 +444,7 @@ export function TabCount({ children }: { children: ReactNode }) {
   return <span className="v19-tab-count">{children}</span>;
 }
 
-export function NavCount({
-  children,
-  label,
-}: {
-  children: ReactNode;
-  label?: string;
-}) {
+export function NavCount({ children, label }: { children: ReactNode; label?: string }) {
   return (
     <span className="ops-nav-count" aria-label={label}>
       {children}
@@ -550,8 +543,10 @@ export function DrawerTabs<T extends string>({
   );
 }
 
-interface TextInputFieldProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "className"> {
+interface TextInputFieldProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "className"
+> {
   containerClassName?: string;
   errorMessage?: string;
   inputClassName?: string;

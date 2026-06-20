@@ -919,6 +919,8 @@ describe("V-19 ББ helper suggestions", () => {
     expect(suggestions.length).toBeGreaterThan(0);
     expect(fileSuggestion).toMatchObject({
       severity: "blocker",
+      title: "Запросить файл: Селфи",
+      reason: expect.stringContaining("нельзя безопасно отправить дальше"),
       target: {
         applicantId: "з-1051-1",
         applicantName: "Артём Соколов",

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { buildSubmissionAiHelperSurface } from "../../src/modules/submissions/aiHelperSurface";
 import { AiHelperSurfacePanel } from "../../src/modules/submissions/components/AiHelperSurfacePanel";
 import type { Submission } from "../../src/modules/submissions/types";
 
@@ -111,7 +112,11 @@ describe("AI helper surface panel", () => {
     );
 
     expect(screen.getByLabelText("Локальная подсказка агента")).toBeVisible();
-    expect(screen.getByText("Локальная проверка")).toBeVisible();
+    expect(screen.getByText("Помощник по подаче")).toBeVisible();
+    expect(screen.getByText("Есть блокер")).toBeVisible();
+    expect(screen.getByText("Почему сейчас")).toBeVisible();
+    expect(screen.getByText("Сигналы")).toBeVisible();
+    expect(screen.getByText("Черновик")).toBeVisible();
     expect(screen.getByText("Границы подсказки")).toBeVisible();
     expect(
       screen.getByText("Детерминированные проверки остаются источником истины."),
@@ -130,6 +135,7 @@ describe("AI helper surface panel", () => {
     expect(
       screen.getByText(/Фокус проверки|Нужна ручная проверка блокеров/),
     ).toBeVisible();
+    expect(screen.getByText("Нужна проверка")).toBeVisible();
     expect(screen.getByText("Следующие действия")).toBeVisible();
   });
 
@@ -154,7 +160,11 @@ describe("AI helper surface panel", () => {
 
     const helper = screen.getByLabelText("Локальная подсказка агента");
     expect(screen.getByText("Пакет на ручной проверке")).toBeVisible();
+    expect(screen.getByText("Ожидание")).toBeVisible();
     expect(helper.textContent ?? "").toContain("Дождитесь ручной проверки");
+    expect(helper.textContent ?? "").toContain(
+      "агенту не нужно выполнять редактируемое действие",
+    );
     expect(helper.textContent ?? "").not.toContain("передайте заявку оператору");
   });
 
@@ -296,7 +306,11 @@ describe("AI helper surface panel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Выполнить ИИ-шаг" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Выполнить следующий шаг: Отправить",
+      }),
+    );
 
     expect(onPrimaryAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -327,10 +341,106 @@ describe("AI helper surface panel", () => {
       />,
     );
 
-    const button = screen.getByRole("button", { name: "ИИ-шаг недоступен" });
+    const button = screen.getByRole("button", {
+      name: /Следующий шаг недоступен:/,
+    });
     expect(button).toBeDisabled();
     fireEvent.click(button);
 
     expect(onPrimaryAction).not.toHaveBeenCalled();
+  });
+
+  test("exposes a structured local helper contract for downstream drawer wiring", () => {
+    const helper = buildSubmissionAiHelperSurface({
+      role: "agent",
+      submission: submission({ status: "returned" }),
+      surface: "agent",
+    });
+
+    expect(helper).toMatchObject({
+      modelVersion: "local-case-helper-v1",
+      owner: "agent",
+      status: "blocked",
+    });
+    expect(helper.nextStep).toContain("Открыть место исправления");
+    expect(helper.highlights).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "questionnaire",
+          source: "questionnaire",
+        }),
+        expect.objectContaining({
+          kind: "files",
+          source: "files",
+        }),
+        expect.objectContaining({
+          kind: "issues",
+          source: "issues",
+        }),
+      ]),
+    );
+    expect(helper.drafts[0]).toMatchObject({
+      audience: "agent",
+      title: "Ответ агенту",
+    });
+    expect(helper.sections.map((section) => section.id)).toEqual(
+      expect.arrayContaining(["why_now", "highlights", "drafts", "guardrails"]),
+    );
+  });
+
+  test("keeps family identity in local helper signals", () => {
+    const helper = buildSubmissionAiHelperSurface({
+      role: "agent",
+      submission: submission({
+        applicants: [
+          ...submission().applicants,
+          {
+            ...submission().applicants[0],
+            fullName: "Иван Иванов",
+            id: "з-ai-2",
+            role: "spouse",
+          },
+        ],
+        status: "in_progress",
+        type: "family",
+      }),
+      surface: "agent",
+    });
+
+    expect(helper.highlights).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          detail: expect.stringContaining("2 заявителя"),
+          kind: "family",
+          source: "status",
+        }),
+      ]),
+    );
+  });
+
+  test("sanitizes unsafe issue copy instead of crashing the helper", () => {
+    const helper = buildSubmissionAiHelperSurface({
+      role: "admin",
+      submission: submission({
+        issues: [
+          {
+            ...submission().issues[0],
+            comment: "Гарантирую одобрение после замены файла.",
+          },
+        ],
+        status: "submitted_for_review",
+      }),
+      surface: "review",
+    });
+    const visibleCopy = [
+      helper.title,
+      helper.summary,
+      helper.nextStep,
+      ...helper.sections.flatMap((section) => section.items),
+      ...helper.drafts.map((draft) => draft.body),
+    ].join(" ");
+
+    expect(visibleCopy).not.toMatch(forbiddenTrustCopy);
+    expect(visibleCopy).toContain("ручной проверки");
   });
 });

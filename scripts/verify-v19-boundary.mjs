@@ -34,7 +34,6 @@ const forbiddenCopy = [
   "Семьи",
   "Группы",
   "Туристы",
-  "Документы",
   "CRM",
   "Dashboard",
   "Smart Inbox",
@@ -48,12 +47,32 @@ const forbiddenCopy = [
   "автоматически записали",
   "решение принято системой",
 ];
+const forbiddenReachableSurfaceTerms = [
+  "agent-inbox",
+  "agent-actions",
+  "agent-settings",
+  "admin-inbox",
+  "admin-actions",
+  "admin-settings",
+  '"Входящие"',
+  '"Мои действия"',
+  '"Настройки"',
+  '"Документы"',
+];
+const reachableSurfaceFiles = [
+  path.join(root, "src/App.tsx"),
+  path.join(root, "src/modules/submissions/types.ts"),
+  path.join(root, "src/modules/submissions/uiTypes.ts"),
+];
+// Legacy AgentInbox/AgentActions components may remain in OperationsScreens as
+// visual references; the V-19 contract is that they are not reachable surfaces.
 
 const visited = new Set();
 const violations = [];
 
 walkImports(entry);
 scanV19Source();
+scanReachableSurfaces();
 
 if (violations.length > 0) {
   console.error("V-19 boundary check failed:");
@@ -111,6 +130,21 @@ function scanV19Source() {
     for (const term of forbiddenCopy) {
       if (source.includes(term)) {
         violations.push(`forbidden copy "${term}" found in ${relative(file)}`);
+      }
+    }
+  }
+}
+
+function scanReachableSurfaces() {
+  for (const file of reachableSurfaceFiles) {
+    if (!fs.existsSync(file)) continue;
+
+    const source = fs.readFileSync(file, "utf8");
+    for (const term of forbiddenReachableSurfaceTerms) {
+      if (source.includes(term)) {
+        violations.push(
+          `forbidden reachable surface "${term}" found in ${relative(file)}`,
+        );
       }
     }
   }

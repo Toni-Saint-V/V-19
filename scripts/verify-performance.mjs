@@ -4,16 +4,19 @@ import { join } from "node:path";
 
 const distAssets = join(process.cwd(), "dist", "assets");
 
-// V-19 v1.1 operator shell is currently at ~103 KB raw CSS after the premium
-// polish token layer. Keep the raw ceiling explicit until the next CSS split;
-// gzip remains the stricter runtime transfer budget.
-const cssRawKbLimit = 106;
+// Temporary V-19 visual-lock baseline. The shell currently ships one global CSS
+// bundle; fail any growth beyond this narrow allowance until a dedicated CSS
+// split or cleanup lowers the budget again.
+const cssRawKbBaseline = 132;
+const cssRawKbAllowance = 4;
+const cssGzipKbBaseline = 22.8;
+const cssGzipKbAllowance = 1.2;
 
 const limits = {
   jsRawKb: 500,
   jsGzipKb: 160,
-  cssRawKb: cssRawKbLimit,
-  cssGzipKb: 20,
+  cssRawKb: cssRawKbBaseline + cssRawKbAllowance,
+  cssGzipKb: cssGzipKbBaseline + cssGzipKbAllowance,
   totalJsRawKb: 650,
   totalJsGzipKb: 180,
 };

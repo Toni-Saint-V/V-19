@@ -25,9 +25,10 @@ function questionnaireSuggestions(submission: Submission): AiSuggestion[] {
           section: "Данные",
           field: section.title,
         },
-        title: "Проверить раздел анкеты",
+        title: `Проверить анкету: ${section.title}`,
         reason:
-          section.missing ?? "Раздел выглядит неполным и требует ручной проверки.",
+          section.missing ??
+          `${applicant.fullName}: раздел заполнен не полностью и может заблокировать отправку на проверку.`,
         confidence:
           section.status === "needs_fix" ? ("high" as const) : ("medium" as const),
         severity:
@@ -71,8 +72,8 @@ function suggestionForFile(
     return {
       id: suggestionId(submissionId, file.applicantId, "file", `${file.type}-missing`),
       type: "file",
-      title: `Добавить файл: ${fileTypeLabels[file.type]}`,
-      reason: `${applicantName}: файл отсутствует и может заблокировать движение подачи.`,
+      title: `Запросить файл: ${fileTypeLabels[file.type]}`,
+      reason: `${applicantName}: обязательный файл отсутствует. Без него подачу нельзя безопасно отправить дальше.`,
       confidence: "high",
       severity: "blocker",
       status: "suggested",
@@ -84,8 +85,8 @@ function suggestionForFile(
     return {
       id: suggestionId(submissionId, file.applicantId, "file", `${file.type}-replace`),
       type: "file",
-      title: `Проверить замену файла: ${fileTypeLabels[file.type]}`,
-      reason: `${applicantName}: файл отмечен как проблемный, нужна ручная проверка.`,
+      title: `Вернуть файл на замену: ${fileTypeLabels[file.type]}`,
+      reason: `${applicantName}: файл уже отмечен проблемным. Нужно подтвердить причину и запросить замену.`,
       confidence: "high",
       severity: "blocker",
       status: "suggested",
@@ -97,8 +98,8 @@ function suggestionForFile(
     return {
       id: suggestionId(submissionId, file.applicantId, "file", `${file.type}-review`),
       type: "file",
-      title: `Проверить файл: ${fileTypeLabels[file.type]}`,
-      reason: `${applicantName}: файл ожидает проверки администратором.`,
+      title: `Проверить файл перед приемкой: ${fileTypeLabels[file.type]}`,
+      reason: `${applicantName}: файл ожидает ручной проверки администратора перед приемкой подачи.`,
       confidence: "medium",
       severity: "warning",
       status: "suggested",
