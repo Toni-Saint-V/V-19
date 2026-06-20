@@ -267,7 +267,7 @@ function issueStatusToCorrectionStatus(
   status: IssueStatus,
 ): CorrectionInsert["status"] {
   if (status === "closed_by_admin") return "closed";
-  if (status === "fixed_by_manager") return "fixed";
+  if (status === "fixed_by_agent") return "fixed";
   return "open";
 }
 
@@ -343,7 +343,7 @@ function toCorrectionInsert(
     created_by: actorId,
     created_at: timestampOrNow(issue.createdAt),
     fixed_at:
-      issue.status === "fixed_by_manager" || issue.status === "closed_by_admin"
+      issue.status === "fixed_by_agent" || issue.status === "closed_by_admin"
         ? new Date().toISOString()
         : null,
   };
@@ -467,7 +467,7 @@ export function toCockpitDraftPersistencePayload(
 function requiresCorrectionHandoff(submission: Submission): boolean {
   return (
     submission.status === "corrections_received" &&
-    submission.issues.some((issue) => issue.status === "fixed_by_manager")
+    submission.issues.some((issue) => issue.status === "fixed_by_agent")
   );
 }
 

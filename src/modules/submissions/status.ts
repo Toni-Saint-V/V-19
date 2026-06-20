@@ -169,8 +169,17 @@ export function unresolvedOpenIssueCount(submission: Submission) {
 }
 
 export function fixedIssueCount(submission: Submission) {
-  return submission.issues.filter((issue) => issue.status === "fixed_by_manager")
-    .length;
+  return submission.issues.filter((issue) => isFixedIssueStatus(issue.status)).length;
+}
+
+export function isFixedIssueStatus(status: Issue["status"]) {
+  return status === "fixed_by_agent";
+}
+
+export function acceptanceBlockingIssueCount(submission: Submission) {
+  return submission.issues.filter(
+    (issue) => issue.status === "open" || isFixedIssueStatus(issue.status),
+  ).length;
 }
 
 export function hasRequiredBasics(submission: Submission) {
@@ -265,7 +274,11 @@ export function canPerformAction(
     };
   }
 
-  if (action === "submit_corrections" && openIssueCount(submission) === 0) {
+  if (
+    action === "submit_corrections" &&
+    openIssueCount(submission) === 0 &&
+    fixedIssueCount(submission) === 0
+  ) {
     return { ok: false, reason: "Нет открытых замечаний для исправления" };
   }
 
@@ -281,15 +294,19 @@ export function canPerformAction(
     return { ok: false, reason: "Нужно добавить точное замечание" };
   }
 
-  if (
-    (action === "accept" || action === "close_issues_accept") &&
-    blockerCount(submission) > 0
-  ) {
-    return { ok: false, reason: "Открытые блокеры не закрыты" };
+  if (action === "accept" && acceptanceBlockingIssueCount(submission) > 0) {
+    return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
-  if (action === "close_issues_accept" && fixedIssueCount(submission) === 0) {
-    return { ok: false, reason: "Нет исправлений для закрытия" };
+  if (action === "close_issues_accept" && openIssueCount(submission) > 0) {
+    return { ok: false, reason: "Есть незакрытые замечания" };
+  }
+
+  if (
+    action === "mark_exported" &&
+    (submission.exportState !== "file_downloaded" || !submission.exportPackage)
+  ) {
+    return { ok: false, reason: "Сначала сформируйте и скачайте пакет выгрузки" };
   }
 
   return { ok: true };
@@ -389,7 +406,7 @@ export function applySubmissionAction(
       ...corrected,
       status: "corrections_received",
       issues: corrected.issues.map((issue) =>
-        issue.status === "open" ? { ...issue, status: "fixed_by_manager" } : issue,
+        issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
       ),
       updatedAt: "сейчас",
       history: [
@@ -412,7 +429,7 @@ export function applySubmissionAction(
       exportState: "ready",
       files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
       issues: submission.issues.map((issue) =>
-        issue.status === "fixed_by_manager"
+        isFixedIssueStatus(issue.status)
           ? { ...issue, status: "closed_by_admin" }
           : issue,
       ),

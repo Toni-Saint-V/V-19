@@ -430,9 +430,7 @@ describe("V-19 submission actions", () => {
     expect(queue.open.some((action) => action.context.includes("Заполнить"))).toBe(
       true,
     );
-    expect(queue.open.some((action) => action.title.includes("Заполнить"))).toBe(
-      false,
-    );
+    expect(queue.open.some((action) => action.title.includes("Заполнить"))).toBe(false);
     expect(queue.open.some((action) => action.cta === "Добавить")).toBe(true);
   });
 
@@ -529,16 +527,12 @@ describe("V-19 submission actions", () => {
     );
     expect(questionnaireValue(draft, "arrival-date", 1)).toBe("19.08.2026");
     expect(questionnaireValue(draft, "departure-date", 1)).toBe("27.08.2026");
-    expect(questionnaireValue(draft, "hotel-name", 2)).toBe(
-      "HOTEL ILUNION BARCELONA",
-    );
+    expect(questionnaireValue(draft, "hotel-name", 2)).toBe("HOTEL ILUNION BARCELONA");
     expect(questionnaireValue(draft, "hotel-city", 2)).toBe("BARCELONA");
     expect(questionnaireValue(draft, "hotel-address", 2)).toBe(
       "CALLE RAMON TUR 196-198",
     );
-    expect(questionnaireValue(draft, "route", 2)).toBe(
-      "Москва, Барселона, Москва",
-    );
+    expect(questionnaireValue(draft, "route", 2)).toBe("Москва, Барселона, Москва");
     expect(draft.applicants[0]?.questionnaireStatus).toBe("partial");
   });
 
@@ -872,7 +866,7 @@ describe("V-19 submission actions", () => {
     const returned = applySubmissionAction(edited, "return_with_issues", "admin");
     const corrected = applySubmissionAction(returned, "submit_corrections", "agent");
 
-    expect(corrected.issues[0]?.status).toBe("fixed_by_manager");
+    expect(corrected.issues[0]?.status).toBe("fixed_by_agent");
     expect(
       corrected.applicants[0]?.sections
         .find((section) => section.title === "Поездка")
@@ -1059,10 +1053,7 @@ describe("V-19 persistence boundary", () => {
 
   it("normalizes legacy local submissions without an agent owner", () => {
     installStorageStub();
-    const legacySubmission = { ...byId("ПД-1051") } as Omit<
-      Submission,
-      "agentId"
-    > & {
+    const legacySubmission = { ...byId("ПД-1051") } as Omit<Submission, "agentId"> & {
       agentId?: string;
     };
     delete legacySubmission.agentId;
@@ -1103,10 +1094,12 @@ describe("V-19 persistence boundary", () => {
       "00000000-0000-4000-8000-000000000001",
     );
 
-    expect(readCockpitSnapshot(payload.submission.family_intelligence as Json)).toEqual({
-      ...submission,
-      agentId: "00000000-0000-4000-8000-000000000001",
-    });
+    expect(readCockpitSnapshot(payload.submission.family_intelligence as Json)).toEqual(
+      {
+        ...submission,
+        agentId: "00000000-0000-4000-8000-000000000001",
+      },
+    );
   });
 
   it("keeps the cockpit snapshot storage contract explicit", () => {
