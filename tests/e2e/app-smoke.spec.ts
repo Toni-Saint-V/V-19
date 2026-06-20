@@ -44,7 +44,7 @@ function escapeRegex(value: string) {
 }
 
 async function openDrawerTab(page: Page, labels: string[]) {
-  const name = new RegExp(`^(${labels.map(escapeRegex).join("|")})(\\b|\\s|$)`);
+  const name = new RegExp(`^(${labels.map(escapeRegex).join("|")})([\\s,]|$)`);
   await drawer(page).getByRole("tab", { name }).click();
 }
 
@@ -53,7 +53,7 @@ async function openQuestionnaireTab(page: Page) {
 }
 
 async function openMediaTab(page: Page) {
-  await openDrawerTab(page, ["Медиа", "Файлы"]);
+  await openDrawerTab(page, ["Документы", "Медиа", "Файлы"]);
 }
 
 async function openSelectedReview(page: Page) {
@@ -229,6 +229,16 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       submissionCardById(page, "ПД-1048").getByText("2 блокера", { exact: true }),
     ).toHaveCount(0);
+    await expect(submissionCard(page, "Дмитрий Орлов")).toHaveCount(0);
+    await expect(submissionCard(page, "Артём Соколов")).toHaveCount(0);
+    await page.getByRole("tab", { name: "В работе" }).click();
+    await expect(submissionCard(page, "Артём Соколов")).toBeVisible();
+    await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
+    await page.getByRole("tab", { name: "Готово" }).click();
+    await expect(submissionCard(page, "Дмитрий Орлов")).toBeVisible();
+    await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
+    await page.getByRole("tab", { name: "Действия" }).click();
+    await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
     await expect(page.getByRole("button", { name: "Исправить" }).first()).toBeVisible();
     await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
 

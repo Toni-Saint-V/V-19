@@ -396,12 +396,12 @@ function App() {
             tone: agentActions.summary.open > 0 ? "warning" : "default",
           },
           {
-            active: surface === "agent-submissions" && agentTab === "all",
+            active: surface === "agent-submissions",
             icon: "П",
             id: "agent-submissions",
             label: "Мои подачи",
             meta: "все рабочие подачи",
-            onClick: () => showAgentTab("all"),
+            onClick: () => showAgentTab("action"),
           },
           {
             disabled: true,
