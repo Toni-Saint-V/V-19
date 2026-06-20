@@ -2,7 +2,12 @@ export type Role = "agent" | "admin";
 
 export type UserRole = Role;
 
-export type Surface = "agent-submissions" | "admin-review" | "export";
+export type Surface =
+  | "agent-inbox"
+  | "agent-actions"
+  | "agent-submissions"
+  | "admin-review"
+  | "export";
 
 export type AgentOwnerId = string;
 

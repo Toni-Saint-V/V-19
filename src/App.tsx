@@ -7,6 +7,7 @@ import {
   dismissAiSuggestion,
   runAiReview,
 } from "./modules/submissions/aiSuggestions";
+import { agentActionQueue, searchAgentActions } from "./modules/submissions/agentActions";
 import { exportSummary } from "./modules/submissions/exportRules";
 import { loadSubmissions, saveSubmissions } from "./modules/submissions/persistence";
 import {
@@ -65,6 +66,8 @@ import { ConfirmationDialog } from "./modules/submissions/components/Primitives"
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
   AdminReviewScreen,
+  AgentActionsScreen,
+  AgentInboxScreen,
   AgentSubmissionsScreen,
   ExportScreen,
 } from "./modules/submissions/pages/OperationsScreens";
@@ -107,7 +110,7 @@ import {
 } from "./modules/submissions/mediaStorage";
 import type { AppProfile } from "./types/session";
 
-const cityFilterOptions: Array<City | "Все города"> = [
+const cities: Array<City | "Все города"> = [
   "Все города",
   ...CANONICAL_CITIES,
 ];
@@ -204,9 +207,7 @@ function firstSubmissionForRole(
   agentId = defaultLocalAgentOwnerId,
 ) {
   if (role === "admin") return reviewQueue(submissions)[0] ?? submissions[0];
-  return (
-    agentQueue(submissions, agentId)[0] ?? ownedSubmissions(submissions, agentId)[0]
-  );
+  return agentQueue(submissions, agentId)[0] ?? ownedSubmissions(submissions, agentId)[0];
 }
 
 function App() {
@@ -228,7 +229,7 @@ function App() {
   >("idle");
   const [remoteSaveError, setRemoteSaveError] = useState("");
   const [surface, setSurface] = useState<Surface>(
-    initialWorkspaceRole === "admin" ? "admin-review" : "agent-submissions",
+    initialWorkspaceRole === "admin" ? "admin-review" : "agent-inbox",
   );
   const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(() => {
@@ -281,7 +282,9 @@ function App() {
       ? remoteProfile.id
       : defaultLocalAgentOwnerId;
   const visibleSubmissionsForRole =
-    role === "agent" ? ownedSubmissions(submissions, currentAgentOwnerId) : submissions;
+    role === "agent"
+      ? ownedSubmissions(submissions, currentAgentOwnerId)
+      : submissions;
   const activeSubmission =
     visibleSubmissionsForRole.find(
       (submission) => submission.id === selectedSubmissionId,
@@ -295,6 +298,27 @@ function App() {
         cityFilter,
       ),
     [cityFilter, currentAgentOwnerId, query, submissions],
+  );
+  const agentActionSource = useMemo(
+    () =>
+      searchSubmissions(
+        agentQueue(submissions, currentAgentOwnerId),
+        "",
+        cityFilter,
+      ),
+    [cityFilter, currentAgentOwnerId, submissions],
+  );
+  const agentActions = useMemo(
+    () => agentActionQueue(agentActionSource),
+    [agentActionSource],
+  );
+  const searchedOpenAgentActions = useMemo(
+    () => searchAgentActions(agentActions.open, query),
+    [agentActions.open, query],
+  );
+  const searchedCompletedAgentActions = useMemo(
+    () => searchAgentActions(agentActions.completed, query),
+    [agentActions.completed, query],
   );
   const searchedReviewQueue = useMemo(
     () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
@@ -328,6 +352,11 @@ function App() {
   const showRoleSwitcher =
     !isSupabaseMode &&
     (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
+  const isV11AgentCollectionSurface =
+    surface === "agent-inbox" ||
+    surface === "agent-actions" ||
+    surface === "agent-submissions";
+  const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
   const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
   const hasWorkspaceAccess = isSupabaseMode
     ? Boolean(remoteProfile)
@@ -337,6 +366,26 @@ function App() {
   const operationalNavItems: OperationalNavItem[] =
     role === "agent"
       ? [
+          {
+            active: surface === "agent-inbox",
+            count: agentInboxUnreadCount,
+            icon: "В",
+            id: "agent-inbox",
+            label: "Входящие",
+            meta: "новые события",
+            onClick: showAgentInbox,
+            tone: agentInboxUnreadCount > 0 ? "danger" : "default",
+          },
+          {
+            active: surface === "agent-actions",
+            count: agentActions.summary.open,
+            icon: "Д",
+            id: "agent-actions",
+            label: "Мои действия",
+            meta: "точные шаги",
+            onClick: showAgentActions,
+            tone: agentActions.summary.open > 0 ? "warning" : "default",
+          },
           {
             active: surface === "agent-submissions",
             icon: "П",
@@ -536,7 +585,7 @@ function App() {
     const visibleList =
       surface === "admin-review"
         ? reviewList
-        : surface === "agent-submissions"
+        : surface === "agent-submissions" || surface === "agent-inbox"
           ? agentList
           : [];
 
@@ -589,7 +638,7 @@ function App() {
     setDrawerMode("closed");
     setDirty(false);
     if (nextRole === "agent") {
-      setSurface("agent-submissions");
+      setSurface("agent-inbox");
       setAgentTab("action");
       setSelectedSubmissionId(
         firstSubmissionForRole(submissions, "agent", defaultLocalAgentOwnerId)?.id ??
@@ -610,11 +659,29 @@ function App() {
     );
   }
 
+  function firstAgentActionSubmission() {
+    return searchedOpenAgentActions[0]?.submission ?? searchedAgentQueue[0];
+  }
+
   function firstReviewSubmissionForTab(tab: ReviewTab) {
     return (
       highestPriorityFirst(searchedReviewQueue.filter(matchesReviewTab(tab)))[0] ??
       searchedReviewQueue[0]
     );
+  }
+
+  function showAgentInbox() {
+    setSurface("agent-inbox");
+    setDrawerMode("closed");
+    const nextSubmission = firstAgentSubmissionForTab("action") ?? searchedAgentQueue[0];
+    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+  }
+
+  function showAgentActions() {
+    setSurface("agent-actions");
+    setDrawerMode("closed");
+    const nextSubmission = firstAgentActionSubmission();
+    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
   }
 
   function showAgentTab(tab: AgentTab) {
@@ -1378,7 +1445,7 @@ function App() {
     skipNextRemoteSaveRef.current = true;
     setRemoteProfile(profile);
     setRole(nextRole);
-    setSurface(nextRole === "admin" ? "admin-review" : "agent-submissions");
+    setSurface(nextRole === "admin" ? "admin-review" : "agent-inbox");
     setSubmissions(nextSubmissions);
     setSelectedSubmissionId(firstSubmission?.id ?? "");
     if (firstSubmission) setActiveDrawerTab(defaultDrawerTab(firstSubmission));
@@ -1449,11 +1516,14 @@ function App() {
       submissionsRef.current = localSubmissions;
       setSubmissions(localSubmissions);
       setSelectedSubmissionId(
-        firstSubmissionForRole(localSubmissions, "agent", defaultLocalAgentOwnerId)
-          ?.id ?? "",
+        firstSubmissionForRole(
+          localSubmissions,
+          "agent",
+          defaultLocalAgentOwnerId,
+        )?.id ?? "",
       );
       setRole("agent");
-      setSurface("agent-submissions");
+      setSurface("agent-inbox");
       clearWorkspaceEmail();
       setWorkspaceEmail("");
       setWorkspaceEmailDraft("");
@@ -1481,7 +1551,7 @@ function App() {
       containerClassName="topbar-filter panel-filter"
       fieldClassName=""
       label="Город"
-      options={cityFilterOptions.map((city) => ({ label: city, value: city }))}
+      options={cities.map((city) => ({ label: city, value: city }))}
       selectClassName="select-control"
       value={cityFilter}
       onChange={(event) => {
@@ -1490,6 +1560,22 @@ function App() {
           nextCity === "Все города" || isCity(nextCity) ? nextCity : "Все города",
         );
       }}
+    />
+  );
+  const inboxSearchControl = (
+    <SearchBar
+      label="Поиск по входящим"
+      placeholder="Поиск по входящим"
+      value={query}
+      onChange={setQuery}
+    />
+  );
+  const agentActionsSearchControl = (
+    <SearchBar
+      label="Поиск по действиям"
+      placeholder="Поиск по действиям"
+      value={query}
+      onChange={setQuery}
     />
   );
   const agentSubmissionsSearchControl = (
@@ -1611,37 +1697,54 @@ function App() {
             >
               Новая подача
             </Button>
-          ) : (
+          ) : !isV11AgentCollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
-              <div className="service-logo" aria-label="VisaFlow V-19">
-                <span className="service-logo-mark" aria-hidden="true">
-                  VF
-                </span>
-                <span className="service-logo-copy">
-                  <span>VisaFlow</span>
-                  <strong>V-19</strong>
-                </span>
-              </div>
+              {!isV11AgentCollectionSurface ? (
+                <div className="service-logo" aria-label="VisaFlow V-19">
+                  <span className="service-logo-mark" aria-hidden="true">
+                    VF
+                  </span>
+                  <span className="service-logo-copy">
+                    <span>VisaFlow</span>
+                    <strong>V-19</strong>
+                  </span>
+                </div>
+              ) : null}
               {isSupabaseMode ? (
-                <p
-                  className="save-status"
-                  role={remoteSaveState === "error" ? "alert" : "status"}
-                >
-                  {remoteSaveState === "saving"
-                    ? "Сохранение"
-                    : remoteSaveState === "error"
-                      ? remoteSaveError
-                      : "Supabase"}
-                </p>
+              <p
+                className="save-status"
+                role={remoteSaveState === "error" ? "alert" : "status"}
+              >
+                {remoteSaveState === "saving"
+                  ? "Сохранение"
+                  : remoteSaveState === "error"
+                    ? remoteSaveError
+                  : "Supabase"}
+              </p>
               ) : null}
             </div>
-          )}
+          ) : null}
         </header>
 
         {emptyRemoteWorkspace ? (
           <RemoteWorkspaceEmptyState
             role={role}
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
+          />
+        ) : surface === "agent-inbox" ? (
+          <AgentInboxScreen
+            onOpen={openSubmission}
+            searchControl={inboxSearchControl}
+            submissions={searchedAgentQueue}
+            summary={summary}
+          />
+        ) : surface === "agent-actions" ? (
+          <AgentActionsScreen
+            completedActions={searchedCompletedAgentActions}
+            onOpen={openSubmission}
+            openActions={searchedOpenAgentActions}
+            searchControl={agentActionsSearchControl}
+            summary={agentActions.summary}
           />
         ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
