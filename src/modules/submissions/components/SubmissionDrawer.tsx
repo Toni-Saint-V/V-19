@@ -282,6 +282,7 @@ export function SubmissionDrawer({
             <DrawerIssues
               onAcceptAiSuggestion={onAcceptAiSuggestion}
               onDismissAiSuggestion={onDismissAiSuggestion}
+              onAiPrimaryAction={handleAiPrimaryAction}
               onOpenTarget={openTarget}
               onRunAiReview={onRunAiReview}
               role={role}
@@ -1389,6 +1390,7 @@ function DrawerFiles({
 function DrawerIssues({
   onAcceptAiSuggestion,
   onDismissAiSuggestion,
+  onAiPrimaryAction,
   onOpenTarget,
   onRunAiReview,
   role,
@@ -1397,6 +1399,7 @@ function DrawerIssues({
 }: {
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onDismissAiSuggestion: (suggestionId: string) => void;
+  onAiPrimaryAction: (action: SubmissionNextStepAction) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
   onRunAiReview: () => void;
   role: Role;
@@ -1409,6 +1412,13 @@ function DrawerIssues({
         <p className="kicker">Замечания</p>
         <h3>{openIssueCount(submission) ? "Что нужно закрыть" : "Замечаний нет"}</h3>
       </div>
+      <AiHelperSurfacePanel
+        compact
+        role={role}
+        submission={submission}
+        surface={surface}
+        onPrimaryAction={onAiPrimaryAction}
+      />
       <BbAiPanel
         compact
         onAccept={onAcceptAiSuggestion}

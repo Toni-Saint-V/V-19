@@ -510,6 +510,11 @@ test.describe("V-19 operations workspace", () => {
       "aria-selected",
       "true",
     );
+    await expect(drawer(page).getByText("ИИ-помощник")).toBeVisible();
+    await expect(drawer(page).getByText("Локальная проверка")).toBeVisible();
+    await expect(
+      drawer(page).getByText("Черновик ответа по исправлениям").first(),
+    ).toBeVisible();
     await expect(
       drawer(page).getByText("Мария Иванова · Медиа · Фото на белом фоне").first(),
     ).toBeVisible();
@@ -527,7 +532,7 @@ test.describe("V-19 operations workspace", () => {
     await uploadAllVisibleFiles(page);
     await drawer(page).getByRole("button", { name: "Отправить исправления" }).click();
     await expect(drawer(page).getByText("Исправлено агентом").first()).toBeVisible();
-    await expect(drawer(page).getByText("Исправления получены")).toBeVisible();
+    await expect(drawer(page).getByText("Исправления получены").first()).toBeVisible();
   });
 
   test("drawer tabs and close flow work from keyboard", async ({ page }) => {
