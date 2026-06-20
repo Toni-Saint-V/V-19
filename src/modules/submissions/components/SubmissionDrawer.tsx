@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -8,7 +8,6 @@ import {
   SheetFrame,
   TextInputField,
 } from "../../../shared/ui/primitives";
-import { applicantCountLabel, tripDates } from "../selectors";
 import {
   fileTypeLabels,
   canAddAdminIssue,
@@ -19,7 +18,6 @@ import {
   blockerCount,
   fixedIssueCount,
   statusLabels,
-  typeLabels,
 } from "../status";
 import {
   questionnaireProblemCount,
@@ -34,10 +32,8 @@ import {
   activeMediaFileTypes,
   buildReadinessQueue,
   fileLabel,
-  fileShortLabel,
   fileStatusLabel,
   firstActionableQueueItem,
-  sectionNavigationTarget,
   tabForTarget,
   targetElementId,
   targetForIssue,
@@ -50,6 +46,7 @@ import type {
   Applicant,
   DrawerTab,
   Issue,
+  IssueSeverity,
   IssueInput,
   PassportExtractedFieldKey,
   QuestionnaireField,
@@ -58,6 +55,7 @@ import type {
   Submission,
   SubmissionAction,
   SubmissionFileStatus,
+  SubmissionFileType,
 } from "../types";
 import type { SubmissionNextStepAction } from "../submissionNextStepEngine";
 import { AiHelperSurfacePanel } from "./AiHelperSurfacePanel";
@@ -121,6 +119,8 @@ export function SubmissionDrawer({
   const primaryAction = getPrimaryAction(submission, role, surface);
   const [issueComposerOpen, setIssueComposerOpen] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<WorkspaceTarget | null>(null);
+  const drawerBodyRef = useRef<HTMLDivElement | null>(null);
+  const tabNavigationModeRef = useRef<"manual" | "target">("manual");
   const canOpenIssueComposer =
     surface === "review" && canAddAdminIssue(submission, role);
   const contentCanBeEdited =
@@ -151,25 +151,60 @@ export function SubmissionDrawer({
   }, [canOpenIssueComposer]);
 
   useLayoutEffect(() => {
+    if (tabNavigationModeRef.current === "target") return;
+    drawerBodyRef.current?.scrollTo({ behavior: "auto", top: 0 });
+  }, [activeTab, submission.id]);
+
+  useLayoutEffect(() => {
     if (!pendingTarget || tabForTarget(pendingTarget) !== activeTab) return;
 
-    const target = document.getElementById(targetElementId(pendingTarget));
-    const drawerBody = target?.closest<HTMLElement>(".drawer-body");
-    if (!target || !drawerBody) return;
+    const targetRequest = pendingTarget;
+    let cancelled = false;
+    let attempts = 0;
 
-    const targetRect = target.getBoundingClientRect();
-    const bodyRect = drawerBody.getBoundingClientRect();
-    drawerBody.scrollTo({
-      behavior: "auto",
-      top: Math.max(drawerBody.scrollTop + targetRect.top - bodyRect.top - 14, 0),
-    });
-    target.focus({ preventScroll: true });
-    setPendingTarget(null);
+    function focusPendingTarget() {
+      if (cancelled) return;
+
+      const target = document.getElementById(targetElementId(targetRequest));
+      const drawerBody = target?.closest<HTMLElement>(".drawer-body");
+      if (!target || !drawerBody) {
+        attempts += 1;
+        if (attempts <= 4) {
+          window.requestAnimationFrame(focusPendingTarget);
+          return;
+        }
+        setPendingTarget(null);
+        tabNavigationModeRef.current = "manual";
+        return;
+      }
+
+      const targetRect = target.getBoundingClientRect();
+      const bodyRect = drawerBody.getBoundingClientRect();
+      drawerBody.scrollTo({
+        behavior: "auto",
+        top: Math.max(drawerBody.scrollTop + targetRect.top - bodyRect.top - 14, 0),
+      });
+      target.focus({ preventScroll: true });
+      setPendingTarget(null);
+      tabNavigationModeRef.current = "manual";
+    }
+
+    window.requestAnimationFrame(focusPendingTarget);
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, pendingTarget]);
 
   function openTarget(target: WorkspaceTarget) {
+    tabNavigationModeRef.current = "target";
     onTab(tabForTarget(target));
     setPendingTarget(target);
+  }
+
+  function handleTabChange(tab: DrawerTab) {
+    tabNavigationModeRef.current = "manual";
+    onTab(tab);
   }
 
   function openFirstProblem() {
@@ -204,17 +239,7 @@ export function SubmissionDrawer({
     >
       <header className="drawer-header">
         <div className="drawer-title-block">
-          <p className="kicker">
-            {submission.id} · {statusLabels[submission.status]}
-          </p>
           <h2 id="drawer-title">{submission.title}</h2>
-          <p>{drawerMetaLine(submission)}</p>
-          <div className="workspace-header-status" aria-label="Статус подачи">
-            <span>Готовность {submission.completeness.total}%</span>
-            <span>{blockerCount(submission)} блокера</span>
-            <span>Анкета {submission.completeness.questionnaire}%</span>
-            <span>Файлы {submission.completeness.files}%</span>
-          </div>
         </div>
         <Button variant="icon" aria-label="Закрыть подачу" onClick={onClose}>
           ×
@@ -223,56 +248,54 @@ export function SubmissionDrawer({
 
       <DrawerTabs
         ariaLabel="Разделы подачи"
+        autoFocusOnValueChange={tabNavigationModeRef.current !== "target"}
         tabs={workspaceTabs.map((tab) => ({
           ...tab,
           meta: drawerTabValue(submission, tab.id),
         }))}
         value={activeTab}
-        onValueChange={onTab}
+        onValueChange={handleTabChange}
       />
 
       <div
         className="drawer-body workspace-drawer-body"
         id={`drawer-panel-${activeTab}`}
+        ref={drawerBodyRef}
         role="tabpanel"
         aria-labelledby={`drawer-tab-${activeTab}`}
       >
-        <WorkspaceNavigation
-          activeTab={activeTab}
-          onOpenTarget={openTarget}
-          onTab={onTab}
-          submission={submission}
-        />
         <main className="workspace-main">
           {activeTab === "overview" ? (
             <DrawerOverview
-              onAcceptAiSuggestion={onAcceptAiSuggestion}
-              onDismissAiSuggestion={onDismissAiSuggestion}
               onAiPrimaryAction={handleAiPrimaryAction}
               onOpenTarget={openTarget}
-              onRunAiReview={onRunAiReview}
               primaryAction={primaryAction}
               role={role}
               submission={submission}
               surface={surface}
             />
           ) : null}
-          {activeTab === "data" ? (
+          {activeTab === "applicants" ? (
+            <DrawerApplicants onOpenTarget={openTarget} submission={submission} />
+          ) : null}
+          {activeTab === "questionnaire" ? (
             <DrawerQuestionnaire
               onApplyPassportField={onApplyPassportField}
               onFieldChange={onQuestionnaireField}
               passportExtractionEnabled={passportExtractionEnabled}
+              pendingTarget={pendingTarget}
               role={role}
               submission={submission}
             />
           ) : null}
-          {activeTab === "media" ? (
+          {activeTab === "files" ? (
             <DrawerFiles
               fileUploadBusy={fileUploadBusy}
               localPassportFileIds={localPassportFileIds}
               onExtractPassport={onExtractPassport}
               onUploadFile={onUploadFile}
               passportExtractionEnabled={passportExtractionEnabled}
+              pendingTarget={pendingTarget}
               requireSelectedFile={requireSelectedFile}
               role={role}
               submission={submission}
@@ -485,116 +508,189 @@ function IssueComposer({
   );
 }
 
-function WorkspaceNavigation({
-  activeTab,
-  onOpenTarget,
-  onTab,
-  submission,
+function DrawerSectionHeader({
+  action,
+  badge,
+  title,
 }: {
-  activeTab: DrawerTab;
-  onOpenTarget: (target: WorkspaceTarget) => void;
-  onTab: (tab: DrawerTab) => void;
-  submission: Submission;
+  action?: ReactNode;
+  badge?: ReactNode;
+  title: string;
 }) {
   return (
-    <aside className="workspace-nav" aria-label="Навигация по заявке">
+    <div className="drawer-section-header">
       <div>
-        <p className="kicker">{submission.title}</p>
-        <strong>{submission.completeness.total}% готово</strong>
+        <h3>{title}</h3>
       </div>
-      <div className="workspace-nav-group" aria-label="Разделы workspace">
-        {workspaceTabs.map((tab) => (
-          <button
-            aria-current={activeTab === tab.id ? "page" : undefined}
-            className={activeTab === tab.id ? "is-active" : ""}
-            key={tab.id}
-            type="button"
-            onClick={() => onTab(tab.id)}
-          >
-            <span>{tab.label}</span>
-            <em>{drawerTabValue(submission, tab.id)}</em>
-          </button>
-        ))}
-      </div>
-      <div className="workspace-nav-group" aria-label="Заявители">
-        <p>Заявители</p>
-        {submission.applicants.map((applicant) => {
-          const blockerTotal = submission.issues.filter(
+      {badge || action ? (
+        <div className="drawer-section-header-side">
+          {badge}
+          {action}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function IssueCategoryTag({ issue }: { issue: Issue }) {
+  return <Badge className="drawer-category-tag">{issueCategoryLabel(issue)}</Badge>;
+}
+
+function SegmentedFilter<T extends string>({
+  ariaLabel,
+  items,
+  onChange,
+  value,
+}: {
+  ariaLabel: string;
+  items: Array<{ count?: number; id: T; label: string }>;
+  onChange: (value: T) => void;
+  value: T;
+}) {
+  return (
+    <div className="drawer-filter-tabs" role="group" aria-label={ariaLabel}>
+      {items.map((item) => (
+        <Button
+          aria-pressed={value === item.id}
+          className={value === item.id ? "is-active" : ""}
+          key={item.id}
+          variant="ghost"
+          onClick={() => onChange(item.id)}
+        >
+          <span>{item.label}</span>
+          {typeof item.count === "number" ? <em>{item.count}</em> : null}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function DrawerApplicants({
+  onOpenTarget,
+  submission,
+}: {
+  onOpenTarget: (target: WorkspaceTarget) => void;
+  submission: Submission;
+}) {
+  const applicantsWithIssues = submission.applicants.filter((applicant) =>
+    submission.issues.some(
+      (issue) => issue.status === "open" && issue.target.applicantId === applicant.id,
+    ),
+  );
+  const [filter, setFilter] = useState<ApplicantFilter>(() =>
+    applicantsWithIssues.length ? "issues" : "all",
+  );
+  const visibleApplicants =
+    filter === "issues" && applicantsWithIssues.length
+      ? applicantsWithIssues
+      : submission.applicants;
+
+  useEffect(() => {
+    setFilter(applicantsWithIssues.length ? "issues" : "all");
+  }, [applicantsWithIssues.length, submission.id]);
+
+  return (
+    <section className="drawer-section">
+      <DrawerSectionHeader
+        title="Состояние по каждому человеку"
+        action={
+          <SegmentedFilter
+            ariaLabel="Фильтр заявителей"
+            items={[
+              { count: applicantsWithIssues.length, id: "issues", label: "Проблемы" },
+              { count: submission.applicants.length, id: "all", label: "Все" },
+            ]}
+            value={filter}
+            onChange={setFilter}
+          />
+        }
+      />
+      <div className="drawer-list applicant-work-list" aria-label="Заявители в подаче">
+        {visibleApplicants.map((applicant) => {
+          const openIssues = submission.issues.filter(
             (issue) =>
-              issue.status === "open" &&
-              issue.severity === "blocker" &&
-              issue.target.applicantId === applicant.id,
+              issue.status === "open" && issue.target.applicantId === applicant.id,
+          );
+          const blockerTotal = openIssues.filter(
+            (issue) => issue.severity === "blocker",
           ).length;
-          const firstProblemSection =
+          const fileIssue = openIssues.find((issue) => issue.target.fileType);
+          const firstIncompleteSection =
             applicant.sections.find((section) => section.status !== "complete") ??
             applicant.sections[0];
+          const questionnaireTarget: WorkspaceTarget = {
+            applicantId: applicant.id,
+            section: firstIncompleteSection?.title,
+            tab: "questionnaire",
+          };
+          const filesTarget: WorkspaceTarget | null = fileIssue?.target.fileType
+            ? {
+                applicantId: applicant.id,
+                fileType: fileIssue.target.fileType,
+                tab: "files",
+              }
+            : null;
+          const percent = questionnaireProgressForApplicant(applicant);
+          const visualState = applicantVisualState(submission, applicant);
 
           return (
-            <button
+            <CardComponent
+              as="article"
+              aria-label={`${applicant.fullName}: ${percent}%, ${
+                blockerTotal
+                  ? blockerCountLabel(blockerTotal)
+                  : openIssues.length
+                    ? issueCountLabel(openIssues.length)
+                    : "без замечаний"
+              }`}
+              className={`applicant-work-card ${visualState.tone}`}
               key={applicant.id}
-              type="button"
-              onClick={() =>
-                onOpenTarget({
-                  applicantId: applicant.id,
-                  section: firstProblemSection?.title,
-                  tab: "data",
-                })
-              }
             >
-              <span>{applicant.fullName}</span>
-              <em>{blockerTotal ? `${blockerTotal} блокер` : "готово"}</em>
-            </button>
+              <div className="applicant-work-main">
+                <div>
+                  <strong>{applicant.fullName}</strong>
+                  <p>{applicantRoleLabel(applicant.role)}</p>
+                </div>
+              </div>
+              <div className="applicant-work-tags">
+                <Badge className="visa-tag visa-tag-muted">{percent}%</Badge>
+                {blockerTotal ? (
+                  <Badge className="visa-tag visa-tag-danger">
+                    {blockerCountLabel(blockerTotal)}
+                  </Badge>
+                ) : null}
+              </div>
+              <div className="applicant-work-actions">
+                <Button
+                  variant="secondary"
+                  onClick={() => onOpenTarget(questionnaireTarget)}
+                >
+                  Анкета
+                </Button>
+                {filesTarget ? (
+                  <Button variant="secondary" onClick={() => onOpenTarget(filesTarget)}>
+                    Файл
+                  </Button>
+                ) : null}
+              </div>
+            </CardComponent>
           );
         })}
       </div>
-      <div className="workspace-nav-group" aria-label="Секции анкеты">
-        <p>Разделы</p>
-        {submission.applicants[0]?.sections.map((section) => {
-          const sectionIssues = submission.issues.filter(
-            (issue) =>
-              issue.status === "open" &&
-              (issue.target.section === section.title ||
-                issue.target.field === section.title),
-          ).length;
-
-          return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() =>
-                onOpenTarget(sectionNavigationTarget(submission, section.title))
-              }
-            >
-              <span>{section.title}</span>
-              <em>
-                {sectionIssues
-                  ? `${sectionIssues}`
-                  : questionnaireLabel(section.status)}
-              </em>
-            </button>
-          );
-        })}
-      </div>
-    </aside>
+    </section>
   );
 }
 
 function DrawerOverview({
-  onAcceptAiSuggestion,
-  onDismissAiSuggestion,
   onAiPrimaryAction,
   onOpenTarget,
-  onRunAiReview,
   primaryAction,
   role,
   submission,
   surface,
 }: {
-  onAcceptAiSuggestion: (suggestionId: string) => void;
-  onDismissAiSuggestion: (suggestionId: string) => void;
   onAiPrimaryAction: (action: SubmissionNextStepAction) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
-  onRunAiReview: () => void;
   primaryAction: ActionDecision;
   role: Role;
   submission: Submission;
@@ -605,10 +701,20 @@ function DrawerOverview({
   const needsAttention = Boolean(blockers || openIssues);
   const fileProgress = fileReadyCount(submission);
   const nextLine = firstWorkLine(submission);
-  const queue = buildReadinessQueue(submission);
+  const queue = buildReadinessQueue(submission).filter(
+    (item) => !(item.type === "admin_blocker" && item.status === "open"),
+  );
+  const openIssueList = submission.issues.filter((issue) => issue.status === "open");
+  const [focus, setFocus] = useState<OverviewFocus>(() =>
+    openIssueList.length ? "issues" : "queue",
+  );
+
+  useEffect(() => {
+    setFocus(openIssueList.length ? "issues" : "queue");
+  }, [openIssueList.length, submission.id]);
 
   return (
-    <section className="drawer-section">
+    <section className="drawer-section drawer-overview">
       <CardComponent
         as="article"
         className={`decision-card ${needsAttention ? "needs-attention" : ""}`}
@@ -637,54 +743,98 @@ function DrawerOverview({
             </dd>
           </div>
           <div>
-            <dt>Следующий шаг</dt>
+            <dt>Открыто</dt>
+            <dd>{openIssues ? issueCountLabel(openIssues) : "Нет замечаний"}</dd>
+          </div>
+          <div>
+            <dt>Анкета</dt>
+            <dd>{submission.completeness.questionnaire}%</dd>
+          </div>
+          <div>
+            <dt>Файлы</dt>
+            <dd>{submission.completeness.files}%</dd>
+          </div>
+          <div>
+            <dt>Действие</dt>
             <dd>{primaryAction.label}</dd>
           </div>
         </dl>
       </CardComponent>
-      <section className="workspace-queue" aria-label="Что мешает отправке">
-        <div className="section-heading">
-          <div>
-            <p className="kicker">Что мешает отправке</p>
-            <h3>{queue.length ? "Очередь готовности" : "Блокеров нет"}</h3>
-          </div>
-        </div>
-        <div className="workspace-queue-list">
-          {queue.length ? (
-            queue.map((item) => (
-              <QueueItemCard item={item} key={item.id} onOpenTarget={onOpenTarget} />
-            ))
-          ) : (
-            <EmptyState text="Активных блокеров и подсказок нет." />
-          )}
-        </div>
-      </section>
-      <div className="detail-progress-summary" aria-label="Прогресс подачи">
-        <span>Анкета {submission.completeness.questionnaire}%</span>
-        <span>Файлы {submission.completeness.files}%</span>
-        <span>{openIssueCount(submission)} открытых замечаний</span>
-      </div>
-      <div className="blocker-box muted-box">
-        <p>
-          Система не принимает визовых решений. Она только помогает подготовить пакет к
-          внутренней проверке.
-        </p>
-      </div>
       <AiHelperSurfacePanel
-        role={role}
-        submission={submission}
-        surface={surface}
+        compact
         onPrimaryAction={onAiPrimaryAction}
-      />
-      <BbAiPanel
-        onAccept={onAcceptAiSuggestion}
-        onDismiss={onDismissAiSuggestion}
-        onRun={onRunAiReview}
         role={role}
         submission={submission}
         surface={surface}
       />
+      <section className="workspace-queue" aria-label="Фокус подачи">
+        <DrawerSectionHeader
+          title={focus === "issues" ? "Открытые препятствия" : "Очередь"}
+          action={
+            <SegmentedFilter
+              ariaLabel="Фокус подачи"
+              items={[
+                { count: openIssueList.length, id: "issues", label: "Замечания" },
+                { count: queue.length, id: "queue", label: "Очередь" },
+              ]}
+              value={focus}
+              onChange={setFocus}
+            />
+          }
+        />
+        {focus === "issues" ? (
+          <div className="compact-issue-list">
+            {openIssueList.length ? (
+              openIssueList.map((issue) => (
+                <CompactIssueRow
+                  issue={issue}
+                  key={issue.id}
+                  onOpenTarget={onOpenTarget}
+                />
+              ))
+            ) : (
+              <EmptyState text="Открытых замечаний нет." />
+            )}
+          </div>
+        ) : (
+          <div className="workspace-queue-list">
+            {queue.length ? (
+              queue.map((item) => (
+                <QueueItemCard item={item} key={item.id} onOpenTarget={onOpenTarget} />
+              ))
+            ) : (
+              <EmptyState text="Активных шагов нет." />
+            )}
+          </div>
+        )}
+      </section>
     </section>
+  );
+}
+
+function CompactIssueRow({
+  issue,
+  onOpenTarget,
+}: {
+  issue: Issue;
+  onOpenTarget: (target: WorkspaceTarget) => void;
+}) {
+  return (
+    <CardComponent as="article" className={`compact-issue-row ${issue.severity}`}>
+      <div>
+        <strong>{issue.target.applicantName}</strong>
+        <p>{drawerIssueSummary(issue)}</p>
+      </div>
+      <IssueCategoryTag issue={issue} />
+      <Button
+        aria-label="Открыть место исправления"
+        className="compact-button"
+        variant="secondary"
+        onClick={() => onOpenTarget(targetForIssue(issue))}
+      >
+        Перейти
+      </Button>
+    </CardComponent>
   );
 }
 
@@ -697,26 +847,34 @@ function QueueItemCard({
 }) {
   return (
     <CardComponent as="article" className={`workspace-queue-item ${item.tone}`}>
-      <span>{queueSourceLabel(item)}</span>
       <div>
         <strong>{item.title}</strong>
         <p>{item.body}</p>
       </div>
+      <Badge className={queueBadgeClass(item)}>{queueSourceLabel(item)}</Badge>
       <Button
         aria-label={item.actionLabel}
+        className="compact-button"
         variant="secondary"
         onClick={() => onOpenTarget(item.target)}
       >
-        {item.actionLabel}
+        {queueActionLabel(item.actionLabel)}
       </Button>
     </CardComponent>
   );
+}
+
+function queueActionLabel(label: string) {
+  if (label === "Открыть место исправления") return "Перейти";
+  if (label === "Открыть раздел") return "Раздел";
+  return label;
 }
 
 function DrawerQuestionnaire({
   onApplyPassportField,
   onFieldChange,
   passportExtractionEnabled,
+  pendingTarget,
   role,
   submission,
 }: {
@@ -732,6 +890,7 @@ function DrawerQuestionnaire({
     value: string;
   }) => void;
   passportExtractionEnabled: boolean;
+  pendingTarget: WorkspaceTarget | null;
   role: Role;
   submission: Submission;
 }) {
@@ -739,7 +898,6 @@ function DrawerQuestionnaire({
   const problemCount = questionnaireProblemCount(submission);
   const questionnaireReady =
     submission.completeness.questionnaire === 100 && problemCount === 0;
-  const isSingleApplicant = submission.applicants.length === 1;
   const [openSectionState, setOpenSectionState] = useState(() => ({
     sectionKey: defaultQuestionnaireSectionKey(submission),
     submissionId: submission.id,
@@ -751,6 +909,11 @@ function DrawerQuestionnaire({
     openSectionState.submissionId === submission.id
       ? openSectionState.sectionKey
       : defaultQuestionnaireSectionKey(submission);
+  const activeApplicantId =
+    openSectionKey.split(":")[0] || submission.applicants[0]?.id || "";
+  const activeApplicant =
+    submission.applicants.find((applicant) => applicant.id === activeApplicantId) ??
+    submission.applicants[0];
 
   useLayoutEffect(() => {
     if (!pendingSectionScrollId) return;
@@ -771,6 +934,30 @@ function DrawerQuestionnaire({
     setPendingSectionScrollId(null);
   }, [openSectionKey, pendingSectionScrollId]);
 
+  useLayoutEffect(() => {
+    if (pendingTarget?.tab !== "questionnaire") return;
+
+    const applicant =
+      submission.applicants.find((item) => item.id === pendingTarget.applicantId) ??
+      submission.applicants[0];
+    if (!applicant) return;
+
+    const targetSection =
+      applicant.sections.find(
+        (section) =>
+          section.title === pendingTarget.section ||
+          section.fields.some((field) => field.label === pendingTarget.field),
+      ) ??
+      applicant.sections.find((section) => section.status !== "complete") ??
+      applicant.sections[0];
+    if (!targetSection) return;
+
+    setOpenSectionState({
+      sectionKey: questionnaireSectionKey(applicant.id, targetSection.id),
+      submissionId: submission.id,
+    });
+  }, [pendingTarget, submission.applicants, submission.id]);
+
   function setOpenSectionKey(sectionKey: string) {
     setOpenSectionState({ sectionKey, submissionId: submission.id });
   }
@@ -780,13 +967,33 @@ function DrawerQuestionnaire({
     setPendingSectionScrollId(sectionElementId);
   }
 
-  function scrollToApplicant(applicantId: string) {
-    document.getElementById(`questionnaire-applicant-${applicantId}`)?.scrollIntoView({
-      block: "start",
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
+  function activateApplicant(applicantId: string) {
+    const applicant =
+      submission.applicants.find((item) => item.id === applicantId) ??
+      submission.applicants[0];
+    if (!applicant) return;
+
+    const issue = submission.issues.find(
+      (item) =>
+        item.status !== "closed_by_admin" && item.target.applicantId === applicant.id,
+    );
+    const nextSection =
+      applicant.sections.find(
+        (section) =>
+          section.title === issue?.target.section ||
+          section.fields.some((field) => field.label === issue?.target.field),
+      ) ??
+      applicant.sections.find((section) => section.status !== "complete") ??
+      applicant.sections[0];
+
+    if (!nextSection) return;
+    const sectionKey = questionnaireSectionKey(applicant.id, nextSection.id);
+    const sectionElementId = targetElementId({
+      applicantId: applicant.id,
+      section: nextSection.title,
+      tab: "questionnaire",
     });
+    openQuestionnaireSection(sectionKey, sectionElementId);
   }
 
   return (
@@ -797,12 +1004,12 @@ function DrawerQuestionnaire({
     >
       <div className="questionnaire-form-intro visa-form-hero">
         <div>
-          <p className="kicker">DS-пакет</p>
-          <h3>Матрица визовой анкеты</h3>
+          <p className="kicker">Анкета</p>
+          <h3>Визовая анкета</h3>
           <p className="drawer-muted visa-form-hero-copy">
             {canEdit
-              ? "Соберите поля в том порядке, в котором администратор сверяет пакет: личность, паспорт, адрес, работа, маршрут."
-              : "Проверяйте один раскрытый блок за раз. Несовпадения фиксируются точным замечанием к полю или документу."}
+              ? "Один заявитель и один раздел в фокусе."
+              : "Проверка по одному раскрытому блоку."}
           </p>
         </div>
         {questionnaireReady ? (
@@ -811,228 +1018,214 @@ function DrawerQuestionnaire({
           <Badge className="visa-tag visa-tag-attention">Уточнить {problemCount}</Badge>
         ) : null}
       </div>
-      {submission.applicants.length > 1 ? (
+      <div className="questionnaire-focus-layout">
         <div
-          className="questionnaire-progress-grid visa-applicant-strip"
-          aria-label="Готовность визовых профилей по заявителям"
+          className="questionnaire-workspace visa-form-workspace"
+          aria-label="Заявители семьи"
         >
           {submission.applicants.map((applicant) => {
-            const percent = questionnaireProgressForApplicant(applicant);
-            const openForApplicant = submission.issues.filter(
-              (issue) =>
-                issue.status !== "closed_by_admin" &&
-                issue.target.applicantId === applicant.id,
-            ).length;
+            const visualState = applicantVisualState(submission, applicant);
+            const expandedApplicant = activeApplicant?.id === applicant.id;
+            const applicantPanelId = `questionnaire-applicant-${applicant.id}`;
 
             return (
-              <Button
-                className="questionnaire-applicant-card visa-applicant-tile"
+              <CardComponent
+                as="article"
+                className={`questionnaire-card visa-applicant-sheet questionnaire-applicant-accordion ${
+                  expandedApplicant ? "is-expanded" : "is-collapsed"
+                } ${visualState.tone}`}
                 key={applicant.id}
-                variant="plain"
-                type="button"
-                onClick={() => scrollToApplicant(applicant.id)}
               >
-                <div>
-                  <span className="visa-avatar-dot" aria-hidden="true" />
-                  <div>
-                    <strong>{applicant.fullName}</strong>
-                    <p>{applicantRoleLabel(applicant.role)} · профиль DS</p>
-                  </div>
-                </div>
-                <Badge
-                  className={
-                    openForApplicant
-                      ? "visa-tag visa-tag-attention"
-                      : "visa-tag visa-tag-progress"
-                  }
+                <Button
+                  aria-controls={applicantPanelId}
+                  aria-expanded={expandedApplicant}
+                  className="questionnaire-applicant-trigger visa-applicant-header"
+                  title={applicant.fullName}
+                  variant="plain"
+                  type="button"
+                  onClick={() => activateApplicant(applicant.id)}
                 >
-                  {openForApplicant ? `${openForApplicant} замечания` : `${percent}%`}
-                </Badge>
-                <div
-                  className="inline-progress visa-progress-line"
-                  role="progressbar"
-                  aria-label={`Визовый профиль заполнен на ${percent}%`}
-                  aria-valuemax={100}
-                  aria-valuemin={0}
-                  aria-valuenow={percent}
-                >
-                  <i style={{ width: `${percent}%` }} />
-                </div>
-              </Button>
-            );
-          })}
-        </div>
-      ) : null}
-      <div className="questionnaire-workspace visa-form-workspace">
-        {submission.applicants.map((applicant) => (
-          <CardComponent
-            as="article"
-            className={`questionnaire-card visa-applicant-sheet ${
-              isSingleApplicant ? "is-single" : ""
-            }`}
-            id={`questionnaire-applicant-${applicant.id}`}
-            key={applicant.id}
-          >
-            {!isSingleApplicant ? (
-              <header className="questionnaire-card-header visa-applicant-header">
-                <div>
-                  <strong>{applicant.fullName}</strong>
-                  <p>{applicantRoleLabel(applicant.role)} · консульский профиль</p>
-                </div>
-                <div className="questionnaire-card-status">
-                  <span>{questionnaireProgressForApplicant(applicant)}%</span>
-                  <Badge className={statusPillClass(applicant.questionnaireStatus)}>
-                    {questionnaireLabel(applicant.questionnaireStatus)}
-                  </Badge>
-                </div>
-              </header>
-            ) : null}
-            <PassportExtractionReviewPanel
-              applicant={applicant}
-              canEdit={canEdit}
-              enabled={passportExtractionEnabled}
-              onApplyField={onApplyPassportField}
-            />
-            <div className="questionnaire-section-list visa-section-stack">
-              {applicant.sections.map((section) => {
-                const issue = sectionIssue(submission, applicant.id, section.title);
-                const sectionKey = questionnaireSectionKey(applicant.id, section.id);
-                const sectionElementId = targetElementId({
-                  applicantId: applicant.id,
-                  section: section.title,
-                  tab: "data",
-                });
-                const fieldsId = `questionnaire-fields-${applicant.id}-${section.id}`;
-                const expanded = openSectionKey === sectionKey;
-
-                return (
-                  <CardComponent
-                    as="section"
-                    className={`questionnaire-edit-section visa-section-card ${
-                      issue ? "has-issue" : ""
-                    } ${expanded ? "is-expanded" : "is-collapsed"}`}
-                    id={sectionElementId}
-                    key={section.id}
-                    aria-label={`${applicant.fullName}: ${section.title}`}
-                  >
-                    <Button
-                      className="questionnaire-section-heading visa-section-trigger"
-                      variant="plain"
-                      type="button"
-                      aria-controls={fieldsId}
-                      aria-expanded={expanded}
-                      onClick={() =>
-                        openQuestionnaireSection(sectionKey, sectionElementId)
-                      }
-                      onFocus={() =>
-                        openQuestionnaireSection(sectionKey, sectionElementId)
-                      }
-                    >
-                      <div>
-                        <span className="visa-step-dot" aria-hidden="true" />
-                        <div>
-                          {section.stepLabel ? (
-                            <p className="consular-step-label visa-step-label">
-                              {section.stepLabel}
-                            </p>
-                          ) : null}
-                          <h4>{section.title}</h4>
-                          {issue ? (
-                            <p className="visa-section-note">{issue.reason}</p>
-                          ) : section.missing ? (
-                            <p className="visa-section-note">{section.missing}</p>
-                          ) : null}
-                        </div>
-                      </div>
-                      <span className="questionnaire-section-side">
-                        {issue || section.status !== "complete" ? (
-                          <Badge className={statusPillClass(section.status)}>
-                            {questionnaireLabel(section.status)}
-                          </Badge>
-                        ) : null}
-                        <span className="accordion-chevron" aria-hidden="true" />
-                      </span>
-                    </Button>
-                    <div
-                      className="questionnaire-fields visa-field-grid"
-                      hidden={!expanded}
-                      id={fieldsId}
-                    >
-                      {section.fields.map((field) => {
-                        const fieldIssue = fieldIssueFor(
+                  <span className="questionnaire-applicant-main">
+                    <span>
+                      <strong>{applicant.fullName}</strong>
+                      <p>{applicantRoleLabel(applicant.role)}</p>
+                    </span>
+                  </span>
+                  <span className="questionnaire-card-status">
+                    <Badge tone="blue">
+                      {questionnaireProgressForApplicant(applicant)}%
+                    </Badge>
+                    {shouldShowApplicantStateBadge(submission, applicant) ? (
+                      <Badge tone={visualState.tone}>{visualState.label}</Badge>
+                    ) : null}
+                    <span className="accordion-chevron" aria-hidden="true" />
+                  </span>
+                </Button>
+                {expandedApplicant ? (
+                  <div className="questionnaire-applicant-panel" id={applicantPanelId}>
+                    <PassportExtractionReviewPanel
+                      applicant={applicant}
+                      canEdit={canEdit}
+                      enabled={passportExtractionEnabled}
+                      onApplyField={onApplyPassportField}
+                    />
+                    <div className="questionnaire-section-list visa-section-stack">
+                      {applicant.sections.map((section) => {
+                        const issue = sectionIssue(
                           submission,
                           applicant.id,
                           section.title,
-                          field.label,
                         );
-                        const error = field.error ?? fieldIssue?.reason;
-                        const fieldClassName = `visa-field ${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`;
-                        const fieldAriaLabel = `${applicant.fullName} · ${section.title} · ${field.label}`;
-                        const fieldElementId = targetElementId({
+                        const sectionKey = questionnaireSectionKey(
+                          applicant.id,
+                          section.id,
+                        );
+                        const sectionElementId = targetElementId({
                           applicantId: applicant.id,
-                          field: field.label,
-                          tab: "data",
+                          section: section.title,
+                          tab: "questionnaire",
                         });
-
-                        if (field.control === "select") {
-                          return (
-                            <Select
-                              aria-label={fieldAriaLabel}
-                              containerClassName={fieldClassName}
-                              disabled={!canEdit}
-                              errorMessage={error}
-                              id={fieldElementId}
-                              key={field.id}
-                              label={field.label}
-                              options={(field.options ?? []).map((option) => ({
-                                label: option,
-                                value: option,
-                              }))}
-                              placeholder={field.placeholder ?? "Выберите"}
-                              required={field.required}
-                              value={field.value}
-                              onChange={(event) =>
-                                onFieldChange({
-                                  applicantId: applicant.id,
-                                  sectionId: section.id,
-                                  fieldId: field.id,
-                                  value: event.target.value,
-                                })
-                              }
-                            />
-                          );
-                        }
+                        const fieldsId = `questionnaire-fields-${applicant.id}-${section.id}`;
+                        const expanded = openSectionKey === sectionKey;
 
                         return (
-                          <TextInputField
-                            aria-label={fieldAriaLabel}
-                            containerClassName={fieldClassName}
-                            disabled={!canEdit}
-                            errorMessage={error}
-                            id={fieldElementId}
-                            key={field.id}
-                            label={field.label}
-                            placeholder={field.placeholder}
-                            required={field.required}
-                            value={field.value}
-                            onChange={(event) =>
-                              onFieldChange({
-                                applicantId: applicant.id,
-                                sectionId: section.id,
-                                fieldId: field.id,
-                                value: event.target.value,
-                              })
-                            }
-                          />
+                          <CardComponent
+                            as="section"
+                            className={`questionnaire-edit-section visa-section-card ${
+                              issue ? "has-issue" : ""
+                            } ${expanded ? "is-expanded" : "is-collapsed"}`}
+                            id={sectionElementId}
+                            key={section.id}
+                            aria-label={`${applicant.fullName}: ${section.title}`}
+                          >
+                            <Button
+                              className="questionnaire-section-heading visa-section-trigger"
+                              variant="plain"
+                              type="button"
+                              aria-controls={fieldsId}
+                              aria-expanded={expanded}
+                              onClick={() =>
+                                openQuestionnaireSection(sectionKey, sectionElementId)
+                              }
+                              onFocus={() =>
+                                openQuestionnaireSection(sectionKey, sectionElementId)
+                              }
+                            >
+                              <div>
+                                <div>
+                                  {section.stepLabel ? (
+                                    <p className="consular-step-label visa-step-label">
+                                      {section.stepLabel}
+                                    </p>
+                                  ) : null}
+                                  <h4>{section.title}</h4>
+                                  {issue ? (
+                                    <p className="visa-section-note">
+                                      {drawerIssueSummary(issue)}
+                                    </p>
+                                  ) : section.missing ? (
+                                    <p className="visa-section-note">
+                                      {section.missing}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <span className="questionnaire-section-side">
+                                {issue || section.status !== "complete" ? (
+                                  <Badge tone={questionnaireTone(section.status)}>
+                                    {questionnaireLabel(section.status)}
+                                  </Badge>
+                                ) : null}
+                                <span
+                                  className="accordion-chevron"
+                                  aria-hidden="true"
+                                />
+                              </span>
+                            </Button>
+                            <div
+                              className="questionnaire-fields visa-field-grid"
+                              hidden={!expanded}
+                              id={fieldsId}
+                            >
+                              {section.fields.map((field) => {
+                                const fieldIssue = fieldIssueFor(
+                                  submission,
+                                  applicant.id,
+                                  section.title,
+                                  field.label,
+                                );
+                                const error = field.error ?? fieldIssue?.reason;
+                                const fieldClassName = `visa-field ${field.span === "full" ? "is-full" : ""} ${error ? "has-error" : ""}`;
+                                const fieldAriaLabel = `${applicant.fullName} · ${section.title} · ${field.label}`;
+                                const fieldElementId = targetElementId({
+                                  applicantId: applicant.id,
+                                  field: field.label,
+                                  tab: "questionnaire",
+                                });
+
+                                if (field.control === "select") {
+                                  return (
+                                    <Select
+                                      aria-label={fieldAriaLabel}
+                                      containerClassName={fieldClassName}
+                                      disabled={!canEdit}
+                                      errorMessage={error}
+                                      id={fieldElementId}
+                                      key={field.id}
+                                      label={field.label}
+                                      options={(field.options ?? []).map((option) => ({
+                                        label: option,
+                                        value: option,
+                                      }))}
+                                      placeholder={field.placeholder ?? "Выберите"}
+                                      required={field.required}
+                                      value={field.value}
+                                      onChange={(event) =>
+                                        onFieldChange({
+                                          applicantId: applicant.id,
+                                          sectionId: section.id,
+                                          fieldId: field.id,
+                                          value: event.target.value,
+                                        })
+                                      }
+                                    />
+                                  );
+                                }
+
+                                return (
+                                  <TextInputField
+                                    aria-label={fieldAriaLabel}
+                                    containerClassName={fieldClassName}
+                                    disabled={!canEdit}
+                                    errorMessage={error}
+                                    id={fieldElementId}
+                                    key={field.id}
+                                    label={field.label}
+                                    placeholder={field.placeholder}
+                                    required={field.required}
+                                    value={field.value}
+                                    onChange={(event) =>
+                                      onFieldChange({
+                                        applicantId: applicant.id,
+                                        sectionId: section.id,
+                                        fieldId: field.id,
+                                        value: event.target.value,
+                                      })
+                                    }
+                                  />
+                                );
+                              })}
+                            </div>
+                          </CardComponent>
                         );
                       })}
                     </div>
-                  </CardComponent>
-                );
-              })}
-            </div>
-          </CardComponent>
-        ))}
+                  </div>
+                ) : null}
+              </CardComponent>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -1144,19 +1337,6 @@ function PassportExtractionReviewPanel({
   );
 }
 
-function drawerMetaLine(submission: Submission) {
-  const parts = [
-    "Испания",
-    submission.city,
-    "Туризм C",
-    tripDates(submission),
-    submission.type === "family" ? typeLabels[submission.type] : undefined,
-    applicantCountLabel(submission.applicants.length),
-  ];
-
-  return parts.filter(Boolean).join(" · ");
-}
-
 function reviewStageLabel(status: Submission["status"]) {
   if (status === "submitted_for_review") return "Внутренняя проверка";
   if (status === "requires_action" || status === "returned") return "Нужны исправления";
@@ -1208,6 +1388,7 @@ function DrawerFiles({
   onExtractPassport,
   onUploadFile,
   passportExtractionEnabled = false,
+  pendingTarget,
   requireSelectedFile = false,
   role,
   submission,
@@ -1217,85 +1398,160 @@ function DrawerFiles({
   onExtractPassport: (fileId: string) => void;
   onUploadFile: (fileId: string, file?: File) => void;
   passportExtractionEnabled?: boolean;
+  pendingTarget: WorkspaceTarget | null;
   requireSelectedFile?: boolean;
   role: Role;
   submission: Submission;
 }) {
   const progress = fileReadyCount(submission);
   const canEditFiles = role === "agent" && canAgentEditSubmissionContent(submission);
-  const fileTypes = activeMediaFileTypes;
+  const initialCategory = initialFileCategory(submission);
+  const [activeCategory, setActiveCategory] = useState<FileCategoryId>(
+    () => initialCategory,
+  );
+  const activeCategoryConfig =
+    fileCategoryConfigs.find((category) => category.id === activeCategory) ??
+    fileCategoryConfigs[0];
+  const fileTypes = activeCategoryConfig.types;
+  const categoryProgress = fileCategoryProgress(submission, activeCategoryConfig);
+  const categoryHasIssue = submission.issues.some(
+    (issue) =>
+      issue.status === "open" &&
+      issue.target.fileType &&
+      activeCategoryConfig.types.includes(issue.target.fileType),
+  );
+
+  useEffect(() => {
+    setActiveCategory(initialCategory);
+  }, [initialCategory, submission.id]);
+
+  useLayoutEffect(() => {
+    if (pendingTarget?.tab !== "files") return;
+
+    const category = fileCategoryForType(pendingTarget.fileType);
+    if (category) setActiveCategory(category.id);
+  }, [pendingTarget]);
 
   return (
     <section className="drawer-section">
-      <div className="section-heading">
-        <div>
-          <p className="kicker">Файлы</p>
-          <h3>Паспорт, фото, селфи и видео</h3>
-          <p className="drawer-muted">
-            {progress.ready}/{progress.total} слотов загружены или ожидают проверки.
-          </p>
-        </div>
-      </div>
-      <div className="media-matrix" role="table" aria-label="Медиа по заявителям">
-        <div className="media-matrix-row is-head" role="row">
-          <span role="columnheader">Заявитель</span>
-          {fileTypes.map((type) => (
-            <span key={type} role="columnheader">
-              {fileShortLabel(type)}
-            </span>
-          ))}
-        </div>
-        {submission.applicants.map((applicant) => (
-          <div className="media-matrix-row" key={applicant.id} role="row">
-            <div className="media-applicant-cell" role="rowheader">
-              <strong>{applicant.fullName}</strong>
-              <p>{applicantRoleLabel(applicant.role)}</p>
-            </div>
-            {fileTypes.map((type) => {
-              const file = submission.files.find(
-                (item) => item.applicantId === applicant.id && item.type === type,
-              );
-              const issue = file
-                ? submission.issues.find(
-                    (item) =>
-                      item.id === file.linkedIssueId &&
-                      item.status !== "closed_by_admin",
-                  )
-                : undefined;
-              const canUploadFile =
-                Boolean(file) &&
-                canEditFiles &&
-                (file?.status === "missing" || file?.status === "needs_replacement");
-              const uploadDisabled = fileUploadBusy || !file;
-              const extractionState = applicant.passportExtraction;
-              const hasLocalPassportFile = file
-                ? localPassportFileIds.includes(file.id)
-                : false;
-              const canExtractPassport =
-                passportExtractionEnabled &&
-                canEditFiles &&
-                Boolean(file) &&
-                file?.type === "passport_scan" &&
-                (Boolean(file.storagePath) || hasLocalPassportFile) &&
-                (file.status === "uploaded" ||
-                  file.status === "pending_review" ||
-                  file.status === "accepted") &&
-                canStartPassportExtraction(applicant);
-              const inputId = file ? `file-upload-${submission.id}-${file.id}` : "";
-              const uploadLabel = `${file?.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileLabel(type)}: ${applicant.fullName}`;
+      <DrawerSectionHeader
+        title="Паспорт, фото и селфи"
+        badge={
+          <Badge className="visa-tag visa-tag-muted">
+            {progress.ready}/{progress.total}
+          </Badge>
+        }
+      />
+      <div
+        className="document-category-tabs"
+        role="group"
+        aria-label="Категории документов"
+      >
+        {fileCategoryConfigs.map((category) => {
+          const categoryStats = fileCategoryProgress(submission, category);
+          const hasIssue = submission.issues.some(
+            (issue) =>
+              issue.status === "open" &&
+              issue.target.fileType &&
+              category.types.includes(issue.target.fileType),
+          );
 
-              return (
-                <div
-                  className={`media-slot-cell ${issue ? "has-issue" : ""}`}
-                  id={targetElementId({
-                    applicantId: applicant.id,
-                    fileType: type,
-                    tab: "media",
-                  })}
-                  key={type}
-                  role="cell"
-                  tabIndex={-1}
-                >
+          return (
+            <Button
+              aria-pressed={activeCategory === category.id}
+              className={activeCategory === category.id ? "is-active" : ""}
+              key={category.id}
+              variant="plain"
+              onClick={() => setActiveCategory(category.id)}
+            >
+              <span>{category.label}</span>
+              <em>
+                {categoryStats.ready}/{categoryStats.total}
+              </em>
+              {hasIssue ? <i aria-label="Есть замечание" /> : null}
+            </Button>
+          );
+        })}
+      </div>
+      <DrawerSectionHeader
+        title={activeCategoryConfig.title}
+        badge={
+          <Badge
+            className={
+              categoryHasIssue
+                ? "visa-tag visa-tag-danger"
+                : categoryProgress.ready === categoryProgress.total
+                  ? "visa-tag visa-tag-ready"
+                  : "visa-tag visa-tag-attention"
+            }
+          >
+            {categoryHasIssue
+              ? "Есть замечание"
+              : `${categoryProgress.ready}/${categoryProgress.total}`}
+          </Badge>
+        }
+      />
+      <div className="drawer-list media-file-list" aria-label="Файлы подачи">
+        <div className="media-file-head" aria-hidden="true">
+          <span>Заявитель</span>
+          <span>Статус</span>
+          <span>Действие</span>
+        </div>
+        {submission.applicants.flatMap((applicant) =>
+          fileTypes.map((type) => {
+            const file = submission.files.find(
+              (item) => item.applicantId === applicant.id && item.type === type,
+            );
+            const issue = file
+              ? submission.issues.find(
+                  (item) =>
+                    item.id === file.linkedIssueId && item.status !== "closed_by_admin",
+                )
+              : undefined;
+            const canUploadFile =
+              Boolean(file) &&
+              canEditFiles &&
+              (file?.status === "missing" || file?.status === "needs_replacement");
+            const uploadDisabled = fileUploadBusy || !file;
+            const extractionState = applicant.passportExtraction;
+            const hasLocalPassportFile = file
+              ? localPassportFileIds.includes(file.id)
+              : false;
+            const canExtractPassport =
+              passportExtractionEnabled &&
+              canEditFiles &&
+              Boolean(file) &&
+              file?.type === "passport_scan" &&
+              (Boolean(file.storagePath) || hasLocalPassportFile) &&
+              (file.status === "uploaded" ||
+                file.status === "pending_review" ||
+                file.status === "accepted") &&
+              canStartPassportExtraction(applicant);
+            const inputId = file ? `file-upload-${submission.id}-${file.id}` : "";
+            const uploadLabel = `${file?.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileLabel(type)}: ${applicant.fullName}`;
+
+            const rowId = file?.id ?? `${applicant.id}-${type}`;
+
+            return (
+              <CardComponent
+                as="article"
+                aria-label={`${applicant.fullName}: ${fileLabel(type)}, ${fileStatusLabel(file)}`}
+                className={`media-file-row ${issue ? "has-issue" : ""} ${
+                  file?.status ?? "missing"
+                }`}
+                id={targetElementId({
+                  applicantId: applicant.id,
+                  fileType: type,
+                  tab: "files",
+                })}
+                key={rowId}
+                tabIndex={-1}
+              >
+                <div className="media-file-main">
+                  <strong>{applicant.fullName}</strong>
+                  <p>{mediaFileRowSubtitle(applicant, issue)}</p>
+                </div>
+                <div className="media-file-status">
                   <Badge
                     className={
                       file ? fileStatusPillClass(file.status) : "status-pill muted"
@@ -1303,7 +1559,8 @@ function DrawerFiles({
                   >
                     {fileStatusLabel(file)}
                   </Badge>
-                  {issue ? <p>{issue.reason}</p> : <p>{fileLabel(type)}</p>}
+                </div>
+                <div className="media-file-actions">
                   {canUploadFile && file ? (
                     requireSelectedFile ? (
                       <>
@@ -1377,10 +1634,10 @@ function DrawerFiles({
                     <Badge className="visa-tag">Распознавание</Badge>
                   ) : null}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+              </CardComponent>
+            );
+          }),
+        )}
       </div>
     </section>
   );
@@ -1403,59 +1660,116 @@ function DrawerIssues({
   submission: Submission;
   surface: "agent" | "review" | "export";
 }) {
+  const [expandedIssueIds, setExpandedIssueIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [view, setView] = useState<IssueView>("issues");
+
+  useEffect(() => {
+    setExpandedIssueIds(new Set());
+    setView("issues");
+  }, [submission.id]);
+
+  function toggleIssue(issueId: string) {
+    setExpandedIssueIds((current) => {
+      const next = new Set(current);
+      if (next.has(issueId)) next.delete(issueId);
+      else next.add(issueId);
+      return next;
+    });
+  }
+
   return (
     <section className="drawer-section">
-      <div>
-        <p className="kicker">Замечания</p>
-        <h3>{openIssueCount(submission) ? "Что нужно закрыть" : "Замечаний нет"}</h3>
-      </div>
-      <BbAiPanel
-        compact
-        onAccept={onAcceptAiSuggestion}
-        onDismiss={onDismissAiSuggestion}
-        onRun={onRunAiReview}
-        role={role}
-        submission={submission}
-        surface={surface}
+      <DrawerSectionHeader
+        title={view === "issues" ? "Что нужно закрыть" : "ББ-проверка"}
+        action={
+          <SegmentedFilter
+            ariaLabel="Режим замечаний"
+            items={[
+              { count: openIssueCount(submission), id: "issues", label: "Замечания" },
+              { id: "bb", label: "ББ" },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        }
       />
-      <div className="drawer-list">
-        {submission.issues.length ? (
-          submission.issues.map((issue) => (
-            <CardComponent
-              as="article"
-              className={`issue-row ${issue.severity}`}
-              id={`workspace-issue-${issue.id}`}
-              key={issue.id}
-              tabIndex={-1}
-            >
-              <span>{issueSeverityLabel(issue.severity)}</span>
-              <div>
-                <strong>{issueTarget(issue)}</strong>
-                <p>{issue.reason}</p>
-                <small>{issue.comment}</small>
-              </div>
-              <div className="issue-row-actions">
-                <em>{issueStatusLabel(issue.status)}</em>
-                {issue.status === "open" ? (
+      {view === "issues" ? (
+        <div className="drawer-list">
+          {submission.issues.length ? (
+            submission.issues.map((issue) => {
+              const expanded = expandedIssueIds.has(issue.id);
+              const detailsId = `issue-details-${issue.id}`;
+
+              return (
+                <CardComponent
+                  as="article"
+                  className={`issue-row compact ${issue.severity} ${
+                    expanded ? "is-expanded" : ""
+                  }`}
+                  id={`workspace-issue-${issue.id}`}
+                  key={issue.id}
+                  tabIndex={-1}
+                >
                   <Button
-                    aria-label="Открыть место исправления"
-                    variant="secondary"
-                    onClick={() => onOpenTarget(targetForIssue(issue))}
+                    aria-controls={detailsId}
+                    aria-expanded={expanded}
+                    className="issue-row-summary"
+                    variant="plain"
+                    onClick={() => toggleIssue(issue.id)}
                   >
-                    Открыть место исправления
+                    <div>
+                      <strong>{issue.target.applicantName}</strong>
+                      <IssueCategoryTag issue={issue} />
+                    </div>
+                    <p>{drawerIssueSummary(issue)}</p>
+                    <span className="accordion-chevron" aria-hidden="true" />
                   </Button>
-                ) : null}
-              </div>
-            </CardComponent>
-          ))
-        ) : (
-          <EmptyState text="Открытых замечаний нет." />
-        )}
-      </div>
+                  <div className="issue-row-details" hidden={!expanded} id={detailsId}>
+                    <p>{issue.comment}</p>
+                    <div className="issue-row-meta">
+                      <Badge className={issueBadgeClass(issue.severity)}>
+                        {issueSeverityLabel(issue.severity)}
+                      </Badge>
+                      <span>{issueStatusLabel(issue.status)}</span>
+                      <span>{issueTarget(issue)}</span>
+                    </div>
+                    {issue.status === "open" ? (
+                      <Button
+                        aria-label="Открыть место исправления"
+                        variant="secondary"
+                        onClick={() => onOpenTarget(targetForIssue(issue))}
+                      >
+                        Перейти
+                      </Button>
+                    ) : null}
+                  </div>
+                </CardComponent>
+              );
+            })
+          ) : (
+            <EmptyState text="Открытых замечаний нет." />
+          )}
+        </div>
+      ) : (
+        <BbAiPanel
+          compact
+          onAccept={onAcceptAiSuggestion}
+          onDismiss={onDismissAiSuggestion}
+          onRun={onRunAiReview}
+          role={role}
+          submission={submission}
+          surface={surface}
+        />
+      )}
     </section>
   );
 }
 
+type ApplicantFilter = "all" | "issues";
+type IssueView = "bb" | "issues";
+type OverviewFocus = "issues" | "queue";
 type HistoryFilter = "all" | "bb";
 
 function DrawerHistory({ submission }: { submission: Submission }) {
@@ -1464,54 +1778,66 @@ function DrawerHistory({ submission }: { submission: Submission }) {
     filter === "bb"
       ? submission.history.filter((event) => event.source === "bb")
       : submission.history;
+  const groups = groupHistoryEvents(events);
 
   return (
     <section className="drawer-section">
-      <div className="section-heading">
-        <div>
-          <p className="kicker">История</p>
-          <h3>Журнал действий</h3>
-        </div>
-        <div className="history-filter" role="group" aria-label="Фильтр истории">
-          <Button
-            className={filter === "all" ? "is-active" : ""}
-            aria-pressed={filter === "all"}
-            variant="ghost"
-            onClick={() => setFilter("all")}
-          >
-            Все
-          </Button>
-          <Button
-            className={filter === "bb" ? "is-active" : ""}
-            aria-pressed={filter === "bb"}
-            variant="ghost"
-            onClick={() => setFilter("bb")}
-          >
-            ББ
-          </Button>
-        </div>
-      </div>
-      <div className="drawer-list">
-        {events.length ? (
-          events.map((event) => (
-            <CardComponent
-              as="article"
-              className="drawer-row history-row"
-              key={event.id}
+      <DrawerSectionHeader
+        title="Журнал действий"
+        action={
+          <div className="history-filter" role="group" aria-label="Фильтр истории">
+            <Button
+              className={filter === "all" ? "is-active" : ""}
+              aria-pressed={filter === "all"}
+              variant="ghost"
+              onClick={() => setFilter("all")}
             >
-              <div>
-                <strong>{event.text}</strong>
-                {event.detail ? (
-                  <>
-                    <p>{event.detail}</p>
-                    <small>{event.at}</small>
-                  </>
-                ) : (
-                  <p>{event.at}</p>
-                )}
+              Все
+            </Button>
+            <Button
+              className={filter === "bb" ? "is-active" : ""}
+              aria-pressed={filter === "bb"}
+              variant="ghost"
+              onClick={() => setFilter("bb")}
+            >
+              ББ
+            </Button>
+          </div>
+        }
+      />
+      <div className="history-timeline">
+        {groups.length ? (
+          groups.map((group) => (
+            <section className="history-day-group" key={group.date}>
+              <p>{group.date}</p>
+              <div className="drawer-list">
+                {group.events.map((event) => {
+                  const time = historyTimeLabel(event.at, group.date);
+
+                  return (
+                    <CardComponent
+                      as="article"
+                      className={`drawer-row history-row ${time ? "has-time" : "no-time"}`}
+                      key={event.id}
+                    >
+                      {time ? <span>{time}</span> : null}
+                      <div>
+                        <strong>{event.text}</strong>
+                        {event.detail ? (
+                          <details>
+                            <summary>Подробнее</summary>
+                            <p>{event.detail}</p>
+                          </details>
+                        ) : null}
+                      </div>
+                      <Badge className="visa-tag visa-tag-muted">
+                        {historySourceLabel(event.source)}
+                      </Badge>
+                    </CardComponent>
+                  );
+                })}
               </div>
-              <span>{historySourceLabel(event.source)}</span>
-            </CardComponent>
+            </section>
           ))
         ) : (
           <EmptyState text="Событий ББ пока нет." />
@@ -1527,6 +1853,194 @@ function historySourceLabel(source: Submission["history"][number]["source"]) {
   if (source === "agent") return "Агент";
   if (source === "system") return "Система";
   return "Без источника";
+}
+
+function issueCountLabel(count: number) {
+  if (count % 10 === 1 && count % 100 !== 11) return `${count} замечание`;
+  if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) {
+    return `${count} замечания`;
+  }
+  return `${count} замечаний`;
+}
+
+function blockerCountLabel(count: number) {
+  if (count % 10 === 1 && count % 100 !== 11) return `${count} блокер`;
+  if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) {
+    return `${count} блокера`;
+  }
+  return `${count} блокеров`;
+}
+
+function toneTagClass(tone: "amber" | "blue" | "danger" | "muted" | "teal") {
+  if (tone === "teal") return "visa-tag-ready";
+  if (tone === "amber") return "visa-tag-attention";
+  if (tone === "danger") return "visa-tag-danger";
+  if (tone === "blue") return "visa-tag-info";
+  return "visa-tag-muted";
+}
+
+function applicantVisualState(
+  submission: Submission,
+  applicant: Applicant,
+): {
+  label: string;
+  tone: "amber" | "danger" | "muted" | "teal";
+} {
+  const percent = questionnaireProgressForApplicant(applicant);
+  const hasBlocker = submission.issues.some(
+    (issue) =>
+      issue.status === "open" &&
+      issue.severity === "blocker" &&
+      issue.target.applicantId === applicant.id,
+  );
+
+  if (hasBlocker) {
+    return { label: "Блокер", tone: "danger" };
+  }
+  if (percent === 100) {
+    return { label: "Сверено", tone: "teal" };
+  }
+  if (percent > 0) {
+    return { label: "В работе", tone: "amber" };
+  }
+  return { label: "Нет данных", tone: "muted" };
+}
+
+function shouldShowApplicantStateBadge(submission: Submission, applicant: Applicant) {
+  const state = applicantVisualState(submission, applicant);
+  return state.tone === "danger" || questionnaireProgressForApplicant(applicant) < 100;
+}
+
+function questionnaireTone(
+  status: QuestionnaireStatus,
+): "amber" | "danger" | "muted" | "teal" {
+  if (status === "complete") return "teal";
+  if (status === "partial") return "amber";
+  if (status === "needs_fix") return "danger";
+  return "muted";
+}
+
+function issueBadgeClass(severity: IssueSeverity) {
+  if (severity === "blocker") return "visa-tag visa-tag-danger";
+  if (severity === "warning") return "visa-tag visa-tag-attention";
+  return "visa-tag visa-tag-info";
+}
+
+function issueCategoryLabel(issue: Issue) {
+  if (issue.target.fileType || issue.type === "file" || issue.type === "media") {
+    return "Медиа";
+  }
+  if (issue.type === "section") return "Раздел";
+  return "Данные";
+}
+
+function drawerIssueSummary(issue: Issue) {
+  if (issue.target.fileType || issue.type === "file" || issue.type === "media") {
+    return "Проверить файл";
+  }
+  if (issue.target.field) return `Проверить поле «${issue.target.field}»`;
+  if (issue.target.section) return `Проверить раздел «${issue.target.section}»`;
+  return "Проверить данные";
+}
+
+function mediaFileRowSubtitle(applicant: Applicant, issue?: Issue) {
+  if (issue) return drawerIssueSummary(issue);
+  return applicantRoleLabel(applicant.role);
+}
+
+function queueTone(
+  item: ReadinessQueueItem,
+): "amber" | "blue" | "danger" | "muted" | "teal" {
+  if (item.status === "fixed") return "teal";
+  if (item.tone === "danger") return "danger";
+  if (item.tone === "warning") return "amber";
+  if (item.tone === "success") return "teal";
+  return "blue";
+}
+
+function queueBadgeClass(item: ReadinessQueueItem) {
+  return `visa-tag ${toneTagClass(queueTone(item))}`;
+}
+
+type FileCategoryId = "passport" | "photo" | "selfie";
+
+type FileCategoryConfig = {
+  id: FileCategoryId;
+  label: string;
+  title: string;
+  types: SubmissionFileType[];
+};
+
+const fileCategoryConfigs: FileCategoryConfig[] = [
+  {
+    id: "passport",
+    label: "Паспорт",
+    title: "Паспорт",
+    types: ["passport_scan"],
+  },
+  {
+    id: "photo",
+    label: "Фото",
+    title: "Фото на белом фоне",
+    types: ["photo"],
+  },
+  {
+    id: "selfie",
+    label: "Селфи",
+    title: "Селфи и видео",
+    types: ["selfie", "selfie_2", "video"],
+  },
+];
+
+function initialFileCategory(submission: Submission): FileCategoryId {
+  const issueFileType = submission.issues.find(
+    (issue) => issue.status === "open" && issue.target.fileType,
+  )?.target.fileType;
+  const category = fileCategoryConfigs.find(
+    (item) => issueFileType && item.types.includes(issueFileType),
+  );
+  return category?.id ?? "passport";
+}
+
+function fileCategoryForType(type: SubmissionFileType) {
+  return fileCategoryConfigs.find((category) => category.types.includes(type));
+}
+
+function fileCategoryProgress(submission: Submission, category: FileCategoryConfig) {
+  const files = submission.files.filter((file) => category.types.includes(file.type));
+  return {
+    ready: files.filter(
+      (file) => file.status !== "missing" && file.status !== "needs_replacement",
+    ).length,
+    total: files.length,
+  };
+}
+
+function groupHistoryEvents(events: Submission["history"]) {
+  const groups: Array<{ date: string; events: Submission["history"] }> = [];
+
+  for (const event of events) {
+    const date = historyDateLabel(event.at);
+    const group = groups.find((item) => item.date === date);
+    if (group) {
+      group.events.push(event);
+    } else {
+      groups.push({ date, events: [event] });
+    }
+  }
+
+  return groups;
+}
+
+function historyDateLabel(value: string) {
+  return value.split(/[ ,]+/)[0] || value;
+}
+
+function historyTimeLabel(value: string, groupDate: string) {
+  const parts = value.split(/[ ,]+/).filter(Boolean);
+  const time = parts[1];
+  if (!time || time === groupDate) return "";
+  return time;
 }
 
 function applicantRoleLabel(role: Submission["applicants"][number]["role"]) {
@@ -1569,8 +2083,9 @@ function issueTarget(issue: Issue) {
 
 function drawerTabValue(submission: Submission, tab: DrawerTab) {
   if (tab === "overview") return `${submission.completeness.total}%`;
-  if (tab === "data") return `${submission.completeness.questionnaire}%`;
-  if (tab === "media") {
+  if (tab === "applicants") return String(submission.applicants.length);
+  if (tab === "questionnaire") return `${submission.completeness.questionnaire}%`;
+  if (tab === "files") {
     const progress = fileReadyCount(submission);
     return `${progress.ready}/${progress.total}`;
   }
@@ -1603,7 +2118,7 @@ function decisionTitle(submission: Submission, primaryAction: ActionDecision) {
 function decisionBadge(submission: Submission, primaryAction: ActionDecision) {
   if (primaryAction.disabled) return "Стоп";
   const blockers = blockerCount(submission);
-  if (blockers > 0) return `${blockers} блокера`;
+  if (blockers > 0) return blockerCountLabel(blockers);
   const open = openIssueCount(submission);
   if (open > 0) return `${open} замеч.`;
   if (submission.status === "ready_for_export") return "К Эксель";
@@ -1613,13 +2128,14 @@ function decisionBadge(submission: Submission, primaryAction: ActionDecision) {
 
 function firstWorkLine(submission: Submission) {
   const firstOpenIssue = submission.issues.find((issue) => issue.status === "open");
-  if (firstOpenIssue) return `${issueTarget(firstOpenIssue)}: ${firstOpenIssue.reason}`;
+  if (firstOpenIssue) {
+    return `${firstOpenIssue.target.applicantName} · ${drawerIssueSummary(firstOpenIssue)}`;
+  }
 
   const firstFixedIssue = submission.issues.find(
     (issue) => issue.status === "fixed_by_manager",
   );
-  if (firstFixedIssue)
-    return `${issueTarget(firstFixedIssue)}: ожидает закрытия администратором`;
+  if (firstFixedIssue) return `${firstFixedIssue.target.applicantName} · ждёт проверки`;
 
   const firstMissingSection = submission.applicants
     .flatMap((applicant) =>
@@ -1627,7 +2143,7 @@ function firstWorkLine(submission: Submission) {
     )
     .find(({ section }) => section.status !== "complete");
   if (firstMissingSection) {
-    return `${firstMissingSection.applicant.fullName}: ${firstMissingSection.section.missing ?? firstMissingSection.section.title}`;
+    return `${firstMissingSection.applicant.fullName} · ${firstMissingSection.section.title}`;
   }
 
   return nextProblem(submission);
@@ -1666,13 +2182,6 @@ function fieldIssueFor(
         issue.target.section === "Данные") &&
       issue.target.field === fieldLabel,
   );
-}
-
-function statusPillClass(status: QuestionnaireStatus) {
-  if (status === "complete") return "visa-tag visa-tag-ready";
-  if (status === "partial") return "visa-tag visa-tag-attention";
-  if (status === "needs_fix") return "visa-tag visa-tag-danger";
-  return "visa-tag visa-tag-muted";
 }
 
 function fileStatusPillClass(status: SubmissionFileStatus) {
