@@ -1777,7 +1777,7 @@ function App() {
             onAddIssue={openIssueComposer}
             onOpen={openSubmission}
             onSelect={selectSubmission}
-            onTab={setReviewTab}
+            onTab={showReviewTab}
             reviewList={reviewList}
             reviewSource={searchedReviewQueue}
             reviewTab={reviewTab}
