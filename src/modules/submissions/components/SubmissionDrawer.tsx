@@ -898,7 +898,10 @@ function DrawerQuestionnaire({
   const problemCount = questionnaireProblemCount(submission);
   const questionnaireReady =
     submission.completeness.questionnaire === 100 && problemCount === 0;
-  const [openSectionState, setOpenSectionState] = useState(() => ({
+  const [openSectionState, setOpenSectionState] = useState<{
+    sectionKey: string | null;
+    submissionId: string;
+  }>(() => ({
     sectionKey: defaultQuestionnaireSectionKey(submission),
     submissionId: submission.id,
   }));
@@ -909,11 +912,10 @@ function DrawerQuestionnaire({
     openSectionState.submissionId === submission.id
       ? openSectionState.sectionKey
       : defaultQuestionnaireSectionKey(submission);
-  const activeApplicantId =
-    openSectionKey.split(":")[0] || submission.applicants[0]?.id || "";
+  const activeApplicantId = openSectionKey?.split(":")[0] ?? "";
   const activeApplicant =
     submission.applicants.find((applicant) => applicant.id === activeApplicantId) ??
-    submission.applicants[0];
+    null;
 
   useLayoutEffect(() => {
     if (!pendingSectionScrollId) return;
@@ -972,6 +974,12 @@ function DrawerQuestionnaire({
       submission.applicants.find((item) => item.id === applicantId) ??
       submission.applicants[0];
     if (!applicant) return;
+
+    if (activeApplicant?.id === applicant.id) {
+      setOpenSectionState({ sectionKey: null, submissionId: submission.id });
+      setPendingSectionScrollId(null);
+      return;
+    }
 
     const issue = submission.issues.find(
       (item) =>
