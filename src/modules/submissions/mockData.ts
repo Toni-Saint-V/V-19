@@ -1,8 +1,5 @@
 import { createQuestionnaireSections } from "./questionnaire";
-import {
-  alternateLocalAgentOwnerId,
-  defaultLocalAgentOwnerId,
-} from "./ownership";
+import { alternateLocalAgentOwnerId, defaultLocalAgentOwnerId } from "./ownership";
 import type { Applicant, Issue, Submission, SubmissionFile } from "./types";
 
 function applicant(
@@ -279,7 +276,7 @@ export const initialSubmissions: Submission[] = [
         "Адрес отеля был неполным",
         "Агент отметил исправление, администратор должен закрыть замечание.",
         "warning",
-        "fixed_by_manager",
+        "fixed_by_agent",
         "Данные",
       ),
     ],

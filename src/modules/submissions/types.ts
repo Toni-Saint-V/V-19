@@ -1,15 +1,21 @@
 export type Role = "agent" | "admin";
 
-export type Surface =
-  | "agent-actions"
-  | "agent-inbox"
-  | "agent-submissions"
-  | "admin-review"
-  | "export";
+export type UserRole = Role;
+
+export type Surface = "agent-submissions" | "admin-review" | "export";
 
 export type AgentOwnerId = string;
 
 export type SubmissionType = "single" | "family";
+
+export type SubmissionKind = SubmissionType;
+
+export type SpainCountryCode = "ES";
+
+export const V19_FIXED_COUNTRY = {
+  code: "ES",
+  label: "Испания",
+} as const satisfies { code: SpainCountryCode; label: Submission["country"] };
 
 export type SubmissionStatus =
   | "draft"
@@ -41,7 +47,9 @@ export type SubmissionFileType =
 
 export type IssueSeverity = "blocker" | "warning" | "info";
 
-export type IssueStatus = "open" | "fixed_by_manager" | "closed_by_admin";
+export type IssueStatus = "open" | "fixed_by_agent" | "closed_by_admin";
+
+export type DomainIssueStatus = "open" | "fixed_by_agent" | "closed_by_admin";
 
 export type ExportState =
   | "not_ready"
@@ -219,6 +227,8 @@ export type Issue = {
   snapshot?: string;
 };
 
+export type IssueTarget = Issue["target"];
+
 export type IssueInput = {
   type: Issue["type"];
   applicantId: string;
@@ -284,6 +294,7 @@ export type Submission = {
   listTitle?: string;
   type: SubmissionType;
   country: "Испания";
+  countryCode?: SpainCountryCode;
   city: City;
   tripDateFrom: string;
   tripDateTo: string;
@@ -329,3 +340,24 @@ export type ExportRow = {
 export type ExportBlocker = {
   reason: string;
 };
+
+export type DomainErrorCode =
+  | "INVALID_SUBMISSION_KIND"
+  | "INVALID_TRANSITION"
+  | "PERMISSION_DENIED"
+  | "VALIDATION_ERROR"
+  | "ISSUE_NOT_FOUND"
+  | "ISSUE_NOT_FIXABLE"
+  | "ACCEPTANCE_BLOCKED"
+  | "EXPORT_NOT_READY"
+  | "EXPORTED_TERMINAL"
+  | "BLOCKED_EXPORT_SCHEMA";
+
+export type DomainError = {
+  code: DomainErrorCode;
+  message: string;
+};
+
+export type CommandResult<T = Submission> =
+  | { ok: true; data: T }
+  | { ok: false; error: DomainError };

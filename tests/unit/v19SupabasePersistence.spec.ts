@@ -205,7 +205,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       ...returnedSubmission,
       status: "corrections_received",
       issues: returnedSubmission.issues.map((issue) =>
-        issue.status === "open" ? { ...issue, status: "fixed_by_manager" } : issue,
+        issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
       ),
     };
 
@@ -339,9 +339,7 @@ describe("V-19 Supabase cockpit persistence", () => {
     const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
 
     expect(loaded.submissions[0]?.agentId).toBe(otherAgentProfile.id);
-    expect(loaded.ownerIdsBySubmissionId.get(submission.id)).toBe(
-      otherAgentProfile.id,
-    );
+    expect(loaded.ownerIdsBySubmissionId.get(submission.id)).toBe(otherAgentProfile.id);
   });
 
   it("does not load another agent row for agent profile", async () => {

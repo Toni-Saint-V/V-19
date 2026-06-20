@@ -274,11 +274,11 @@ function cardIssueLines(submission: Submission) {
       target: issueTarget(issue),
       shortTarget: issueShortTarget(issue),
       text:
-        issue.status === "fixed_by_manager"
+        issue.status === "fixed_by_agent"
           ? `${issue.reason}: исправлено агентом`
           : issue.reason,
       shortText:
-        issue.status === "fixed_by_manager"
+        issue.status === "fixed_by_agent"
           ? `${issueShortText(issue)}: исправлено агентом`
           : issueShortText(issue),
     }));
@@ -346,7 +346,7 @@ function fileSlotSummary(submission: Submission) {
 function cardNextActionLine(submission: Submission, role: Role) {
   const hasOpenIssue = submission.issues.some((issue) => issue.status === "open");
   const hasFixedIssue = submission.issues.some(
-    (issue) => issue.status === "fixed_by_manager",
+    (issue) => issue.status === "fixed_by_agent",
   );
   const fileSlots = fileSlotSummary(submission);
 

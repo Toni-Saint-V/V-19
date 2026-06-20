@@ -91,7 +91,11 @@ function visibleCopy(brief: ReturnType<typeof buildSubmissionNextStepBrief>) {
 describe("submission next-step engine", () => {
   test("prioritizes safe passport field application before submit handoff", () => {
     const draft = draftSubmission();
-    const withPassport = finishPassportExtraction(draft, passportFile(draft), extractedPassport);
+    const withPassport = finishPassportExtraction(
+      draft,
+      passportFile(draft),
+      extractedPassport,
+    );
 
     const brief = buildSubmissionNextStepBrief({
       role: "agent",
@@ -213,7 +217,11 @@ describe("submission next-step engine", () => {
   });
 
   test("returns admin accept and export actions from lifecycle state", () => {
-    const submitted = applySubmissionAction(readyForReviewSubmission(), "submit_for_review", "agent");
+    const submitted = applySubmissionAction(
+      readyForReviewSubmission(),
+      "submit_for_review",
+      "agent",
+    );
     const adminReview = buildSubmissionNextStepBrief({
       role: "admin",
       submission: submitted,
@@ -381,7 +389,7 @@ describe("submission next-step engine", () => {
       reason: "Email исправлен агентом",
       comment: "Проверьте новое значение.",
       severity: "blocker",
-      status: "fixed_by_manager",
+      status: "fixed_by_agent",
       createdBy: "admin",
       createdAt: "сейчас",
     };

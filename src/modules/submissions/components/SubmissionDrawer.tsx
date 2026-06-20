@@ -2075,7 +2075,7 @@ function issueSeverityLabel(severity: Issue["severity"]) {
 
 function issueStatusLabel(status: Issue["status"]) {
   if (status === "open") return "Открыто";
-  if (status === "fixed_by_manager") return "Исправлено агентом";
+  if (status === "fixed_by_agent") return "Исправлено агентом";
   return "Закрыто администратором";
 }
 
@@ -2141,7 +2141,7 @@ function firstWorkLine(submission: Submission) {
   }
 
   const firstFixedIssue = submission.issues.find(
-    (issue) => issue.status === "fixed_by_manager",
+    (issue) => issue.status === "fixed_by_agent",
   );
   if (firstFixedIssue) return `${firstFixedIssue.target.applicantName} · ждёт проверки`;
 

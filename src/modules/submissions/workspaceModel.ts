@@ -63,7 +63,7 @@ export function buildReadinessQueue(submission: Submission): ReadinessQueueItem[
   return [
     ...submission.issues.filter((issue) => issue.status === "open").map(issueQueueItem),
     ...submission.issues
-      .filter((issue) => issue.status === "fixed_by_manager")
+      .filter((issue) => issue.status === "fixed_by_agent")
       .map(fixedIssueQueueItem),
     ...activeAiSuggestions(submission).map(aiSuggestionQueueItem),
     ...systemMissingQueueItems(submission),
