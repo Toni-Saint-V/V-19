@@ -19,12 +19,12 @@ export type WorkspaceTarget =
       applicantId: string;
       field?: string;
       section?: string;
-      tab: "data";
+      tab: "questionnaire";
     }
   | {
       applicantId: string;
       fileType: SubmissionFileType;
-      tab: "media";
+      tab: "files";
     }
   | {
       issueId?: string;
@@ -45,8 +45,9 @@ export type ReadinessQueueItem = {
 
 export const workspaceTabs: Array<{ id: DrawerTab; label: string }> = [
   { id: "overview", label: "Обзор" },
-  { id: "data", label: "Анкета" },
-  { id: "media", label: "Файлы" },
+  { id: "applicants", label: "Заявители" },
+  { id: "questionnaire", label: "Анкета" },
+  { id: "files", label: "Документы" },
   { id: "issues", label: "Замечания" },
   { id: "history", label: "История" },
 ];
@@ -74,10 +75,10 @@ export function firstActionableQueueItem(submission: Submission) {
 }
 
 export function targetElementId(target: WorkspaceTarget): string {
-  if (target.tab === "media") {
+  if (target.tab === "files") {
     return `workspace-media-${target.applicantId}-${target.fileType}`;
   }
-  if (target.tab === "data") {
+  if (target.tab === "questionnaire") {
     const suffix = target.field ?? target.section ?? "profile";
     return `workspace-data-${target.applicantId}-${stableDomToken(suffix)}`;
   }
@@ -128,7 +129,7 @@ export function sectionNavigationTarget(
   return {
     applicantId: applicantWithWork?.id ?? submission.applicants[0]?.id ?? "",
     section: sectionTitle,
-    tab: "data",
+    tab: "questionnaire",
   };
 }
 
@@ -204,7 +205,7 @@ function systemMissingQueueItems(submission: Submission): ReadinessQueueItem[] {
         target: {
           applicantId: applicant.id,
           section: section.title,
-          tab: "data",
+          tab: "questionnaire",
         },
         title: `${applicant.fullName} · Данные · ${section.title}`,
         tone: "warning",
@@ -221,7 +222,7 @@ export function targetForIssue(issue: Issue): WorkspaceTarget {
     return {
       applicantId: issue.target.applicantId,
       fileType: issue.target.fileType,
-      tab: "media",
+      tab: "files",
     };
   }
 
@@ -229,7 +230,7 @@ export function targetForIssue(issue: Issue): WorkspaceTarget {
     applicantId: issue.target.applicantId,
     field: issue.target.field,
     section: issue.target.section,
-    tab: "data",
+    tab: "questionnaire",
   };
 }
 
@@ -238,7 +239,7 @@ function targetForSuggestion(suggestion: AiSuggestion): WorkspaceTarget {
     return {
       applicantId: suggestion.target.applicantId,
       fileType: suggestion.target.fileType,
-      tab: "media",
+      tab: "files",
     };
   }
 
@@ -246,7 +247,7 @@ function targetForSuggestion(suggestion: AiSuggestion): WorkspaceTarget {
     applicantId: suggestion.target.applicantId,
     field: suggestion.target.field,
     section: suggestion.target.section,
-    tab: "data",
+    tab: "questionnaire",
   };
 }
 

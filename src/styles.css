@@ -1086,12 +1086,10 @@ p {
 }
 
 .v19-event-row {
-  position: relative;
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  grid-template-columns: 8px 10px minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
-  overflow: hidden;
   min-height: var(--v19-row-height);
   padding: 9px 16px 9px 12px;
 }
@@ -1160,19 +1158,15 @@ p {
   opacity: 0.72;
 }
 
-.v19-event-row.is-unread::before {
-  content: "";
-  position: absolute;
-  inset: 10px auto 10px 0;
-  width: 2px;
-  border-radius: 0 var(--v19-radius-pill) var(--v19-radius-pill) 0;
-  background: linear-gradient(180deg, rgb(151 160 255 / 0.95), rgb(93 108 255 / 0.62));
-  box-shadow: 10px 0 24px rgb(124 132 255 / 0.14);
-  pointer-events: none;
+.v19-unread-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--v19-accent);
 }
 
-.v19-event-row:not(.v19-action-row) .v19-event-icon {
-  justify-self: end;
+.v19-event-row.is-read .v19-unread-dot {
+  background: transparent;
 }
 
 .v19-event-icon {
@@ -7858,9 +7852,15 @@ p {
     padding: 14px 16px;
   }
 
+  .v19-event-row:not(.v19-action-row) .v19-unread-dot,
   .v19-event-row:not(.v19-action-row) .v19-event-icon {
     grid-row: 1;
     margin-top: 8px;
+  }
+
+  .v19-event-row:not(.v19-action-row) .v19-unread-dot {
+    grid-column: 1;
+    justify-self: start;
   }
 
   .v19-event-row:not(.v19-action-row) .v19-event-icon {

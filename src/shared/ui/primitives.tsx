@@ -461,6 +461,7 @@ export function NavCount({
 
 interface DrawerTabsProps<T extends string> {
   ariaLabel: string;
+  autoFocusOnValueChange?: boolean;
   className?: string;
   onValueChange: (value: T) => void;
   tabs: Array<{ id: T; label: string; meta?: string }>;
@@ -469,6 +470,7 @@ interface DrawerTabsProps<T extends string> {
 
 export function DrawerTabs<T extends string>({
   ariaLabel,
+  autoFocusOnValueChange = true,
   className,
   onValueChange,
   tabs,
@@ -477,10 +479,11 @@ export function DrawerTabs<T extends string>({
   const tabRefs = useRef(new Map<T, HTMLButtonElement>());
 
   useEffect(() => {
+    if (!autoFocusOnValueChange) return;
     requestAnimationFrame(() => {
       tabRefs.current.get(value)?.focus({ preventScroll: true });
     });
-  }, [value]);
+  }, [autoFocusOnValueChange, value]);
 
   function focusTab(index: number) {
     const tab = tabs[index];
@@ -523,6 +526,7 @@ export function DrawerTabs<T extends string>({
         return (
           <button
             aria-controls={`drawer-panel-${tab.id}`}
+            aria-label={tab.meta ? `${tab.label}, ${tab.meta}` : tab.label}
             aria-selected={selected}
             className={selected ? "is-active" : ""}
             id={`drawer-tab-${tab.id}`}

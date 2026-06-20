@@ -84,7 +84,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
       searchText: "",
       severity: "blocker",
       submission,
-      tab: "media",
+      tab: "files",
       title: rowText.title,
     });
   }
@@ -142,7 +142,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
       searchText: "",
       severity: "warning",
       submission,
-      tab: "data",
+      tab: "questionnaire",
       title: rowText.title,
     });
   }
@@ -168,7 +168,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
       searchText: "",
       severity: "warning",
       submission,
-      tab: "media",
+      tab: "files",
       title: rowText.title,
     });
   }

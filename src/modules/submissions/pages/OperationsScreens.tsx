@@ -564,7 +564,7 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
       needsAction: true,
       read: false,
       submission: videoIssue,
-      tab: "media",
+      tab: "files",
       time: "34 мин назад",
       title: "Администратор уточнил замечание по видео",
       tone: "amber",

@@ -1089,7 +1089,7 @@ function App() {
           remoteProfile,
         ).then(() => undefined),
       );
-      setActiveDrawerTab("media");
+      setActiveDrawerTab("files");
       return;
     }
 
@@ -1111,7 +1111,7 @@ function App() {
           : undefined,
       ),
     );
-    setActiveDrawerTab("media");
+    setActiveDrawerTab("files");
   }
 
   function updateSubmissionById(
@@ -1172,7 +1172,7 @@ function App() {
         }
         return finishPassportExtraction(current, latestFile, result);
       });
-      setActiveDrawerTab("data");
+      setActiveDrawerTab("questionnaire");
     } catch {
       updateSubmissionById(submission.id, (current) => {
         const latestFile = current.files.find((candidate) => candidate.id === fileId);
@@ -1182,7 +1182,7 @@ function App() {
           "Распознавание паспорта недоступно. Проверьте данные вручную.",
         );
       });
-      setActiveDrawerTab("media");
+      setActiveDrawerTab("files");
     }
   }
 
@@ -1194,7 +1194,7 @@ function App() {
     updateActiveSubmission((submission) =>
       applyPassportExtractionField(submission, applicantId, key, mode),
     );
-    setActiveDrawerTab("data");
+    setActiveDrawerTab("questionnaire");
   }
 
   function updateActiveQuestionnaireField(input: {
@@ -1321,7 +1321,7 @@ function App() {
     enqueueSupabaseInitialPassportUploads(preparedSubmission, passportUploads);
     setSelectedSubmissionId(preparedSubmission.id);
     setDrawerMode("detail");
-    setActiveDrawerTab(passportUploads.length ? "media" : "overview");
+    setActiveDrawerTab(passportUploads.length ? "files" : "overview");
     setDirty(false);
   }
 
@@ -1353,7 +1353,7 @@ function App() {
     if (!request) return;
     setSelectedSubmissionId(request.submissionId);
     setDrawerMode("detail");
-    setActiveDrawerTab("data");
+    setActiveDrawerTab("questionnaire");
   }
 
   function toggleExportSelection(id: string) {
@@ -1619,12 +1619,15 @@ function App() {
     />
   );
   const agentSubmissionsSearchControl = (
-    <SearchBar
-      label="Поиск по подачам"
-      placeholder="Поиск по подачам"
-      value={query}
-      onChange={setQuery}
-    />
+    <>
+      <SearchBar
+        label="Поиск по подачам"
+        placeholder="Поиск по подачам"
+        value={query}
+        onChange={setQuery}
+      />
+      {cityFilterControl}
+    </>
   );
 
   if (!hasWorkspaceAccess) {
@@ -1705,6 +1708,26 @@ function App() {
         <header className="topbar">
           <div>
             <h1>{surfaceTitle(surface)}</h1>
+          </div>
+          <div className="mobile-topbar-actions">
+            {role === "agent" && surface !== "agent-submissions" ? (
+              <Button
+                aria-label="Новая подача"
+                variant="primary"
+                onClick={openCreateSubmissionDrawer}
+              >
+                Новая подача
+              </Button>
+            ) : null}
+            {showRoleSwitcher ? (
+              <Button
+                aria-label="Сменить роль"
+                variant="secondary"
+                onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
+              >
+                Сменить роль
+              </Button>
+            ) : null}
           </div>
           {surface === "agent-submissions" ? (
             <Button

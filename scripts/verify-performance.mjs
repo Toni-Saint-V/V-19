@@ -4,10 +4,10 @@ import { join } from "node:path";
 
 const distAssets = join(process.cwd(), "dist", "assets");
 
-// V-19 v1.1 operator shell is currently at ~96 KB raw CSS after the collection
-// expansion. Keep the raw ceiling explicit until the next CSS split/reduction;
+// V-19 v1.1 operator shell is currently at ~103 KB raw CSS after the premium
+// polish token layer. Keep the raw ceiling explicit until the next CSS split;
 // gzip remains the stricter runtime transfer budget.
-const cssRawKbLimit = 100;
+const cssRawKbLimit = 106;
 
 const limits = {
   jsRawKb: 500,

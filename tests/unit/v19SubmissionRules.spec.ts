@@ -425,7 +425,7 @@ describe("V-19 submission actions", () => {
     expect(queue.open[0]).toMatchObject({
       cta: "Исправить",
       severity: "blocker",
-      tab: "media",
+      tab: "files",
     });
     expect(queue.open.some((action) => action.context.includes("Заполнить"))).toBe(
       true,

@@ -105,7 +105,7 @@ describe("submission next-step engine", () => {
       target: {
         applicantId: applicantId(withPassport),
         field: "Номер паспорта",
-        tab: "data",
+        tab: "questionnaire",
       },
     });
     expect(brief.primaryAction.label).toContain("Примените");
@@ -138,7 +138,7 @@ describe("submission next-step engine", () => {
       kind: "passport_review",
       target: {
         field: "Номер паспорта",
-        tab: "data",
+        tab: "questionnaire",
       },
     });
     expect(brief.primaryAction.label).toContain("конфликт");
@@ -191,7 +191,7 @@ describe("submission next-step engine", () => {
       kind: "navigate_target",
       target: {
         field: "Email",
-        tab: "data",
+        tab: "questionnaire",
       },
     });
   });
