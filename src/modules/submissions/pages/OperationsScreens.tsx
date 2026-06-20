@@ -64,8 +64,6 @@ type InboxEvent = {
   tone: "amber" | "blue" | "danger" | "muted" | "teal";
 };
 
-// Legacy visual reference: do not route in V-19. Preserve until Agent submissions
-// reaches visual parity with this compact dark operational pattern.
 export function AgentActionsScreen({
   completedActions,
   onOpen,
@@ -109,7 +107,7 @@ export function AgentActionsScreen({
         : dueFilter === "today"
           ? "Сегодня"
           : dueFilter === "week"
-            ? "На этой неделе"
+            ? "На неделе"
             : "Открытые действия";
 
   return (
@@ -188,12 +186,7 @@ export function AgentActionsScreen({
                 tone: "danger",
               },
               { count: summary.today, id: "today", label: "Сегодня", tone: "amber" },
-              {
-                count: summary.week,
-                id: "week",
-                label: "На этой неделе",
-                tone: "neutral",
-              },
+              { count: summary.week, id: "week", label: "На неделе", tone: "neutral" },
             ]}
             value={dueFilter === "all" ? null : dueFilter}
           />
@@ -267,8 +260,6 @@ export function AgentActionsScreen({
   );
 }
 
-// Legacy visual reference: do not route in V-19. Preserve until Agent submissions
-// reaches visual parity with this compact dark operational pattern.
 export function AgentInboxScreen({
   onOpen,
   searchControl,

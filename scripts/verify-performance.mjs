@@ -11,6 +11,11 @@ const cssRawKbBaseline = 132;
 const cssRawKbAllowance = 4;
 const cssGzipKbBaseline = 22.8;
 const cssGzipKbAllowance = 1.2;
+// AgentInbox and AgentActions are restored first-class agent surfaces. Keep a
+// no-growth aggregate JS ceiling at the measured bundle size until code-splitting
+// or cleanup lowers the budget again.
+const totalJsGzipKbBaseline = 182;
+const totalJsGzipKbAllowance = 0;
 
 const limits = {
   jsRawKb: 500,
@@ -18,7 +23,7 @@ const limits = {
   cssRawKb: cssRawKbBaseline + cssRawKbAllowance,
   cssGzipKb: cssGzipKbBaseline + cssGzipKbAllowance,
   totalJsRawKb: 650,
-  totalJsGzipKb: 180,
+  totalJsGzipKb: totalJsGzipKbBaseline + totalJsGzipKbAllowance,
 };
 
 if (!existsSync(distAssets)) {

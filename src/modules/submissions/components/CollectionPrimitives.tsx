@@ -137,7 +137,6 @@ export function ToolbarIconButton({
       icon={<ToolbarIcon icon={icon} />}
       label={label}
       pressed={pressed}
-      tooltip={label}
     />
   );
 }

@@ -11,8 +11,6 @@ const forbiddenPrimaryLabels = [
   "Smart Inbox",
   "AI Checker",
   "Operations Center",
-  "Входящие",
-  "Мои действия",
   "Настройки",
 ];
 
@@ -246,7 +244,32 @@ test.describe("V-19 operations workspace", () => {
     await page.reload();
   });
 
-  test("agent surface exposes only the submissions cockpit", async ({ page }) => {
+  test("agent surfaces expose inbox, actions and submissions cockpit", async ({ page }) => {
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Входящие" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Входящие" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Мои действия" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Мои подачи" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Подачу «Семья Петровых» вернули/ }),
+    ).toBeVisible();
+    await page.screenshot({
+      fullPage: true,
+      path: "docs/qa/v19-agent-inbox-restored-desktop.png",
+    });
+
+    await page.getByRole("button", { name: "Мои действия" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Мои действия" }),
+    ).toBeVisible();
+    await expect(page.getByText("Открытые действия")).toBeVisible();
+    await expect(page.locator(".v19-action-row").first()).toBeVisible();
+    await page.screenshot({
+      fullPage: true,
+      path: "docs/qa/v19-agent-actions-restored-desktop.png",
+    });
+
     await page.getByRole("button", { name: "Мои подачи" }).click();
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();

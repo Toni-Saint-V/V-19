@@ -48,14 +48,10 @@ const forbiddenCopy = [
   "решение принято системой",
 ];
 const forbiddenReachableSurfaceTerms = [
-  "agent-inbox",
-  "agent-actions",
   "agent-settings",
   "admin-inbox",
   "admin-actions",
   "admin-settings",
-  '"Входящие"',
-  '"Мои действия"',
   '"Настройки"',
   '"Документы"',
 ];
@@ -64,8 +60,8 @@ const reachableSurfaceFiles = [
   path.join(root, "src/modules/submissions/types.ts"),
   path.join(root, "src/modules/submissions/uiTypes.ts"),
 ];
-// Legacy AgentInbox/AgentActions components may remain in OperationsScreens as
-// visual references; the V-19 contract is that they are not reachable surfaces.
+// AgentInbox/AgentActions are allowed agent surfaces; admin inbox/actions and
+// settings remain outside the V-19 navigation contract.
 
 const visited = new Set();
 const violations = [];
