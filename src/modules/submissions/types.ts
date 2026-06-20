@@ -177,6 +177,16 @@ export type SubmissionAction =
 
 export type City = "Москва" | "Санкт-Петербург" | "Казань";
 
+export const CANONICAL_CITIES = [
+  "Москва",
+  "Санкт-Петербург",
+  "Казань",
+] as const satisfies readonly City[];
+
+export function isCity(value: string): value is City {
+  return CANONICAL_CITIES.includes(value as City);
+}
+
 export type Applicant = {
   id: string;
   fullName: string;

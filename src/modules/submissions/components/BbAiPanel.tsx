@@ -40,9 +40,10 @@ export function BbAiPanel({
       <div className="bb-panel-header">
         <div>
           <p className="kicker">ББ</p>
-          <h3>{compact ? "Подсказки для проверки" : "Возможные проблемы"}</h3>
+          <h3>{compact ? "Кандидаты замечаний" : "Кандидаты точечных замечаний"}</h3>
           <p>
-            Подсвечивает возможные проблемы; решение остаётся за администратором.
+            Локальные правила находят место проверки; решение остаётся за
+            администратором.
           </p>
         </div>
         <Badge tone={suggestions.length ? "amber" : "muted"}>
@@ -56,12 +57,12 @@ export function BbAiPanel({
           disabled={state === "checking" || !canRun}
           onClick={onRun}
         >
-          {hasRun ? "Проверить снова" : "Запустить проверку"}
+          {hasRun ? "Обновить кандидаты" : "Найти кандидаты"}
         </Button>
         <span>
           {canRun
-            ? "Повторы скрываются. Решение принимает администратор."
-            : "Проверка ББ недоступна в этом статусе."}
+            ? "Запуск ручной. Повтор не создаёт дубли."
+            : "Кандидаты недоступны в этом статусе."}
         </span>
       </div>
 
@@ -79,7 +80,7 @@ export function BbAiPanel({
           ))}
         </div>
       ) : state === "ready" ? (
-        <EmptyState text="Активных подсказок нет." />
+        <EmptyState text="Кандидатов замечаний нет." />
       ) : null}
     </section>
   );
@@ -127,7 +128,7 @@ function AiSuggestionCard({
 function stateLabel(state: AiReviewState, activeCount: number) {
   if (state === "checking") return "Проверяет";
   if (state === "failed") return "Ошибка";
-  if (state === "ready") return activeCount ? "Есть подсказки" : "Подсказок нет";
+  if (state === "ready") return activeCount ? `Найдено ${activeCount}` : "Не найдено";
   return "Не запускался";
 }
 

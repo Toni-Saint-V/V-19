@@ -1,5 +1,8 @@
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
-import { buildSubmissionAiHelperSurface } from "../aiHelperSurface";
+import {
+  buildSubmissionAiHelperSurface,
+  type AiHelperCaseStatus,
+} from "../aiHelperSurface";
 import type { SubmissionNextStepAction } from "../submissionNextStepEngine";
 import type { Role, Submission } from "../types";
 
@@ -26,11 +29,9 @@ export function AiHelperSurfacePanel({
     helper.primaryAction.kind === "wait" ||
     helper.primaryAction.kind === "none";
   const actionButtonAriaLabel = primaryActionDisabled
-    ? "ИИ-шаг недоступен"
-    : "Выполнить ИИ-шаг";
-  const actionButtonLabel = primaryActionDisabled
-    ? "Недоступно"
-    : "Выполнить";
+    ? `Следующий шаг недоступен: ${helper.nextStep}`
+    : `Выполнить следующий шаг: ${helper.primaryAction.label}`;
+  const actionButtonLabel = helper.primaryAction.label;
 
   return (
     <CardComponent
@@ -40,12 +41,14 @@ export function AiHelperSurfacePanel({
     >
       <div className="ai-helper-surface-header">
         <div>
-          <p className="kicker">ИИ-помощник</p>
+          <p className="kicker">Помощник по подаче</p>
           <h3>{helper.title}</h3>
           <p>{helper.summary}</p>
         </div>
         <div>
-          <Badge tone="muted">Локальная проверка</Badge>
+          <Badge tone={helper.status === "blocked" ? "amber" : "muted"}>
+            {statusLabel(helper.status)}
+          </Badge>
           <Button
             aria-label={actionButtonAriaLabel}
             disabled={primaryActionDisabled}
@@ -65,18 +68,30 @@ export function AiHelperSurfacePanel({
           const hiddenCount = section.items.length - visibleItems.length;
 
           return (
-          <section key={section.id} className="ai-helper-surface-section">
-            <h4>{section.title}</h4>
-            <ul>
-              {visibleItems.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            {hiddenCount > 0 ? <small>+{hiddenCount}</small> : null}
-          </section>
+            <section key={section.id} className="ai-helper-surface-section">
+              <h4>{section.title}</h4>
+              <ul>
+                {visibleItems.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              {hiddenCount > 0 ? <small>+{hiddenCount}</small> : null}
+            </section>
           );
         })}
       </div>
     </CardComponent>
   );
+}
+
+function statusLabel(status: AiHelperCaseStatus) {
+  const labels = {
+    blocked: "Есть блокер",
+    complete: "Завершено",
+    needs_review: "Нужна проверка",
+    ready: "Готов к шагу",
+    waiting: "Ожидание",
+  } satisfies Record<AiHelperCaseStatus, string>;
+
+  return labels[status];
 }

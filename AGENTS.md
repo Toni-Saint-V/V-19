@@ -1,276 +1,1291 @@
-# V-19 Production Codex
+# VisaFlow V-19 Local Agents
 
 ## 0. Operating Contract
 
-- Move the product toward the stated goal using the smallest valid stack, the smallest safe change, and fresh evidence.
-- Optimize for product outcomes, not process.
-- Never fake completion, readiness, OCR, uploads, AI decisions, official verification, production proof, or verification results.
-- Public control stays simple and plugin-neutral: `-go`, `-next`, `-pick N`, `-check`, `-ship`, and explicit merge/push/deploy requests.
-- Plugin-first means conditional routing, not plugin sprawl. Use a plugin, skill, MCP server, connector, browser, DevTools, reviewer, or live service only when it has a concrete source-truth, risk, or deliverable reason.
-- Default escalation order: files, targeted tests, browser proof, DevTools, domain plugin, review skill, heavy multi-provider review.
-- Use at most one task-specific helper and one verifier unless the risk clearly requires more or the user explicitly asks for more.
-- Before repo edits, inspect branch/status and the relevant source truth. Before commit, push, merge, rebase, or destructive git steps, inspect the current diff and preserve unrelated dirty work.
-- Do not expand scope silently. Stop and ask before touching auth, database, schema, deployment, production, admin, secrets, payments, or user data outside the declared scope.
+You are working inside the local VisaFlow repository.
+
+Move the product toward V-19 using:
+
+- the smallest valid stack;
+- the smallest safe change;
+- the existing stack;
+- the current architecture where possible;
+- fresh evidence from files, tests, screenshots, and runtime proof.
+
+Plugin-first means conditional routing, not plugin sprawl.
+
+Optimize for product outcomes, not process.
+
+Never fake:
+
+- completion;
+- readiness;
+- OCR;
+- uploads;
+- AI decisions;
+- official verification;
+- production proof;
+- verification results;
+- Excel artifact proof.
+
+Before editing:
+
+- Before repo edits, inspect branch/status;
+- inspect the current branch/status;
+- inspect the relevant files;
+- preserve unrelated dirty work;
+- do not infer intended architecture from unrelated uncommitted diffs.
+
+Before commit, push, merge, rebase, destructive git operations, database changes, deployment, auth changes, or production-sensitive work:
+
+- inspect the current diff;
+- preserve unrelated work;
+- stop if scope is unclear.
+
+Do not expand scope silently.
+
+---
 
 ## 1. Mission
 
-- Build premium, secure, fast, production-grade VisaFlow software with clean architecture and excellent UX.
-- Optimize for product outcomes: fewer visa case mistakes, faster readiness, clearer handoff to human review.
-- This project is a React 19 + Vite 7 SPA with strict TypeScript, custom CSS/UI, Supabase JS, Vitest, and Playwright.
-- Routing is currently local application state, not Next.js or React Router.
-- Supabase is present through typed client/config, local-demo fallback, migrations, RLS policies, and private storage.
-- Current durable logic lives mainly in `src/lib/workflow.ts`, domain types in `src/types/domain.ts`, and service boundaries in `src/services/`.
-- Do not infer intended architecture from unrelated uncommitted dirty diffs.
-- Do not fake completion, readiness, OCR, uploads, AI decisions, official verification, or production proof.
+Build premium, secure, fast, production-grade VisaFlow software with clean architecture and excellent UX.
 
-## 2. Operating Modes
+VisaFlow exists to reduce visa case mistakes, improve readiness, and make human review handoff clear.
 
-Use only these modes:
+Current stack:
 
-- Architect Mode: define feature goal, business rules, data model, auth and permissions, Supabase tables/RLS, UX states, motion states, security risks, file structure, implementation plan, and test plan.
-- Builder Mode: implement clean typed code, separate UI/domain/data/security/AI logic, use reusable components, handle UX states, validate inputs, respect Supabase/Auth/RLS, and avoid overengineering.
-- Auditor Mode: check architecture, security, RLS, auth and permissions, UX/UI, motion, accessibility, performance, tests, observability, file order, and AI safety.
+- React 19;
+- Vite 7;
+- strict TypeScript;
+- custom CSS/UI;
+- Supabase JS;
+- Vitest;
+- Playwright.
 
-Workflow aliases are not modes:
+Current routing:
 
-- `-go`: inspect, choose one bounded high-impact task, execute through the smallest valid mode mix, verify, review, stop.
-- `-next`: planning only; propose the next high-impact tasks and do not edit files.
+- local application state;
+- not Next.js;
+- not React Router.
+
+Do not introduce React Router or another routing framework unless explicitly required by the task and justified by a concrete product need.
+
+Current durable logic lives mainly in:
+
+- `src/lib/workflow.ts`;
+- `src/types/domain.ts`;
+- `src/services/`;
+- `src/lib/supabase`;
+- `supabase/`.
+
+Adapt to the current repository before creating new structure.
+
+---
+
+## 1.1 V-19 Product Scope Lock
+
+For V-19, the product scope is locked.
+
+Main entity:
+
+```ts
+Submission;
+```
+
+Allowed Submission types:
+
+```ts
+single;
+family;
+```
+
+Allowed roles:
+
+```ts
+agent;
+admin;
+```
+
+Allowed primary surfaces:
+
+Agent:
+
+```text
+My submissions
+Submission drawer
+```
+
+Admin:
+
+```text
+Review
+Export
+Submission drawer
+Excel preview
+```
+
+Spain is fixed metadata.
+
+```ts
+countryCode: "ES";
+countryLabel: "Испания";
+```
+
+Do not add country selection.
+
+V-19 must not add or preserve as primary surfaces:
+
+- CRM;
+- People screen;
+- Families screen;
+- Groups;
+- analytics dashboard;
+- AI checker;
+- AI filters;
+- board view;
+- saved filters;
+- legal promise screens;
+- multi-country selection.
+
+Applicants, questionnaire, files, issues, and history exist inside Submission. They are not standalone products.
+
+Do not add navigation items just to fill the sidebar.
+
+Do not hide removed features with CSS. Remove forbidden scope from:
+
+- routes;
+- route constants;
+- navigation config;
+- permissions;
+- feature flags;
+- fixtures;
+- mock data;
+- search aliases;
+- telemetry labels;
+- tests;
+- copy;
+- component names where relevant.
+
+V-19 implementation order:
+
+```text
+1. Scope cleanup
+2. Domain engine
+3. App shell
+4. Agent workspace
+5. Submission drawer
+6. Creation flow
+7. Admin review
+8. Export
+9. Hardening
+```
+
+Domain engine must come before production UI wiring:
+
+- types;
+- status;
+- commands;
+- guards;
+- selectors;
+- issue lifecycle;
+- tests.
+
+Do not implement status transitions inside React components.
+
+---
+
+## 1.2 VisaFlow Visual Lock
+
+The current VisaFlow UI is already a 90+ dark premium SaaS interface.
+
+Preserve its visual soul.
+
+Do not reinterpret “premium” as a redesign.
+
+Visual source of truth:
+
+1. `docs/VISAFLOW_VISUAL_LOCK.md`, if present;
+2. current app screenshots;
+3. existing tokens/styles.
+
+If `docs/VISAFLOW_VISUAL_LOCK.md` does not exist and the task touches visual tokens, create it.
+
+### Locked dark surfaces
+
+```css
+--vf-bg-app: #070809;
+--vf-bg-shell: #0b0c0e;
+--vf-bg-panel: #0e1013;
+--vf-bg-row: #15171b;
+--vf-bg-row-hover: #191c21;
+--vf-bg-control: #1a1c21;
+
+--vf-border-subtle: rgba(255, 255, 255, 0.08);
+--vf-border-strong: rgba(255, 255, 255, 0.13);
+```
+
+### Locked text
+
+```css
+--vf-text-primary: #f3f4f6;
+--vf-text-secondary: #b2b6bf;
+--vf-text-muted: #8f949e;
+```
+
+### Locked indigo accent / focus
+
+```css
+--vf-accent: #6874e8;
+--vf-accent-hover: #7580ee;
+--vf-accent-active: #5964d6;
+--vf-focus: #7c84ff;
+```
+
+### Locked neutral selected state
+
+```css
+--vf-selected-bg: #25272d;
+--vf-selected-bg-hover: #2a2d34;
+--vf-selected-border: rgba(255, 255, 255, 0.11);
+--vf-selected-text: #f3f4f6;
+
+--vf-nav-selected-bg: #25272d;
+--vf-nav-selected-border: rgba(255, 255, 255, 0.12);
+
+--vf-row-selected-bg: #181b21;
+--vf-row-selected-border: rgba(104, 116, 232, 0.72);
+```
+
+### Locked red
+
+```css
+--vf-red: #ff5c67;
+--vf-red-hover: #ff6b75;
+--vf-red-active: #e94d59;
+--vf-red-fg: #18080a;
+--vf-red-soft-bg: rgba(255, 92, 103, 0.13);
+--vf-red-soft-border: rgba(255, 92, 103, 0.48);
+--vf-red-soft-text: #ff8a92;
+```
+
+### Locked yellow
+
+```css
+--vf-yellow: #f4b840;
+--vf-yellow-hover: #ffc653;
+--vf-yellow-active: #d99b25;
+--vf-yellow-fg: #171006;
+--vf-yellow-soft-bg: rgba(244, 184, 64, 0.13);
+--vf-yellow-soft-border: rgba(244, 184, 64, 0.48);
+--vf-yellow-soft-text: #f4b840;
+```
+
+### Locked green
+
+```css
+--vf-green: #45d082;
+--vf-green-hover: #58df93;
+--vf-green-active: #30b86a;
+--vf-green-fg: #06150c;
+--vf-green-soft-bg: rgba(69, 208, 130, 0.13);
+--vf-green-soft-border: rgba(69, 208, 130, 0.48);
+--vf-green-soft-text: #59df94;
+```
+
+### Status mapping
+
+```text
+returned / blocker / destructive = red
+video / files / pending / warning = yellow
+accepted / ready / success / complete = green
+selected navigation/views = neutral gray
+focus outline = indigo
+active row border may use subtle indigo
+```
+
+### Visual rules
+
+Preserve:
+
+- current dark SaaS atmosphere;
+- current density;
+- current typography feel;
+- current radii;
+- current spacing;
+- current graphite containers;
+- current neutral gray selected states;
+- current red/yellow/green status feeling.
+
+Do not:
+
+- redesign the UI;
+- make backgrounds lighter;
+- make backgrounds pure black;
+- replace selected gray with indigo;
+- replace selected gray with amber/yellow;
+- add glow;
+- add glassmorphism;
+- add gradients;
+- add heavy shadows;
+- use Tailwind red/yellow/green directly in components;
+- pick new semantic colors manually;
+- change opacity of entire rows for draft/disabled states;
+- introduce a new visual language.
+
+Any UI change touching color, selected state, row styling, status chips, surfaces, or layout must preserve this lock and provide before/after screenshots under `docs/qa/` when screenshots are possible.
+
+---
+
+## 2. Public Commands
+
+Use only these public controls:
+
+```text
+-go
+-next
+-pick N
+-check
+-ship
+```
+
+Aliases:
+
+- `-go`: inspect, choose one bounded high-impact task, execute, verify, review, stop.
+- `-next`: planning only; propose next high-impact tasks and do not edit files.
 - `-pick N`: execute only selected task N from the latest batch.
-- `-check`: verify the current diff with the smallest relevant command stack.
+- `-check`: verify current diff with the smallest relevant command stack.
 - `-ship`: final release-confidence gate.
 
-Forbidden legacy modes: `$product`, `$engineer`, `$reviewer`, `$qa`, `-logic`, `-ui`, `-ux`, `-qa`, `-auto`, `-auto2` as public operating modes.
+Forbidden public modes:
 
-## 3. Skill Orchestrator
+```text
+$product
+$engineer
+$reviewer
+$qa
+-logic
+-ui
+-ux
+-qa
+-auto
+-auto2
+```
 
-- First identify task type: fast fix, standard feature, premium feature, core product module, audit, or release gate.
-- Use only relevant skills/tools; never activate every available skill or plugin blindly.
-- Prefer repo files, exact code inspection, and current runtime evidence over memory or generic assumptions.
-- State applied and skipped skills when the choice affects risk, speed, or verification.
-- Requirements/spec/task breakdown can use the available spec or planning surface only when acceptance criteria are the deliverable.
-- Product design, UX research, flow audit, prototype, or visual direction can use product-design, stark, universal-design, or browser evidence only when there is a real design target.
-- Implementation, debugging, tests, and refactors should usually use repo files and the relevant test command first; add development skills only for a concrete language/framework need.
-- Browser, Chrome DevTools, GitHub, Vercel, Supabase, database, document, spreadsheet, analytics, or live connectors are activated only when that source truth or deliverable is in scope.
-- Final review, architecture risk, debt, test-health, or release readiness can use one review surface when risk justifies it.
-- If helpers overlap, choose the one with stronger local source truth, lower noise, clearer rollback, and better verification.
-- If a named helper is unavailable, disabled, unauthenticated, or irrelevant, say so briefly and continue with the smallest safe fallback.
-- Fast Fix budget: 0-1 extra skills, targeted file read, targeted proof.
-- Standard Feature budget: Architect plus Builder, optional Auditor, focused tests.
-- Premium Feature budget: Architect plus Builder plus runtime QA, screenshots, accessibility and mobile proof.
-- Core Product Module budget: full Architect/Builder/Auditor loop, security/RLS review, E2E, observability and rollback notes.
+---
 
-## 4. Platinum Product Standard
+## 3. Operating Modes
 
-- Every important user-facing feature must feel like a premium SaaS product: clear hierarchy, strong primary action, dense but readable layout, and no raw unfinished screens.
-- Required states for important flows: loading, skeleton, empty, error, success, disabled, permission denied, mobile, accessibility, and reduced motion.
-- The primary action must be obvious; secondary actions must not compete visually.
-- Trust-sensitive copy must explain uncertainty and next human action instead of pretending certainty.
-- Mobile quality must not be lower than desktop quality.
-- UI changes require fresh visual proof and screenshots under `docs/qa/`.
-- Do not add polish while broken flows, runtime errors, trust issues, or accessibility regressions remain.
+Use only these modes internally.
 
-## 5. Premium UX/UI Rules
+### Architect Mode
 
-- Use reusable components and existing design tokens before inventing new variants.
-- Keep typography, spacing, color, radius, shadow, and component variants consistent across the app.
-- Forms must include labels, validation, helper/error text, disabled/submitting states, and keyboard/focus support.
-- Cards must have a clear purpose; do not nest decorative cards inside cards.
-- Tables must support scanning, empty/loading states, overflow strategy, and useful row actions.
-- Modals, drawers, toasts, command menus, AI assistant panels, onboarding screens, and dashboards must have clear entry/exit states and accessible labels.
-- Use dashboards for decisions and monitoring, not decorative metric walls.
-- Ban random colors, random spacing, weak hierarchy, giant components, business logic inside UI, raw unstyled screens, and inconsistent variants.
+Define:
 
-## 6. Motion UX Rules
+- feature goal;
+- business rules;
+- data model;
+- auth and permissions;
+- Supabase tables/RLS if relevant;
+- UX states;
+- motion states;
+- security risks;
+- file structure;
+- implementation plan;
+- test plan.
 
-- Motion must communicate meaning: state change, hierarchy, feedback, loading, success, error, optimistic update, or navigation.
-- Use transform and opacity first; avoid layout-thrashing animation.
-- Motion tokens:
-  - duration: instant `80ms`, fast `150ms`, normal `220ms`, slow `350ms`, page `300ms`
-  - easing: standard, entrance, exit, emphasized
-  - spring: subtle, snappy, soft
-  - scale: tap `0.98`, hover `1.01`
-  - opacity: hidden `0`, visible `1`, disabled `0.5`
-- Buttons should respond to hover, press, disabled, loading, and success/error states.
-- Cards, lists, tables, forms, navigation, modals, drawers, AI helper, loading states, and page transitions may use lightweight motion when it clarifies state.
-- Always support `prefers-reduced-motion`.
-- Ban slow decorative animations, distracting loops, blocking animation, motion without accessibility fallback, and motion on huge lists without virtualization.
+### Builder Mode
 
-## 7. Clean Architecture Rules
+Implement:
 
-- Separate UI, application/use-case, domain, data/repository, infrastructure, security, and AI layers.
-- UI components render state and dispatch actions; they must not own complex business rules, permission logic, prompts, or Supabase workflows.
-- Domain/use-case code owns readiness, status transitions, validation decisions, and side effects orchestration.
-- Repositories/services own data access and mapping between raw Supabase rows and safe domain models.
-- Security logic must be centralized and testable, not duplicated across components.
-- AI logic must live behind explicit services/actions with validators and guardrails.
-- Ban circular dependencies, giant utility files, vague helpers, raw unsafe DB objects in UI, and mixed concerns.
+- clean typed code;
+- separated UI/domain/data/security/AI logic;
+- reusable components;
+- required UX states;
+- input validation;
+- Supabase/Auth/RLS boundaries;
+- smallest safe change.
 
-## 8. File Structure Rules
+### Auditor Mode
 
-- Adapt to the current repository before introducing new structure.
-- Current accepted areas: `src/lib`, `src/services`, `src/types`, `src/data`, `src/lib/supabase`, `supabase/`, `tests/`, `docs/qa/`.
-- Prefer feature-first structure for new major modules only:
-  - `src/features/<feature>/ui`
-  - `src/features/<feature>/components`
-  - `src/features/<feature>/hooks`
-  - `src/features/<feature>/actions`
-  - `src/features/<feature>/services`
-  - `src/features/<feature>/repositories`
-  - `src/features/<feature>/schemas`
-  - `src/features/<feature>/types`
-  - `src/features/<feature>/tests`
-- Shared code may grow under `src/shared/` for reusable UI, hooks, lib, auth, config, types, schemas, constants, motion, errors, and utils.
-- Server-side concerns may grow under `src/server/` or `supabase/functions/` for db, auth, AI, jobs, security, and observability.
-- Do not move existing files for architecture purity; migrate only when a product task makes the boundary necessary.
-- File names must be specific: prefer `create-project.use-case.ts`, `project.repository.ts`, `project.schema.ts`, `project-permissions.ts`, `project-empty-state.tsx`.
-- Avoid `utils.ts`, `helpers.ts`, `stuff.ts`, and vague `data.ts` for new files.
+Check:
 
-## 9. Supabase Rules
+- architecture;
+- security;
+- RLS;
+- auth and permissions;
+- UX/UI;
+- motion;
+- accessibility;
+- performance;
+- tests;
+- observability;
+- file order;
+- AI safety;
+- visual lock compliance.
 
-- Private data tables must have RLS enabled, owner/user/org access relationship, indexes for common filters, `created_at`, `updated_at`, and clear policies.
-- Never expose a service role key or private key to client code.
-- Use migrations for schema changes; do not mutate production-like schema ad hoc.
-- Keep storage buckets private unless public access is explicitly required and reviewed.
-- Use safe selects: request only fields needed by the view/use case.
-- Paginate or limit list queries; ban unbounded private-data queries.
-- Add indexes for common filters, joins, ownership checks, and ordering.
-- RLS policies must be tested or reviewed for agent/admin visibility, ownership, and denial paths.
-- Keep generated database types in sync when schema changes.
+---
 
-## 10. Auth & Permissions Rules
+## 4. Skill / Tool Orchestration
 
-- Auth is not authorization.
-- Centralize permission checks with explicit capabilities such as `canRead`, `canCreate`, `canUpdate`, `canDelete`, `canInvite`, `canManageBilling`, and `canUseAI`.
-- Check permissions server-side or in trusted Supabase/RLS boundaries; UI hiding is not security.
-- Prevent role escalation and cross-tenant or cross-agent access.
-- Separate billing/admin permissions from normal user permissions.
-- Log admin actions, destructive actions, permission denials, and security-relevant changes.
-- Confirm destructive actions and show the affected object clearly.
-- Demo/local auth may support local workflows, but must never be represented as production security.
+First identify task type:
 
-## 11. Security Rules
+- fast fix;
+- standard feature;
+- premium feature;
+- core product module;
+- audit;
+- release gate.
 
-- Validate input at the boundary and again server-side for trusted writes.
-- Enforce authorization before data access, file access, AI actions, exports, and destructive operations.
-- Protect against XSS, SQL injection, SSRF, IDOR, unsafe uploads, private data leakage, prompt injection, and unsafe AI tool execution.
-- Use rate limits and quotas for AI, API-like actions, uploads, exports, and expensive workflows.
-- Keep secrets in environment/server contexts only; never in client code, screenshots, logs, or prompts.
-- Do not expose stack traces, SQL errors, storage paths, tokens, or internal DB details to users.
-- Return only fields needed for the current use case.
-- Use `npm run verify:safety` for normal trust/copy/security-sensitive changes and `npm run verify:security` for release-facing dependency/security checks.
+Use only relevant tools.
 
-## 12. Business Logic Rules
+Default escalation order:
 
-- Business logic belongs in use cases, domain services, or focused services, not in buttons/forms/pages.
-- Use schemas for external input validation when the boundary is non-trivial.
-- Normal business flow should return typed results instead of throwing.
-- Preferred result shape:
+```text
+files
+→ targeted tests
+→ browser proof
+→ DevTools
+→ domain-specific tool
+→ review skill
+→ heavy multi-provider review
+```
+
+Use at most one task-specific helper and one verifier unless risk clearly requires more or the user explicitly asks.
+
+Prefer:
+
+- repo files;
+- exact code inspection;
+- current runtime evidence;
+- targeted tests.
+
+Do not activate every available tool blindly.
+
+If a helper/tool is unavailable, disabled, unauthenticated, or irrelevant, say so briefly and continue with the smallest safe fallback.
+
+Budgets:
+
+- Fast Fix: 0–1 extra skills, targeted file read, targeted proof.
+- Standard Feature: Architect + Builder, optional Auditor, focused tests.
+- Premium Feature: Architect + Builder + runtime QA, screenshots, accessibility and mobile proof.
+- Core Product Module: full Architect/Builder/Auditor loop, security/RLS review, E2E, observability and rollback notes.
+
+---
+
+## 5. Platinum Product Standard
+
+Every important user-facing feature must feel like a premium SaaS product:
+
+- clear hierarchy;
+- obvious primary action;
+- dense but readable layout;
+- no raw unfinished screens;
+- no decorative metric walls;
+- strong trust boundaries.
+
+Important flows require states:
+
+- loading;
+- skeleton;
+- empty;
+- error;
+- success;
+- disabled;
+- permission denied;
+- mobile;
+- accessibility;
+- reduced motion.
+
+Do not add polish while broken flows, runtime errors, trust issues, or accessibility regressions remain.
+
+Premium does not mean redesigning VisaFlow’s current dark graphite UI.
+
+---
+
+## 6. UX/UI Rules
+
+Use existing design tokens and reusable components before inventing variants.
+
+Forms must include:
+
+- labels;
+- validation;
+- helper text;
+- error text;
+- disabled state;
+- submitting state;
+- keyboard/focus support.
+
+Cards must have a clear purpose.
+
+Do not nest decorative cards inside cards.
+
+Tables must support:
+
+- scanning;
+- empty state;
+- loading state;
+- overflow strategy;
+- useful row actions.
+
+Modals, drawers, toasts, command menus, AI panels, onboarding screens, and dashboards must have:
+
+- clear entry;
+- clear exit;
+- accessible labels;
+- focus behavior;
+- reduced-motion support when animated.
+
+Ban:
+
+- random colors;
+- random spacing;
+- weak hierarchy;
+- giant components;
+- business logic inside UI;
+- raw unstyled screens;
+- inconsistent variants;
+- visual changes that violate Visual Lock.
+
+---
+
+## 7. Motion Rules
+
+Motion must communicate meaning:
+
+- state change;
+- hierarchy;
+- feedback;
+- loading;
+- success;
+- error;
+- optimistic update;
+- navigation.
+
+Use transform and opacity first.
+
+Avoid layout-thrashing animation.
+
+Motion tokens:
+
+```text
+instant: 80ms
+fast: 150ms
+normal: 220ms
+slow: 350ms
+page: 300ms
+tap scale: 0.98
+hover scale: 1.01
+disabled opacity: 0.5
+```
+
+Always support:
+
+```css
+prefers-reduced-motion
+```
+
+Ban:
+
+- slow decorative animations;
+- distracting loops;
+- blocking animations;
+- motion without accessibility fallback;
+- motion on huge lists without virtualization.
+
+---
+
+## 8. Clean Architecture Rules
+
+Separate:
+
+- UI;
+- application/use-case;
+- domain;
+- data/repository;
+- infrastructure;
+- security;
+- AI.
+
+UI components render state and dispatch actions.
+
+UI must not own:
+
+- complex business rules;
+- permission logic;
+- prompts;
+- Supabase workflows;
+- status transitions.
+
+Domain/use-case code owns:
+
+- readiness;
+- status transitions;
+- validation decisions;
+- side-effect orchestration.
+
+Repositories/services own:
+
+- data access;
+- mapping raw Supabase rows to safe domain models.
+
+Security logic must be centralized and testable.
+
+Ban:
+
+- circular dependencies;
+- giant utility files;
+- vague helpers;
+- raw unsafe DB objects in UI;
+- mixed concerns.
+
+---
+
+## 9. File Structure Rules
+
+Adapt to the repository before introducing structure.
+
+Current accepted areas:
+
+```text
+src/lib
+src/services
+src/types
+src/data
+src/lib/supabase
+supabase/
+tests/
+docs/qa/
+docs/
+```
+
+Prefer feature-first structure for new major modules only:
+
+```text
+src/features/<feature>/ui
+src/features/<feature>/components
+src/features/<feature>/hooks
+src/features/<feature>/actions
+src/features/<feature>/services
+src/features/<feature>/repositories
+src/features/<feature>/schemas
+src/features/<feature>/types
+src/features/<feature>/tests
+```
+
+Shared code may grow under:
+
+```text
+src/shared/
+```
+
+Server-side concerns may grow under:
+
+```text
+src/server/
+supabase/functions/
+```
+
+Do not move existing files for architecture purity.
+
+Migrate only when a product task makes the boundary necessary.
+
+File names must be specific.
+
+Prefer:
+
+```text
+create-submission.use-case.ts
+submission.repository.ts
+submission.schema.ts
+submission-permissions.ts
+submission-empty-state.tsx
+```
+
+Avoid:
+
+```text
+utils.ts
+helpers.ts
+stuff.ts
+data.ts
+```
+
+for new files.
+
+---
+
+## 10. Supabase Rules
+
+Private data tables must have:
+
+- RLS enabled;
+- owner/user/org access relationship;
+- indexes for common filters;
+- `created_at`;
+- `updated_at`;
+- clear policies.
+
+Never expose service role keys or private keys to client code.
+
+Use migrations for schema changes.
+
+Do not mutate production-like schema ad hoc.
+
+Keep storage buckets private unless public access is explicitly required and reviewed.
+
+Use safe selects.
+
+Request only fields needed by the view/use case.
+
+Paginate or limit list queries.
+
+Ban unbounded private-data queries.
+
+Add indexes for common:
+
+- filters;
+- joins;
+- ownership checks;
+- ordering.
+
+RLS policies must be tested or explicitly reviewed for:
+
+- agent visibility;
+- admin visibility;
+- ownership;
+- denial paths.
+
+Keep generated database types in sync when schema changes.
+
+---
+
+## 11. Auth & Permissions Rules
+
+Auth is not authorization.
+
+Centralize permission checks with explicit capabilities:
+
+```ts
+canRead;
+canCreate;
+canUpdate;
+canDelete;
+canInvite;
+canManageBilling;
+canUseAI;
+```
+
+For V-19, ensure role-safe capabilities for:
+
+```ts
+agent;
+admin;
+```
+
+Check permissions server-side or in trusted Supabase/RLS boundaries.
+
+UI hiding is not security.
+
+Prevent:
+
+- role escalation;
+- cross-tenant access;
+- cross-agent access;
+- unauthorized export;
+- unauthorized file access.
+
+Log:
+
+- admin actions;
+- destructive actions;
+- permission denials;
+- security-relevant changes.
+
+Confirm destructive actions and show the affected object clearly.
+
+Demo/local auth may support local workflows, but must never be represented as production security.
+
+---
+
+## 12. Security Rules
+
+Validate input at the boundary and again server-side for trusted writes.
+
+Enforce authorization before:
+
+- data access;
+- file access;
+- AI actions;
+- exports;
+- destructive operations.
+
+Protect against:
+
+- XSS;
+- SQL injection;
+- SSRF;
+- IDOR;
+- unsafe uploads;
+- private data leakage;
+- prompt injection;
+- unsafe AI tool execution.
+
+Use rate limits and quotas for:
+
+- AI;
+- API-like actions;
+- uploads;
+- exports;
+- expensive workflows.
+
+Never expose:
+
+- stack traces;
+- SQL errors;
+- storage paths;
+- tokens;
+- internal DB details;
+- secrets;
+- private documents;
+- private prompts.
+
+Use:
+
+```text
+npm run verify:safety
+```
+
+for normal trust/copy/security-sensitive changes.
+
+Use:
+
+```text
+npm run verify:security
+```
+
+for release-facing dependency/security checks.
+
+---
+
+## 13. Business Logic Rules
+
+Business logic belongs in:
+
+- use cases;
+- domain services;
+- focused services.
+
+Business logic does not belong in:
+
+- buttons;
+- forms;
+- pages;
+- visual components.
+
+Use schemas for non-trivial external input validation.
+
+Normal business flow should return typed results instead of throwing.
+
+Preferred shape:
 
 ```ts
 type Result<T> = { ok: true; data: T } | { ok: false; error: AppError };
 ```
 
-- Use cases should: validate input, require auth, check permissions, validate business rules, execute data operations, handle side effects explicitly, and return safe output.
-- Keep use cases testable without rendering UI.
-- Preserve VisaFlow domain truth: readiness comes from deterministic checks and human review, not AI certainty.
+Use cases should:
 
-## 13. AI Helper Rules
+- validate input;
+- require auth;
+- check permissions;
+- validate business rules;
+- execute data operations;
+- handle side effects explicitly;
+- return safe output.
 
-- AI helper must be safe, scoped, logged, permissioned, and validated.
-- VisaFlow AI may explain, organize, simplify, prepare, summarize blockers, and draft review-safe helper text.
-- VisaFlow AI may not promise visas, estimate approval odds, claim official/government verification, fake OCR/uploads/results, or decide outcomes.
-- Preferred AI structure:
-  - `server/ai/prompts`
-  - `server/ai/tools`
-  - `server/ai/context`
-  - `server/ai/validators`
-  - `server/ai/safety`
-  - `server/ai/logging`
-  - `server/ai/rate-limit`
-  - `server/ai/actions`
-- AI pipeline: validate user, check permission, check quota/rate limit, build scoped context, exclude unnecessary private data, run AI, validate output, ask confirmation for dangerous actions, execute safe action, log result, return user-friendly response.
-- Ban AI bypassing permissions, modifying critical data without validation, seeing secrets, trusting unvalidated output, or executing tools without permission checks.
+Preserve VisaFlow domain truth:
 
-## 14. Async Jobs Rules
+```text
+Readiness comes from deterministic checks and human review, not AI certainty.
+```
 
-- Use background jobs for AI processing, email sending, file processing, report generation, imports, exports, billing webhooks, notifications, sync tasks, and expensive workflows when synchronous UI would be slow or fragile.
-- Jobs must have status, ownership/context, idempotency key, retry policy for safe operations, and failure logging.
-- Avoid duplicate side effects by making writes idempotent.
-- Surface job state in UI: queued, running, succeeded, failed, retrying, cancelled when relevant.
-- Do not introduce a job system for tiny synchronous work.
+---
 
-## 15. Performance Rules
+## 14. V-19 Domain Rules
 
-- Frontend: code split, lazy load heavy surfaces, use skeleton loading, virtualize large lists, debounce search, optimize images, and keep client bundle small.
-- Backend/data: paginate, limit queries, select only needed fields, index filters, cache stable data, use transactions for critical writes, and move slow work to jobs.
-- AI: send minimal scoped context, stream when useful, cache deterministic outputs, rate limit, quota, and track cost.
-- Avoid re-render-heavy component designs and unnecessary global state.
-- Keep `scripts/verify-performance.mjs` budgets passing unless a deliberate budget change is reviewed.
-- Do not add dependencies without clear product value and bundle/performance awareness.
+Submission statuses must be domain-owned.
 
-## 16. Error System
+Do not compute allowed transitions in React components.
 
-- Use consistent typed errors for application/business failures.
-- Standard codes:
-  - `VALIDATION_ERROR`
-  - `AUTH_REQUIRED`
-  - `PERMISSION_DENIED`
-  - `NOT_FOUND`
-  - `CONFLICT`
-  - `RATE_LIMITED`
-  - `AI_OUTPUT_INVALID`
-  - `EXTERNAL_SERVICE_ERROR`
-  - `DATABASE_ERROR`
-  - `UNKNOWN_ERROR`
-- Each error should include `code`, `safeMessage`, `severity`, and safe metadata when useful.
-- Never expose secrets, stack traces, SQL internals, storage internals, or provider raw errors to users.
-- UI must show actionable recovery where possible.
+`requiresAction` is a derived operational flag, not a persisted lifecycle status.
 
-## 17. Testing Rules
+Issue lifecycle:
 
-- Test business risk, not implementation noise.
-- Unit test domain logic, status transitions, permission logic, validation, export/readiness rules, and AI output validators.
-- Integration test repositories/services when data mapping, Supabase, storage, or external boundaries are touched.
-- RLS tests or explicit policy review are required for private-data schema/policy changes.
-- E2E test critical flows: sign up, sign in, onboarding, create/update/delete core resources, permission denied, billing changes, AI action, admin action, destructive action, and VisaFlow handoff flows when relevant.
-- UI/runtime changes require Playwright proof and screenshots under `docs/qa/`.
-- Accessibility-sensitive flows should include automated axe checks where practical.
+```text
+open
+→ fixed_by_agent
+→ closed_by_admin
+```
 
-## 18. Observability Rules
+`fixed_by_agent` does not mean closed.
 
-- Log auth failures, permission denials, destructive actions, admin actions, billing changes, AI tool calls, background job failures, failed external API calls, and security events.
-- Track error rate, latency, AI usage, AI cost, job success/failure, activation events, funnel events, and slow queries when relevant.
-- Logs must not contain secrets, tokens, private documents, unnecessary personal data, prompts with sensitive context, or raw provider payloads unless explicitly safe.
-- Use stable event names and include user/org/case context only at the minimum safe granularity.
-- Observability requirements scale with risk; tiny UI fixes do not need new logging.
+Acceptance is blocked while any blocking issue is:
 
-## 19. Feature Flags
+```text
+open
+fixed_by_agent
+```
 
-- Use feature flags for beta features, AI tools, new UI flows, pricing experiments, admin-only tools, gradual rollout, and kill switches.
-- Centralize flag evaluation.
-- Defaults must be safe if flag config is missing.
-- Do not leave dead flags or flag-specific forks without cleanup plans.
-- Avoid feature flags for tiny internal refactors with no rollout risk.
+Export is fail-closed.
 
-## 20. Data Lifecycle
+Excel preview and workbook generation must use the same row model.
 
-- For each important entity, define owner, access rules, export rules, deletion rules, soft delete need, audit trail need, retention, backup/restore, and behavior when user or organization is deleted.
-- Visa case data, applicant data, media, corrections, exports, appointments, and AI logs are sensitive.
-- Do not retain private data longer than needed for the product/legal purpose.
-- Exports must include only eligible rows and safe fields.
-- Deletion and archival must preserve required audit integrity without exposing private data.
+A mock download button is not proof of export.
 
-## 21. CI/CD Readiness
+Product-ready requires:
 
-- Before merge/deploy, use the smallest gate that matches the risk.
-- Normal code gate: `npm run typecheck`, targeted tests, and `npm run verify` when runtime/build is affected.
-- UI/runtime gate: `npm run test:e2e` plus screenshots under `docs/qa/`.
-- Security/release-facing gate: `npm run verify:security`.
-- Workflow/instruction gate: `npm run verify:codex-hook` when AGENTS, hooks, prompts, operating memo, or workflow scripts change.
-- Ship gate: `npm run verify:full`.
-- Do not claim done while relevant tests, verification, Critical, Serious, or Medium findings remain.
+- runtime proof;
+- role-safe browser flow;
+- full E2E;
+- accessibility evidence;
+- responsive screenshots;
+- transition tests;
+- actual parsed Excel artifact;
+- preview/workbook row match.
 
-## 22. Response Contract For Future Agents
+---
+
+## 15. AI Helper Rules
+
+AI helper must be:
+
+- safe;
+- scoped;
+- logged;
+- permissioned;
+- validated.
+
+VisaFlow AI may:
+
+- explain;
+- organize;
+- simplify;
+- prepare;
+- summarize blockers;
+- draft review-safe helper text.
+
+VisaFlow AI may not:
+
+- promise visas;
+- estimate approval odds as certainty;
+- claim official/government verification;
+- fake OCR;
+- fake uploads;
+- fake results;
+- decide outcomes.
+
+AI pipeline:
+
+```text
+validate user
+→ check permission
+→ check quota/rate limit
+→ build scoped context
+→ exclude unnecessary private data
+→ run AI
+→ validate output
+→ ask confirmation for dangerous actions
+→ execute safe action
+→ log result
+→ return user-friendly response
+```
+
+Ban AI from:
+
+- bypassing permissions;
+- modifying critical data without validation;
+- seeing secrets;
+- trusting unvalidated output;
+- executing tools without permission checks.
+
+---
+
+## 16. Async Jobs Rules
+
+Use background jobs for:
+
+- AI processing;
+- email sending;
+- file processing;
+- report generation;
+- imports;
+- exports;
+- billing webhooks;
+- notifications;
+- sync tasks;
+- expensive workflows.
+
+Jobs must have:
+
+- status;
+- ownership/context;
+- idempotency key;
+- retry policy for safe operations;
+- failure logging.
+
+Avoid duplicate side effects with idempotent writes.
+
+Do not introduce a job system for tiny synchronous work.
+
+---
+
+## 17. Performance Rules
+
+Frontend:
+
+- code split;
+- lazy-load heavy surfaces;
+- use skeleton loading;
+- virtualize large lists;
+- debounce search;
+- optimize images;
+- keep bundle small.
+
+Backend/data:
+
+- paginate;
+- limit queries;
+- select only needed fields;
+- index filters;
+- cache stable data;
+- use transactions for critical writes;
+- move slow work to jobs.
+
+AI:
+
+- send minimal scoped context;
+- stream when useful;
+- cache deterministic outputs;
+- rate limit;
+- quota;
+- track cost.
+
+Avoid:
+
+- re-render-heavy component designs;
+- unnecessary global state;
+- dependencies without clear product value.
+
+Keep performance budgets passing unless a deliberate budget change is reviewed.
+
+---
+
+## 18. Error System
+
+Use consistent typed errors.
+
+Standard codes:
+
+```text
+VALIDATION_ERROR
+AUTH_REQUIRED
+PERMISSION_DENIED
+NOT_FOUND
+CONFLICT
+RATE_LIMITED
+AI_OUTPUT_INVALID
+EXTERNAL_SERVICE_ERROR
+DATABASE_ERROR
+UNKNOWN_ERROR
+```
+
+Each error should include:
+
+- `code`;
+- `safeMessage`;
+- `severity`;
+- safe metadata when useful.
+
+Never expose:
+
+- secrets;
+- stack traces;
+- SQL internals;
+- storage internals;
+- provider raw errors.
+
+UI must show actionable recovery where possible.
+
+---
+
+## 19. Testing Rules
+
+Test business risk, not implementation noise.
+
+Unit test:
+
+- domain logic;
+- status transitions;
+- permission logic;
+- validation;
+- export/readiness rules;
+- AI output validators;
+- issue lifecycle;
+- V-19 selectors.
+
+Integration test repositories/services when touching:
+
+- data mapping;
+- Supabase;
+- storage;
+- external boundaries.
+
+RLS tests or explicit policy review are required for private-data schema/policy changes.
+
+E2E test critical flows:
+
+- sign up;
+- sign in;
+- onboarding;
+- create/update/delete core resources;
+- permission denied;
+- admin action;
+- destructive action;
+- VisaFlow handoff flows;
+- V-19 draft-to-export flow when relevant.
+
+UI/runtime changes require Playwright proof and screenshots under:
+
+```text
+docs/qa/
+```
+
+Visual-token changes require before/after screenshots when possible.
+
+Accessibility-sensitive flows should include automated axe checks where practical.
+
+---
+
+## 20. Observability Rules
+
+Log:
+
+- auth failures;
+- permission denials;
+- destructive actions;
+- admin actions;
+- billing changes;
+- AI tool calls;
+- background job failures;
+- failed external API calls;
+- security events;
+- export generation;
+- export marking;
+- issue creation/closure.
+
+Do not log:
+
+- secrets;
+- tokens;
+- private documents;
+- unnecessary personal data;
+- prompts with sensitive context;
+- raw provider payloads unless explicitly safe.
+
+Use stable event names.
+
+Include user/org/case context only at minimum safe granularity.
+
+---
+
+## 21. Feature Flags
+
+Use feature flags for:
+
+- beta features;
+- AI tools;
+- new UI flows;
+- pricing experiments;
+- admin-only tools;
+- gradual rollout;
+- kill switches.
+
+Centralize flag evaluation.
+
+Defaults must be safe if flag config is missing.
+
+Do not leave dead flags or flag-specific forks without cleanup plans.
+
+Do not keep forbidden V-19 features as hidden flagged primary surfaces.
+
+---
+
+## 22. Data Lifecycle
+
+For each important entity define:
+
+- owner;
+- access rules;
+- export rules;
+- deletion rules;
+- soft delete need;
+- audit trail need;
+- retention;
+- backup/restore;
+- behavior when user/org is deleted.
+
+Visa case data, applicant data, media, corrections, exports, appointments, and AI logs are sensitive.
+
+Do not retain private data longer than needed.
+
+Exports must include only eligible rows and safe fields.
+
+Deletion and archival must preserve required audit integrity without exposing private data.
+
+---
+
+## 23. CI/CD Readiness
+
+Before merge/deploy, use the smallest gate matching risk.
+
+Normal code gate:
+
+```text
+npm run typecheck
+targeted tests
+npm run verify when runtime/build is affected
+```
+
+UI/runtime gate:
+
+```text
+npm run test:e2e
+screenshots under docs/qa/
+```
+
+Security/release gate:
+
+```text
+npm run verify:security
+```
+
+Workflow/instruction gate:
+
+```text
+npm run verify:codex-hook
+```
+
+Ship gate:
+
+```text
+npm run verify:full
+```
+
+Do not claim done while relevant tests, verification, Critical, Serious, or Medium findings remain.
+
+---
+
+## 24. Response Contract
 
 For substantial work, report:
 
@@ -302,13 +1317,31 @@ Skipped:
 ## Final Verdict
 ```
 
-- For small fixes, shorten the response but still include changed files, verification, risks, and verdict.
-- For critical systems, use the full structure.
-- Every final report must include verification run or a clear reason it was not run.
-- UI changes must list screenshot paths or explain why screenshots are not applicable.
-- Include readiness delta for product-moving work.
+For small fixes, shorten the response but still include:
 
-## 23. Non-Negotiable Rules
+- changed files;
+- verification;
+- risks;
+- verdict.
+
+For UI changes, include:
+
+- screenshot paths;
+- or a clear reason screenshots are not applicable.
+
+For visual-token changes, include:
+
+- replaced hardcoded colors;
+- confirmation that layout did not change;
+- before/after screenshots if possible.
+
+Every final report must include verification run or a clear reason it was not run.
+
+Include readiness delta for product-moving work.
+
+---
+
+## 25. Non-Negotiable Rules
 
 - No business logic in UI.
 - No complex Supabase calls in UI.
@@ -335,12 +1368,20 @@ Skipped:
 - No missing rate limits for AI/API surfaces.
 - No technical errors shown to users.
 - No overengineering simple fixes.
+- No violation of VisaFlow Visual Lock.
+- No V-19 scope expansion.
+- No hidden forbidden routes.
+- No fake Excel/export proof.
 
-## 24. Final Self-Audit
+---
+
+## 26. Final Self-Audit
 
 Before final verdict, check:
 
 - Architecture: concerns separated, no accidental broad refactor.
+- Scope: V-19 boundaries preserved.
+- Visual Lock: current dark UI soul preserved.
 - Security: input validation, auth, permissions, secrets, data exposure.
 - RLS: private tables and storage protected when schema/data access changes.
 - UX: hierarchy, primary action, states, copy, trust boundaries.
@@ -352,3 +1393,19 @@ Before final verdict, check:
 - Observability: important security/admin/AI/job events covered when relevant.
 - File order: clear names, no vague utilities, no unrelated churn.
 - Verification: fresh evidence exists before claiming done.
+
+If proof is incomplete, say:
+
+```text
+Implementation complete, product-ready proof incomplete.
+```
+
+Do not say:
+
+```text
+Production-ready
+Fully done
+Ready to ship
+```
+
+unless the relevant proof gates actually passed.

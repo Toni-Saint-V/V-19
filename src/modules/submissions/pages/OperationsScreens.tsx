@@ -17,11 +17,7 @@ import {
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
 import type { AgentTab, ExportTab, ReviewTab } from "../uiTypes";
-import {
-  EmptyState,
-  PanelHeader,
-  SummaryRow,
-} from "../components/Primitives";
+import { EmptyState, PanelHeader, SummaryRow } from "../components/Primitives";
 import {
   ActionRow,
   CollectionGroupLabel,
@@ -68,6 +64,8 @@ type InboxEvent = {
   tone: "amber" | "blue" | "danger" | "muted" | "teal";
 };
 
+// Legacy visual reference: do not route in V-19. Preserve until Agent submissions
+// reaches visual parity with this compact dark operational pattern.
 export function AgentActionsScreen({
   completedActions,
   onOpen,
@@ -111,7 +109,7 @@ export function AgentActionsScreen({
         : dueFilter === "today"
           ? "Сегодня"
           : dueFilter === "week"
-            ? "На неделе"
+            ? "На этой неделе"
             : "Открытые действия";
 
   return (
@@ -135,16 +133,16 @@ export function AgentActionsScreen({
           search={searchControl}
           tabs={[
             { count: summary.open, id: "open", label: "Открытые" },
-            { count: summary.completed || undefined, id: "completed", label: "Выполненные" },
+            {
+              count: summary.completed || undefined,
+              id: "completed",
+              label: "Выполненные",
+            },
           ]}
           tools={
             <ToolbarTools>
               <ToolbarIconButton
-                label={
-                  dueFilter === "all"
-                    ? "Фильтр: все действия"
-                    : "Фильтр: активен"
-                }
+                label={dueFilter === "all" ? "Фильтр: все действия" : "Фильтр: активен"}
                 icon="filter"
                 pressed={dueFilter !== "all"}
                 onClick={() =>
@@ -159,9 +157,7 @@ export function AgentActionsScreen({
               />
               <ToolbarIconButton
                 label={
-                  sortOldest
-                    ? "Сортировка: поздние ниже"
-                    : "Сортировка: важные сверху"
+                  sortOldest ? "Сортировка: поздние ниже" : "Сортировка: важные сверху"
                 }
                 icon="sort"
                 pressed={sortOldest}
@@ -185,9 +181,19 @@ export function AgentActionsScreen({
               setDueFilter((value) => (value === nextFilter ? "all" : nextFilter))
             }
             tabs={[
-              { count: summary.overdue, id: "overdue", label: "Просрочено", tone: "danger" },
+              {
+                count: summary.overdue,
+                id: "overdue",
+                label: "Просрочено",
+                tone: "danger",
+              },
               { count: summary.today, id: "today", label: "Сегодня", tone: "amber" },
-              { count: summary.week, id: "week", label: "На неделе", tone: "neutral" },
+              {
+                count: summary.week,
+                id: "week",
+                label: "На этой неделе",
+                tone: "neutral",
+              },
             ]}
             value={dueFilter === "all" ? null : dueFilter}
           />
@@ -261,6 +267,8 @@ export function AgentActionsScreen({
   );
 }
 
+// Legacy visual reference: do not route in V-19. Preserve until Agent submissions
+// reaches visual parity with this compact dark operational pattern.
 export function AgentInboxScreen({
   onOpen,
   searchControl,
@@ -388,9 +396,7 @@ export function AgentInboxScreen({
                 icon="sort"
                 pressed={sortOrder === "oldest"}
                 onClick={() =>
-                  setSortOrder((value) =>
-                    value === "newest" ? "oldest" : "newest",
-                  )
+                  setSortOrder((value) => (value === "newest" ? "oldest" : "newest"))
                 }
               />
               <ToolbarIconButton
@@ -711,12 +717,11 @@ export function AgentSubmissionsScreen({
         {orderedSubmissions.length ? (
           <>
             <div className="v19-submission-list-head" aria-hidden="true">
-              <span />
               <span>Подача</span>
               <span>Статус</span>
               <span>Файлы</span>
-              <span>%</span>
-              <span />
+              <span>Готовность</span>
+              <span>Действие</span>
             </div>
             <div className="v19-event-list v19-submission-list">
               {orderedSubmissions.map((submission) => (
@@ -776,9 +781,7 @@ export function AgentSubmissionsScreen({
             <div className="v19-next-card">
               <span>Приоритет</span>
               <strong>{prioritySubmission.title}</strong>
-              <p>
-                {submissionPriorityLine(prioritySubmission)}
-              </p>
+              <p>{submissionPriorityLine(prioritySubmission)}</p>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -841,18 +844,36 @@ function submissionExtraTagLabel(submission: Submission) {
 
 function submissionActionLabel(submission: Submission) {
   if (submission.status === "requires_action" || submission.status === "returned") {
-    return "Исправить";
+    const issue = submission.issues.find((item) => item.status === "open");
+    if (issue?.target.fileType) return fileActionLabel(issue.target.fileType);
+    if (issue?.target.field) return "Исправить поле";
+    if (issue?.target.section) return "Исправить раздел";
+    return "Исправить замечания";
   }
   if (submission.status === "draft" || submission.status === "in_progress") {
-    return "Продолжить";
+    const missingFile = submission.files.find(
+      (file) => file.status === "missing" || file.status === "needs_replacement",
+    );
+    if (submission.completeness.questionnaire < 100) return "Заполнить анкету";
+    if (missingFile) return fileActionLabel(missingFile.type);
+    return "Отправить на проверку";
   }
   if (
     submission.status === "submitted_for_review" ||
     submission.status === "corrections_received"
   ) {
-    return "Статус";
+    return "Смотреть статус";
   }
-  return "Открыть";
+  if (submission.status === "ready_for_export") return "Готово к выгрузке";
+  return "Открыть историю";
+}
+
+function fileActionLabel(fileType: Submission["files"][number]["type"]) {
+  if (fileType === "photo") return "Заменить фото";
+  if (fileType === "selfie" || fileType === "selfie_2") return "Добавить селфи";
+  if (fileType === "video") return "Заменить видео";
+  if (fileType === "passport_scan") return "Заменить паспорт";
+  return "Заменить файл";
 }
 
 function submissionPriorityLine(submission: Submission) {
@@ -910,7 +931,9 @@ export function AdminReviewScreen({
                 Открыть выбранную
               </Button>
               <Button
-                aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
+                aria-describedby={
+                  !canAddIssue ? "admin-return-disabled-note" : undefined
+                }
                 disabled={!canAddIssue}
                 variant="secondary"
                 onClick={() => visibleSubmission && onAddIssue(visibleSubmission)}
@@ -922,7 +945,9 @@ export function AdminReviewScreen({
           eyebrow="Проверка"
           titleId="review-title"
           title="Рабочий список"
-          description={canAddIssue ? "Возврат только с точным замечанием" : addIssueReason}
+          description={
+            canAddIssue ? "Возврат только с точным замечанием" : addIssueReason
+          }
           tabs={[
             ["all", "Все"],
             ["review", "На проверке"],

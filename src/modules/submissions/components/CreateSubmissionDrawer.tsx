@@ -5,6 +5,7 @@ import type {
   PreliminaryIntakeDraft,
   Submission,
 } from "../types";
+import { CANONICAL_CITIES, isCity } from "../types";
 
 const maxFamilyApplicants = 6;
 
@@ -25,9 +26,12 @@ const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
 };
 
 export function CreateSubmissionDrawer({
+  applicantNames = [],
   city,
   dirty,
   familyCount,
+  onApplicantName,
+  onCity,
   onClose,
   onCreate,
   onFamilyCount,
@@ -70,9 +74,12 @@ export function CreateSubmissionDrawer({
       ? "Успешно извлекли данные паспорта"
       : `Успешно извлекли данные: ${passportUploads.length} паспортов`
     : "Паспорт нужен для автозаполнения анкеты";
-
   function selectType(nextType: Submission["type"]) {
     onType(nextType);
+  }
+
+  function handleCityChange(value: string) {
+    if (isCity(value)) onCity(value);
   }
 
   function updatePreliminaryIntake<Key extends keyof PreliminaryIntakeDraft>(
@@ -140,7 +147,7 @@ export function CreateSubmissionDrawer({
             {createStep === "passport"
               ? "Паспорт и семейные автоподстановки"
               : "Анкета, фото и селфи"}{" "}
-            · {type === "family" ? "Семья / группа" : "Один заявитель"} · {city}
+            · {type === "family" ? "Семья" : "Один заявитель"} · {city}
           </p>
         </div>
         <div className="drawer-header-actions">
@@ -161,7 +168,11 @@ export function CreateSubmissionDrawer({
         <section className="preintake-board" aria-label="Предварительная заявка">
           <ol className="create-flow-steps" aria-label="Шаги создания подачи">
             <li className={createStep === "passport" ? "is-active" : ""}>
-              <button type="button" onClick={() => setCreateStep("passport")}>
+              <button
+                type="button"
+                aria-label="Шаг 1: паспорт и семья"
+                onClick={() => setCreateStep("passport")}
+              >
                 <span>1</span>
                 <strong>Паспорт и семья</strong>
               </button>
@@ -177,13 +188,35 @@ export function CreateSubmissionDrawer({
               </button>
             </li>
           </ol>
+          <section className="create-flow-panel" aria-label="Создание подачи">
+            <div className="preintake-two-columns">
+              <label>
+                <span>Страна</span>
+                <input readOnly value="Испания" />
+              </label>
+              <label>
+                <span>Город подачи</span>
+                <select
+                  aria-label="Город подачи"
+                  value={city}
+                  onChange={(event) => handleCityChange(event.target.value)}
+                >
+                  {CANONICAL_CITIES.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
 
           {createStep === "passport" ? (
             <section
               className={`preintake-scan-section ${passportReady ? "has-passport" : ""}`}
               aria-labelledby="passport-intake-title"
             >
-              <div className="preintake-scan-toolbar">
+              <div className="preintake-scan-toolbar" aria-label="Заявители в подаче">
                 <div className="preintake-mode-tags" aria-label="Тип подачи">
                   <button
                     className={type === "single" ? "is-active" : ""}
@@ -220,7 +253,7 @@ export function CreateSubmissionDrawer({
                     }
                     onClick={addFamilyMember}
                   >
-                    Добавить
+                    Добавить человека
                   </button>
                   <button
                     className="primary-button"
@@ -231,6 +264,19 @@ export function CreateSubmissionDrawer({
                     Дальше
                   </button>
                 </div>
+              </div>
+              <div className="create-people-list" aria-label="Имена заявителей">
+                {Array.from({ length: applicantCount }, (_, index) => (
+                  <label key={index}>
+                    <span>{applicantInputLabel(index, type)}</span>
+                    <input
+                      aria-label={applicantInputLabel(index, type)}
+                      value={applicantNames[index] ?? ""}
+                      placeholder={applicantInputPlaceholder(index, type)}
+                      onChange={(event) => onApplicantName?.(index, event.target.value)}
+                    />
+                  </label>
+                ))}
               </div>
 
               <div className="preintake-scan-main">
@@ -544,7 +590,7 @@ export function CreateSubmissionDrawer({
                 <div className="create-panel-head">
                   <div>
                     <p className="kicker">Анкета</p>
-                    <h3>Разделы questionnaire</h3>
+                    <h3>Разделы анкеты</h3>
                   </div>
                   <span>Черновик</span>
                 </div>
@@ -633,4 +679,18 @@ function applicantLabel(index: number, type: Submission["type"]) {
   if (type === "single") return "Заявитель";
   if (index === 0) return "Основной заявитель";
   return `Заявитель ${index + 1}`;
+}
+
+function applicantInputLabel(index: number, type: Submission["type"]) {
+  if (type === "single") return "Заявитель";
+  if (index === 0) return "Основной заявитель";
+  if (index === 1) return "Супруг";
+  return `Ребенок ${index - 1}`;
+}
+
+function applicantInputPlaceholder(index: number, type: Submission["type"]) {
+  if (type === "single") return "ФИО заявителя";
+  if (index === 0) return "ФИО основного заявителя";
+  if (index === 1) return "ФИО супруга";
+  return "ФИО ребенка";
 }
