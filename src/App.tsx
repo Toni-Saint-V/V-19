@@ -352,10 +352,11 @@ function App() {
   const showRoleSwitcher =
     !isSupabaseMode &&
     (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
-  const isV11AgentCollectionSurface =
+  const isV19CollectionSurface =
     surface === "agent-inbox" ||
     surface === "agent-actions" ||
-    surface === "agent-submissions";
+    surface === "agent-submissions" ||
+    surface === "admin-review";
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
   const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
   const hasWorkspaceAccess = isSupabaseMode
@@ -1545,6 +1546,14 @@ function App() {
       onChange={setQuery}
     />
   );
+  const adminReviewSearchControl = (
+    <SearchBar
+      label="Поиск в текущем списке"
+      placeholder="Поиск по имени или ID"
+      value={query}
+      onChange={setQuery}
+    />
+  );
   const cityFilterControl = (
     <Select
       aria-label="Фильтр по городу"
@@ -1608,6 +1617,8 @@ function App() {
   return (
     <main
       className={`ops-shell surface-${surface} ${
+        isV19CollectionSurface ? "is-v19-collection-surface" : ""
+      } ${
         drawerMode !== "closed" ? "has-open-drawer" : ""
       }`}
       aria-label="Рабочая область подач"
@@ -1697,9 +1708,9 @@ function App() {
             >
               Новая подача
             </Button>
-          ) : !isV11AgentCollectionSurface || isSupabaseMode ? (
+          ) : !isV19CollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
-              {!isV11AgentCollectionSurface ? (
+              {!isV19CollectionSurface ? (
                 <div className="service-logo" aria-label="VisaFlow V-19">
                   <span className="service-logo-mark" aria-hidden="true">
                     VF
@@ -1768,8 +1779,9 @@ function App() {
             onSelect={selectSubmission}
             onTab={setReviewTab}
             reviewList={reviewList}
+            reviewSource={searchedReviewQueue}
             reviewTab={reviewTab}
-            searchControl={searchControl}
+            searchControl={adminReviewSearchControl}
             visibleSubmission={visibleReviewSubmission}
           />
         ) : null}

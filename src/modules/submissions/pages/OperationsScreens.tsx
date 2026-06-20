@@ -30,7 +30,6 @@ import {
   ToolbarIconButton,
   ToolbarTools,
 } from "../components/CollectionPrimitives";
-import { SubmissionList } from "../components/SubmissionList";
 
 function pluralRu(count: number, one: string, few: string, many: string) {
   const mod10 = Math.abs(count) % 10;
@@ -118,7 +117,11 @@ export function AgentActionsScreen({
     >
       <CardComponent
         as="section"
-        className="v19-collection-panel"
+        className={
+          activeTab === "open"
+            ? "v19-collection-panel has-summary-filters"
+            : "v19-collection-panel"
+        }
         aria-labelledby="agent-actions-title"
       >
         <h2 id="agent-actions-title" className="sr-only">
@@ -344,7 +347,11 @@ export function AgentInboxScreen({
     >
       <CardComponent
         as="section"
-        className="v19-collection-panel"
+        className={
+          activeFilterLabels.length
+            ? "v19-collection-panel has-active-filters"
+            : "v19-collection-panel"
+        }
         aria-labelledby="agent-inbox-title"
       >
         <h2 id="agent-inbox-title" className="sr-only">
@@ -656,7 +663,11 @@ export function AgentSubmissionsScreen({
     >
       <CardComponent
         as="section"
-        className="v19-collection-panel"
+        className={
+          activeFilterLabels.length
+            ? "v19-collection-panel has-active-filters"
+            : "v19-collection-panel"
+        }
         aria-labelledby="agent-title"
       >
         <h2 id="agent-title" className="sr-only">
@@ -882,6 +893,7 @@ export function AdminReviewScreen({
   onSelect,
   onTab,
   reviewList,
+  reviewSource,
   reviewTab,
   searchControl,
   visibleSubmission,
@@ -892,10 +904,15 @@ export function AdminReviewScreen({
   onSelect: (submission: Submission) => void;
   onTab: (tab: ReviewTab) => void;
   reviewList: Submission[];
+  reviewSource: Submission[];
   reviewTab: ReviewTab;
   searchControl: ReactNode;
   visibleSubmission: Submission | null;
 }) {
+  const [blockersOnly, setBlockersOnly] = useState(false);
+  const [comfortableView, setComfortableView] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [sortNewest, setSortNewest] = useState(true);
   const canAddIssue = Boolean(
     visibleSubmission && canAddAdminIssue(visibleSubmission, "admin"),
   );
@@ -904,68 +921,255 @@ export function AdminReviewScreen({
     : visibleSubmission
       ? adminIssueUnavailableReason(visibleSubmission)
       : "В этой вкладке нет видимой подачи для действия.";
+  const tabCounts = {
+    all: reviewSource.length,
+    corrections: reviewSource.filter((submission) =>
+      matchesAdminReviewStatus(submission, "corrections"),
+    ).length,
+    ready: reviewSource.filter((submission) =>
+      matchesAdminReviewStatus(submission, "ready"),
+    ).length,
+    review: reviewSource.filter((submission) =>
+      matchesAdminReviewStatus(submission, "review"),
+    ).length,
+  };
+  const blockerSubmissions = reviewSource.filter(
+    (submission) => blockerCount(submission) > 0,
+  ).length;
+  const filteredReviewList = useMemo(
+    () =>
+      blockersOnly
+        ? reviewList.filter((submission) => blockerCount(submission) > 0)
+        : reviewList,
+    [blockersOnly, reviewList],
+  );
+  const visibleReviewList = useMemo(
+    () => (sortNewest ? filteredReviewList : [...filteredReviewList].reverse()),
+    [filteredReviewList, sortNewest],
+  );
+  const prioritySubmission =
+    visibleSubmission ?? visibleReviewList[0] ?? reviewSource[0] ?? null;
+  const activeFilterLabels: string[] = [
+    blockersOnly ? "Только блокеры" : null,
+    sortNewest ? null : "Обратный порядок",
+    comfortableView ? null : "Компактный вид",
+  ].filter((label): label is string => Boolean(label));
+  const toolbarSearch = (
+    <div className="v19-admin-search-stack">
+      {searchControl}
+      {filterControl}
+    </div>
+  );
+
   return (
-    <div className="main-grid core-list-grid admin-review-grid">
+    <div
+      className={`v19-screen-grid v19-admin-review-screen ${
+        panelOpen ? "" : "is-panel-closed"
+      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+    >
       <CardComponent
         as="section"
-        className="submission-panel magic-admin-queue"
+        className={
+          activeFilterLabels.length
+            ? "v19-collection-panel has-active-filters"
+            : "v19-collection-panel"
+        }
         aria-labelledby="review-title"
       >
-        <PanelHeader
-          action={
-            <div className="core-header-actions">
+        <h2 id="review-title" className="sr-only">
+          Очередь проверки администратора
+        </h2>
+
+        <CollectionToolbar
+          activeFilters={activeFilterLabels}
+          ariaLabel="Инструменты проверки"
+          onTabChange={onTab}
+          search={toolbarSearch}
+          tabs={[
+            { count: tabCounts.all, id: "all", label: "Все" },
+            { count: tabCounts.review, id: "review", label: "Проверка" },
+            {
+              count: tabCounts.corrections,
+              id: "corrections",
+              label: "Исправления",
+            },
+            { count: tabCounts.ready, id: "ready", label: "К выгрузке" },
+          ]}
+          tools={
+            <ToolbarTools>
+              <ToolbarIconButton
+                label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
+                icon="filter"
+                pressed={blockersOnly}
+                onClick={() => setBlockersOnly((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+                icon="view"
+                pressed={!comfortableView}
+                onClick={() => setComfortableView((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
+                icon="sort"
+                pressed={!sortNewest}
+                onClick={() => setSortNewest((value) => !value)}
+              />
+              <ToolbarIconButton
+                label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
+                icon="panel"
+                pressed={panelOpen}
+                onClick={() => setPanelOpen((value) => !value)}
+              />
+            </ToolbarTools>
+          }
+          value={reviewTab}
+        />
+
+        {visibleReviewList.length ? (
+          <>
+            <div className="v19-submission-list-head" aria-hidden="true">
+              <span>Подача</span>
+              <span>Статус</span>
+              <span>Файлы</span>
+              <span>Готовность</span>
+              <span>Действие</span>
+            </div>
+            <div className="v19-event-list v19-submission-list">
+              {visibleReviewList.map((submission) => (
+                <SubmissionCollectionRow
+                  action={adminReviewActionLabel(submission)}
+                  completeness={`${submission.completeness.total}%`}
+                  extraTagCount={submissionExtraTagCount(submission)}
+                  extraTagLabel={submissionExtraTagLabel(submission)}
+                  fileState={submissionFileStateLabel(submission)}
+                  fileTone={submissionFileStateTone(submission)}
+                  key={submission.id}
+                  meta={adminReviewMeta(submission)}
+                  status={submission.status}
+                  statusLabel={formatSubmissionListStatus(submission)}
+                  submissionId={submission.id}
+                  title={formatSubmissionListTitle(submission)}
+                  onOpen={() => {
+                    onSelect(submission);
+                    onOpen(submission, defaultDrawerTab(submission));
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="v19-empty-state">
+            <h3>Очередь проверки пуста</h3>
+            <p>
+              Новые подачи появятся здесь после отправки агентом или после исправлений.
+            </p>
+            <Button variant="secondary" onClick={() => onTab("all")}>
+              Показать все
+            </Button>
+          </div>
+        )}
+      </CardComponent>
+
+      {panelOpen ? (
+        <ContextPanel className="v19-admin-context" label="Сводка проверки">
+          <p className="kicker">Сводка</p>
+          <div className="v19-unread-summary">
+            <strong>{tabCounts.all}</strong>
+            <span>
+              {pluralRu(tabCounts.all, "подача в очереди", "подачи в очереди", "подач в очереди")}
+            </span>
+          </div>
+          <div className="v19-panel-metrics v19-admin-status-metrics">
+            <span>
+              На проверке
+              <strong>{tabCounts.review}</strong>
+            </span>
+            <span>
+              Исправления
+              <strong>{tabCounts.corrections}</strong>
+            </span>
+            <span>
+              К выгрузке
+              <strong>{tabCounts.ready}</strong>
+            </span>
+            <span>
+              Блокеры
+              <strong>{blockerSubmissions}</strong>
+            </span>
+          </div>
+          {prioritySubmission ? (
+            <div className="v19-next-card">
+              <span>Фокус проверки</span>
+              <strong>{prioritySubmission.title}</strong>
+              <p>{adminReviewPriorityLine(prioritySubmission)}</p>
               <Button
-                disabled={!visibleSubmission}
-                variant="secondary"
-                onClick={() => visibleSubmission && onOpen(visibleSubmission)}
+                variant="primary"
+                onClick={() => {
+                  onSelect(prioritySubmission);
+                  onOpen(prioritySubmission, defaultDrawerTab(prioritySubmission));
+                }}
               >
-                Открыть выбранную
+                {adminReviewActionLabel(prioritySubmission)}
               </Button>
               <Button
-                aria-describedby={
-                  !canAddIssue ? "admin-return-disabled-note" : undefined
-                }
+                aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
                 disabled={!canAddIssue}
                 variant="secondary"
                 onClick={() => visibleSubmission && onAddIssue(visibleSubmission)}
               >
-                Вернуть
+                Вернуть с замечанием
               </Button>
+              {!canAddIssue ? (
+                <em className="v19-admin-disabled-note" id="admin-return-disabled-note">
+                  {addIssueReason}
+                </em>
+              ) : null}
             </div>
-          }
-          eyebrow="Проверка"
-          titleId="review-title"
-          title="Рабочий список"
-          description={
-            canAddIssue ? "Возврат только с точным замечанием" : addIssueReason
-          }
-          tabs={[
-            ["all", "Все"],
-            ["review", "На проверке"],
-            ["corrections", "Исправления"],
-            ["ready", "К выгрузке"],
-          ]}
-          search={searchControl}
-          side={filterControl}
-          value={reviewTab}
-          onTab={onTab}
-        />
-        {!canAddIssue ? (
-          <p className="action-disabled-note" id="admin-return-disabled-note">
-            {addIssueReason}
-          </p>
+          ) : null}
+        </ContextPanel>
         ) : null}
-        <SubmissionList
-          activeSubmission={visibleSubmission}
-          empty="Очередь проверки пуста."
-          onOpen={onOpen}
-          onSelect={onSelect}
-          role="admin"
-          submissions={reviewList}
-        />
-      </CardComponent>
     </div>
   );
+}
+
+function matchesAdminReviewStatus(submission: Submission, tab: ReviewTab) {
+  if (tab === "all") {
+    return [
+      "submitted_for_review",
+      "corrections_received",
+      "ready_for_export",
+    ].includes(submission.status);
+  }
+  if (tab === "review") return submission.status === "submitted_for_review";
+  if (tab === "corrections") return submission.status === "corrections_received";
+  return submission.status === "ready_for_export";
+}
+
+function adminReviewActionLabel(submission: Submission) {
+  if (submission.status === "corrections_received") return "Проверить";
+  if (submission.status === "ready_for_export") return "Пакет";
+  return "Открыть";
+}
+
+function adminReviewMeta(submission: Submission) {
+  const blockers = blockerCount(submission);
+  if (blockers > 0) return `${blockers} блокера · ${submission.updatedAt}`;
+
+  const open = openIssueCount(submission);
+  if (open > 0) return `${open} замечания · ${submission.updatedAt}`;
+
+  return `${submission.city} · ${typeLabels[submission.type]} · ${tripDates(submission)}`;
+}
+
+function adminReviewPriorityLine(submission: Submission) {
+  const blockers = blockerCount(submission);
+  if (blockers > 0) return `${blockers} блокера ждут точного решения`;
+
+  const open = openIssueCount(submission);
+  if (open > 0) return `${open} замечания открыты`;
+
+  return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
 }
 
 export function ExportScreen({

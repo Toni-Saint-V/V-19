@@ -1,0 +1,1384 @@
+{
+  "generatedAt": "2026-06-20T18:03:00.732Z",
+  "baseUrl": "http://127.0.0.1:5173/",
+  "ok": true,
+  "results": [
+    {
+      "viewport": {
+        "id": "desktop",
+        "width": 1920,
+        "height": 1080
+      },
+      "scenario": "inbox",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-desktop-inbox.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-inbox is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "left": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1910,
+          "bottom": 1070,
+          "left": 296,
+          "width": 1614,
+          "height": 1060
+        },
+        "screen": {
+          "top": 75,
+          "right": 1813,
+          "bottom": 1025,
+          "left": 393,
+          "width": 1420,
+          "height": 950
+        },
+        "panel": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 509,
+          "left": 393,
+          "width": 1098,
+          "height": 434
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 127,
+          "left": 393,
+          "width": 1098,
+          "height": 52
+        },
+        "tabs": {
+          "top": 91,
+          "right": 587.296875,
+          "bottom": 123,
+          "left": 393,
+          "width": 194.296875,
+          "height": 32
+        },
+        "search": {
+          "top": 87,
+          "right": 1211.140625,
+          "bottom": 127,
+          "left": 951.140625,
+          "width": 260,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 87,
+          "right": 1813,
+          "bottom": 131,
+          "left": 1613,
+          "width": 200,
+          "height": 44
+        },
+        "list": {
+          "top": 135,
+          "bottom": 509,
+          "height": 374,
+          "clientHeight": 374,
+          "scrollHeight": 374,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 445,
+          "bottom": 509,
+          "height": 64
+        },
+        "documentScrollHeight": 1080,
+        "documentClientHeight": 1080,
+        "documentScrollWidth": 1920,
+        "documentClientWidth": 1920,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "desktop",
+        "width": 1920,
+        "height": 1080
+      },
+      "scenario": "actions",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-desktop-actions.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel has-summary-filters",
+        "shell": {
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "left": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1910,
+          "bottom": 1070,
+          "left": 296,
+          "width": 1614,
+          "height": 1060
+        },
+        "screen": {
+          "top": 75,
+          "right": 1813,
+          "bottom": 1025,
+          "left": 393,
+          "width": 1420,
+          "height": 950
+        },
+        "panel": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 704,
+          "left": 393,
+          "width": 1098,
+          "height": 629
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 127,
+          "left": 393,
+          "width": 1098,
+          "height": 52
+        },
+        "tabs": {
+          "top": 91,
+          "right": 628.15625,
+          "bottom": 123,
+          "left": 393,
+          "width": 235.15625,
+          "height": 32
+        },
+        "search": {
+          "top": 87,
+          "right": 1231.578125,
+          "bottom": 127,
+          "left": 971.578125,
+          "width": 260,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 87,
+          "right": 1813,
+          "bottom": 131,
+          "left": 1613,
+          "width": 200,
+          "height": 44
+        },
+        "list": {
+          "top": 175,
+          "bottom": 704,
+          "height": 529,
+          "clientHeight": 529,
+          "scrollHeight": 529,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 640,
+          "bottom": 704,
+          "height": 64
+        },
+        "documentScrollHeight": 1080,
+        "documentClientHeight": 1080,
+        "documentScrollWidth": 1920,
+        "documentClientWidth": 1920,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "desktop",
+        "width": 1920,
+        "height": 1080
+      },
+      "scenario": "submissions",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-desktop-submissions.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "left": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1910,
+          "bottom": 1070,
+          "left": 296,
+          "width": 1614,
+          "height": 1060
+        },
+        "screen": {
+          "top": 75,
+          "right": 1813,
+          "bottom": 1025,
+          "left": 393,
+          "width": 1420,
+          "height": 950
+        },
+        "panel": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 285,
+          "left": 393,
+          "width": 1098,
+          "height": 210
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 181,
+          "left": 393,
+          "width": 1098,
+          "height": 106
+        },
+        "tabs": {
+          "top": 91,
+          "right": 813,
+          "bottom": 123,
+          "left": 393,
+          "width": 420,
+          "height": 32
+        },
+        "search": {
+          "top": 87,
+          "right": 1491,
+          "bottom": 127,
+          "left": 1231,
+          "width": 260,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 87,
+          "right": 1813,
+          "bottom": 131,
+          "left": 1613,
+          "width": 200,
+          "height": 44
+        },
+        "list": {
+          "top": 221,
+          "bottom": 285,
+          "height": 64,
+          "clientHeight": 64,
+          "scrollHeight": 64,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 221,
+          "bottom": 285,
+          "height": 64
+        },
+        "documentScrollHeight": 1080,
+        "documentClientHeight": 1080,
+        "documentScrollWidth": 1920,
+        "documentClientWidth": 1920,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "desktop",
+        "width": 1920,
+        "height": 1080
+      },
+      "scenario": "admin-review",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-desktop-admin-review.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "left": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1910,
+          "bottom": 1070,
+          "left": 296,
+          "width": 1614,
+          "height": 1060
+        },
+        "screen": {
+          "top": 75,
+          "right": 1813,
+          "bottom": 1025,
+          "left": 393,
+          "width": 1420,
+          "height": 950
+        },
+        "panel": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 285.1875,
+          "left": 393,
+          "width": 1098,
+          "height": 210.1875
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 1491,
+          "bottom": 181,
+          "left": 393,
+          "width": 1098,
+          "height": 106
+        },
+        "tabs": {
+          "top": 91,
+          "right": 802.015625,
+          "bottom": 123,
+          "left": 393,
+          "width": 409.015625,
+          "height": 32
+        },
+        "search": {
+          "top": 87,
+          "right": 1491,
+          "bottom": 127,
+          "left": 1231,
+          "width": 260,
+          "height": 40
+        },
+        "select": {
+          "top": 139,
+          "right": 813,
+          "bottom": 181,
+          "left": 393,
+          "width": 420,
+          "height": 42
+        },
+        "tools": {
+          "top": 87,
+          "right": 1813,
+          "bottom": 131,
+          "left": 1613,
+          "width": 200,
+          "height": 44
+        },
+        "list": {
+          "top": 221,
+          "bottom": 285.1875,
+          "height": 64.1875,
+          "clientHeight": 64,
+          "scrollHeight": 64,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 221,
+          "bottom": 285.1875,
+          "height": 64.1875
+        },
+        "documentScrollHeight": 1080,
+        "documentClientHeight": 1080,
+        "documentScrollWidth": 1920,
+        "documentClientWidth": 1920,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "tablet",
+        "width": 1024,
+        "height": 768
+      },
+      "scenario": "inbox",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-tablet-inbox.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-inbox is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 1024,
+          "bottom": 768,
+          "left": 0,
+          "width": 1024,
+          "height": 768
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1014,
+          "bottom": 758,
+          "left": 80,
+          "width": 934,
+          "height": 748
+        },
+        "screen": {
+          "top": 75,
+          "right": 989,
+          "bottom": 713,
+          "left": 105,
+          "width": 884,
+          "height": 638
+        },
+        "panel": {
+          "top": 75,
+          "right": 989,
+          "bottom": 713,
+          "left": 105,
+          "width": 884,
+          "height": 638
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 989,
+          "bottom": 227,
+          "left": 105,
+          "width": 884,
+          "height": 152
+        },
+        "tabs": {
+          "top": 87,
+          "right": 299.296875,
+          "bottom": 119,
+          "left": 105,
+          "width": 194.296875,
+          "height": 32
+        },
+        "search": {
+          "top": 131,
+          "right": 305,
+          "bottom": 171,
+          "left": 105,
+          "width": 200,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 183,
+          "right": 305,
+          "bottom": 227,
+          "left": 105,
+          "width": 200,
+          "height": 44
+        },
+        "list": {
+          "top": 235,
+          "bottom": 713,
+          "height": 478,
+          "clientHeight": 478,
+          "scrollHeight": 478,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 623,
+          "bottom": 713,
+          "height": 90
+        },
+        "documentScrollHeight": 768,
+        "documentClientHeight": 768,
+        "documentScrollWidth": 1024,
+        "documentClientWidth": 1024,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "tablet",
+        "width": 1024,
+        "height": 768
+      },
+      "scenario": "actions",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-tablet-actions.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel has-summary-filters",
+        "shell": {
+          "top": 0,
+          "right": 1024,
+          "bottom": 768,
+          "left": 0,
+          "width": 1024,
+          "height": 768
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1014,
+          "bottom": 758,
+          "left": 80,
+          "width": 934,
+          "height": 748
+        },
+        "screen": {
+          "top": 75,
+          "right": 989,
+          "bottom": 713,
+          "left": 105,
+          "width": 884,
+          "height": 638
+        },
+        "panel": {
+          "top": 75,
+          "right": 989,
+          "bottom": 713,
+          "left": 105,
+          "width": 884,
+          "height": 638
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 989,
+          "bottom": 227,
+          "left": 105,
+          "width": 884,
+          "height": 152
+        },
+        "tabs": {
+          "top": 87,
+          "right": 340.15625,
+          "bottom": 119,
+          "left": 105,
+          "width": 235.15625,
+          "height": 32
+        },
+        "search": {
+          "top": 131,
+          "right": 340.15625,
+          "bottom": 171,
+          "left": 105,
+          "width": 235.15625,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 183,
+          "right": 340.15625,
+          "bottom": 227,
+          "left": 105,
+          "width": 235.15625,
+          "height": 44
+        },
+        "list": {
+          "top": 275,
+          "bottom": 713,
+          "height": 438,
+          "clientHeight": 438,
+          "scrollHeight": 524,
+          "scrollTop": 86
+        },
+        "lastRow": {
+          "top": 649,
+          "bottom": 713,
+          "height": 64
+        },
+        "documentScrollHeight": 768,
+        "documentClientHeight": 768,
+        "documentScrollWidth": 1024,
+        "documentClientWidth": 1024,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "tablet",
+        "width": 1024,
+        "height": 768
+      },
+      "scenario": "submissions",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-tablet-submissions.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 1024,
+          "bottom": 768,
+          "left": 0,
+          "width": 1024,
+          "height": 768
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1014,
+          "bottom": 758,
+          "left": 80,
+          "width": 934,
+          "height": 748
+        },
+        "screen": {
+          "top": 75,
+          "right": 989,
+          "bottom": 713,
+          "left": 105,
+          "width": 884,
+          "height": 638
+        },
+        "panel": {
+          "top": 75,
+          "right": 989,
+          "bottom": 713,
+          "left": 105,
+          "width": 884,
+          "height": 638
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 989,
+          "bottom": 281,
+          "left": 105,
+          "width": 884,
+          "height": 206
+        },
+        "tabs": {
+          "top": 87,
+          "right": 989,
+          "bottom": 119,
+          "left": 105,
+          "width": 884,
+          "height": 32
+        },
+        "search": {
+          "top": 131,
+          "right": 989,
+          "bottom": 171,
+          "left": 105,
+          "width": 884,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 237,
+          "right": 989,
+          "bottom": 281,
+          "left": 105,
+          "width": 884,
+          "height": 44
+        },
+        "list": {
+          "top": 321,
+          "bottom": 713,
+          "height": 392,
+          "clientHeight": 392,
+          "scrollHeight": 392,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 321,
+          "bottom": 713,
+          "height": 392
+        },
+        "documentScrollHeight": 768,
+        "documentClientHeight": 768,
+        "documentScrollWidth": 1024,
+        "documentClientWidth": 1024,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "tablet",
+        "width": 1024,
+        "height": 768
+      },
+      "scenario": "admin-review",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-tablet-admin-review.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 1024,
+          "bottom": 768,
+          "left": 0,
+          "width": 1024,
+          "height": 768
+        },
+        "workspace": {
+          "top": 10,
+          "right": 1014,
+          "bottom": 758,
+          "left": 80,
+          "width": 934,
+          "height": 748
+        },
+        "screen": {
+          "top": 75,
+          "right": 989,
+          "bottom": 713,
+          "left": 105,
+          "width": 884,
+          "height": 638
+        },
+        "panel": {
+          "top": 75,
+          "right": 989,
+          "bottom": 333.1875,
+          "left": 105,
+          "width": 884,
+          "height": 258.1875
+        },
+        "toolbar": {
+          "top": 75,
+          "right": 989,
+          "bottom": 229,
+          "left": 105,
+          "width": 884,
+          "height": 154
+        },
+        "tabs": {
+          "top": 87,
+          "right": 514.015625,
+          "bottom": 119,
+          "left": 105,
+          "width": 409.015625,
+          "height": 32
+        },
+        "search": {
+          "top": 131,
+          "right": 664.484375,
+          "bottom": 173,
+          "left": 105,
+          "width": 559.484375,
+          "height": 42
+        },
+        "select": {
+          "top": 131,
+          "right": 989,
+          "bottom": 173,
+          "left": 664.484375,
+          "width": 324.515625,
+          "height": 42
+        },
+        "tools": {
+          "top": 185,
+          "right": 989,
+          "bottom": 229,
+          "left": 105,
+          "width": 884,
+          "height": 44
+        },
+        "list": {
+          "top": 269,
+          "bottom": 333.1875,
+          "height": 64.1875,
+          "clientHeight": 64,
+          "scrollHeight": 64,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 269,
+          "bottom": 333.1875,
+          "height": 64.1875
+        },
+        "documentScrollHeight": 768,
+        "documentClientHeight": 768,
+        "documentScrollWidth": 1024,
+        "documentClientWidth": 1024,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      "scenario": "inbox",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-mobile-inbox.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-inbox is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0,
+          "width": 390,
+          "height": 844
+        },
+        "workspace": {
+          "top": 121,
+          "right": 380,
+          "bottom": 834,
+          "left": 8,
+          "width": 372,
+          "height": 713
+        },
+        "screen": {
+          "top": 238.59375,
+          "right": 365,
+          "bottom": 805,
+          "left": 23,
+          "width": 342,
+          "height": 566.40625
+        },
+        "panel": {
+          "top": 238.59375,
+          "right": 365,
+          "bottom": 805,
+          "left": 23,
+          "width": 342,
+          "height": 566.40625
+        },
+        "toolbar": {
+          "top": 238.59375,
+          "right": 365,
+          "bottom": 390.59375,
+          "left": 23,
+          "width": 342,
+          "height": 152
+        },
+        "tabs": {
+          "top": 250.59375,
+          "right": 365,
+          "bottom": 282.59375,
+          "left": 23,
+          "width": 342,
+          "height": 32
+        },
+        "search": {
+          "top": 294.59375,
+          "right": 365,
+          "bottom": 334.59375,
+          "left": 23,
+          "width": 342,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 346.59375,
+          "right": 365,
+          "bottom": 390.59375,
+          "left": 23,
+          "width": 342,
+          "height": 44
+        },
+        "list": {
+          "top": 398.59375,
+          "bottom": 805,
+          "height": 406.40625,
+          "clientHeight": 406,
+          "scrollHeight": 727,
+          "scrollTop": 321
+        },
+        "lastRow": {
+          "top": 660.578125,
+          "bottom": 804.375,
+          "height": 143.796875
+        },
+        "documentScrollHeight": 844,
+        "documentClientHeight": 844,
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      "scenario": "actions",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-mobile-actions.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel has-summary-filters",
+        "shell": {
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0,
+          "width": 390,
+          "height": 844
+        },
+        "workspace": {
+          "top": 121,
+          "right": 380,
+          "bottom": 834,
+          "left": 8,
+          "width": 372,
+          "height": 713
+        },
+        "screen": {
+          "top": 238.59375,
+          "right": 365,
+          "bottom": 805,
+          "left": 23,
+          "width": 342,
+          "height": 566.40625
+        },
+        "panel": {
+          "top": 238.59375,
+          "right": 365,
+          "bottom": 805,
+          "left": 23,
+          "width": 342,
+          "height": 566.40625
+        },
+        "toolbar": {
+          "top": 238.59375,
+          "right": 365,
+          "bottom": 390.59375,
+          "left": 23,
+          "width": 342,
+          "height": 152
+        },
+        "tabs": {
+          "top": 250.59375,
+          "right": 365,
+          "bottom": 282.59375,
+          "left": 23,
+          "width": 342,
+          "height": 32
+        },
+        "search": {
+          "top": 294.59375,
+          "right": 365,
+          "bottom": 334.59375,
+          "left": 23,
+          "width": 342,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 346.59375,
+          "right": 365,
+          "bottom": 390.59375,
+          "left": 23,
+          "width": 342,
+          "height": 44
+        },
+        "list": {
+          "top": 438.59375,
+          "bottom": 805,
+          "height": 366.40625,
+          "clientHeight": 366,
+          "scrollHeight": 1070,
+          "scrollTop": 704
+        },
+        "lastRow": {
+          "top": 662.59375,
+          "bottom": 804.59375,
+          "height": 142
+        },
+        "documentScrollHeight": 844,
+        "documentClientHeight": 844,
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      "scenario": "submissions",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-mobile-submissions.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0,
+          "width": 390,
+          "height": 844
+        },
+        "workspace": {
+          "top": 121,
+          "right": 380,
+          "bottom": 834,
+          "left": 8,
+          "width": 372,
+          "height": 713
+        },
+        "screen": {
+          "top": 302.59375,
+          "right": 365,
+          "bottom": 805,
+          "left": 23,
+          "width": 342,
+          "height": 502.40625
+        },
+        "panel": {
+          "top": 302.59375,
+          "right": 365,
+          "bottom": 805,
+          "left": 23,
+          "width": 342,
+          "height": 502.40625
+        },
+        "toolbar": {
+          "top": 302.59375,
+          "right": 365,
+          "bottom": 508.59375,
+          "left": 23,
+          "width": 342,
+          "height": 206
+        },
+        "tabs": {
+          "top": 314.59375,
+          "right": 365,
+          "bottom": 346.59375,
+          "left": 23,
+          "width": 342,
+          "height": 32
+        },
+        "search": {
+          "top": 358.59375,
+          "right": 365,
+          "bottom": 398.59375,
+          "left": 23,
+          "width": 342,
+          "height": 40
+        },
+        "select": null,
+        "tools": {
+          "top": 464.59375,
+          "right": 365,
+          "bottom": 508.59375,
+          "left": 23,
+          "width": 342,
+          "height": 44
+        },
+        "list": {
+          "top": 516.59375,
+          "bottom": 648.59375,
+          "height": 132,
+          "clientHeight": 132,
+          "scrollHeight": 132,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 516.59375,
+          "bottom": 648.59375,
+          "height": 132
+        },
+        "documentScrollHeight": 844,
+        "documentClientHeight": 844,
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    },
+    {
+      "viewport": {
+        "id": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      "scenario": "admin-review",
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/2026-06-20-top-controls-logic-proof-mobile-admin-review.png",
+      "consoleErrors": [],
+      "metrics": {
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface ",
+        "panelClass": "mp-card v19-collection-panel",
+        "shell": {
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0,
+          "width": 390,
+          "height": 844
+        },
+        "workspace": {
+          "top": 121,
+          "right": 380,
+          "bottom": 834,
+          "left": 8,
+          "width": 372,
+          "height": 713
+        },
+        "screen": {
+          "top": 204,
+          "right": 365,
+          "bottom": 821,
+          "left": 23,
+          "width": 342,
+          "height": 617
+        },
+        "panel": {
+          "top": 204,
+          "right": 365,
+          "bottom": 550.1875,
+          "left": 23,
+          "width": 342,
+          "height": 346.1875
+        },
+        "toolbar": {
+          "top": 204,
+          "right": 365,
+          "bottom": 398,
+          "left": 23,
+          "width": 342,
+          "height": 194
+        },
+        "tabs": {
+          "top": 216,
+          "right": 365,
+          "bottom": 248,
+          "left": 23,
+          "width": 342,
+          "height": 32
+        },
+        "search": {
+          "top": 260,
+          "right": 365,
+          "bottom": 300,
+          "left": 23,
+          "width": 342,
+          "height": 40
+        },
+        "select": {
+          "top": 300,
+          "right": 365,
+          "bottom": 342,
+          "left": 23,
+          "width": 342,
+          "height": 42
+        },
+        "tools": {
+          "top": 354,
+          "right": 365,
+          "bottom": 398,
+          "left": 23,
+          "width": 342,
+          "height": 44
+        },
+        "list": {
+          "top": 406,
+          "bottom": 542.1875,
+          "height": 136.1875,
+          "clientHeight": 136,
+          "scrollHeight": 136,
+          "scrollTop": 0
+        },
+        "lastRow": {
+          "top": 406,
+          "bottom": 542.1875,
+          "height": 136.1875
+        },
+        "documentScrollHeight": 844,
+        "documentClientHeight": 844,
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "checks": {
+          "noConsoleErrors": true,
+          "noDocumentYScroll": true,
+          "noDocumentXScroll": true,
+          "workspaceWithinViewport": true,
+          "screenWithinWorkspace": true,
+          "panelWithinViewport": true,
+          "searchWithinToolbar": true,
+          "selectWithinToolbar": true,
+          "toolsWithinScreen": true,
+          "toolbarVisibleChildrenWithin": true,
+          "internalScrollOnly": true,
+          "lastRowVisibleAfterScroll": true,
+          "rowsWithin": true
+        }
+      },
+      "failures": [],
+      "ok": true
+    }
+  ]
+}
