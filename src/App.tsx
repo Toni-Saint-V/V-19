@@ -2049,7 +2049,7 @@ function App() {
         ) : null}
 
         {surface === "settings" ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<SettingsLoadingState />}>
             <SettingsScreen
               confirmLeave={confirmSettingsLeave}
               dirty={settingsDirty}
@@ -2314,6 +2314,21 @@ function WorkspaceAccessGate({
         </form>
       </section>
     </main>
+  );
+}
+
+function SettingsLoadingState() {
+  return (
+    <section
+      className="workspace-empty-state"
+      role="status"
+      aria-live="polite"
+      aria-labelledby="settings-loading-title"
+    >
+      <p className="kicker">Рабочее место</p>
+      <h2 id="settings-loading-title">Настройки загружаются</h2>
+      <p>Подготавливаем локальные параметры роли, доступа и рабочего режима.</p>
+    </section>
   );
 }
 

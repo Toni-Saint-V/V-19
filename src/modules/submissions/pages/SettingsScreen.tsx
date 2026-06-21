@@ -108,7 +108,7 @@ export default function SettingsScreen({
               <dt>Данные</dt>
               <dd>{modeLabel}</dd>
             </div>
-            <div>
+            <div className="settings-access-email">
               <dt>Почта</dt>
               <dd>{email || "Не задана"}</dd>
             </div>

@@ -109,10 +109,14 @@ async function expectAgentNoDocumentScroll(page: Page, context: string) {
   );
 }
 
-async function expectDrawerFitsViewport(page: Page, context: string) {
+async function expectDrawerFitsViewport(
+  page: Page,
+  context: string,
+  closeButtonName = "Закрыть подачу",
+) {
   const dialog = page.getByRole("dialog").first();
   await expect(dialog).toBeVisible();
-  await expect(page.getByRole("button", { name: "Закрыть подачу" })).toBeVisible();
+  await expect(page.getByRole("button", { name: closeButtonName })).toBeVisible();
 
   const box = await dialog.boundingBox();
   const viewport = page.viewportSize();
@@ -136,6 +140,13 @@ async function screenshot(page: Page, viewport: ViewportProof, name: string) {
   });
 }
 
+async function expectSettingsReady(page: Page) {
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Настройки доступа" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Сводка по действиям")).toBeVisible();
+}
+
 test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
@@ -151,8 +162,17 @@ test.describe("V-19 responsive proof", () => {
       });
 
       await openFreshWorkspace(page);
+      await expect(page.getByRole("button", { name: "Выгрузка" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: /^Проверка/ })).toHaveCount(0);
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent inbox`);
       await screenshot(page, viewport, "agent-inbox");
+
+      await page.getByRole("button", { name: "Мои действия" }).click();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Мои действия" }),
+      ).toBeVisible();
+      await expectAgentNoDocumentScroll(page, `${viewport.label}: agent actions`);
+      await screenshot(page, viewport, "agent-actions");
 
       await page.getByRole("button", { name: "Мои подачи" }).click();
       await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
@@ -160,18 +180,56 @@ test.describe("V-19 responsive proof", () => {
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent submissions`);
       await screenshot(page, viewport, "agent-submissions");
 
+      await page.getByRole("button", { name: "Новая подача" }).first().click();
+      await expect(page.getByRole("heading", { name: "Новая подача" })).toBeVisible();
+      await expectDrawerFitsViewport(
+        page,
+        `${viewport.label}: create submission drawer`,
+        "Закрыть создание",
+      );
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: create drawer`,
+      );
+      await screenshot(page, viewport, "create-submission-drawer");
+      await page.getByRole("button", { name: "Закрыть создание" }).click();
+
       await page.locator('[data-submission-id="ПД-1048"]').first().click();
       await expectDrawerFitsViewport(page, `${viewport.label}: submission drawer`);
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: drawer`);
       await screenshot(page, viewport, "submission-drawer");
       await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
+      await page.getByRole("button", { name: "Настройки" }).click();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Настройки" }),
+      ).toBeVisible();
+      await expectSettingsReady(page);
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: agent settings`);
+      await screenshot(page, viewport, "agent-settings");
+
       await openFreshWorkspace(page, {
         heading: "Проверка",
         workspaceEmail: "admin@visaflow.local",
       });
+      await expect(page.getByText("Мои подачи", { exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Новая подача" })).toHaveCount(0);
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
       await screenshot(page, viewport, "admin-review");
+
+      await page.getByRole("button", { name: "Входящие" }).click();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Входящие" }),
+      ).toBeVisible();
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin inbox`);
+      await screenshot(page, viewport, "admin-inbox");
+
+      await page.getByRole("button", { name: "Мои действия" }).click();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Мои действия" }),
+      ).toBeVisible();
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin actions`);
+      await screenshot(page, viewport, "admin-actions");
 
       await page.getByRole("button", { name: "Выгрузка" }).click();
       await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
@@ -180,6 +238,14 @@ test.describe("V-19 responsive proof", () => {
       await generateButton.scrollIntoViewIfNeeded();
       await expect(generateButton).toBeVisible();
       await screenshot(page, viewport, "export");
+
+      await page.getByRole("button", { name: "Настройки" }).click();
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Настройки" }),
+      ).toBeVisible();
+      await expectSettingsReady(page);
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin settings`);
+      await screenshot(page, viewport, "admin-settings");
     }
 
     expect(problems).toEqual([]);
