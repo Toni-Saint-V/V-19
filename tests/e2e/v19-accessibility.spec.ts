@@ -60,6 +60,12 @@ test.describe("V-19 accessibility contract", () => {
     ).toBeVisible();
     await expectNoAxeViolations(page, "agent submissions");
 
+    await page.getByRole("button", { name: "Новая подача" }).first().click();
+    await expect(page.getByRole("dialog", { name: "Новая подача" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Закрыть создание" })).toBeVisible();
+    await expectNoAxeViolations(page, "create submission drawer");
+    await page.getByRole("button", { name: "Закрыть создание" }).click();
+
     await page.getByRole("button", { name: "Настройки" }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: "Настройки" }),

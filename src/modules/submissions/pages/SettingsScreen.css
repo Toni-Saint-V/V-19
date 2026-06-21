@@ -78,6 +78,10 @@
   line-height: var(--v19-settings-card-title-line-height);
 }
 
+.settings-access-email {
+  grid-column: 1 / -1;
+}
+
 .settings-field {
   display: grid;
   gap: var(--v19-settings-field-gap);
