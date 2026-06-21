@@ -1,8 +1,11 @@
 import {
+  fixedIssueCount,
   canPerformAction,
+  openIssueCount,
   unresolvedOpenIssueCount,
 } from "./status";
 import { formatAgentActionRowText } from "./listFormatters";
+import { applicantCountLabel } from "./selectors";
 import type { DrawerTab, Submission, SubmissionFile } from "./types";
 
 export type AgentActionDue = "overdue" | "today" | "week" | "completed";
@@ -36,6 +39,21 @@ export type AgentActionSummary = {
   week: number;
 };
 
+export type OperationalInboxEvent = {
+  action: string;
+  badge: string;
+  context: string;
+  icon: string;
+  id: string;
+  needsAction: boolean;
+  read: boolean;
+  submission: Submission;
+  tab: DrawerTab;
+  time: string;
+  title: string;
+  tone: "amber" | "blue" | "danger" | "muted" | "teal";
+};
+
 export function agentActionQueue(submissions: Submission[]) {
   const open = sortAgentActions(submissions.flatMap(agentOpenActions)).map(
     withSearchText,
@@ -49,6 +67,85 @@ export function agentActionQueue(submissions: Submission[]) {
     open,
     summary: summarizeAgentActions(open, completed),
   };
+}
+
+export function adminActionQueue(submissions: Submission[]) {
+  const open = sortAgentActions(submissions.flatMap(adminOpenActions)).map(
+    withSearchText,
+  );
+  const completed = sortAgentActions(
+    submissions.flatMap(adminCompletedActions),
+  ).map(withSearchText);
+
+  return {
+    completed,
+    open,
+    summary: summarizeAgentActions(open, completed),
+  };
+}
+
+export function adminInboxEvents(submissions: Submission[]): OperationalInboxEvent[] {
+  return submissions.flatMap((submission): OperationalInboxEvent[] => {
+    if (submission.status === "corrections_received") {
+      const fixed = fixedIssueCount(submission);
+      return [
+        {
+          action: "Проверить исправления",
+          badge: "Исправления",
+          context: `${fixed || openIssueCount(submission)} замечания`,
+          icon: "issue",
+          id: `admin-inbox-corrections-${submission.id}`,
+          needsAction: true,
+          read: false,
+          submission,
+          tab: "issues",
+          time: "12 мин назад",
+          title: `Агент отправил исправления по «${submission.title}»`,
+          tone: "blue",
+        },
+      ];
+    }
+
+    if (submission.status === "submitted_for_review") {
+      return [
+        {
+          action: "Открыть проверку",
+          badge: "Проверка",
+          context: `${applicantCountLabel(submission.applicants.length)} · ${submission.city}`,
+          icon: "status",
+          id: `admin-inbox-review-${submission.id}`,
+          needsAction: true,
+          read: false,
+          submission,
+          tab: "overview",
+          time: "34 мин назад",
+          title: `Подача «${submission.title}» ждёт проверки`,
+          tone: "amber",
+        },
+      ];
+    }
+
+    if (submission.status === "ready_for_export") {
+      return [
+        {
+          action: "Проверить пакет",
+          badge: "К выгрузке",
+          context: `${applicantCountLabel(submission.applicants.length)} · Excel`,
+          icon: "accepted",
+          id: `admin-inbox-export-${submission.id}`,
+          needsAction: true,
+          read: false,
+          submission,
+          tab: "overview",
+          time: "1 ч назад",
+          title: `Подача «${submission.title}» принята для выгрузки`,
+          tone: "teal",
+        },
+      ];
+    }
+
+    return [];
+  });
 }
 
 export function searchAgentActions(actions: AgentActionItem[], query: string) {
@@ -203,6 +300,89 @@ function agentCompletedActions(submission: Submission): AgentActionItem[] {
       submission,
       tab: "history",
       title: rowText.title,
+    },
+  ];
+}
+
+function adminOpenActions(submission: Submission): AgentActionItem[] {
+  if (submission.status === "submitted_for_review") {
+    return [
+      {
+        badges: [{ label: "Проверка", tone: "amber" }],
+        completed: false,
+        context: `${applicantCountLabel(submission.applicants.length)} · ${submission.city}`,
+        cta: "Проверить",
+        due: "today",
+        dueLabel: "Ждёт проверки",
+        id: `admin-review-${submission.id}`,
+        searchText: "",
+        severity: "warning",
+        submission,
+        tab: "overview",
+        title: "Проверить пакет",
+      },
+    ];
+  }
+
+  if (submission.status === "corrections_received") {
+    const fixed = fixedIssueCount(submission);
+    return [
+      {
+        badges: [{ label: "Исправления", tone: "blue" }],
+        completed: false,
+        context: `${fixed || openIssueCount(submission)} замечания · ${submission.city}`,
+        cta: "Проверить",
+        due: "overdue",
+        dueLabel: "Исправления получены",
+        id: `admin-corrections-${submission.id}`,
+        searchText: "",
+        severity: "blocker",
+        submission,
+        tab: "issues",
+        title: "Проверить исправления",
+      },
+    ];
+  }
+
+  if (submission.status === "ready_for_export") {
+    return [
+      {
+        badges: [{ label: "К выгрузке", tone: "teal" }],
+        completed: false,
+        context: `${applicantCountLabel(submission.applicants.length)} · Excel`,
+        cta: "Пакет",
+        due: "week",
+        dueLabel: "Готово к пакету",
+        id: `admin-export-${submission.id}`,
+        searchText: "",
+        severity: "ready",
+        submission,
+        tab: "overview",
+        title: "Проверить пакет выгрузки",
+      },
+    ];
+  }
+
+  return [];
+}
+
+function adminCompletedActions(submission: Submission): AgentActionItem[] {
+  if (submission.status !== "exported") return [];
+
+  return [
+    {
+      badges: [{ label: "Выгружено", tone: "teal" }],
+      completed: true,
+      context: `${applicantCountLabel(submission.applicants.length)} · Excel`,
+      cta: "История",
+      due: "completed",
+      dueLabel: "Пакет выгружен",
+      id: `admin-completed-export-${submission.id}`,
+      searchText: "",
+      severity: "info",
+      submission,
+      tab: "history",
+      title: "Пакет выгружен",
     },
   ];
 }

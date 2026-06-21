@@ -8,7 +8,11 @@ import {
   dismissAiSuggestion,
   runAiReview,
 } from "../../src/modules/submissions/aiSuggestions";
-import { agentActionQueue } from "../../src/modules/submissions/agentActions";
+import {
+  adminActionQueue,
+  adminInboxEvents,
+  agentActionQueue,
+} from "../../src/modules/submissions/agentActions";
 import {
   buildExportRows,
   exportSummary,
@@ -47,8 +51,10 @@ import {
   updateQuestionnaireField,
 } from "../../src/modules/submissions/submissionActions";
 import {
+  adminIssueGuard,
   applySubmissionAction,
   canAddAdminIssue,
+  canEditSubmissionContent,
   canPerformAction,
   defaultDrawerTab,
   transitionMatrix,
@@ -60,6 +66,7 @@ import type {
   SubmissionAction,
   SubmissionStatus,
 } from "../../src/modules/submissions/types";
+import { matchesReviewTab } from "../../src/modules/submissions/uiTypes";
 
 function byId(id: string) {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -241,6 +248,46 @@ describe("V-19 submission status rules", () => {
     expect(canAddAdminIssue(byId("ПД-1053"), "admin")).toBe(true);
     expect(canAddAdminIssue(byId("ПД-1056"), "admin")).toBe(false);
     expect(canAddAdminIssue(byId("ПД-1053"), "agent")).toBe(false);
+    expect(adminIssueGuard(byId("ПД-1053"), "admin")).toEqual({ ok: true });
+    expect(adminIssueGuard(byId("ПД-1056"), "admin")).toEqual({
+      ok: false,
+      reason: "Пакет уже принят. Новое замечание доступно только до принятия.",
+    });
+    expect(adminIssueGuard(byId("ПД-1053"), "agent")).toEqual({
+      ok: false,
+      reason: "Недостаточно прав",
+    });
+  });
+
+  it("keeps submission content editing agent-only and status-gated", () => {
+    expect(canEditSubmissionContent(byId("ПД-1048"), "agent")).toBe(true);
+    expect(canEditSubmissionContent(byId("ПД-1048"), "admin")).toBe(false);
+    expect(canEditSubmissionContent(byId("ПД-1053"), "agent")).toBe(false);
+  });
+
+  it("keeps admin review tab status selection outside React screens", () => {
+    const base = byId("ПД-1053");
+    const statuses: SubmissionStatus[] = [
+      "draft",
+      "in_progress",
+      "requires_action",
+      "submitted_for_review",
+      "returned",
+      "corrections_received",
+      "ready_for_export",
+      "exported",
+    ];
+    const matchingStatuses = (tab: Parameters<typeof matchesReviewTab>[0]) =>
+      statuses.filter((status) => matchesReviewTab(tab)({ ...base, status }));
+
+    expect(matchingStatuses("all")).toEqual([
+      "submitted_for_review",
+      "corrections_received",
+      "ready_for_export",
+    ]);
+    expect(matchingStatuses("review")).toEqual(["submitted_for_review"]);
+    expect(matchingStatuses("corrections")).toEqual(["corrections_received"]);
+    expect(matchingStatuses("ready")).toEqual(["ready_for_export"]);
   });
 });
 
@@ -326,6 +373,49 @@ describe("V-19 export rules", () => {
     expect(
       applyExportStateToSelection(submissions, ["ПД-1051"], "file_generated"),
     ).toBe(submissions);
+  });
+
+  it("fails closed when a ready selection cannot produce safe export rows", () => {
+    const noApplicants = readyClone({
+      id: "ПД-БЕЗ-ЗАЯВИТЕЛЕЙ",
+      applicants: [],
+    });
+    const blankApplicantName = readyClone({
+      id: "ПД-БЕЗ-ФИО",
+      applicants: [
+        {
+          ...byId("ПД-1056").applicants[0]!,
+          fullName: " ",
+        },
+      ],
+    });
+    const noApplicantSelection = [noApplicants];
+
+    expect(exportSummary([noApplicants])).toMatchObject({
+      rowCount: 0,
+      ready: false,
+      canGenerate: false,
+      canDownload: false,
+      canMarkExported: false,
+    });
+    expect(
+      exportSummary([noApplicants]).blockers.map((blocker) => blocker.reason),
+    ).toContain("В выборке есть подачи без заявителей");
+    expect(
+      applyExportStateToSelection(
+        noApplicantSelection,
+        ["ПД-БЕЗ-ЗАЯВИТЕЛЕЙ"],
+        "file_generated",
+      ),
+    ).toBe(noApplicantSelection);
+
+    expect(
+      exportSummary([blankApplicantName]).blockers.map((blocker) => blocker.reason),
+    ).toContain("В строках выгрузки есть заявители без ФИО");
+    expect(exportSummary([blankApplicantName])).toMatchObject({
+      ready: false,
+      canGenerate: false,
+    });
   });
 
   it("keeps download state locked until the selected package is generated", () => {
@@ -434,15 +524,88 @@ describe("V-19 submission actions", () => {
     expect(queue.open.some((action) => action.cta === "Добавить")).toBe(true);
   });
 
-  it("derives submit corrections action only after domain fixes exist", () => {
-    const returnedWithFixes: Submission = {
-      ...byId("ПД-1048"),
-      files: byId("ПД-1048").files.map((file) => ({ ...file, status: "accepted" })),
-      issues: byId("ПД-1048").issues.map((issue) => ({ ...issue, status: "open" })),
-    };
-    const queue = agentActionQueue([returnedWithFixes]);
+  it("derives admin inbox and action queues from review and export states", () => {
+    const queue = adminActionQueue(initialSubmissions);
+    const inbox = adminInboxEvents(initialSubmissions);
 
-    expect(canPerformAction(returnedWithFixes, "submit_corrections", "agent")).toEqual({
+    expect(queue.summary.open).toBe(queue.open.length);
+    expect(queue.summary.completed).toBe(queue.completed.length);
+    expect(queue.open.map((action) => action.title)).toEqual(
+      expect.arrayContaining([
+        "Проверить пакет",
+        "Проверить исправления",
+        "Проверить пакет выгрузки",
+      ]),
+    );
+    expect(queue.completed).toHaveLength(1);
+    expect(queue.completed[0]).toMatchObject({
+      cta: "История",
+      tab: "history",
+      title: "Пакет выгружен",
+    });
+    expect(queue.open.some((action) => action.cta === "Добавить")).toBe(false);
+    expect(queue.open.some((action) => action.cta === "Исправить")).toBe(false);
+    expect(inbox.map((event) => event.badge)).toEqual(
+      expect.arrayContaining(["Проверка", "Исправления", "К выгрузке"]),
+    );
+    expect(inbox.every((event) => event.id.startsWith("admin-inbox-"))).toBe(true);
+  });
+
+  it("derives submit corrections only after all targeted file replacements are uploaded", () => {
+    const returned = byId("ПД-1048");
+    const photoFile = returned.files.find(
+      (file) => file.applicantId === "з-1048-1" && file.type === "photo",
+    );
+    const passportFile = returned.files.find(
+      (file) => file.applicantId === "з-1048-3" && file.type === "passport_scan",
+    );
+    if (!photoFile || !passportFile) throw new Error("Missing replacement files");
+
+    expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
+      ok: false,
+      reason: "Сначала исправьте целевые замечания",
+    });
+
+    const withPhotoReplacement = applyUploadedFileMetadata(returned, photoFile.id, {
+      generatedFileName: "v19replacement_photo_white.jpg",
+      mimeType: "image/jpeg",
+      originalFileName: "photo-fixed.jpg",
+      sizeBytes: 180_000,
+      storageBucket: "submission-media",
+      storagePath: "ПД-1048/з-1048-1/photo_white/v19replacement_photo_white.jpg",
+      uploadedAtIso: "2026-06-21T10:00:00.000Z",
+    });
+
+    expect(
+      withPhotoReplacement.files.find((file) => file.id === photoFile.id),
+    ).toMatchObject({
+      originalFileName: "photo-fixed.jpg",
+      reviewStatus: "not_reviewed",
+      reviewedBy: undefined,
+      status: "uploaded",
+    });
+    expect(canPerformAction(withPhotoReplacement, "submit_corrections", "agent")).toEqual({
+      ok: false,
+      reason: "Сначала исправьте целевые замечания",
+    });
+
+    const withAllReplacements = applyUploadedFileMetadata(
+      withPhotoReplacement,
+      passportFile.id,
+      {
+        generatedFileName: "v19replacement_passport_scan.pdf",
+        mimeType: "application/pdf",
+        originalFileName: "passport-fixed.pdf",
+        sizeBytes: 420_000,
+        storageBucket: "submission-media",
+        storagePath:
+          "ПД-1048/з-1048-3/passport_scan/v19replacement_passport_scan.pdf",
+        uploadedAtIso: "2026-06-21T10:01:00.000Z",
+      },
+    );
+    const queue = agentActionQueue([withAllReplacements]);
+
+    expect(canPerformAction(withAllReplacements, "submit_corrections", "agent")).toEqual({
       ok: true,
     });
     expect(queue.open).toHaveLength(1);
@@ -452,6 +615,18 @@ describe("V-19 submission actions", () => {
       tab: "issues",
       title: "Ивановы",
     });
+
+    const submittedCorrections = applySubmissionAction(
+      withAllReplacements,
+      "submit_corrections",
+      "agent",
+    );
+
+    expect(submittedCorrections.status).toBe("corrections_received");
+    expect(submittedCorrections.issues.map((issue) => issue.status)).toEqual([
+      "fixed_by_agent",
+      "fixed_by_agent",
+    ]);
   });
 
   it("keeps the local agent queue scoped to the current owner", () => {

@@ -22,6 +22,14 @@ const requiredMigrationOrder = [
   "20260613010029_visaflow_rpc_submit_boundary.sql",
   "20260614000000_ai_helper_audit_quota.sql",
   "20260615000000_ai_helper_security_advisor_hardening.sql",
+  "20260616000000_export_batch_identity.sql",
+  "20260616001000_complete_export_package_rpc.sql",
+  "20260616002000_prevent_export_regression.sql",
+  "20260617001000_submit_corrections_handoff_rpc.sql",
+  "20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
+  "20260617003000_passport_workspace_media_slots.sql",
+  "20260617004000_complete_export_package_workspace_media_slots.sql",
+  "20260617005000_passport_extraction_audit_quota_contract.sql",
 ];
 
 const requiredRemoteMigrationOrder = [
@@ -32,6 +40,14 @@ const requiredRemoteMigrationOrder = [
   "20260613010029_visaflow_rpc_submit_boundary",
   "20260614000000_ai_helper_audit_quota",
   "20260616001949_ai_helper_security_advisor_hardening",
+  "20260616000000_export_batch_identity",
+  "20260616001000_complete_export_package_rpc",
+  "20260616002000_prevent_export_regression",
+  "20260617001000_submit_corrections_handoff_rpc",
+  "20260617002000_preserve_applicant_profile_on_cockpit_save",
+  "20260617003000_passport_workspace_media_slots",
+  "20260617004000_complete_export_package_workspace_media_slots",
+  "20260617005000_passport_extraction_audit_quota_contract",
 ];
 
 const integrityBlockers = [];

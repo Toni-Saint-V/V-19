@@ -30,6 +30,6 @@ Implement passport-photo data extraction as a guarded, optional local OCR featur
 ## Assumptions
 
 - Continue on branch `product/operator-workspace-passport-intake-run`.
-- Existing untracked `docs/qa/*` and prototype files are unrelated and must not be touched.
+- Existing untracked `docs/qa/*` and draft research files are unrelated and must not be touched.
 - Production key setup is out of scope; provider fails closed if server env is absent.
 - This is not official document verification. UI copy must say the operator manually checks extracted data.

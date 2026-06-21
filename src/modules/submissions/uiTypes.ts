@@ -37,28 +37,43 @@ export function matchesReviewTab(tab: ReviewTab) {
 
 export function surfaceTitle(surface: Surface) {
   if (surface === "agent-actions") return "Мои действия";
+  if (surface === "admin-actions") return "Мои действия";
   if (surface === "agent-inbox") return "Входящие";
+  if (surface === "admin-inbox") return "Входящие";
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка подач";
+  if (surface === "settings") return "Настройки";
   return "Выгрузка пакетов";
 }
 
 export function surfaceDescription(surface: Surface) {
   if (surface === "agent-actions") {
-    return "Очередь точных действий по всем подачам агента.";
+    return "Точные шаги по подачам агента.";
   }
 
   if (surface === "agent-inbox") {
-    return "Новые события по подачам и точный переход к месту, где нужно действие.";
+    return "События и переход к нужному месту.";
+  }
+
+  if (surface === "admin-actions") {
+    return "Проверки, исправления и пакеты.";
+  }
+
+  if (surface === "admin-inbox") {
+    return "События проверки и выгрузки.";
   }
 
   if (surface === "agent-submissions") {
-    return "Держите в фокусе подачи, где нужно дозаполнить анкету, файлы или ответить на замечания.";
+    return "Подачи, анкеты, файлы и замечания.";
   }
 
   if (surface === "admin-review") {
-    return "Сначала верхняя подача: проверьте пакет, примите или верните с точным замечанием.";
+    return "Проверка без потери контекста.";
   }
 
-  return "Соберите принятые подачи, проверьте состав пакета и зафиксируйте выгрузку.";
+  if (surface === "settings") {
+    return "Роль, режим данных и безопасный выход.";
+  }
+
+  return "Проверка пакета перед Excel.";
 }

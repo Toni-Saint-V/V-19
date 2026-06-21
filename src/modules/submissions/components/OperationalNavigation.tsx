@@ -31,26 +31,10 @@ export function OperationalSidebar({
     <aside className="left-rail ops-sidebar" aria-label="Операционный центр">
       <div className="rail-mark ops-brand" aria-label={brand}>
         <span>VF</span>
-        <strong>{brand}</strong>
-        <em>{roleLabel}</em>
-        <button aria-label="Командное меню" type="button">
-          <svg
-            aria-hidden="true"
-            fill="none"
-            focusable="false"
-            height="16"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            viewBox="0 0 24 24"
-            width="16"
-          >
-            <path d="M12 5.5h.01" />
-            <path d="M12 12h.01" />
-            <path d="M12 18.5h.01" />
-          </svg>
-        </button>
+        <div className="ops-brand-copy">
+          <strong>{brand}</strong>
+          <em>{roleLabel}</em>
+        </div>
       </div>
       <nav className="rail-nav ops-nav" aria-label="Операционные разделы">
         {items.map((item) => (

@@ -5,23 +5,32 @@ import {
   Button,
   CardComponent,
 } from "../../../shared/ui/primitives";
-import type { AgentActionItem, AgentActionSummary } from "../agentActions";
+import type {
+  AgentActionItem,
+  AgentActionSummary,
+  OperationalInboxEvent,
+} from "../agentActions";
 import type { ExportSummary } from "../exportRules";
 import {
   formatSubmissionListStatus,
   formatSubmissionListTitle,
 } from "../listFormatters";
-import { counts, tripDates } from "../selectors";
+import { applicantCountLabel, counts, tripDates } from "../selectors";
 import {
+  adminIssueGuard,
   blockerCount,
-  canAddAdminIssue,
   defaultDrawerTab,
   openIssueCount,
   statusLabels,
   typeLabels,
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
-import type { AgentTab, ExportTab, ReviewTab } from "../uiTypes";
+import {
+  matchesReviewTab,
+  type AgentTab,
+  type ExportTab,
+  type ReviewTab,
+} from "../uiTypes";
 import { EmptyState, SummaryRow } from "../components/Primitives";
 import {
   ActionRow,
@@ -85,28 +94,7 @@ function transitionUiState(update: () => void) {
   }
 }
 
-function adminIssueUnavailableReason(submission: Submission) {
-  if (submission.status === "ready_for_export")
-    return "Пакет уже принят. Новое замечание доступно только до принятия.";
-  if (submission.status === "exported")
-    return "Подача уже выгружена. Возврат из истории не выполняется.";
-  return "Возврат доступен только для подач на проверке или после исправлений.";
-}
-
-type InboxEvent = {
-  action: string;
-  badge: string;
-  context: string;
-  icon: string;
-  id: string;
-  needsAction: boolean;
-  read: boolean;
-  submission: Submission;
-  tab: DrawerTab;
-  time: string;
-  title: string;
-  tone: "amber" | "blue" | "danger" | "muted" | "teal";
-};
+type InboxEvent = OperationalInboxEvent;
 
 export function AgentActionsScreen({
   completedActions,
@@ -330,11 +318,13 @@ export function AgentActionsScreen({
 }
 
 export function AgentInboxScreen({
+  inboxEvents,
   onOpen,
   searchControl,
   submissions,
   summary,
 }: {
+  inboxEvents?: InboxEvent[];
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   searchControl: ReactNode;
   submissions: Submission[];
@@ -348,11 +338,11 @@ export function AgentInboxScreen({
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const events = useMemo(
     () =>
-      buildAgentInboxEvents(submissions).map((event) => ({
+      (inboxEvents ?? buildAgentInboxEvents(submissions)).map((event) => ({
         ...event,
         read: event.read || readEventIds.has(event.id),
       })),
-    [readEventIds, submissions],
+    [inboxEvents, readEventIds, submissions],
   );
   const visibleEvents = useMemo(() => {
     const tabEvents =
@@ -687,6 +677,9 @@ export function AgentSubmissionsScreen({
   activeTab,
   agentList,
   cityControl,
+  cityFilterLabel = "Все",
+  hasSearchQuery = false,
+  onClearFilters,
   onCreate,
   onOpen,
   onSelect,
@@ -698,6 +691,9 @@ export function AgentSubmissionsScreen({
   activeTab: AgentTab;
   agentList: Submission[];
   cityControl?: ReactNode;
+  cityFilterLabel?: string;
+  hasSearchQuery?: boolean;
+  onClearFilters?: () => void;
   onCreate: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
@@ -732,10 +728,21 @@ export function AgentSubmissionsScreen({
   const visibleTab: Exclude<AgentTab, "all"> =
     activeTab === "all" ? "action" : activeTab;
   const activeFilterLabels: string[] = [
+    hasSearchQuery ? "Поиск" : null,
+    cityFilterLabel !== "Все" ? cityFilterLabel : null,
     blockersOnly ? "Только блокеры" : null,
     sortNewest ? null : "Обратный порядок",
     comfortableView ? null : "Компактный вид",
   ].filter((label): label is string => Boolean(label));
+  const hasFiltering = activeFilterLabels.length > 0;
+  const resetFilters = () => {
+    transitionUiState(() => {
+      setBlockersOnly(false);
+      setSortNewest(true);
+      setComfortableView(true);
+      onClearFilters?.();
+    });
+  };
   return (
     <div
       className={`v19-screen-grid v19-inbox-screen v19-submissions-screen ${
@@ -826,6 +833,7 @@ export function AgentSubmissionsScreen({
                   fileState={submissionFileStateLabel(submission)}
                   fileTone={submissionFileStateTone(submission)}
                   key={submission.id}
+                  meta={submissionMetaLine(submission)}
                   status={submission.status}
                   statusLabel={formatSubmissionListStatus(submission)}
                   submissionId={submission.id}
@@ -839,11 +847,15 @@ export function AgentSubmissionsScreen({
             </div>
           </>
         ) : (
-          <div className="v19-empty-state" key={`submissions-empty-${visibleTab}-${blockersOnly}`}>
-            <h3>В этой вкладке нет подач</h3>
-            <p>Список обновится после создания или изменения статуса подачи.</p>
-            <Button variant="secondary" onClick={onCreate}>
-              Новая подача
+          <div className="v19-empty-state" key={`submissions-empty-${visibleTab}-${activeFilterLabels.join("-")}`}>
+            <h3>{hasFiltering ? "Ничего не найдено" : "В этой вкладке нет подач"}</h3>
+            <p>
+              {hasFiltering
+                ? "Измените поиск, город или локальный фильтр, чтобы вернуть подачи в список."
+                : "Список обновится после создания или изменения статуса подачи."}
+            </p>
+            <Button variant="secondary" onClick={hasFiltering ? resetFilters : onCreate}>
+              {hasFiltering ? "Сбросить фильтры" : "Новая подача"}
             </Button>
           </div>
         )}
@@ -890,6 +902,16 @@ export function AgentSubmissionsScreen({
       ) : null}
     </div>
   );
+}
+
+function submissionMetaLine(submission: Submission) {
+  return [
+    typeLabels[submission.type],
+    applicantCountLabel(submission.applicants.length),
+    submission.city,
+    tripDates(submission),
+    `обновлено ${submission.updatedAt}`,
+  ].join(" · ");
 }
 
 function submissionFileStateLabel(submission: Submission) {
@@ -1006,15 +1028,9 @@ export function AdminReviewScreen({
   const [sortNewest, setSortNewest] = useState(true);
   const tabCounts = {
     all: reviewSource.length,
-    corrections: reviewSource.filter((submission) =>
-      matchesAdminReviewStatus(submission, "corrections"),
-    ).length,
-    ready: reviewSource.filter((submission) =>
-      matchesAdminReviewStatus(submission, "ready"),
-    ).length,
-    review: reviewSource.filter((submission) =>
-      matchesAdminReviewStatus(submission, "review"),
-    ).length,
+    corrections: reviewSource.filter(matchesReviewTab("corrections")).length,
+    ready: reviewSource.filter(matchesReviewTab("ready")).length,
+    review: reviewSource.filter(matchesReviewTab("review")).length,
   };
   const blockerSubmissions = reviewSource.filter(
     (submission) => blockerCount(submission) > 0,
@@ -1037,14 +1053,13 @@ export function AdminReviewScreen({
       : null;
   const prioritySubmission =
     visibleSelectedSubmission ?? visibleReviewList[0] ?? null;
-  const canAddIssue = Boolean(
-    prioritySubmission && canAddAdminIssue(prioritySubmission, "admin"),
-  );
+  const addIssueGuard = prioritySubmission
+    ? adminIssueGuard(prioritySubmission, "admin")
+    : null;
+  const canAddIssue = addIssueGuard?.ok === true;
   const addIssueReason = canAddIssue
     ? ""
-    : prioritySubmission
-      ? adminIssueUnavailableReason(prioritySubmission)
-      : "В этой вкладке нет видимой подачи для действия.";
+    : addIssueGuard?.reason ?? "В этой вкладке нет видимой подачи для действия.";
   const activeFilterLabels: string[] = [
     blockersOnly ? "Только блокеры" : null,
     sortNewest ? null : "Обратный порядок",
@@ -1231,19 +1246,6 @@ export function AdminReviewScreen({
         ) : null}
     </div>
   );
-}
-
-function matchesAdminReviewStatus(submission: Submission, tab: ReviewTab) {
-  if (tab === "all") {
-    return [
-      "submitted_for_review",
-      "corrections_received",
-      "ready_for_export",
-    ].includes(submission.status);
-  }
-  if (tab === "review") return submission.status === "submitted_for_review";
-  if (tab === "corrections") return submission.status === "corrections_received";
-  return submission.status === "ready_for_export";
 }
 
 function adminReviewActionLabel(submission: Submission) {

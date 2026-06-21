@@ -269,8 +269,21 @@ export function SearchBar({
   }
 
   return (
-    <label className={cn("mp-searchbar", "search", "panel-search", className)}>
-      <span aria-hidden="true">⌕</span>
+    <label
+      className={cn(
+        "mp-searchbar",
+        "search",
+        "panel-search",
+        "v19-toolbar-search",
+        className,
+      )}
+    >
+      <span className="search-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" focusable="false">
+          <circle cx="8.5" cy="8.5" r="5.2" />
+          <path d="M12.4 12.4L16 16" />
+        </svg>
+      </span>
       <input
         aria-label={label}
         id={inputId}
