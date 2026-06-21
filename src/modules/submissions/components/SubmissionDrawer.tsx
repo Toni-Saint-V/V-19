@@ -18,7 +18,7 @@ import {
 import {
   fileTypeLabels,
   canAddAdminIssue,
-  canAgentEditSubmissionContent,
+  canEditSubmissionContent,
   getPrimaryAction,
   nextProblem,
   openIssueCount,
@@ -125,20 +125,23 @@ export function SubmissionDrawer({
 }) {
   const primaryAction = getPrimaryAction(submission, role, surface);
   const [issueComposerOpen, setIssueComposerOpen] = useState(false);
+  const [issueView, setIssueView] = useState<IssueView>("issues");
   const [pendingTarget, setPendingTarget] = useState<WorkspaceTarget | null>(null);
   const drawerBodyRef = useRef<HTMLDivElement | null>(null);
   const tabNavigationModeRef = useRef<"manual" | "target">("manual");
   const canOpenIssueComposer =
     surface === "review" && canAddAdminIssue(submission, role);
-  const contentCanBeEdited =
-    role === "agent" && canAgentEditSubmissionContent(submission);
+  const contentCanBeEdited = canEditSubmissionContent(submission, role);
   const footerHint =
-    primaryAction.reason ??
+    (primaryAction.action === "open_history" && primaryAction.disabled
+      ? undefined
+      : primaryAction.reason) ??
     (contentCanBeEdited
       ? "Изменения сохраняются внутри подачи"
       : "Проверьте данные и выберите действие по подаче");
   useEffect(() => {
     setIssueComposerOpen(false);
+    setIssueView("issues");
   }, [submission.id]);
 
   useEffect(() => {
@@ -244,28 +247,70 @@ export function SubmissionDrawer({
         onClose();
       }}
     >
-      <header className="drawer-header">
-        <div className="drawer-title-block">
+      <header className="drawer-header drawer-topbar">
+        <div className="drawer-title-block drawer-title-sr">
           <h2 id="drawer-title">{submission.title}</h2>
           <p>
             {submission.id} · {statusLabels[submission.status]}
           </p>
         </div>
-        <Button variant="icon" aria-label="Закрыть подачу" onClick={onClose}>
-          ×
-        </Button>
+        <DrawerTabs
+          ariaLabel="Разделы подачи"
+          autoFocusOnValueChange={tabNavigationModeRef.current !== "target"}
+          tabs={workspaceTabs.map((tab) => ({
+            ...tab,
+            meta: drawerTabValue(submission, tab.id),
+          }))}
+          value={activeTab}
+          onValueChange={handleTabChange}
+        />
+        <div className="drawer-topbar-actions" aria-label="Действия панели">
+          {activeTab === "issues" ? (
+            <SegmentedFilter
+              ariaLabel="Режим замечаний"
+              items={[
+                { count: openIssueCount(submission), id: "issues", label: "Замечания" },
+                { id: "bb", label: "ББ" },
+              ]}
+              value={issueView}
+              onChange={setIssueView}
+            />
+          ) : null}
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Открыть первый блокер"
+            disabled={!firstActionableQueueItem(submission)}
+            onClick={openFirstProblem}
+          >
+            !
+          </button>
+          {canOpenIssueComposer ? (
+            <button
+              className="icon-button"
+              type="button"
+              aria-label={
+                issueComposerOpen
+                  ? "Форма замечания открыта"
+                  : "Показать форму замечания"
+              }
+              aria-pressed={issueComposerOpen}
+              disabled={issueComposerOpen}
+              onClick={() => setIssueComposerOpen(true)}
+            >
+              +
+            </button>
+          ) : null}
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Закрыть подачу"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
       </header>
-
-      <DrawerTabs
-        ariaLabel="Разделы подачи"
-        autoFocusOnValueChange={tabNavigationModeRef.current !== "target"}
-        tabs={workspaceTabs.map((tab) => ({
-          ...tab,
-          meta: drawerTabValue(submission, tab.id),
-        }))}
-        value={activeTab}
-        onValueChange={handleTabChange}
-      />
 
       <div
         className="drawer-body workspace-drawer-body"
@@ -317,6 +362,7 @@ export function SubmissionDrawer({
               onDismissAiSuggestion={onDismissAiSuggestion}
               onOpenTarget={openTarget}
               onRunAiReview={onRunAiReview}
+              view={issueView}
               role={role}
               submission={submission}
               surface={surface}
@@ -1140,7 +1186,7 @@ function DrawerQuestionnaire({
   role: Role;
   submission: Submission;
 }) {
-  const canEdit = role === "agent" && canAgentEditSubmissionContent(submission);
+  const canEdit = canEditSubmissionContent(submission, role);
   const problemCount = questionnaireProblemCount(submission);
   const questionnaireReady =
     submission.completeness.questionnaire === 100 && problemCount === 0;
@@ -1730,7 +1776,7 @@ function DrawerFiles({
   submission: Submission;
 }) {
   const progress = fileReadyCount(submission);
-  const canEditFiles = role === "agent" && canAgentEditSubmissionContent(submission);
+  const canEditFiles = canEditSubmissionContent(submission, role);
   const initialCategory = initialFileCategory(submission);
   const [activeCategory, setActiveCategory] = useState<FileCategoryId>(
     () => initialCategory,
@@ -1977,6 +2023,7 @@ function DrawerIssues({
   role,
   submission,
   surface,
+  view,
 }: {
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onDismissAiSuggestion: (suggestionId: string) => void;
@@ -1985,15 +2032,14 @@ function DrawerIssues({
   role: Role;
   submission: Submission;
   surface: "agent" | "review" | "export";
+  view: IssueView;
 }) {
   const [expandedIssueIds, setExpandedIssueIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [view, setView] = useState<IssueView>("issues");
 
   useEffect(() => {
     setExpandedIssueIds(new Set());
-    setView("issues");
   }, [submission.id]);
 
   function toggleIssue(issueId: string) {
@@ -2009,17 +2055,6 @@ function DrawerIssues({
     <section className="drawer-section">
       <DrawerSectionHeader
         title={view === "issues" ? "Что нужно закрыть" : "ББ-проверка"}
-        action={
-          <SegmentedFilter
-            ariaLabel="Режим замечаний"
-            items={[
-              { count: openIssueCount(submission), id: "issues", label: "Замечания" },
-              { id: "bb", label: "ББ" },
-            ]}
-            value={view}
-            onChange={setView}
-          />
-        }
       />
       {view === "issues" ? (
         <div className="drawer-list">

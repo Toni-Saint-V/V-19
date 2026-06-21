@@ -14,6 +14,13 @@ vi.mock("tesseract.js", () => ({
   recognize: tesseractMock.recognize,
 }));
 
+vi.mock("tesseract.js/src/Tesseract.js", () => ({
+  default: {
+    recognize: tesseractMock.recognize,
+  },
+  recognize: tesseractMock.recognize,
+}));
+
 const validMrzText = [
   "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
   "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",

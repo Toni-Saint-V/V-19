@@ -96,8 +96,36 @@ export function canAgentEditSubmissionContent(submission: Submission) {
   return agentEditableStatuses.includes(submission.status);
 }
 
+export function canEditSubmissionContent(submission: Submission, role: Role) {
+  return role === "agent" && canAgentEditSubmissionContent(submission);
+}
+
+export function adminIssueGuard(
+  submission: Submission,
+  role: Role,
+): { ok: true } | { ok: false; reason: string } {
+  if (role !== "admin") return { ok: false, reason: "Недостаточно прав" };
+  if (adminIssueStatuses.includes(submission.status)) return { ok: true };
+  if (submission.status === "ready_for_export") {
+    return {
+      ok: false,
+      reason: "Пакет уже принят. Новое замечание доступно только до принятия.",
+    };
+  }
+  if (submission.status === "exported") {
+    return {
+      ok: false,
+      reason: "Подача уже выгружена. Возврат из истории не выполняется.",
+    };
+  }
+  return {
+    ok: false,
+    reason: "Возврат доступен только для подач на проверке или после исправлений.",
+  };
+}
+
 export function canAddAdminIssue(submission: Submission, role: Role) {
-  return role === "admin" && adminIssueStatuses.includes(submission.status);
+  return adminIssueGuard(submission, role).ok;
 }
 
 export const transitionMatrix: Record<

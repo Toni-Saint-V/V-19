@@ -46,6 +46,13 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     (submission) =>
       submission.status === "exported" || submission.exportState === "marked_exported",
   );
+  const emptyApplicantSubmissions = submissions.filter(
+    (submission) => submission.applicants.length === 0,
+  );
+  const rows = buildExportRows(submissions);
+  const rowsWithMissingApplicantName = rows.filter(
+    (row) => !row.applicantName.trim(),
+  );
   const cities = new Set(submissions.map((submission) => submission.city));
   const dates = new Set(submissions.map(tripDates));
   const types = new Set(submissions.map((submission) => submission.type));
@@ -57,6 +64,14 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
 
   if (alreadyExported.length > 0) {
     blockers.push({ reason: "В выборке есть уже выгруженные подачи" });
+  }
+
+  if (emptyApplicantSubmissions.length > 0) {
+    blockers.push({ reason: "В выборке есть подачи без заявителей" });
+  }
+
+  if (rowsWithMissingApplicantName.length > 0) {
+    blockers.push({ reason: "В строках выгрузки есть заявители без ФИО" });
   }
 
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });

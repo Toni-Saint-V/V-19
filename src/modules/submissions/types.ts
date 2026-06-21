@@ -6,8 +6,11 @@ export type Surface =
   | "agent-inbox"
   | "agent-actions"
   | "agent-submissions"
+  | "admin-inbox"
+  | "admin-actions"
   | "admin-review"
-  | "export";
+  | "export"
+  | "settings";
 
 export type AgentOwnerId = string;
 

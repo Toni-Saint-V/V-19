@@ -352,7 +352,7 @@ describeLive("Supabase live persistence, RLS and Storage smoke", () => {
         .from(mediaStorageBucket)
         .upload(target.path, file, {
           contentType: file.type,
-          upsert: true,
+          upsert: false,
         });
       expect(ownerUploadError).toBeNull();
     }

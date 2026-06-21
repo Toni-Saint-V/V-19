@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 import { buildMediaSlot } from "../../src/lib/workflow";
 import {
   buildMediaStoragePath,
+  createMediaSignedUrl,
+  deleteMediaFromStorage,
   mediaStorageBucket,
   storageTargetForSlot,
   uploadMediaToStorage,
@@ -167,7 +169,7 @@ describe("media storage contract", () => {
     ).toThrow(/size/);
   });
 
-  test("returns null in local-demo before validating upload target", async () => {
+  test("validates upload targets before returning local-demo null", async () => {
     await expect(
       uploadMediaToStorage(
         {
@@ -176,6 +178,44 @@ describe("media storage contract", () => {
         },
         new File(["x"], "bad.mp4", { type: "video/mp4" }),
       ),
+    ).rejects.toThrow(/storage path/);
+
+    await expect(
+      uploadMediaToStorage(
+        buildMediaStoragePath(
+          "VF-1044",
+          "applicant-1",
+          "photo_white",
+          "751234567_photo_white.jpg",
+        ),
+        new File(["x"], "photo.jpg", { type: "image/jpeg" }),
+      ),
     ).resolves.toBeNull();
+  });
+
+  test("validates delete and signed-url targets before returning local-demo null", async () => {
+    await expect(
+      deleteMediaFromStorage({
+        bucket: mediaStorageBucket,
+        path: "unsafe/path",
+      }),
+    ).rejects.toThrow(/storage path/);
+
+    await expect(
+      createMediaSignedUrl({
+        bucket: mediaStorageBucket,
+        path: "unsafe/path",
+      }),
+    ).rejects.toThrow(/storage path/);
+
+    const target = buildMediaStoragePath(
+      "VF-1044",
+      "applicant-1",
+      "photo_white",
+      "751234567_photo_white.jpg",
+    );
+
+    await expect(deleteMediaFromStorage(target)).resolves.toBeUndefined();
+    await expect(createMediaSignedUrl(target)).resolves.toBeNull();
   });
 });

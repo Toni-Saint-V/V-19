@@ -325,7 +325,10 @@ async function invokeLocalPassportExtraction(input: {
 
   const quality = await safePassportImageQualityFromFile(input.localFile);
 
-  const tesseract = await import("tesseract.js");
+  // tesseract.js does not publish declarations for this recognize-only subpath.
+  // Keep the narrow import to avoid bundling scheduler/language tables into V-19.
+  // @ts-expect-error see note above
+  const tesseract = await import("tesseract.js/src/Tesseract.js");
   const recognize = tesseract.recognize ?? tesseract.default.recognize;
   const rotations = [0, 90, 180, 270] as const;
 

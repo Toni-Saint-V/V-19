@@ -48,11 +48,6 @@ const forbiddenCopy = [
   "решение принято системой",
 ];
 const forbiddenReachableSurfaceTerms = [
-  "agent-settings",
-  "admin-inbox",
-  "admin-actions",
-  "admin-settings",
-  '"Настройки"',
   '"Документы"',
 ];
 const reachableSurfaceFiles = [
@@ -60,8 +55,9 @@ const reachableSurfaceFiles = [
   path.join(root, "src/modules/submissions/types.ts"),
   path.join(root, "src/modules/submissions/uiTypes.ts"),
 ];
-// AgentInbox/AgentActions are allowed agent surfaces; admin inbox/actions and
-// settings remain outside the V-19 navigation contract.
+// The current V-19 design/application contract allows inbox/actions for both
+// roles plus a bounded settings surface. Standalone documents remain outside
+// the primary navigation contract.
 
 const visited = new Set();
 const violations = [];

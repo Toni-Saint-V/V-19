@@ -15,6 +15,7 @@
     "test:e2e": "playwright test",
     "test:e2e:supabase": "playwright test --config playwright.supabase.config.ts",
     "verify:performance": "node scripts/verify-performance.mjs",
+    "verify:v19-ui-proof": "playwright test tests/e2e/v19-accessibility.spec.ts tests/e2e/v19-responsive-proof.spec.ts tests/e2e/v19-ux-states.spec.ts --project=chromium",
     "verify:safety": "node scripts/verify-safety.mjs",
     "verify:codex-hook": "node scripts/verify-codex-hook.mjs",
     "verify:agent-screen-system": "node scripts/verify-agent-screen-system.mjs",
@@ -23,7 +24,7 @@
     "verify:production-readiness": "node scripts/verify-production-readiness.mjs",
     "verify:production-packet": "node scripts/verify-production-readiness.mjs --expect-blocked",
     "verify:security": "npm audit --omit=dev",
-    "verify": "npm run typecheck && npm run lint && npm run verify:safety && npm run verify:codex-hook && npm run verify:agent-screen-system && npm run verify:v19-boundary && npm run test && npm run build && npm run verify:performance",
+    "verify": "npm run typecheck && npm run lint && npm run verify:safety && npm run verify:codex-hook && npm run verify:agent-screen-system && npm run verify:v19-boundary && npm run verify:v19-ui-proof && npm run test && npm run build && npm run verify:performance",
     "verify:full": "npm run verify && npm run verify:supabase-release && npm run verify:production-packet && npm run verify:security && npm run test:e2e"
   },
   "dependencies": {

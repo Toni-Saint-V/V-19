@@ -29,6 +29,14 @@ const requiredMigrationOrder = [
   "20260613010029_visaflow_rpc_submit_boundary.sql",
   "20260614000000_ai_helper_audit_quota.sql",
   "20260615000000_ai_helper_security_advisor_hardening.sql",
+  "20260616000000_export_batch_identity.sql",
+  "20260616001000_complete_export_package_rpc.sql",
+  "20260616002000_prevent_export_regression.sql",
+  "20260617001000_submit_corrections_handoff_rpc.sql",
+  "20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
+  "20260617003000_passport_workspace_media_slots.sql",
+  "20260617004000_complete_export_package_workspace_media_slots.sql",
+  "20260617005000_passport_extraction_audit_quota_contract.sql",
 ];
 
 const checks = [];
@@ -229,6 +237,46 @@ function verifyRuntimeGuards() {
   );
 }
 
+function verifyWorkspaceMediaSlotContract() {
+  const workspaceSlots = readProjectFile(
+    resolve(migrationsDir, "20260617003000_passport_workspace_media_slots.sql"),
+    "Workspace media-slot migration exists",
+  );
+  const exportPackageSlots = readProjectFile(
+    resolve(
+      migrationsDir,
+      "20260617004000_complete_export_package_workspace_media_slots.sql",
+    ),
+    "Export package workspace media-slot migration exists",
+  );
+
+  expectContains(
+    workspaceSlots,
+    "alter type public.media_slot_type add value if not exists 'selfie_2';",
+    "Workspace media-slot migration adds selfie_2 enum value",
+  );
+  expectContains(
+    workspaceSlots,
+    "alter type public.media_slot_type add value if not exists 'passport_scan';",
+    "Workspace media-slot migration adds passport_scan enum value",
+  );
+  expectContains(
+    workspaceSlots,
+    "'selfie_2'",
+    "Workspace storage policies include selfie_2",
+  );
+  expectContains(
+    workspaceSlots,
+    "'passport_scan'",
+    "Workspace storage policies include passport_scan",
+  );
+  expectContains(
+    exportPackageSlots,
+    "and m.type in ('photo_white', 'selfie', 'selfie_2', 'passport_scan')",
+    "Export package RPC includes workspace media slot types",
+  );
+}
+
 function verifyAiHelperSecurityHardening() {
   const quotaMigration = readProjectFile(
     resolve(migrationsDir, "20260614000000_ai_helper_audit_quota.sql"),
@@ -339,6 +387,37 @@ function verifySmokeGuard() {
     "ownerOverwriteAfterHandoffError",
     "Live smoke proves owner storage overwrite is blocked after handoff",
   );
+  expectContains(
+    liveSmoke,
+    "signedUrlError",
+    "Live smoke proves owner signed URL access",
+  );
+  expectContains(
+    liveSmoke,
+    "otherSignedUrlError",
+    "Live smoke proves cross-agent signed URL denial",
+  );
+  const ownerUploadIndex = liveSmoke.indexOf(
+    "const { error: ownerUploadError }",
+  );
+  const otherUploadIndex = liveSmoke.indexOf(
+    "const { error: otherUploadError }",
+  );
+  const initialOwnerUploadBlock =
+    ownerUploadIndex >= 0 && otherUploadIndex > ownerUploadIndex
+      ? liveSmoke.slice(ownerUploadIndex, otherUploadIndex)
+      : "";
+  if (
+    initialOwnerUploadBlock.includes("upsert: false") &&
+    !initialOwnerUploadBlock.includes("upsert: true")
+  ) {
+    pass("Live smoke initial owner media upload is create-only");
+  } else {
+    fail(
+      "Live smoke initial owner media upload is create-only",
+      "Owner setup upload must use upsert: false before overwrite-negative checks",
+    );
+  }
   expectContains(
     liveSmoke,
     "blockedReviewError",
@@ -478,6 +557,14 @@ function verifyDocsAndScripts() {
     "20260613010029_visaflow_rpc_submit_boundary.sql",
     "20260614000000_ai_helper_audit_quota.sql",
     "20260615000000_ai_helper_security_advisor_hardening.sql",
+    "20260616000000_export_batch_identity.sql",
+    "20260616001000_complete_export_package_rpc.sql",
+    "20260616002000_prevent_export_regression.sql",
+    "20260617001000_submit_corrections_handoff_rpc.sql",
+    "20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
+    "20260617003000_passport_workspace_media_slots.sql",
+    "20260617004000_complete_export_package_workspace_media_slots.sql",
+    "20260617005000_passport_extraction_audit_quota_contract.sql",
     "Agent smoke account exists.",
     "Backup owner:",
     "Supabase organization/project plan supports leaked password protection.",
@@ -513,6 +600,7 @@ function report() {
 
 verifyMigrationOrder();
 verifyRuntimeGuards();
+verifyWorkspaceMediaSlotContract();
 verifyAiHelperSecurityHardening();
 verifySmokeGuard();
 verifyDocsAndScripts();

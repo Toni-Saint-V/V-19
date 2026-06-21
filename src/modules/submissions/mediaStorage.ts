@@ -19,10 +19,10 @@ export async function uploadMediaToStorage(
   target: MediaStorageTarget,
   file: File,
 ): Promise<{ path: string } | null> {
+  validateMediaStorageTarget({ target, file });
+
   const client = getSupabaseClient();
   if (!client) return null;
-
-  validateMediaStorageTarget({ target, file });
 
   const { data, error } = await client.storage
     .from(target.bucket)
@@ -43,10 +43,10 @@ export async function uploadMediaToStorage(
 export async function deleteMediaFromStorage(
   target: MediaStorageTarget,
 ): Promise<void> {
+  validateMediaStorageTarget({ target });
+
   const client = getSupabaseClient();
   if (!client) return;
-
-  validateMediaStorageTarget({ target });
 
   const { error } = await client.storage.from(target.bucket).remove([target.path]);
   if (error) {
@@ -61,10 +61,10 @@ export async function createMediaSignedUrl(
   target: MediaStorageTarget,
   expiresInSeconds = 60 * 10,
 ): Promise<string | null> {
+  validateMediaStorageTarget({ target });
+
   const client = getSupabaseClient();
   if (!client) return null;
-
-  validateMediaStorageTarget({ target });
 
   const { data, error } = await client.storage
     .from(target.bucket)

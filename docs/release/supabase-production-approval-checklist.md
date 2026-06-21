@@ -30,6 +30,14 @@ Required migration order:
 5. `20260613010029_visaflow_rpc_submit_boundary.sql`
 6. `20260614000000_ai_helper_audit_quota.sql`
 7. `20260615000000_ai_helper_security_advisor_hardening.sql`
+8. `20260616000000_export_batch_identity.sql`
+9. `20260616001000_complete_export_package_rpc.sql`
+10. `20260616002000_prevent_export_regression.sql`
+11. `20260617001000_submit_corrections_handoff_rpc.sql`
+12. `20260617002000_preserve_applicant_profile_on_cockpit_save.sql`
+13. `20260617003000_passport_workspace_media_slots.sql`
+14. `20260617004000_complete_export_package_workspace_media_slots.sql`
+15. `20260617005000_passport_extraction_audit_quota_contract.sql`
 
 Approval:
 
