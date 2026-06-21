@@ -94,6 +94,7 @@ git diff --check
 npx vitest run tests/unit/supabaseSecurityContract.spec.ts
 npm run verify:supabase-release
 node scripts/verify-production-readiness.mjs --expect-blocked
+npm run verify:local-readiness
 npm run verify:full
 ```
 
@@ -105,6 +106,8 @@ Results:
 - `npm run verify:supabase-release`: passed, including AI helper SQL grant/revoke statement checks.
 - `node scripts/verify-production-readiness.mjs --expect-blocked`: passed fail-closed, 34 blockers remain.
 - `npm run verify:full`: passed, including typecheck, lint, safety, boundary, unit/integration tests, build, performance, Supabase release gate, security audit, and 28 Playwright E2E tests.
+
+Current gate semantics separate the local layer from production activation. Use `npm run verify:local-readiness` for local merge-readiness proof. `npm run verify:full` is allowed to stop at the fail-closed production packet while production evidence is stale; it must pass only after the production packet evidence is refreshed and the activation checklist is complete.
 
 Current focused verification after production advisor gate hardening:
 
@@ -157,7 +160,8 @@ Database rollback must be a forward migration or approved restore path. Do not m
 ## Merge Checklist
 
 - [ ] Branch reviewed against the listed production-readiness commits and current PR head.
-- [ ] `npm run verify:full` passed after final diff.
+- [ ] `npm run verify:local-readiness` passed after final diff.
+- [ ] `npm run verify:full` result recorded after final diff; production activation requires a pass only after production packet evidence is refreshed.
 - [ ] `npm run test:supabase-live` passed against sandbox.
 - [ ] Production approval checklist completed if production activation is planned.
 - [ ] Future production migrations are not applied from Codex without explicit owner approval.
@@ -187,6 +191,7 @@ Out of scope: auth redesign, billing, admin redesign, unrelated schema expansion
 - npm run verify:v19-boundary
 - npm run format:check
 - npm run test
+- npm run verify:local-readiness
 - npm run verify:full
 
 ## Risk And Rollback

@@ -45,10 +45,11 @@ Before any production migration or client activation, run:
 ```bash
 npm run verify:supabase-release
 npm run test:supabase-live
+npm run verify:local-readiness
 npm run verify:full
 ```
 
-`npm run verify:supabase-release` checks local migration order, RLS/Storage guard migrations, the sandbox-only smoke target guard, rollback documentation, and the production env evidence gate. `npm run test:supabase-live` remains sandbox-only; do not point it at production. Production activation also requires `VITE_SUPABASE_ACTIVATION_TARGET=production` and `VITE_SUPABASE_PRODUCTION_APPROVED=true` after owner approval.
+`npm run verify:supabase-release` checks local migration order, RLS/Storage guard migrations, the sandbox-only smoke target guard, rollback documentation, and the production env evidence gate. `npm run test:supabase-live` remains sandbox-only; do not point it at production. `npm run verify:local-readiness` proves the local layer with local verification, security audit, and full Playwright E2E. `npm run verify:full` runs local readiness and release checks before the fail-closed production packet, so a production `NO_GO` does not hide local proof. Production activation also requires `VITE_SUPABASE_ACTIVATION_TARGET=production` and `VITE_SUPABASE_PRODUCTION_APPROVED=true` after owner approval.
 
 ## Local/demo behavior
 

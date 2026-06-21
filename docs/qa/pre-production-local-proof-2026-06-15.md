@@ -5,6 +5,24 @@ Target: `/Users/user/Documents/V-19`
 Branch: `main`
 Scope: local and allow-listed sandbox proof only. No production mutation, deploy, migration apply, or activation.
 
+## 2026-06-22 Local Readiness Gate Refresh
+
+Target: `/Users/user/Documents/V-19`
+Branch: `codex/v19-readiness-performance-gate`
+Scope: local readiness and release-gate plumbing proof only. No production mutation, deploy, migration apply, push, or activation.
+
+- `npm run verify:local-readiness`
+  - Result: pass
+  - Evidence: local `verify` passed; `npm audit --omit=dev` found 0 vulnerabilities; Playwright E2E passed 45 tests with 3 skipped.
+- `npm run verify:supabase-release`
+  - Result: pass
+  - Evidence: 107 checks passed, including exact `verify:local-readiness` command checks, safe local-readiness command order, release docs coverage, sandbox target guards, RLS/Storage guard checks, and fail-closed production packet wiring.
+- `npm run verify:full`
+  - Result: blocked as expected at production packet.
+  - Evidence: local readiness passed, Supabase release gate passed, then `verify:production-packet` stopped with `NO_GO`.
+
+This refresh proves the local layer is green under the current branch gate. It does not close sandbox/live evidence freshness, production activation, production migration evidence gaps, orphan production auth/profile state, backup/restore proof, production env activation, post-activation checks, or final owner `GO`.
+
 ## Fresh Commands
 
 - `npm run verify:supabase-release`

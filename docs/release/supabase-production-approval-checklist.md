@@ -108,6 +108,7 @@ Run before production activation:
 ```bash
 npm run verify:supabase-release
 npm run test:supabase-live
+npm run verify:local-readiness
 npm run verify:full
 ```
 
@@ -119,9 +120,14 @@ Record results:
 - [ ] `npm run test:supabase-live`
   - result:
   - timestamp:
+- [ ] `npm run verify:local-readiness`
+  - result:
+  - timestamp:
 - [ ] `npm run verify:full`
   - result:
   - timestamp:
+  - expected before production evidence refresh: fail-closed `NO_GO`
+  - expected before activation: pass
 
 Browser/key audit:
 

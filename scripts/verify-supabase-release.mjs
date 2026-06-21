@@ -146,6 +146,32 @@ function expectNoQuotaExecuteGrantToRole(content, role, label) {
   }
 }
 
+function scriptCommands(script) {
+  return script
+    .split("&&")
+    .map((command) => command.trim())
+    .filter(Boolean);
+}
+
+function hasScriptCommand(commands, expected) {
+  return commands.includes(expected);
+}
+
+function commandIndex(commands, expected) {
+  return commands.indexOf(expected);
+}
+
+function expectExactScriptCommands(commands, expectedCommands, label) {
+  const actual = commands.join(" && ");
+  const expected = expectedCommands.join(" && ");
+
+  if (actual === expected) {
+    pass(label);
+  } else {
+    fail(label, `Expected "${expected}", got "${actual || "<empty>"}"`);
+  }
+}
+
 function verifyMigrationOrder() {
   const migrationFiles = readdirSync(migrationsDir)
     .filter((fileName) => fileName.endsWith(".sql"))
@@ -397,12 +423,8 @@ function verifySmokeGuard() {
     "otherSignedUrlError",
     "Live smoke proves cross-agent signed URL denial",
   );
-  const ownerUploadIndex = liveSmoke.indexOf(
-    "const { error: ownerUploadError }",
-  );
-  const otherUploadIndex = liveSmoke.indexOf(
-    "const { error: otherUploadError }",
-  );
+  const ownerUploadIndex = liveSmoke.indexOf("const { error: ownerUploadError }");
+  const otherUploadIndex = liveSmoke.indexOf("const { error: otherUploadError }");
   const initialOwnerUploadBlock =
     ownerUploadIndex >= 0 && otherUploadIndex > ownerUploadIndex
       ? liveSmoke.slice(ownerUploadIndex, otherUploadIndex)
@@ -469,6 +491,21 @@ function verifySmokeGuard() {
 
 function verifyDocsAndScripts() {
   const packageJson = JSON.parse(readProjectFile(packagePath, "package.json exists"));
+  const verifyLocalReadinessScript =
+    packageJson.scripts?.["verify:local-readiness"] ?? "";
+  const verifyFullScript = packageJson.scripts?.["verify:full"] ?? "";
+  const verifyLocalReadinessCommands = scriptCommands(verifyLocalReadinessScript);
+  const verifyFullCommands = scriptCommands(verifyFullScript);
+  const expectedLocalReadinessCommands = [
+    "npm run verify",
+    "npm run verify:security",
+    "npm run test:e2e",
+  ];
+  const expectedVerifyFullCommands = [
+    "npm run verify:local-readiness",
+    "npm run verify:supabase-release",
+    "npm run verify:production-packet",
+  ];
   const readme = readProjectFile(supabaseReadmePath, "Supabase README exists");
   const runbook = readProjectFile(
     releaseRunbookPath,
@@ -486,7 +523,76 @@ function verifyDocsAndScripts() {
     fail("Package exposes verify:supabase-release", "Missing npm script");
   }
 
-  if (packageJson.scripts?.["verify:full"]?.includes("verify:supabase-release")) {
+  if (packageJson.scripts?.["verify:local-readiness"]) {
+    pass("Package exposes verify:local-readiness");
+  } else {
+    fail("Package exposes verify:local-readiness", "missing npm script");
+  }
+
+  if (hasScriptCommand(verifyLocalReadinessCommands, "npm run verify")) {
+    pass("verify:local-readiness includes local verify gate");
+  } else {
+    fail(
+      "verify:local-readiness includes local verify gate",
+      "npm run verify:local-readiness must include npm run verify",
+    );
+  }
+
+  if (hasScriptCommand(verifyLocalReadinessCommands, "npm run verify:security")) {
+    pass("verify:local-readiness includes security audit");
+  } else {
+    fail(
+      "verify:local-readiness includes security audit",
+      "npm run verify:local-readiness must include npm run verify:security",
+    );
+  }
+
+  if (hasScriptCommand(verifyLocalReadinessCommands, "npm run test:e2e")) {
+    pass("verify:local-readiness includes full Playwright E2E");
+  } else {
+    fail(
+      "verify:local-readiness includes full Playwright E2E",
+      "npm run verify:local-readiness must include npm run test:e2e",
+    );
+  }
+
+  const localVerifyIndex = commandIndex(verifyLocalReadinessCommands, "npm run verify");
+  const localSecurityIndex = commandIndex(
+    verifyLocalReadinessCommands,
+    "npm run verify:security",
+  );
+  const localE2eIndex = commandIndex(verifyLocalReadinessCommands, "npm run test:e2e");
+  if (
+    localVerifyIndex > -1 &&
+    localSecurityIndex > -1 &&
+    localE2eIndex > -1 &&
+    localSecurityIndex > localVerifyIndex &&
+    localE2eIndex > localSecurityIndex
+  ) {
+    pass("verify:local-readiness runs checks in safe order");
+  } else {
+    fail(
+      "verify:local-readiness runs checks in safe order",
+      "npm run verify:local-readiness must run npm run verify before npm run verify:security before npm run test:e2e",
+    );
+  }
+
+  expectExactScriptCommands(
+    verifyLocalReadinessCommands,
+    expectedLocalReadinessCommands,
+    "verify:local-readiness has exact command sequence",
+  );
+
+  if (hasScriptCommand(verifyFullCommands, "npm run verify:local-readiness")) {
+    pass("verify:full includes local readiness gate");
+  } else {
+    fail(
+      "verify:full includes local readiness gate",
+      "npm run verify:full must include npm run verify:local-readiness",
+    );
+  }
+
+  if (hasScriptCommand(verifyFullCommands, "npm run verify:supabase-release")) {
     pass("verify:full includes Supabase release gate");
   } else {
     fail(
@@ -501,7 +607,7 @@ function verifyDocsAndScripts() {
     fail("Package exposes verify:production-packet", "missing npm script");
   }
 
-  if (packageJson.scripts?.["verify:full"]?.includes("verify:production-packet")) {
+  if (hasScriptCommand(verifyFullCommands, "npm run verify:production-packet")) {
     pass("verify:full includes production packet gate");
   } else {
     fail(
@@ -510,9 +616,43 @@ function verifyDocsAndScripts() {
     );
   }
 
+  const localReadinessIndex = commandIndex(
+    verifyFullCommands,
+    "npm run verify:local-readiness",
+  );
+  const supabaseReleaseIndex = commandIndex(
+    verifyFullCommands,
+    "npm run verify:supabase-release",
+  );
+  const productionPacketIndex = commandIndex(
+    verifyFullCommands,
+    "npm run verify:production-packet",
+  );
+  if (
+    localReadinessIndex > -1 &&
+    supabaseReleaseIndex > -1 &&
+    productionPacketIndex > -1 &&
+    productionPacketIndex > localReadinessIndex &&
+    productionPacketIndex > supabaseReleaseIndex
+  ) {
+    pass("verify:full runs production packet after local release proof");
+  } else {
+    fail(
+      "verify:full runs production packet after local release proof",
+      "npm run verify:production-packet must run after npm run verify:local-readiness and npm run verify:supabase-release so fail-closed production blockers do not hide local proof",
+    );
+  }
+
+  expectExactScriptCommands(
+    verifyFullCommands,
+    expectedVerifyFullCommands,
+    "verify:full has exact layered command sequence",
+  );
+
   for (const expected of [
     "npm run verify:supabase-release",
     "npm run test:supabase-live",
+    "npm run verify:local-readiness",
     "production",
     "rollback",
   ]) {
@@ -523,6 +663,7 @@ function verifyDocsAndScripts() {
     "Do not apply these migrations to production from Codex without explicit owner approval.",
     "supabase-workspace-pr-package.md",
     "supabase-production-approval-checklist.md",
+    "npm run verify:local-readiness",
     "Rollback Boundary",
     "Migration Order",
     "Final Sandbox RLS And Storage Smoke",
@@ -541,6 +682,8 @@ function verifyDocsAndScripts() {
     "5d73f7d Add Supabase production promotion gate",
     "7f715e7 Harden AI helper Supabase security",
     "20260615000000_ai_helper_security_advisor_hardening.sql",
+    "npm run verify:local-readiness",
+    "production activation requires a pass only after production packet evidence is refreshed",
     "Ready for PR review",
     "Not ready for production activation until the production approval checklist is completed.",
   ]) {
@@ -567,6 +710,9 @@ function verifyDocsAndScripts() {
     "20260617005000_passport_extraction_audit_quota_contract.sql",
     "Agent smoke account exists.",
     "Backup owner:",
+    "npm run verify:local-readiness",
+    "expected before production evidence refresh: fail-closed `NO_GO`",
+    "expected before activation: pass",
     "Supabase organization/project plan supports leaked password protection.",
     "Supabase plan eligibility for leaked password protection is confirmed.",
     "Auth leaked password protection is enabled.",

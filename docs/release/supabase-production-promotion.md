@@ -34,8 +34,9 @@ Dry-run checklist before production:
 3. Confirm no migration is edited after sandbox proof.
 4. Confirm `npm run verify:supabase-release` passes locally.
 5. Confirm `npm run test:supabase-live` passes against the allow-listed sandbox.
-6. Confirm `npm run verify:full` passes after the release gate is included.
-7. Confirm Supabase plan eligibility supports leaked password protection, Supabase security advisors have no activation-blocking warnings, and Auth leaked password protection is enabled.
+6. Confirm `npm run verify:local-readiness` passes locally.
+7. Confirm `npm run verify:full` passes after the production packet evidence is refreshed.
+8. Confirm Supabase plan eligibility supports leaked password protection, Supabase security advisors have no activation-blocking warnings, and Auth leaked password protection is enabled.
 
 Current production state as of 2026-06-16:
 
