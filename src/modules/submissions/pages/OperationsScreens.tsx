@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import {
-  ActionDock,
   Badge,
   Button,
   CardComponent,
@@ -1452,40 +1451,45 @@ export function ExportScreen({
                   : "Блокировано"}
               </Badge>
             </div>
-            <ActionDock
-              actions={
-                <>
-                  <Button
-                    disabled={exportBusy || !exportPlan.canGenerate}
-                    onClick={onGenerate}
-                  >
-                    Сформировать Эксель
-                  </Button>
-                  <Button
-                    disabled={exportBusy || !exportPlan.canDownload}
-                    variant="secondary"
-                    onClick={onDownload}
-                  >
-                    Скачать
-                  </Button>
-                  <Button
-                    disabled={exportBusy || !exportPlan.canMarkExported}
-                    loading={exportBusy}
-                    variant="secondary"
-                    onClick={onMarkExported}
-                  >
-                    Отметить выгружено
-                  </Button>
-                </>
-              }
-              className="export-action-dock"
-              actionsClassName="export-actions"
-              busy={exportBusy}
-              hint={actionHint}
-              hintClassName="export-action-hint"
-              hintId="export-action-hint"
-              testId="export-action-dock"
-            />
+            <div
+              aria-busy={exportBusy || undefined}
+              aria-describedby={actionHint ? "export-action-hint" : undefined}
+              className="mp-action-dock export-action-dock"
+              data-testid="export-action-dock"
+            >
+              <div className="mp-action-dock-actions export-actions">
+                <Button
+                  disabled={exportBusy || !exportPlan.canGenerate}
+                  onClick={onGenerate}
+                >
+                  Сформировать Эксель
+                </Button>
+                <Button
+                  disabled={exportBusy || !exportPlan.canDownload}
+                  variant="secondary"
+                  onClick={onDownload}
+                >
+                  Скачать
+                </Button>
+                <Button
+                  disabled={exportBusy || !exportPlan.canMarkExported}
+                  loading={exportBusy}
+                  variant="secondary"
+                  onClick={onMarkExported}
+                >
+                  Отметить выгружено
+                </Button>
+              </div>
+              {actionHint ? (
+                <p
+                  aria-live="polite"
+                  className="mp-action-dock-hint export-action-hint"
+                  id="export-action-hint"
+                >
+                  {actionHint}
+                </p>
+              ) : null}
+            </div>
             <dl
               className="export-package-summary"
               aria-label="Состав выбранного пакета"
