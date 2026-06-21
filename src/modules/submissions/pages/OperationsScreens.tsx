@@ -1,5 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
+import { flushSync } from "react-dom";
+import {
+  ActionDock,
+  Badge,
+  Button,
+  CardComponent,
+} from "../../../shared/ui/primitives";
 import type { AgentActionItem, AgentActionSummary } from "../agentActions";
 import type { ExportSummary } from "../exportRules";
 import {
@@ -17,7 +23,7 @@ import {
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
 import type { AgentTab, ExportTab, ReviewTab } from "../uiTypes";
-import { EmptyState, PanelHeader, SummaryRow } from "../components/Primitives";
+import { EmptyState, SummaryRow } from "../components/Primitives";
 import {
   ActionRow,
   CollectionGroupLabel,
@@ -38,6 +44,46 @@ function pluralRu(count: number, one: string, few: string, many: string) {
   if (mod10 === 1 && mod100 !== 11) return one;
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
   return many;
+}
+
+type ViewTransitionLike = {
+  finished: Promise<unknown>;
+};
+
+const viewTransitionClass = "vf-vt";
+
+function transitionUiState(update: () => void) {
+  if (
+    typeof document === "undefined" ||
+    typeof window === "undefined" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    update();
+    return;
+  }
+
+  const transitionDocument = document as Document & {
+    startViewTransition?: (updateCallback: () => void) => ViewTransitionLike;
+  };
+
+  if (!transitionDocument.startViewTransition) {
+    update();
+    return;
+  }
+
+  const transitionRoot = document.documentElement;
+
+  try {
+    transitionRoot.classList.add(viewTransitionClass);
+    const transition = transitionDocument.startViewTransition(() => flushSync(update));
+
+    transition.finished.finally(() => {
+      transitionRoot.classList.remove(viewTransitionClass);
+    });
+  } catch {
+    transitionRoot.classList.remove(viewTransitionClass);
+    update();
+  }
 }
 
 function adminIssueUnavailableReason(submission: Submission) {
@@ -130,7 +176,39 @@ export function AgentActionsScreen({
 
         <CollectionToolbar
           ariaLabel="Инструменты действий"
-          onTabChange={setActiveTab}
+          filterTabs={
+            activeTab === "open" ? (
+              <SummaryFilterTabs
+                ariaLabel="Сроки действий"
+                onValueChange={(nextFilter) =>
+                  transitionUiState(() =>
+                    setDueFilter((value) =>
+                      value === nextFilter ? "all" : nextFilter,
+                    ),
+                  )
+                }
+                tabs={[
+                  {
+                    count: summary.overdue,
+                    id: "overdue",
+                    label: "Просрочено",
+                    tone: "danger",
+                  },
+                  { count: summary.today, id: "today", label: "Сегодня", tone: "amber" },
+                  {
+                    count: summary.week,
+                    id: "week",
+                    label: "На неделе",
+                    tone: "neutral",
+                  },
+                ]}
+                value={dueFilter === "all" ? null : dueFilter}
+              />
+            ) : null
+          }
+          onTabChange={(nextTab) =>
+            transitionUiState(() => setActiveTab(nextTab))
+          }
           search={searchControl}
           tabs={[
             { count: summary.open, id: "open", label: "Открытые" },
@@ -140,6 +218,7 @@ export function AgentActionsScreen({
               label: "Выполненные",
             },
           ]}
+          tabsAriaLabel="Состояние действий"
           tools={
             <ToolbarTools>
               <ToolbarIconButton
@@ -147,14 +226,18 @@ export function AgentActionsScreen({
                 icon="filter"
                 pressed={dueFilter !== "all"}
                 onClick={() =>
-                  setDueFilter((value) => (value === "all" ? "overdue" : "all"))
+                  transitionUiState(() =>
+                    setDueFilter((value) => (value === "all" ? "overdue" : "all")),
+                  )
                 }
               />
               <ToolbarIconButton
                 label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
                 icon="view"
                 pressed={!comfortableView}
-                onClick={() => setComfortableView((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setComfortableView((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={
@@ -162,38 +245,22 @@ export function AgentActionsScreen({
                 }
                 icon="sort"
                 pressed={sortOldest}
-                onClick={() => setSortOldest((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setSortOldest((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
                 icon="panel"
                 pressed={panelOpen}
-                onClick={() => setPanelOpen((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setPanelOpen((value) => !value))
+                }
               />
             </ToolbarTools>
           }
           value={activeTab}
         />
-
-        {activeTab === "open" ? (
-          <SummaryFilterTabs
-            ariaLabel="Сроки действий"
-            onValueChange={(nextFilter) =>
-              setDueFilter((value) => (value === nextFilter ? "all" : nextFilter))
-            }
-            tabs={[
-              {
-                count: summary.overdue,
-                id: "overdue",
-                label: "Просрочено",
-                tone: "danger",
-              },
-              { count: summary.today, id: "today", label: "Сегодня", tone: "amber" },
-              { count: summary.week, id: "week", label: "На неделе", tone: "neutral" },
-            ]}
-            value={dueFilter === "all" ? null : dueFilter}
-          />
-        ) : null}
 
         {visibleActions.length ? (
           <div className="v19-event-list v19-action-list" aria-label="Список действий">
@@ -213,7 +280,7 @@ export function AgentActionsScreen({
             ))}
           </div>
         ) : (
-          <div className="v19-empty-state">
+          <div className="v19-empty-state" key={`actions-empty-${activeTab}-${dueFilter}`}>
             <h3>Открытых действий нет</h3>
             <p>
               Все текущие шаги выполнены. Новые действия появятся после изменений в
@@ -361,12 +428,15 @@ export function AgentInboxScreen({
         <CollectionToolbar
           activeFilters={activeFilterLabels}
           ariaLabel="Инструменты входящих"
-          onTabChange={setActiveTab}
+          onTabChange={(nextTab) =>
+            transitionUiState(() => setActiveTab(nextTab))
+          }
           search={searchControl}
           tabs={[
             { count: unreadCount, id: "unread", label: "Непрочитанные" },
             { id: "all", label: "Все" },
           ]}
+          tabsAriaLabel="Состояние входящих"
           tools={
             <ToolbarTools>
               <ToolbarIconButton
@@ -377,13 +447,17 @@ export function AgentInboxScreen({
                 }
                 icon="filter"
                 pressed={actionOnly}
-                onClick={() => setActionOnly((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setActionOnly((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
                 icon="view"
                 pressed={!comfortableView}
-                onClick={() => setComfortableView((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setComfortableView((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={
@@ -394,14 +468,20 @@ export function AgentInboxScreen({
                 icon="sort"
                 pressed={sortOrder === "oldest"}
                 onClick={() =>
-                  setSortOrder((value) => (value === "newest" ? "oldest" : "newest"))
+                  transitionUiState(() =>
+                    setSortOrder((value) =>
+                      value === "newest" ? "oldest" : "newest",
+                    ),
+                  )
                 }
               />
               <ToolbarIconButton
                 label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
                 icon="panel"
                 pressed={panelOpen}
-                onClick={() => setPanelOpen((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setPanelOpen((value) => !value))
+                }
               />
             </ToolbarTools>
           }
@@ -434,7 +514,7 @@ export function AgentInboxScreen({
             ))}
           </div>
         ) : (
-          <div className="v19-empty-state">
+          <div className="v19-empty-state" key={`inbox-empty-${activeTab}-${actionOnly}`}>
             <h3>Новых событий нет</h3>
             <p>Здесь появятся изменения, которые требуют вашего внимания.</p>
             <Button variant="secondary" onClick={() => setActiveTab("all")}>
@@ -607,6 +687,7 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
 export function AgentSubmissionsScreen({
   activeTab,
   agentList,
+  cityControl,
   onCreate,
   onOpen,
   onSelect,
@@ -617,6 +698,7 @@ export function AgentSubmissionsScreen({
 }: {
   activeTab: AgentTab;
   agentList: Submission[];
+  cityControl?: ReactNode;
   onCreate: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
@@ -677,7 +759,8 @@ export function AgentSubmissionsScreen({
         <CollectionToolbar
           activeFilters={activeFilterLabels}
           ariaLabel="Инструменты подач"
-          onTabChange={onTab}
+          cityControl={cityControl}
+          onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
           search={searchControl}
           tabs={[
             { count: tabCounts.action, id: "action", label: "Действия" },
@@ -685,31 +768,40 @@ export function AgentSubmissionsScreen({
             { count: tabCounts.review, id: "review", label: "Проверка" },
             { count: tabCounts.done, id: "done", label: "Готово" },
           ]}
+          tabsAriaLabel="Состояние подач"
           tools={
             <ToolbarTools>
               <ToolbarIconButton
                 label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
                 icon="filter"
                 pressed={blockersOnly}
-                onClick={() => setBlockersOnly((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setBlockersOnly((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
                 icon="view"
                 pressed={!comfortableView}
-                onClick={() => setComfortableView((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setComfortableView((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
                 icon="sort"
                 pressed={!sortNewest}
-                onClick={() => setSortNewest((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setSortNewest((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
                 icon="panel"
                 pressed={panelOpen}
-                onClick={() => setPanelOpen((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setPanelOpen((value) => !value))
+                }
               />
             </ToolbarTools>
           }
@@ -748,7 +840,7 @@ export function AgentSubmissionsScreen({
             </div>
           </>
         ) : (
-          <div className="v19-empty-state">
+          <div className="v19-empty-state" key={`submissions-empty-${visibleTab}-${blockersOnly}`}>
             <h3>В этой вкладке нет подач</h3>
             <p>Список обновится после создания или изменения статуса подачи.</p>
             <Button variant="secondary" onClick={onCreate}>
@@ -959,12 +1051,6 @@ export function AdminReviewScreen({
     sortNewest ? null : "Обратный порядок",
     comfortableView ? null : "Компактный вид",
   ].filter((label): label is string => Boolean(label));
-  const toolbarSearch = (
-    <div className="v19-admin-search-stack">
-      {searchControl}
-      {filterControl}
-    </div>
-  );
 
   return (
     <div
@@ -988,8 +1074,9 @@ export function AdminReviewScreen({
         <CollectionToolbar
           activeFilters={activeFilterLabels}
           ariaLabel="Инструменты проверки"
-          onTabChange={onTab}
-          search={toolbarSearch}
+          cityControl={filterControl}
+          onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
+          search={searchControl}
           tabs={[
             { count: tabCounts.all, id: "all", label: "Все" },
             { count: tabCounts.review, id: "review", label: "Проверка" },
@@ -1000,31 +1087,40 @@ export function AdminReviewScreen({
             },
             { count: tabCounts.ready, id: "ready", label: "К выгрузке" },
           ]}
+          tabsAriaLabel="Состояние проверки"
           tools={
             <ToolbarTools>
               <ToolbarIconButton
                 label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
                 icon="filter"
                 pressed={blockersOnly}
-                onClick={() => setBlockersOnly((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setBlockersOnly((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
                 icon="view"
                 pressed={!comfortableView}
-                onClick={() => setComfortableView((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setComfortableView((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
                 icon="sort"
                 pressed={!sortNewest}
-                onClick={() => setSortNewest((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setSortNewest((value) => !value))
+                }
               />
               <ToolbarIconButton
                 label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
                 icon="panel"
                 pressed={panelOpen}
-                onClick={() => setPanelOpen((value) => !value)}
+                onClick={() =>
+                  transitionUiState(() => setPanelOpen((value) => !value))
+                }
               />
             </ToolbarTools>
           }
@@ -1064,7 +1160,7 @@ export function AdminReviewScreen({
             </div>
           </>
         ) : (
-          <div className="v19-empty-state">
+          <div className="v19-empty-state" key={`review-empty-${reviewTab}-${blockersOnly}`}>
             <h3>Очередь проверки пуста</h3>
             <p>
               Новые подачи появятся здесь после отправки агентом или после исправлений.
@@ -1214,6 +1310,10 @@ export function ExportScreen({
     exportError ||
     (exportBusy ? "Фиксируем выгрузку..." : exportActionHint(exportPlan));
   const packageFacts = exportPackageFacts(exportPlan);
+  const selectedExportIdSet = useMemo(
+    () => new Set(selectedExportIds),
+    [selectedExportIds],
+  );
 
   return (
     <>
@@ -1223,52 +1323,67 @@ export function ExportScreen({
           className="submission-panel magic-export-queue"
           aria-labelledby="export-title"
         >
-          <PanelHeader
-            eyebrow="Выгрузка"
-            titleId="export-title"
-            title="Пакеты для Excel"
-            description="Готовые пакеты и история выгрузки"
-            tabs={[
-              ["ready", "Готовы"],
-              ["history", "История"],
-            ]}
+          <h2 id="export-title" className="sr-only">
+            Пакеты для Excel
+          </h2>
+
+          <CollectionToolbar
+            ariaLabel="Инструменты выгрузки"
+            cityControl={filterControl}
+            className="v19-export-toolbar"
+            onTabChange={onTab}
             search={searchControl}
-            side={filterControl}
+            tabs={[
+              { count: readyList.length, id: "ready", label: "Готовы" },
+              { count: historyList.length, id: "history", label: "История" },
+            ]}
+            tabsAriaLabel="Состояние выгрузки"
             value={exportTab}
-            onTab={onTab}
           />
           {exportTab === "ready" ? (
             <div className="submission-list magic-export-list">
-              {readyList.map((submission) => (
-                <CardComponent
-                  as="article"
-                  className="export-row magic-export-row"
-                  key={submission.id}
-                >
-                  <label className="export-check">
-                    <input
-                      checked={selectedExportIds.includes(submission.id)}
-                      type="checkbox"
-                      onChange={() => onToggle(submission.id)}
-                    />
-                    <span className="sr-only">Выбрать подачу</span>
-                  </label>
-                  <Button
-                    className="export-row-main"
-                    variant="plain"
-                    onClick={() => onOpen(submission)}
+              {readyList.map((submission) => {
+                const selected = selectedExportIdSet.has(submission.id);
+
+                return (
+                  <CardComponent
+                    as="article"
+                    aria-label={`Пакет ${submission.title}${
+                      selected ? ", выбран" : ""
+                    }`}
+                    className={`export-row magic-export-row ${
+                      selected ? "is-selected" : ""
+                    }`}
+                    key={submission.id}
                   >
-                    <strong>{submission.title}</strong>
-                    <span>
-                      {submission.id} · {typeLabels[submission.type]} ·{" "}
-                      {submission.city} · {tripDates(submission)}
-                    </span>
-                  </Button>
-                  <Button variant="secondary" onClick={() => onOpen(submission)}>
-                    Смотреть пакет
-                  </Button>
-                </CardComponent>
-              ))}
+                    <label className="export-check">
+                      <input
+                        aria-label={`Выбрать пакет: ${submission.title}`}
+                        checked={selected}
+                        type="checkbox"
+                        onChange={() => onToggle(submission.id)}
+                      />
+                      <span className="sr-only">
+                        Выбрать пакет: {submission.title}
+                      </span>
+                    </label>
+                    <Button
+                      className="export-row-main"
+                      variant="plain"
+                      onClick={() => onOpen(submission)}
+                    >
+                      <strong>{submission.title}</strong>
+                      <span>
+                        {submission.id} · {typeLabels[submission.type]} ·{" "}
+                        {submission.city} · {tripDates(submission)}
+                      </span>
+                    </Button>
+                    <Button variant="secondary" onClick={() => onOpen(submission)}>
+                      Смотреть пакет
+                    </Button>
+                  </CardComponent>
+                );
+              })}
               {readyList.length === 0 ? (
                 <EmptyState text="Нет подач готовых к выгрузке." />
               ) : null}
@@ -1287,7 +1402,7 @@ export function ExportScreen({
                       {submission.id} · {submission.city} · {tripDates(submission)}
                     </p>
                   </div>
-                  <Badge className="visa-tag visa-tag-ready">Выгружено</Badge>
+                  <Badge tone="teal">Выгружено</Badge>
                 </CardComponent>
               ))}
             </div>
@@ -1331,18 +1446,46 @@ export function ExportScreen({
                 <h2>{exportPackageTitle(exportPlan)}</h2>
                 <p className="export-package-line">{exportPackageLine(exportPlan)}</p>
               </div>
-              <Badge
-                className={
-                  exportPlan.ready
-                    ? "visa-tag visa-tag-ready"
-                    : "visa-tag visa-tag-danger"
-                }
-              >
+              <Badge tone={exportPlan.ready ? "teal" : "danger"}>
                 {exportPlan.ready
                   ? exportStateLabel(exportPlan.exportState)
                   : "Блокировано"}
               </Badge>
             </div>
+            <ActionDock
+              actions={
+                <>
+                  <Button
+                    disabled={exportBusy || !exportPlan.canGenerate}
+                    onClick={onGenerate}
+                  >
+                    Сформировать Эксель
+                  </Button>
+                  <Button
+                    disabled={exportBusy || !exportPlan.canDownload}
+                    variant="secondary"
+                    onClick={onDownload}
+                  >
+                    Скачать
+                  </Button>
+                  <Button
+                    disabled={exportBusy || !exportPlan.canMarkExported}
+                    loading={exportBusy}
+                    variant="secondary"
+                    onClick={onMarkExported}
+                  >
+                    Отметить выгружено
+                  </Button>
+                </>
+              }
+              className="export-action-dock"
+              actionsClassName="export-actions"
+              busy={exportBusy}
+              hint={actionHint}
+              hintClassName="export-action-hint"
+              hintId="export-action-hint"
+              testId="export-action-dock"
+            />
             <dl
               className="export-package-summary"
               aria-label="Состав выбранного пакета"
@@ -1397,36 +1540,6 @@ export function ExportScreen({
                 </div>
               ))}
             </div>
-            <div
-              className="export-actions"
-              aria-busy={exportBusy}
-              aria-describedby="export-action-hint"
-            >
-              <Button
-                disabled={exportBusy || !exportPlan.canGenerate}
-                onClick={onGenerate}
-              >
-                Сформировать Эксель
-              </Button>
-              <Button
-                disabled={exportBusy || !exportPlan.canDownload}
-                variant="secondary"
-                onClick={onDownload}
-              >
-                Скачать
-              </Button>
-              <Button
-                disabled={exportBusy || !exportPlan.canMarkExported}
-                loading={exportBusy}
-                variant="secondary"
-                onClick={onMarkExported}
-              >
-                Отметить выгружено
-              </Button>
-            </div>
-            <p className="export-action-hint" id="export-action-hint">
-              {actionHint}
-            </p>
           </CardComponent>
         </CardComponent>
       </div>

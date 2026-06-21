@@ -29,6 +29,7 @@ const failures = [];
 verifyVisualLock();
 verifyReferenceFiles();
 verifyNoForbiddenArtifacts();
+verifyMotionContract();
 
 if (failures.length > 0) {
   console.error("Agent Screen System verification failed:");
@@ -73,6 +74,47 @@ function verifyVisualLock() {
     expectedReferences,
     "docs/VISAFLOW_VISUAL_LOCK.md agent reference list",
   );
+}
+
+function verifyMotionContract() {
+  const stylesPath = path.join(root, "src", "styles.css");
+
+  if (!fs.existsSync(stylesPath)) {
+    failures.push("src/styles.css is missing");
+    return;
+  }
+
+  const styles = fs.readFileSync(stylesPath, "utf8");
+
+  if (!styles.includes("html.vf-vt::view-transition-old(root)")) {
+    failures.push("View Transition root CSS must be scoped to html.vf-vt");
+  }
+
+  if (/::view-transition-(?:old|new)\(root\)/.test(styles.replaceAll("html.vf-vt::view-transition-old(root)", "").replaceAll("html.vf-vt::view-transition-new(root)", ""))) {
+    failures.push("Unscoped root View Transition selectors are not allowed");
+  }
+
+  const screenGridBlock = styles.match(/\.v19-screen-grid\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+
+  if (/grid-template-columns\s+var\([^;]*motion|gap\s+var\([^;]*motion/.test(screenGridBlock)) {
+    failures.push(".v19-screen-grid must not animate layout properties");
+  }
+
+  const reducedMotionBlock =
+    styles.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+
+  if (
+    !reducedMotionBlock.includes("animation: none !important") ||
+    !reducedMotionBlock.includes("transition: none !important")
+  ) {
+    failures.push("Reduced motion must disable app animation and transition effects");
+  }
+
+  const exportQueueBlocks = [...styles.matchAll(/\.magic-export-queue\s*\{([^{}]*)\}/g)];
+
+  if (exportQueueBlocks.some((match) => /overflow:\s*hidden/.test(match[1]))) {
+    failures.push("Mobile export queue must not hide enabled row actions with overflow: hidden");
+  }
 }
 
 function verifyReferenceFiles() {
