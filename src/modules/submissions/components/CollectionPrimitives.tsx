@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import {
   Badge,
+  Button,
   CardComponent,
   IconButton,
   StateTabs,
@@ -27,34 +28,61 @@ type SummaryFilterTab<T extends string> = {
 export function CollectionToolbar<T extends string>({
   activeFilters = [],
   ariaLabel,
+  cityControl,
   className,
+  filterTabs,
+  filters,
   onTabChange,
   search,
   tabs,
-  tools,
+  tabsAriaLabel,
+  tools = null,
   value,
 }: {
   activeFilters?: string[];
   ariaLabel: string;
+  cityControl?: ReactNode;
   className?: string;
+  filterTabs?: ReactNode;
+  filters?: ReactNode;
   onTabChange: (value: T) => void;
   search: ReactNode;
   tabs: Array<CollectionTab<T>>;
-  tools: ReactNode;
+  tabsAriaLabel?: string;
+  tools?: ReactNode;
   value: T;
 }) {
   return (
     <>
-      <div className={cn("v19-collection-toolbar", className)} aria-label={ariaLabel}>
+      <div
+        className={cn(
+          "v19-collection-toolbar",
+          tabs.length > 3 && "has-many-tabs",
+          (cityControl != null || filters != null) && "has-control-stack",
+          cityControl != null && "has-city-control",
+          filters != null && "has-filter-control",
+          tools != null && "has-toolbar-tools",
+          className,
+        )}
+        aria-label={ariaLabel}
+      >
         <StateTabs
-          ariaLabel="Состояние событий"
+          ariaLabel={tabsAriaLabel ?? "Состояние списка"}
           onValueChange={onTabChange}
           tabs={tabs}
           value={value}
         />
-        {search}
+        <ToolbarControlStack
+          cityControl={cityControl}
+          filters={filters}
+          search={search}
+        />
         {tools}
       </div>
+
+      {filterTabs ? (
+        <div className="v19-toolbar-filter-row">{filterTabs}</div>
+      ) : null}
 
       {activeFilters.length ? (
         <div className="v19-active-filters" aria-label="Активные фильтры">
@@ -67,8 +95,35 @@ export function CollectionToolbar<T extends string>({
   );
 }
 
-export function ToolbarTools({ children }: { children: ReactNode }) {
+export function ToolbarTools({ children = null }: { children?: ReactNode }) {
   return <div className="v19-toolbar-tools">{children}</div>;
+}
+
+function ToolbarControlStack({
+  cityControl,
+  className,
+  filters,
+  search,
+}: {
+  cityControl?: ReactNode;
+  className?: string;
+  filters?: ReactNode;
+  search: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "v19-toolbar-control-stack",
+        cityControl != null && "has-city-control",
+        filters != null && "has-filter-control",
+        className,
+      )}
+    >
+      {search}
+      {filters}
+      {cityControl}
+    </div>
+  );
 }
 
 export function SummaryFilterTabs<T extends string>({
@@ -89,7 +144,7 @@ export function SummaryFilterTabs<T extends string>({
         const tone = tab.tone ?? "neutral";
 
         return (
-          <button
+          <Button
             aria-pressed={selected}
             className={cn(
               "v19-summary-filter-tab",
@@ -97,11 +152,12 @@ export function SummaryFilterTabs<T extends string>({
               selected && "is-active",
             )}
             key={tab.id}
+            variant="plain"
             type="button"
             onClick={() => onValueChange(tab.id)}
           >
             {tab.label} <TabCount>{tab.count}</TabCount>
-          </button>
+          </Button>
         );
       })}
     </div>
