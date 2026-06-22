@@ -134,6 +134,7 @@ export type PassportExtractionReviewState = {
   error?: string;
   extractedFields: PassportExtractedField[];
   lastAttemptAtIso?: string;
+  openaiAttemptedForFingerprint?: string;
   orientation?: {
     corrected: boolean;
     reason: "mrz_detected";

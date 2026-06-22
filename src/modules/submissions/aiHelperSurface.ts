@@ -218,10 +218,12 @@ function buildHighlights(
 function passportHighlight(submission: Submission): AiHelperHighlight | null {
   const passportBrief = buildPassportExtractionBrief(submission);
   if (passportBrief.status === "not_started") return null;
+  const identity = passportExtractedIdentity(submission);
+  const prefix = identity ? `${identity} · ` : "";
 
   if (passportBrief.status === "extracting") {
     return {
-      detail: "Распознавание выполняется, редактируемый шаг заблокирован ожиданием",
+      detail: `${prefix}Распознавание выполняется, редактируемый шаг заблокирован ожиданием`,
       kind: "passport",
       label: "Паспорт",
       source: "passport",
@@ -229,7 +231,7 @@ function passportHighlight(submission: Submission): AiHelperHighlight | null {
   }
   if (passportBrief.metrics.conflicts > 0) {
     return {
-      detail: `${passportBrief.metrics.conflicts} конфликтных полей требуют ручного выбора`,
+      detail: `${prefix}${passportBrief.metrics.conflicts} конфликтных полей требуют ручного выбора`,
       kind: "passport",
       label: "Паспорт",
       source: "passport",
@@ -237,7 +239,7 @@ function passportHighlight(submission: Submission): AiHelperHighlight | null {
   }
   if (passportBrief.metrics.safeFieldsToApply > 0) {
     return {
-      detail: `${passportBrief.metrics.safeFieldsToApply} безопасных полей можно применить после проверки`,
+      detail: `${prefix}${passportBrief.metrics.safeFieldsToApply} безопасных полей можно применить после проверки`,
       kind: "passport",
       label: "Паспорт",
       source: "passport",
@@ -245,7 +247,7 @@ function passportHighlight(submission: Submission): AiHelperHighlight | null {
   }
   if (passportBrief.status === "failed" || passportBrief.status === "unavailable") {
     return {
-      detail: "Автозаполнение недоступно, нужен ручной ввод",
+      detail: `${prefix}Автозаполнение недоступно, нужен ручной ввод`,
       kind: "passport",
       label: "Паспорт",
       source: "passport",
@@ -253,11 +255,22 @@ function passportHighlight(submission: Submission): AiHelperHighlight | null {
   }
 
   return {
-    detail: passportBrief.summary,
+    detail: `${prefix}${passportBrief.summary}`,
     kind: "passport",
     label: "Паспорт",
     source: "passport",
   };
+}
+
+function passportExtractedIdentity(submission: Submission) {
+  for (const applicant of submission.applicants) {
+    const fields = applicant.passportExtraction?.extractedFields ?? [];
+    const surname = fields.find((field) => field.key === "surname")?.value.trim();
+    const firstName = fields.find((field) => field.key === "firstName")?.value.trim();
+    const identity = [surname, firstName].filter(Boolean).join(" ");
+    if (identity) return identity;
+  }
+  return "";
 }
 
 function fileHighlight(submission: Submission): AiHelperHighlight {

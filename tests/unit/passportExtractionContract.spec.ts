@@ -312,6 +312,341 @@ describe("passport extraction contract", () => {
     });
   });
 
+  test("uses OpenAI fallback once when provider is enabled and allowed", async () => {
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            storage_bucket: "submission-media",
+            storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/rest/v1/passport_extraction_openai_attempts")) {
+        return new Response(null, { status: 201 });
+      }
+      if (url.includes("/storage/v1/object/submission-media/")) {
+        return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+      }
+      if (url === "https://api.openai.com/v1/responses") {
+        return Response.json({
+          output_text: JSON.stringify({
+            fields: [
+              {
+                confidence: "high",
+                key: "passportNumber",
+                needsManualReview: true,
+                value: "765432100",
+              },
+            ],
+            mrzValid: true,
+            status: "extracted",
+            summary: "OpenAI fallback извлек паспортные поля.",
+          }),
+        });
+      }
+      if (
+        url.includes("/rest/v1/ai_helper_audit_events") &&
+        init?.method === "GET"
+      ) {
+        return Response.json([]);
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ allowOpenAiFallback: true }),
+      createSupabaseRestPassportExtractionDependencies(
+        {
+          OPENAI_API_KEY: "server-openai-key",
+          PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
+          PASSPORT_EXTRACTION_PROVIDER_ORDER: "openai",
+          SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+          SUPABASE_URL: "https://project.supabase.co",
+        },
+        fetchMock as unknown as typeof fetch,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/responses",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          authorization: "Bearer server-openai-key",
+        }),
+      }),
+    );
+    expect(await json(response)).toMatchObject({
+      openAiAttempted: true,
+      source: "openai-vision",
+      status: "extracted",
+    });
+    const auditPost = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).includes("/rest/v1/ai_helper_audit_events") &&
+        (init as RequestInit | undefined)?.method === "POST",
+    );
+    expect(JSON.parse(String((auditPost?.[1] as RequestInit).body))).toMatchObject({
+      metadata: {
+        document_fingerprint:
+          "submission-media|VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg|image/jpeg|1024",
+        openai_attempted: true,
+        provider: "openai",
+      },
+    });
+  });
+
+  test("returns attempted unavailable when OpenAI fallback API fails", async () => {
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            storage_bucket: "submission-media",
+            storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/rest/v1/passport_extraction_openai_attempts")) {
+        return new Response(null, { status: 201 });
+      }
+      if (
+        url.includes("/rest/v1/ai_helper_audit_events") &&
+        init?.method === "GET"
+      ) {
+        return Response.json([]);
+      }
+      if (url.includes("/storage/v1/object/submission-media/")) {
+        return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+      }
+      if (url === "https://api.openai.com/v1/responses") {
+        return new Response("rate limited", { status: 429 });
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ allowOpenAiFallback: true }),
+      createSupabaseRestPassportExtractionDependencies(
+        {
+          OPENAI_API_KEY: "server-openai-key",
+          PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
+          SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+          SUPABASE_URL: "https://project.supabase.co",
+        },
+        fetchMock as unknown as typeof fetch,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      openAiAttempted: true,
+      source: "openai-vision",
+      status: "unavailable",
+    });
+  });
+
+  test("skips OpenAI fallback when server reservation has an attempt for the document", async () => {
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            storage_bucket: "submission-media",
+            storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/rest/v1/passport_extraction_openai_attempts")) {
+        expect(init?.method).toBe("POST");
+        return new Response(null, { status: 409 });
+      }
+      if (url === "https://api.openai.com/v1/responses") {
+        throw new Error("OpenAI must not be called after server-side attempt.");
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ allowOpenAiFallback: true }),
+      createSupabaseRestPassportExtractionDependencies(
+        {
+          OPENAI_API_KEY: "server-openai-key",
+          PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
+          SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+          SUPABASE_URL: "https://project.supabase.co",
+        },
+        fetchMock as unknown as typeof fetch,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      source: "edge-stub",
+      status: "unavailable",
+    });
+  });
+
+  test("skips OpenAI fallback when the client already used it for the same file", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            storage_bucket: "submission-media",
+            storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      if (url === "https://api.openai.com/v1/responses") {
+        throw new Error("OpenAI must not be called twice for one fingerprint.");
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ allowOpenAiFallback: false }),
+      createSupabaseRestPassportExtractionDependencies(
+        {
+          OPENAI_API_KEY: "server-openai-key",
+          PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
+          PASSPORT_EXTRACTION_PROVIDER_ORDER: "openai",
+          SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+          SUPABASE_URL: "https://project.supabase.co",
+        },
+        fetchMock as unknown as typeof fetch,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      source: "edge-stub",
+      status: "unavailable",
+    });
+  });
+
+  test("reserves an OpenAI attempt before reading storage", async () => {
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            storage_bucket: "submission-media",
+            storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/rest/v1/passport_extraction_openai_attempts")) {
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toMatchObject({
+          document_fingerprint:
+            "submission-media|VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg|image/jpeg|1024",
+          storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+        });
+        return new Response(null, { status: 409 });
+      }
+      if (url.includes("/storage/v1/object/submission-media/")) {
+        throw new Error("Storage must not be read before an OpenAI reservation.");
+      }
+      if (url === "https://api.openai.com/v1/responses") {
+        throw new Error("OpenAI must not be called after a duplicate reservation.");
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ allowOpenAiFallback: true }),
+      createSupabaseRestPassportExtractionDependencies(
+        {
+          OPENAI_API_KEY: "server-openai-key",
+          PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
+          PASSPORT_EXTRACTION_PROVIDER_ORDER: "openai",
+          SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+          SUPABASE_URL: "https://project.supabase.co",
+        },
+        fetchMock as unknown as typeof fetch,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      source: "edge-stub",
+      status: "unavailable",
+    });
+    expect(
+      fetchMock.mock.calls.some(
+        ([input]) => String(input) === "https://api.openai.com/v1/responses",
+      ),
+    ).toBe(false);
+  });
+
   test("denies Supabase extraction when media belongs to another agent", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);

@@ -41,8 +41,9 @@ export interface PassportExtractionResult {
   applicantIndex?: number;
   fields: PassportExtractionField[];
   guardrails: string[];
+  openAiAttempted?: boolean;
   orientation?: PassportExtractionOrientation;
-  source: "edge-provider" | "edge-stub" | "local-ocr";
+  source: "edge-provider" | "edge-stub" | "local-ocr" | "openai-vision";
   status: "extracted" | "unavailable";
   summary: string;
 }
@@ -83,7 +84,8 @@ export function parsePassportExtractionResult(
   if (
     value.source !== "edge-provider" &&
     value.source !== "edge-stub" &&
-    value.source !== "local-ocr"
+    value.source !== "local-ocr" &&
+    value.source !== "openai-vision"
   ) {
     return {
       ok: false,
@@ -156,7 +158,11 @@ export function parsePassportExtractionResult(
           ? value.applicantIndex
           : undefined,
       fields: fields.filter((field) => field.value),
-      guardrails: [...passportExtractionGuardrails],
+      guardrails: validatedGuardrails(value.guardrails),
+      openAiAttempted:
+        typeof value.openAiAttempted === "boolean"
+          ? value.openAiAttempted
+          : value.source === "openai-vision",
       orientation,
       source: value.source,
       status: value.status,
@@ -180,4 +186,15 @@ export function safeUnavailablePassportExtractionResult(
     summary:
       "Распознавание паспорта недоступно. Заполните данные вручную и проверьте документ.",
   };
+}
+
+function validatedGuardrails(value: unknown) {
+  if (!Array.isArray(value)) return [...passportExtractionGuardrails];
+
+  const providerGuardrails = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return [...new Set([...passportExtractionGuardrails, ...providerGuardrails])];
 }

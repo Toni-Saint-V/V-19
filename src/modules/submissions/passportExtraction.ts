@@ -175,6 +175,7 @@ export function startPassportExtraction(
     attemptCount: safeAttemptCount(state?.attemptCount) + 1,
     extractedFields: [],
     lastAttemptAtIso: new Date().toISOString(),
+    openaiAttemptedForFingerprint: state?.openaiAttemptedForFingerprint,
     sourceFileId: file.id,
     sourceFileName: file.originalFileName ?? file.generatedFileName,
     sourceStoragePath: file.storagePath,
@@ -187,6 +188,7 @@ export function finishPassportExtraction(
   submission: Submission,
   file: SubmissionFile,
   result: PassportExtractionResult,
+  sourceFingerprint?: string,
 ): Submission {
   return updateApplicantExtraction(submission, file.applicantId, (state) => ({
     appliedFieldKeys: [],
@@ -197,6 +199,10 @@ export function finishPassportExtraction(
       verified: false,
     })),
     lastAttemptAtIso: state?.lastAttemptAtIso,
+    openaiAttemptedForFingerprint:
+      result.openAiAttempted && sourceFingerprint
+        ? sourceFingerprint
+        : state?.openaiAttemptedForFingerprint,
     orientation: result.orientation,
     requestId: createRequestId(),
     sourceFileId: file.id,
@@ -218,6 +224,7 @@ export function failPassportExtraction(
     error,
     extractedFields: [],
     lastAttemptAtIso: state?.lastAttemptAtIso,
+    openaiAttemptedForFingerprint: state?.openaiAttemptedForFingerprint,
     sourceFileId: file.id,
     sourceFileName: file.originalFileName ?? file.generatedFileName,
     sourceStoragePath: file.storagePath,
