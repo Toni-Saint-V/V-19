@@ -370,17 +370,32 @@ function localOcrSummary(fields: number, quality: PassportImageQualityReport | n
   return `Локальный OCR нашёл ${fields} полей MRZ. Проверьте их вручную перед отправкой.${qualityNote}`;
 }
 
-export async function invokePassportExtraction(input: {
-  applicantIndex?: number;
-  file: SubmissionFile;
-  localFile?: File;
-  submission: Submission;
-}): Promise<PassportExtractionResult> {
+type PassportExtractionInput =
+  | {
+      applicantIndex?: number;
+      file?: SubmissionFile;
+      localFile: File;
+      submission?: Submission;
+    }
+  | {
+      applicantIndex?: number;
+      file: SubmissionFile;
+      localFile?: File;
+      submission: Submission;
+    };
+
+export async function invokePassportExtraction(
+  input: PassportExtractionInput,
+): Promise<PassportExtractionResult> {
   if (input.localFile) {
     return invokeLocalPassportExtraction({
       applicantIndex: input.applicantIndex,
       localFile: input.localFile,
     });
+  }
+
+  if (!input.file || !input.submission) {
+    return safeUnavailablePassportExtractionResult(input.applicantIndex);
   }
 
   const client = getSupabaseClient();

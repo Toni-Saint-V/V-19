@@ -201,6 +201,43 @@ function normalizeCreateApplicantNames(names: string[], count: number) {
   );
 }
 
+function applicantNameFromPassportUpload(upload: PassportUploadDraft | undefined) {
+  if (!upload) return "";
+
+  const surname = upload.extractedFields
+    .find((field) => field.key === "surname")
+    ?.value.trim();
+  const firstName = upload.extractedFields
+    .find((field) => field.key === "firstName")
+    ?.value.trim();
+
+  return [surname, firstName].filter(Boolean).join(" ");
+}
+
+function applicantNamesForCreateDraft({
+  currentNames,
+  familyCount,
+  passportUploads,
+  type,
+}: {
+  currentNames: string[];
+  familyCount: number;
+  passportUploads: PassportUploadDraft[];
+  type: Submission["type"];
+}) {
+  const applicantCount = type === "family" ? familyCount : 1;
+  const names = normalizeCreateApplicantNames(currentNames, applicantCount);
+
+  for (const upload of passportUploads) {
+    const extractedName = applicantNameFromPassportUpload(upload);
+    if (!extractedName) continue;
+    if (upload.applicantIndex < 0 || upload.applicantIndex >= names.length) continue;
+    names[upload.applicantIndex] = extractedName;
+  }
+
+  return names;
+}
+
 function firstSubmissionForRole(
   submissions: Submission[],
   role: Role,
@@ -1210,7 +1247,7 @@ function App() {
         const slot = passportSlotForUpload(current, upload);
         if (!slot || !upload.file) return current;
         rememberLocalPassportFile(slot.id, upload.file);
-        return uploadRequiredFile(current, slot.id, {
+        const withUploadedFile = uploadRequiredFile(current, slot.id, {
           generatedFileName: upload.file.name,
           mimeType: upload.file.type,
           originalFileName: upload.file.name,
@@ -1219,10 +1256,43 @@ function App() {
           storagePath: "",
           uploadedAtIso: new Date().toISOString(),
         });
+        return applyInitialPassportExtraction(withUploadedFile, slot.id, upload);
       }, submission);
     }
 
     return submission;
+  }
+
+  function applyInitialPassportExtraction(
+    submission: Submission,
+    fileId: string,
+    upload: PassportUploadDraft,
+  ): Submission {
+    if (!upload.extractedFields.length) return submission;
+
+    const file = submission.files.find((candidate) => candidate.id === fileId);
+    if (!file) return submission;
+
+    return {
+      ...submission,
+      applicants: submission.applicants.map((applicant) =>
+        applicant.id === file.applicantId
+          ? {
+              ...applicant,
+              passportExtraction: {
+                appliedFieldKeys: [],
+                extractedFields: upload.extractedFields,
+                sourceFileId: file.id,
+                sourceFileName: upload.fileName,
+                sourceStoragePath: file.storagePath,
+                status: "ready" as const,
+                summary:
+                  "ФИО и поля MRZ распознаны при создании черновика. Проверьте их вручную.",
+              },
+            }
+          : applicant,
+      ),
+    };
   }
 
   function enqueueSupabaseInitialPassportUploads(
@@ -1257,9 +1327,15 @@ function App() {
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
   ) {
+    const applicantNames = applicantNamesForCreateDraft({
+      currentNames: createApplicantNames,
+      familyCount: createFamilyCount,
+      passportUploads,
+      type: createType,
+    });
     const newSubmission = createDraftSubmission({
       agentId: currentAgentOwnerId,
-      applicantNames: createApplicantNames,
+      applicantNames,
       city: createCity,
       familyCount: createFamilyCount,
       idScheme: isSupabaseMode ? "supabase" : "local",

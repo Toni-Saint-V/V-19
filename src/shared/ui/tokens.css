@@ -161,6 +161,13 @@
   --v19-group-header-height: 42px;
   --v19-input-height: 44px;
   --v19-button-height: 40px;
+  --v19-upload-panel-padding: 42px 28px 34px;
+  --v19-upload-panel-padding-mobile: 34px 18px 28px;
+  --v19-upload-visual-width: 136px;
+  --v19-upload-visual-height: 112px;
+  --v19-upload-title-size: 24px;
+  --v19-upload-title-size-mobile: 21px;
+  --v19-upload-copy-max-width: 480px;
   --v19-agent-primary-cta-min-width: 134px;
   --v19-agent-primary-cta-padding-x: 20px;
   --v19-hit-target: 44px;
