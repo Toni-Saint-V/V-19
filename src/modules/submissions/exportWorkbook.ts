@@ -1,5 +1,4 @@
-import { buildExportPackageIdentity } from "./exportRules";
-import type { ExportPackageIdentity, ExportRow, Submission } from "./types";
+import type { ExportPackageIdentity, ExportRow } from "./types";
 
 export const exportWorkbookColumns = [
   ["submissionCode", "Подача"],
@@ -22,11 +21,16 @@ export type ExportWorkbookArtifact = {
   rows: string[][];
 };
 
+export type ExportWorkbookBlockedReason =
+  | "download_failed"
+  | "export_not_ready"
+  | "row_mismatch";
+
 export type ExportWorkbookDownloadResult =
   | { ok: true; fileName: string }
   | {
       ok: false;
-      reason: "download_failed" | "empty_package";
+      reason: ExportWorkbookBlockedReason;
       safeMessage: string;
     };
 
@@ -84,26 +88,27 @@ export function createExportWorkbookArtifact(
   };
 }
 
-export function createSubmissionExportWorkbookArtifact(
-  rows: ExportRow[],
-  submissions: Submission[],
-): ExportWorkbookArtifact | null {
-  const identity = buildExportPackageIdentity(submissions, "xlsx");
-  return identity ? createExportWorkbookArtifact(rows, identity) : null;
-}
-
 export default function downloadExportWorkbook(
   rows: ExportRow[],
-  submissions: Submission[],
+  identity: ExportPackageIdentity | null,
 ): ExportWorkbookDownloadResult {
-  const artifact = createSubmissionExportWorkbookArtifact(rows, submissions);
-  if (!artifact) {
+  if (!identity || identity.rowCount < 1) {
     return {
       ok: false,
-      reason: "empty_package",
-      safeMessage: "Пакет выгрузки пуст. Обновите выборку и сформируйте файл заново.",
+      reason: "export_not_ready",
+      safeMessage: "Сначала сформируйте файл выгрузки для текущей выборки.",
     };
   }
+
+  if (identity.rowCount !== rows.length) {
+    return {
+      ok: false,
+      reason: "row_mismatch",
+      safeMessage: "Предпросмотр устарел. Обновите выборку и сформируйте файл заново.",
+    };
+  }
+
+  const artifact = createExportWorkbookArtifact(rows, identity);
 
   const runtime = globalThis as BrowserDownloadRuntime;
   let url = "";
