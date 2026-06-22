@@ -85,6 +85,55 @@ describe("passport extraction brief", () => {
     expect(brief.guardrails.join(" ")).not.toMatch(/официальн.+проверен|гарант/i);
   });
 
+  test("prioritizes blocking passport expiry issues over field application", () => {
+    const draft = draftSubmission();
+    const ready = finishPassportExtraction(draft, passportFile(draft), {
+      ...extractedPassport,
+      fields: [
+        ...extractedPassport.fields,
+        {
+          confidence: "medium",
+          key: "passportExpiresAt",
+          needsManualReview: true,
+          value: "01.01.2000",
+        },
+      ],
+    });
+
+    const brief = buildPassportExtractionBrief(ready);
+
+    expect(brief.nextStep).toEqual({
+      action: "manual_entry",
+      label: "Заполните паспортные данные вручную",
+    });
+  });
+
+  test.each(["31.12.2099", "not-a-date"])(
+    "does not block safe application for non-expired passport expiry value %s",
+    (expiryValue) => {
+      const draft = draftSubmission();
+      const ready = finishPassportExtraction(draft, passportFile(draft), {
+        ...extractedPassport,
+        fields: [
+          ...extractedPassport.fields,
+          {
+            confidence: "medium",
+            key: "passportExpiresAt",
+            needsManualReview: true,
+            value: expiryValue,
+          },
+        ],
+      });
+
+      const brief = buildPassportExtractionBrief(ready);
+
+      expect(brief.nextStep).toEqual({
+        action: "apply_safe_fields",
+        label: "Примените безопасные поля в анкету",
+      });
+    },
+  );
+
   test("prioritizes conflicts over safe field application", () => {
     const draft = draftSubmission();
     const applicantId = draft.applicants[0]?.id;

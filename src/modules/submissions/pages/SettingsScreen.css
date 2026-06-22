@@ -55,6 +55,47 @@
   line-height: var(--v19-settings-copy-line-height);
 }
 
+.settings-context-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 2px 0 0;
+}
+
+.settings-context-strip div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: var(--v19-border-width) solid var(--border-soft);
+  border-radius: var(--v19-radius-control);
+  background: var(--surface-1);
+}
+
+.settings-context-strip div.is-dirty {
+  border-color: var(--vf-warning-border);
+  background: var(--vf-warning-soft);
+}
+
+.settings-context-strip dt {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 680;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-context-strip dd {
+  margin: 5px 0 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 680;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr)
@@ -166,6 +207,10 @@
 @media (max-width: 760px) {
   .workspace-settings {
     padding-bottom: var(--v19-settings-page-padding-bottom-mobile);
+  }
+
+  .settings-context-strip {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .settings-grid {

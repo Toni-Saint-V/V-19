@@ -66,7 +66,7 @@ const blockedByPendingReview: SubmissionAction[] = [
   "submit_for_review",
   "submit_corrections",
 ];
-
+const manualEntryLabel = "Заполните паспортные данные вручную";
 const guardrails = [
   "Распознавание паспорта не является официальной проверкой.",
   "Перед отправкой нужно вручную проверить распознанные поля.",
@@ -76,6 +76,7 @@ const guardrails = [
 export function buildPassportExtractionBrief(
   submission: Submission,
 ): PassportExtractionBrief {
+  let hasExpiryBlocker = false;
   const applicants: PassportExtractionApplicantBrief[] = submission.applicants.map(
     (applicant) => {
       const state = applicant.passportExtraction;
@@ -83,7 +84,12 @@ export function buildPassportExtractionBrief(
         state?.status ?? "not_started";
       const rows = passportExtractionRows(applicant);
       const extractedFieldKeys =
-        state?.extractedFields.map((field) => field.key) ?? [];
+        state?.extractedFields.map((field) => {
+          if (field.key === "passportExpiresAt") {
+            hasExpiryBlocker ||= isExpiredPassportDate(field.value);
+          }
+          return field.key;
+        }) ?? [];
       const appliedFieldKeys = state?.appliedFieldKeys ?? [];
       const conflictFieldKeys = rows
         .filter((row) => row.conflict)
@@ -161,10 +167,30 @@ export function buildPassportExtractionBrief(
     blockedActions,
     guardrails,
     metrics,
-    nextStep: nextStep(status, metrics),
+    nextStep: nextStep(status, metrics, hasExpiryBlocker),
     status,
     summary: briefSummary(status, metrics),
   };
+}
+
+function isExpiredPassportDate(value: string, now = new Date()): boolean {
+  const parsed = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value.trim());
+  if (!parsed) return false;
+
+  const day = Number(parsed[1]);
+  const month = Number(parsed[2]);
+  const year = Number(parsed[3]);
+  const expiry = new Date(year, month - 1, day);
+  if (
+    expiry.getFullYear() !== year ||
+    expiry.getMonth() !== month - 1 ||
+    expiry.getDate() !== day
+  ) {
+    return false;
+  }
+
+  const endOfExpiryDay = new Date(year, month - 1, day + 1).getTime();
+  return endOfExpiryDay <= now.getTime();
 }
 
 function briefStatus(
@@ -196,6 +222,7 @@ function briefStatus(
 function nextStep(
   status: PassportExtractionBriefStatus,
   metrics: PassportExtractionBrief["metrics"],
+  hasExpiryBlocker: boolean,
 ): PassportExtractionBrief["nextStep"] {
   if (status === "extracting") {
     return { action: "wait", label: "Дождитесь завершения распознавания" };
@@ -204,6 +231,12 @@ function nextStep(
     return {
       action: "resolve_conflicts",
       label: "Разберите конфликтные паспортные поля вручную",
+    };
+  }
+  if (hasExpiryBlocker) {
+    return {
+      action: "manual_entry",
+      label: manualEntryLabel,
     };
   }
   if (metrics.safeFieldsToApply > 0) {
@@ -221,7 +254,7 @@ function nextStep(
   if (status === "failed" || status === "unavailable") {
     return {
       action: "manual_entry",
-      label: "Заполните паспортные данные вручную",
+      label: manualEntryLabel,
     };
   }
   if (status === "not_started") {

@@ -1651,6 +1651,7 @@ function PassportExtractionReviewPanel({
   }
 
   if (!rows.length) return null;
+  const safeRows = rows.filter((row) => !row.applied && !row.conflict);
 
   return (
     <CardComponent as="section" className="passport-extraction-panel">
@@ -1670,6 +1671,15 @@ function PassportExtractionReviewPanel({
         <Badge className="visa-tag visa-tag-attention">
           {rows.filter((row) => !row.applied).length} к проверке
         </Badge>
+        {canEdit && safeRows[0] ? (
+          <Button
+            onClick={() =>
+              safeRows.map(({ key }) => onApplyField(applicant.id, key, "safe"))
+            }
+          >
+            Авто
+          </Button>
+        ) : null}
       </div>
       <div className="passport-extraction-rows">
         {rows.map((row) => (
