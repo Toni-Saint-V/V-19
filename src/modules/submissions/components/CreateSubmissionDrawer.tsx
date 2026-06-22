@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   City,
   PassportUploadDraft,
@@ -10,6 +10,55 @@ import { CANONICAL_CITIES, isCity } from "../types";
 const maxFamilyApplicants = 6;
 
 type CreateSubmissionStep = "passport" | "questionnaire";
+
+const createSteps: Array<{
+  ariaLabel?: string;
+  id: CreateSubmissionStep;
+  label: string;
+  number: string;
+}> = [
+  {
+    ariaLabel: "Шаг 1: паспорт и семья",
+    id: "passport",
+    label: "Паспорт и семья",
+    number: "1",
+  },
+  { id: "questionnaire", label: "Анкета и файлы", number: "2" },
+];
+
+const submissionTypeOptions: Array<{ label: string; value: Submission["type"] }> = [
+  { label: "Заявитель", value: "single" },
+  { label: "Семья", value: "family" },
+];
+
+const firstStepFamilyQuestions: Array<{
+  key: Extract<keyof PreliminaryIntakeDraft, "sameHomeAddress" | "sameSpainStay">;
+  label: string;
+}> = [
+  { key: "sameHomeAddress", label: "Один адрес проживания в России у всех?" },
+  { key: "sameSpainStay", label: "Одно проживание в Испании у всех?" },
+];
+
+const extractedFieldLabels = [
+  "Фамилия",
+  "Имя",
+  "Дата рождения",
+  "Номер паспорта",
+];
+
+const mediaRequirements = [
+  ["Фото на белом фоне", "35x45"],
+  ["Селфи", "для внутренней сверки"],
+  ["Селфи 2", "если требуется консульством"],
+];
+
+const questionnaireSections = [
+  "Личные данные",
+  "Паспорт",
+  "Адрес и контакты",
+  "Работа и занятость",
+  "Маршрут и проживание",
+];
 
 const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
   arrivalPlace: "",
@@ -30,6 +79,7 @@ export function CreateSubmissionDrawer({
   city,
   dirty,
   familyCount,
+  focusCloseToken = 0,
   onApplicantName,
   onCity,
   onClose,
@@ -43,6 +93,7 @@ export function CreateSubmissionDrawer({
   city: City;
   dirty: boolean;
   familyCount: number;
+  focusCloseToken?: number;
   onApplicantName?: (index: number, name: string) => void;
   onCity: (city: City) => void;
   onClose: () => void;
@@ -57,6 +108,7 @@ export function CreateSubmissionDrawer({
 }) {
   const applicantCount = type === "family" ? familyCount : 1;
   const passportFileInputRef = useRef<HTMLInputElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
@@ -67,6 +119,10 @@ export function CreateSubmissionDrawer({
     preliminaryIntake.sameTripDates,
     preliminaryIntake.sameSpainStay,
     preliminaryIntake.sameArrivalPlace,
+  ].filter(Boolean).length;
+  const firstStepFamilyAnswerCount = [
+    preliminaryIntake.sameHomeAddress,
+    preliminaryIntake.sameSpainStay,
   ].filter(Boolean).length;
   const passportReady = passportUploads.length > 0;
   const extractionStatusLabel = passportReady
@@ -127,6 +183,11 @@ export function CreateSubmissionDrawer({
     onCreate(passportUploads, preliminaryIntake);
   }
 
+  useEffect(() => {
+    if (!focusCloseToken) return;
+    closeButtonRef.current?.focus({ preventScroll: true });
+  }, [focusCloseToken]);
+
   return (
     <div
       className="submission-drawer create-drawer"
@@ -139,8 +200,8 @@ export function CreateSubmissionDrawer({
         onClose();
       }}
     >
-      <header className="drawer-header create-drawer-header">
-        <div>
+      <header className="drawer-header drawer-topbar create-drawer-header">
+        <div className="drawer-title-block drawer-title-sr">
           <p className="kicker">Предварительный черновик</p>
           <h2 id="create-title">Новая подача</h2>
           <p>
@@ -150,11 +211,27 @@ export function CreateSubmissionDrawer({
             · {type === "family" ? "Семья" : "Один заявитель"} · {city}
           </p>
         </div>
-        <div className="drawer-header-actions">
+        <ol className="cf-steps" aria-label="Шаги создания подачи">
+          {createSteps.map((step) => (
+            <li key={step.id} className={createStep === step.id ? "is-active" : ""}>
+              <button
+                type="button"
+                aria-label={step.ariaLabel}
+                disabled={step.id === "questionnaire" && !passportReady}
+                onClick={() => setCreateStep(step.id)}
+              >
+                <span>{step.number}</span>
+                <strong>{step.label}</strong>
+              </button>
+            </li>
+          ))}
+        </ol>
+        <div className="drawer-topbar-actions drawer-header-actions">
           <span className="status-chip amber">
             {dirty ? "Есть изменения" : "Черновик"}
           </span>
           <button
+            ref={closeButtonRef}
             className="icon-button"
             type="button"
             aria-label="Закрыть создание"
@@ -165,140 +242,145 @@ export function CreateSubmissionDrawer({
         </div>
       </header>
       <div className="drawer-body create-drawer-body">
-        <section className="preintake-board" aria-label="Предварительная заявка">
-          <ol className="create-flow-steps" aria-label="Шаги создания подачи">
-            <li className={createStep === "passport" ? "is-active" : ""}>
-              <button
-                type="button"
-                aria-label="Шаг 1: паспорт и семья"
-                onClick={() => setCreateStep("passport")}
-              >
-                <span>1</span>
-                <strong>Паспорт и семья</strong>
-              </button>
-            </li>
-            <li className={createStep === "questionnaire" ? "is-active" : ""}>
-              <button
-                type="button"
-                disabled={!passportReady}
-                onClick={() => setCreateStep("questionnaire")}
-              >
-                <span>2</span>
-                <strong>Анкета и файлы</strong>
-              </button>
-            </li>
-          </ol>
-          <section className="create-flow-panel" aria-label="Создание подачи">
-            <div className="preintake-two-columns">
-              <label>
-                <span>Страна</span>
-                <input readOnly value="Испания" />
-              </label>
-              <label>
-                <span>Город подачи</span>
-                <select
-                  aria-label="Город подачи"
-                  value={city}
-                  onChange={(event) => handleCityChange(event.target.value)}
-                >
-                  {CANONICAL_CITIES.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </section>
-
+        <section
+          className={`pi-board ${
+            createStep === "passport" ? "is-passport-step" : ""
+          }`}
+          aria-label="Предварительная заявка"
+        >
           {createStep === "passport" ? (
             <section
-              className={`preintake-scan-section ${passportReady ? "has-passport" : ""}`}
+              className={`pi-scan-section ${passportReady ? "has-passport" : ""}`}
               aria-labelledby="passport-intake-title"
             >
-              <div className="preintake-scan-toolbar" aria-label="Заявители в подаче">
-                <div className="preintake-mode-tags" aria-label="Тип подачи">
-                  <button
-                    className={type === "single" ? "is-active" : ""}
-                    type="button"
-                    onClick={() => selectType("single")}
-                  >
-                    Заявитель
-                  </button>
-                  <button
-                    className={type === "family" ? "is-active" : ""}
-                    type="button"
-                    onClick={() => selectType("family")}
-                  >
-                    Семья
-                  </button>
+              <div className="pi-create-view-panel">
+                <section
+                  className="cf-panel cf-intake-panel"
+                  aria-label="Создание подачи"
+                >
+                  <div className="pi-two-columns">
+                    <label>
+                      <span>Страна</span>
+                      <input readOnly value="Испания" />
+                    </label>
+                    <label>
+                      <span>Город подачи</span>
+                      <select
+                        aria-label="Город подачи"
+                        value={city}
+                        onChange={(event) => handleCityChange(event.target.value)}
+                      >
+                        {CANONICAL_CITIES.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+                <div className="pi-scan-toolbar" aria-label="Заявители в подаче">
+                  <div className="pi-mode-tags" aria-label="Тип подачи">
+                    {submissionTypeOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        className={type === option.value ? "is-active" : ""}
+                        type="button"
+                        onClick={() => selectType(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pi-scan-toolbar-actions">
+                    <button
+                      className="icon-button pi-add-person-button"
+                      type="button"
+                      aria-label="Добавить заявителя в семью"
+                      disabled={
+                        type === "family" && applicantCount >= maxFamilyApplicants
+                      }
+                      onClick={addFamilyMember}
+                    >
+                      +
+                    </button>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={
+                        type === "family" && applicantCount >= maxFamilyApplicants
+                      }
+                      onClick={addFamilyMember}
+                    >
+                      Добавить человека
+                    </button>
+                  </div>
                 </div>
-                <div className="preintake-scan-toolbar-actions">
-                  <button
-                    className="icon-button preintake-add-person-button"
-                    type="button"
-                    aria-label="Добавить заявителя в семью"
-                    disabled={
-                      type === "family" && applicantCount >= maxFamilyApplicants
-                    }
-                    onClick={addFamilyMember}
-                  >
-                    +
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={
-                      type === "family" && applicantCount >= maxFamilyApplicants
-                    }
-                    onClick={addFamilyMember}
-                  >
-                    Добавить человека
-                  </button>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    disabled={!passportReady}
-                    onClick={handlePrimaryAction}
-                  >
-                    Дальше
-                  </button>
+                <div className="create-people-list" aria-label="Имена заявителей">
+                  {Array.from({ length: applicantCount }, (_, index) => (
+                    <label key={index}>
+                      <span>{applicantInputLabel(index, type)}</span>
+                      <input
+                        aria-label={applicantInputLabel(index, type)}
+                        value={applicantNames[index] ?? ""}
+                        placeholder={applicantInputPlaceholder(index, type)}
+                        onChange={(event) =>
+                          onApplicantName?.(index, event.target.value)
+                        }
+                      />
+                    </label>
+                  ))}
                 </div>
-              </div>
-              <div className="create-people-list" aria-label="Имена заявителей">
-                {Array.from({ length: applicantCount }, (_, index) => (
-                  <label key={index}>
-                    <span>{applicantInputLabel(index, type)}</span>
-                    <input
-                      aria-label={applicantInputLabel(index, type)}
-                      value={applicantNames[index] ?? ""}
-                      placeholder={applicantInputPlaceholder(index, type)}
-                      onChange={(event) => onApplicantName?.(index, event.target.value)}
-                    />
-                  </label>
-                ))}
+                {type === "family" ? (
+                  <section
+                    className="pi-family-yes-no"
+                    aria-labelledby="pi-family-yes-no-title"
+                  >
+                    <div className="create-panel-head">
+                      <div>
+                        <p className="kicker">Семейные данные</p>
+                        <h3 id="pi-family-yes-no-title">Общие ответы</h3>
+                      </div>
+                      <span>
+                        {firstStepFamilyAnswerCount
+                          ? `${firstStepFamilyAnswerCount}/2`
+                          : "Нет"}
+                      </span>
+                    </div>
+                    {firstStepFamilyQuestions.map((question) => (
+                      <FamilyYesNoQuestion
+                        key={question.key}
+                        checked={preliminaryIntake[question.key]}
+                        label={question.label}
+                        onChecked={(checked) =>
+                          updatePreliminaryIntake(question.key, checked)
+                        }
+                      />
+                    ))}
+                  </section>
+                ) : null}
               </div>
 
-              <div className="preintake-scan-main">
-                <div className="preintake-document-visual" aria-hidden="true">
+              <div className="pi-scan-main">
+                <div className="pi-document-visual" aria-hidden="true">
                   <svg viewBox="0 0 180 150" role="img">
-                    <g className="preintake-visual-stack">
+                    <g className="pi-visual-stack">
                       <path d="M58 100 L118 88 Q129 86 132 96 L133 104 Q135 114 124 117 L65 129 Q55 131 53 120 L52 112 Q50 103 58 100Z" />
                       <path d="M57 78 L123 66 Q133 64 135 75 L136 83 Q138 93 127 96 L62 108 Q52 110 50 99 L49 91 Q47 81 57 78Z" />
                     </g>
                     <path
-                      className="preintake-visual-page"
+                      className="pi-visual-page"
                       d="M54 35 L120 23 Q132 21 135 33 L137 65 Q139 77 127 80 L59 93 Q47 95 45 83 L43 52 Q41 38 54 35Z"
                     />
                     <path
-                      className="preintake-visual-page-edge"
+                      className="pi-visual-page-edge"
                       d="M47 76 Q69 69 94 66 Q119 63 137 68"
                     />
                     <path
-                      className="preintake-visual-passport-line"
+                      className="pi-visual-passport-line"
                       d="M63 49 L113 40"
                     />
-                    <path className="preintake-visual-scan" d="M35 72 H146" />
+                    <path className="pi-visual-scan" d="M35 72 H146" />
                   </svg>
                 </div>
                 <p className="kicker">Паспортная точка входа</p>
@@ -309,7 +391,7 @@ export function CreateSubmissionDrawer({
                 </p>
                 <input
                   ref={passportFileInputRef}
-                  className="preintake-file-input"
+                  className="pi-file-input"
                   aria-hidden="true"
                   accept="image/jpeg,image/png,application/pdf"
                   multiple={type === "family"}
@@ -321,17 +403,27 @@ export function CreateSubmissionDrawer({
                     event.currentTarget.value = "";
                   }}
                 />
-                <button
-                  className="primary-button preintake-upload-button"
-                  type="button"
-                  onClick={() => passportFileInputRef.current?.click()}
-                >
-                  {passportReady ? "Заменить паспорт" : "Загрузить паспорт"}
-                </button>
+                <div className="pi-empty-actions">
+                  <button
+                    className="primary-button pi-upload-button"
+                    type="button"
+                    onClick={() => passportFileInputRef.current?.click()}
+                  >
+                    {passportReady ? "Заменить паспорт" : "Загрузить паспорт"}
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={!passportReady}
+                    onClick={handlePrimaryAction}
+                  >
+                    Дальше
+                  </button>
+                </div>
               </div>
 
               <div
-                className={`preintake-extraction-status ${
+                className={`pi-extraction-status ${
                   passportReady ? "is-success" : "is-idle"
                 }`}
                 aria-live="polite"
@@ -342,7 +434,7 @@ export function CreateSubmissionDrawer({
               </div>
 
               {passportUploads.length ? (
-                <div className="passport-upload-list" aria-label="Загруженные паспорта">
+                <div className="pu-list" aria-label="Загруженные паспорта">
                   <p>{`Выбрано локально: ${passportUploads.length} паспортов`}</p>
                   {passportUploads.map((upload, index) => (
                     <article key={upload.id}>
@@ -361,19 +453,19 @@ export function CreateSubmissionDrawer({
 
           {createStep === "passport" && type === "family" && passportReady ? (
             <section
-              className="preintake-shared-panel"
-              aria-labelledby="preintake-shared-title"
+              className="pi-shared-panel"
+              aria-labelledby="pi-shared-title"
             >
               <div className="create-panel-head">
                 <div>
                   <p className="kicker">Семейные совпадения</p>
-                  <h3 id="preintake-shared-title">Что можно подставить всем</h3>
+                  <h3 id="pi-shared-title">Что можно подставить всем</h3>
                 </div>
                 <span>
                   {sharedAnswerCount ? `${sharedAnswerCount}/4` : "Не выбрано"}
                 </span>
               </div>
-              <div className="preintake-family-count" aria-label="Размер семьи">
+              <div className="pi-family-count" aria-label="Размер семьи">
                 <div>
                   <p className="kicker">Заявители</p>
                   <strong>{applicantCount} человек</strong>
@@ -430,7 +522,7 @@ export function CreateSubmissionDrawer({
                   updatePreliminaryIntake("sameTripDates", checked)
                 }
               >
-                <div className="preintake-two-columns">
+                <div className="pi-two-columns">
                   <label>
                     <span>Въезд</span>
                     <input
@@ -464,7 +556,7 @@ export function CreateSubmissionDrawer({
                   updatePreliminaryIntake("sameSpainStay", checked)
                 }
               >
-                <div className="preintake-three-columns">
+                <div className="pi-three-columns">
                   <label>
                     <span>Название</span>
                     <input
@@ -525,8 +617,8 @@ export function CreateSubmissionDrawer({
           ) : null}
 
           {createStep === "questionnaire" ? (
-            <section className="create-flow-grid" aria-label="Следующие шаги анкеты">
-              <article className="create-flow-panel extraction-review-placeholder">
+            <section className="cf-grid" aria-label="Следующие шаги анкеты">
+              <article className="cf-panel extraction-review-placeholder">
                 <div className="create-panel-head">
                   <div>
                     <p className="kicker">Паспорт</p>
@@ -534,22 +626,20 @@ export function CreateSubmissionDrawer({
                   </div>
                   <span>{passportUploads.length ? "Подставятся" : "Нет файла"}</span>
                 </div>
-                <div className="extracted-field-preview">
-                  {["Фамилия", "Имя", "Дата рождения", "Номер паспорта"].map(
-                    (label) => (
-                      <label key={label}>
-                        <span>{label}</span>
-                        <input
-                          readOnly
-                          value={
-                            passportUploads.length
-                              ? "Заполнится после обработки"
-                              : "Сначала загрузите паспорт"
-                          }
-                        />
-                      </label>
-                    ),
-                  )}
+                <div className="ef-preview">
+                  {extractedFieldLabels.map((label) => (
+                    <label key={label}>
+                      <span>{label}</span>
+                      <input
+                        readOnly
+                        value={
+                          passportUploads.length
+                            ? "Заполнится после обработки"
+                            : "Сначала загрузите паспорт"
+                        }
+                      />
+                    </label>
+                  ))}
                 </div>
                 <p>
                   Поля будут перенесены в анкету как черновик. Агент сможет поправить их
@@ -557,7 +647,7 @@ export function CreateSubmissionDrawer({
                 </p>
               </article>
 
-              <article className="create-flow-panel media-requirements">
+              <article className="cf-panel media-requirements">
                 <div className="create-panel-head">
                   <div>
                     <p className="kicker">Файлы</p>
@@ -565,12 +655,8 @@ export function CreateSubmissionDrawer({
                   </div>
                   <span>{applicantCount} заяв.</span>
                 </div>
-                <div className="media-requirement-list">
-                  {[
-                    ["Фото на белом фоне", "35x45"],
-                    ["Селфи", "для внутренней сверки"],
-                    ["Селфи 2", "если требуется консульством"],
-                  ].map(([title, meta]) => (
+                <div className="mr-list">
+                  {mediaRequirements.map(([title, meta]) => (
                     <div key={title}>
                       <strong>{title}</strong>
                       <span>{meta}</span>
@@ -578,7 +664,7 @@ export function CreateSubmissionDrawer({
                   ))}
                 </div>
                 <button
-                  className="secondary-button media-requirement-action"
+                  className="secondary-button mr-action"
                   type="button"
                   onClick={handlePrimaryAction}
                 >
@@ -586,7 +672,7 @@ export function CreateSubmissionDrawer({
                 </button>
               </article>
 
-              <article className="create-flow-panel">
+              <article className="cf-panel">
                 <div className="create-panel-head">
                   <div>
                     <p className="kicker">Анкета</p>
@@ -594,15 +680,9 @@ export function CreateSubmissionDrawer({
                   </div>
                   <span>Черновик</span>
                 </div>
-                <div className="questionnaire-section-preview">
-                  {[
-                    "Личные данные",
-                    "Паспорт",
-                    "Адрес и контакты",
-                    "Работа и занятость",
-                    "Маршрут и проживание",
-                  ].map((section) => (
-                    <div className="questionnaire-section-item" key={section}>
+                <div className="qs-preview">
+                  {questionnaireSections.map((section) => (
+                    <div className="qs-item" key={section}>
                       <strong>{section}</strong>
                       <span>Заполнить после сохранения</span>
                     </div>
@@ -646,6 +726,40 @@ export function CreateSubmissionDrawer({
   );
 }
 
+function FamilyYesNoQuestion({
+  checked,
+  label,
+  onChecked,
+}: {
+  checked: boolean;
+  label: string;
+  onChecked: (checked: boolean) => void;
+}) {
+  return (
+    <div className="fyn-question">
+      <span>{label}</span>
+      <div role="group" aria-label={label}>
+        <button
+          className={checked ? "is-active" : ""}
+          type="button"
+          aria-pressed={checked}
+          onClick={() => onChecked(true)}
+        >
+          Да
+        </button>
+        <button
+          className={!checked ? "is-active" : ""}
+          type="button"
+          aria-pressed={!checked}
+          onClick={() => onChecked(false)}
+        >
+          Нет
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PreintakeCheckCard({
   checked,
   children,
@@ -660,8 +774,8 @@ function PreintakeCheckCard({
   onChecked: (checked: boolean) => void;
 }) {
   return (
-    <article className={`preintake-check-card ${checked ? "is-active" : ""}`}>
-      <label className="preintake-check-row">
+    <article className={`pi-check-card ${checked ? "is-active" : ""}`}>
+      <label className="pi-check-row">
         <input
           checked={checked}
           name={name}
@@ -670,7 +784,7 @@ function PreintakeCheckCard({
         />
         <span>{label}</span>
       </label>
-      {checked ? <div className="preintake-check-fields">{children}</div> : null}
+      {checked ? <div className="pi-check-fields">{children}</div> : null}
     </article>
   );
 }
