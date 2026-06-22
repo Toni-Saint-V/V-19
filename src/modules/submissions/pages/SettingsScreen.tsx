@@ -40,6 +40,11 @@ export default function SettingsScreen({
 }) {
   const roleLabel = role === "agent" ? "Агент" : "Администратор";
   const modeLabel = isSupabaseMode ? "Supabase" : "Локальный демо-режим";
+  const saveStatusLabel = dirty
+    ? "Есть изменения"
+    : saveState === "saved"
+      ? "Сохранено"
+      : "Без изменений";
 
   return (
     <section className="workspace-settings" aria-labelledby="settings-title">
@@ -47,6 +52,20 @@ export default function SettingsScreen({
         <p className="kicker">Рабочее место</p>
         <h2 id="settings-title">Настройки доступа</h2>
         <p>Локальные параметры V-19 рабочего места без изменения данных подач.</p>
+        <dl className="settings-context-strip" aria-label="Состояние рабочего места">
+          <div>
+            <dt>Роль</dt>
+            <dd>{roleLabel}</dd>
+          </div>
+          <div>
+            <dt>Данные</dt>
+            <dd>{modeLabel}</dd>
+          </div>
+          <div className={dirty ? "is-dirty" : undefined}>
+            <dt>Сохранение</dt>
+            <dd>{saveStatusLabel}</dd>
+          </div>
+        </dl>
       </header>
 
       <div className="settings-grid">
@@ -77,8 +96,8 @@ export default function SettingsScreen({
               }
             />
             <span>
-              Подсказки в drawer
-              <small>Показывать безопасные next-step подсказки внутри подачи.</small>
+              Подсказки в панели подачи
+              <small>Показывать безопасные подсказки следующего шага внутри подачи.</small>
             </span>
           </label>
 
@@ -92,7 +111,7 @@ export default function SettingsScreen({
             />
             <span>
               Плотные списки
-              <small>Сохранять desktop-first плотность рабочих очередей.</small>
+              <small>Сохранять плотность рабочих очередей на широком экране.</small>
             </span>
           </label>
         </section>

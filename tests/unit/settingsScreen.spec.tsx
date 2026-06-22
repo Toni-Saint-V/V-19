@@ -41,8 +41,12 @@ describe("SettingsScreen", () => {
   test("exposes access context and keeps email in a dedicated full-width cell", () => {
     renderSettings();
 
+    const headerState = screen.getByLabelText("Состояние рабочего места");
     const summary = screen.getByLabelText("Параметры рабочего места");
 
+    expect(headerState).toHaveTextContent("Администратор");
+    expect(headerState).toHaveTextContent("Локальный демо-режим");
+    expect(headerState).toHaveTextContent("Без изменений");
     expect(summary).toHaveTextContent("Администратор");
     expect(summary).toHaveTextContent("Локальный демо-режим");
     expect(summary).toHaveTextContent("admin@visaflow.local");
@@ -54,6 +58,9 @@ describe("SettingsScreen", () => {
   test("announces dirty, saved, and disabled save states", () => {
     const dirtyProps = renderSettings({ dirty: true });
 
+    expect(screen.getByLabelText("Состояние рабочего места")).toHaveTextContent(
+      "Есть изменения",
+    );
     expect(screen.getByRole("status")).toHaveTextContent(
       "Есть несохранённые изменения",
     );
@@ -63,6 +70,9 @@ describe("SettingsScreen", () => {
     cleanup();
     renderSettings({ dirty: false, saveState: "saved" });
 
+    expect(screen.getByLabelText("Состояние рабочего места")).toHaveTextContent(
+      "Сохранено",
+    );
     expect(screen.getByRole("status")).toHaveTextContent("Настройки сохранены");
     expect(screen.getByRole("button", { name: "Отменить" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Сохранить" })).toBeDisabled();

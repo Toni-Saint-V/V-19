@@ -141,6 +141,46 @@ export function AgentActionsScreen({
           : dueFilter === "week"
             ? "На неделе"
             : "Открытые действия";
+  const panelToggleTool = (
+    <ToolbarIconButton
+      label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
+      icon="panel"
+      pressed={panelOpen}
+      onClick={() => transitionUiState(() => setPanelOpen((value) => !value))}
+    />
+  );
+  const toolbarToolButtons = (
+    <>
+      <ToolbarIconButton
+        label={dueFilter === "all" ? "Фильтр: все действия" : "Фильтр: активен"}
+        icon="filter"
+        pressed={dueFilter !== "all"}
+        onClick={() =>
+          transitionUiState(() =>
+            setDueFilter((value) => (value === "all" ? "overdue" : "all")),
+          )
+        }
+      />
+      <ToolbarIconButton
+        label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+        icon="view"
+        pressed={!comfortableView}
+        onClick={() =>
+          transitionUiState(() => setComfortableView((value) => !value))
+        }
+      />
+      <ToolbarIconButton
+        label={
+          sortOldest ? "Сортировка: поздние ниже" : "Сортировка: важные сверху"
+        }
+        icon="sort"
+        pressed={sortOldest}
+        onClick={() => transitionUiState(() => setSortOldest((value) => !value))}
+      />
+      {panelToggleTool}
+    </>
+  );
+  const toolbarTools = <ToolbarTools>{toolbarToolButtons}</ToolbarTools>;
 
   return (
     <div
@@ -206,46 +246,7 @@ export function AgentActionsScreen({
             },
           ]}
           tabsAriaLabel="Состояние действий"
-          tools={
-            <ToolbarTools>
-              <ToolbarIconButton
-                label={dueFilter === "all" ? "Фильтр: все действия" : "Фильтр: активен"}
-                icon="filter"
-                pressed={dueFilter !== "all"}
-                onClick={() =>
-                  transitionUiState(() =>
-                    setDueFilter((value) => (value === "all" ? "overdue" : "all")),
-                  )
-                }
-              />
-              <ToolbarIconButton
-                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
-                icon="view"
-                pressed={!comfortableView}
-                onClick={() =>
-                  transitionUiState(() => setComfortableView((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={
-                  sortOldest ? "Сортировка: поздние ниже" : "Сортировка: важные сверху"
-                }
-                icon="sort"
-                pressed={sortOldest}
-                onClick={() =>
-                  transitionUiState(() => setSortOldest((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
-                icon="panel"
-                pressed={panelOpen}
-                onClick={() =>
-                  transitionUiState(() => setPanelOpen((value) => !value))
-                }
-              />
-            </ToolbarTools>
-          }
+          tools={toolbarTools}
           value={activeTab}
         />
 
@@ -282,6 +283,7 @@ export function AgentActionsScreen({
 
       {panelOpen ? (
         <ContextPanel label="Нагрузка по действиям">
+          {toolbarTools}
           <p className="kicker">Нагрузка</p>
           <div className="v19-unread-summary">
             <strong>{summary.open}</strong>
@@ -384,6 +386,52 @@ export function AgentInboxScreen({
     sortOrder === "oldest" ? "Старые сверху" : null,
     comfortableView ? null : "Компактный вид",
   ].filter((label): label is string => Boolean(label));
+  const panelToggleTool = (
+    <ToolbarIconButton
+      label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
+      icon="panel"
+      pressed={panelOpen}
+      onClick={() => transitionUiState(() => setPanelOpen((value) => !value))}
+    />
+  );
+  const toolbarToolButtons = (
+    <>
+      <ToolbarIconButton
+        label={
+          actionOnly
+            ? "Фильтр: только требующие действия"
+            : "Фильтр: все события"
+        }
+        icon="filter"
+        pressed={actionOnly}
+        onClick={() => transitionUiState(() => setActionOnly((value) => !value))}
+      />
+      <ToolbarIconButton
+        label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+        icon="view"
+        pressed={!comfortableView}
+        onClick={() =>
+          transitionUiState(() => setComfortableView((value) => !value))
+        }
+      />
+      <ToolbarIconButton
+        label={
+          sortOrder === "newest"
+            ? "Сортировка: новые сверху"
+            : "Сортировка: старые сверху"
+        }
+        icon="sort"
+        pressed={sortOrder === "oldest"}
+        onClick={() =>
+          transitionUiState(() =>
+            setSortOrder((value) => (value === "newest" ? "oldest" : "newest")),
+          )
+        }
+      />
+      {panelToggleTool}
+    </>
+  );
+  const toolbarTools = <ToolbarTools>{toolbarToolButtons}</ToolbarTools>;
 
   function openEvent(event: InboxEvent) {
     setReadEventIds((current) => new Set(current).add(event.id));
@@ -426,54 +474,7 @@ export function AgentInboxScreen({
             { id: "all", label: "Все" },
           ]}
           tabsAriaLabel="Состояние входящих"
-          tools={
-            <ToolbarTools>
-              <ToolbarIconButton
-                label={
-                  actionOnly
-                    ? "Фильтр: только требующие действия"
-                    : "Фильтр: все события"
-                }
-                icon="filter"
-                pressed={actionOnly}
-                onClick={() =>
-                  transitionUiState(() => setActionOnly((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
-                icon="view"
-                pressed={!comfortableView}
-                onClick={() =>
-                  transitionUiState(() => setComfortableView((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={
-                  sortOrder === "newest"
-                    ? "Сортировка: новые сверху"
-                    : "Сортировка: старые сверху"
-                }
-                icon="sort"
-                pressed={sortOrder === "oldest"}
-                onClick={() =>
-                  transitionUiState(() =>
-                    setSortOrder((value) =>
-                      value === "newest" ? "oldest" : "newest",
-                    ),
-                  )
-                }
-              />
-              <ToolbarIconButton
-                label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
-                icon="panel"
-                pressed={panelOpen}
-                onClick={() =>
-                  transitionUiState(() => setPanelOpen((value) => !value))
-                }
-              />
-            </ToolbarTools>
-          }
+          tools={toolbarTools}
           value={activeTab}
         />
 
@@ -515,6 +516,7 @@ export function AgentInboxScreen({
 
       {panelOpen ? (
         <ContextPanel label="Сводка входящих">
+          {toolbarTools}
           <p className="kicker">Сводка</p>
           <div className="v19-unread-summary">
             <strong>{unreadCount}</strong>
@@ -743,6 +745,42 @@ export function AgentSubmissionsScreen({
       onClearFilters?.();
     });
   };
+  const panelToggleTool = (
+    <ToolbarIconButton
+      label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
+      icon="panel"
+      pressed={panelOpen}
+      onClick={() => transitionUiState(() => setPanelOpen((value) => !value))}
+    />
+  );
+  const toolbarToolButtons = (
+    <>
+      <ToolbarIconButton
+        label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
+        icon="filter"
+        pressed={blockersOnly}
+        onClick={() =>
+          transitionUiState(() => setBlockersOnly((value) => !value))
+        }
+      />
+      <ToolbarIconButton
+        label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+        icon="view"
+        pressed={!comfortableView}
+        onClick={() =>
+          transitionUiState(() => setComfortableView((value) => !value))
+        }
+      />
+      <ToolbarIconButton
+        label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
+        icon="sort"
+        pressed={!sortNewest}
+        onClick={() => transitionUiState(() => setSortNewest((value) => !value))}
+      />
+      {panelToggleTool}
+    </>
+  );
+  const toolbarTools = <ToolbarTools>{toolbarToolButtons}</ToolbarTools>;
   return (
     <div
       className={`v19-screen-grid v19-inbox-screen v19-submissions-screen ${
@@ -775,42 +813,7 @@ export function AgentSubmissionsScreen({
             { count: tabCounts.done, id: "done", label: "Готово" },
           ]}
           tabsAriaLabel="Состояние подач"
-          tools={
-            <ToolbarTools>
-              <ToolbarIconButton
-                label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
-                icon="filter"
-                pressed={blockersOnly}
-                onClick={() =>
-                  transitionUiState(() => setBlockersOnly((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
-                icon="view"
-                pressed={!comfortableView}
-                onClick={() =>
-                  transitionUiState(() => setComfortableView((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
-                icon="sort"
-                pressed={!sortNewest}
-                onClick={() =>
-                  transitionUiState(() => setSortNewest((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
-                icon="panel"
-                pressed={panelOpen}
-                onClick={() =>
-                  transitionUiState(() => setPanelOpen((value) => !value))
-                }
-              />
-            </ToolbarTools>
-          }
+          tools={toolbarTools}
           value={visibleTab}
         />
 
@@ -863,6 +866,7 @@ export function AgentSubmissionsScreen({
 
       {panelOpen ? (
         <ContextPanel className="v19-submissions-context" label="Сводка подач">
+          {toolbarTools}
           <p className="kicker">Сводка</p>
           <div className="v19-panel-metrics v19-submission-status-metrics">
             <span>
@@ -1065,6 +1069,42 @@ export function AdminReviewScreen({
     sortNewest ? null : "Обратный порядок",
     comfortableView ? null : "Компактный вид",
   ].filter((label): label is string => Boolean(label));
+  const panelToggleTool = (
+    <ToolbarIconButton
+      label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
+      icon="panel"
+      pressed={panelOpen}
+      onClick={() => transitionUiState(() => setPanelOpen((value) => !value))}
+    />
+  );
+  const toolbarToolButtons = (
+    <>
+      <ToolbarIconButton
+        label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
+        icon="filter"
+        pressed={blockersOnly}
+        onClick={() =>
+          transitionUiState(() => setBlockersOnly((value) => !value))
+        }
+      />
+      <ToolbarIconButton
+        label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
+        icon="view"
+        pressed={!comfortableView}
+        onClick={() =>
+          transitionUiState(() => setComfortableView((value) => !value))
+        }
+      />
+      <ToolbarIconButton
+        label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
+        icon="sort"
+        pressed={!sortNewest}
+        onClick={() => transitionUiState(() => setSortNewest((value) => !value))}
+      />
+      {panelToggleTool}
+    </>
+  );
+  const toolbarTools = <ToolbarTools>{toolbarToolButtons}</ToolbarTools>;
 
   return (
     <div
@@ -1102,42 +1142,7 @@ export function AdminReviewScreen({
             { count: tabCounts.ready, id: "ready", label: "К выгрузке" },
           ]}
           tabsAriaLabel="Состояние проверки"
-          tools={
-            <ToolbarTools>
-              <ToolbarIconButton
-                label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
-                icon="filter"
-                pressed={blockersOnly}
-                onClick={() =>
-                  transitionUiState(() => setBlockersOnly((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={comfortableView ? "Вид: комфортный" : "Вид: компактный"}
-                icon="view"
-                pressed={!comfortableView}
-                onClick={() =>
-                  transitionUiState(() => setComfortableView((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
-                icon="sort"
-                pressed={!sortNewest}
-                onClick={() =>
-                  transitionUiState(() => setSortNewest((value) => !value))
-                }
-              />
-              <ToolbarIconButton
-                label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
-                icon="panel"
-                pressed={panelOpen}
-                onClick={() =>
-                  transitionUiState(() => setPanelOpen((value) => !value))
-                }
-              />
-            </ToolbarTools>
-          }
+          tools={toolbarTools}
           value={reviewTab}
         />
 
@@ -1188,6 +1193,7 @@ export function AdminReviewScreen({
 
       {panelOpen ? (
         <ContextPanel className="v19-admin-context" label="Сводка проверки">
+          {toolbarTools}
           <p className="kicker">Сводка</p>
           <div className="v19-unread-summary">
             <strong>{tabCounts.all}</strong>

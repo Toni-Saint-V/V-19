@@ -60,6 +60,7 @@ import {
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
 import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
 import {
+  applySafePassportExtractionFields,
   applyPassportExtractionField,
   canStartPassportExtraction,
   failPassportExtraction,
@@ -1285,11 +1286,15 @@ function App() {
     });
   }
 
-  async function extractPassportForActiveSubmission(fileId: string) {
+  async function extractPassportForSubmission(
+    submissionId: string,
+    fileId: string,
+    applySafeFieldsAfter = false,
+  ) {
     if (!passportExtractionEnabled || role !== "agent") return;
 
     const submission = submissionsRef.current.find(
-      (candidate) => candidate.id === selectedSubmissionId,
+      (candidate) => candidate.id === submissionId,
     );
     const file = submission?.files.find((candidate) => candidate.id === fileId);
     if (!submission || !file || file.type !== "passport_scan") return;
@@ -1328,9 +1333,12 @@ function App() {
             "Файл паспорта изменился во время распознавания. Запустите проверку снова.",
           );
         }
-        return finishPassportExtraction(current, latestFile, result);
+        const finished = finishPassportExtraction(current, latestFile, result);
+        return applySafeFieldsAfter
+          ? applySafePassportExtractionFields(finished, latestFile.applicantId)
+          : finished;
       });
-      setActiveDrawerTab("questionnaire");
+      if (selectedSubmissionId === submission.id) setActiveDrawerTab("questionnaire");
     } catch {
       updateSubmissionById(submission.id, (current) => {
         const latestFile = current.files.find((candidate) => candidate.id === fileId);
@@ -1340,8 +1348,13 @@ function App() {
           "Распознавание паспорта недоступно. Проверьте данные вручную.",
         );
       });
-      setActiveDrawerTab("files");
+      if (selectedSubmissionId === submission.id) setActiveDrawerTab("files");
     }
+  }
+
+  async function extractPassportForActiveSubmission(fileId: string) {
+    if (!selectedSubmissionId) return;
+    await extractPassportForSubmission(selectedSubmissionId, fileId);
   }
 
   function applyPassportFieldForActiveSubmission(
@@ -1455,6 +1468,19 @@ function App() {
     }
   }
 
+  function extractInitialPassportUploads(
+    submission: Submission,
+    passportUploads: PassportUploadDraft[],
+  ) {
+    passportUploads.forEach((upload) => {
+      const selectedFile = upload.file;
+      const slot = passportSlotForUpload(submission, upload);
+      if (!slot || !selectedFile) return;
+      rememberLocalPassportFile(slot.id, selectedFile);
+      void extractPassportForSubmission(submission.id, slot.id, true);
+    });
+  }
+
   function createDraft(
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
@@ -1477,9 +1503,10 @@ function App() {
     submissionsRef.current = nextSubmissions;
     setSubmissions(nextSubmissions);
     enqueueSupabaseInitialPassportUploads(preparedSubmission, passportUploads);
+    extractInitialPassportUploads(preparedSubmission, passportUploads);
     setSelectedSubmissionId(preparedSubmission.id);
     setDrawerMode("detail");
-    setActiveDrawerTab(passportUploads.length ? "files" : "overview");
+    setActiveDrawerTab(passportUploads.length ? "questionnaire" : "overview");
     setDirty(false);
   }
 

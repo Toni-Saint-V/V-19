@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   applyPassportExtractionField,
+  applySafePassportExtractionFields,
   canStartPassportExtraction,
   finishPassportExtraction,
   hasPassportExtractionReviewPending,
@@ -108,6 +109,43 @@ describe("passport extraction state", () => {
     expect(applied.applicants[0]?.passportExtraction?.appliedFieldKeys).toContain(
       "passportNumber",
     );
+  });
+
+  test("autofills safe passport fields after creation extraction", () => {
+    const draft = draftSubmission();
+    const file = passportFile(draft);
+    const ready = finishPassportExtraction(draft, file, {
+      fields: [
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: true,
+          value: "765432100",
+        },
+        {
+          confidence: "medium",
+          key: "passportExpiresAt",
+          needsManualReview: true,
+          value: "26.02.2030",
+        },
+      ],
+      guardrails: [],
+      source: "edge-provider",
+      status: "extracted",
+      summary: "Данные паспорта подготовлены.",
+    });
+    const applicantId = ready.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+
+    const autofilled = applySafePassportExtractionFields(ready, applicantId);
+
+    expect(questionnaireValue(autofilled, "passport-no")).toBe("765432100");
+    expect(questionnaireValue(autofilled, "passport-expiry-date")).toBe(
+      "26.02.2030",
+    );
+    expect(
+      autofilled.applicants[0]?.passportExtraction?.appliedFieldKeys,
+    ).toEqual(expect.arrayContaining(["passportNumber", "passportExpiresAt"]));
   });
 
   test("tracks free extraction attempts without blocking retries", () => {

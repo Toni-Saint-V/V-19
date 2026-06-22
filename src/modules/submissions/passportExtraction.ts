@@ -294,6 +294,22 @@ export function applyPassportExtractionField(
   }));
 }
 
+export function applySafePassportExtractionFields(
+  submission: Submission,
+  applicantId: string,
+): Submission {
+  const applicant = submission.applicants.find((item) => item.id === applicantId);
+  if (!applicant?.passportExtraction) return submission;
+
+  return passportExtractionRows(applicant)
+    .filter((row) => !row.applied && !row.conflict)
+    .reduce(
+      (current, row) =>
+        applyPassportExtractionField(current, applicantId, row.key, "safe"),
+      submission,
+    );
+}
+
 export function markPassportExtractionReviewed(
   submission: Submission,
   mode: "verified" | "dismissed",
