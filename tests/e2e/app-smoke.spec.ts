@@ -785,7 +785,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       drawer(page).getByRole("heading", { name: "Новая подача" }),
     ).toBeVisible();
-    await expect(drawer(page).getByLabel("Создание подачи")).toBeVisible();
+    await expect(drawer(page).getByLabel("Предварительная заявка")).toBeVisible();
     await expect(drawer(page).getByLabel("Заявители в подаче")).toBeVisible();
 
     await drawer(page)
@@ -793,25 +793,31 @@ test.describe("V-19 operations workspace", () => {
       .setInputFiles({
         name: "passport.pdf",
         mimeType: "application/pdf",
-        buffer: Buffer.from("passport-local-preview"),
+        buffer: Buffer.from("%PDF-1.4\n%passport-local-preview\n"),
       });
-    await expect(drawer(page).getByText("Готово").first()).toBeVisible();
+    await expect(drawer(page).getByText("Выбрано").first()).toBeVisible();
     await expect(
-      drawer(page).getByText("Успешно извлекли данные паспорта"),
+      drawer(page).getByText(
+        "Файл выбран. ФИО не распознано автоматически, проверьте паспорт вручную.",
+      ),
     ).toBeVisible();
 
     await drawer(page).getByRole("button", { name: "Семья", exact: true }).click();
     await expect(
       drawer(page).locator(".create-people-list").getByRole("button"),
     ).toHaveCount(0);
-    await expect(
-      drawer(page).locator(".qs-preview").getByRole("button"),
-    ).toHaveCount(0);
-    await drawer(page).getByRole("button", { name: "Добавить человека" }).click();
-    await expect(drawer(page).getByLabel("Ребенок 1")).toBeVisible();
-    await expect(drawer(page).getByRole("checkbox", { name: "Ребенок 1" })).toHaveCount(
+    await expect(drawer(page).locator(".qs-preview").getByRole("button")).toHaveCount(
       0,
     );
+    await drawer(page)
+      .getByRole("button", { name: /Добавить заявителя в семью/ })
+      .click();
+    await expect(
+      drawer(page).getByRole("button", { name: "Заявитель 3 Паспорт не загружен" }),
+    ).toBeVisible();
+    await expect(
+      drawer(page).getByRole("checkbox", { name: "Заявитель 3" }),
+    ).toHaveCount(0);
     await page.keyboard.press("Escape");
 
     const confirmation = page.getByRole("dialog", { name: "Закрыть панель?" });

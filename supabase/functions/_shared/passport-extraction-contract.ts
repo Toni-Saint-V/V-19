@@ -32,6 +32,7 @@ export interface PassportDocumentRef {
 
 export interface PassportExtractionRequest {
   actor: PassportExtractionActor;
+  allowOpenAiFallback?: boolean;
   document: PassportDocumentRef;
   applicantIndex?: number;
   requestId?: string;
@@ -39,6 +40,7 @@ export interface PassportExtractionRequest {
 }
 
 export interface PassportExtractionClientRequest {
+  allowOpenAiFallback?: boolean;
   document: PassportDocumentRef;
   applicantIndex?: number;
   requestId?: string;
@@ -62,8 +64,9 @@ export interface PassportExtractionResult {
   applicantIndex?: number;
   fields: PassportExtractionField[];
   guardrails: string[];
+  openAiAttempted?: boolean;
   orientation?: PassportExtractionOrientation;
-  source: "edge-provider" | "edge-stub" | "local-ocr";
+  source: "edge-provider" | "edge-stub" | "local-ocr" | "openai-vision";
   status: "extracted" | "unavailable";
   summary: string;
 }
@@ -77,6 +80,7 @@ export interface PassportExtractionAuditEvent {
     | "passport_extraction_denied"
     | "passport_extraction_provider_failed"
     | "passport_extraction_output_rejected";
+  metadata?: Record<string, boolean | number | string | null>;
   reason: string;
   requestId?: string;
   storagePath?: string;
@@ -163,6 +167,10 @@ export function parsePassportExtractionRequest(
         mimeType: document.mimeType as PassportDocumentRef["mimeType"],
         sizeBytes: document.sizeBytes,
       },
+      allowOpenAiFallback:
+        typeof value.allowOpenAiFallback === "boolean"
+          ? value.allowOpenAiFallback
+          : undefined,
       requestId: typeof value.requestId === "string" ? value.requestId : undefined,
       submissionId:
         typeof value.submissionId === "string" ? value.submissionId : undefined,
@@ -236,7 +244,8 @@ export function parsePassportExtractionResult(
   if (
     value.source !== "edge-provider" &&
     value.source !== "edge-stub" &&
-    value.source !== "local-ocr"
+    value.source !== "local-ocr" &&
+    value.source !== "openai-vision"
   ) {
     return {
       ok: false,
@@ -309,7 +318,11 @@ export function parsePassportExtractionResult(
           ? value.applicantIndex
           : undefined,
       fields: fields.filter((field) => field.value),
-      guardrails: [...passportExtractionGuardrails],
+      guardrails: validatedGuardrails(value.guardrails),
+      openAiAttempted:
+        typeof value.openAiAttempted === "boolean"
+          ? value.openAiAttempted
+          : value.source === "openai-vision",
       orientation,
       source: value.source,
       status: value.status,
@@ -340,14 +353,34 @@ export function passportExtractionAuditEvent(
   reason: string,
   request?: Partial<PassportExtractionRequest>,
   createdAt = new Date().toISOString(),
+  metadata: Record<string, boolean | number | string | null> = {},
 ): PassportExtractionAuditEvent {
   return {
     actorId: request?.actor?.id,
     actorRole: request?.actor?.role,
     createdAt,
     event,
+    metadata: {
+      fallback_allowed:
+        typeof request?.allowOpenAiFallback === "boolean"
+          ? request.allowOpenAiFallback
+          : null,
+      storage_path: request?.document?.path ?? null,
+      ...metadata,
+    },
     reason,
     requestId: request?.requestId,
     storagePath: request?.document?.path,
   };
+}
+
+function validatedGuardrails(value: unknown) {
+  if (!Array.isArray(value)) return [...passportExtractionGuardrails];
+
+  const providerGuardrails = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return [...new Set([...passportExtractionGuardrails, ...providerGuardrails])];
 }

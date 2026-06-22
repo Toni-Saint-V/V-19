@@ -140,12 +140,10 @@ describe("passport extraction state", () => {
     const autofilled = applySafePassportExtractionFields(ready, applicantId);
 
     expect(questionnaireValue(autofilled, "passport-no")).toBe("765432100");
-    expect(questionnaireValue(autofilled, "passport-expiry-date")).toBe(
-      "26.02.2030",
+    expect(questionnaireValue(autofilled, "passport-expiry-date")).toBe("26.02.2030");
+    expect(autofilled.applicants[0]?.passportExtraction?.appliedFieldKeys).toEqual(
+      expect.arrayContaining(["passportNumber", "passportExpiresAt"]),
     );
-    expect(
-      autofilled.applicants[0]?.passportExtraction?.appliedFieldKeys,
-    ).toEqual(expect.arrayContaining(["passportNumber", "passportExpiresAt"]));
   });
 
   test("tracks free extraction attempts without blocking retries", () => {
@@ -181,6 +179,36 @@ describe("passport extraction state", () => {
       passportExtractionAttemptUsage(restarted.applicants[0] ?? applicant),
     ).toMatchObject({
       used: 2,
+    });
+  });
+
+  test("stores the OpenAI fallback fingerprint when provider was attempted", () => {
+    const draft = draftSubmission();
+    const file = passportFile(draft);
+    const ready = finishPassportExtraction(
+      draft,
+      file,
+      {
+        fields: [
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: true,
+            value: "765432100",
+          },
+        ],
+        guardrails: [],
+        openAiAttempted: true,
+        source: "openai-vision",
+        status: "extracted",
+        summary: "OpenAI fallback извлек паспортные поля.",
+      },
+      "passport-fingerprint-1",
+    );
+
+    expect(ready.applicants[0]?.passportExtraction).toMatchObject({
+      openaiAttemptedForFingerprint: "passport-fingerprint-1",
+      status: "ready",
     });
   });
 

@@ -369,7 +369,9 @@ async function invokeLocalPassportExtraction(input: {
 
 function localOcrSummary(fields: number, quality: PassportImageQualityReport | null) {
   const qualityNote =
-    quality && quality.status !== "pass" ? ` ${passportImageQualitySummary(quality)}` : "";
+    quality && quality.status !== "pass"
+      ? ` ${passportImageQualitySummary(quality)}`
+      : "";
   return `Локальный OCR нашёл ${fields} полей MRZ. Проверьте их вручную перед отправкой.${qualityNote}`;
 }
 
@@ -378,23 +380,34 @@ type PassportExtractionInput =
       applicantIndex?: number;
       file?: SubmissionFile;
       localFile: File;
+      openAiFallbackAllowed?: boolean;
       submission?: Submission;
     }
   | {
       applicantIndex?: number;
       file: SubmissionFile;
       localFile?: File;
+      openAiFallbackAllowed?: boolean;
       submission: Submission;
     };
 
 export async function invokePassportExtraction(
   input: PassportExtractionInput,
 ): Promise<PassportExtractionResult> {
+  let localResult: PassportExtractionResult | null = null;
   if (input.localFile) {
-    return invokeLocalPassportExtraction({
+    localResult = await invokeLocalPassportExtraction({
       applicantIndex: input.applicantIndex,
       localFile: input.localFile,
     });
+    if (
+      localResult.status === "extracted" ||
+      !input.file ||
+      !input.submission ||
+      input.openAiFallbackAllowed === false
+    ) {
+      return localResult;
+    }
   }
 
   if (!input.file || !input.submission) {
@@ -414,7 +427,7 @@ export async function invokePassportExtraction(
     typeof sizeBytes !== "number" ||
     sizeBytes <= 0
   ) {
-    return safeUnavailablePassportExtractionResult(input.applicantIndex);
+    return localResult ?? safeUnavailablePassportExtractionResult(input.applicantIndex);
   }
 
   const { data, error } = await client.functions.invoke<unknown>("passport-extract", {
@@ -426,6 +439,7 @@ export async function invokePassportExtraction(
         path: input.file.storagePath,
         sizeBytes,
       },
+      allowOpenAiFallback: input.openAiFallbackAllowed !== false,
       submissionId: input.submission.id,
     },
   });
@@ -437,6 +451,14 @@ export async function invokePassportExtraction(
   const parsed = parsePassportExtractionResult(data);
   if (!parsed.ok) {
     throw new Error(parsed.safeMessage);
+  }
+
+  if (
+    localResult &&
+    parsed.data.status === "unavailable" &&
+    !parsed.data.openAiAttempted
+  ) {
+    return localResult;
   }
 
   return parsed.data;

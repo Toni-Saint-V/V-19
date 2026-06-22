@@ -6,6 +6,17 @@ const tesseractMock = vi.hoisted(() => ({
   recognize: vi.fn(),
   text: "",
 }));
+const supabaseMock = vi.hoisted(() => ({
+  invoke: vi.fn(),
+}));
+
+vi.mock("../../src/lib/supabase/client", () => ({
+  getSupabaseClient: () => ({
+    functions: {
+      invoke: supabaseMock.invoke,
+    },
+  }),
+}));
 
 vi.mock("tesseract.js", () => ({
   default: {
@@ -145,10 +156,22 @@ describe("passport extraction service local OCR quality integration", () => {
         text: tesseractMock.text,
       },
     }));
+    supabaseMock.invoke.mockResolvedValue({
+      data: {
+        fields: [],
+        guardrails: [],
+        openAiAttempted: false,
+        source: "edge-stub",
+        status: "unavailable",
+        summary: "Server extraction unavailable.",
+      },
+      error: null,
+    });
   });
 
   afterEach(() => {
     restoreBrowserImageMocks();
+    supabaseMock.invoke.mockReset();
     tesseractMock.recognize.mockReset();
   });
 
@@ -215,5 +238,122 @@ describe("passport extraction service local OCR quality integration", () => {
     expect(tesseractMock.recognize).toHaveBeenCalledTimes(4);
     expect(result.status).toBe("unavailable");
     expect(result.summary).toContain("Скан паспорта не готов к OCR");
+  });
+
+  test("uses edge fallback after local OCR is unavailable", async () => {
+    installBrowserImageMocks({
+      height: 700,
+      luma: () => 120,
+      width: 1200,
+    });
+    tesseractMock.text = "NO PASSPORT MRZ";
+    supabaseMock.invoke.mockResolvedValue({
+      data: {
+        fields: [
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: true,
+            value: "765432100",
+          },
+        ],
+        guardrails: [],
+        openAiAttempted: true,
+        source: "openai-vision",
+        status: "extracted",
+        summary: "OpenAI fallback извлек паспортные поля.",
+      },
+      error: null,
+    });
+
+    const result = await invokeLocalPassport("image/jpeg", 120_000);
+
+    expect(supabaseMock.invoke).toHaveBeenCalledWith(
+      "passport-extract",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          allowOpenAiFallback: true,
+        }),
+      }),
+    );
+    expect(result).toMatchObject({
+      openAiAttempted: true,
+      source: "openai-vision",
+      status: "extracted",
+    });
+  });
+
+  test("keeps local unavailable result when edge did not attempt OpenAI", async () => {
+    installBrowserImageMocks({
+      height: 360,
+      luma: () => 130,
+      width: 640,
+    });
+    tesseractMock.text = "NO PASSPORT MRZ";
+    supabaseMock.invoke.mockResolvedValue({
+      data: {
+        fields: [],
+        guardrails: [],
+        openAiAttempted: false,
+        source: "edge-stub",
+        status: "unavailable",
+        summary: "Server extraction unavailable.",
+      },
+      error: null,
+    });
+
+    const result = await invokeLocalPassport("image/png", 120_000);
+
+    expect(supabaseMock.invoke).toHaveBeenCalledOnce();
+    expect(result.summary).toContain("Скан паспорта не готов к OCR");
+  });
+
+  test("does not call edge fallback when OpenAI is disabled for the same fingerprint", async () => {
+    installBrowserImageMocks({
+      height: 700,
+      luma: () => 120,
+      width: 1200,
+    });
+    tesseractMock.text = "NO PASSPORT MRZ";
+
+    const result = await invokePassportExtraction({
+      applicantIndex: 0,
+      file: submissionFile("image/jpeg"),
+      localFile: localPassportFile("image/jpeg", 120_000),
+      openAiFallbackAllowed: false,
+      submission: submission(),
+    });
+
+    expect(supabaseMock.invoke).not.toHaveBeenCalled();
+    expect(result.status).toBe("unavailable");
+  });
+
+  test("forwards disabled OpenAI fallback to edge when no local file is available", async () => {
+    supabaseMock.invoke.mockResolvedValue({
+      data: {
+        fields: [],
+        guardrails: [],
+        source: "edge-stub",
+        status: "unavailable",
+        summary: "Server extraction unavailable.",
+      },
+      error: null,
+    });
+
+    await invokePassportExtraction({
+      applicantIndex: 0,
+      file: submissionFile("application/pdf"),
+      openAiFallbackAllowed: false,
+      submission: submission(),
+    });
+
+    expect(supabaseMock.invoke).toHaveBeenCalledWith(
+      "passport-extract",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          allowOpenAiFallback: false,
+        }),
+      }),
+    );
   });
 });

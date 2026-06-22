@@ -125,14 +125,9 @@ import {
 } from "./modules/submissions/mediaStorage";
 import type { AppProfile } from "./types/session";
 
-const SettingsScreen = lazy(
-  () => import("./modules/submissions/pages/SettingsScreen"),
-);
+const SettingsScreen = lazy(() => import("./modules/submissions/pages/SettingsScreen"));
 
-const cities: Array<City | "Все города"> = [
-  "Все города",
-  ...CANONICAL_CITIES,
-];
+const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
 const fallbackAdminEmails = ["admin@visaflow.local"];
 const fallbackAgentEmails = ["agent@visaflow.local"];
@@ -277,13 +272,21 @@ function applicantNamesForCreateDraft({
   return names;
 }
 
+const passportScanUploadMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "application/pdf",
+]);
+
 function firstSubmissionForRole(
   submissions: Submission[],
   role: Role,
   agentId = defaultLocalAgentOwnerId,
 ) {
   if (role === "admin") return reviewQueue(submissions)[0] ?? submissions[0];
-  return agentQueue(submissions, agentId)[0] ?? ownedSubmissions(submissions, agentId)[0];
+  return (
+    agentQueue(submissions, agentId)[0] ?? ownedSubmissions(submissions, agentId)[0]
+  );
 }
 
 function App() {
@@ -310,9 +313,7 @@ function App() {
   const [settingsDraft, setSettingsDraft] = useState<WorkspaceSettings>(
     defaultWorkspaceSettings,
   );
-  const [settingsSaveState, setSettingsSaveState] = useState<"idle" | "saved">(
-    "idle",
-  );
+  const [settingsSaveState, setSettingsSaveState] = useState<"idle" | "saved">("idle");
   const [confirmSettingsLeave, setConfirmSettingsLeave] = useState(false);
   const [surface, setSurface] = useState<Surface>(
     initialWorkspaceRole === "admin" ? "admin-review" : "agent-inbox",
@@ -371,9 +372,7 @@ function App() {
       ? remoteProfile.id
       : defaultLocalAgentOwnerId;
   const visibleSubmissionsForRole =
-    role === "agent"
-      ? ownedSubmissions(submissions, currentAgentOwnerId)
-      : submissions;
+    role === "agent" ? ownedSubmissions(submissions, currentAgentOwnerId) : submissions;
   const activeSubmission =
     visibleSubmissionsForRole.find(
       (submission) => submission.id === selectedSubmissionId,
@@ -390,11 +389,7 @@ function App() {
   );
   const agentActionSource = useMemo(
     () =>
-      searchSubmissions(
-        agentQueue(submissions, currentAgentOwnerId),
-        "",
-        cityFilter,
-      ),
+      searchSubmissions(agentQueue(submissions, currentAgentOwnerId), "", cityFilter),
     [cityFilter, currentAgentOwnerId, submissions],
   );
   const agentActions = useMemo(
@@ -738,9 +733,9 @@ function App() {
         ? reviewList
         : surface === "admin-inbox" || surface === "admin-actions"
           ? searchedAdminOperationalQueue
-        : surface === "agent-submissions" || surface === "agent-inbox"
-          ? agentList
-          : [];
+          : surface === "agent-submissions" || surface === "agent-inbox"
+            ? agentList
+            : [];
 
     if (visibleList.length === 0) return;
     if (visibleList.some((submission) => submission.id === selectedSubmissionId))
@@ -1133,6 +1128,12 @@ function App() {
         throw new Error("Media slot no longer exists for this upload.");
       }
       if (
+        targetFile.type === "passport_scan" &&
+        !passportScanUploadMimeTypes.has(selectedFile.type)
+      ) {
+        throw new Error("Passport scan uploads accept only JPEG, PNG or PDF files.");
+      }
+      if (
         targetFile.status !== "missing" &&
         targetFile.status !== "needs_replacement"
       ) {
@@ -1264,6 +1265,16 @@ function App() {
 
   async function uploadActiveFile(fileId: string, selectedFile?: File) {
     if (!activeSubmission) return;
+    const targetFile = activeSubmission.files.find((file) => file.id === fileId);
+    if (
+      selectedFile &&
+      targetFile?.type === "passport_scan" &&
+      !passportScanUploadMimeTypes.has(selectedFile.type)
+    ) {
+      setRemoteSaveState("error");
+      setRemoteSaveError("Загрузите паспорт в формате JPEG, PNG или PDF.");
+      return;
+    }
 
     if (isSupabaseMode) {
       if (!remoteProfile) {
@@ -1289,7 +1300,9 @@ function App() {
       return;
     }
 
-    if (selectedFile) rememberLocalPassportFile(fileId, selectedFile);
+    if (selectedFile && targetFile?.type === "passport_scan") {
+      rememberLocalPassportFile(fileId, selectedFile);
+    }
     updateActiveSubmission((submission) =>
       uploadRequiredFile(
         submission,
@@ -1345,6 +1358,9 @@ function App() {
     );
     const localFile = localPassportFilesRef.current.get(file.id);
     const requestedFingerprint = passportSourceFingerprint(file, localFile);
+    const openAiFallbackAllowed =
+      applicant.passportExtraction?.openaiAttemptedForFingerprint !==
+      requestedFingerprint;
     updateSubmissionById(submission.id, (current) =>
       startPassportExtraction(current, file),
     );
@@ -1354,6 +1370,7 @@ function App() {
         applicantIndex: applicantIndex >= 0 ? applicantIndex : undefined,
         file,
         localFile,
+        openAiFallbackAllowed,
         submission,
       });
       updateSubmissionById(submission.id, (current) => {
@@ -1370,7 +1387,12 @@ function App() {
             "Файл паспорта изменился во время распознавания. Запустите проверку снова.",
           );
         }
-        const finished = finishPassportExtraction(current, latestFile, result);
+        const finished = finishPassportExtraction(
+          current,
+          latestFile,
+          result,
+          requestedFingerprint,
+        );
         return applySafeFieldsAfter
           ? applySafePassportExtractionFields(finished, latestFile.applicantId)
           : finished;
@@ -1488,7 +1510,7 @@ function App() {
     const file = submission.files.find((candidate) => candidate.id === fileId);
     if (!file) return submission;
 
-    return {
+    const withExtraction = {
       ...submission,
       applicants: submission.applicants.map((applicant) =>
         applicant.id === file.applicantId
@@ -1508,6 +1530,7 @@ function App() {
           : applicant,
       ),
     };
+    return applySafePassportExtractionFields(withExtraction, file.applicantId);
   }
 
   function enqueueSupabaseInitialPassportUploads(
@@ -1533,7 +1556,17 @@ function App() {
           slot.id,
           selectedFile,
           remoteProfile,
-        ).then(() => undefined),
+        ).then((updatedSubmission) => {
+          if (updatedSubmission) {
+            if (upload.extractedFields.length) {
+              updateSubmissionById(updatedSubmission.id, (current) =>
+                applyInitialPassportExtraction(current, slot.id, upload),
+              );
+              return;
+            }
+            void extractPassportForSubmission(updatedSubmission.id, slot.id, true);
+          }
+        }),
       );
     }
   }
@@ -1579,7 +1612,9 @@ function App() {
     submissionsRef.current = nextSubmissions;
     setSubmissions(nextSubmissions);
     enqueueSupabaseInitialPassportUploads(preparedSubmission, passportUploads);
-    extractInitialPassportUploads(preparedSubmission, passportUploads);
+    if (!isSupabaseMode) {
+      extractInitialPassportUploads(preparedSubmission, passportUploads);
+    }
     setSelectedSubmissionId(preparedSubmission.id);
     setDrawerMode("detail");
     setActiveDrawerTab(passportUploads.length ? "questionnaire" : "overview");
@@ -1640,9 +1675,8 @@ function App() {
     if (!exportPlan.canDownload) return;
 
     try {
-      const { default: downloadExportWorkbook } = await import(
-        "./modules/submissions/exportWorkbook"
-      );
+      const { default: downloadExportWorkbook } =
+        await import("./modules/submissions/exportWorkbook");
       const result = downloadExportWorkbook(
         exportPlan.rows,
         exportPlan.downloadPackageIdentity,
@@ -1838,11 +1872,8 @@ function App() {
       submissionsRef.current = localSubmissions;
       setSubmissions(localSubmissions);
       setSelectedSubmissionId(
-        firstSubmissionForRole(
-          localSubmissions,
-          "agent",
-          defaultLocalAgentOwnerId,
-        )?.id ?? "",
+        firstSubmissionForRole(localSubmissions, "agent", defaultLocalAgentOwnerId)
+          ?.id ?? "",
       );
       setRole("agent");
       setSurface("agent-inbox");
@@ -1920,8 +1951,7 @@ function App() {
     />
   );
   const showInlineCreateShortcut =
-    role === "agent" &&
-    (surface === "agent-inbox" || surface === "agent-actions");
+    role === "agent" && (surface === "agent-inbox" || surface === "agent-actions");
 
   if (!hasWorkspaceAccess) {
     return (
@@ -1942,9 +1972,7 @@ function App() {
     <main
       className={`ops-shell surface-${surface} ${
         isV19CollectionSurface ? "is-v19-collection-surface" : ""
-      } ${
-        drawerMode !== "closed" ? "has-open-drawer" : ""
-      }`}
+      } ${drawerMode !== "closed" ? "has-open-drawer" : ""}`}
       aria-label="Рабочая область подач"
     >
       <OperationalSidebar
@@ -2040,16 +2068,16 @@ function App() {
                 <span className="service-logo">VisaFlow V-19</span>
               ) : null}
               {isSupabaseMode ? (
-              <p
-                className="save-status"
-                role={remoteSaveState === "error" ? "alert" : "status"}
-              >
-                {remoteSaveState === "saving"
-                  ? "Сохранение"
-                  : remoteSaveState === "error"
-                    ? remoteSaveError
-                  : "Supabase"}
-              </p>
+                <p
+                  className="save-status"
+                  role={remoteSaveState === "error" ? "alert" : "status"}
+                >
+                  {remoteSaveState === "saving"
+                    ? "Сохранение"
+                    : remoteSaveState === "error"
+                      ? remoteSaveError
+                      : "Supabase"}
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -2279,7 +2307,6 @@ function App() {
           }}
         />
       ) : null}
-
     </main>
   );
 }

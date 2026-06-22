@@ -4,6 +4,7 @@ import { invokePassportExtraction } from "../passportExtractionService";
 import type {
   City,
   PassportExtractedField,
+  PassportExtractedFieldKey,
   PassportUploadDraft,
   PreliminaryIntakeDraft,
   Submission,
@@ -41,11 +42,14 @@ const firstStepFamilyQuestions: Array<{
   { key: "sameSpainStay", label: "Одно проживание в Испании у всех?" },
 ];
 
-const extractedFieldLabels = [
-  "Фамилия",
-  "Имя",
-  "Дата рождения",
-  "Номер паспорта",
+const extractedFieldPreviewItems: Array<{
+  key: PassportExtractedFieldKey;
+  label: string;
+}> = [
+  { key: "surname", label: "Фамилия" },
+  { key: "firstName", label: "Имя" },
+  { key: "birthDate", label: "Дата рождения" },
+  { key: "passportNumber", label: "Номер паспорта" },
 ];
 
 const mediaRequirements = [
@@ -75,6 +79,12 @@ const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
   tripDateFrom: "",
   tripDateTo: "",
 };
+
+const passportScanUploadMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "application/pdf",
+]);
 
 type PassportUploadVisualStatus =
   | "empty"
@@ -125,6 +135,13 @@ function passportUploadStatusText(upload: PassportUploadDraft | undefined) {
   return upload.fileName;
 }
 
+function passportUploadFieldValue(
+  upload: PassportUploadDraft | undefined,
+  key: PassportExtractedFieldKey,
+) {
+  return upload?.extractedFields.find((field) => field.key === key)?.value.trim() ?? "";
+}
+
 function passportUploadsStatus(passportUploads: PassportUploadDraft[]) {
   if (!passportUploads.length) {
     return {
@@ -164,7 +181,9 @@ function passportUploadsStatus(passportUploads: PassportUploadDraft[]) {
   };
 }
 
-function passportStatusClassName(tone: ReturnType<typeof passportUploadsStatus>["tone"]) {
+function passportStatusClassName(
+  tone: ReturnType<typeof passportUploadsStatus>["tone"],
+) {
   if (tone === "success") return "is-success";
   if (tone === "processing") return "is-processing";
   if (tone === "selected") return "is-selected";
@@ -204,9 +223,11 @@ export function CreateSubmissionDrawer({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const uploadBatchRef = useRef(0);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
+  const [passportFileError, setPassportFileError] = useState("");
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
-  const [highlightedApplicantIndex, setHighlightedApplicantIndex] =
-    useState<number | null>(null);
+  const [highlightedApplicantIndex, setHighlightedApplicantIndex] = useState<
+    number | null
+  >(null);
   const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
     emptyPreliminaryIntakeDraft,
@@ -245,7 +266,17 @@ export function CreateSubmissionDrawer({
   async function addPassportFiles(files: FileList | null) {
     if (!files?.length) return;
 
-    const selectedFiles = Array.from(files).slice(0, maxFamilyApplicants);
+    const allSelectedFiles = Array.from(files);
+    const rejectedCount = allSelectedFiles.filter(
+      (file) => !passportScanUploadMimeTypes.has(file.type),
+    ).length;
+    const selectedFiles = allSelectedFiles
+      .filter((file) => passportScanUploadMimeTypes.has(file.type))
+      .slice(0, maxFamilyApplicants);
+    setPassportFileError(
+      rejectedCount ? "Паспорт принимается только в формате JPEG, PNG или PDF." : "",
+    );
+    if (!selectedFiles.length) return;
     const nextBatch = uploadBatchRef.current + 1;
     uploadBatchRef.current = nextBatch;
 
@@ -254,10 +285,12 @@ export function CreateSubmissionDrawer({
       onFamilyCount(Math.max(2, Math.min(maxFamilyApplicants, selectedFiles.length)));
     }
 
-    const targetStartIndex =
-      selectedFiles.length > 1 ? 0 : safeActiveApplicantIndex;
+    const targetStartIndex = selectedFiles.length > 1 ? 0 : safeActiveApplicantIndex;
     const nextUploads = selectedFiles.map((file, index) => ({
-      applicantIndex: boundedApplicantIndex(targetStartIndex + index, maxFamilyApplicants),
+      applicantIndex: boundedApplicantIndex(
+        targetStartIndex + index,
+        maxFamilyApplicants,
+      ),
       extractedFields: [],
       file,
       fileName: file.name,
@@ -287,6 +320,7 @@ export function CreateSubmissionDrawer({
           );
 
           if (uploadBatchRef.current !== nextBatch) return;
+          setPassportFileError("");
 
           setPassportUploads((current) =>
             current.map((candidate) =>
@@ -349,7 +383,9 @@ export function CreateSubmissionDrawer({
   }, [focusCloseToken]);
 
   useEffect(() => {
-    setActiveApplicantIndex((current) => boundedApplicantIndex(current, applicantCount));
+    setActiveApplicantIndex((current) =>
+      boundedApplicantIndex(current, applicantCount),
+    );
     setHighlightedApplicantIndex((current) => {
       if (current === null) return null;
       return current < applicantCount ? current : null;
@@ -373,10 +409,8 @@ export function CreateSubmissionDrawer({
           <p className="kicker">Предварительный черновик</p>
           <h2 id="create-title">Новая подача</h2>
           <p>
-            {createStep === "passport"
-              ? "Загрузка паспорта"
-              : "Анкета, фото и селфи"}{" "}
-            · {type === "family" ? "Семья" : "Один заявитель"}
+            {createStep === "passport" ? "Загрузка паспорта" : "Анкета, фото и селфи"} ·{" "}
+            {type === "family" ? "Семья" : "Один заявитель"}
           </p>
         </div>
         <ol className="cf-steps" aria-label="Шаги создания подачи">
@@ -411,9 +445,7 @@ export function CreateSubmissionDrawer({
       </header>
       <div className="drawer-body create-drawer-body">
         <section
-          className={`pi-board ${
-            createStep === "passport" ? "is-passport-step" : ""
-          }`}
+          className={`pi-board ${createStep === "passport" ? "is-passport-step" : ""}`}
           aria-label="Предварительная заявка"
         >
           {createStep === "passport" ? (
@@ -441,10 +473,7 @@ export function CreateSubmissionDrawer({
                     ))}
                     {type === "family" ? (
                       <>
-                        <span
-                          className="pi-family-count-pill"
-                          aria-live="polite"
-                        >
+                        <span className="pi-family-count-pill" aria-live="polite">
                           {applicantCount} чел.
                         </span>
                         <Button
@@ -528,9 +557,14 @@ export function CreateSubmissionDrawer({
                 <p className="kicker">Паспортная точка входа</p>
                 <h3 id="passport-intake-title">Загрузите паспорт</h3>
                 <p>
-                  На этом шаге ничего не заполняется вручную. Выберите скан или PDF,
-                  а черновик анкеты соберется после обработки.
+                  На этом шаге ничего не заполняется вручную. Выберите скан или PDF, а
+                  черновик анкеты соберется после обработки.
                 </p>
+                {passportFileError ? (
+                  <p className="form-error" role="alert">
+                    {passportFileError}
+                  </p>
+                ) : null}
                 <input
                   ref={passportFileInputRef}
                   className="pi-file-input"
@@ -605,19 +639,24 @@ export function CreateSubmissionDrawer({
                   <span>{passportUploads.length ? "Подставятся" : "Нет файла"}</span>
                 </div>
                 <div className="ef-preview">
-                  {extractedFieldLabels.map((label) => (
-                    <label key={label}>
-                      <span>{label}</span>
-                      <input
-                        readOnly
-                        value={
-                          passportUploads.length
-                            ? "Заполнится после обработки"
-                            : "Сначала загрузите паспорт"
-                        }
-                      />
-                    </label>
-                  ))}
+                  {extractedFieldPreviewItems.map((item) => {
+                    const value = passportUploadFieldValue(activeUpload, item.key);
+
+                    return (
+                      <label key={item.key}>
+                        <span>{item.label}</span>
+                        <input
+                          readOnly
+                          value={
+                            value ||
+                            (passportUploads.length
+                              ? "Требует проверки"
+                              : "Сначала загрузите паспорт")
+                          }
+                        />
+                      </label>
+                    );
+                  })}
                 </div>
                 <p>
                   Поля будут перенесены в анкету как черновик. Агент сможет поправить их
