@@ -19,6 +19,7 @@ export type ExportSummary = {
   canGenerate: boolean;
   canDownload: boolean;
   canMarkExported: boolean;
+  downloadPackageIdentity: ExportPackageIdentity | null;
 };
 
 const exportRowColumns: Array<keyof ExportRow> = [
@@ -50,9 +51,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     (submission) => submission.applicants.length === 0,
   );
   const rows = buildExportRows(submissions);
-  const rowsWithMissingApplicantName = rows.filter(
-    (row) => !row.applicantName.trim(),
-  );
+  const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
   const cities = new Set(submissions.map((submission) => submission.city));
   const dates = new Set(submissions.map(tripDates));
   const types = new Set(submissions.map((submission) => submission.type));
@@ -124,12 +123,10 @@ export function exportSummary(
         exportPackageIdentityMatches(submission.exportPackage, packageIdentity),
     );
   const effectiveBlockers = packageStale
-    ? [
-        ...blockers,
-        { reason: "Состав выгрузки изменился после формирования файла" },
-      ]
+    ? [...blockers, { reason: "Состав выгрузки изменился после формирования файла" }]
     : blockers;
   const ready = blockers.length === 0;
+  const canDownload = ready && !packageStale && exportState === "file_generated";
 
   return {
     rows,
@@ -138,8 +135,9 @@ export function exportSummary(
     ready: ready && !packageStale,
     exportState,
     canGenerate: ready && (exportState === "ready" || packageStale),
-    canDownload: ready && !packageStale && exportState === "file_generated",
+    canDownload,
     canMarkExported: ready && !packageStale && exportState === "file_downloaded",
+    downloadPackageIdentity: canDownload ? packageIdentity : null,
   };
 }
 
@@ -175,6 +173,18 @@ export function exportPackageIdentityMatches(
     left.idempotencyKey === right.idempotencyKey &&
     left.rowCount === right.rowCount &&
     sameStringArray(left.submissionIds, right.submissionIds)
+  );
+}
+
+export function exportRowsMatchPackageIdentity(
+  rows: ExportRow[],
+  identity: ExportPackageIdentity | null,
+): identity is ExportPackageIdentity {
+  return Boolean(
+    identity &&
+    identity.rowCount === rows.length &&
+    identity.contentFingerprint ===
+      exportPackageContentFingerprint(rows, identity.format),
   );
 }
 

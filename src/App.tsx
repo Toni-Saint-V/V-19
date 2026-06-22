@@ -1542,7 +1542,7 @@ function App() {
       );
       const result = downloadExportWorkbook(
         exportPlan.rows,
-        selectedForExport,
+        exportPlan.downloadPackageIdentity,
       );
       if (!result.ok) {
         return setExportError(result.safeMessage);
