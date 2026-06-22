@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "../../../shared/ui/primitives";
+import { invokePassportExtraction } from "../passportExtractionService";
 import type {
   City,
+  PassportExtractedField,
   PassportUploadDraft,
   PreliminaryIntakeDraft,
   Submission,
 } from "../types";
-import { CANONICAL_CITIES, isCity } from "../types";
 
 const maxFamilyApplicants = 6;
 
@@ -74,14 +76,105 @@ const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
   tripDateTo: "",
 };
 
+type PassportUploadVisualStatus =
+  | "empty"
+  | "extracting"
+  | "ready"
+  | "selected"
+  | "unavailable";
+
+function boundedApplicantIndex(index: number, applicantCount: number) {
+  return Math.max(0, Math.min(index, Math.max(0, applicantCount - 1)));
+}
+
+function passportUploadFullName(upload: PassportUploadDraft | undefined) {
+  if (!upload) return "";
+
+  const surname = upload.extractedFields
+    .find((field) => field.key === "surname")
+    ?.value.trim();
+  const firstName = upload.extractedFields
+    .find((field) => field.key === "firstName")
+    ?.value.trim();
+
+  return [surname, firstName].filter(Boolean).join(" ");
+}
+
+function passportUploadVisualStatus(
+  upload: PassportUploadDraft | undefined,
+): PassportUploadVisualStatus {
+  if (!upload) return "empty";
+  if (upload.status === "extracting") return "extracting";
+  if (passportUploadFullName(upload)) return "ready";
+  if (upload.status === "unavailable" || upload.status === "failed") {
+    return "unavailable";
+  }
+
+  return "selected";
+}
+
+function passportUploadStatusText(upload: PassportUploadDraft | undefined) {
+  const fullName = passportUploadFullName(upload);
+  if (fullName) return fullName;
+  if (!upload) return "Паспорт не загружен";
+  if (upload.status === "extracting") return "Распознаем MRZ";
+  if (upload.status === "unavailable" || upload.status === "failed") {
+    return "ФИО не распознано";
+  }
+
+  return upload.fileName;
+}
+
+function passportUploadsStatus(passportUploads: PassportUploadDraft[]) {
+  if (!passportUploads.length) {
+    return {
+      label: "Паспорт нужен для автозаполнения анкеты",
+      tone: "idle" as const,
+      title: "Ожидает файл",
+    };
+  }
+
+  if (passportUploads.some((upload) => upload.status === "extracting")) {
+    return {
+      label: "Распознаем данные паспорта. ФИО подставится в слот, если OCR увидит MRZ.",
+      tone: "processing" as const,
+      title: "Обработка",
+    };
+  }
+
+  const extractedCount = passportUploads.filter((upload) =>
+    passportUploadFullName(upload),
+  ).length;
+
+  if (extractedCount) {
+    return {
+      label:
+        extractedCount === passportUploads.length
+          ? "ФИО подставлено из MRZ. Проверьте данные после создания черновика."
+          : `ФИО найдено: ${extractedCount}/${passportUploads.length}. Остальные паспорта требуют проверки.`,
+      tone: "success" as const,
+      title: "Готово",
+    };
+  }
+
+  return {
+    label: "Файл выбран. ФИО не распознано автоматически, проверьте паспорт вручную.",
+    tone: "selected" as const,
+    title: "Выбрано",
+  };
+}
+
+function passportStatusClassName(tone: ReturnType<typeof passportUploadsStatus>["tone"]) {
+  if (tone === "success") return "is-success";
+  if (tone === "processing") return "is-processing";
+  if (tone === "selected") return "is-selected";
+  return "is-idle";
+}
+
 export function CreateSubmissionDrawer({
-  applicantNames = [],
-  city,
   dirty,
   familyCount,
   focusCloseToken = 0,
-  onApplicantName,
-  onCity,
   onClose,
   onCreate,
   onFamilyCount,
@@ -109,33 +202,37 @@ export function CreateSubmissionDrawer({
   const applicantCount = type === "family" ? familyCount : 1;
   const passportFileInputRef = useRef<HTMLInputElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const uploadBatchRef = useRef(0);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
+  const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
+  const [highlightedApplicantIndex, setHighlightedApplicantIndex] =
+    useState<number | null>(null);
   const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
     emptyPreliminaryIntakeDraft,
   );
-  const sharedAnswerCount = [
-    preliminaryIntake.sameHomeAddress,
-    preliminaryIntake.sameTripDates,
-    preliminaryIntake.sameSpainStay,
-    preliminaryIntake.sameArrivalPlace,
-  ].filter(Boolean).length;
+  const safeActiveApplicantIndex = boundedApplicantIndex(
+    activeApplicantIndex,
+    applicantCount,
+  );
+  const activeUpload = passportUploads.find(
+    (upload) => upload.applicantIndex === safeActiveApplicantIndex,
+  );
   const firstStepFamilyAnswerCount = [
     preliminaryIntake.sameHomeAddress,
     preliminaryIntake.sameSpainStay,
   ].filter(Boolean).length;
   const passportReady = passportUploads.length > 0;
-  const extractionStatusLabel = passportReady
-    ? passportUploads.length === 1
-      ? "Успешно извлекли данные паспорта"
-      : `Успешно извлекли данные: ${passportUploads.length} паспортов`
-    : "Паспорт нужен для автозаполнения анкеты";
+  const passportStatus = passportUploadsStatus(passportUploads);
+  const passportStatusClass = passportStatusClassName(passportStatus.tone);
+  const hasActiveUpload = Boolean(activeUpload);
+  const uploadButtonLabel = hasActiveUpload
+    ? `Заменить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`
+    : `Загрузить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`;
   function selectType(nextType: Submission["type"]) {
     onType(nextType);
-  }
-
-  function handleCityChange(value: string) {
-    if (isCity(value)) onCity(value);
+    setActiveApplicantIndex(0);
+    setHighlightedApplicantIndex(null);
   }
 
   function updatePreliminaryIntake<Key extends keyof PreliminaryIntakeDraft>(
@@ -145,33 +242,96 @@ export function CreateSubmissionDrawer({
     setPreliminaryIntake((current) => ({ ...current, [key]: value }));
   }
 
-  function addPassportFiles(files: FileList | null) {
+  async function addPassportFiles(files: FileList | null) {
     if (!files?.length) return;
 
-    const nextUploads = Array.from(files)
-      .slice(0, maxFamilyApplicants)
-      .map((file, index) => ({
-        applicantIndex: Math.min(index, applicantCount - 1),
-        extractedFields: [],
-        file,
-        fileName: file.name,
-        id: `passport-${Date.now()}-${index}`,
-        status: "selected" as const,
-      }));
+    const selectedFiles = Array.from(files).slice(0, maxFamilyApplicants);
+    const nextBatch = uploadBatchRef.current + 1;
+    uploadBatchRef.current = nextBatch;
+
+    if (selectedFiles.length > 1) {
+      onType("family");
+      onFamilyCount(Math.max(2, Math.min(maxFamilyApplicants, selectedFiles.length)));
+    }
+
+    const targetStartIndex =
+      selectedFiles.length > 1 ? 0 : safeActiveApplicantIndex;
+    const nextUploads = selectedFiles.map((file, index) => ({
+      applicantIndex: boundedApplicantIndex(targetStartIndex + index, maxFamilyApplicants),
+      extractedFields: [],
+      file,
+      fileName: file.name,
+      id: `passport-${Date.now()}-${index}`,
+      status: "extracting" as const,
+    }));
     setPassportUploads((current) =>
-      [...current, ...nextUploads].slice(0, maxFamilyApplicants),
+      mergePassportUploads(current, nextUploads, applicantCount),
     );
+    setActiveApplicantIndex(nextUploads[0]?.applicantIndex ?? safeActiveApplicantIndex);
+    setHighlightedApplicantIndex(null);
     onPassportFilesSelected();
+
+    await Promise.all(
+      nextUploads.map(async (upload) => {
+        try {
+          const result = await invokePassportExtraction({
+            applicantIndex: upload.applicantIndex,
+            localFile: upload.file,
+          });
+          const extractedFields: PassportExtractedField[] = result.fields.map(
+            (field) => ({
+              ...field,
+              source: "passport_scan" as const,
+              verified: false,
+            }),
+          );
+
+          if (uploadBatchRef.current !== nextBatch) return;
+
+          setPassportUploads((current) =>
+            current.map((candidate) =>
+              candidate.id === upload.id
+                ? {
+                    ...candidate,
+                    extractedFields,
+                    status: result.status === "extracted" ? "ready" : "unavailable",
+                  }
+                : candidate,
+            ),
+          );
+        } catch {
+          if (uploadBatchRef.current !== nextBatch) return;
+
+          setPassportUploads((current) =>
+            current.map((candidate) =>
+              candidate.id === upload.id
+                ? {
+                    ...candidate,
+                    extractedFields: [],
+                    status: "failed",
+                  }
+                : candidate,
+            ),
+          );
+        }
+      }),
+    );
   }
 
   function addFamilyMember() {
     if (type !== "family") {
       onType("family");
       onFamilyCount(Math.max(2, familyCount));
+      setActiveApplicantIndex(1);
+      setHighlightedApplicantIndex(1);
       return;
     }
 
-    onFamilyCount(Math.min(maxFamilyApplicants, applicantCount + 1));
+    const nextCount = Math.min(maxFamilyApplicants, applicantCount + 1);
+    const nextIndex = nextCount - 1;
+    onFamilyCount(nextCount);
+    setActiveApplicantIndex(nextIndex);
+    setHighlightedApplicantIndex(nextIndex);
   }
 
   function handlePrimaryAction() {
@@ -187,6 +347,14 @@ export function CreateSubmissionDrawer({
     if (!focusCloseToken) return;
     closeButtonRef.current?.focus({ preventScroll: true });
   }, [focusCloseToken]);
+
+  useEffect(() => {
+    setActiveApplicantIndex((current) => boundedApplicantIndex(current, applicantCount));
+    setHighlightedApplicantIndex((current) => {
+      if (current === null) return null;
+      return current < applicantCount ? current : null;
+    });
+  }, [applicantCount]);
 
   return (
     <div
@@ -206,9 +374,9 @@ export function CreateSubmissionDrawer({
           <h2 id="create-title">Новая подача</h2>
           <p>
             {createStep === "passport"
-              ? "Паспорт и семейные автоподстановки"
+              ? "Загрузка паспорта"
               : "Анкета, фото и селфи"}{" "}
-            · {type === "family" ? "Семья" : "Один заявитель"} · {city}
+            · {type === "family" ? "Семья" : "Один заявитель"}
           </p>
         </div>
         <ol className="cf-steps" aria-label="Шаги создания подачи">
@@ -254,33 +422,13 @@ export function CreateSubmissionDrawer({
               aria-labelledby="passport-intake-title"
             >
               <div className="pi-create-view-panel">
-                <section
-                  className="cf-panel cf-intake-panel"
-                  aria-label="Создание подачи"
-                >
-                  <div className="pi-two-columns">
-                    <label>
-                      <span>Страна</span>
-                      <input readOnly value="Испания" />
-                    </label>
-                    <label>
-                      <span>Город подачи</span>
-                      <select
-                        aria-label="Город подачи"
-                        value={city}
-                        onChange={(event) => handleCityChange(event.target.value)}
-                      >
-                        {CANONICAL_CITIES.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                </section>
                 <div className="pi-scan-toolbar" aria-label="Заявители в подаче">
-                  <div className="pi-mode-tags" aria-label="Тип подачи">
+                  <div
+                    className={`pi-mode-tags ${
+                      type === "family" ? "has-add-person" : ""
+                    }`}
+                    aria-label="Тип подачи"
+                  >
                     {submissionTypeOptions.map((option) => (
                       <button
                         key={option.value}
@@ -291,46 +439,44 @@ export function CreateSubmissionDrawer({
                         {option.label}
                       </button>
                     ))}
-                  </div>
-                  <div className="pi-scan-toolbar-actions">
-                    <button
-                      className="icon-button pi-add-person-button"
-                      type="button"
-                      aria-label="Добавить заявителя в семью"
-                      disabled={
-                        type === "family" && applicantCount >= maxFamilyApplicants
-                      }
-                      onClick={addFamilyMember}
-                    >
-                      +
-                    </button>
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={
-                        type === "family" && applicantCount >= maxFamilyApplicants
-                      }
-                      onClick={addFamilyMember}
-                    >
-                      Добавить человека
-                    </button>
+                    {type === "family" ? (
+                      <>
+                        <span
+                          className="pi-family-count-pill"
+                          aria-live="polite"
+                        >
+                          {applicantCount} чел.
+                        </span>
+                        <Button
+                          className="pi-add-person-button"
+                          variant="icon"
+                          type="button"
+                          aria-label={`Добавить заявителя в семью. Сейчас ${applicantCount}`}
+                          disabled={applicantCount >= maxFamilyApplicants}
+                          title={
+                            applicantCount >= maxFamilyApplicants
+                              ? "Максимум 6 заявителей"
+                              : "Добавить заявителя"
+                          }
+                          onClick={addFamilyMember}
+                        >
+                          +
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
-                <div className="create-people-list" aria-label="Имена заявителей">
-                  {Array.from({ length: applicantCount }, (_, index) => (
-                    <label key={index}>
-                      <span>{applicantInputLabel(index, type)}</span>
-                      <input
-                        aria-label={applicantInputLabel(index, type)}
-                        value={applicantNames[index] ?? ""}
-                        placeholder={applicantInputPlaceholder(index, type)}
-                        onChange={(event) =>
-                          onApplicantName?.(index, event.target.value)
-                        }
-                      />
-                    </label>
-                  ))}
-                </div>
+                <PassportTargetList
+                  activeApplicantIndex={safeActiveApplicantIndex}
+                  applicantCount={applicantCount}
+                  highlightedApplicantIndex={highlightedApplicantIndex}
+                  passportUploads={passportUploads}
+                  type={type}
+                  onSelect={(index) => {
+                    setActiveApplicantIndex(index);
+                    setHighlightedApplicantIndex(null);
+                  }}
+                />
                 {type === "family" ? (
                   <section
                     className="pi-family-yes-no"
@@ -364,73 +510,70 @@ export function CreateSubmissionDrawer({
               <div className="pi-scan-main">
                 <div className="pi-document-visual" aria-hidden="true">
                   <svg viewBox="0 0 180 150" role="img">
-                    <g className="pi-visual-stack">
-                      <path d="M58 100 L118 88 Q129 86 132 96 L133 104 Q135 114 124 117 L65 129 Q55 131 53 120 L52 112 Q50 103 58 100Z" />
-                      <path d="M57 78 L123 66 Q133 64 135 75 L136 83 Q138 93 127 96 L62 108 Q52 110 50 99 L49 91 Q47 81 57 78Z" />
-                    </g>
                     <path
                       className="pi-visual-page"
-                      d="M54 35 L120 23 Q132 21 135 33 L137 65 Q139 77 127 80 L59 93 Q47 95 45 83 L43 52 Q41 38 54 35Z"
+                      d="M52 26 H128 Q140 26 140 38 V112 Q140 124 128 124 H52 Q40 124 40 112 V38 Q40 26 52 26Z"
                     />
                     <path
                       className="pi-visual-page-edge"
-                      d="M47 76 Q69 69 94 66 Q119 63 137 68"
+                      d="M57 48 H116 M57 62 H102 M57 96 H123"
                     />
                     <path
-                      className="pi-visual-passport-line"
-                      d="M63 49 L113 40"
+                      className="pi-visual-chip"
+                      d="M58 74 H84 Q90 74 90 80 V96 Q90 102 84 102 H58 Q52 102 52 96 V80 Q52 74 58 74Z"
                     />
                     <path className="pi-visual-scan" d="M35 72 H146" />
                   </svg>
                 </div>
                 <p className="kicker">Паспортная точка входа</p>
-                <h3 id="passport-intake-title">Сначала скан паспорта</h3>
+                <h3 id="passport-intake-title">Загрузите паспорт</h3>
                 <p>
-                  Поля из паспорта подставятся в черновик анкеты автоматически.
-                  Исправить их можно позже.
+                  На этом шаге ничего не заполняется вручную. Выберите скан или PDF,
+                  а черновик анкеты соберется после обработки.
                 </p>
                 <input
                   ref={passportFileInputRef}
                   className="pi-file-input"
                   aria-hidden="true"
                   accept="image/jpeg,image/png,application/pdf"
-                  multiple={type === "family"}
+                  multiple
                   name="preintakePassportScans"
                   tabIndex={-1}
                   type="file"
                   onChange={(event) => {
-                    addPassportFiles(event.currentTarget.files);
+                    void addPassportFiles(event.currentTarget.files);
                     event.currentTarget.value = "";
                   }}
                 />
                 <div className="pi-empty-actions">
-                  <button
-                    className="primary-button pi-upload-button"
+                  <Button
+                    className={`pi-upload-button ${
+                      hasActiveUpload ? "" : "is-attention"
+                    }`}
+                    variant="primary"
                     type="button"
                     onClick={() => passportFileInputRef.current?.click()}
                   >
-                    {passportReady ? "Заменить паспорт" : "Загрузить паспорт"}
-                  </button>
-                  <button
-                    className="secondary-button"
+                    {uploadButtonLabel}
+                  </Button>
+                  <Button
+                    variant="secondary"
                     type="button"
                     disabled={!passportReady}
                     onClick={handlePrimaryAction}
                   >
                     Дальше
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               <div
-                className={`pi-extraction-status ${
-                  passportReady ? "is-success" : "is-idle"
-                }`}
+                className={`pi-extraction-status ${passportStatusClass}`}
                 aria-live="polite"
               >
                 <span aria-hidden="true" />
-                <strong>{passportReady ? "Готово" : "Ожидает файл"}</strong>
-                <p>{extractionStatusLabel}</p>
+                <strong>{passportStatus.title}</strong>
+                <p>{passportStatus.label}</p>
               </div>
 
               {passportUploads.length ? (
@@ -448,171 +591,6 @@ export function CreateSubmissionDrawer({
                   ))}
                 </div>
               ) : null}
-            </section>
-          ) : null}
-
-          {createStep === "passport" && type === "family" && passportReady ? (
-            <section
-              className="pi-shared-panel"
-              aria-labelledby="pi-shared-title"
-            >
-              <div className="create-panel-head">
-                <div>
-                  <p className="kicker">Семейные совпадения</p>
-                  <h3 id="pi-shared-title">Что можно подставить всем</h3>
-                </div>
-                <span>
-                  {sharedAnswerCount ? `${sharedAnswerCount}/4` : "Не выбрано"}
-                </span>
-              </div>
-              <div className="pi-family-count" aria-label="Размер семьи">
-                <div>
-                  <p className="kicker">Заявители</p>
-                  <strong>{applicantCount} человек</strong>
-                </div>
-                <div>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    aria-label="Уменьшить количество заявителей"
-                    disabled={applicantCount <= 2}
-                    onClick={() => onFamilyCount(applicantCount - 1)}
-                  >
-                    −
-                  </button>
-                  <span>{applicantCount}</span>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    aria-label="Увеличить количество заявителей"
-                    disabled={applicantCount >= maxFamilyApplicants}
-                    onClick={() => onFamilyCount(applicantCount + 1)}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <PreintakeCheckCard
-                checked={preliminaryIntake.sameHomeAddress}
-                label="Один адрес проживания"
-                name="preintakeSameHomeAddress"
-                onChecked={(checked) =>
-                  updatePreliminaryIntake("sameHomeAddress", checked)
-                }
-              >
-                <label>
-                  <span>Адрес проживания</span>
-                  <input
-                    name="preintakeHomeAddress"
-                    value={preliminaryIntake.homeAddress}
-                    placeholder="AKADEMIKA KOROLEVA STREET 4 1 149"
-                    onChange={(event) =>
-                      updatePreliminaryIntake("homeAddress", event.target.value)
-                    }
-                  />
-                </label>
-              </PreintakeCheckCard>
-
-              <PreintakeCheckCard
-                checked={preliminaryIntake.sameTripDates}
-                label="Одинаковые даты поездки"
-                name="preintakeSameTripDates"
-                onChecked={(checked) =>
-                  updatePreliminaryIntake("sameTripDates", checked)
-                }
-              >
-                <div className="pi-two-columns">
-                  <label>
-                    <span>Въезд</span>
-                    <input
-                      name="preintakeTripDateFrom"
-                      value={preliminaryIntake.tripDateFrom}
-                      placeholder="19.08.2026"
-                      onChange={(event) =>
-                        updatePreliminaryIntake("tripDateFrom", event.target.value)
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Выезд</span>
-                    <input
-                      name="preintakeTripDateTo"
-                      value={preliminaryIntake.tripDateTo}
-                      placeholder="27.08.2026"
-                      onChange={(event) =>
-                        updatePreliminaryIntake("tripDateTo", event.target.value)
-                      }
-                    />
-                  </label>
-                </div>
-              </PreintakeCheckCard>
-
-              <PreintakeCheckCard
-                checked={preliminaryIntake.sameSpainStay}
-                label="Одно проживание в Испании"
-                name="preintakeSameSpainStay"
-                onChecked={(checked) =>
-                  updatePreliminaryIntake("sameSpainStay", checked)
-                }
-              >
-                <div className="pi-three-columns">
-                  <label>
-                    <span>Название</span>
-                    <input
-                      name="preintakeSpainStayName"
-                      value={preliminaryIntake.spainStayName}
-                      placeholder="HOTEL ILUNION BARCELONA"
-                      onChange={(event) =>
-                        updatePreliminaryIntake("spainStayName", event.target.value)
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Город</span>
-                    <input
-                      name="preintakeSpainStayCity"
-                      value={preliminaryIntake.spainStayCity}
-                      placeholder="BARCELONA"
-                      onChange={(event) =>
-                        updatePreliminaryIntake("spainStayCity", event.target.value)
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Адрес</span>
-                    <input
-                      name="preintakeSpainStayAddress"
-                      value={preliminaryIntake.spainStayAddress}
-                      placeholder="CALLE RAMON TUR 196-198"
-                      onChange={(event) =>
-                        updatePreliminaryIntake("spainStayAddress", event.target.value)
-                      }
-                    />
-                  </label>
-                </div>
-              </PreintakeCheckCard>
-
-              <PreintakeCheckCard
-                checked={preliminaryIntake.sameArrivalPlace}
-                label="Одно место прибытия"
-                name="preintakeSameArrivalPlace"
-                onChecked={(checked) =>
-                  updatePreliminaryIntake("sameArrivalPlace", checked)
-                }
-              >
-                <label>
-                  <span>Маршрут / место прибытия</span>
-                  <input
-                    name="preintakeArrivalPlace"
-                    value={preliminaryIntake.arrivalPlace}
-                    placeholder="Москва, Барселона, Москва"
-                    onChange={(event) =>
-                      updatePreliminaryIntake("arrivalPlace", event.target.value)
-                    }
-                  />
-                </label>
-              </PreintakeCheckCard>
             </section>
           ) : null}
 
@@ -726,6 +704,80 @@ export function CreateSubmissionDrawer({
   );
 }
 
+function mergePassportUploads(
+  current: PassportUploadDraft[],
+  nextUploads: PassportUploadDraft[],
+  applicantCount: number,
+) {
+  const replacedIndexes = new Set(nextUploads.map((upload) => upload.applicantIndex));
+  const retainedUploads = current.filter(
+    (upload) =>
+      upload.applicantIndex < applicantCount &&
+      !replacedIndexes.has(upload.applicantIndex),
+  );
+
+  const mergedUploads = [...retainedUploads, ...nextUploads];
+  return mergedUploads.sort(
+    (first: PassportUploadDraft, second: PassportUploadDraft) =>
+      first.applicantIndex - second.applicantIndex,
+  );
+}
+
+function PassportTargetList({
+  activeApplicantIndex,
+  applicantCount,
+  highlightedApplicantIndex,
+  passportUploads,
+  type,
+  onSelect,
+}: {
+  activeApplicantIndex: number;
+  applicantCount: number;
+  highlightedApplicantIndex: number | null;
+  passportUploads: PassportUploadDraft[];
+  type: Submission["type"];
+  onSelect: (index: number) => void;
+}) {
+  return (
+    <div className="pi-passport-targets" aria-label="Кому загружается паспорт">
+      <p className="kicker">Паспорта</p>
+      <div>
+        {Array.from({ length: applicantCount }, (_, index) => {
+          const upload = passportUploads.find(
+            (candidate) => candidate.applicantIndex === index,
+          );
+          const status = passportUploadVisualStatus(upload);
+          const isActive = index === activeApplicantIndex;
+          const isHighlighted = index === highlightedApplicantIndex;
+
+          return (
+            <button
+              key={index}
+              className={[
+                "pi-passport-target",
+                `is-${status}`,
+                isActive ? "is-active" : "",
+                isHighlighted ? "is-highlighted" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => onSelect(index)}
+            >
+              <span>
+                <strong>{applicantLabel(index, type)}</strong>
+                <em>{passportUploadStatusText(upload)}</em>
+              </span>
+              <i aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FamilyYesNoQuestion({
   checked,
   label,
@@ -760,51 +812,8 @@ function FamilyYesNoQuestion({
   );
 }
 
-function PreintakeCheckCard({
-  checked,
-  children,
-  label,
-  name,
-  onChecked,
-}: {
-  checked: boolean;
-  children: ReactNode;
-  label: string;
-  name: string;
-  onChecked: (checked: boolean) => void;
-}) {
-  return (
-    <article className={`pi-check-card ${checked ? "is-active" : ""}`}>
-      <label className="pi-check-row">
-        <input
-          checked={checked}
-          name={name}
-          type="checkbox"
-          onChange={(event) => onChecked(event.target.checked)}
-        />
-        <span>{label}</span>
-      </label>
-      {checked ? <div className="pi-check-fields">{children}</div> : null}
-    </article>
-  );
-}
-
 function applicantLabel(index: number, type: Submission["type"]) {
   if (type === "single") return "Заявитель";
   if (index === 0) return "Основной заявитель";
   return `Заявитель ${index + 1}`;
-}
-
-function applicantInputLabel(index: number, type: Submission["type"]) {
-  if (type === "single") return "Заявитель";
-  if (index === 0) return "Основной заявитель";
-  if (index === 1) return "Супруг";
-  return `Ребенок ${index - 1}`;
-}
-
-function applicantInputPlaceholder(index: number, type: Submission["type"]) {
-  if (type === "single") return "ФИО заявителя";
-  if (index === 0) return "ФИО основного заявителя";
-  if (index === 1) return "ФИО супруга";
-  return "ФИО ребенка";
 }
