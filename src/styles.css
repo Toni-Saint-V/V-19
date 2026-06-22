@@ -9063,9 +9063,46 @@ p {
   color: var(--v19-fg-secondary);
 }
 
+.pi-extraction-status.is-processing > span {
+  background: var(--v19-warning);
+  box-shadow: 0 0 0 4px var(--vf-warning-soft);
+}
+
+.pi-extraction-status.is-processing {
+  border-color: var(--vf-warning-border);
+  background: var(--vf-warning-soft);
+}
+
+.pi-extraction-status.is-selected > span {
+  background: var(--v19-accent);
+  box-shadow: 0 0 0 4px var(--vf-accent-soft);
+}
+
+.pi-extraction-status.is-selected {
+  border-color: var(--vf-accent-border);
+  background: var(--v19-control);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .pi-extraction-status.is-success {
     animation: pi-status-enter var(--v19-motion-slow) var(--v19-motion-ease-out) both;
+  }
+
+  .pi-extraction-status.is-processing > span {
+    animation: pi-processing-pulse 1.3s ease-in-out infinite;
+  }
+}
+
+@keyframes pi-processing-pulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.62;
+  }
+
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
   }
 }
 
@@ -9427,12 +9464,12 @@ p {
   align-self: stretch;
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: 18px 20px;
+  gap: 12px;
+  padding: 16px 18px;
   border: 1px solid var(--v19-line-default);
   border-radius: 16px;
   background: var(--v19-control);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .pi-create-view-panel .cf-intake-panel {
@@ -9495,14 +9532,15 @@ p {
 }
 
 .fyn-question button {
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: var(--v19-tab-height);
+  padding: 0 var(--v19-tab-padding-x);
   border: 1px solid var(--v19-line-default);
-  border-radius: 999px;
+  border-radius: var(--v19-radius-pill);
   color: var(--v19-fg-secondary);
   background: var(--v19-control);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--v19-tab-font-size);
+  font-weight: var(--v19-tab-font-weight);
+  line-height: var(--v19-tab-line-height);
 }
 
 .fyn-question button.is-active,
@@ -9521,30 +9559,6 @@ p {
   gap: 10px;
 }
 
-.is-passport-step .pi-mode-tags button {
-  padding: 0 16px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 620;
-}
-
-.is-passport-step .pi-scan-toolbar-actions {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 10px;
-}
-
-.is-passport-step .pi-add-person-button {
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
-}
-
-.is-passport-step .create-people-list {
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
 .is-passport-step .create-people-list input,
 .cf-intake-panel input,
 .cf-intake-panel select {
@@ -9555,24 +9569,61 @@ p {
   grid-area: main;
   gap: 14px;
   min-height: 0;
-  padding: 62px 24px 42px;
+  padding: var(--v19-upload-panel-padding);
   border: 1px solid var(--v19-line-default);
   border-radius: 16px;
   background: var(--v19-surface);
 }
 
 .is-passport-step .pi-document-visual {
-  width: 126px;
-  height: 108px;
+  width: var(--v19-upload-visual-width);
+  height: var(--v19-upload-visual-height);
 }
 
 .is-passport-step .pi-scan-main > h3 {
-  font-size: 24px;
+  font-size: var(--v19-upload-title-size);
+  letter-spacing: 0;
 }
 
 .is-passport-step .pi-scan-main > p {
-  max-width: 440px;
-  font-size: 15px;
+  max-width: var(--v19-upload-copy-max-width);
+  font-size: var(--v19-body-size);
+  line-height: var(--v19-body-line-height);
+}
+
+.is-passport-step .pi-visual-page {
+  stroke-width: 3;
+}
+
+.is-passport-step .pi-visual-page-edge,
+.is-passport-step .pi-visual-chip {
+  opacity: 0.72;
+  stroke: var(--v19-fg-tertiary);
+  stroke-width: 3;
+}
+
+.is-passport-step .pi-visual-scan {
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .is-passport-step .pi-visual-scan {
+    animation: pi-scan-line 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes pi-scan-line {
+  0%,
+  100% {
+    transform: translateY(-18px);
+    opacity: 0.48;
+  }
+
+  50% {
+    transform: translateY(18px);
+    opacity: 0.9;
+  }
 }
 
 .pi-empty-actions {
@@ -9583,12 +9634,32 @@ p {
   margin-top: 8px;
 }
 
-.pi-empty-actions .primary-button,
-.pi-empty-actions .secondary-button {
-  padding-right: 18px;
-  padding-left: 18px;
-  font-size: 14px;
-  font-weight: 650;
+.pi-upload-button.is-attention {
+  border-color: var(--vf-accent-border);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 0 0 4px var(--vf-accent-soft);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pi-upload-button.is-attention {
+    animation: pi-upload-ready 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes pi-upload-ready {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.12),
+      0 0 0 3px var(--vf-accent-soft);
+  }
+
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.14),
+      0 0 0 5px var(--vf-accent-soft);
+  }
 }
 
 .is-passport-step .pi-extraction-status {
@@ -9606,6 +9677,218 @@ p {
   grid-area: uploads;
 }
 
+.is-passport-step .pi-create-view-panel {
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.is-passport-step .pi-create-view-panel .cf-intake-panel {
+  padding-bottom: 12px;
+}
+
+.is-passport-step .pi-scan-toolbar {
+  gap: 10px;
+}
+
+.is-passport-step .pi-mode-tags {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.is-passport-step .pi-mode-tags.has-add-person {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(52px, auto) 40px;
+}
+
+.is-passport-step .pi-mode-tags button:not(.pi-add-person-button) {
+  justify-content: center;
+  min-width: 0;
+}
+
+.pi-family-count-pill {
+  display: inline-grid;
+  place-items: center;
+  justify-self: stretch;
+  min-height: var(--v19-agent-chip-height);
+  padding: 0 var(--v19-agent-chip-compact-padding-x);
+  border: 1px solid var(--v19-line-default);
+  border-radius: var(--v19-radius-pill);
+  color: var(--v19-fg-secondary);
+  background: var(--v19-control);
+  font-size: var(--v19-agent-chip-font-size);
+  font-weight: var(--v19-tab-font-weight);
+  line-height: var(--v19-tab-line-height);
+  white-space: nowrap;
+}
+
+.pi-passport-targets {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--v19-line-default);
+}
+
+.pi-passport-targets > .kicker {
+  color: var(--v19-fg-tertiary);
+}
+
+.pi-passport-targets > div {
+  display: grid;
+  gap: 7px;
+}
+
+.pi-passport-target {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--v19-line-default);
+  border-radius: 14px;
+  color: var(--v19-fg-secondary);
+  background: var(--v19-row-background);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--v19-motion-fast) var(--v19-motion-ease),
+    background-color var(--v19-motion-fast) var(--v19-motion-ease),
+    box-shadow var(--v19-motion-fast) var(--v19-motion-ease),
+    transform var(--v19-motion-fast) var(--v19-motion-ease-out);
+}
+
+.pi-passport-target span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pi-passport-target strong,
+.pi-passport-target em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-passport-target strong {
+  color: var(--v19-fg);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.pi-passport-target em {
+  color: var(--v19-fg-secondary);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.25;
+}
+
+.pi-passport-target i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--v19-line-default);
+  border-radius: 999px;
+  background: var(--v19-control);
+}
+
+.pi-passport-target i::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--v19-fg-tertiary);
+}
+
+.pi-passport-target:hover,
+.pi-passport-target.is-active {
+  border-color: var(--vf-accent-border);
+  background: var(--v19-selected);
+}
+
+.pi-passport-target.is-active {
+  box-shadow: 0 0 0 3px var(--vf-accent-soft);
+}
+
+.pi-passport-target.is-highlighted {
+  border-color: var(--vf-accent-border);
+}
+
+.pi-passport-target.is-extracting i::before {
+  background: var(--v19-warning);
+}
+
+.pi-passport-target.is-ready {
+  border-color: var(--vf-success-border);
+}
+
+.pi-passport-target.is-ready i {
+  border-color: var(--vf-success-border);
+  background: var(--vf-success-soft);
+}
+
+.pi-passport-target.is-ready i::before {
+  width: 10px;
+  height: 6px;
+  border: solid var(--v19-success);
+  border-width: 0 0 2px 2px;
+  border-radius: 0;
+  background: transparent;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.pi-passport-target.is-unavailable i::before {
+  background: var(--v19-warning);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pi-passport-target.is-highlighted {
+    animation: pi-target-added 520ms var(--v19-motion-ease-out) both;
+  }
+
+  .pi-passport-target.is-extracting i::before {
+    animation: pi-processing-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes pi-target-added {
+  0% {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 0 rgb(var(--accent) / 0);
+  }
+
+  60% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 4px var(--vf-accent-soft);
+  }
+
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 3px var(--vf-accent-soft);
+  }
+}
+
+.is-passport-step .pi-family-yes-no {
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.is-passport-step .fyn-question {
+  gap: 8px;
+  padding: 9px 11px;
+  background: var(--v19-row-background);
+}
+
+.is-passport-step .fyn-question > span {
+  font-size: var(--v19-row-title-size);
+}
+
 @media (max-width: 720px) {
   .v19-toolbar-control-stack .search,
   .panel-search {
@@ -9619,10 +9902,10 @@ p {
 
   .is-passport-step .pi-scan-section {
     grid-template-areas:
-      "side"
       "main"
       "status"
-      "uploads";
+      "uploads"
+      "side";
     grid-template-columns: 1fr;
     min-height: 0;
   }
@@ -9637,10 +9920,10 @@ p {
 
   .is-passport-step .pi-scan-main {
     min-height: 330px;
-    padding: 38px 18px 30px;
+    padding: var(--v19-upload-panel-padding-mobile);
   }
 
   .is-passport-step .pi-scan-main > h3 {
-    font-size: 21px;
+    font-size: var(--v19-upload-title-size-mobile);
   }
 }
