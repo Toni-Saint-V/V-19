@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { buildMediaSlot } from "../../src/lib/workflow";
 import {
   buildMediaStoragePath,
+  buildVisaApplicationPdfStorageTarget,
   createMediaSignedUrl,
   deleteMediaFromStorage,
   mediaStorageBucket,
@@ -56,6 +57,43 @@ describe("media storage contract", () => {
         ),
       }),
     ).not.toThrow();
+  });
+
+  test("accepts returned visa application PDFs as private generated artifacts", () => {
+    const sha256 = "a".repeat(64);
+    const target = buildVisaApplicationPdfStorageTarget({
+      applicantId: "applicant-1",
+      nonce: "2026-06-23T10:11:12.000Z:upload",
+      sha256,
+      submissionId: "VF-1044",
+    });
+
+    expect(target).toEqual({
+      bucket: mediaStorageBucket,
+      path: "VF-1044/applicant-1/visa_application_pdf/aaaaaaaaaaaaaaaa_20260623T101112000Zuploa_visa_application_pdf.pdf",
+    });
+    expect(() =>
+      validateMediaStorageTarget({
+        file: new File(["%PDF"], "returned.pdf", { type: "application/pdf" }),
+        target,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateMediaStorageTarget({
+        file: new File(["x"], "returned.jpg", { type: "image/jpeg" }),
+        target,
+      }),
+    ).toThrow(/MIME type/);
+  });
+
+  test("rejects returned visa application PDF storage targets without full SHA-256", () => {
+    expect(() =>
+      buildVisaApplicationPdfStorageTarget({
+        applicantId: "applicant-1",
+        sha256: "abc123",
+        submissionId: "VF-1044",
+      }),
+    ).toThrow(/SHA-256/);
   });
 
   test("rejects unsafe path segments", () => {

@@ -72,6 +72,15 @@ import {
   type PassportFieldApplyMode,
 } from "./modules/submissions/passportExtraction";
 import {
+  extractPdfTextFromFile,
+  normalizeVisaApplicationPdfUploadFile,
+} from "./modules/submissions/pdfTextExtraction";
+import {
+  applyVisaApplicationPdfReview,
+  confirmVisaApplicationPdfManualReview,
+  dismissVisaApplicationPdfReview,
+} from "./modules/submissions/visaApplicationPdfReconciliation";
+import {
   OperationalSidebar,
   type OperationalNavItem,
 } from "./modules/submissions/components/OperationalNavigation";
@@ -117,6 +126,7 @@ import { formatPersistenceFailureForUser } from "./services/persistenceObservabi
 import { invokePassportExtraction } from "./modules/submissions/passportExtractionService";
 import {
   buildMediaStoragePath,
+  buildVisaApplicationPdfStorageTarget,
   deleteMediaFromStorage,
   mediaStorageBucket,
   uploadMediaToStorage,
@@ -1437,6 +1447,142 @@ function App() {
     updateActiveSubmission((submission) => updateQuestionnaireField(submission, input));
   }
 
+  async function reviewVisaApplicationPdfForActiveSubmission(file: File) {
+    if (!activeSubmission) return;
+    const extracted = await extractPdfTextFromFile(file);
+    const artifact = {
+      extractedPageCount: extracted.extractedPageCount,
+      extractionSource: extracted.source,
+      fileName: extracted.fileName,
+      mimeType: extracted.mimeType,
+      ocrPageLimit: extracted.ocrPageLimit,
+      parserVersion: extracted.parserVersion,
+      sha256: extracted.sha256,
+      sizeBytes: extracted.sizeBytes,
+      uploadedBy: workspaceEmail || role,
+    };
+
+    if (isSupabaseMode) {
+      if (!remoteProfile) {
+        const message = "Сначала войдите в Supabase.";
+        setRemoteSaveState("error");
+        setRemoteSaveError(message);
+        throw new Error(message);
+      }
+
+      setRemoteSaveState("saving");
+      setRemoteSaveError("");
+      let uploadedStorageTarget: MediaStorageTarget | null = null;
+
+      try {
+        await drainRemoteSavesBeforeExport(remoteProfile, submissionsRef.current);
+        const latestSubmission = submissionsRef.current.find(
+          (submission) => submission.id === activeSubmission.id,
+        );
+        if (!latestSubmission) {
+          throw new Error("Submission no longer exists for this PDF review.");
+        }
+
+        const preview = applyVisaApplicationPdfReview(
+          latestSubmission,
+          extracted.text,
+          { artifact },
+        );
+        const review = preview.visaApplicationPdfReview;
+        const uploadedAtIso = new Date().toISOString();
+        const storageTarget = buildVisaApplicationPdfStorageTarget({
+          applicantId: review?.applicantId ?? "unmatched",
+          nonce: createMediaUploadNonce(uploadedAtIso),
+          sha256: extracted.sha256,
+          submissionId: latestSubmission.id,
+        });
+        const uploadFile = normalizeVisaApplicationPdfUploadFile(file);
+        const uploaded = await uploadMediaToStorage(storageTarget, uploadFile);
+        if (!uploaded) {
+          throw new Error("Supabase Storage upload did not return an object path.");
+        }
+        uploadedStorageTarget = storageTarget;
+
+        const reviewedSubmission = applyVisaApplicationPdfReview(
+          latestSubmission,
+          extracted.text,
+          {
+            artifact: {
+              ...artifact,
+              storageBucket: mediaStorageBucket,
+              storagePath: uploaded.path,
+              uploadedAtIso,
+            },
+          },
+        );
+        remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
+          remoteProfile,
+          [reviewedSubmission],
+          remoteOwnerIdsRef.current,
+        );
+
+        uploadedStorageTarget = null;
+        const nextSubmissions = submissionsRef.current.map((submission) =>
+          submission.id === reviewedSubmission.id ? reviewedSubmission : submission,
+        );
+        submissionsRef.current = nextSubmissions;
+        remoteSubmissionFingerprintsRef.current = new Map(
+          remoteSubmissionFingerprintsRef.current,
+        );
+        remoteSubmissionFingerprintsRef.current.set(
+          reviewedSubmission.id,
+          cockpitSubmissionFingerprint(reviewedSubmission),
+        );
+        setSubmissions(nextSubmissions);
+        setRemoteSaveState("idle");
+        setActiveDrawerTab("files");
+        return;
+      } catch (error) {
+        if (uploadedStorageTarget) {
+          try {
+            await deleteMediaFromStorage(uploadedStorageTarget);
+          } catch {
+            setRemoteSaveState("error");
+            setRemoteSaveError(
+              "PDF анкеты не сохранён в заявке, и загруженный файл не удалось удалить из Storage. Нужна проверка оператора.",
+            );
+            throw error;
+          }
+        }
+        const message = formatPersistenceFailureForUser(
+          error,
+          "PDF анкеты не сохранён. Повторите загрузку.",
+        );
+        setRemoteSaveState("error");
+        setRemoteSaveError(message);
+        throw new Error(message);
+      }
+    }
+
+    updateActiveSubmission((submission) =>
+      applyVisaApplicationPdfReview(submission, extracted.text, {
+        artifact,
+      }),
+    );
+    setActiveDrawerTab("files");
+  }
+
+  function confirmVisaApplicationPdfReviewForActiveSubmission(reviewId: string) {
+    if (!activeSubmission) return;
+    updateActiveSubmission((submission) =>
+      confirmVisaApplicationPdfManualReview(submission, reviewId, workspaceEmail || role),
+    );
+    setActiveDrawerTab("files");
+  }
+
+  function dismissVisaApplicationPdfReviewForActiveSubmission(reviewId: string) {
+    if (!activeSubmission) return;
+    updateActiveSubmission((submission) =>
+      dismissVisaApplicationPdfReview(submission, reviewId, workspaceEmail || role),
+    );
+    setActiveDrawerTab("files");
+  }
+
   function runAiReviewForActiveSubmission() {
     if (!activeSubmission) return;
     const reviewSurface =
@@ -2214,9 +2360,16 @@ function App() {
           onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
           onApplyPassportField={applyPassportFieldForActiveSubmission}
           onExtractPassport={extractPassportForActiveSubmission}
+          onConfirmVisaApplicationPdfReview={
+            confirmVisaApplicationPdfReviewForActiveSubmission
+          }
+          onDismissVisaApplicationPdfReview={
+            dismissVisaApplicationPdfReviewForActiveSubmission
+          }
           onRunAiReview={runAiReviewForActiveSubmission}
           onTab={setActiveDrawerTab}
           onQuestionnaireField={updateActiveQuestionnaireField}
+          onReviewVisaApplicationPdf={reviewVisaApplicationPdfForActiveSubmission}
           onUploadFile={uploadActiveFile}
           fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
           localPassportFileIds={localPassportFileIds}
