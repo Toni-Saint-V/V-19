@@ -2,6 +2,12 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
+import {
+  requiredMigrationOrder,
+  requiredMigrationsInActualOrder,
+  requiredRemoteMigrationOrder,
+  undeclaredMigrationFiles,
+} from "./supabase-migration-contract.mjs";
 
 const repoRoot = process.cwd();
 const readinessPath = resolve(
@@ -13,42 +19,6 @@ const migrationsDir = resolve(repoRoot, "supabase/migrations");
 const sandboxProjectId = "oevvaowoklqttqkraxho";
 const expectBlocked = process.argv.includes("--expect-blocked");
 const readinessContractVersion = "2026-06-16-production-readiness-v2";
-
-const requiredMigrationOrder = [
-  "20260611000000_visaflow_mvp_foundation.sql",
-  "20260612000000_visaflow_rls_performance_hardening.sql",
-  "20260612001000_visaflow_rpc_corrections_persistence.sql",
-  "20260613005039_visaflow_runtime_write_guards.sql",
-  "20260613010029_visaflow_rpc_submit_boundary.sql",
-  "20260614000000_ai_helper_audit_quota.sql",
-  "20260615000000_ai_helper_security_advisor_hardening.sql",
-  "20260616000000_export_batch_identity.sql",
-  "20260616001000_complete_export_package_rpc.sql",
-  "20260616002000_prevent_export_regression.sql",
-  "20260617001000_submit_corrections_handoff_rpc.sql",
-  "20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
-  "20260617003000_passport_workspace_media_slots.sql",
-  "20260617004000_complete_export_package_workspace_media_slots.sql",
-  "20260617005000_passport_extraction_audit_quota_contract.sql",
-];
-
-const requiredRemoteMigrationOrder = [
-  "20260611000000_visaflow_mvp_foundation",
-  "20260612000000_visaflow_rls_performance_hardening",
-  "20260612001000_visaflow_rpc_corrections_persistence",
-  "20260613005039_visaflow_runtime_write_guards",
-  "20260613010029_visaflow_rpc_submit_boundary",
-  "20260614000000_ai_helper_audit_quota",
-  "20260616001949_ai_helper_security_advisor_hardening",
-  "20260616000000_export_batch_identity",
-  "20260616001000_complete_export_package_rpc",
-  "20260616002000_prevent_export_regression",
-  "20260617001000_submit_corrections_handoff_rpc",
-  "20260617002000_preserve_applicant_profile_on_cockpit_save",
-  "20260617003000_passport_workspace_media_slots",
-  "20260617004000_complete_export_package_workspace_media_slots",
-  "20260617005000_passport_extraction_audit_quota_contract",
-];
 
 const integrityBlockers = [];
 const activationBlockers = [];
@@ -261,9 +231,8 @@ function verifyMigrationOrder(packet) {
   const migrationFiles = readdirSync(migrationsDir)
     .filter((fileName) => fileName.endsWith(".sql"))
     .sort();
-  const actualRequiredOrder = migrationFiles.filter((fileName) =>
-    requiredMigrationOrder.includes(fileName),
-  );
+  const actualRequiredOrder = requiredMigrationsInActualOrder(migrationFiles);
+  const undeclaredMigrations = undeclaredMigrationFiles(migrationFiles);
 
   if (actualRequiredOrder.join("\n") === requiredMigrationOrder.join("\n")) {
     pass("Local required migration order is intact");
@@ -272,6 +241,14 @@ function verifyMigrationOrder(packet) {
       "Local required migration order is intact",
       `Expected ${requiredMigrationOrder.join(" -> ")}`,
     );
+  }
+  if (undeclaredMigrations.length) {
+    block(
+      "No undeclared Supabase migrations exist outside production contract",
+      `undeclared: ${undeclaredMigrations.join(", ")}`,
+    );
+  } else {
+    pass("No undeclared Supabase migrations exist outside production contract");
   }
 
   const packetOrder = packet.migrationContract?.requiredOrder ?? [];

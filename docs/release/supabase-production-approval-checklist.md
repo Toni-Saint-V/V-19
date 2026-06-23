@@ -38,6 +38,7 @@ Required migration order:
 13. `20260617003000_passport_workspace_media_slots.sql`
 14. `20260617004000_complete_export_package_workspace_media_slots.sql`
 15. `20260617005000_passport_extraction_audit_quota_contract.sql`
+16. `20260622000100_ai_helper_audit_event_metadata.sql`
 
 Approval:
 
@@ -109,6 +110,7 @@ Run before production activation:
 npm run verify:supabase-release
 npm run test:supabase-live
 npm run verify:local-readiness
+npm run verify:auth-data-readiness
 npm run verify:full
 ```
 
@@ -121,6 +123,9 @@ Record results:
   - result:
   - timestamp:
 - [ ] `npm run verify:local-readiness`
+  - result:
+  - timestamp:
+- [ ] `npm run verify:auth-data-readiness`
   - result:
   - timestamp:
 - [ ] `npm run verify:full`
