@@ -11,6 +11,7 @@ export default defineConfig({
     command: "npm run dev -- --port 4197 --strictPort",
     env: {
       VITE_SUPABASE_BACKEND_TARGET: "local-demo",
+      VITE_E2E_PASSPORT_MOCK_ENABLED: "true",
       VITE_SUPABASE_SANDBOX_PROBE_ENABLED: "false",
       VITE_SUPABASE_RELEASE_ENABLED: "false",
     },

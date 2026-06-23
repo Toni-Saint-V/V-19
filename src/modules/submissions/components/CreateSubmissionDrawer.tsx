@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../shared/ui/primitives";
 import { invokePassportExtraction } from "../passportExtractionService";
-import type {
-  City,
-  PassportExtractedField,
-  PassportExtractedFieldKey,
-  PassportUploadDraft,
-  PreliminaryIntakeDraft,
-  Submission,
+import "./CreateSubmissionDrawer.css";
+import {
+  type City,
+  type PassportExtractedField,
+  type PassportExtractedFieldKey,
+  type PassportUploadDraft,
+  type PreliminaryIntakeDraft,
+  type Submission,
 } from "../types";
 
 const maxFamilyApplicants = 6;
@@ -49,7 +50,13 @@ const extractedFieldPreviewItems: Array<{
   { key: "surname", label: "Фамилия" },
   { key: "firstName", label: "Имя" },
   { key: "birthDate", label: "Дата рождения" },
+  { key: "birthPlace", label: "Место рождения" },
+  { key: "birthCountry", label: "Страна рождения" },
+  { key: "citizenship", label: "Гражданство" },
   { key: "passportNumber", label: "Номер паспорта" },
+  { key: "passportIssuedAt", label: "Дата выдачи" },
+  { key: "passportIssuePlace", label: "Место выдачи" },
+  { key: "passportExpiresAt", label: "Дата окончания паспорта" },
 ];
 
 const mediaRequirements = [
@@ -83,8 +90,10 @@ const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
 const passportScanUploadMimeTypes = new Set([
   "image/jpeg",
   "image/png",
-  "application/pdf",
 ]);
+
+const e2ePassportMockEnabled =
+  import.meta.env.DEV && import.meta.env.VITE_E2E_PASSPORT_MOCK_ENABLED === "true";
 
 type PassportUploadVisualStatus =
   | "empty"
@@ -110,12 +119,20 @@ function passportUploadFullName(upload: PassportUploadDraft | undefined) {
   return [surname, firstName].filter(Boolean).join(" ");
 }
 
+function hasRequiredPassportIdentity(upload: PassportUploadDraft | undefined) {
+  return Boolean(passportUploadFullName(upload));
+}
+
+function isPassportUploadReady(upload: PassportUploadDraft | undefined) {
+  return upload?.status === "ready" && hasRequiredPassportIdentity(upload);
+}
+
 function passportUploadVisualStatus(
   upload: PassportUploadDraft | undefined,
 ): PassportUploadVisualStatus {
   if (!upload) return "empty";
   if (upload.status === "extracting") return "extracting";
-  if (passportUploadFullName(upload)) return "ready";
+  if (isPassportUploadReady(upload)) return "ready";
   if (upload.status === "unavailable" || upload.status === "failed") {
     return "unavailable";
   }
@@ -129,7 +146,7 @@ function passportUploadStatusText(upload: PassportUploadDraft | undefined) {
   if (!upload) return "Паспорт не загружен";
   if (upload.status === "extracting") return "Распознаем MRZ";
   if (upload.status === "unavailable" || upload.status === "failed") {
-    return "ФИО не распознано";
+    return "Не подтвержден как паспорт";
   }
 
   return upload.fileName;
@@ -159,9 +176,7 @@ function passportUploadsStatus(passportUploads: PassportUploadDraft[]) {
     };
   }
 
-  const extractedCount = passportUploads.filter((upload) =>
-    passportUploadFullName(upload),
-  ).length;
+  const extractedCount = passportUploads.filter(isPassportUploadReady).length;
 
   if (extractedCount) {
     return {
@@ -175,9 +190,10 @@ function passportUploadsStatus(passportUploads: PassportUploadDraft[]) {
   }
 
   return {
-    label: "Файл выбран. ФИО не распознано автоматически, проверьте паспорт вручную.",
+    label:
+      "Файл не подтвержден как паспорт. Загрузите разворот загранпаспорта с MRZ.",
     tone: "selected" as const,
-    title: "Выбрано",
+    title: "Не принято",
   };
 }
 
@@ -188,6 +204,46 @@ function passportStatusClassName(
   if (tone === "processing") return "is-processing";
   if (tone === "selected") return "is-selected";
   return "is-idle";
+}
+
+function e2ePassportMockFields(fileName: string): PassportExtractedField[] | null {
+  if (!e2ePassportMockEnabled) return null;
+
+  const match = /^e2e-passport-(.+)\.jpe?g$/iu.exec(fileName.trim());
+  if (!match?.[1]) return null;
+
+  const [surname = "Новый", ...givenParts] = match[1]
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .split(/\s+/);
+  const firstName = givenParts.join(" ") || "заявитель";
+  const base = Date.now().toString().slice(-6).padStart(6, "0");
+  const values: Array<
+    [PassportExtractedFieldKey, string, PassportExtractedField["confidence"]]
+  > = [
+    ["surname", surname, "high"],
+    ["firstName", firstName, "high"],
+    ["birthDate", "01.01.1990", "medium"],
+    ["birthPlace", "MOSCOW", "low"],
+    ["birthCountry", "USSR", "medium"],
+    ["citizenship", "Russian Federation", "medium"],
+    ["gender", "Male - Мужской", "medium"],
+    ["passportType", "Ordinary Passport", "medium"],
+    ["passportNumber", `900${base}`.slice(0, 9), "high"],
+    ["passportIssueCountry", "Russian Federation", "medium"],
+    ["passportIssuedAt", "01.01.2020", "medium"],
+    ["passportIssuePlace", "FMS 77001", "low"],
+    ["passportExpiresAt", "01.01.2030", "medium"],
+  ];
+
+  return values.map(([key, value, confidence]) => ({
+    confidence,
+    key,
+    needsManualReview: true,
+    source: "passport_scan",
+    value,
+    verified: false,
+  }));
 }
 
 export function CreateSubmissionDrawer({
@@ -243,10 +299,13 @@ export function CreateSubmissionDrawer({
     preliminaryIntake.sameHomeAddress,
     preliminaryIntake.sameSpainStay,
   ].filter(Boolean).length;
-  const passportReady = passportUploads.length > 0;
+  const passportReady =
+    passportUploads.length > 0 &&
+    passportUploads.every(isPassportUploadReady);
   const passportStatus = passportUploadsStatus(passportUploads);
   const passportStatusClass = passportStatusClassName(passportStatus.tone);
   const hasActiveUpload = Boolean(activeUpload);
+  const activeUploadReady = isPassportUploadReady(activeUpload);
   const uploadButtonLabel = hasActiveUpload
     ? `Заменить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`
     : `Загрузить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`;
@@ -274,7 +333,7 @@ export function CreateSubmissionDrawer({
       .filter((file) => passportScanUploadMimeTypes.has(file.type))
       .slice(0, maxFamilyApplicants);
     setPassportFileError(
-      rejectedCount ? "Паспорт принимается только в формате JPEG, PNG или PDF." : "",
+      rejectedCount ? "Паспорт принимается только в формате JPEG или PNG." : "",
     );
     if (!selectedFiles.length) return;
     const nextBatch = uploadBatchRef.current + 1;
@@ -307,6 +366,24 @@ export function CreateSubmissionDrawer({
     await Promise.all(
       nextUploads.map(async (upload) => {
         try {
+          const e2eFields = e2ePassportMockFields(upload.fileName);
+          if (e2eFields) {
+            if (uploadBatchRef.current !== nextBatch) return;
+            setPassportFileError("");
+            setPassportUploads((current) =>
+              current.map((candidate) =>
+                candidate.id === upload.id
+                  ? {
+                      ...candidate,
+                      extractedFields: e2eFields,
+                      status: "ready",
+                    }
+                  : candidate,
+              ),
+            );
+            return;
+          }
+
           const result = await invokePassportExtraction({
             applicantIndex: upload.applicantIndex,
             localFile: upload.file,
@@ -368,11 +445,23 @@ export function CreateSubmissionDrawer({
     setHighlightedApplicantIndex(nextIndex);
   }
 
-  function handlePrimaryAction() {
-    if (createStep === "passport") {
-      setCreateStep("questionnaire");
+  function showPassportNotReadyAlert() {
+    window.alert(
+      "Паспорт еще не подтвержден. Загрузите разворот загранпаспорта с MRZ и дождитесь зеленого статуса.",
+    );
+  }
+
+  function openQuestionnaireStep() {
+    if (!passportReady) {
+      showPassportNotReadyAlert();
       return;
     }
+
+    setCreateStep("questionnaire");
+  }
+
+  function handlePrimaryAction() {
+    if (createStep === "passport") return openQuestionnaireStep();
 
     onCreate(passportUploads, preliminaryIntake);
   }
@@ -419,8 +508,14 @@ export function CreateSubmissionDrawer({
               <button
                 type="button"
                 aria-label={step.ariaLabel}
-                disabled={step.id === "questionnaire" && !passportReady}
-                onClick={() => setCreateStep(step.id)}
+                onClick={() => {
+                  if (step.id === "questionnaire") {
+                    openQuestionnaireStep();
+                    return;
+                  }
+
+                  setCreateStep(step.id);
+                }}
               >
                 <span>{step.number}</span>
                 <strong>{step.label}</strong>
@@ -557,8 +652,8 @@ export function CreateSubmissionDrawer({
                 <p className="kicker">Паспортная точка входа</p>
                 <h3 id="passport-intake-title">Загрузите паспорт</h3>
                 <p>
-                  На этом шаге ничего не заполняется вручную. Выберите скан или PDF, а
-                  черновик анкеты соберется после обработки.
+                  На этом шаге ничего не заполняется вручную. Выберите JPEG или PNG,
+                  а черновик анкеты соберется после обработки.
                 </p>
                 {passportFileError ? (
                   <p className="form-error" role="alert">
@@ -569,7 +664,7 @@ export function CreateSubmissionDrawer({
                   ref={passportFileInputRef}
                   className="pi-file-input"
                   aria-hidden="true"
-                  accept="image/jpeg,image/png,application/pdf"
+                  accept="image/jpeg,image/png"
                   multiple
                   name="preintakePassportScans"
                   tabIndex={-1}
@@ -586,6 +681,12 @@ export function CreateSubmissionDrawer({
                     }`}
                     variant="primary"
                     type="button"
+                    disabled={activeUploadReady}
+                    title={
+                      activeUploadReady
+                        ? "Паспорт уже распознан. Чтобы заменить, создайте новый черновик или выберите другого заявителя."
+                        : undefined
+                    }
                     onClick={() => passportFileInputRef.current?.click()}
                   >
                     {uploadButtonLabel}
@@ -593,7 +694,6 @@ export function CreateSubmissionDrawer({
                   <Button
                     variant="secondary"
                     type="button"
-                    disabled={!passportReady}
                     onClick={handlePrimaryAction}
                   >
                     Дальше
@@ -725,6 +825,7 @@ export function CreateSubmissionDrawer({
         <button
           className="secondary-button"
           type="button"
+          disabled={!passportReady}
           onClick={() => onCreate(passportUploads, preliminaryIntake)}
         >
           Сохранить черновик

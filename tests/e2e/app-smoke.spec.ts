@@ -170,6 +170,35 @@ async function saveDraftFromDrawer(page: Page) {
 
 async function submitForReviewFromDrawer(page: Page) {
   await drawer(page).getByRole("button", { name: "Отправить", exact: true }).click();
+  const verifyPassportButton = page.getByRole("button", {
+    name: "Проверил, отправить",
+  });
+  if (
+    await verifyPassportButton
+      .waitFor({ state: "visible", timeout: 1_000 })
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    await verifyPassportButton.click();
+  }
+}
+
+function e2ePassportFile(name: string) {
+  return {
+    buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+    mimeType: "image/jpeg",
+    name: `e2e-passport-${name}.jpg`,
+  };
+}
+
+async function uploadCreatePassports(page: Page, names: string[]) {
+  await drawer(page)
+    .locator(".pi-file-input")
+    .setInputFiles(names.map((name) => e2ePassportFile(name)));
+  await expect(drawer(page).getByText(names[0]).first()).toBeVisible();
+  await expect(
+    drawer(page).getByRole("button", { name: "Сохранить черновик" }),
+  ).toBeEnabled();
 }
 
 async function createNamedSubmission(
@@ -177,21 +206,7 @@ async function createNamedSubmission(
   input: { names: string[]; type: "single" | "family" },
 ) {
   await page.getByRole("button", { name: "Новая подача" }).click();
-  if (input.type === "family") {
-    await drawer(page).getByRole("button", { name: "Семья", exact: true }).click();
-    await drawer(page).getByLabel("Основной заявитель").fill(input.names[0]);
-    await drawer(page).getByLabel("Супруг").fill(input.names[1]);
-
-    for (let index = 2; index < input.names.length; index += 1) {
-      await drawer(page).getByRole("button", { name: "Добавить человека" }).click();
-      await drawer(page)
-        .getByLabel(`Ребенок ${index - 1}`)
-        .fill(input.names[index]);
-    }
-  } else {
-    await drawer(page).getByRole("textbox", { name: "Заявитель" }).fill(input.names[0]);
-  }
-
+  await uploadCreatePassports(page, input.names);
   await drawer(page).getByRole("button", { name: "Сохранить черновик" }).click();
 }
 
@@ -608,12 +623,11 @@ test.describe("V-19 operations workspace", () => {
   }, testInfo) => {
     await page.getByRole("button", { name: "Новая подача" }).click();
     await expect(page.getByRole("heading", { name: "Новая подача" })).toBeVisible();
-    await expect(page.locator('input[readonly][value="Испания"]')).toBeVisible();
     await expect(
-      drawer(page).getByRole("combobox", { name: "Город подачи" }),
+      drawer(page).getByRole("heading", { name: "Загрузите паспорт" }),
     ).toBeVisible();
 
-    await drawer(page).getByRole("button", { name: "Семья", exact: true }).click();
+    await uploadCreatePassports(page, ["Основной заявитель", "Супруг"]);
     await drawer(page).getByRole("button", { name: "Сохранить черновик" }).click();
     await expect(
       drawer(page).getByRole("heading", { name: "Новая семейная подача" }),
@@ -795,11 +809,19 @@ test.describe("V-19 operations workspace", () => {
         mimeType: "application/pdf",
         buffer: Buffer.from("%PDF-1.4\n%passport-local-preview\n"),
       });
-    await expect(drawer(page).getByText("Выбрано").first()).toBeVisible();
     await expect(
-      drawer(page).getByText(
-        "Файл выбран. ФИО не распознано автоматически, проверьте паспорт вручную.",
-      ),
+      drawer(page).getByText("Паспорт принимается только в формате JPEG или PNG."),
+    ).toBeVisible();
+    await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeEnabled();
+    let passportAlertMessage = "";
+    page.once("dialog", async (dialog) => {
+      passportAlertMessage = dialog.message();
+      await dialog.accept();
+    });
+    await drawer(page).getByRole("button", { name: "Дальше" }).click();
+    expect(passportAlertMessage).toContain("Паспорт еще не подтвержден");
+    await expect(
+      drawer(page).getByRole("heading", { name: "Загрузите паспорт" }),
     ).toBeVisible();
 
     await drawer(page).getByRole("button", { name: "Семья", exact: true }).click();
@@ -839,7 +861,7 @@ test.describe("V-19 operations workspace", () => {
 
   test("created draft persists after reload", async ({ page }) => {
     await page.getByRole("button", { name: "Новая подача" }).click();
-    await drawer(page).getByRole("button", { name: "Семья", exact: true }).click();
+    await uploadCreatePassports(page, ["Основной заявитель", "Супруг"]);
     await drawer(page).getByRole("button", { name: "Сохранить черновик" }).click();
     await expect(
       drawer(page).getByRole("heading", { name: "Новая семейная подача" }),
@@ -1049,10 +1071,14 @@ test.describe("V-19 operations workspace", () => {
   });
 
   test("one submission moves from creation to Excel export", async ({ page }) => {
+    const submissionTitle = "Новая подача";
+    const applicantName = "Новый заявитель";
+
     await page.getByRole("button", { name: "Новая подача" }).click();
+    await uploadCreatePassports(page, [applicantName]);
     await page.getByRole("button", { name: "Сохранить черновик" }).click();
     await expect(
-      drawer(page).getByRole("heading", { name: "Новая подача" }),
+      drawer(page).getByRole("heading", { name: submissionTitle }),
     ).toBeVisible();
 
     await openQuestionnaireTab(page);
@@ -1066,7 +1092,7 @@ test.describe("V-19 operations workspace", () => {
 
     await switchToAdmin(page);
     await page.getByRole("tab", { name: "Проверка" }).click();
-    await openAdminSubmission(page, "Новая подача");
+    await openAdminSubmission(page, submissionTitle);
     await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
     await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
     await expect(
@@ -1081,7 +1107,7 @@ test.describe("V-19 operations workspace", () => {
 
     await page.getByRole("button", { name: "Сменить роль" }).click();
     await page.getByRole("button", { name: "Мои подачи" }).click();
-    await submissionCard(page, "Новая подача").click();
+    await submissionCard(page, submissionTitle).click();
     await expect(page.getByRole("tab", { name: "Замечания" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -1120,7 +1146,7 @@ test.describe("V-19 operations workspace", () => {
       .getByRole("checkbox")
       .check();
     await expect(
-      page.locator(".export-preview").getByText("Новый заявитель"),
+      page.locator(".export-preview").getByText(applicantName),
     ).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
     await page

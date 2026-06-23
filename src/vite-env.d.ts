@@ -22,6 +22,7 @@ declare global {
     readonly VITE_SUPABASE_BROWSER_QA_PASSED?: string;
     readonly VITE_SUPABASE_BROWSER_KEY_AUDITED?: string;
     readonly VITE_SUPABASE_PRODUCTION_APPROVED?: string;
+    readonly VITE_E2E_PASSPORT_MOCK_ENABLED?: string;
   }
 
   interface ImportMeta {

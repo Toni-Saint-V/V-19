@@ -118,15 +118,63 @@ describe("passport extraction state", () => {
       fields: [
         {
           confidence: "high",
+          key: "surname",
+          needsManualReview: true,
+          value: "VOLKOV",
+        },
+        {
+          confidence: "high",
+          key: "firstName",
+          needsManualReview: true,
+          value: "ANTON",
+        },
+        {
+          confidence: "medium",
+          key: "birthDate",
+          needsManualReview: true,
+          value: "20.08.1990",
+        },
+        {
+          confidence: "low",
+          key: "birthPlace",
+          needsManualReview: true,
+          value: "LENINGRAD",
+        },
+        {
+          confidence: "medium",
+          key: "birthCountry",
+          needsManualReview: true,
+          value: "USSR",
+        },
+        {
+          confidence: "medium",
+          key: "citizenship",
+          needsManualReview: true,
+          value: "Russian Federation",
+        },
+        {
+          confidence: "high",
           key: "passportNumber",
           needsManualReview: true,
           value: "765432100",
         },
         {
           confidence: "medium",
+          key: "passportIssuedAt",
+          needsManualReview: true,
+          value: "26.02.2016",
+        },
+        {
+          confidence: "low",
+          key: "passportIssuePlace",
+          needsManualReview: true,
+          value: "FMS 78039",
+        },
+        {
+          confidence: "medium",
           key: "passportExpiresAt",
           needsManualReview: true,
-          value: "26.02.2030",
+          value: "26.02.2026",
         },
       ],
       guardrails: [],
@@ -139,10 +187,29 @@ describe("passport extraction state", () => {
 
     const autofilled = applySafePassportExtractionFields(ready, applicantId);
 
+    expect(questionnaireValue(autofilled, "surname")).toBe("VOLKOV");
+    expect(questionnaireValue(autofilled, "first-name")).toBe("ANTON");
+    expect(questionnaireValue(autofilled, "birth-date")).toBe("20.08.1990");
+    expect(questionnaireValue(autofilled, "birth-place")).toBe("LENINGRAD");
+    expect(questionnaireValue(autofilled, "birth-country")).toBe("USSR");
+    expect(questionnaireValue(autofilled, "nationality")).toBe("Russian Federation");
     expect(questionnaireValue(autofilled, "passport-no")).toBe("765432100");
-    expect(questionnaireValue(autofilled, "passport-expiry-date")).toBe("26.02.2030");
+    expect(questionnaireValue(autofilled, "passport-issue-date")).toBe("26.02.2016");
+    expect(questionnaireValue(autofilled, "passport-issue-place")).toBe("FMS 78039");
+    expect(questionnaireValue(autofilled, "passport-expiry-date")).toBe("26.02.2026");
     expect(autofilled.applicants[0]?.passportExtraction?.appliedFieldKeys).toEqual(
-      expect.arrayContaining(["passportNumber", "passportExpiresAt"]),
+      expect.arrayContaining([
+        "surname",
+        "firstName",
+        "birthDate",
+        "birthPlace",
+        "birthCountry",
+        "citizenship",
+        "passportNumber",
+        "passportIssuedAt",
+        "passportIssuePlace",
+        "passportExpiresAt",
+      ]),
     );
   });
 

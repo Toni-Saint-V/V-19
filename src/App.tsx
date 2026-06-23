@@ -71,7 +71,6 @@ import {
   startPassportExtraction,
   type PassportFieldApplyMode,
 } from "./modules/submissions/passportExtraction";
-import { CreateSubmissionDrawer } from "./modules/submissions/components/CreateSubmissionDrawer";
 import {
   OperationalSidebar,
   type OperationalNavItem,
@@ -126,6 +125,11 @@ import {
 import type { AppProfile } from "./types/session";
 
 const SettingsScreen = lazy(() => import("./modules/submissions/pages/SettingsScreen"));
+const CreateSubmissionDrawer = lazy(() =>
+  import("./modules/submissions/components/CreateSubmissionDrawer").then((module) => ({
+    default: module.CreateSubmissionDrawer,
+  })),
+);
 
 const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
@@ -1046,10 +1050,7 @@ function App() {
 
   function updateSubmission(action: SubmissionAction) {
     if (!activeSubmission) return;
-    if (
-      passportExtractionEnabled &&
-      requiresPassportExtractionReviewBeforeAction(activeSubmission, action)
-    ) {
+    if (requiresPassportExtractionReviewBeforeAction(activeSubmission, action)) {
       setPassportReviewRequest({ action, submissionId: activeSubmission.id });
       return;
     }
@@ -1579,6 +1580,7 @@ function App() {
       const selectedFile = upload.file;
       const slot = passportSlotForUpload(submission, upload);
       if (!slot || !selectedFile) return;
+      if (upload.extractedFields.length) return;
       rememberLocalPassportFile(slot.id, selectedFile);
       void extractPassportForSubmission(submission.id, slot.id, true);
     });
@@ -2233,53 +2235,55 @@ function App() {
       ) : null}
 
       {drawerMode === "create" ? (
-        <CreateSubmissionDrawer
-          applicantNames={createApplicantNames}
-          city={createCity}
-          dirty={dirty}
-          familyCount={createFamilyCount}
-          focusCloseToken={createCloseFocusToken}
-          onApplicantName={(index, name) => {
-            setCreateApplicantNames((current) => {
-              const next = normalizeCreateApplicantNames(current, createFamilyCount);
-              next[index] = name;
-              return next;
-            });
-            setDirty(true);
-          }}
-          onCity={(city) => {
-            setCreateCity(city);
-            setDirty(true);
-          }}
-          onClose={closeDrawer}
-          onCreate={createDraft}
-          onFamilyCount={(count) => {
-            const safeCount = Math.max(2, Math.min(6, count || 2));
-            setCreateFamilyCount(safeCount);
-            setCreateApplicantNames((current) =>
-              normalizeCreateApplicantNames(current, safeCount),
-            );
-            setDirty(true);
-          }}
-          onPassportFilesSelected={() => {
-            setDirty(true);
-          }}
-          onType={(type) => {
-            setCreateType(type);
-            if (type === "single") {
-              setCreateFamilyCount(2);
+        <Suspense fallback={null}>
+          <CreateSubmissionDrawer
+            applicantNames={createApplicantNames}
+            city={createCity}
+            dirty={dirty}
+            familyCount={createFamilyCount}
+            focusCloseToken={createCloseFocusToken}
+            onApplicantName={(index, name) => {
+              setCreateApplicantNames((current) => {
+                const next = normalizeCreateApplicantNames(current, createFamilyCount);
+                next[index] = name;
+                return next;
+              });
+              setDirty(true);
+            }}
+            onCity={(city) => {
+              setCreateCity(city);
+              setDirty(true);
+            }}
+            onClose={closeDrawer}
+            onCreate={createDraft}
+            onFamilyCount={(count) => {
+              const safeCount = Math.max(2, Math.min(6, count || 2));
+              setCreateFamilyCount(safeCount);
               setCreateApplicantNames((current) =>
-                normalizeCreateApplicantNames(current, 1),
+                normalizeCreateApplicantNames(current, safeCount),
               );
-            } else {
-              setCreateApplicantNames((current) =>
-                normalizeCreateApplicantNames(current, createFamilyCount),
-              );
-            }
-            setDirty(true);
-          }}
-          type={createType}
-        />
+              setDirty(true);
+            }}
+            onPassportFilesSelected={() => {
+              setDirty(true);
+            }}
+            onType={(type) => {
+              setCreateType(type);
+              if (type === "single") {
+                setCreateFamilyCount(2);
+                setCreateApplicantNames((current) =>
+                  normalizeCreateApplicantNames(current, 1),
+                );
+              } else {
+                setCreateApplicantNames((current) =>
+                  normalizeCreateApplicantNames(current, createFamilyCount),
+                );
+              }
+              setDirty(true);
+            }}
+            type={createType}
+          />
+        </Suspense>
       ) : null}
 
       {passportReviewRequest ? (

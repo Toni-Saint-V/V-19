@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { invokePassportExtraction } from "../../src/modules/submissions/passportExtractionService";
+import {
+  invokePassportExtraction,
+  parsePassportMrzText,
+  parsePassportVisualText,
+} from "../../src/modules/submissions/passportExtractionService";
 import type { Submission, SubmissionFile } from "../../src/modules/submissions/types";
 
 const tesseractMock = vi.hoisted(() => ({
@@ -197,6 +201,60 @@ describe("passport extraction service local OCR quality integration", () => {
     expect(result.summary).toContain("Скан паспорта не готов к OCR");
   });
 
+  test("parses noisy MRZ from a rotated passport crop", () => {
+    const fields = parsePassportMrzText(
+      [
+        "P<RUSVOLKOV<<ANTONK<<KLLLLLLLLLLLLLLLLLKKKK",
+        "7528696137RUS9008205M2602268<<<<<<LLLLLL<<00",
+      ].join("\n"),
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+        expect.objectContaining({ key: "birthDate", value: "20.08.1990" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+  });
+
+  test("adds visual passport fields from noisy OCR around the MRZ", () => {
+    const mrzFields = parsePassportMrzText(
+      [
+        "P<RUSVOLKOV<<ANTONK<<KLLLLLLLLLLLLLLLLLKKKK",
+        "7528696137RUS9008205M2602268<<<<<<LLLLLL<<00",
+      ].join("\n"),
+    );
+    const visualFields = parsePassportVisualText(
+      [
+        "LPAXGAHCTEONATIONALITYLEEY",
+        "POCCHIACKASEJIEPALINSRUSSIANFEDERATIONID",
+        "LATAPOXAENUSDATEOFBIRTHYUERHAS3ANUCHLAVO",
+        "NN20081990LWV",
+        "RANDOM09032058NOISE28518",
+        "IMONSEXMECROPOXAENUSPLACEOFBIRTH",
+        "MMNEHWUHTPAJLUSSR",
+        "HAVASHINADATEOFISSUEOPRANBBIAABLUIAOKYMEHTAUTHORITY",
+        "26022016DMC78039",
+        "PYLARAOXONIAHMSCPOKADATEOFEXPIRYFOANUESSRAGENSUAHOLDERSSIGNATURE",
+        "NEIICTENS",
+        "2602202674",
+      ].join("\n"),
+      mrzFields,
+    );
+
+    expect(visualFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "birthCountry", value: "USSR" }),
+        expect.objectContaining({ key: "birthPlace", value: "LENINGRAD" }),
+        expect.objectContaining({ key: "passportIssuedAt", value: "26.02.2016" }),
+        expect.objectContaining({ key: "passportIssuePlace", value: "FMS 78039" }),
+      ]),
+    );
+  });
+
   test("continues OCR when image quality pixels are unavailable", async () => {
     installBrowserImageMocks({
       getImageDataThrows: true,
@@ -235,12 +293,12 @@ describe("passport extraction service local OCR quality integration", () => {
 
     const result = await invokeLocalPassport("image/png", 120_000);
 
-    expect(tesseractMock.recognize).toHaveBeenCalledTimes(4);
+    expect(tesseractMock.recognize).toHaveBeenCalledTimes(16);
     expect(result.status).toBe("unavailable");
     expect(result.summary).toContain("Скан паспорта не готов к OCR");
   });
 
-  test("uses edge fallback after local OCR is unavailable", async () => {
+  test("does not allow paid fallback after local OCR finds no passport MRZ", async () => {
     installBrowserImageMocks({
       height: 700,
       luma: () => 120,
@@ -249,19 +307,12 @@ describe("passport extraction service local OCR quality integration", () => {
     tesseractMock.text = "NO PASSPORT MRZ";
     supabaseMock.invoke.mockResolvedValue({
       data: {
-        fields: [
-          {
-            confidence: "high",
-            key: "passportNumber",
-            needsManualReview: true,
-            value: "765432100",
-          },
-        ],
+        fields: [],
         guardrails: [],
-        openAiAttempted: true,
-        source: "openai-vision",
-        status: "extracted",
-        summary: "OpenAI fallback извлек паспортные поля.",
+        openAiAttempted: false,
+        source: "edge-stub",
+        status: "unavailable",
+        summary: "Server extraction unavailable.",
       },
       error: null,
     });
@@ -272,15 +323,15 @@ describe("passport extraction service local OCR quality integration", () => {
       "passport-extract",
       expect.objectContaining({
         body: expect.objectContaining({
-          allowOpenAiFallback: true,
+          allowOpenAiFallback: false,
         }),
       }),
     );
     expect(result).toMatchObject({
-      openAiAttempted: true,
-      source: "openai-vision",
-      status: "extracted",
+      status: "unavailable",
     });
+    expect(result.openAiAttempted).not.toBe(true);
+    expect(result.summary).toContain("локальный OCR не нашел MRZ");
   });
 
   test("keeps local unavailable result when edge did not attempt OpenAI", async () => {
@@ -305,7 +356,7 @@ describe("passport extraction service local OCR quality integration", () => {
     const result = await invokeLocalPassport("image/png", 120_000);
 
     expect(supabaseMock.invoke).toHaveBeenCalledOnce();
-    expect(result.summary).toContain("Скан паспорта не готов к OCR");
+    expect(result.summary).toContain("локальный OCR не нашел MRZ");
   });
 
   test("does not call edge fallback when OpenAI is disabled for the same fingerprint", async () => {
@@ -328,7 +379,7 @@ describe("passport extraction service local OCR quality integration", () => {
     expect(result.status).toBe("unavailable");
   });
 
-  test("forwards disabled OpenAI fallback to edge when no local file is available", async () => {
+  test("keeps OpenAI disabled at edge when no local file is available", async () => {
     supabaseMock.invoke.mockResolvedValue({
       data: {
         fields: [],

@@ -387,7 +387,15 @@ export function getPrimaryAction(
     };
     const decision = byStatus[submission.status];
     const guard = canPerformAction(submission, decision.action, role);
-    return { ...decision, disabled: !guard.ok, reason: guard.reason };
+    const waitsForPassportReview = requiresPassportExtractionReviewBeforeAction(
+      submission,
+      decision.action,
+    ) && guard.reason === "Проверьте распознанные паспортные данные перед отправкой";
+    return {
+      ...decision,
+      disabled: !guard.ok && !waitsForPassportReview,
+      reason: guard.reason,
+    };
   }
 
   if (submission.status === "corrections_received") {

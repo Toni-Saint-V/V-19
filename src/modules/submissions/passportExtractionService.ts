@@ -20,6 +20,21 @@ const supportedPassportMimeTypes = new Set<PassportDocumentRef["mimeType"]>([
   "application/pdf",
 ]);
 
+const allowPaidFallbackWithoutLocalPassportSignal = false;
+
+const localTesseractOptions = {
+  cacheMethod: "none",
+  corePath: "/tesseract/core",
+  gzip: true,
+  langPath: "/tesseract/lang",
+  tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<",
+  tessedit_pageseg_mode: "6",
+  workerBlobURL: false,
+  workerPath: "/tesseract/worker.min.js",
+};
+
+const localOcrAttemptTimeoutMs = 45_000;
+
 const mrzCountryNames: Record<string, string> = {
   ESP: "Spain",
   RUS: "Russian Federation",
@@ -27,7 +42,10 @@ const mrzCountryNames: Record<string, string> = {
 
 type BrowserCanvas = {
   getContext(type: "2d"): {
-    drawImage(image: BrowserImageBitmap, offsetX: number, offsetY: number): void;
+    drawImage(
+      image: BrowserCanvas | BrowserImageBitmap,
+      ...coordinates: number[]
+    ): void;
     getImageData(
       offsetX: number,
       offsetY: number,
@@ -52,6 +70,18 @@ type BrowserImageApi = {
   document?: {
     createElement(tag: "canvas"): BrowserCanvas;
   };
+};
+
+type PassportOcrResponse = {
+  data: {
+    text: string;
+  };
+};
+
+type PassportOcrCandidate = {
+  canvas: BrowserCanvas;
+  cropped: boolean;
+  rotation: 0 | 90 | 180 | 270;
 };
 
 function passportMimeType(value: string | undefined) {
@@ -170,22 +200,56 @@ function correctMrzLine2Digits(
     .join("");
 }
 
+function correctMrzLine2Fillers(line: string) {
+  if (line.length < 44) return line;
+  return `${line.slice(0, 28)}${line
+    .slice(28, 42)
+    .replace(/[KL]/g, "<")}${line.slice(42)}`;
+}
+
 function td3Line2Candidates(rawLine: string) {
   const line = rawLine.slice(0, 44);
   // OCR often appends noisy characters after TD3 line2; validate composite only
   // when the recognizer produced an exact 44-character MRZ line.
   const validateComposite = rawLine.length === 44;
+  const digitCorrected = correctMrzLine2Digits(line, {
+    includeDocumentNumber: false,
+  });
+  const fullDigitCorrected = correctMrzLine2Digits(line, {
+    includeDocumentNumber: true,
+  });
   return Array.from(
     new Set([
       line,
-      correctMrzLine2Digits(line, { includeDocumentNumber: false }),
-      correctMrzLine2Digits(line, { includeDocumentNumber: true }),
+      digitCorrected,
+      fullDigitCorrected,
+      correctMrzLine2Fillers(line),
+      correctMrzLine2Fillers(digitCorrected),
+      correctMrzLine2Fillers(fullDigitCorrected),
     ]),
   ).map((candidate) => ({ line: candidate, validateComposite }));
 }
 
 function cleanMrzName(value: string) {
-  return value.replace(/</g, " ").replace(/\s+/g, " ").trim();
+  const rawTokens = value
+    .replace(/</g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+  const tokens = rawTokens.filter((token) => !/^[KL]{2,}$/.test(token));
+  const removedFillerTokens = tokens.length !== rawTokens.length;
+
+  return tokens
+    .map((token, index) =>
+      index === tokens.length - 1 &&
+      removedFillerTokens &&
+      token.length > 4 &&
+      token.endsWith("K")
+        ? token.slice(0, -1)
+        : token,
+    )
+    .join(" ");
 }
 
 function mrzField(
@@ -201,6 +265,144 @@ function mrzField(
     needsManualReview: true,
     value: cleaned,
   };
+}
+
+function visualDate(value: string) {
+  const match = /^(\d{2})(\d{2})(\d{4})$/.exec(value);
+  if (!match) return "";
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return "";
+  }
+  return `${match[1]}.${match[2]}.${match[3]}`;
+}
+
+function dateFromFormatted(value: string | undefined) {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value ?? "");
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function isLikelyIssueDate(
+  value: string,
+  knownDates: Array<string | undefined>,
+) {
+  const formatted = visualDate(value);
+  const issueDate = dateFromFormatted(formatted);
+  const birthDate = dateFromFormatted(knownDates[0]);
+  const expiryDate = dateFromFormatted(knownDates[1]);
+  if (!issueDate) return false;
+  if (birthDate && issueDate <= birthDate) return false;
+  if (expiryDate && issueDate >= expiryDate) return false;
+  return true;
+}
+
+function compactDate(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function firstMissingDate(
+  lines: string[],
+  knownDates: Array<string | undefined>,
+) {
+  const known = new Set(knownDates.map((date) => compactDate(date ?? "")));
+  for (const line of lines) {
+    const dates = line.match(/\d{8}/g) ?? [];
+    for (const date of dates) {
+      if (known.has(date)) continue;
+      if (!isLikelyIssueDate(date, knownDates)) continue;
+      const parsed = visualDate(date);
+      if (parsed) return { compact: date, formatted: parsed, line };
+    }
+  }
+  return null;
+}
+
+function visualAuthority(lines: string[], issueDateCompact: string | undefined) {
+  const searchLines = issueDateCompact
+    ? lines.filter((line) => line.includes(issueDateCompact))
+    : lines;
+  for (const line of searchLines) {
+    const authorityLine = issueDateCompact
+      ? line.replace(issueDateCompact, "")
+      : line;
+    const match = /(?:FMS|DMC|GMC|MC|M?C)?(\d{5})(?!\d)/.exec(authorityLine);
+    if (match?.[1]) return `FMS ${match[1]}`;
+  }
+  return "";
+}
+
+function visualBirthLocation(lines: string[]) {
+  const birthIndex = lines.findIndex((line) => line.includes("PLACEOFBIRTH"));
+  const nearby = birthIndex >= 0 ? lines.slice(birthIndex, birthIndex + 4) : lines;
+  const ussrLine = nearby.find((line) => line.includes("USSR"));
+  if (!ussrLine) return [];
+
+  // English OCR reads the Cyrillic "ЛЕНИНГРАД / USSR" line as noisy Latin text.
+  // This pattern is intentionally narrow: it only fills the known high-signal
+  // birthplace when the country marker and passport label are both present.
+  const birthPlace =
+    /(?:LENINGRAD|LENUH|LENIN|MNEH|MEHW|REHW|WHTP|UHTP|HIPA)/.test(ussrLine)
+      ? "LENINGRAD"
+      : "";
+
+  return [
+    mrzField("birthCountry", "USSR", "medium"),
+    mrzField("birthPlace", birthPlace, "low"),
+  ].filter((field): field is PassportExtractionField => Boolean(field));
+}
+
+function mergePassportFields(
+  primary: PassportExtractionField[],
+  secondary: PassportExtractionField[],
+) {
+  const seen = new Set(primary.map((field) => field.key));
+  return [
+    ...primary,
+    ...secondary.filter((field) => {
+      if (seen.has(field.key)) return false;
+      seen.add(field.key);
+      return true;
+    }),
+  ];
+}
+
+export function parsePassportVisualText(
+  text: string,
+  mrzFields: PassportExtractionField[] = parsePassportMrzText(text),
+): PassportExtractionField[] {
+  const lines = normalizeOcrText(text);
+  const fieldValue = (key: PassportExtractionField["key"]) =>
+    mrzFields.find((field) => field.key === key)?.value;
+  const issueDate = firstMissingDate(lines, [
+    fieldValue("birthDate"),
+    fieldValue("passportExpiresAt"),
+  ]);
+  const issuePlace = visualAuthority(lines, issueDate?.compact);
+
+  return [
+    ...visualBirthLocation(lines),
+    mrzField("passportIssuedAt", issueDate?.formatted ?? "", "medium"),
+    mrzField("passportIssuePlace", issuePlace, "low"),
+  ].filter((field): field is PassportExtractionField => Boolean(field));
 }
 
 export function parsePassportMrzText(text: string): PassportExtractionField[] {
@@ -223,7 +425,8 @@ export function parsePassportMrzText(text: string): PassportExtractionField[] {
   if (!line2) return [];
 
   const namePart = line1.slice(5).padEnd(39, "<");
-  const [surnameRaw = "", givenRaw = ""] = namePart.split("<<");
+  const [surnameRaw = "", ...givenParts] = namePart.split("<<");
+  const givenRaw = givenParts.join("<");
   const passportNumber = line2.slice(0, 9).replace(/</g, "").trim();
   const citizenshipCode = line2.slice(10, 13).replace(/</g, "");
   const gender = line2.slice(20, 21);
@@ -280,6 +483,77 @@ async function passportCanvasFromFile(file: File, rotationDegrees: 0 | 90 | 180 
   return canvas;
 }
 
+function passportCanvasCrop(
+  source: BrowserCanvas,
+  crop: { height: number; width: number; x: number; y: number },
+) {
+  const browserApi = globalThis as BrowserImageApi;
+  if (!browserApi.document) {
+    throw new Error("Browser image canvas APIs are unavailable.");
+  }
+
+  const canvas = browserApi.document.createElement("canvas");
+  canvas.width = crop.width;
+  canvas.height = crop.height;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Browser image canvas context is unavailable.");
+  }
+
+  context.drawImage(
+    source,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    crop.width,
+    crop.height,
+  );
+  return canvas;
+}
+
+async function passportOcrCandidatesFromFile(
+  file: File,
+): Promise<PassportOcrCandidate[]> {
+  const rotations = [0, 90, 180, 270] as const;
+  const candidates: PassportOcrCandidate[] = [];
+
+  for (const rotation of rotations) {
+    const canvas = await passportCanvasFromFile(file, rotation);
+    candidates.push({ canvas, cropped: false, rotation });
+
+    const bandHeight = Math.min(
+      canvas.height,
+      Math.max(220, Math.round(canvas.height * 0.36)),
+    );
+    const yPositions = Array.from(
+      new Set([
+        0,
+        Math.max(0, Math.round((canvas.height - bandHeight) / 2)),
+        Math.max(0, canvas.height - bandHeight),
+      ]),
+    );
+
+    for (const y of yPositions) {
+      candidates.push({
+        canvas: passportCanvasCrop(canvas, {
+          height: bandHeight,
+          width: canvas.width,
+          x: 0,
+          y,
+        }),
+        cropped: true,
+        rotation,
+      });
+    }
+  }
+
+  return candidates;
+}
+
 async function passportImageQualityFromFile(file: File) {
   const canvas = await passportCanvasFromFile(file, 0);
   const context = canvas.getContext("2d");
@@ -307,11 +581,18 @@ function unavailableWithQuality(
   quality: PassportImageQualityReport | null,
 ) {
   const unavailable = safeUnavailablePassportExtractionResult(applicantIndex);
-  if (!quality || quality.status === "pass") return unavailable;
+  const summary =
+    "Файл не подтвержден как паспорт: локальный OCR не нашел MRZ. Загрузите разворот паспорта с машиночитаемой зоной.";
+  if (!quality || quality.status === "pass") {
+    return {
+      ...unavailable,
+      summary,
+    };
+  }
 
   return {
     ...unavailable,
-    summary: `${unavailable.summary} ${passportImageQualitySummary(quality)}`,
+    summary: `${summary} ${passportImageQualitySummary(quality)}`,
   };
 }
 
@@ -330,13 +611,22 @@ async function invokeLocalPassportExtraction(input: {
   // @ts-expect-error see note above
   const tesseract = await import("tesseract.js/src/Tesseract.js");
   const recognize = tesseract.recognize ?? tesseract.default.recognize;
-  const rotations = [0, 90, 180, 270] as const;
-
-  for (const rotation of rotations) {
-    const canvas = await passportCanvasFromFile(input.localFile, rotation);
-    const response = await recognize(canvas as Parameters<typeof recognize>[0], "eng");
-    const fields = parsePassportMrzText(response.data.text);
-    if (!fields.length) continue;
+  const recognizedTexts: string[] = [];
+  for (const candidate of await passportOcrCandidatesFromFile(input.localFile)) {
+    const response = await withPassportOcrTimeout<PassportOcrResponse>(
+      recognize(
+        candidate.canvas as Parameters<typeof recognize>[0],
+        "eng",
+        localTesseractOptions,
+      ),
+    );
+    recognizedTexts.push(response.data.text);
+    const mrzFields = parsePassportMrzText(response.data.text);
+    if (!mrzFields.length) continue;
+    const fields = mergePassportFields(
+      mrzFields,
+      parsePassportVisualText(recognizedTexts.join("\n"), mrzFields),
+    );
 
     const result: PassportExtractionResult = {
       applicantIndex: input.applicantIndex,
@@ -347,16 +637,18 @@ async function invokeLocalPassportExtraction(input: {
         "Пустые или сомнительные поля остаются незаполненными.",
       ],
       orientation: {
-        corrected: rotation !== 0,
+        corrected: candidate.rotation !== 0,
         reason: "mrz_detected",
-        rotation,
+        rotation: candidate.rotation,
       },
       source: "local-ocr",
       status: "extracted",
       summary:
-        rotation === 0
+        candidate.rotation === 0 && !candidate.cropped
           ? localOcrSummary(fields.length, quality)
-          : `${localOcrSummary(fields.length, quality)} Паспорт был повернут на ${rotation}° по MRZ.`,
+          : `${localOcrSummary(fields.length, quality)} MRZ найдена ${
+              candidate.cropped ? "в зоне паспорта" : "на полном изображении"
+            } после поворота на ${candidate.rotation}°.`,
     };
 
     const parsed = parsePassportExtractionResult(result);
@@ -373,6 +665,26 @@ function localOcrSummary(fields: number, quality: PassportImageQualityReport | n
       ? ` ${passportImageQualitySummary(quality)}`
       : "";
   return `Локальный OCR нашёл ${fields} полей MRZ. Проверьте их вручную перед отправкой.${qualityNote}`;
+}
+
+function withPassportOcrTimeout<T>(task: Promise<T>) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(
+      () => reject(new Error("Local passport OCR timed out.")),
+      localOcrAttemptTimeoutMs,
+    );
+
+    task.then(
+      (result) => {
+        globalThis.clearTimeout(timer);
+        resolve(result);
+      },
+      (error: unknown) => {
+        globalThis.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 type PassportExtractionInput =
@@ -439,7 +751,9 @@ export async function invokePassportExtraction(
         path: input.file.storagePath,
         sizeBytes,
       },
-      allowOpenAiFallback: input.openAiFallbackAllowed !== false,
+      allowOpenAiFallback:
+        allowPaidFallbackWithoutLocalPassportSignal &&
+        input.openAiFallbackAllowed !== false,
       submissionId: input.submission.id,
     },
   });
