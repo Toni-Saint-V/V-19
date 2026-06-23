@@ -1,3 +1,9 @@
+import type {
+  VisaApplicationPdfExtractionSource,
+  VisaApplicationPdfReviewData,
+  VisaPdfFinding,
+} from "./visaApplicationPdfReviewTypes";
+
 export type Role = "agent" | "admin";
 
 export type UserRole = Role;
@@ -147,6 +153,34 @@ export type PassportExtractionReviewState = {
   status: PassportExtractionStatus;
   summary?: string;
   verifiedAtIso?: string;
+};
+
+export type VisaApplicationPdfReviewState = {
+  id: string;
+  applicantId?: string;
+  applicantName?: string;
+  artifact?: {
+    fileName: string;
+    extractedPageCount?: number;
+    extractionSource?: VisaApplicationPdfExtractionSource;
+    mimeType: string;
+    ocrPageLimit?: number;
+    parserVersion?: number;
+    sha256: string;
+    sizeBytes: number;
+    storageBucket?: string;
+    storagePath?: string;
+    uploadedAtIso: string;
+    uploadedBy?: string;
+  };
+  checkedAtIso: string;
+  data: VisaApplicationPdfReviewData;
+  fileName?: string;
+  findings: VisaPdfFinding[];
+  handoffStatus: "blocked" | "needs_manual_confirmation" | "ready_for_agent";
+  manualReviewConfirmedAtIso?: string;
+  manualReviewConfirmedBy?: string;
+  status: "clear" | "blocked" | "needs_review";
 };
 
 export type PassportUploadDraft = {
@@ -318,6 +352,8 @@ export type Submission = {
   tripDateFrom: string;
   tripDateTo: string;
   status: SubmissionStatus;
+  visaApplicationPdfReview?: VisaApplicationPdfReviewState;
+  visaApplicationPdfReviews?: VisaApplicationPdfReviewState[];
   applicants: Applicant[];
   issues: Issue[];
   files: SubmissionFile[];
