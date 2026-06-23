@@ -6,12 +6,15 @@ import {
 } from "./mediaStoragePolicy";
 
 export {
+  assertVisaApplicationPdfSha256,
   buildMediaStoragePath,
+  buildVisaApplicationPdfStorageTarget,
   mediaStorageBucket,
   MediaStorageValidationError,
   storageTargetForSlot,
   validateMediaStorageTarget,
   type MediaStorageTarget,
+  type MediaStorageObjectType,
   type MediaStorageValidationInput,
 } from "./mediaStoragePolicy";
 

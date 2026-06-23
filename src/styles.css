@@ -3936,6 +3936,39 @@ p {
   white-space: nowrap;
 }
 
+.media-file-main ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.media-file-review-actions {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.media-file-review-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.media-file-review-action-row span {
+  min-width: 132px;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .media-file-status,
 .media-file-actions {
   display: grid;

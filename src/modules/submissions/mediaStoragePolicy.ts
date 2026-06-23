@@ -1,12 +1,15 @@
 import type { MediaSlot, MediaSlotType } from "../../types/domain";
+import { maxVisaApplicationPdfBytes } from "./visaApplicationPdfReviewTypes";
 
 export const mediaStorageBucket = "submission-media";
+export type MediaStorageObjectType = MediaSlotType | "visa_application_pdf";
 
-const mediaSlotTypes = new Set<MediaSlotType>([
+const mediaStorageObjectTypes = new Set<MediaStorageObjectType>([
   "photo_white",
   "selfie",
   "selfie_2",
   "passport_scan",
+  "visa_application_pdf",
   "video",
 ]);
 
@@ -48,12 +51,14 @@ function extensionForFileName(fileName: string): string {
   return fileName.split(".").at(-1)?.toLowerCase() ?? "";
 }
 
-function allowedExtensions(type: MediaSlotType): Set<string> {
+function allowedExtensions(type: MediaStorageObjectType): Set<string> {
+  if (type === "visa_application_pdf") return new Set(["pdf"]);
   if (type === "passport_scan") return new Set(["jpg", "jpeg", "png", "pdf"]);
   return type === "video" ? new Set(["mp4"]) : new Set(["jpg", "jpeg", "png"]);
 }
 
-function allowedMimeTypes(type: MediaSlotType): Set<string> {
+function allowedMimeTypes(type: MediaStorageObjectType): Set<string> {
+  if (type === "visa_application_pdf") return new Set(["application/pdf"]);
   if (type === "passport_scan")
     return new Set(["image/jpeg", "image/png", "application/pdf"]);
   return type === "video"
@@ -69,14 +74,15 @@ function mimeTypeForExtension(extension: string): string | null {
   return null;
 }
 
-function maxSizeBytes(type: MediaSlotType): number {
+function maxSizeBytes(type: MediaStorageObjectType): number {
+  if (type === "visa_application_pdf") return maxVisaApplicationPdfBytes;
   return type === "video" ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
 }
 
 function parseStoragePath(path: string): {
   submissionId: string;
   applicantId: string;
-  type: MediaSlotType;
+  type: MediaStorageObjectType;
   fileName: string;
 } {
   const parts = path.split("/");
@@ -87,7 +93,7 @@ function parseStoragePath(path: string): {
   }
 
   const [submissionId, applicantId, type, fileName] = parts;
-  if (!mediaSlotTypes.has(type as MediaSlotType)) {
+  if (!mediaStorageObjectTypes.has(type as MediaStorageObjectType)) {
     throw new MediaStorageValidationError(
       "Media storage path contains an invalid slot type.",
     );
@@ -96,12 +102,15 @@ function parseStoragePath(path: string): {
   return {
     submissionId: safePathSegment(submissionId, "submissionId"),
     applicantId: safePathSegment(applicantId, "applicantId"),
-    type: type as MediaSlotType,
+    type: type as MediaStorageObjectType,
     fileName: safePathSegment(fileName, "generatedFileName"),
   };
 }
 
-function hasExpectedGeneratedSuffix(type: MediaSlotType, fileName: string): boolean {
+function hasExpectedGeneratedSuffix(
+  type: MediaStorageObjectType,
+  fileName: string,
+): boolean {
   if (type === "photo_white")
     return /^[a-zA-Z0-9]+_photo_white\.(jpg|jpeg|png)$/.test(fileName);
   if (type === "selfie") return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png)$/.test(fileName);
@@ -109,6 +118,10 @@ function hasExpectedGeneratedSuffix(type: MediaSlotType, fileName: string): bool
     return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png)$/.test(fileName);
   if (type === "passport_scan")
     return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|pdf)$/.test(fileName);
+  if (type === "visa_application_pdf")
+    return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_visa_application_pdf\.pdf$/.test(
+      fileName,
+    );
   return /^[a-zA-Z0-9]+_video\.mp4$/.test(fileName);
 }
 
@@ -173,7 +186,7 @@ export function validateMediaStorageTarget({
 export function buildMediaStoragePath(
   submissionId: string,
   applicantId: string,
-  type: MediaSlotType,
+  type: MediaStorageObjectType,
   generatedFileName: string,
 ): MediaStorageTarget {
   const target: MediaStorageTarget = {
@@ -204,4 +217,39 @@ export function storageTargetForSlot(
     slot.type,
     slot.generatedFileName,
   );
+}
+
+export function buildVisaApplicationPdfStorageTarget(input: {
+  applicantId: string;
+  nonce?: string;
+  sha256: string;
+  submissionId: string;
+}): MediaStorageTarget {
+  const checksumPrefix = assertVisaApplicationPdfSha256(input.sha256).slice(0, 16);
+  const nonceSegment = safeVisaApplicationPdfStorageNonce(input.nonce);
+  return buildMediaStoragePath(
+    input.submissionId,
+    input.applicantId,
+    "visa_application_pdf",
+    `${safePathSegment(checksumPrefix, "sha256")}${nonceSegment}_visa_application_pdf.pdf`,
+  );
+}
+
+export function assertVisaApplicationPdfSha256(sha256: string) {
+  const normalized = sha256.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    throw new MediaStorageValidationError(
+      "Visa application PDF artifact must include a full SHA-256 checksum.",
+    );
+  }
+  return normalized;
+}
+
+function safeVisaApplicationPdfStorageNonce(nonce: string | undefined) {
+  if (!nonce) return "";
+  const normalized = nonce.replace(/[^a-zA-Z0-9]/g, "").slice(0, 24);
+  if (!normalized) {
+    throw new MediaStorageValidationError("visaApplicationPdf upload nonce is invalid.");
+  }
+  return `_${normalized}`;
 }

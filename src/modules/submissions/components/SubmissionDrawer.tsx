@@ -36,6 +36,10 @@ import {
   type PassportFieldApplyMode,
 } from "../passportExtraction";
 import {
+  visaApplicationPdfAgentHandoffStatus,
+  visaApplicationPdfReviewsForSubmission,
+} from "../visaApplicationPdfReconciliation";
+import {
   activeMediaFileTypes,
   buildReadinessQueue,
   fileLabel,
@@ -85,6 +89,9 @@ export function SubmissionDrawer({
   onQuestionnaireField,
   onApplyPassportField,
   onExtractPassport,
+  onConfirmVisaApplicationPdfReview,
+  onDismissVisaApplicationPdfReview,
+  onReviewVisaApplicationPdf,
   onUploadFile,
   passportExtractionEnabled = false,
   requireSelectedFile,
@@ -115,6 +122,9 @@ export function SubmissionDrawer({
     mode: PassportFieldApplyMode,
   ) => void;
   onExtractPassport: (fileId: string) => void;
+  onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
+  onDismissVisaApplicationPdfReview: (reviewId: string) => void;
+  onReviewVisaApplicationPdf: (file: File) => Promise<void>;
   onTab: (tab: DrawerTab) => void;
   onUploadFile: (fileId: string, file?: File) => void;
   passportExtractionEnabled?: boolean;
@@ -347,7 +357,10 @@ export function SubmissionDrawer({
             <DrawerFiles
               fileUploadBusy={fileUploadBusy}
               localPassportFileIds={localPassportFileIds}
+              onConfirmVisaApplicationPdfReview={onConfirmVisaApplicationPdfReview}
+              onDismissVisaApplicationPdfReview={onDismissVisaApplicationPdfReview}
               onExtractPassport={onExtractPassport}
+              onReviewVisaApplicationPdf={onReviewVisaApplicationPdf}
               onUploadFile={onUploadFile}
               passportExtractionEnabled={passportExtractionEnabled}
               pendingTarget={pendingTarget}
@@ -1767,7 +1780,10 @@ function defaultQuestionnaireSectionKey(submission: Submission) {
 function DrawerFiles({
   fileUploadBusy = false,
   localPassportFileIds = [],
+  onConfirmVisaApplicationPdfReview,
+  onDismissVisaApplicationPdfReview,
   onExtractPassport,
+  onReviewVisaApplicationPdf,
   onUploadFile,
   passportExtractionEnabled = false,
   pendingTarget,
@@ -1777,7 +1793,10 @@ function DrawerFiles({
 }: {
   fileUploadBusy?: boolean;
   localPassportFileIds?: string[];
+  onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
+  onDismissVisaApplicationPdfReview: (reviewId: string) => void;
   onExtractPassport: (fileId: string) => void;
+  onReviewVisaApplicationPdf: (file: File) => Promise<void>;
   onUploadFile: (fileId: string, file?: File) => void;
   passportExtractionEnabled?: boolean;
   pendingTarget: WorkspaceTarget | null;
@@ -1802,6 +1821,33 @@ function DrawerFiles({
       issue.target.fileType &&
       activeCategoryConfig.types.includes(issue.target.fileType),
   );
+  const [pdfReviewBusy, setPdfReviewBusy] = useState(false);
+  const [pdfReviewError, setPdfReviewError] = useState("");
+  const pdfReviewAvailable = submission.status === "exported";
+  const pdfReviews = visaApplicationPdfReviewsForSubmission(submission);
+  const pdfHandoffStatus = visaApplicationPdfAgentHandoffStatus(submission);
+  const canReviewVisaPdf =
+    pdfReviewAvailable &&
+    !fileUploadBusy &&
+    !pdfReviewBusy &&
+    role === "admin";
+
+  async function handleVisaApplicationPdf(file: File) {
+    setPdfReviewBusy(true);
+    setPdfReviewError("");
+    try {
+      await onReviewVisaApplicationPdf(file);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "PDF анкеты не удалось прочитать. Проверьте файл и попробуйте снова.";
+      setPdfReviewError(message);
+      window.alert(message);
+    } finally {
+      setPdfReviewBusy(false);
+    }
+  }
 
   useEffect(() => {
     setActiveCategory(initialCategory);
@@ -1824,6 +1870,20 @@ function DrawerFiles({
           </Badge>
         }
       />
+      {pdfReviewAvailable ? (
+        <VisaApplicationPdfReviewPanel
+          busy={pdfReviewBusy}
+          canUpload={canReviewVisaPdf}
+          error={pdfReviewError}
+          handoffStatus={pdfHandoffStatus}
+          applicants={submission.applicants}
+          reviews={pdfReviews}
+          submissionId={submission.id}
+          onConfirm={onConfirmVisaApplicationPdfReview}
+          onDismiss={onDismissVisaApplicationPdfReview}
+          onReview={handleVisaApplicationPdf}
+        />
+      ) : null}
       <div
         className="document-category-tabs"
         role="group"
@@ -2022,6 +2082,222 @@ function DrawerFiles({
         )}
       </div>
     </section>
+  );
+}
+
+function VisaApplicationPdfReviewPanel({
+  applicants,
+  busy,
+  canUpload,
+  error,
+  handoffStatus,
+  onConfirm,
+  onDismiss,
+  onReview,
+  reviews,
+  submissionId,
+}: {
+  applicants: Submission["applicants"];
+  busy: boolean;
+  canUpload: boolean;
+  error: string;
+  handoffStatus: ReturnType<typeof visaApplicationPdfAgentHandoffStatus>;
+  onConfirm: (reviewId: string) => void;
+  onDismiss: (reviewId: string) => void;
+  onReview: (file: File) => void;
+  reviews: NonNullable<Submission["visaApplicationPdfReviews"]>;
+  submissionId: string;
+}) {
+  const inputId = `visa-application-pdf-${submissionId}`;
+  const status = aggregateVisaPdfReviewStatus(applicants, reviews);
+  const uploadDisabled = busy || handoffStatus.ok;
+  const findings = reviews.flatMap((review) =>
+    review.findings.map((finding) => ({
+      ...finding,
+      applicantName: review.applicantName,
+      fileName: review.artifact?.fileName ?? review.fileName,
+    })),
+  );
+  const missingApplicants = applicants.filter(
+    (applicant) =>
+      !reviews.some((review) => review.applicantId === applicant.id),
+  );
+  const unmatchedReviews = reviews.filter((review) => !review.applicantId);
+
+  function handleAgentHandoffClick() {
+    window.alert(handoffStatus.reason);
+  }
+
+  return (
+    <CardComponent
+      as="article"
+      aria-label="Проверка PDF анкеты"
+      className={`media-file-row ${status === "blocked" ? "has-issue needs_replacement" : ""}`}
+    >
+      <div className="media-file-main">
+        <strong>PDF анкеты после выгрузки</strong>
+        <p>
+          {reviews.length
+            ? `Проверено PDF: ${reviews.length}/${applicants.length}`
+            : "Загрузите PDF, который вернулся после внешней обработки, чтобы поймать ошибки перед передачей агентам."}
+        </p>
+        {status === "blocked" ? (
+          <p>Не отдавать агентам: есть критичные расхождения в анкете.</p>
+        ) : status === "clear" ? (
+          <p>Можно отдавать агентам: критичные данные совпали.</p>
+        ) : status === "needs_review" ? (
+          <p>Критичных ошибок нет, но предупреждения требуют ручного подтверждения.</p>
+        ) : (
+          <p>PDF после внешней обработки ещё не загружен.</p>
+        )}
+        {applicants.map((applicant) => {
+          const review = reviews.find((item) => item.applicantId === applicant.id);
+          const data = review?.data ?? {};
+          const extractedName = [data.surname, data.firstName].filter(Boolean).join(" ");
+
+          return (
+            <p key={applicant.id}>
+              {applicant.fullName}:{" "}
+              {review
+                ? `${visaPdfReviewStatusLabel(review.status)}${
+                    extractedName ? `, ФИО PDF: ${extractedName}` : ""
+                  }${data.passportNumber ? `, паспорт: ${data.passportNumber}` : ""}`
+                : "PDF не загружен"}
+            </p>
+          );
+        })}
+        {missingApplicants.length ? (
+          <p>Не хватает PDF: {missingApplicants.map((item) => item.fullName).join(", ")}.</p>
+        ) : null}
+        {unmatchedReviews.length ? (
+          <p>Есть PDF, который не сопоставился с заявителем: {unmatchedReviews.length}.</p>
+        ) : null}
+        {reviews.some((review) => review.artifact?.extractionSource === "local_ocr") ? (
+          <p>Источник текста: локальный OCR. Проверьте поля вручную перед передачей.</p>
+        ) : null}
+        {reviews.some(
+          (review) =>
+            review.status === "needs_review" &&
+            review.handoffStatus === "ready_for_agent",
+        ) ? (
+          <p>Предупреждения подтверждены вручную.</p>
+        ) : null}
+        {error ? <p role="alert">{error}</p> : null}
+        {findings.length ? (
+          <ul aria-label="Ошибки PDF анкеты">
+            {findings.map((finding, index) => (
+              <li key={`${finding.field}-${finding.fileName ?? "pdf"}-${index}`}>
+                {finding.applicantName ? `${finding.applicantName}: ` : ""}
+                {finding.message}
+                {finding.expected || finding.value ? (
+                  <>
+                    {" "}
+                    {finding.expected ? `Заявка: ${finding.expected}.` : ""}
+                    {finding.value ? ` PDF: ${finding.value}.` : ""}
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {reviews.some(
+          (review) =>
+            review.status === "needs_review" &&
+            review.handoffStatus !== "ready_for_agent",
+        ) || unmatchedReviews.length ? (
+          <div className="media-file-review-actions">
+            {reviews.map((review) => {
+              const needsConfirmation =
+                review.status === "needs_review" &&
+                review.handoffStatus !== "ready_for_agent";
+              const canDismissReview = !review.applicantId || review.status === "blocked";
+              if (!needsConfirmation && !canDismissReview) return null;
+
+              return (
+                <div className="media-file-review-action-row" key={review.id}>
+                  <span>
+                    {review.applicantName ??
+                      review.artifact?.fileName ??
+                      review.fileName ??
+                      "PDF анкеты"}
+                  </span>
+                  {needsConfirmation ? (
+                    <Button
+                      disabled={busy || !canUpload}
+                      variant="secondary"
+                      onClick={() => onConfirm(review.id)}
+                    >
+                      Подтвердить
+                    </Button>
+                  ) : null}
+                  {canDismissReview ? (
+                    <Button
+                      disabled={busy || !canUpload}
+                      variant="ghost"
+                      onClick={() => onDismiss(review.id)}
+                    >
+                      Снять PDF
+                    </Button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+      <div className="media-file-status">
+        <Badge className={visaPdfReviewPillClass(status)}>
+          {visaPdfReviewStatusLabel(status)}
+        </Badge>
+      </div>
+      <div className="media-file-actions">
+        <Button variant="primary" onClick={handleAgentHandoffClick}>
+          Передать агентам
+        </Button>
+        {canUpload ? (
+          <>
+            <input
+              accept="application/pdf"
+              aria-label="Выбрать PDF анкеты после выгрузки"
+              className="sr-only"
+              disabled={uploadDisabled}
+              id={inputId}
+              type="file"
+              onChange={(event) => {
+                const selectedFile = event.currentTarget.files?.[0];
+                if (selectedFile) onReview(selectedFile);
+                event.currentTarget.value = "";
+              }}
+            />
+            <label
+              aria-disabled={uploadDisabled || undefined}
+              className="mp-button secondary-button compact-button"
+              htmlFor={inputId}
+              role="button"
+              tabIndex={0}
+              onClick={(event) => {
+                if (!uploadDisabled) return;
+                event.preventDefault();
+              }}
+              onKeyDown={(event) => {
+                if (uploadDisabled) return;
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                event.currentTarget.click();
+              }}
+            >
+              {busy
+                ? "Проверка"
+                : handoffStatus.ok
+                  ? "PDF проверен"
+                  : reviews.length
+                    ? "Загрузить ещё PDF"
+                    : "Проверить PDF"}
+            </label>
+          </>
+        ) : null}
+      </div>
+    </CardComponent>
   );
 }
 
@@ -2608,6 +2884,52 @@ function fileStatusPillClass(status: SubmissionFileStatus) {
     return "status-pill warning";
   if (status === "needs_replacement") return "status-pill danger";
   return "status-pill muted";
+}
+
+type VisaPdfReviewStatus =
+  | NonNullable<Submission["visaApplicationPdfReview"]>["status"]
+  | "missing";
+
+function visaPdfReviewStatusLabel(status?: VisaPdfReviewStatus) {
+  if (status === "clear") return "Можно отдать";
+  if (status === "blocked") return "Не отдавать";
+  if (status === "needs_review") return "Требует проверки";
+  return "Ждёт PDF";
+}
+
+function visaPdfReviewPillClass(status?: VisaPdfReviewStatus) {
+  if (status === "clear") return "visa-tag visa-tag-ready";
+  if (status === "blocked") return "visa-tag visa-tag-danger";
+  if (status === "needs_review") return "visa-tag visa-tag-attention";
+  return "visa-tag visa-tag-muted";
+}
+
+function aggregateVisaPdfReviewStatus(
+  applicants: Submission["applicants"],
+  reviews: NonNullable<Submission["visaApplicationPdfReviews"]>,
+): VisaPdfReviewStatus {
+  if (!reviews.length) return "missing";
+  if (reviews.some((review) => review.status === "blocked")) return "blocked";
+  if (
+    applicants.some(
+      (applicant) =>
+        !reviews.some(
+          (review) => review.applicantId === applicant.id && review.status !== "blocked",
+        ),
+    )
+  ) {
+    return "missing";
+  }
+  if (
+    reviews.some(
+      (review) =>
+        review.status === "needs_review" &&
+        review.handoffStatus !== "ready_for_agent",
+    )
+  ) {
+    return "needs_review";
+  }
+  return "clear";
 }
 
 function queueSourceLabel(item: ReadinessQueueItem) {
