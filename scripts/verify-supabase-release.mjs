@@ -1,5 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  requiredMigrationOrder,
+  requiredMigrationsInActualOrder,
+  undeclaredMigrationFiles,
+} from "./supabase-migration-contract.mjs";
 
 const repoRoot = process.cwd();
 const migrationsDir = resolve(repoRoot, "supabase/migrations");
@@ -20,24 +25,6 @@ const liveSmokePath = resolve(repoRoot, "tests/integration/supabase-live.spec.ts
 const packagePath = resolve(repoRoot, "package.json");
 const smokeEnvPath = resolve(repoRoot, ".env.supabase-smoke.local");
 const allowedSandboxProjectId = "oevvaowoklqttqkraxho";
-
-const requiredMigrationOrder = [
-  "20260611000000_visaflow_mvp_foundation.sql",
-  "20260612000000_visaflow_rls_performance_hardening.sql",
-  "20260612001000_visaflow_rpc_corrections_persistence.sql",
-  "20260613005039_visaflow_runtime_write_guards.sql",
-  "20260613010029_visaflow_rpc_submit_boundary.sql",
-  "20260614000000_ai_helper_audit_quota.sql",
-  "20260615000000_ai_helper_security_advisor_hardening.sql",
-  "20260616000000_export_batch_identity.sql",
-  "20260616001000_complete_export_package_rpc.sql",
-  "20260616002000_prevent_export_regression.sql",
-  "20260617001000_submit_corrections_handoff_rpc.sql",
-  "20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
-  "20260617003000_passport_workspace_media_slots.sql",
-  "20260617004000_complete_export_package_workspace_media_slots.sql",
-  "20260617005000_passport_extraction_audit_quota_contract.sql",
-];
 
 const checks = [];
 
@@ -206,9 +193,7 @@ function verifyMigrationOrder() {
     pass("Required Supabase migrations are present");
   }
 
-  const actualRequiredOrder = migrationFiles.filter((fileName) =>
-    requiredMigrationOrder.includes(fileName),
-  );
+  const actualRequiredOrder = requiredMigrationsInActualOrder(migrationFiles);
   if (actualRequiredOrder.join("\n") !== requiredMigrationOrder.join("\n")) {
     fail(
       "Required Supabase migrations are in promotion order",
@@ -218,6 +203,16 @@ function verifyMigrationOrder() {
     );
   } else {
     pass("Required Supabase migrations are in promotion order");
+  }
+
+  const undeclaredMigrations = undeclaredMigrationFiles(migrationFiles);
+  if (undeclaredMigrations.length) {
+    fail(
+      "No undeclared Supabase migrations exist outside promotion order",
+      `Undeclared: ${undeclaredMigrations.join(", ")}`,
+    );
+  } else {
+    pass("No undeclared Supabase migrations exist outside promotion order");
   }
 }
 
@@ -503,6 +498,7 @@ function verifyDocsAndScripts() {
   ];
   const expectedVerifyFullCommands = [
     "npm run verify:local-readiness",
+    "npm run verify:auth-data-readiness",
     "npm run verify:supabase-release",
     "npm run verify:production-packet",
   ];
@@ -601,6 +597,15 @@ function verifyDocsAndScripts() {
     );
   }
 
+  if (hasScriptCommand(verifyFullCommands, "npm run verify:auth-data-readiness")) {
+    pass("verify:full includes Auth/Data readiness gate");
+  } else {
+    fail(
+      "verify:full includes Auth/Data readiness gate",
+      "npm run verify:full must include npm run verify:auth-data-readiness",
+    );
+  }
+
   if (packageJson.scripts?.["verify:production-packet"]) {
     pass("Package exposes verify:production-packet");
   } else {
@@ -624,14 +629,21 @@ function verifyDocsAndScripts() {
     verifyFullCommands,
     "npm run verify:supabase-release",
   );
+  const authDataReadinessIndex = commandIndex(
+    verifyFullCommands,
+    "npm run verify:auth-data-readiness",
+  );
   const productionPacketIndex = commandIndex(
     verifyFullCommands,
     "npm run verify:production-packet",
   );
   if (
     localReadinessIndex > -1 &&
+    authDataReadinessIndex > -1 &&
     supabaseReleaseIndex > -1 &&
     productionPacketIndex > -1 &&
+    authDataReadinessIndex > localReadinessIndex &&
+    supabaseReleaseIndex > authDataReadinessIndex &&
     productionPacketIndex > localReadinessIndex &&
     productionPacketIndex > supabaseReleaseIndex
   ) {
@@ -639,7 +651,7 @@ function verifyDocsAndScripts() {
   } else {
     fail(
       "verify:full runs production packet after local release proof",
-      "npm run verify:production-packet must run after npm run verify:local-readiness and npm run verify:supabase-release so fail-closed production blockers do not hide local proof",
+      "npm run verify:production-packet must run after npm run verify:local-readiness, npm run verify:auth-data-readiness, and npm run verify:supabase-release so fail-closed production blockers do not hide local proof",
     );
   }
 
@@ -653,6 +665,7 @@ function verifyDocsAndScripts() {
     "npm run verify:supabase-release",
     "npm run test:supabase-live",
     "npm run verify:local-readiness",
+    "npm run verify:auth-data-readiness",
     "production",
     "rollback",
   ]) {
@@ -664,6 +677,7 @@ function verifyDocsAndScripts() {
     "supabase-workspace-pr-package.md",
     "supabase-production-approval-checklist.md",
     "npm run verify:local-readiness",
+    "npm run verify:auth-data-readiness",
     "Rollback Boundary",
     "Migration Order",
     "Final Sandbox RLS And Storage Smoke",
@@ -708,6 +722,7 @@ function verifyDocsAndScripts() {
     "20260617003000_passport_workspace_media_slots.sql",
     "20260617004000_complete_export_package_workspace_media_slots.sql",
     "20260617005000_passport_extraction_audit_quota_contract.sql",
+    "20260622000100_ai_helper_audit_event_metadata.sql",
     "Agent smoke account exists.",
     "Backup owner:",
     "npm run verify:local-readiness",
