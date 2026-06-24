@@ -3,6 +3,11 @@ dist/
 .playwright-mcp/
 .vercel/
 supabase/.temp/
+supabase/.branches/
+codex-context-export/
+codex-plugin-export/
+codex-context-export.zip
+install-all-codex-plugins.zsh
 playwright-report/
 test-results/
 coverage/

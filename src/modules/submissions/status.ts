@@ -9,7 +9,11 @@ import type {
   SubmissionStatus,
 } from "./types";
 import { clearOpenQuestionnaireIssueErrors } from "./questionnaire";
-import { requiresPassportExtractionReviewBeforeAction } from "./passportExtractionGuards";
+import {
+  passportGateReason,
+  requiresPassportExtractionReviewBeforeAction,
+  requiresPassportGateBeforeAction,
+} from "./passportExtractionGuards";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -293,6 +297,13 @@ export function canPerformAction(
 
   if (action === "submit_for_review" && hasMissingRequiredWork(submission)) {
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
+  }
+
+  if (requiresPassportGateBeforeAction(submission, action)) {
+    return {
+      ok: false,
+      reason: passportGateReason(submission),
+    };
   }
 
   if (requiresPassportExtractionReviewBeforeAction(submission, action)) {

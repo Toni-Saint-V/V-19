@@ -20,6 +20,8 @@ const lazyWorkbookRawKbLimit = 6;
 const lazyWorkbookGzipKbLimit = 2.4;
 const lazySettingsRawKbLimit = 5;
 const lazySettingsGzipKbLimit = 1.8;
+const lazyPassportOcrRawKbLimit = 8.2;
+const lazyPassportOcrGzipKbLimit = 3.7;
 
 const limits = {
   jsRawKb: 500,
@@ -79,9 +81,14 @@ const lazyWorkbookAssets = jsAssets.filter((asset) =>
 const lazySettingsAssets = jsAssets.filter((asset) =>
   asset.file.startsWith("SettingsScreen-"),
 );
+const lazyPassportOcrAssets = jsAssets.filter((asset) =>
+  asset.file.startsWith("Tesseract-"),
+);
 const initialJsAssets = jsAssets.filter(
   (asset) =>
-    !lazyWorkbookAssets.includes(asset) && !lazySettingsAssets.includes(asset),
+    !lazyWorkbookAssets.includes(asset) &&
+    !lazySettingsAssets.includes(asset) &&
+    !lazyPassportOcrAssets.includes(asset),
 );
 const totalJsRawKb =
   initialJsAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
@@ -95,6 +102,10 @@ const lazySettingsRawKb =
   lazySettingsAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const lazySettingsGzipKb =
   lazySettingsAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
+const lazyPassportOcrRawKb =
+  lazyPassportOcrAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
+const lazyPassportOcrGzipKb =
+  lazyPassportOcrAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
 
 if (totalJsRawKb > limits.totalJsRawKb) {
   failures.push(
@@ -114,6 +125,10 @@ if (lazyWorkbookAssets.length > 1) {
 
 if (lazySettingsAssets.length > 1) {
   failures.push("settings screen must stay in one lazy JS chunk");
+}
+
+if (lazyPassportOcrAssets.length > 1) {
+  failures.push("passport OCR must stay in one lazy JS chunk");
 }
 
 if (lazyWorkbookRawKb > lazyWorkbookRawKbLimit) {
@@ -148,6 +163,22 @@ if (lazySettingsGzipKb > lazySettingsGzipKbLimit) {
   );
 }
 
+if (lazyPassportOcrRawKb > lazyPassportOcrRawKbLimit) {
+  failures.push(
+    `passport OCR lazy JS: ${lazyPassportOcrRawKb.toFixed(
+      1,
+    )} KB raw exceeds ${lazyPassportOcrRawKbLimit} KB`,
+  );
+}
+
+if (lazyPassportOcrGzipKb > lazyPassportOcrGzipKbLimit) {
+  failures.push(
+    `passport OCR lazy JS: ${lazyPassportOcrGzipKb.toFixed(
+      1,
+    )} KB gzip exceeds ${lazyPassportOcrGzipKbLimit} KB`,
+  );
+}
+
 if (failures.length) {
   console.error(failures.join("\n"));
   process.exit(1);
@@ -173,5 +204,9 @@ console.log(
     1,
   )} KB gzip\nsettings lazy JS: ${lazySettingsRawKb.toFixed(
     1,
-  )} KB raw, ${lazySettingsGzipKb.toFixed(1)} KB gzip`,
+  )} KB raw, ${lazySettingsGzipKb.toFixed(
+    1,
+  )} KB gzip\npassport OCR lazy JS: ${lazyPassportOcrRawKb.toFixed(
+    1,
+  )} KB raw, ${lazyPassportOcrGzipKb.toFixed(1)} KB gzip`,
 );

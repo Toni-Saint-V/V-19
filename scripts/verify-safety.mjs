@@ -11,8 +11,15 @@ const ignoredDirs = new Set([
   "playwright-report",
   "test-results",
   ".playwright-mcp",
+  "codex-context-export",
+  "codex-plugin-export",
 ]);
-const ignoredFiles = new Set(["package-lock.json", "verify-safety.mjs"]);
+const ignoredFiles = new Set([
+  "codex-context-export.zip",
+  "install-all-codex-plugins.zsh",
+  "package-lock.json",
+  "verify-safety.mjs",
+]);
 const ignoredSecretScanFiles = new Set([
   "scripts/verify-production-readiness.mjs",
   "tests/e2e-supabase/browser-key-audit.spec.ts",

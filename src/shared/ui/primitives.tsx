@@ -268,6 +268,10 @@ export function SearchBar({
     onChange(event.target.value);
   }
 
+  function handleClear() {
+    onChange("");
+  }
+
   return (
     <label
       className={cn(
@@ -275,23 +279,37 @@ export function SearchBar({
         "search",
         "panel-search",
         "v19-toolbar-search",
+        value && "has-value",
         className,
       )}
     >
-      <span className="search-icon" aria-hidden="true">
-        <svg viewBox="0 0 20 20" focusable="false">
-          <circle cx="8.5" cy="8.5" r="5.2" />
-          <path d="M12.4 12.4L16 16" />
+      <span className="icon search-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 5 5" />
         </svg>
       </span>
+      <span className="sr-only">{label}</span>
       <input
         aria-label={label}
+        autoComplete="off"
         id={inputId}
         name={inputId}
         placeholder={placeholder}
+        type="search"
         value={value}
         onChange={handleChange}
       />
+      <button
+        aria-label="Очистить поиск"
+        className="clear"
+        type="button"
+        onClick={handleClear}
+      >
+        <svg className="icon sm" aria-hidden="true" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M18 6 6 18" />
+        </svg>
+      </button>
     </label>
   );
 }
@@ -354,7 +372,7 @@ export function SegmentedTabs<T extends string>({
         return (
           <button
             aria-selected={selected}
-            className={selected ? "is-active" : ""}
+            className={cn("tab", selected && "active is-active")}
             key={id}
             ref={(node) => {
               if (node) tabRefs.current.set(id, node);
@@ -382,13 +400,21 @@ interface StateTabsProps<T extends string> {
   value: T;
 }
 
-export function StateTabs<T extends string>({
+interface SegmentedControlProps<T extends string> {
+  ariaLabel: string;
+  className?: string;
+  onValueChange: (value: T) => void;
+  tabs: Array<{ count?: number; id: T; label: string }>;
+  value: T;
+}
+
+export function SegmentedControl<T extends string>({
   ariaLabel,
   className,
   onValueChange,
   tabs,
   value,
-}: StateTabsProps<T>) {
+}: SegmentedControlProps<T>) {
   const tabRefs = useRef(new Map<T, HTMLButtonElement>());
 
   function focusTab(index: number) {
@@ -422,7 +448,7 @@ export function StateTabs<T extends string>({
 
   return (
     <div
-      className={cn("v19-state-tabs", className)}
+      className={cn("v19-segmented-control", "tabs", className)}
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -432,7 +458,7 @@ export function StateTabs<T extends string>({
         return (
           <button
             aria-selected={selected}
-            className={selected ? "is-active" : ""}
+            className={cn("tab", selected && "active is-active")}
             key={tab.id}
             ref={(node) => {
               if (node) tabRefs.current.set(tab.id, node);
@@ -453,8 +479,17 @@ export function StateTabs<T extends string>({
   );
 }
 
+export function StateTabs<T extends string>(props: StateTabsProps<T>) {
+  return (
+    <SegmentedControl
+      {...props}
+      className={cn("v19-state-tabs", props.className)}
+    />
+  );
+}
+
 export function TabCount({ children }: { children: ReactNode }) {
-  return <span className="v19-tab-count">{children}</span>;
+  return <span className="tab-count v19-tab-count">{children}</span>;
 }
 
 export function NavCount({ children, label }: { children: ReactNode; label?: string }) {
