@@ -35,6 +35,32 @@ const requiredIndexSnippets = [
   "create index if not exists status_history_entity_id_idx on public.status_history (entity_id)",
 ];
 
+const requiredSeedSnippets = [
+  "insert into auth.users",
+  "insert into auth.identities",
+  "insert into public.profiles",
+  "agent.dev@visaflow.local",
+  "admin.dev@visaflow.local",
+  "'agent'",
+  "'admin'",
+  "insert into public.submissions",
+  "returned_with_open_issue",
+  "in_progress",
+  "submitted_for_review",
+  "corrections_received",
+  "ready_for_export",
+  "insert into public.applicants",
+  "insert into public.questionnaire_answers",
+  "on conflict (applicant_id, section_id, field_id)",
+  "insert into public.media_assets",
+  "insert into public.corrections",
+  "insert into public.status_history",
+  "insert into public.export_batches",
+  "generate_series(1, 56)",
+  "'duplicateCheckStatus', 'unknown'",
+  "'downloadEnabled', false",
+];
+
 const scannedPublicFiles = [
   ".env.example",
   "index.html",
@@ -126,13 +152,43 @@ function verifyAuthProfileBoundary() {
   );
   expectContains(
     authService,
-    "fetchCurrentProfile(data.session.user.id)",
+    "profileForSupabaseUser(data.session.user, {",
     "Supabase sign-in requires matching profile lookup",
   );
   expectContains(
     authService,
-    "Supabase profile was not found for this user.",
-    "Supabase sign-in fails closed without a profile",
+    "fetchCurrentProfile(user.id)",
+    "Supabase sign-in checks for an existing profile before recovery",
+  );
+  expectContains(
+    authService,
+    'supabaseRuntimeConfig.evidence.target !== "production"',
+    "Supabase sign-in blocks production profile auto-repair",
+  );
+  expectContains(
+    authService,
+    "Production profile repair requires owner-approved role assignment",
+    "Supabase sign-in explains production profile repair boundary",
+  );
+  expectContains(
+    authService,
+    "allowMissingProfileRecovery: true",
+    "Supabase sign-up can create a confirmed agent profile",
+  );
+  expectContains(
+    authService,
+    "role: \"agent\"",
+    "Supabase profile recovery creates agent profiles only",
+  );
+  expectContains(
+    authService,
+    "upsertProfile({",
+    "Supabase sign-up can create a confirmed user profile",
+  );
+  expectContains(
+    authService,
+    "metadataString(user.user_metadata, \"display_name\")",
+    "Supabase sign-in recovers display name from trusted user metadata",
   );
   expectContains(
     profileService,
@@ -275,11 +331,74 @@ function verifyRunbooks() {
   }
 }
 
+function verifyLocalSeed() {
+  const seed = readProjectFile("supabase/seed.sql");
+  const readme = readProjectFile("supabase/README.md");
+  const normalizedSeed = normalizedSql(seed);
+
+  expectContains(
+    seed,
+    "Use only with local Supabase reset/start workflows",
+    "Local Supabase seed is explicitly local-only",
+  );
+  expectContains(
+    seed,
+    "Do not run against production",
+    "Local Supabase seed forbids production use",
+  );
+  expectContains(
+    readme,
+    "Do not run `supabase/seed.sql` against sandbox or production.",
+    "Supabase README documents seed sandbox/production boundary",
+  );
+
+  for (const snippet of requiredSeedSnippets) {
+    expectContains(seed, snippet, `Local Supabase seed includes ${snippet}`);
+  }
+
+  expectNotMatching(
+    normalizedSeed,
+    /\bservice_role\b/,
+    "Local Supabase seed contains no service-role marker",
+  );
+  expectNotMatching(
+    seed,
+    /sk-[A-Za-z0-9_-]+/,
+    "Local Supabase seed contains no OpenAI-style secret",
+  );
+  expectNotMatching(
+    seed,
+    /@gmail\.com|@yandex\.|@mail\.ru|@icloud\.com/i,
+    "Local Supabase seed contains no real-looking consumer inboxes",
+  );
+  expectNotMatching(
+    normalizedSeed,
+    /\binsert\s+into\s+storage\.objects\b/,
+    "Local Supabase seed does not fake Storage objects",
+  );
+  expectNotMatching(
+    normalizedSeed,
+    /\bexcel_generated\b|\bocr\b/,
+    "Local Supabase seed does not claim OCR or generated Excel",
+  );
+  expectContains(
+    seed,
+    "'none'",
+    "Local Supabase seed keeps media upload state fail-closed",
+  );
+  expectContains(
+    seed,
+    "'not_reviewed'",
+    "Local Supabase seed keeps media review state fail-closed",
+  );
+}
+
 verifyPackageScript();
 verifyNoFrontendSecrets();
 verifyAuthProfileBoundary();
 verifyMigrations();
 verifyRunbooks();
+verifyLocalSeed();
 
 const failed = checks.filter((check) => !check.ok);
 for (const check of checks) {

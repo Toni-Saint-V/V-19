@@ -7,7 +7,11 @@ import type { Json } from "../../src/lib/supabase/database.types";
 const mockState = vi.hoisted(() => ({
   applicantRows: [] as unknown[],
   fromCalls: [] as string[],
-  rpcCalls: [] as Array<{ args: { payload: unknown }; name: string }>,
+  questionnaireRows: [] as unknown[],
+  rpcCalls: [] as Array<{
+    args: { answers?: unknown; payload?: unknown };
+    name: string;
+  }>,
   submissionRows: [] as unknown[],
 }));
 
@@ -53,11 +57,13 @@ vi.mock("../../src/lib/supabase/client", () => {
             queryResult(
               table === "submissions"
                 ? mockState.submissionRows
-                : mockState.applicantRows,
+                : table === "applicants"
+                  ? mockState.applicantRows
+                  : mockState.questionnaireRows,
             ),
         };
       },
-      rpc: (name: string, args: { payload: unknown }) => {
+      rpc: (name: string, args: { answers?: unknown; payload?: unknown }) => {
         mockState.rpcCalls.push({ args, name });
         return Promise.resolve({ error: null });
       },
@@ -75,6 +81,7 @@ import {
   readCockpitSnapshot,
   saveCockpitSubmissionsForProfile,
   toCockpitDraftPersistencePayload,
+  toCockpitQuestionnaireAnswerInserts,
 } from "../../src/modules/submissions/supabasePersistence";
 
 const agentProfile: AppProfile = {
@@ -101,11 +108,16 @@ const otherAgentProfile: AppProfile = {
 };
 
 function payloadSubmission(callIndex = 0) {
+  const draftCalls = mockState.rpcCalls;
   return (
-    mockState.rpcCalls[callIndex]?.args.payload as {
+    draftCalls[callIndex]?.args.payload as {
       submission: { agent_id: string; id: string; title: string };
     }
   ).submission;
+}
+
+function rpcNames() {
+  return mockState.rpcCalls.map((call) => call.name);
 }
 
 function draftPayload(submission: Submission) {
@@ -115,6 +127,7 @@ function draftPayload(submission: Submission) {
 beforeEach(() => {
   mockState.applicantRows = [];
   mockState.fromCalls = [];
+  mockState.questionnaireRows = [];
   mockState.rpcCalls = [];
   mockState.submissionRows = [];
 });
@@ -152,8 +165,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       new Map(),
     );
 
-    expect(mockState.rpcCalls).toHaveLength(1);
-    expect(mockState.rpcCalls[0]?.name).toBe("save_submission_draft");
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
     expect(payloadSubmission()).toMatchObject({
       agent_id: agentProfile.id,
       id: changedSubmission.id,
@@ -184,7 +196,10 @@ describe("V-19 Supabase cockpit persistence", () => {
       new Map(),
     );
 
-    expect(mockState.rpcCalls).toHaveLength(2);
+    expect(rpcNames()).toEqual([
+      "save_submission_draft",
+      "save_submission_draft",
+    ]);
     expect(payloadSubmission(0)).toMatchObject({
       agent_id: agentProfile.id,
       id: firstAgentSubmission.id,
@@ -215,11 +230,11 @@ describe("V-19 Supabase cockpit persistence", () => {
       new Map(),
     );
 
-    expect(mockState.rpcCalls).toHaveLength(1);
-    expect(mockState.rpcCalls[0]?.name).toBe("submit_corrections_handoff");
+    expect(rpcNames()).toEqual(["submit_corrections_handoff"]);
     expect(
       (
-        mockState.rpcCalls[0]?.args.payload as {
+        mockState.rpcCalls.find((call) => call.name === "submit_corrections_handoff")
+          ?.args.payload as {
           submission: { status: string };
         }
       ).submission.status,
@@ -267,6 +282,60 @@ describe("V-19 Supabase cockpit persistence", () => {
       phone: null,
     });
     expect(savedSnapshot?.applicants[0]).not.toHaveProperty("normalizedProfile");
+  });
+
+  it("hydrates fallback submissions from normalized questionnaire answers", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    const sourceAnswer = payload.questionnaire_answers?.find(
+      (answer) => answer.value,
+    );
+    if (!sourceAnswer) throw new Error("expected questionnaire answer");
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.applicantRows = [
+      {
+        id: sourceAnswer.applicant_id,
+        submission_id: submission.id,
+        full_name: submission.applicants[0]?.fullName,
+        questionnaire_percent: 100,
+        media_percent: 100,
+      },
+    ];
+    mockState.questionnaireRows = [
+      {
+        ...sourceAnswer,
+        id: "00000000-0000-4000-8000-000000000333",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const field = loaded.submissions[0]?.applicants[0]?.sections
+      .flatMap((section) => section.fields)
+      .find((candidate) => candidate.id === sourceAnswer.field_id);
+
+    expect(mockState.fromCalls).toEqual([
+      "submissions",
+      "applicants",
+      "questionnaire_answers",
+    ]);
+    expect(field).toMatchObject({
+      id: sourceAnswer.field_id,
+      label: sourceAnswer.label,
+      value: sourceAnswer.value,
+    });
   });
 
   it("does not reuse normalized applicant rows after loading remote data", async () => {
@@ -411,6 +480,26 @@ describe("V-19 Supabase cockpit persistence", () => {
     });
   });
 
+  it("persists detailed questionnaire fields as normalized answer rows", () => {
+    const submission = initialSubmissions[0] as Submission;
+    const answers = toCockpitQuestionnaireAnswerInserts(submission, agentProfile.id);
+    const firstField = submission.applicants[0]?.sections[0]?.fields[0];
+
+    expect(answers.length).toBeGreaterThan(0);
+    expect(answers[0]).toMatchObject({
+      applicant_id: submission.applicants[0]?.id,
+      field_id: firstField?.id,
+      label: firstField?.label,
+      section_id: submission.applicants[0]?.sections[0]?.id,
+      submission_id: submission.id,
+      updated_by: agentProfile.id,
+      value: firstField?.value,
+    });
+
+    const payload = draftPayload(submission);
+    expect(payload.questionnaire_answers).toEqual(answers);
+  });
+
   it("preserves the original owner when an admin saves a dirty submission", async () => {
     const changedSubmission = {
       ...(initialSubmissions[0] as Submission),
@@ -428,7 +517,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       ownerIds,
     );
 
-    expect(mockState.rpcCalls).toHaveLength(1);
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
     expect(payloadSubmission().agent_id).toBe("00000000-0000-4000-8000-000000000111");
     expect(nextOwnerIds.get(untouchedSubmission.id)).toBe(
       "00000000-0000-4000-8000-000000000222",

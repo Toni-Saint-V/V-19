@@ -12,10 +12,14 @@ VITE_SUPABASE_SANDBOX_PROBE_ENABLED=true
 VITE_SUPABASE_PROJECT_ID=oevvaowoklqttqkraxho
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
+VITE_SUPABASE_ANON_KEY=
 VITE_SUPABASE_EDGE_FUNCTIONS_URL=
 ```
 
 Do not place service-role, OpenAI, or other backend secrets in frontend env files.
+
+`VITE_SUPABASE_ANON_KEY` is supported as the browser-safe Supabase anon key alias.
+Do not define both keys with different values.
 
 ## Live smoke env
 
@@ -60,6 +64,38 @@ When the public Supabase values are missing, the app stays in local demo mode:
 - no network persistence is attempted;
 - storage helpers return `null` instead of pretending an upload happened;
 - protected routes still enforce Agent/Admin screen boundaries.
+
+## Local Supabase seed
+
+`supabase/seed.sql` is a local development fixture only. It creates fake Supabase
+Auth users, matching `public.profiles`, submissions, applicants, normalized
+questionnaire answers, media metadata, corrections, status history, and one
+export metadata record for local MVP testing.
+
+Use it through the normal local Supabase reset/start workflow, for example:
+
+```bash
+supabase db reset
+```
+
+Local seeded credentials:
+
+```bash
+agent.dev@visaflow.local / visaflow-local-agent
+admin.dev@visaflow.local / visaflow-local-admin
+```
+
+Seed safety boundaries:
+
+- fake data only; no real personal data;
+- no service-role key or frontend secret;
+- no `storage.objects` rows are inserted;
+- media rows are metadata-only and stay `none` / `not_reviewed`;
+- export duplicate status is `unknown`;
+- download is marked disabled in seed audit metadata;
+- no OCR, AI decision, or generated Excel artifact is claimed.
+
+Do not run `supabase/seed.sql` against sandbox or production.
 
 ## Backend target
 

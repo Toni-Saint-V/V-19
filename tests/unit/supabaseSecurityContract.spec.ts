@@ -99,6 +99,68 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("adds questionnaire answers as an RLS-protected normalized persistence table", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260624001000_questionnaire_answers_persistence.sql",
+    );
+
+    expect(migration).toContain("create table if not exists public.questionnaire_answers");
+    expect(migration).toContain("unique (applicant_id, section_id, field_id)");
+    expect(migration).toContain(
+      "alter table public.questionnaire_answers enable row level security",
+    );
+    expect(migration).toContain(
+      'create policy "questionnaire answers read through submission"',
+    );
+    expect(migration).toContain(
+      'create policy "questionnaire answers write editable submission"',
+    );
+    expect(migration).toContain(
+      'create policy "questionnaire answers delete editable submission"',
+    );
+    expect(migration).toContain(
+      "create or replace function public.upsert_questionnaire_answers(answers jsonb)",
+    );
+    expect(migration).toContain("updated_by,");
+    expect(migration).toContain("auth.uid()");
+    expect(migration).toContain(
+      "Questionnaire answer applicant does not belong to submission",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.upsert_questionnaire_answers(jsonb) to authenticated",
+    );
+    expect(migration).toContain(
+      "grant select, insert, update, delete on public.questionnaire_answers",
+    );
+  });
+
+  test("keeps questionnaire answer persistence inside the atomic cockpit save RPC", () => {
+    const questionnaireMigration = readProjectFile(
+      "supabase/migrations/20260624001000_questionnaire_answers_persistence.sql",
+    );
+    const historicalCockpitSaveMigration = readProjectFile(
+      "supabase/migrations/20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
+    );
+    const cockpitRepository = readProjectFile(
+      "src/modules/submissions/supabasePersistence.ts",
+    );
+
+    expect(questionnaireMigration).toContain(
+      "alter function public.save_submission_draft(jsonb) set schema app_private",
+    );
+    expect(questionnaireMigration).toContain(
+      "create or replace function public.save_submission_draft(payload jsonb)",
+    );
+    expect(questionnaireMigration).toContain("payload ? 'questionnaire_answers'");
+    expect(questionnaireMigration).toContain("insert into public.questionnaire_answers");
+    expect(questionnaireMigration).toContain(
+      "delete from public.questionnaire_answers qa",
+    );
+    expect(questionnaireMigration).toContain("'questionnaireAnswers'");
+    expect(historicalCockpitSaveMigration).not.toContain("questionnaire_answers");
+    expect(cockpitRepository).not.toContain('"upsert_questionnaire_answers"');
+  });
+
   test("keeps export batch identity migration additive for legacy batches", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260616000000_export_batch_identity.sql",

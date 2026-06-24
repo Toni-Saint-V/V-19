@@ -1,10 +1,15 @@
 import type { Role } from "../types/domain";
 import type { AppProfile, AppSession } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
-import { fetchCurrentProfile } from "./profileService";
+import { supabaseRuntimeConfig } from "../lib/supabase/config";
+import { fetchCurrentProfile, upsertProfile } from "./profileService";
 import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 export type { AppProfile, AppSession };
+
+export type SupabaseSignUpResult =
+  | { status: "authenticated"; session: AppSession }
+  | { status: "confirmation_required"; email: string };
 
 const demoProfiles: Record<Role, AppProfile> = {
   agent: {
@@ -22,6 +27,59 @@ const demoProfiles: Record<Role, AppProfile> = {
     role: "admin",
   },
 };
+
+function metadataString(
+  metadata: Record<string, unknown> | null | undefined,
+  key: string,
+): string | null {
+  const value = metadata?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function profileForSupabaseUser(user: {
+  email?: string;
+  id: string;
+  user_metadata?: Record<string, unknown>;
+}, options: {
+  allowMissingProfileRecovery: boolean;
+  fallback?: {
+    displayName?: string;
+    organizationName?: string | null;
+  };
+}): Promise<AppProfile> {
+  const existingProfile = await fetchCurrentProfile(user.id);
+  if (existingProfile) return existingProfile;
+
+  if (!options.allowMissingProfileRecovery) {
+    throw new Error(
+      "Supabase profile was not found for this user. Production profile repair requires owner-approved role assignment.",
+    );
+  }
+
+  const email = user.email?.trim().toLowerCase() ?? "";
+  const displayName =
+    metadataString(user.user_metadata, "display_name") ??
+    metadataString(user.user_metadata, "name") ??
+    options.fallback?.displayName?.trim() ??
+    email;
+  const organizationName =
+    metadataString(user.user_metadata, "organization_name") ??
+    options.fallback?.organizationName ??
+    null;
+  const profile = await upsertProfile({
+    id: user.id,
+    email,
+    displayName,
+    organizationName,
+    role: "agent",
+  });
+
+  if (!profile) {
+    throw new Error("Supabase profile was not created for this user.");
+  }
+
+  return profile;
+}
 
 export async function getCurrentAppSession(): Promise<AppSession | null> {
   const client = getSupabaseClient();
@@ -78,15 +136,77 @@ export async function signInSupabaseWithPassword(
     throw new Error("Supabase session was not returned.");
   }
 
-  const profile = await fetchCurrentProfile(data.session.user.id);
-  if (!profile) {
-    throw new Error("Supabase profile was not found for this user.");
-  }
+  const profile = await profileForSupabaseUser(data.session.user, {
+    allowMissingProfileRecovery:
+      supabaseRuntimeConfig.evidence.target !== "production",
+  });
 
   return {
     mode: "supabase",
     profile,
     supabaseSession: data.session,
+  };
+}
+
+export async function signUpSupabaseAgentWithPassword({
+  displayName,
+  email,
+  organizationName,
+  password,
+}: {
+  displayName: string;
+  email: string;
+  organizationName?: string;
+  password: string;
+}): Promise<SupabaseSignUpResult> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error("Supabase is inactive.");
+  }
+
+  const safeEmail = email.trim().toLowerCase();
+  const safeDisplayName = displayName.trim() || safeEmail;
+  const safeOrganizationName = organizationName?.trim() || null;
+  const { data, error } = await client.auth.signUp({
+    email: safeEmail,
+    password,
+    options: {
+      data: {
+        display_name: safeDisplayName,
+        organization_name: safeOrganizationName,
+      },
+    },
+  });
+
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "auth.sign_up_password",
+      fallbackKind: "auth",
+    });
+  }
+
+  if (!data.session?.user.id) {
+    return {
+      status: "confirmation_required",
+      email: safeEmail,
+    };
+  }
+
+  const profile = await profileForSupabaseUser(data.session.user, {
+    allowMissingProfileRecovery: true,
+    fallback: {
+      displayName: safeDisplayName,
+      organizationName: safeOrganizationName,
+    },
+  });
+
+  return {
+    status: "authenticated",
+    session: {
+      mode: "supabase",
+      profile,
+      supabaseSession: data.session,
+    },
   };
 }
 

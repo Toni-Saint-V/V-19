@@ -5,6 +5,8 @@ import type {
   CorrectionInsert,
   Json,
   MediaAssetInsert,
+  QuestionnaireAnswerRow,
+  QuestionnaireAnswerInsert,
   StatusHistoryInsert,
   SubmissionDraftPersistencePayload,
   SubmissionRow,
@@ -17,6 +19,7 @@ import { mapSupabasePersistenceError } from "../../services/persistenceObservabi
 import type { AppProfile } from "../../types/session";
 import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
+import { normalizeSubmissionQuestionnaire } from "./questionnaire";
 import type {
   Applicant,
   Issue,
@@ -37,6 +40,8 @@ const submissionSelect =
   "id,agent_id,type,title,country,city,travel_date,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const applicantSelect =
   "id,submission_id,full_name,questionnaire_percent,media_percent,created_at,updated_at" as const;
+const questionnaireAnswerSelect =
+  "id,submission_id,applicant_id,section_id,field_id,label,value,updated_by,created_at,updated_at" as const;
 
 export interface CockpitLoadResult {
   ownerIdsBySubmissionId: Map<string, string>;
@@ -50,6 +55,10 @@ type SnapshotEnvelope = {
 type CockpitApplicantRow = Pick<
   ApplicantRow,
   "full_name" | "id" | "media_percent" | "questionnaire_percent" | "submission_id"
+>;
+type CockpitQuestionnaireAnswerRow = Pick<
+  QuestionnaireAnswerRow,
+  "applicant_id" | "field_id" | "label" | "section_id" | "submission_id" | "value"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -407,6 +416,25 @@ function toCockpitMediaAssetInserts(submission: Submission): MediaAssetInsert[] 
   });
 }
 
+export function toCockpitQuestionnaireAnswerInserts(
+  submission: Submission,
+  actorId: string,
+): QuestionnaireAnswerInsert[] {
+  return submission.applicants.flatMap((applicant) =>
+    applicant.sections.flatMap((section) =>
+      section.fields.map((field) => ({
+        submission_id: submission.id,
+        applicant_id: applicant.id,
+        section_id: section.id,
+        field_id: field.id,
+        label: field.label,
+        value: field.value,
+        updated_by: actorId,
+      })),
+    ),
+  );
+}
+
 export function toCockpitDraftPersistencePayload(
   submission: Submission,
   actorId: string,
@@ -454,6 +482,10 @@ export function toCockpitDraftPersistencePayload(
     applicants: ownedSubmission.applicants.map((applicant) =>
       toApplicantInsert(ownedSubmission, applicant),
     ),
+    questionnaire_answers: toCockpitQuestionnaireAnswerInserts(
+      ownedSubmission,
+      actorId,
+    ),
     media_assets: toCockpitMediaAssetInserts(ownedSubmission),
     corrections: ownedSubmission.issues.map((issue) =>
       toCorrectionInsert(ownedSubmission, issue, actorId),
@@ -474,6 +506,7 @@ function requiresCorrectionHandoff(submission: Submission): boolean {
 function fallbackSubmissionFromRows(
   row: SubmissionRow,
   applicants: CockpitApplicantRow[],
+  questionnaireAnswers: CockpitQuestionnaireAnswerRow[],
 ): Submission {
   const applicantItems: Applicant[] = applicants.map((applicant) => ({
     id: applicant.id,
@@ -482,10 +515,13 @@ function fallbackSubmissionFromRows(
     questionnaireStatus:
       applicant.questionnaire_percent >= 100 ? "complete" : "partial",
     fileStatus: applicant.media_percent >= 100 ? "complete" : "partial",
-    sections: [],
+    sections: questionnaireSectionsFromAnswerRows(
+      applicant.id,
+      questionnaireAnswers.filter((answer) => answer.applicant_id === applicant.id),
+    ),
   }));
 
-  return {
+  return normalizeSubmissionQuestionnaire({
     id: row.id,
     agentId: row.agent_id,
     title: row.title,
@@ -514,7 +550,37 @@ function fallbackSubmissionFromRows(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     history: [],
-  };
+  });
+}
+
+function questionnaireSectionsFromAnswerRows(
+  applicantId: string,
+  answers: CockpitQuestionnaireAnswerRow[],
+) {
+  const sectionsById = new Map<string, CockpitQuestionnaireAnswerRow[]>();
+  for (const answer of answers) {
+    const current = sectionsById.get(answer.section_id) ?? [];
+    current.push(answer);
+    sectionsById.set(answer.section_id, current);
+  }
+
+  return Array.from(sectionsById.entries()).map(([sectionId, sectionAnswers]) => ({
+    id: sectionId,
+    title: sectionId,
+    status: "partial" as const,
+    fields: sectionAnswers.map((answer) => ({
+      id: answer.field_id,
+      label: answer.label,
+      value: questionnaireAnswerValue(answer.value),
+      required: true,
+    })),
+  }));
+}
+
+function questionnaireAnswerValue(value: Json): string {
+  if (typeof value === "string") return value;
+  if (value === null) return "";
+  return JSON.stringify(value);
 }
 
 export async function loadCockpitSubmissionsForProfile(
@@ -563,11 +629,26 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
+  const { data: questionnaireRows, error: questionnaireError } = await client
+    .from("questionnaire_answers")
+    .select(questionnaireAnswerSelect)
+    .in("submission_id", submissionIds);
+
+  if (questionnaireError) {
+    throw mapSupabasePersistenceError(questionnaireError, {
+      operation: "questionnaire_answers.list",
+      fallbackKind: "database",
+    });
+  }
+
   const ownerIdsBySubmissionId = new Map<string, string>();
   const submissions = rows.map((row) => {
     ownerIdsBySubmissionId.set(row.id, row.agent_id);
     const submissionApplicants = (applicantRows ?? []).filter(
       (applicant) => applicant.submission_id === row.id,
+    );
+    const submissionQuestionnaireAnswers = (questionnaireRows ?? []).filter(
+      (answer) => answer.submission_id === row.id,
     );
     const snapshot = readCockpitSnapshot(row.family_intelligence);
     if (snapshot) {
@@ -578,7 +659,11 @@ export async function loadCockpitSubmissionsForProfile(
       );
     }
 
-    return fallbackSubmissionFromRows(row, submissionApplicants);
+    return fallbackSubmissionFromRows(
+      row,
+      submissionApplicants,
+      submissionQuestionnaireAnswers,
+    );
   });
 
   return {

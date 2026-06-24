@@ -49,6 +49,12 @@ export type Database = {
         Update: Partial<CorrectionInsert>;
         Relationships: [];
       };
+      questionnaire_answers: {
+        Row: QuestionnaireAnswerRow;
+        Insert: QuestionnaireAnswerInsert;
+        Update: Partial<QuestionnaireAnswerInsert>;
+        Relationships: [];
+      };
       export_batches: {
         Row: ExportBatchRow;
         Insert: ExportBatchInsert;
@@ -83,6 +89,7 @@ export type Database = {
         Returns: {
           submissionId: string;
           applicants: number;
+          questionnaireAnswers?: number;
           mediaAssets: number;
           statusHistory: number;
         };
@@ -94,9 +101,18 @@ export type Database = {
         Returns: {
           submissionId: string;
           applicants: number;
+          questionnaireAnswers?: number;
           mediaAssets: number;
           statusHistory: number;
           idempotent?: boolean;
+        };
+      };
+      upsert_questionnaire_answers: {
+        Args: {
+          answers: QuestionnaireAnswerInsert[];
+        };
+        Returns: {
+          answers: number;
         };
       };
     };
@@ -245,6 +261,28 @@ export type CorrectionInsert = Omit<CorrectionRow, "id" | "created_at" | "fixed_
   fixed_at?: string | null;
 };
 
+export interface QuestionnaireAnswerRow extends DbRecord {
+  id: string;
+  submission_id: string;
+  applicant_id: string;
+  section_id: string;
+  field_id: string;
+  label: string;
+  value: Json;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type QuestionnaireAnswerInsert = Omit<
+  QuestionnaireAnswerRow,
+  "id" | "created_at" | "updated_at"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export interface ExportBatchRow extends DbRecord {
   id: string;
   created_by: string;
@@ -329,6 +367,7 @@ export type StatusHistoryInsert = Omit<StatusHistoryRow, "id" | "changed_at"> & 
 export interface SubmissionDraftPersistencePayload extends DbRecord {
   submission: SubmissionInsert;
   applicants: ApplicantInsert[];
+  questionnaire_answers?: QuestionnaireAnswerInsert[];
   media_assets: MediaAssetInsert[];
   corrections: CorrectionInsert[];
   status_history: StatusHistoryInsert[];
