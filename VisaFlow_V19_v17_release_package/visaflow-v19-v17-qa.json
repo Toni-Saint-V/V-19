@@ -1,0 +1,289 @@
+{
+  "summary": {
+    "passed": 56,
+    "failed": 0,
+    "total": 56
+  },
+  "checks": [
+    {
+      "check": "1440: runtime has no console/page errors",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1440: self-contained brand logo renders",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1440: submissions context rail opens by default",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1440: context rail is docked, not floating",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1440: no document horizontal overflow",
+      "status": "PASS",
+      "detail": "1440/1440"
+    },
+    {
+      "check": "1440: docked submission list uses compact five-zone contract",
+      "status": "PASS",
+      "detail": "5"
+    },
+    {
+      "check": "1440: context rail has no horizontal overflow",
+      "status": "PASS",
+      "detail": "349/349"
+    },
+    {
+      "check": "Rail action opens Submission drawer",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Rail action opens exact questionnaire tab",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Rail action focuses exact target field",
+      "status": "PASS",
+      "detail": "intendedDeparture"
+    },
+    {
+      "check": "Context rail closes from rail header",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Closed rail restores six-column submission table",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Toolbar control reopens context rail",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer issues: target surface renders",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer issues: no drawer-level horizontal overflow",
+      "status": "PASS",
+      "detail": "838/838"
+    },
+    {
+      "check": "Issues: exactly two issue cards render",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Issues: cards use compact reason/comment columns",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer files: target surface renders",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer files: no drawer-level horizontal overflow",
+      "status": "PASS",
+      "detail": "838/838"
+    },
+    {
+      "check": "Files: trust boundary appears once",
+      "status": "PASS",
+      "detail": "1"
+    },
+    {
+      "check": "Files: repeated standalone copy removed from rows",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer questionnaire: target surface renders",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer questionnaire: no drawer-level horizontal overflow",
+      "status": "PASS",
+      "detail": "838/838"
+    },
+    {
+      "check": "Questionnaire: exact blocker mini-diff has three values",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Questionnaire: issue field exposes aria-invalid",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer applicants: target surface renders",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer applicants: no drawer-level horizontal overflow",
+      "status": "PASS",
+      "detail": "838/838"
+    },
+    {
+      "check": "Applicants: balanced matrix has four rows",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer overview: target surface renders",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Drawer overview: no drawer-level horizontal overflow",
+      "status": "PASS",
+      "detail": "838/838"
+    },
+    {
+      "check": "1440: runtime remains error-free after interactions",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1280: context rail remains a docked screen column",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1280: no document horizontal overflow",
+      "status": "PASS",
+      "detail": "1280/1280"
+    },
+    {
+      "check": "1280: runtime has no errors",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1024: rail is closed by default to preserve workspace",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1024: no document horizontal overflow",
+      "status": "PASS",
+      "detail": "1024/1024"
+    },
+    {
+      "check": "1024: rail opens as overlay on explicit action",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "1024: runtime has no errors",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "390: no document horizontal overflow",
+      "status": "PASS",
+      "detail": "390/390"
+    },
+    {
+      "check": "390: submission row exposes mobile summary",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "390: issue drawer has no document overflow",
+      "status": "PASS",
+      "detail": "390/390"
+    },
+    {
+      "check": "390: issue cards stack detail blocks",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "390: runtime has no errors",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Inbox: event begins unread",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Inbox: opening event marks only event read",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Inbox: opening event does not mutate Submission status",
+      "status": "PASS",
+      "detail": "returned->returned"
+    },
+    {
+      "check": "Admin: primary navigation has exactly Work and Export",
+      "status": "PASS",
+      "detail": "['Работа\\n2', 'Выгрузка']"
+    },
+    {
+      "check": "Admin Work: local tabs are Review, Corrections, Events",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Admin Export: right rail is docked by default",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Admin Export: mapping audit lists exactly 56 contract rows",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Admin Export: unresolved mapping remains visible",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Admin Export: real download stays disabled",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Admin Export: package action bar moves responsibility to rail",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Admin Export: rail has no horizontal overflow",
+      "status": "PASS",
+      "detail": "349/349"
+    },
+    {
+      "check": "Admin Export: no document horizontal overflow",
+      "status": "PASS",
+      "detail": "1440/1440"
+    },
+    {
+      "check": "Admin: runtime has no errors",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}

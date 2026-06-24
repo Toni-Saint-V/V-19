@@ -1,5 +1,6 @@
 import { Button, NavCount } from "../../../shared/ui/primitives";
 import type { ReactNode, SVGProps } from "react";
+import logoUrl from "../../../assets/visaflow-logo.png";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
 
@@ -20,28 +21,59 @@ export function OperationalSidebar({
   brand = "VisaFlow",
   footer,
   items,
+  mobileTitle,
+  onRoleClick,
   roleLabel,
 }: {
   brand?: string;
   footer: ReactNode;
   items: OperationalNavItem[];
+  mobileTitle?: string;
+  onRoleClick?: () => void;
   roleLabel: string;
 }) {
   return (
-    <aside className="left-rail ops-sidebar" aria-label="Операционный центр">
-      <div className="rail-mark ops-brand" aria-label={brand}>
-        <span>VF</span>
-        <div className="ops-brand-copy">
-          <strong>{brand}</strong>
-          <em>{roleLabel}</em>
+    <aside className="ops-sidebar" aria-label="Операционный центр">
+      {mobileTitle ? (
+        <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
+          <strong>{mobileTitle}</strong>
+          <span aria-hidden="true">VF</span>
         </div>
+      ) : null}
+      <div className="ops-brand" aria-label={brand}>
+        <img className="ops-brand-logo" src={logoUrl} alt="" aria-hidden="true" />
+        <div className="ops-brand-copy">
+          <strong>VisaFlow V-19</strong>
+          <em>Операции по Испании</em>
+        </div>
+        <button
+          className="ops-role-chip"
+          type="button"
+          aria-label="Открыть выбор рабочей роли"
+          title="Рабочая роль"
+          onClick={onRoleClick}
+        >
+          {roleLabel}
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </button>
       </div>
-      <nav className="rail-nav ops-nav" aria-label="Операционные разделы">
+      <button className="ops-sidebar-command" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 5 5" />
+        </svg>
+        <span>Найти подачу</span>
+        <kbd>⌘ K</kbd>
+      </button>
+      <p className="ops-nav-label">Рабочая область</p>
+      <nav className="ops-nav" aria-label="Операционные разделы">
         {items.map((item) => (
           <Button
             aria-current={item.active ? "page" : undefined}
             aria-label={`${item.label}. ${item.meta}`}
-            className={`rail-item ops-nav-item ${item.active ? "is-active" : ""} ${
+            className={`ops-nav-item ${item.active ? "is-active" : ""} ${
               item.tone ? `tone-${item.tone}` : ""
             }`}
             disabled={item.disabled}
@@ -49,12 +81,11 @@ export function OperationalSidebar({
             variant="ghost"
             onClick={item.onClick}
           >
-            <span className="rail-icon ops-nav-icon" aria-hidden="true">
+            <span className="ops-nav-icon" aria-hidden="true">
               <OperationalIcon id={item.id} fallback={item.icon} />
             </span>
             <span className="ops-nav-copy">
               <strong>{item.label}</strong>
-              <small>{item.meta}</small>
             </span>
             {typeof item.count === "number" ? (
               <NavCount label={`${item.count}`}>{item.count}</NavCount>
@@ -74,20 +105,20 @@ function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {
   const common = {
     fill: "none",
     focusable: "false",
-    height: "16",
+    height: "17",
     stroke: "currentColor",
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     strokeWidth: "1.8",
     viewBox: "0 0 24 24",
-    width: "16",
+    width: "17",
   } satisfies SVGProps<SVGSVGElement>;
 
   if (id.includes("inbox")) {
     return (
       <svg {...common}>
-        <path d="M4 7.5h16l-2.2 9H6.2L4 7.5Z" />
-        <path d="M8.2 12.5h2.1l1 1.6h1.4l1-1.6h2.1" />
+        <path d="M4 4h16v13H4z" />
+        <path d="M4 13h4l2 3h4l2-3h4" />
       </svg>
     );
   }
@@ -95,19 +126,31 @@ function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {
   if (id.includes("actions")) {
     return (
       <svg {...common}>
-        <path d="m5 12 4 4L19 6" />
-        <path d="M4 19h16" />
+        <path d="m4 7 2 2 4-4" />
+        <path d="M13 7h7" />
+        <path d="m4 14 2 2 4-4" />
+        <path d="M13 14h7" />
+        <path d="M4 21h16" />
       </svg>
     );
   }
 
-  if (id.includes("submissions") || id.includes("review")) {
+  if (id.includes("submissions")) {
     return (
       <svg {...common}>
-        <path d="M7 4.5h7l3 3V19.5H7V4.5Z" />
-        <path d="M14 4.5v4h4" />
-        <path d="M9.5 12h5" />
-        <path d="M9.5 15.5h4" />
+        <path d="M6 3h8l4 4v14H6z" />
+        <path d="M14 3v5h5" />
+        <path d="M9 13h6M9 17h6" />
+      </svg>
+    );
+  }
+
+  if (id.includes("review") || id.includes("work")) {
+    return (
+      <svg {...common}>
+        <path d="M5 4h14v16H5z" />
+        <path d="M8 8h8M8 12h5" />
+        <path d="m14 16 2 2 4-4" />
       </svg>
     );
   }
@@ -115,9 +158,9 @@ function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {
   if (id.includes("export")) {
     return (
       <svg {...common}>
-        <path d="M12 4v10" />
-        <path d="m8.5 10.5 3.5 3.5 3.5-3.5" />
-        <path d="M5 19h14" />
+        <path d="M5 4h14v16H5z" />
+        <path d="M8 8h8M8 12h8M8 16h5" />
+        <path d="M16 14v6m0 0-2-2m2 2 2-2" />
       </svg>
     );
   }
@@ -125,13 +168,8 @@ function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {
   if (id.includes("settings")) {
     return (
       <svg {...common}>
-        <path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z" />
-        <path d="M12 3.5v2" />
-        <path d="M12 18.5v2" />
-        <path d="M4.6 7.2l1.7 1" />
-        <path d="m17.7 15.8 1.7 1" />
-        <path d="m4.6 16.8 1.7-1" />
-        <path d="m17.7 8.2 1.7-1" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A8 8 0 0 0 15 6l-.3-2.6h-4L10.4 6a8 8 0 0 0-1.5.9l-2.4-1-2 3.4 2 1.5a7 7 0 0 0 0 2.2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.5.9l.3 2.6h4l.3-2.6a8 8 0 0 0 1.5-.9l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z" />
       </svg>
     );
   }

@@ -93,6 +93,7 @@ import {
   AgentSubmissionsScreen,
   ExportScreen,
 } from "./modules/submissions/pages/OperationsScreens";
+import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import { CANONICAL_CITIES, isCity } from "./modules/submissions/types";
 import type {
   City,
@@ -120,6 +121,7 @@ import {
 import {
   getCurrentAppSession,
   signInSupabaseWithPassword,
+  signUpSupabaseAgentWithPassword,
   signOutCurrentSession,
 } from "./services/authService";
 import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
@@ -303,7 +305,7 @@ function firstSubmissionForRole(
   );
 }
 
-function App() {
+function MainApp() {
   const isSupabaseMode = supabaseRuntimeConfig.selected === "supabase";
   const passportExtractionEnabled = passportExtractionEnabledFromEnv(
     import.meta.env as { readonly VITE_PASSPORT_EXTRACTION_ENABLED?: string },
@@ -313,6 +315,11 @@ function App() {
   const [role, setRole] = useState<Role>(initialWorkspaceRole);
   const [workspaceEmailDraft, setWorkspaceEmailDraft] = useState(workspaceEmail);
   const [workspacePasswordDraft, setWorkspacePasswordDraft] = useState("");
+  const [workspaceAuthMode, setWorkspaceAuthMode] = useState<"sign-in" | "sign-up">(
+    "sign-in",
+  );
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState("");
+  const [workspaceOrganizationDraft, setWorkspaceOrganizationDraft] = useState("");
   const [workspaceAccessError, setWorkspaceAccessError] = useState("");
   const [authChecked, setAuthChecked] = useState(!isSupabaseMode);
   const [loginBusy, setLoginBusy] = useState(false);
@@ -341,6 +348,8 @@ function App() {
   const [activeDrawerTab, setActiveDrawerTab] = useState<DrawerTab>(
     defaultDrawerTab(loadSubmissions()[0]),
   );
+  const [drawerInitialTarget, setDrawerInitialTarget] =
+    useState<WorkspaceTarget | null>(null);
   const [dirty, setDirty] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [createCloseFocusToken, setCreateCloseFocusToken] = useState(0);
@@ -478,15 +487,32 @@ function App() {
     surface === "admin-actions" ||
     surface === "admin-review";
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
-  const adminInboxUnreadCount = searchedAdminInboxEvents.filter(
-    (event) => !event.read,
-  ).length;
   const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
   const hasWorkspaceAccess = isSupabaseMode
     ? Boolean(remoteProfile)
     : showRoleSwitcher || Boolean(resolvedWorkspaceRole);
   const emptyRemoteWorkspace =
     isSupabaseMode && Boolean(remoteProfile) && authChecked && submissions.length === 0;
+  const sessionDisplayName =
+    isSupabaseMode && remoteProfile
+      ? remoteProfile.displayName || remoteProfile.email
+      : role === "agent"
+        ? "Татьяна Новикова"
+        : "Ирина Лебедева";
+  const sessionInitials =
+    isSupabaseMode && remoteProfile
+      ? remoteProfile.role === "admin"
+        ? "АД"
+        : "АГ"
+      : role === "agent"
+        ? "ТН"
+        : "ИЛ";
+  const sessionRoleLabel =
+    isSupabaseMode && remoteProfile
+      ? remoteProfile.role === "admin"
+        ? "Admin profile"
+        : "Agent profile"
+      : `${role === "agent" ? "Агент" : "Админ"} · VisaFlow Operations`;
   const operationalNavItems: OperationalNavItem[] =
     role === "agent"
       ? [
@@ -529,31 +555,11 @@ function App() {
         ]
       : [
           {
-            active: surface === "admin-inbox",
-            count: adminInboxUnreadCount,
-            icon: "В",
-            id: "admin-inbox",
-            label: "Входящие",
-            meta: "события проверки",
-            onClick: showAdminInbox,
-            tone: adminInboxUnreadCount > 0 ? "warning" : "default",
-          },
-          {
-            active: surface === "admin-actions",
-            count: adminActions.summary.open,
-            icon: "Д",
-            id: "admin-actions",
-            label: "Мои действия",
-            meta: "решения админа",
-            onClick: showAdminActions,
-            tone: adminActions.summary.open > 0 ? "warning" : "default",
-          },
-          {
             active: surface === "admin-review",
             count: searchedReviewQueue.length,
             icon: "П",
-            id: "admin-review",
-            label: "Проверка",
+            id: "admin-work",
+            label: "Работа",
             meta: "очередь проверки",
             onClick: () => showReviewTab("review"),
           },
@@ -566,14 +572,6 @@ function App() {
             meta: "готово к Excel",
             onClick: showExportSurface,
             tone: summary.ready > 0 ? "success" : "default",
-          },
-          {
-            active: surface === "settings",
-            icon: "Н",
-            id: "admin-settings",
-            label: "Настройки",
-            meta: "роль и доступ",
-            onClick: showSettingsSurface,
           },
         ];
 
@@ -874,10 +872,6 @@ function App() {
     return searchedOpenAgentActions[0]?.submission ?? searchedAgentQueue[0];
   }
 
-  function firstAdminActionSubmission() {
-    return searchedOpenAdminActions[0]?.submission ?? searchedReviewQueue[0];
-  }
-
   function firstReviewSubmissionForTab(tab: ReviewTab) {
     return (
       highestPriorityFirst(searchedReviewQueue.filter(matchesReviewTab(tab)))[0] ??
@@ -910,25 +904,6 @@ function App() {
       setAgentTab(tab);
       setDrawerMode("closed");
       const nextSubmission = firstAgentSubmissionForTab(tab);
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAdminInbox() {
-    requestSettingsLeave(() => {
-      setSurface("admin-inbox");
-      setDrawerMode("closed");
-      const nextSubmission =
-        searchedAdminInboxEvents[0]?.submission ?? searchedReviewQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAdminActions() {
-    requestSettingsLeave(() => {
-      setSurface("admin-actions");
-      setDrawerMode("closed");
-      const nextSubmission = firstAdminActionSubmission();
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
@@ -966,16 +941,22 @@ function App() {
     setDirty(false);
   }
 
-  function openSubmission(submission: Submission, tab = defaultDrawerTab(submission)) {
+  function openSubmission(
+    submission: Submission,
+    tab = defaultDrawerTab(submission),
+    target?: WorkspaceTarget,
+  ) {
     rememberReturnFocus();
     setSelectedSubmissionId(submission.id);
     setActiveDrawerTab(tab);
+    setDrawerInitialTarget(target ?? null);
     setDrawerMode("detail");
   }
 
   function selectSubmission(submission: Submission) {
     setSelectedSubmissionId(submission.id);
     setActiveDrawerTab(defaultDrawerTab(submission));
+    setDrawerInitialTarget(null);
   }
 
   function closeDrawer() {
@@ -983,6 +964,7 @@ function App() {
       setConfirmClose(true);
       return;
     }
+    setDrawerInitialTarget(null);
     setDrawerMode("closed");
   }
 
@@ -1969,11 +1951,35 @@ function App() {
         setWorkspaceAccessError("Введите почту и пароль Supabase.");
         return;
       }
+      if (workspaceAuthMode === "sign-up" && !workspaceNameDraft.trim()) {
+        setWorkspaceAccessError("Введите имя для Supabase-профиля.");
+        return;
+      }
 
       setLoginBusy(true);
       setWorkspaceAccessError("");
       try {
-        const session = await signInSupabaseWithPassword(email, workspacePasswordDraft);
+        const signUpResult =
+          workspaceAuthMode === "sign-up"
+            ? await signUpSupabaseAgentWithPassword({
+                displayName: workspaceNameDraft,
+                email,
+                organizationName: workspaceOrganizationDraft,
+                password: workspacePasswordDraft,
+              })
+            : null;
+        if (signUpResult?.status === "confirmation_required") {
+          setWorkspaceAccessError(
+            "Проверьте почту и подтвердите Supabase-регистрацию, затем войдите.",
+          );
+          setWorkspaceAuthMode("sign-in");
+          setWorkspacePasswordDraft("");
+          return;
+        }
+        const session =
+          signUpResult?.status === "authenticated"
+            ? signUpResult.session
+            : await signInSupabaseWithPassword(email, workspacePasswordDraft);
         const loaded = await loadCockpitSubmissionsForProfile(session.profile);
         applyRemoteWorkspace(
           session.profile,
@@ -1985,7 +1991,9 @@ function App() {
         setWorkspaceAccessError(
           formatPersistenceFailureForUser(
             error,
-            "Не удалось войти. Проверьте почту, пароль и профиль Supabase.",
+            workspaceAuthMode === "sign-up"
+              ? "Не удалось зарегистрироваться. Проверьте почту, пароль и Supabase profile policy."
+              : "Не удалось войти. Проверьте почту, пароль и профиль Supabase.",
           ),
         );
       } finally {
@@ -2015,6 +2023,9 @@ function App() {
       remoteSubmissionFingerprintsRef.current = new Map();
       setRemoteProfile(null);
       setWorkspacePasswordDraft("");
+      setWorkspaceNameDraft("");
+      setWorkspaceOrganizationDraft("");
+      setWorkspaceAuthMode("sign-in");
       setWorkspaceAccessError("");
       const localSubmissions = loadSubmissions();
       submissionsRef.current = localSubmissions;
@@ -2098,8 +2109,11 @@ function App() {
       onChange={setQuery}
     />
   );
-  const showInlineCreateShortcut =
-    role === "agent" && (surface === "agent-inbox" || surface === "agent-actions");
+  const showMobileCreateDock =
+    role === "agent" &&
+    (surface === "agent-inbox" ||
+      surface === "agent-actions" ||
+      surface === "agent-submissions");
 
   if (!hasWorkspaceAccess) {
     return (
@@ -2108,8 +2122,14 @@ function App() {
         email={workspaceEmailDraft}
         error={workspaceAccessError}
         onEmail={setWorkspaceEmailDraft}
+        onMode={setWorkspaceAuthMode}
+        onName={setWorkspaceNameDraft}
+        onOrganization={setWorkspaceOrganizationDraft}
         onPassword={setWorkspacePasswordDraft}
         onSubmit={submitWorkspaceEmail}
+        mode={workspaceAuthMode}
+        name={workspaceNameDraft}
+        organization={workspaceOrganizationDraft}
         password={workspacePasswordDraft}
         requiresPassword={isSupabaseMode}
       />
@@ -2125,50 +2145,57 @@ function App() {
     >
       <OperationalSidebar
         items={operationalNavItems}
+        mobileTitle={
+          role === "agent" &&
+          (surface === "agent-inbox" ||
+            surface === "agent-actions" ||
+            surface === "agent-submissions")
+            ? surfaceTitle(surface)
+            : undefined
+        }
+        onRoleClick={() =>
+          showRoleSwitcher
+            ? chooseRole(role === "agent" ? "admin" : "agent")
+            : resetWorkspaceEmail()
+        }
         roleLabel={role === "agent" ? "Агент" : "Админ"}
         footer={
           <>
-            {showInlineCreateShortcut ? (
-              <Button
-                className="rail-item ops-nav-item ops-create-item"
-                aria-label="Новая подача"
-                variant="ghost"
-                onClick={openCreateSubmissionDrawer}
-              >
-                <span className="rail-icon ops-nav-icon" aria-hidden="true">
-                  +
-                </span>
-                <span className="ops-nav-copy">
-                  <strong>Новая подача</strong>
-                  <small>черновик заявки</small>
-                </span>
-              </Button>
-            ) : null}
             {showRoleSwitcher ? (
               <Button
-                className="rail-user ops-session"
+                className="ops-session"
                 aria-label="Сменить роль"
                 variant="ghost"
                 onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
               >
                 <span>{role === "agent" ? "ТП" : "АД"}</span>
                 <div>
-                  <strong>{role === "agent" ? "Тони" : "Админ"}</strong>
-                  <small>Рабочая роль</small>
+                  <strong>{role === "agent" ? "Татьяна Новикова" : "Ирина Лебедева"}</strong>
+                  <small>{role === "agent" ? "Агент" : "Админ"} · VisaFlow Operations</small>
                 </div>
+                <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
+                  <circle cx="5" cy="12" r="1" />
+                  <circle cx="12" cy="12" r="1" />
+                  <circle cx="19" cy="12" r="1" />
+                </svg>
               </Button>
             ) : (
               <Button
-                className="rail-user ops-session"
+                className="ops-session"
                 aria-label="Выйти из рабочей области"
                 variant="ghost"
                 onClick={resetWorkspaceEmail}
               >
-                <span>ТП</span>
+                <span>{sessionInitials}</span>
                 <div>
-                  <strong>Тони</strong>
-                  <small>Рабочая роль</small>
+                  <strong>{sessionDisplayName}</strong>
+                  <small>{sessionRoleLabel}</small>
                 </div>
+                <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
+                  <circle cx="5" cy="12" r="1" />
+                  <circle cx="12" cy="12" r="1" />
+                  <circle cx="19" cy="12" r="1" />
+                </svg>
               </Button>
             )}
           </>
@@ -2177,30 +2204,14 @@ function App() {
 
       <section className="workspace">
         <header className="topbar">
+          {isV19CollectionSurface ? (
+            <button className="v19-topbar-menu" type="button" aria-label="Меню">
+              <span aria-hidden="true" />
+            </button>
+          ) : null}
           <div className="topbar-heading">
             <h1>{surfaceTitle(surface)}</h1>
             <p>{surfaceDescription(surface)}</p>
-          </div>
-          <div className="mobile-topbar-actions">
-            {showInlineCreateShortcut ? (
-              <Button
-                aria-label="Новая подача"
-                variant="primary"
-                onClick={openCreateSubmissionDrawer}
-              >
-                Новая подача
-              </Button>
-            ) : null}
-            {showRoleSwitcher ? (
-              <Button
-                aria-label="Сменить роль"
-                className="mobile-role-switch"
-                variant="secondary"
-                onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
-              >
-                Сменить роль
-              </Button>
-            ) : null}
           </div>
           {surface === "agent-submissions" ? (
             <Button
@@ -2208,6 +2219,7 @@ function App() {
               variant="primary"
               onClick={openCreateSubmissionDrawer}
             >
+              <span aria-hidden="true">+</span>
               Новая подача
             </Button>
           ) : !isV19CollectionSurface || isSupabaseMode ? (
@@ -2238,6 +2250,7 @@ function App() {
           />
         ) : surface === "agent-inbox" ? (
           <AgentInboxScreen
+            cityControl={cityFilterControl}
             onOpen={openSubmission}
             searchControl={inboxSearchControl}
             submissions={searchedAgentQueue}
@@ -2245,6 +2258,7 @@ function App() {
           />
         ) : surface === "agent-actions" ? (
           <AgentActionsScreen
+            cityControl={cityFilterControl}
             completedActions={searchedCompletedAgentActions}
             onOpen={openSubmission}
             openActions={searchedOpenAgentActions}
@@ -2255,7 +2269,6 @@ function App() {
           <AgentSubmissionsScreen
             activeTab={agentTab}
             agentList={agentList}
-            cityFilterLabel={cityFilter === "Все города" ? "Все" : cityFilter}
             hasSearchQuery={query.trim().length > 0}
             onCreate={openCreateSubmissionDrawer}
             onClearFilters={() => {
@@ -2265,7 +2278,6 @@ function App() {
             onOpen={openSubmission}
             onSelect={selectSubmission}
             onTab={showAgentTab}
-            cityControl={cityFilterControl}
             searchControl={agentSubmissionsSearchControl}
             visibleSubmission={visibleAgentSubmission}
             summary={summary}
@@ -2346,11 +2358,24 @@ function App() {
             />
           </Suspense>
         ) : null}
+
+        {showMobileCreateDock ? (
+          <div className="mobile-create-dock">
+            <Button
+              aria-label="Новая подача"
+              variant="primary"
+              onClick={openCreateSubmissionDrawer}
+            >
+              Новая подача
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       {drawerMode === "detail" && activeSubmission ? (
         <SubmissionDrawer
           activeTab={activeDrawerTab}
+          initialTarget={drawerInitialTarget}
           issueComposerRequest={issueComposerRequest}
           onIssueComposerConsumed={() => setIssueComposerRequest(null)}
           onAction={updateSubmission}
@@ -2468,6 +2493,10 @@ function App() {
   );
 }
 
+function App() {
+  return <MainApp />;
+}
+
 function PassportExtractionReviewDialog({
   onCancel,
   onDismiss,
@@ -2523,15 +2552,27 @@ function WorkspaceAccessGate({
   email,
   error,
   onEmail,
+  onMode,
+  onName,
+  onOrganization,
   onPassword,
   onSubmit,
+  mode = "sign-in",
+  name = "",
+  organization = "",
   password = "",
   requiresPassword = false,
 }: {
   busy?: boolean;
   email: string;
   error: string;
+  mode?: "sign-in" | "sign-up";
+  name?: string;
+  organization?: string;
   onEmail: (email: string) => void;
+  onMode?: (mode: "sign-in" | "sign-up") => void;
+  onName?: (name: string) => void;
+  onOrganization?: (organization: string) => void;
   onPassword?: (password: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   password?: string;
@@ -2551,9 +2592,41 @@ function WorkspaceAccessGate({
           <span className="access-badge">Закрытый доступ</span>
         </div>
         <p className="access-intro" id="workspace-access-copy">
-          Введите рабочую почту, чтобы открыть свой рабочий стол.
+          {requiresPassword
+            ? mode === "sign-up"
+              ? "Создайте агентский профиль через Supabase Auth."
+              : "Войдите через Supabase Auth, чтобы открыть рабочий стол по роли профиля."
+            : "Введите рабочую почту, чтобы открыть свой рабочий стол."}
         </p>
         <form onSubmit={onSubmit}>
+          {requiresPassword && mode === "sign-up" ? (
+            <>
+              <label>
+                <span>Имя</span>
+                <input
+                  autoComplete="name"
+                  id="workspace-name"
+                  name="name"
+                  placeholder="Имя агента"
+                  type="text"
+                  value={name}
+                  onChange={(event) => onName?.(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Организация</span>
+                <input
+                  autoComplete="organization"
+                  id="workspace-organization"
+                  name="organization"
+                  placeholder="Название агентства"
+                  type="text"
+                  value={organization}
+                  onChange={(event) => onOrganization?.(event.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
           <label>
             <span>Рабочая почта</span>
             <input
@@ -2591,13 +2664,24 @@ function WorkspaceAccessGate({
               {busy
                 ? "Проверяем текущую сессию."
                 : requiresPassword
-                  ? "Вход идёт через Supabase Auth."
+                  ? mode === "sign-up"
+                    ? "Роль будет agent; admin назначается только на стороне Supabase."
+                    : "Вход идёт через Supabase Auth."
                   : "Доступ откроется после проверки почты."}
             </p>
           )}
           <Button type="submit" disabled={busy}>
-            {busy ? "Проверяем" : "Войти"}
+            {busy ? "Проверяем" : mode === "sign-up" ? "Создать профиль" : "Войти"}
           </Button>
+          {requiresPassword ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onMode?.(mode === "sign-up" ? "sign-in" : "sign-up")}
+            >
+              {mode === "sign-up" ? "У меня уже есть доступ" : "Создать агентский доступ"}
+            </Button>
+          ) : null}
         </form>
       </section>
     </main>

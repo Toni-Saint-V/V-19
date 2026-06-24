@@ -20,6 +20,14 @@ type CollectionTab<T extends string> = {
   label: string;
 };
 
+export type CollectionActiveFilter =
+  | string
+  | {
+      id: string;
+      label: string;
+      onRemove?: () => void;
+    };
+
 type SummaryFilterTone = "amber" | "danger" | "neutral";
 
 type SummaryFilterTab<T extends string> = {
@@ -36,6 +44,9 @@ export function CollectionToolbar<T extends string>({
   className,
   filterTabs,
   filters,
+  mobileCityControl,
+  mobileTitle,
+  onClearActiveFilters,
   onTabChange,
   search,
   tabs,
@@ -43,12 +54,15 @@ export function CollectionToolbar<T extends string>({
   tools = null,
   value,
 }: {
-  activeFilters?: string[];
+  activeFilters?: CollectionActiveFilter[];
   ariaLabel: string;
   cityControl?: ReactNode;
   className?: string;
   filterTabs?: ReactNode;
   filters?: ReactNode;
+  mobileCityControl?: ReactNode;
+  mobileTitle?: string;
+  onClearActiveFilters?: () => void;
   onTabChange: (value: T) => void;
   search: ReactNode;
   tabs: Array<CollectionTab<T>>;
@@ -70,6 +84,9 @@ export function CollectionToolbar<T extends string>({
         )}
         aria-label={ariaLabel}
       >
+        {mobileTitle ? (
+          <h2 className="v19-mobile-toolbar-title">{mobileTitle}</h2>
+        ) : null}
         <StateTabs
           ariaLabel={tabsAriaLabel ?? "Состояние списка"}
           onValueChange={onTabChange}
@@ -79,6 +96,7 @@ export function CollectionToolbar<T extends string>({
         <ToolbarControlStack
           cityControl={cityControl}
           filters={filters}
+          mobileCityControl={mobileCityControl}
           search={search}
         />
         {tools}
@@ -89,13 +107,60 @@ export function CollectionToolbar<T extends string>({
       ) : null}
 
       {activeFilters.length ? (
-        <div className="v19-active-filters" aria-label="Активные фильтры">
-          {activeFilters.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
+        <ActiveFiltersRow
+          filters={activeFilters}
+          onClear={onClearActiveFilters}
+        />
       ) : null}
     </>
+  );
+}
+
+function ActiveFiltersRow({
+  filters,
+  onClear,
+}: {
+  filters: CollectionActiveFilter[];
+  onClear?: () => void;
+}) {
+  return (
+    <div
+      className="active-filters v19-active-filters"
+      aria-label="Активные фильтры"
+    >
+      {filters.map((filter) => {
+        const chip =
+          typeof filter === "string"
+            ? { id: filter, label: filter, onRemove: undefined }
+            : filter;
+
+        return (
+          <span className="filter-chip" key={chip.id}>
+            {chip.label}
+            {chip.onRemove ? (
+              <button
+                aria-label={`Удалить фильтр ${chip.label}`}
+                type="button"
+                onClick={chip.onRemove}
+              >
+                <svg className="icon sm" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
+            ) : null}
+          </span>
+        );
+      })}
+      {onClear ? (
+        <button
+          className="btn ghost small v19-active-filters-reset"
+          type="button"
+          onClick={onClear}
+        >
+          Сбросить
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -107,11 +172,13 @@ function ToolbarControlStack({
   cityControl,
   className,
   filters,
+  mobileCityControl,
   search,
 }: {
   cityControl?: ReactNode;
   className?: string;
   filters?: ReactNode;
+  mobileCityControl?: ReactNode;
   search: ReactNode;
 }) {
   return (
@@ -126,6 +193,9 @@ function ToolbarControlStack({
       {search}
       {filters}
       {cityControl}
+      {mobileCityControl ? (
+        <div className="v19-mobile-city-control">{mobileCityControl}</div>
+      ) : null}
     </div>
   );
 }
@@ -304,36 +374,49 @@ export function ActionRow({
 export function SubmissionCollectionRow({
   action,
   completeness,
+  compact = false,
   extraTagCount = 0,
   extraTagLabel,
+  fileDetail,
   fileState,
   fileTone,
+  kind = "family",
   meta,
   onOpen,
   searchText,
   status,
+  statusDetail,
   statusLabel,
   submissionId,
   title,
+  trip,
+  tripDetail,
 }: {
   action: string;
   completeness: string;
+  compact?: boolean;
   extraTagCount?: number;
   extraTagLabel?: string;
+  fileDetail?: string;
   fileState: string;
   fileTone: "amber" | "muted" | "teal";
+  kind?: "family" | "single";
   meta?: ReactNode;
   onOpen: () => void;
   searchText?: string;
   status: SubmissionStatus;
+  statusDetail?: string;
   statusLabel: string;
   submissionId: string;
   title: string;
+  trip?: string;
+  tripDetail?: string;
 }) {
   return (
     <button
       className={cn(
         "v19-submission-row",
+        compact ? "is-rail-compact" : "is-rail-full",
         (status === "returned" || status === "requires_action") && "is-attention",
       )}
       data-submission-card=""
@@ -342,10 +425,35 @@ export function SubmissionCollectionRow({
       onClick={onOpen}
     >
       <span className="v19-event-main">
+        <span className="v19-submission-kind-icon" aria-hidden="true">
+          <SvgIcon>
+            {kind === "family" ? (
+              <>
+                <path d="M16 21v-2a4 4 0 0 0-8 0v2" />
+                <circle cx="12" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                <path d="M2 21v-2a4 4 0 0 1 3-3.87" />
+                <path d="M8 3.13a4 4 0 0 0 0 7.75" />
+              </>
+            ) : (
+              <>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </>
+            )}
+          </SvgIcon>
+        </span>
         <strong title={title}>{title}</strong>
         {searchText ? <span className="sr-only">{searchText}</span> : null}
         {meta ? <em>{meta}</em> : null}
       </span>
+      {trip ? (
+        <span className="v19-submission-trip">
+          <strong title={trip}>{trip}</strong>
+          {tripDetail ? <em>{tripDetail}</em> : null}
+        </span>
+      ) : null}
       <span className="v19-submission-status-tag" aria-label={`Статус: ${statusLabel}`}>
         <Badge
           className={cn(extraTagCount > 0 && "has-status-suffix")}
@@ -358,10 +466,14 @@ export function SubmissionCollectionRow({
             </span>
           ) : null}
         </Badge>
+        {compact && statusDetail ? <em>{statusDetail}</em> : null}
       </span>
-      <span className="v19-submission-file-tag" aria-label={`Файлы: ${fileState}`}>
-        <Badge tone={fileTone}>{fileState}</Badge>
-      </span>
+      {!compact ? (
+        <span className="v19-submission-file-tag" aria-label={`Файлы: ${fileState}`}>
+          <Badge tone={fileTone}>{fileState}</Badge>
+          {fileDetail ? <em>{fileDetail}</em> : null}
+        </span>
+      ) : null}
       <span
         className="v19-submission-percent-tag"
         aria-label={`Готовность: ${completeness}`}
@@ -461,17 +573,17 @@ function ToolbarIcon({ icon }: { icon: ToolbarIconName }) {
     return (
       <SvgIcon>
         <path d="M8 5v14" />
-        <path d="m5 8 3-3 3 3" />
+        <path d="m5 16 3 3 3-3" />
         <path d="M16 19V5" />
-        <path d="m13 16 3 3 3-3" />
+        <path d="m13 8 3-3 3 3" />
       </SvgIcon>
     );
   }
 
   return (
     <SvgIcon>
-      <path d="M5 5h14v14H5V5Z" />
-      <path d="M14 5v14" />
+      <rect x="3" y="4" width="18" height="16" rx="1" />
+      <path d="M15 4v16" />
     </SvgIcon>
   );
 }

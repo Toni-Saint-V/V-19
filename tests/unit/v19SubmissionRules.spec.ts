@@ -38,6 +38,11 @@ import {
   toCockpitDraftPersistencePayload,
 } from "../../src/modules/submissions/supabasePersistence";
 import {
+  failPassportExtraction,
+  finishPassportExtraction,
+  markPassportExtractionReviewed,
+} from "../../src/modules/submissions/passportExtraction";
+import {
   addPreciseAdminIssue,
   applyUploadedFileMetadata,
   applyExportStateToSelection,
@@ -603,9 +608,43 @@ describe("V-19 submission actions", () => {
         uploadedAtIso: "2026-06-21T10:01:00.000Z",
       },
     );
-    const queue = agentActionQueue([withAllReplacements]);
-
     expect(canPerformAction(withAllReplacements, "submit_corrections", "agent")).toEqual({
+      ok: false,
+      reason: "Загранпаспорт не подтвержден: распознавание еще не выполнено.",
+    });
+
+    const withExtractedPassport = finishPassportExtraction(
+      withAllReplacements,
+      withAllReplacements.files.find((file) => file.id === passportFile.id) ??
+        passportFile,
+      {
+        fields: [
+          {
+            confidence: "high",
+            key: "passportType",
+            needsManualReview: true,
+            value: "Ordinary Passport",
+          },
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: true,
+            value: "778194571",
+          },
+        ],
+        guardrails: [],
+        source: "local-ocr",
+        status: "extracted",
+        summary: "Паспорт подтвержден.",
+      },
+    );
+    const withVerifiedPassport = markPassportExtractionReviewed(
+      withExtractedPassport,
+      "verified",
+    );
+    const queue = agentActionQueue([withVerifiedPassport]);
+
+    expect(canPerformAction(withVerifiedPassport, "submit_corrections", "agent")).toEqual({
       ok: true,
     });
     expect(queue.open).toHaveLength(1);
@@ -617,7 +656,7 @@ describe("V-19 submission actions", () => {
     });
 
     const submittedCorrections = applySubmissionAction(
-      withAllReplacements,
+      withVerifiedPassport,
       "submit_corrections",
       "agent",
     );
@@ -765,6 +804,114 @@ describe("V-19 submission actions", () => {
       true,
     );
     expect(submitted.history[0].source).toBe("agent");
+  });
+
+  it("blocks review submission when extracted passport is expired", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const passportFile = filled.files.find(
+      (file) =>
+        file.type === "passport_scan" &&
+        file.applicantId === filled.applicants[0]?.id,
+    );
+    if (!passportFile) throw new Error("Missing passport file");
+
+    const withExpiredPassport = finishPassportExtraction(filled, passportFile, {
+      fields: [
+        {
+          confidence: "high",
+          key: "passportType",
+          needsManualReview: true,
+          value: "Ordinary Passport",
+        },
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: true,
+          value: "752869613",
+        },
+        {
+          confidence: "medium",
+          key: "passportIssuedAt",
+          needsManualReview: true,
+          value: "26.02.2016",
+        },
+        {
+          confidence: "medium",
+          key: "passportExpiresAt",
+          needsManualReview: true,
+          value: "26.02.2026",
+        },
+      ],
+      guardrails: [],
+      source: "local-ocr",
+      status: "extracted",
+      summary: "Локальный OCR нашел паспорт.",
+    });
+    const inProgress = applySubmissionAction(
+      withExpiredPassport,
+      "save_progress",
+      "agent",
+    );
+
+    expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Паспорт 752869613 просрочен.",
+    });
+  });
+
+  it("blocks real passport uploads until extraction confirms the document", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["IVANOV IVAN"],
+      city: "Москва",
+      familyCount: 1,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const passportFile = filled.files.find(
+      (file) =>
+        file.type === "passport_scan" &&
+        file.applicantId === filled.applicants[0]?.id,
+    );
+    if (!passportFile) throw new Error("Missing passport file");
+
+    const withRealPassportUpload = {
+      ...filled,
+      files: filled.files.map((file) =>
+        file.id === passportFile.id
+          ? {
+              ...file,
+              mimeType: "image/jpeg",
+              originalFileName: "document.jpg",
+              storageBucket: "submission-media",
+              storagePath: "submissions/document.jpg",
+            }
+          : file,
+      ),
+    };
+    const inProgress = applySubmissionAction(
+      withRealPassportUpload,
+      "save_progress",
+      "agent",
+    );
+
+    expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Загранпаспорт не подтвержден: распознавание еще не выполнено.",
+    });
+
+    const failed = failPassportExtraction(inProgress, passportFile, "Не распознано");
+    expect(canPerformAction(failed, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Файл не подтвержден как загранпаспорт. Загрузите разворот паспорта с MRZ.",
+    });
   });
 
   it("uploads one file without marking the whole package complete", () => {

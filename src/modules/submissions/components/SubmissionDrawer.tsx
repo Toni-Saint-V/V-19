@@ -76,6 +76,7 @@ import { EmptyState } from "./Primitives";
 export function SubmissionDrawer({
   activeTab,
   fileUploadBusy = false,
+  initialTarget = null,
   issueComposerRequest,
   localPassportFileIds = [],
   onAction,
@@ -101,6 +102,7 @@ export function SubmissionDrawer({
 }: {
   activeTab: DrawerTab;
   fileUploadBusy?: boolean;
+  initialTarget?: WorkspaceTarget | null;
   issueComposerRequest: { submissionId: string; token: number } | null;
   localPassportFileIds?: string[];
   onAction: (action: SubmissionAction) => void;
@@ -221,6 +223,13 @@ export function SubmissionDrawer({
     onTab(tabForTarget(target));
     setPendingTarget(target);
   }
+
+  useEffect(() => {
+    if (!initialTarget) return;
+    tabNavigationModeRef.current = "target";
+    onTab(tabForTarget(initialTarget));
+    setPendingTarget(initialTarget);
+  }, [initialTarget, onTab]);
 
   function handleTabChange(tab: DrawerTab) {
     tabNavigationModeRef.current = "manual";

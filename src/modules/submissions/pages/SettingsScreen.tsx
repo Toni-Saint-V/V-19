@@ -51,7 +51,7 @@ export default function SettingsScreen({
       <header className="settings-header">
         <p className="kicker">Рабочее место</p>
         <h2 id="settings-title">Настройки доступа</h2>
-        <p>Локальные параметры V-19 рабочего места без изменения данных подач.</p>
+        <p>Параметры рабочего места без изменения подач.</p>
         <dl className="settings-context-strip" aria-label="Состояние рабочего места">
           <div>
             <dt>Роль</dt>
@@ -82,7 +82,7 @@ export default function SettingsScreen({
                 })
               }
             >
-              <option value="instant">Сразу при новом действии</option>
+              <option value="instant">Сразу</option>
               <option value="daily">Ежедневная сводка</option>
             </select>
           </label>
@@ -97,7 +97,7 @@ export default function SettingsScreen({
             />
             <span>
               Подсказки в панели подачи
-              <small>Показывать безопасные подсказки следующего шага внутри подачи.</small>
+              <small>Показывать подсказки следующего шага.</small>
             </span>
           </label>
 
@@ -111,7 +111,7 @@ export default function SettingsScreen({
             />
             <span>
               Плотные списки
-              <small>Сохранять плотность рабочих очередей на широком экране.</small>
+              <small>Уплотнять рабочие очереди.</small>
             </span>
           </label>
         </section>
