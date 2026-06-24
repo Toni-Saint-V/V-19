@@ -15,6 +15,7 @@ export const requiredMigrationOrder = [
   "20260617004000_complete_export_package_workspace_media_slots.sql",
   "20260617005000_passport_extraction_audit_quota_contract.sql",
   "20260622000100_ai_helper_audit_event_metadata.sql",
+  "20260624001000_questionnaire_answers_persistence.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -34,6 +35,7 @@ export const requiredRemoteMigrationOrder = [
   "20260617004000_complete_export_package_workspace_media_slots",
   "20260617005000_passport_extraction_audit_quota_contract",
   "20260622000100_ai_helper_audit_event_metadata",
+  "20260624001000_questionnaire_answers_persistence",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

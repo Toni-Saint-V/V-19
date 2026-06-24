@@ -1,15 +1,30 @@
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { Submission } from "../../src/types/domain";
 
 const supabaseMock = vi.hoisted(() => ({
   client: null as null | Record<string, unknown>,
 }));
+const supabaseConfigMock = vi.hoisted(() => ({
+  activationTarget: "sandbox" as "sandbox" | "production",
+}));
 
 vi.mock("../../src/lib/supabase/client", () => ({
   getSupabaseClient: () => supabaseMock.client,
 }));
+vi.mock("../../src/lib/supabase/config", () => ({
+  supabaseRuntimeConfig: {
+    evidence: {
+      get target() {
+        return supabaseConfigMock.activationTarget;
+      },
+    },
+  },
+}));
 
-import { signInSupabaseWithPassword } from "../../src/services/authService";
+import {
+  signInSupabaseWithPassword,
+  signUpSupabaseAgentWithPassword,
+} from "../../src/services/authService";
 import { saveSubmissionDraft } from "../../src/services/submissionService";
 import {
   buildMediaStoragePath,
@@ -54,6 +69,11 @@ function makeSubmission(): Submission {
 }
 
 describe("Supabase persistence failure paths", () => {
+  beforeEach(() => {
+    supabaseMock.client = null;
+    supabaseConfigMock.activationTarget = "sandbox";
+  });
+
   test("does not overwrite an existing Storage object during media upload", async () => {
     const upload = vi.fn(async () => ({
       data: { path: "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg" },
@@ -213,6 +233,181 @@ describe("Supabase persistence failure paths", () => {
         retryable: false,
       },
       userMessage: "Unable to sign in. Check email, password, and Supabase profile.",
+    });
+  });
+
+  test("recovers a missing agent profile after confirmed Supabase sign-up", async () => {
+    const signInWithPassword = vi.fn(async () => ({
+      data: {
+        session: {
+          user: {
+            id: "00000000-0000-4000-8000-000000000321",
+            email: "confirmed-agent@example.com",
+            user_metadata: {
+              display_name: "Confirmed Agent",
+              organization_name: "Confirmed Agency",
+            },
+          },
+        },
+      },
+      error: null,
+    }));
+    const upsertPayloads: unknown[] = [];
+    supabaseMock.client = {
+      auth: { signInWithPassword },
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: null }),
+          }),
+        }),
+        upsert: (payload: unknown) => {
+          upsertPayloads.push(payload);
+          return {
+            select: () => ({
+              single: async () => ({
+                data: {
+                  id: "00000000-0000-4000-8000-000000000321",
+                  email: "confirmed-agent@example.com",
+                  display_name: "Confirmed Agent",
+                  organization_name: "Confirmed Agency",
+                  role: "agent",
+                },
+                error: null,
+              }),
+            }),
+          };
+        },
+      }),
+    };
+
+    await expect(
+      signInSupabaseWithPassword("confirmed-agent@example.com", "secret-password"),
+    ).resolves.toMatchObject({
+      mode: "supabase",
+      profile: {
+        email: "confirmed-agent@example.com",
+        role: "agent",
+      },
+    });
+    expect(upsertPayloads[0]).toEqual({
+      id: "00000000-0000-4000-8000-000000000321",
+      email: "confirmed-agent@example.com",
+      display_name: "Confirmed Agent",
+      organization_name: "Confirmed Agency",
+    });
+  });
+
+  test("does not auto-create a missing profile during production sign-in", async () => {
+    supabaseConfigMock.activationTarget = "production";
+    const signInWithPassword = vi.fn(async () => ({
+      data: {
+        session: {
+          user: {
+            id: "00000000-0000-4000-8000-000000000654",
+            email: "orphan-agent@example.com",
+            user_metadata: {
+              display_name: "Orphan Agent",
+            },
+          },
+        },
+      },
+      error: null,
+    }));
+    const upsert = vi.fn();
+    supabaseMock.client = {
+      auth: { signInWithPassword },
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: null }),
+          }),
+        }),
+        upsert,
+      }),
+    };
+
+    await expect(
+      signInSupabaseWithPassword("orphan-agent@example.com", "secret-password"),
+    ).rejects.toThrow(
+      "Production profile repair requires owner-approved role assignment.",
+    );
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  test("creates Supabase sign-up profile without writing client-owned role", async () => {
+    const signUp = vi.fn(async () => ({
+      data: {
+        session: {
+          user: {
+            id: "00000000-0000-4000-8000-000000000123",
+            email: "new-agent@example.com",
+          },
+        },
+      },
+      error: null,
+    }));
+    const upsertPayloads: unknown[] = [];
+    supabaseMock.client = {
+      auth: { signUp },
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: null }),
+          }),
+        }),
+        upsert: (payload: unknown) => {
+          upsertPayloads.push(payload);
+          return {
+            select: () => ({
+              single: async () => ({
+                data: {
+                  id: "00000000-0000-4000-8000-000000000123",
+                  email: "new-agent@example.com",
+                  display_name: "New Agent",
+                  organization_name: "New Agency",
+                  role: "agent",
+                },
+                error: null,
+              }),
+            }),
+          };
+        },
+      }),
+    };
+
+    await expect(
+      signUpSupabaseAgentWithPassword({
+        displayName: "New Agent",
+        email: "NEW-AGENT@example.com",
+        organizationName: "New Agency",
+        password: "secret-password",
+      }),
+    ).resolves.toMatchObject({
+      status: "authenticated",
+      session: {
+        mode: "supabase",
+        profile: {
+          email: "new-agent@example.com",
+          role: "agent",
+        },
+      },
+    });
+    expect(signUp).toHaveBeenCalledWith({
+      email: "new-agent@example.com",
+      password: "secret-password",
+      options: {
+        data: {
+          display_name: "New Agent",
+          organization_name: "New Agency",
+        },
+      },
+    });
+    expect(upsertPayloads[0]).toEqual({
+      id: "00000000-0000-4000-8000-000000000123",
+      email: "new-agent@example.com",
+      display_name: "New Agent",
+      organization_name: "New Agency",
     });
   });
 });
