@@ -48,11 +48,11 @@ export function surfaceTitle(surface: Surface) {
 
 export function surfaceDescription(surface: Surface) {
   if (surface === "agent-actions") {
-    return "Точные шаги по подачам агента.";
+    return "Контроль подач";
   }
 
   if (surface === "agent-inbox") {
-    return "События и переход к нужному месту.";
+    return "События и реакции по подачам.";
   }
 
   if (surface === "admin-actions") {

@@ -291,12 +291,48 @@ export function ContextPanel({
   );
 }
 
+export function ContextRail({
+  children,
+  className,
+  label,
+  onClose,
+  title,
+}: {
+  children: ReactNode;
+  className?: string;
+  label: string;
+  onClose: () => void;
+  title: string;
+}) {
+  return (
+    <ContextPanel className={cn("v19-context-rail", className)} label={label}>
+      <div className="v19-rail-header">
+        <div>
+          <p className="kicker">{label}</p>
+          <h2>{title}</h2>
+        </div>
+        <button
+          className="v19-rail-close"
+          type="button"
+          aria-label="Скрыть контекст"
+          onClick={onClose}
+        >
+          <SvgIcon>
+            <path d="m6 6 12 12M18 6 6 18" />
+          </SvgIcon>
+        </button>
+      </div>
+      {children}
+    </ContextPanel>
+  );
+}
+
 export function CollectionRow({
   action,
   badge,
   icon,
   meta,
-  onOpen,
+  onAction,
   read,
   title,
   tone,
@@ -305,28 +341,35 @@ export function CollectionRow({
   badge: string;
   icon: ReactNode;
   meta: ReactNode;
-  onOpen: () => void;
+  onAction: () => void;
   read: boolean;
   title: string;
   tone: "amber" | "blue" | "danger" | "muted" | "teal";
 }) {
   return (
-    <button
-      className={cn("v19-event-row", read ? "is-read" : "is-unread")}
-      type="button"
-      onClick={onOpen}
+    <div
+      className={cn(
+        "v19-event-row",
+        read ? "is-read" : "is-unread",
+        `tone-${tone}`,
+      )}
     >
+      <span className={cn("v19-event-tone-strip", `tone-${tone}`)} aria-hidden="true" />
       <span className="v19-unread-dot" aria-hidden="true" />
-      <span className={cn("v19-event-icon", `tone-${tone}`)} aria-hidden="true">
-        {icon}
-      </span>
-      <span className="v19-event-main">
-        <strong>{title}</strong>
-        <em>{meta}</em>
+      <span className="v19-event-cell">
+        <span className={cn("v19-event-icon", `tone-${tone}`)} aria-hidden="true">
+          {icon}
+        </span>
+        <span className="v19-event-main">
+          <strong>{title}</strong>
+          <em>{meta}</em>
+        </span>
       </span>
       <Badge tone={tone}>{badge}</Badge>
-      <span className="v19-event-action">{action}</span>
-    </button>
+      <button className="v19-event-action" type="button" onClick={onAction}>
+        {action}
+      </button>
+    </div>
   );
 }
 
@@ -335,6 +378,7 @@ export function ActionRow({
   context,
   cta,
   onOpen,
+  selected = false,
   severity,
   title,
 }: {
@@ -345,12 +389,19 @@ export function ActionRow({
   context: ReactNode;
   cta: string;
   onOpen: () => void;
+  selected?: boolean;
   severity: "blocker" | "info" | "ready" | "warning";
   title: string;
 }) {
   return (
     <button
-      className={cn("v19-event-row", "v19-action-row", `severity-${severity}`)}
+      className={cn(
+        "v19-event-row",
+        "v19-action-row",
+        `severity-${severity}`,
+        selected && "is-selected",
+      )}
+      aria-current={selected ? "true" : undefined}
       type="button"
       onClick={onOpen}
     >
@@ -466,7 +517,7 @@ export function SubmissionCollectionRow({
             </span>
           ) : null}
         </Badge>
-        {compact && statusDetail ? <em>{statusDetail}</em> : null}
+        {statusDetail ? <em>{statusDetail}</em> : null}
       </span>
       {!compact ? (
         <span className="v19-submission-file-tag" aria-label={`Файлы: ${fileState}`}>

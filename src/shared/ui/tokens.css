@@ -81,7 +81,7 @@
   --v19-fg-muted: var(--vf-text-tertiary);
   --v19-accent: rgb(var(--accent));
   --v19-accent-hover: rgb(var(--accent-hover));
-  --v19-accent-fg: #06101b;
+  --v19-accent-fg: #000000;
   --v19-danger: rgb(var(--danger));
   --v19-success: rgb(var(--success));
   --v19-warning: rgb(var(--warning));
