@@ -330,21 +330,25 @@ export function ContextRail({
 export function CollectionRow({
   action,
   badge,
-  icon,
+  family,
   meta,
   onAction,
+  passport,
   read,
   title,
   tone,
+  trip,
 }: {
   action: string;
   badge: string;
-  icon: ReactNode;
+  family?: boolean;
   meta: ReactNode;
   onAction: () => void;
+  passport: string;
   read: boolean;
   title: string;
   tone: "amber" | "blue" | "danger" | "muted" | "teal";
+  trip: string;
 }) {
   return (
     <div
@@ -357,14 +361,38 @@ export function CollectionRow({
       <span className={cn("v19-event-tone-strip", `tone-${tone}`)} aria-hidden="true" />
       <span className="v19-unread-dot" aria-hidden="true" />
       <span className="v19-event-cell">
-        <span className={cn("v19-event-icon", `tone-${tone}`)} aria-hidden="true">
-          {icon}
+        <span
+          className={cn(
+            "v19-event-persona-icon",
+            family ? "is-family" : "is-single",
+          )}
+          aria-hidden="true"
+        >
+          {family ? (
+            <SvgIcon>
+              <path d="M15.5 18.5v-1a3.5 3.5 0 0 0-7 0v1" />
+              <circle cx="12" cy="8.5" r="3" />
+              <path d="M20 18.5v-.8a3.1 3.1 0 0 0-2.3-3" />
+              <path d="M16.9 5.8a2.8 2.8 0 0 1 0 5.4" />
+              <path d="M4 18.5v-.8a3.1 3.1 0 0 1 2.3-3" />
+              <path d="M7.1 5.8a2.8 2.8 0 0 0 0 5.4" />
+            </SvgIcon>
+          ) : (
+            <SvgIcon>
+              <path d="M18 20a6 6 0 0 0-12 0" />
+              <circle cx="12" cy="8" r="4" />
+              <path d="M18.5 8.5h2" />
+              <path d="M19.5 7.5v2" />
+            </SvgIcon>
+          )}
         </span>
         <span className="v19-event-main">
           <strong>{title}</strong>
-          <em>{meta}</em>
+          <em className="sr-only">{meta}</em>
         </span>
       </span>
+      <span className="v19-event-passport">{passport}</span>
+      <span className="v19-event-trip">{trip}</span>
       <Badge tone={tone}>{badge}</Badge>
       <button className="v19-event-action" type="button" onClick={onAction}>
         {action}

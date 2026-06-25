@@ -19,18 +19,19 @@ export type OperationalNavItem = {
 
 export function OperationalSidebar({
   brand = "VisaFlow",
+  createAction,
   footer,
   items,
   mobileTitle,
-  onRoleClick,
-  roleLabel,
 }: {
   brand?: string;
+  createAction?: {
+    label: string;
+    onClick: () => void;
+  };
   footer: ReactNode;
   items: OperationalNavItem[];
   mobileTitle?: string;
-  onRoleClick?: () => void;
-  roleLabel: string;
 }) {
   return (
     <aside className="ops-sidebar" aria-label="Операционный центр">
@@ -43,31 +44,9 @@ export function OperationalSidebar({
       <div className="ops-brand" aria-label={brand}>
         <img className="ops-brand-logo" src={logoUrl} alt="" aria-hidden="true" />
         <div className="ops-brand-copy">
-          <strong>VisaFlow V-19</strong>
-          <em>Операции по Испании</em>
+          <strong>VisaFlow</strong>
         </div>
-        <button
-          className="ops-role-chip"
-          type="button"
-          aria-label="Открыть выбор рабочей роли"
-          title="Рабочая роль"
-          onClick={onRoleClick}
-        >
-          {roleLabel}
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="m9 6 6 6-6 6" />
-          </svg>
-        </button>
       </div>
-      <button className="ops-sidebar-command" type="button">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="m16 16 5 5" />
-        </svg>
-        <span>Найти подачу</span>
-        <kbd>⌘ K</kbd>
-      </button>
-      <p className="ops-nav-label">Рабочая область</p>
       <nav className="ops-nav" aria-label="Операционные разделы">
         {items.map((item) => (
           <Button
@@ -96,6 +75,21 @@ export function OperationalSidebar({
           </Button>
         ))}
       </nav>
+      {createAction ? (
+        <button
+          className="ops-sidebar-create"
+          type="button"
+          aria-label={createAction.label}
+          onClick={createAction.onClick}
+        >
+          <span aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </span>
+          <strong>{createAction.label}</strong>
+        </button>
+      ) : null}
       <div className="ops-sidebar-footer">{footer}</div>
     </aside>
   );

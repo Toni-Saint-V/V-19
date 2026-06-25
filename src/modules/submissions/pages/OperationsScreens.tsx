@@ -631,6 +631,7 @@ export function AgentActionsScreen({
 
 export function AgentInboxScreen({
   cityControl,
+  contextRailEnabled,
   inboxEvents,
   onOpen,
   searchControl,
@@ -638,6 +639,7 @@ export function AgentInboxScreen({
   summary,
 }: {
   cityControl?: ReactNode;
+  contextRailEnabled?: boolean;
   inboxEvents?: InboxEvent[];
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   searchControl: ReactNode;
@@ -648,7 +650,7 @@ export function AgentInboxScreen({
   const [actionOnly, setActionOnly] = useState(false);
   const [comfortableView, setComfortableView] = useState(true);
   const [informationalOnly, setInformationalOnly] = useState(false);
-  const hasContextRail = cityControl != null;
+  const hasContextRail = contextRailEnabled ?? cityControl != null;
   const [panelOpen, setPanelOpen] = useState(
     () => hasContextRail && defaultContextRailOpen(),
   );
@@ -799,34 +801,9 @@ export function AgentInboxScreen({
       {hasContextRail ? panelToggleTool : null}
     </>
   );
-  type InboxMobileFilter = "action" | "all" | "info" | "unread";
-  const mobileFilterValue: InboxMobileFilter = informationalOnly
-    ? "info"
-    : actionOnly
-      ? "action"
-      : activeTab;
-  const mobileFilterOptions: Array<MobileFilterOption<InboxMobileFilter>> = [
-    { count: unreadCount, id: "unread", label: "Непрочитанные" },
-    { count: events.length, id: "all", label: "Все события" },
-    { count: actionEventCount, id: "action", label: "Требуют действия" },
-    { count: informationalEventCount, id: "info", label: "Информационные" },
-  ];
   const toolbarTools = (
     <ToolbarTools>
       <div className="v19-desktop-toolbar-tools">{toolbarToolButtons}</div>
-      <MobileFilterSheet<InboxMobileFilter>
-        label="Фильтры входящих"
-        options={mobileFilterOptions}
-        title="Статус входящих"
-        value={mobileFilterValue}
-        onValueChange={(nextFilter) =>
-          transitionUiState(() => {
-            setActionOnly(nextFilter === "action");
-            setInformationalOnly(nextFilter === "info");
-            setActiveTab(nextFilter === "unread" ? "unread" : "all");
-          })
-        }
-      />
       {mobilePanelToggleTool}
     </ToolbarTools>
   );
@@ -894,13 +871,15 @@ export function AgentInboxScreen({
                   <CollectionRow
                     action={event.action}
                     badge={event.badge}
-                    icon={<InboxEventIcon icon={event.icon} />}
+                    family={event.submission.type === "family"}
                     key={event.id}
                     meta={<InboxEventMeta event={event} />}
                     onAction={() => openEventDrawer(event)}
+                    passport={inboxPassportNumber(event.submission)}
                     read={event.read}
                     title={event.title}
                     tone={event.tone}
+                    trip={tripDates(event.submission)}
                   />
                 ))}
               </div>
@@ -1017,9 +996,7 @@ function inboxRailNewsTitle(event: InboxEvent) {
 function InboxEventMeta({ event }: { event: InboxEvent }) {
   return (
     <span className="v19-inbox-event-meta">
-      <span>{inboxEventSourceLabel(event)}</span>
       <span>{event.context}</span>
-      <span>{event.time}</span>
     </span>
   );
 }
@@ -1030,43 +1007,6 @@ function inboxEventSourceLabel(event: InboxEvent) {
   if (event.badge === "Принято") return "Проверка";
   if (event.badge === "Черновик") return "Система";
   return event.submission.title;
-}
-
-function InboxEventIcon({ icon }: { icon: string }) {
-  if (icon === "issue") {
-    return (
-      <SvgIcon>
-        <path d="M12 8v5" />
-        <path d="M12 17h.01" />
-        <path d="M10.3 4.8h3.4l6.5 11.4-1.7 3H5.5l-1.7-3 6.5-11.4Z" />
-      </SvgIcon>
-    );
-  }
-
-  if (icon === "file") {
-    return (
-      <SvgIcon>
-        <path d="M7 4.5h7l3 3V19.5H7V4.5Z" />
-        <path d="M14 4.5v4h4" />
-        <path d="M9.5 13h5" />
-      </SvgIcon>
-    );
-  }
-
-  if (icon === "accepted") {
-    return (
-      <SvgIcon>
-        <path d="m5 12 4 4L19 6" />
-      </SvgIcon>
-    );
-  }
-
-  return (
-    <SvgIcon>
-      <path d="M12 6v6l4 2" />
-      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
-    </SvgIcon>
-  );
 }
 
 function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
@@ -1100,59 +1040,72 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
       action: "Открыть",
       badge: "Возвращено",
       context: "2 блокера",
-      icon: "issue",
       id: `agent-inbox-reference-returned-${returned.id}`,
       needsAction: true,
       read: false,
       submission: returned,
       tab: "issues",
       time: "12 мин назад",
-      title: `Подачу «${returned.title}» вернули на исправление`,
+      title: inboxSubmissionLeadName(returned),
       tone: "danger",
     },
     {
       action: "Открыть",
       badge: "Видео",
-      context: videoApplicant?.fullName ?? videoIssue.title,
-      icon: "file",
+      context: "Видео",
       id: `agent-inbox-reference-video-${videoIssue.id}`,
       needsAction: true,
       read: false,
       submission: videoIssue,
       tab: "files",
       time: "34 мин назад",
-      title: "Администратор уточнил замечание по видео",
+      title: videoApplicant?.fullName ?? inboxSubmissionLeadName(videoIssue),
       tone: "amber",
     },
     {
       action: "Открыть",
       badge: "Принято",
-      context: "Готово к выгрузке",
-      icon: "accepted",
+      context: "Принято",
       id: `agent-inbox-reference-accepted-${accepted.id}`,
       needsAction: false,
       read: false,
       submission: accepted,
       tab: "overview",
       time: "1 ч назад",
-      title: `Подача «${accepted.title}» принята`,
+      title: inboxSubmissionLeadName(accepted),
       tone: "teal",
     },
     {
       action: "Открыть",
       badge: "Черновик",
-      context: draft.title,
-      icon: "status",
+      context: "Черновик",
       id: `agent-inbox-reference-draft-${draft.id}`,
       needsAction: false,
       read: true,
       submission: draft,
       tab: "overview",
       time: "вчера, 18:42",
-      title: "Черновик автоматически сохранён",
+      title: inboxSubmissionLeadName(draft),
       tone: "muted",
     },
   ];
+}
+
+function inboxSubmissionLeadName(submission: Submission) {
+  return submission.applicants[0]?.fullName ?? submission.title;
+}
+
+function inboxPassportNumber(submission: Submission) {
+  const applicant = submission.applicants[0];
+  const extractedPassport = applicant?.passportExtraction?.extractedFields
+    .find((field) => field.key === "passportNumber")
+    ?.value.trim();
+  const questionnairePassport = applicant?.sections
+    .flatMap((section) => section.fields)
+    .find((field) => field.id === "passport-no")
+    ?.value.trim();
+
+  return extractedPassport || questionnairePassport || "—";
 }
 
 export function AgentSubmissionsScreen({
