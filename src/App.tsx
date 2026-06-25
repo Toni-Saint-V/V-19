@@ -882,6 +882,7 @@ function MainApp() {
   function showAgentInbox() {
     requestSettingsLeave(() => {
       setSurface("agent-inbox");
+      setAgentTab("action");
       setDrawerMode("closed");
       const nextSubmission =
         firstAgentSubmissionForTab("action") ?? searchedAgentQueue[0];
@@ -2088,7 +2089,7 @@ function MainApp() {
   const inboxSearchControl = (
     <SearchBar
       label="Поиск по входящим"
-      placeholder="Поиск по входящим"
+      placeholder="Имя, ID или заявитель"
       value={query}
       onChange={setQuery}
     />
@@ -2096,7 +2097,7 @@ function MainApp() {
   const agentActionsSearchControl = (
     <SearchBar
       label="Поиск по действиям"
-      placeholder="Поиск по действиям"
+      placeholder="Имя, ID или заявитель"
       value={query}
       onChange={setQuery}
     />
@@ -2111,9 +2112,7 @@ function MainApp() {
   );
   const showMobileCreateDock =
     role === "agent" &&
-    (surface === "agent-inbox" ||
-      surface === "agent-actions" ||
-      surface === "agent-submissions");
+    (surface === "agent-actions" || surface === "agent-submissions");
 
   if (!hasWorkspaceAccess) {
     return (
@@ -2213,10 +2212,14 @@ function MainApp() {
             <h1>{surfaceTitle(surface)}</h1>
             <p>{surfaceDescription(surface)}</p>
           </div>
-          {surface === "agent-submissions" ? (
+          {surface === "agent-submissions" ||
+          surface === "agent-inbox" ||
+          surface === "agent-actions" ? (
             <Button
-              className="v19-topbar-cta"
-              variant="primary"
+              className={`v19-topbar-cta ${
+                surface === "agent-inbox" ? "is-secondary" : ""
+              }`}
+              variant={surface === "agent-inbox" ? "secondary" : "primary"}
               onClick={openCreateSubmissionDrawer}
             >
               <span aria-hidden="true">+</span>

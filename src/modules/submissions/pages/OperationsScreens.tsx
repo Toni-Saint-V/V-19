@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import {
   Badge,
@@ -32,20 +32,27 @@ import {
   type ReviewTab,
 } from "../uiTypes";
 import { EmptyState, SummaryRow } from "../components/Primitives";
+import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
   ActionRow,
   CollectionGroupLabel,
   CollectionRow,
   CollectionToolbar,
   ContextPanel,
+  ContextRail,
   type CollectionActiveFilter,
   SubmissionCollectionRow,
   SvgIcon,
-  SummaryFilterTabs,
   ToolbarIconButton,
   ToolbarTools,
 } from "../components/CollectionPrimitives";
-import { targetForIssue, type WorkspaceTarget } from "../workspaceModel";
+import {
+  buildReadinessQueue,
+  firstActionableQueueItem,
+  sectionNavigationTarget,
+  targetForIssue,
+  type WorkspaceTarget,
+} from "../workspaceModel";
 
 function pluralRu(count: number, one: string, few: string, many: string) {
   const mod10 = Math.abs(count) % 10;
@@ -208,6 +215,108 @@ function MobileFilterSheet<T extends string>({
   );
 }
 
+function firstFileWorkspaceTarget(submission: Submission): WorkspaceTarget | undefined {
+  const file =
+    submission.files.find((item) => item.status === "needs_replacement") ??
+    submission.files.find(
+      (item) => item.status === "missing" || item.status === "pending_review",
+    );
+
+  if (!file) {
+    return undefined;
+  }
+
+  return {
+    applicantId: file.applicantId,
+    fileType: file.type,
+    tab: "files",
+  };
+}
+
+function firstQuestionnaireWorkspaceTarget(
+  submission: Submission,
+): WorkspaceTarget | undefined {
+  const applicant = submission.applicants.find((item) =>
+    ["empty", "partial", "needs_fix"].includes(item.questionnaireStatus),
+  );
+  const section = applicant?.sections.find((item) => item.status !== "complete");
+
+  if (!applicant || !section) {
+    return undefined;
+  }
+
+  return sectionNavigationTarget(submission, section.title);
+}
+
+function queueTargetForTab(
+  submission: Submission,
+  tab: DrawerTab,
+): WorkspaceTarget | undefined {
+  return buildReadinessQueue(submission).find((item) => item.target.tab === tab)
+    ?.target;
+}
+
+function targetForSubmissionTab(
+  submission: Submission,
+  tab: DrawerTab,
+): WorkspaceTarget | undefined {
+  const queueTarget = queueTargetForTab(submission, tab);
+
+  if (queueTarget) {
+    return queueTarget;
+  }
+
+  if (tab === "files") {
+    return firstFileWorkspaceTarget(submission);
+  }
+
+  if (tab === "questionnaire") {
+    return firstQuestionnaireWorkspaceTarget(submission);
+  }
+
+  if (tab === "issues") {
+    const issue = primarySubmissionIssue(submission);
+    return issue ? targetForIssue(issue) : undefined;
+  }
+
+  return firstActionableQueueItem(submission)?.target;
+}
+
+function drawerTabForScreenTarget(
+  target: WorkspaceTarget | undefined,
+  fallback: DrawerTab,
+): DrawerTab {
+  return target?.tab ?? fallback;
+}
+
+function defaultContextRailOpen() {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  return window.innerWidth >= 1280;
+}
+
+function useContextRailEscape(isOpen: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+}
+
 export function AgentActionsScreen({
   cityControl,
   completedActions,
@@ -228,7 +337,11 @@ export function AgentActionsScreen({
   const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "today" | "week">(
     "all",
   );
-  const [panelOpen, setPanelOpen] = useState(true);
+  const hasContextRail = cityControl != null;
+  const [panelOpen, setPanelOpen] = useState(
+    () => hasContextRail && defaultContextRailOpen(),
+  );
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [sortOldest, setSortOldest] = useState(false);
 
   const baseActions = activeTab === "open" ? openActions : completedActions;
@@ -242,9 +355,9 @@ export function AgentActionsScreen({
       : baseActions;
   const orderedActions = sortOldest ? [...filteredActions].reverse() : filteredActions;
   const visibleActions = orderedActions;
-  const upcomingDeadlines = openActions
-    .filter((action) => action.due !== "completed")
-    .slice(0, 3);
+  const selectedAction =
+    visibleActions.find((action) => action.id === selectedActionId) ??
+    visibleActions[0];
   const actionGroupLabel =
     activeTab === "completed"
       ? "Выполненные действия"
@@ -290,14 +403,34 @@ export function AgentActionsScreen({
       setSortOldest(false);
       setComfortableView(true);
     });
+  useContextRailEscape(hasContextRail && panelOpen, closePanel);
+
+  function closePanel() {
+    transitionUiState(() => setPanelOpen(false));
+  }
+
+  function togglePanel() {
+    transitionUiState(() => setPanelOpen((value) => !value));
+  }
+
   const panelToggleTool = (
     <ToolbarIconButton
-      label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
+      label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
       icon="panel"
       pressed={panelOpen}
-      onClick={() => transitionUiState(() => setPanelOpen((value) => !value))}
+      onClick={togglePanel}
     />
   );
+  const mobilePanelToggleTool = hasContextRail ? (
+    <div className="v19-mobile-context-tool">
+      <ToolbarIconButton
+        label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
+        icon="panel"
+        pressed={panelOpen}
+        onClick={togglePanel}
+      />
+    </div>
+  ) : null;
   const toolbarToolButtons = (
     <>
       <ToolbarIconButton
@@ -318,7 +451,7 @@ export function AgentActionsScreen({
         pressed={sortOldest}
         onClick={() => transitionUiState(() => setSortOldest((value) => !value))}
       />
-      {panelToggleTool}
+      {hasContextRail ? panelToggleTool : null}
     </>
   );
   type ActionMobileFilter = "completed" | "open" | "overdue" | "today";
@@ -355,25 +488,29 @@ export function AgentActionsScreen({
           })
         }
       />
+      {mobilePanelToggleTool}
     </ToolbarTools>
   );
+  function openAction(action: AgentActionItem) {
+    const target = targetForSubmissionTab(action.submission, action.tab);
+
+    setSelectedActionId(action.id);
+    onOpen(action.submission, drawerTabForScreenTarget(target, action.tab), target);
+  }
 
   return (
-    <div
-      className={`v19-screen-grid v19-inbox-screen v19-actions-screen ${
-        panelOpen ? "" : "is-panel-closed"
-      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
-    >
+    <>
+      <div
+        className={`v19-screen-grid v19-inbox-screen v19-actions-screen ${
+          panelOpen ? "" : "is-panel-closed"
+        } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+      >
       <CardComponent
         as="section"
         className={
-          activeTab === "open" && activeFilters.length
-            ? "v19-collection-panel has-summary-filters has-active-filters"
-            : activeTab === "open"
-              ? "v19-collection-panel has-summary-filters"
-              : activeFilters.length
-                ? "v19-collection-panel has-active-filters"
-                : "v19-collection-panel"
+          activeFilters.length
+            ? "v19-collection-panel has-active-filters"
+            : "v19-collection-panel"
         }
         aria-labelledby="agent-actions-title"
       >
@@ -385,36 +522,6 @@ export function AgentActionsScreen({
           activeFilters={activeFilters}
           ariaLabel="Инструменты действий"
           className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
-          filterTabs={
-            activeTab === "open" ? (
-              <SummaryFilterTabs
-                ariaLabel="Сроки действий"
-                onValueChange={(nextFilter) =>
-                  transitionUiState(() =>
-                    setDueFilter((value) =>
-                      value === nextFilter ? "all" : nextFilter,
-                    ),
-                  )
-                }
-                tabs={[
-                  {
-                    count: summary.overdue,
-                    id: "overdue",
-                    label: "Просрочено",
-                    tone: "danger",
-                  },
-                  { count: summary.today, id: "today", label: "Сегодня", tone: "amber" },
-                  {
-                    count: summary.week,
-                    id: "week",
-                    label: "На неделе",
-                    tone: "neutral",
-                  },
-                ]}
-                value={dueFilter === "all" ? null : dueFilter}
-              />
-            ) : null
-          }
           mobileCityControl={cityControl}
           mobileTitle="Мои действия"
           onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
@@ -447,8 +554,9 @@ export function AgentActionsScreen({
                 cta={action.cta}
                 key={action.id}
                 severity={action.severity}
+                selected={selectedAction?.id === action.id}
                 title={action.title}
-                onOpen={() => onOpen(action.submission, action.tab)}
+                onOpen={() => openAction(action)}
               />
             ))}
           </div>
@@ -466,40 +574,58 @@ export function AgentActionsScreen({
         )}
       </CardComponent>
 
-      {panelOpen ? (
-        <ContextPanel label="Нагрузка по действиям">
-          <p className="kicker">Нагрузка</p>
-          <div className="v19-unread-summary">
-            <strong>{summary.open}</strong>
-            <span>
-              {pluralRu(
-                summary.open,
-                "открытое действие",
-                "открытых действия",
-                "открытых действий",
-              )}
-            </span>
-          </div>
-          <div className="v19-panel-metrics v19-actions-metrics">
-            <span>
-              <em>{summary.overdue} просрочено</em>
-            </span>
-            <span>
-              <strong>{summary.today} на сегодня</strong>
-            </span>
-          </div>
-          <div className="v19-next-card v19-deadline-list">
-            <span>Следующие сроки</span>
-            {upcomingDeadlines.map((action) => (
-              <p key={action.id}>
-                <strong>{action.submission.title}</strong>
-                <em>{action.dueLabel}</em>
-              </p>
-            ))}
-          </div>
-        </ContextPanel>
+      </div>
+
+      {hasContextRail && panelOpen ? (
+        <button className="v19-context-backdrop" type="button" onClick={closePanel}>
+          <span className="sr-only">Закрыть контекст</span>
+        </button>
       ) : null}
-    </div>
+
+      {hasContextRail && panelOpen && selectedAction ? (
+        <AgentSubmissionContextRail
+          applicantSummary={applicantCountLabel(selectedAction.submission.applicants.length)}
+          fileSummary={submissionFileStateLabel(selectedAction.submission).replace(
+            "Файлы ",
+            "",
+          )}
+          history={selectedAction.submission.history}
+          issues={selectedAction.submission.issues
+            .filter((issue) => issue.status === "open")
+            .slice(0, 4)
+            .map((issue) => ({
+              id: issue.id,
+              reason: issue.reason,
+              targetLine: issueTargetLine(issue),
+              tone: issue.severity === "blocker" ? "danger" : "warning",
+              onOpen: () => {
+                onOpen(
+                  selectedAction.submission,
+                  drawerTabForIssue(issue),
+                  targetForIssue(issue),
+                );
+              },
+            }))}
+          nextAction={{
+            description: `${selectedAction.context}`,
+            label: selectedAction.cta,
+            title: selectedAction.title,
+            onOpen: () => openAction(selectedAction),
+          }}
+          openIssueCount={openIssueCount(selectedAction.submission)}
+          status={{
+            label: submissionStatusChipLabel(selectedAction.submission),
+            tone: submissionRailTone(selectedAction.submission),
+          }}
+          submission={selectedAction.submission}
+          tripSummary={tripDates(selectedAction.submission)}
+          onClose={closePanel}
+          onOpenTab={(tab) => {
+            onOpen(selectedAction.submission, tab);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -522,16 +648,15 @@ export function AgentInboxScreen({
   const [actionOnly, setActionOnly] = useState(false);
   const [comfortableView, setComfortableView] = useState(true);
   const [informationalOnly, setInformationalOnly] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [readEventIds, setReadEventIds] = useState<Set<string>>(() => new Set());
+  const hasContextRail = cityControl != null;
+  const [panelOpen, setPanelOpen] = useState(
+    () => hasContextRail && defaultContextRailOpen(),
+  );
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const events = useMemo(
-    () =>
-      (inboxEvents ?? buildAgentInboxEvents(submissions)).map((event) => ({
-        ...event,
-        read: event.read || readEventIds.has(event.id),
-      })),
-    [inboxEvents, readEventIds, submissions],
+    () => inboxEvents ?? buildAgentInboxEvents(submissions),
+    [inboxEvents, submissions],
   );
   const visibleEvents = useMemo(() => {
     const tabEvents =
@@ -557,9 +682,13 @@ export function AgentInboxScreen({
     ? unreadActionCount
     : Math.min(summary.requiresAction, unreadCount);
   const informationalEventCount = Math.max(unreadCount - actionEventCount, 0);
-  const nextEvent = visibleEvents[0] ?? events[0];
-  const panelNextEvent =
-    events.find((event) => event.id.includes("reference-video")) ?? nextEvent;
+  const selectedEvent =
+    visibleEvents.find((event) => event.id === selectedEventId) ??
+    visibleEvents[0];
+  const railEvents = events.filter((event) => !event.read).slice(0, 3);
+  const railPeerEvents = (railEvents.length ? railEvents : events)
+    .filter((event) => event.id !== selectedEvent?.id)
+    .slice(0, 2);
   const eventGroups = [
     {
       events: visibleEvents.filter((event) => !event.time.startsWith("вчера")),
@@ -608,14 +737,34 @@ export function AgentInboxScreen({
       setSortOrder("newest");
       setComfortableView(true);
     });
+  useContextRailEscape(hasContextRail && panelOpen, closePanel);
+
+  function closePanel() {
+    transitionUiState(() => setPanelOpen(false));
+  }
+
+  function togglePanel() {
+    transitionUiState(() => setPanelOpen((value) => !value));
+  }
+
   const panelToggleTool = (
     <ToolbarIconButton
-      label={panelOpen ? "Панель: показана" : "Панель: скрыта"}
+      label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
       icon="panel"
       pressed={panelOpen}
-      onClick={() => transitionUiState(() => setPanelOpen((value) => !value))}
+      onClick={togglePanel}
     />
   );
+  const mobilePanelToggleTool = hasContextRail ? (
+    <div className="v19-mobile-context-tool">
+      <ToolbarIconButton
+        label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
+        icon="panel"
+        pressed={panelOpen}
+        onClick={togglePanel}
+      />
+    </div>
+  ) : null;
   const toolbarToolButtons = (
     <>
       <ToolbarIconButton
@@ -647,7 +796,7 @@ export function AgentInboxScreen({
           )
         }
       />
-      {panelToggleTool}
+      {hasContextRail ? panelToggleTool : null}
     </>
   );
   type InboxMobileFilter = "action" | "all" | "info" | "unread";
@@ -678,25 +827,28 @@ export function AgentInboxScreen({
           })
         }
       />
+      {mobilePanelToggleTool}
     </ToolbarTools>
   );
 
-  function openEvent(event: InboxEvent) {
-    setReadEventIds((current) => new Set(current).add(event.id));
-    onOpen(event.submission, event.tab);
+  function openEventDrawer(event: InboxEvent) {
+    const target = targetForSubmissionTab(event.submission, event.tab);
+
+    setSelectedEventId(event.id);
+    onOpen(event.submission, drawerTabForScreenTarget(target, event.tab), target);
   }
 
   function openPanelNextEvent(event: InboxEvent) {
-    setReadEventIds((current) => new Set(current).add(event.id));
-    onOpen(event.submission, event.tab);
+    openEventDrawer(event);
   }
 
   return (
-    <div
-      className={`v19-screen-grid v19-inbox-screen ${
-        panelOpen ? "" : "is-panel-closed"
-      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
-    >
+    <>
+      <div
+        className={`v19-screen-grid v19-inbox-screen ${
+          panelOpen ? "" : "is-panel-closed"
+        } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+      >
       <CardComponent
         as="section"
         className={
@@ -744,19 +896,23 @@ export function AgentInboxScreen({
                     badge={event.badge}
                     icon={<InboxEventIcon icon={event.icon} />}
                     key={event.id}
-                    meta={
-                      <>
-                        {event.context} · {event.time}
-                      </>
-                    }
+                    meta={<InboxEventMeta event={event} />}
+                    onAction={() => openEventDrawer(event)}
                     read={event.read}
                     title={event.title}
                     tone={event.tone}
-                    onOpen={() => openEvent(event)}
                   />
                 ))}
               </div>
             ))}
+            {visibleEvents.length <= 1 ? (
+              <div className="v19-inbox-list-cue" aria-label="Состояние очереди входящих">
+                <strong>
+                  {unreadCount} непрочитанных · {actionEventCount} требуют реакции
+                </strong>
+                <span>Новые события появятся здесь после комментариев, возвратов и проверок.</span>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="v19-empty-state" key={`inbox-empty-${activeTab}-${actionOnly}`}>
@@ -769,47 +925,111 @@ export function AgentInboxScreen({
         )}
       </CardComponent>
 
-      {panelOpen ? (
-        <ContextPanel className="v19-inbox-summary" label="Сводка входящих">
-          <p className="kicker">Сводка</p>
-          <div className="v19-unread-summary">
-            <strong>{unreadCount}</strong>
-            <span>
-              {pluralRu(
-                unreadCount,
-                "непрочитанное событие",
-                "непрочитанных события",
-                "непрочитанных событий",
-              )}
-            </span>
-          </div>
-          <div className="v19-panel-metrics">
-            <span>
-              Требуют действия
-              <strong>{actionEventCount}</strong>
-            </span>
-            <span>
-              Информационные
-              <strong>{informationalEventCount}</strong>
-            </span>
-          </div>
-          {panelNextEvent ? (
-            <div className="v19-next-card">
-              <span>Следующее действие</span>
-              <strong>{panelNextEvent.title}</strong>
-              <p>{panelNextEvent.context}</p>
-              <Button
-                variant="primary"
-                onClick={() => openPanelNextEvent(panelNextEvent)}
-              >
-                {panelNextEvent.action}
-              </Button>
-            </div>
-          ) : null}
-        </ContextPanel>
+      </div>
+
+      {hasContextRail && panelOpen ? (
+        <button className="v19-context-backdrop" type="button" onClick={closePanel}>
+          <span className="sr-only">Закрыть контекст</span>
+        </button>
       ) : null}
-    </div>
+
+      {hasContextRail && panelOpen ? (
+        <ContextRail
+          className="v19-inbox-summary"
+          label="Фокус входящего"
+          title={selectedEvent ? selectedEvent.badge : "Входящие"}
+          onClose={closePanel}
+        >
+          <section className="v19-rail-card v19-inbox-overview-card">
+            <h3>Очередь входящих</h3>
+            <div className="v19-inbox-summary-line">
+              <span>
+                <strong>{unreadCount}</strong>
+                <em>Непрочитанных</em>
+              </span>
+              <span>
+                <strong>{actionEventCount}</strong>
+                <em>Требуют реакции</em>
+              </span>
+              <span>
+                <strong>{informationalEventCount}</strong>
+                <em>Инфо</em>
+              </span>
+            </div>
+          </section>
+
+          {selectedEvent ? (
+            <section className="v19-rail-card v19-inbox-next-card">
+              <p className="v19-rail-label">Текущее событие</p>
+              <h3>{selectedEvent.title}</h3>
+              <p>
+                {inboxEventSourceLabel(selectedEvent)} · {selectedEvent.context} ·{" "}
+                {selectedEvent.time}
+              </p>
+              <Button variant="primary" onClick={() => openPanelNextEvent(selectedEvent)}>
+                {selectedEvent.action}
+                <SvgIcon>
+                  <path d="M9 6l6 6-6 6" />
+                </SvgIcon>
+              </Button>
+            </section>
+          ) : null}
+
+          {railPeerEvents.length ? (
+            <section className="v19-rail-card">
+              <h3>Ещё в очереди</h3>
+              <div className="v19-rail-status-list">
+                {railPeerEvents.map((event) => (
+                  <button
+                    className="v19-rail-news-item"
+                    key={event.id}
+                    type="button"
+                    onClick={() => openPanelNextEvent(event)}
+                  >
+                    <span
+                      className={`v19-rail-issue-dot tone-${event.tone === "danger" ? "danger" : event.tone === "amber" ? "warning" : "success"}`}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      <strong>{inboxRailNewsTitle(event)}</strong>
+                      <small>
+                        {inboxEventSourceLabel(event)} · {event.time}
+                      </small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </ContextRail>
+      ) : null}
+    </>
   );
+}
+
+function inboxRailNewsTitle(event: InboxEvent) {
+  if (event.badge === "Возвращено") return "Возврат на исправление";
+  if (event.badge === "Видео") return "Комментарий к видео";
+  if (event.badge === "Принято") return "Подача принята";
+  return event.title;
+}
+
+function InboxEventMeta({ event }: { event: InboxEvent }) {
+  return (
+    <span className="v19-inbox-event-meta">
+      <span>{inboxEventSourceLabel(event)}</span>
+      <span>{event.context}</span>
+      <span>{event.time}</span>
+    </span>
+  );
+}
+
+function inboxEventSourceLabel(event: InboxEvent) {
+  if (event.badge === "Возвращено") return "Администратор";
+  if (event.badge === "Видео") return "Файл";
+  if (event.badge === "Принято") return "Проверка";
+  if (event.badge === "Черновик") return "Система";
+  return event.submission.title;
 }
 
 function InboxEventIcon({ icon }: { icon: string }) {
@@ -860,6 +1080,12 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
     submissions.find((submission) =>
       submission.files.some((file) => file.status === "needs_replacement"),
     ) ?? returned;
+  const videoFile = videoIssue.files.find(
+    (file) => file.status === "needs_replacement",
+  );
+  const videoApplicant = videoIssue.applicants.find(
+    (applicant) => applicant.id === videoFile?.applicantId,
+  );
   const accepted =
     submissions.find((submission) => submission.status === "ready_for_export") ??
     submissions[2] ??
@@ -881,13 +1107,13 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
       submission: returned,
       tab: "issues",
       time: "12 мин назад",
-      title: "Подачу «Семья Петровых» вернули на исправление",
+      title: `Подачу «${returned.title}» вернули на исправление`,
       tone: "danger",
     },
     {
       action: "Открыть",
       badge: "Видео",
-      context: "Пётр Петров",
+      context: videoApplicant?.fullName ?? videoIssue.title,
       icon: "file",
       id: `agent-inbox-reference-video-${videoIssue.id}`,
       needsAction: true,
@@ -909,13 +1135,13 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
       submission: accepted,
       tab: "overview",
       time: "1 ч назад",
-      title: "Подача «Анна Смирнова» принята",
+      title: `Подача «${accepted.title}» принята`,
       tone: "teal",
     },
     {
       action: "Открыть",
       badge: "Черновик",
-      context: "Семья Орловых",
+      context: draft.title,
       icon: "status",
       id: `agent-inbox-reference-draft-${draft.id}`,
       needsAction: false,
@@ -933,6 +1159,7 @@ export function AgentSubmissionsScreen({
   activeTab,
   agentList,
   hasSearchQuery = false,
+  mobileTitle = "Мои подачи",
   onClearFilters,
   onCreate,
   onOpen,
@@ -945,6 +1172,7 @@ export function AgentSubmissionsScreen({
   activeTab: AgentTab;
   agentList: Submission[];
   hasSearchQuery?: boolean;
+  mobileTitle?: string;
   onClearFilters?: () => void;
   onCreate: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
@@ -1115,7 +1343,7 @@ export function AgentSubmissionsScreen({
           activeFilters={activeFilters}
           ariaLabel="Инструменты подач"
           className="v19-agent-mobile-toolbar"
-          mobileTitle="Мои подачи"
+          mobileTitle={mobileTitle}
           onClearActiveFilters={activeFilters.length ? resetFilters : undefined}
           onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
           search={searchControl}
@@ -1155,10 +1383,14 @@ export function AgentSubmissionsScreen({
                   key={submission.id}
                   meta={submissionIdentityMeta(submission)}
                   status={submission.status}
-                  statusDetail={submissionStatusDetailLine(submission)}
-                  statusLabel={formatSubmissionListStatus(submission)}
+                  statusDetail={
+                    railCompact
+                      ? submissionStatusDetailLine(submission)
+                      : submissionIssueDetailLine(submission)
+                  }
+                  statusLabel={submissionStatusChipLabel(submission)}
                   submissionId={submission.id}
-                  title={formatSubmissionListTitle(submission)}
+                  title={submission.title}
                   trip={submission.city}
                   tripDetail={tripDates(submission)}
                   onOpen={() => {
@@ -1184,165 +1416,56 @@ export function AgentSubmissionsScreen({
         )}
       </CardComponent>
 
-      {panelOpen ? (
-        <ContextPanel className="v19-submissions-context" label="Контекст подачи">
-          <div className="v19-rail-header">
-            <div>
-              <p className="kicker">Контекст подачи</p>
-              <h2>{prioritySubmission?.title ?? "Подача не выбрана"}</h2>
-            </div>
-            <button
-              className="v19-rail-close"
-              type="button"
-              aria-label="Скрыть контекст"
-              onClick={() => setV17PanelOpen(false)}
-            >
-              <SvgIcon>
-                <path d="m6 6 12 12M18 6 6 18" />
-              </SvgIcon>
-            </button>
-          </div>
-          {prioritySubmission ? (
-            <>
-              <section className="v19-rail-card v19-rail-card-primary">
-                <p className="v19-rail-meta">
-                  {prioritySubmission.id} · {prioritySubmission.city}
-                </p>
-                <div className="v19-rail-statusline">
-                  <Badge tone={submissionRailTone(prioritySubmission)}>
-                    {formatSubmissionListStatus(prioritySubmission)}
-                  </Badge>
-                  <strong>{prioritySubmission.completeness.total}%</strong>
-                </div>
-                <div
-                  className="v19-rail-progress"
-                  style={
-                    {
-                      "--progress": `${prioritySubmission.completeness.total}%`,
-                    } as CSSProperties
-                  }
-                  aria-hidden="true"
-                />
-                <p className="v19-rail-meta">
-                  {applicantCountLabel(prioritySubmission.applicants.length)} ·{" "}
-                  {tripDates(prioritySubmission)} ·{" "}
-                  {submissionFileStateLabel(prioritySubmission).replace("Файлы ", "")}
-                </p>
-              </section>
-
-              <section className="v19-rail-card">
-                <p className="v19-rail-label">Следующее действие</p>
-                <h3>{priorityIssue?.reason ?? submissionActionLabel(prioritySubmission)}</h3>
-                <p>{priorityIssue?.comment ?? submissionPriorityLine(prioritySubmission)}</p>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    openPriorityTarget(
-                      prioritySubmission,
-                      priorityIssue
-                        ? drawerTabForIssue(priorityIssue)
-                        : defaultDrawerTab(prioritySubmission),
-                      priorityIssue ? targetForIssue(priorityIssue) : undefined,
-                    );
-                  }}
-                >
-                  {priorityIssue ? issueActionLabel(priorityIssue) : submissionActionLabel(prioritySubmission)}
-                </Button>
-              </section>
-
-              <section className="v19-rail-card">
-                <p className="v19-rail-label">
-                  Открытые замечания · {openIssueCount(prioritySubmission)}
-                </p>
-                <div className="v19-rail-issue-list">
-                  {prioritySubmission.issues
-                    .filter((issue) => issue.status === "open")
-                    .slice(0, 4)
-                    .map((issue) => (
-                      <button
-                        className="v19-rail-issue"
-                        key={issue.id}
-                        type="button"
-                        onClick={() => {
-                          openPriorityTarget(
-                            prioritySubmission,
-                            drawerTabForIssue(issue),
-                            targetForIssue(issue),
-                          );
-                        }}
-                      >
-                        <span
-                          className={`v19-rail-issue-dot tone-${issue.severity === "blocker" ? "danger" : "warning"}`}
-                          aria-hidden="true"
-                        />
-                        <span>
-                          <strong>{issue.reason}</strong>
-                          <small>{issueTargetLine(issue)}</small>
-                        </span>
-                        <SvgIcon>
-                          <path d="M9 6l6 6-6 6" />
-                        </SvgIcon>
-                      </button>
-                    ))}
-                </div>
-              </section>
-
-              <section className="v19-rail-card">
-                <p className="v19-rail-label">Быстрые переходы</p>
-                <div className="v19-rail-quick-links">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      openPriorityTarget(prioritySubmission, "questionnaire");
-                    }}
-                  >
-                    <SvgIcon>
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </SvgIcon>
-                    Анкета
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      openPriorityTarget(prioritySubmission, "files");
-                    }}
-                  >
-                    <SvgIcon>
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-                      <path d="M14 2v6h6" />
-                    </SvgIcon>
-                    Файлы
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      openPriorityTarget(prioritySubmission, "issues");
-                    }}
-                  >
-                    <SvgIcon>
-                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-                      <path d="M12 9v4M12 17h.01" />
-                    </SvgIcon>
-                    Замечания
-                  </Button>
-                </div>
-              </section>
-
-              <section className="v19-rail-card">
-                <p className="v19-rail-label">Последние изменения</p>
-                <div className="v19-rail-history">
-                  {prioritySubmission.history.slice(0, 2).map((item) => (
-                    <span key={item.id}>
-                      <strong>{item.text}</strong>
-                      <small>{item.at}{item.detail ? ` · ${item.detail}` : ""}</small>
-                    </span>
-                  ))}
-                </div>
-              </section>
-            </>
-          ) : null}
-        </ContextPanel>
+      {panelOpen && prioritySubmission ? (
+        <AgentSubmissionContextRail
+          applicantSummary={applicantCountLabel(prioritySubmission.applicants.length)}
+          fileSummary={submissionFileStateLabel(prioritySubmission).replace("Файлы ", "")}
+          history={prioritySubmission.history}
+          issues={prioritySubmission.issues
+            .filter((issue) => issue.status === "open")
+            .slice(0, 4)
+            .map((issue) => ({
+              id: issue.id,
+              reason: issue.reason,
+              targetLine: issueTargetLine(issue),
+              tone: issue.severity === "blocker" ? "danger" : "warning",
+              onOpen: () => {
+                openPriorityTarget(
+                  prioritySubmission,
+                  drawerTabForIssue(issue),
+                  targetForIssue(issue),
+                );
+              },
+            }))}
+          nextAction={{
+            description:
+              priorityIssue?.comment ?? submissionPriorityLine(prioritySubmission),
+            label: priorityIssue
+              ? issueActionLabel(priorityIssue)
+              : submissionActionLabel(prioritySubmission),
+            title: priorityIssue?.reason ?? submissionActionLabel(prioritySubmission),
+            onOpen: () => {
+              openPriorityTarget(
+                prioritySubmission,
+                priorityIssue
+                  ? drawerTabForIssue(priorityIssue)
+                  : defaultDrawerTab(prioritySubmission),
+                priorityIssue ? targetForIssue(priorityIssue) : undefined,
+              );
+            },
+          }}
+          openIssueCount={openIssueCount(prioritySubmission)}
+          status={{
+            label: submissionStatusChipLabel(prioritySubmission),
+            tone: submissionRailTone(prioritySubmission),
+          }}
+          submission={prioritySubmission}
+          tripSummary={tripDates(prioritySubmission)}
+          onClose={() => setV17PanelOpen(false)}
+          onOpenTab={(tab) => {
+            openPriorityTarget(prioritySubmission, tab);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -1442,6 +1565,19 @@ function submissionStatusDetailLine(submission: Submission) {
   }
 
   return `${submission.updatedAt} · ${files}`;
+}
+
+function submissionIssueDetailLine(submission: Submission) {
+  const blockers = blockerCount(submission);
+  if (blockers > 0) {
+    return `${blockers} ${pluralRu(blockers, "блокер", "блокера", "блокеров")}`;
+  }
+
+  return openIssueCount(submission) > 0 ? "есть замечания" : undefined;
+}
+
+function submissionStatusChipLabel(submission: Submission) {
+  return statusLabels[submission.status];
 }
 
 function primarySubmissionIssue(submission: Submission) {
