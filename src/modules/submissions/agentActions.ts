@@ -43,7 +43,6 @@ export type OperationalInboxEvent = {
   action: string;
   badge: string;
   context: string;
-  icon: string;
   id: string;
   needsAction: boolean;
   read: boolean;
@@ -93,7 +92,6 @@ export function adminInboxEvents(submissions: Submission[]): OperationalInboxEve
           action: "Проверить исправления",
           badge: "Исправления",
           context: `${fixed || openIssueCount(submission)} замечания`,
-          icon: "issue",
           id: `admin-inbox-corrections-${submission.id}`,
           needsAction: true,
           read: false,
@@ -112,7 +110,6 @@ export function adminInboxEvents(submissions: Submission[]): OperationalInboxEve
           action: "Открыть проверку",
           badge: "Проверка",
           context: `${applicantCountLabel(submission.applicants.length)} · ${submission.city}`,
-          icon: "status",
           id: `admin-inbox-review-${submission.id}`,
           needsAction: true,
           read: false,
@@ -131,7 +128,6 @@ export function adminInboxEvents(submissions: Submission[]): OperationalInboxEve
           action: "Проверить пакет",
           badge: "К выгрузке",
           context: `${applicantCountLabel(submission.applicants.length)} · Excel`,
-          icon: "accepted",
           id: `admin-inbox-export-${submission.id}`,
           needsAction: true,
           read: false,
