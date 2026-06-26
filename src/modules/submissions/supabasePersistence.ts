@@ -119,7 +119,13 @@ export function readCockpitSnapshot(value: Json | null): Submission | null {
   const envelope = snapshotEnvelope(value);
   if (!envelope || envelope.version !== cockpitSnapshotVersion) return null;
 
-  return isCockpitSubmission(envelope.submission) ? envelope.submission : null;
+  if (!isCockpitSubmission(envelope.submission)) return null;
+
+  try {
+    return normalizeSubmissionForCanonicalRuntime(envelope.submission);
+  } catch {
+    return null;
+  }
 }
 
 function attachNormalizedApplicantRows(
