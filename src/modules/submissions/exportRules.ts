@@ -7,6 +7,12 @@ import type {
 } from "./types";
 import { tripDates } from "./selectors";
 import {
+  type CanonicalSubmissionStatus,
+  canonicalRequiredMediaReadiness,
+  isCanonicalFrontendMediaType,
+  normalizeLegacySubmissionStatus,
+} from "./domainContract";
+import {
   buildExportContractRows,
   buildExportPreview,
   exportContractFingerprint,
@@ -41,11 +47,15 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   const blockers: ExportBlocker[] = [];
   const contractValid = validateExportContractShape();
   const notReady = submissions.filter(
-    (submission) => submission.status !== "ready_for_export",
+    (submission) => statusForExportDecision(submission) !== "ready_for_export",
   );
   const alreadyExported = submissions.filter(
     (submission) =>
-      submission.status === "exported" || submission.exportState === "marked_exported",
+      statusForExportDecision(submission) === "exported" ||
+      submission.exportState === "marked_exported",
+  );
+  const missingCanonicalMedia = submissions.filter(
+    (submission) => !canonicalMediaReadyForExport(submission),
   );
   const emptyApplicantSubmissions = submissions.filter(
     (submission) => submission.applicants.length === 0,
@@ -74,6 +84,12 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
 
   if (alreadyExported.length > 0) {
     blockers.push({ reason: "В выборке есть уже выгруженные подачи" });
+  }
+
+  if (missingCanonicalMedia.length > 0) {
+    blockers.push({
+      reason: "В выборке есть подачи без полного канонического пакета медиа",
+    });
   }
 
   if (emptyApplicantSubmissions.length > 0) {
@@ -159,7 +175,8 @@ export function selectedReadySubmissionsForExport(
   const selectedIdSet = new Set(selectedIds);
   return submissions.filter(
     (submission) =>
-      submission.status === "ready_for_export" && selectedIdSet.has(submission.id),
+      statusForExportDecision(submission) === "ready_for_export" &&
+      selectedIdSet.has(submission.id),
   );
 }
 
@@ -237,9 +254,29 @@ export function getExportSelectionState(
 }
 
 function inferExportState(submission: Submission): ExportState {
-  if (submission.status === "exported") return "marked_exported";
-  if (submission.status === "ready_for_export") return "ready";
+  const status = statusForExportDecision(submission);
+  if (status === "exported") return "marked_exported";
+  if (status === "ready_for_export") return "ready";
   return "not_ready";
+}
+
+function statusForExportDecision(
+  submission: Submission,
+): CanonicalSubmissionStatus | null {
+  const status = normalizeLegacySubmissionStatus(submission.status);
+  return status.ok ? status.data : null;
+}
+
+function canonicalMediaReadyForExport(submission: Submission): boolean {
+  return canonicalRequiredMediaReadiness(
+    {
+      applicants: submission.applicants,
+      files: submission.files.filter((file) =>
+        isCanonicalFrontendMediaType(file.type),
+      ),
+    },
+    { requireAccepted: true },
+  ).ok;
 }
 
 function exportPackageContentFingerprint(

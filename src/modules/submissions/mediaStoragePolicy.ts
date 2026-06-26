@@ -1,17 +1,23 @@
-import type { MediaSlot, MediaSlotType } from "../../types/domain";
+import {
+  isRejectedLegacyMediaType,
+  toCanonicalStorageMediaType,
+} from "./domainContract";
+import type { CanonicalFrontendMediaType } from "./domainContract";
+import type { MediaSlot } from "../../types/domain";
 import { maxVisaApplicationPdfBytes } from "./visaApplicationPdfReviewTypes";
 
 export const mediaStorageBucket = "submission-media";
-export type MediaStorageObjectType = MediaSlotType | "visa_application_pdf";
+export type MediaStorageObjectType =
+  | CanonicalFrontendMediaType
+  | "visa_application_pdf";
 
 const mediaStorageObjectTypes = new Set<MediaStorageObjectType>([
-  "photo_white",
+  "passport_scan",
   "selfie",
   "selfie_2",
-  "passport_scan",
   "visa_application_pdf",
-  "video",
 ]);
+const legacyArchiveMediaStorageObjectTypes = new Set(["photo_white", "video"]);
 
 export interface MediaStorageTarget {
   bucket: typeof mediaStorageBucket;
@@ -19,6 +25,7 @@ export interface MediaStorageTarget {
 }
 
 export interface MediaStorageValidationInput {
+  allowLegacyArchive?: boolean;
   target: MediaStorageTarget;
   file?: Pick<File, "name" | "size" | "type">;
 }
@@ -54,6 +61,10 @@ function extensionForFileName(fileName: string): string {
 function allowedExtensions(type: MediaStorageObjectType): Set<string> {
   if (type === "visa_application_pdf") return new Set(["pdf"]);
   if (type === "passport_scan") return new Set(["jpg", "jpeg", "png", "pdf"]);
+  return new Set(["jpg", "jpeg", "png"]);
+}
+
+function allowedLegacyArchiveExtensions(type: string): Set<string> {
   return type === "video" ? new Set(["mp4"]) : new Set(["jpg", "jpeg", "png"]);
 }
 
@@ -61,6 +72,10 @@ function allowedMimeTypes(type: MediaStorageObjectType): Set<string> {
   if (type === "visa_application_pdf") return new Set(["application/pdf"]);
   if (type === "passport_scan")
     return new Set(["image/jpeg", "image/png", "application/pdf"]);
+  return new Set(["image/jpeg", "image/png"]);
+}
+
+function allowedLegacyArchiveMimeTypes(type: string): Set<string> {
   return type === "video"
     ? new Set(["video/mp4"])
     : new Set(["image/jpeg", "image/png"]);
@@ -76,13 +91,20 @@ function mimeTypeForExtension(extension: string): string | null {
 
 function maxSizeBytes(type: MediaStorageObjectType): number {
   if (type === "visa_application_pdf") return maxVisaApplicationPdfBytes;
+  return 50 * 1024 * 1024;
+}
+
+function maxLegacyArchiveSizeBytes(type: string): number {
   return type === "video" ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
 }
 
-function parseStoragePath(path: string): {
+function parseStoragePath(
+  path: string,
+  options: { allowLegacyArchive?: boolean } = {},
+): {
   submissionId: string;
   applicantId: string;
-  type: MediaStorageObjectType;
+  type: string;
   fileName: string;
 } {
   const parts = path.split("/");
@@ -93,7 +115,13 @@ function parseStoragePath(path: string): {
   }
 
   const [submissionId, applicantId, type, fileName] = parts;
-  if (!mediaStorageObjectTypes.has(type as MediaStorageObjectType)) {
+  if (
+    !mediaStorageObjectTypes.has(type as MediaStorageObjectType) &&
+    !(
+      options.allowLegacyArchive &&
+      legacyArchiveMediaStorageObjectTypes.has(type)
+    )
+  ) {
     throw new MediaStorageValidationError(
       "Media storage path contains an invalid slot type.",
     );
@@ -102,7 +130,7 @@ function parseStoragePath(path: string): {
   return {
     submissionId: safePathSegment(submissionId, "submissionId"),
     applicantId: safePathSegment(applicantId, "applicantId"),
-    type: type as MediaStorageObjectType,
+    type,
     fileName: safePathSegment(fileName, "generatedFileName"),
   };
 }
@@ -111,8 +139,6 @@ function hasExpectedGeneratedSuffix(
   type: MediaStorageObjectType,
   fileName: string,
 ): boolean {
-  if (type === "photo_white")
-    return /^[a-zA-Z0-9]+_photo_white\.(jpg|jpeg|png)$/.test(fileName);
   if (type === "selfie") return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png)$/.test(fileName);
   if (type === "selfie_2")
     return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png)$/.test(fileName);
@@ -122,10 +148,18 @@ function hasExpectedGeneratedSuffix(
     return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_visa_application_pdf\.pdf$/.test(
       fileName,
     );
-  return /^[a-zA-Z0-9]+_video\.mp4$/.test(fileName);
+  return false;
+}
+
+function hasExpectedLegacyArchiveSuffix(type: string, fileName: string): boolean {
+  if (type === "photo_white")
+    return /^[a-zA-Z0-9]+_photo_white\.(jpg|jpeg|png)$/.test(fileName);
+  if (type === "video") return /^[a-zA-Z0-9]+_video\.mp4$/.test(fileName);
+  return false;
 }
 
 export function validateMediaStorageTarget({
+  allowLegacyArchive = false,
   target,
   file,
 }: MediaStorageValidationInput): MediaStorageTarget {
@@ -135,9 +169,14 @@ export function validateMediaStorageTarget({
     );
   }
 
-  const parsed = parseStoragePath(target.path);
+  const parsed = parseStoragePath(target.path, { allowLegacyArchive });
   const extension = extensionForFileName(parsed.fileName);
-  if (!allowedExtensions(parsed.type).has(extension)) {
+  const isLegacyArchive =
+    allowLegacyArchive && legacyArchiveMediaStorageObjectTypes.has(parsed.type);
+  const extensionAllowed = isLegacyArchive
+    ? allowedLegacyArchiveExtensions(parsed.type).has(extension)
+    : allowedExtensions(parsed.type as MediaStorageObjectType).has(extension);
+  if (!extensionAllowed) {
     throw new MediaStorageValidationError(
       `File extension is not allowed for ${parsed.type}.`,
     );
@@ -150,14 +189,23 @@ export function validateMediaStorageTarget({
     );
   }
 
-  if (!hasExpectedGeneratedSuffix(parsed.type, parsed.fileName)) {
+  const generatedSuffixValid = isLegacyArchive
+    ? hasExpectedLegacyArchiveSuffix(parsed.type, parsed.fileName)
+    : hasExpectedGeneratedSuffix(
+        parsed.type as MediaStorageObjectType,
+        parsed.fileName,
+      );
+  if (!generatedSuffixValid) {
     throw new MediaStorageValidationError(
       "Generated file name must use generated slot naming and must not include user supplied names.",
     );
   }
 
   if (file) {
-    if (!allowedMimeTypes(parsed.type).has(file.type)) {
+    const mimeAllowed = isLegacyArchive
+      ? allowedLegacyArchiveMimeTypes(parsed.type).has(file.type)
+      : allowedMimeTypes(parsed.type as MediaStorageObjectType).has(file.type);
+    if (!mimeAllowed) {
       throw new MediaStorageValidationError(
         `MIME type is not allowed for ${parsed.type}.`,
       );
@@ -172,7 +220,10 @@ export function validateMediaStorageTarget({
     if (
       !Number.isInteger(file.size) ||
       file.size <= 0 ||
-      file.size > maxSizeBytes(parsed.type)
+      file.size >
+        (isLegacyArchive
+          ? maxLegacyArchiveSizeBytes(parsed.type)
+          : maxSizeBytes(parsed.type as MediaStorageObjectType))
     ) {
       throw new MediaStorageValidationError(
         `File size is outside the allowed ${parsed.type} limit.`,
@@ -186,8 +237,9 @@ export function validateMediaStorageTarget({
 export function buildMediaStoragePath(
   submissionId: string,
   applicantId: string,
-  type: MediaStorageObjectType,
+  type: string,
   generatedFileName: string,
+  options: { allowLegacyArchive?: boolean } = {},
 ): MediaStorageTarget {
   const target: MediaStorageTarget = {
     bucket: mediaStorageBucket,
@@ -197,7 +249,7 @@ export function buildMediaStoragePath(
     )}/${type}/${safePathSegment(generatedFileName, "generatedFileName")}`,
   };
 
-  return validateMediaStorageTarget({ target });
+  return validateMediaStorageTarget({ ...options, target });
 }
 
 export function storageTargetForSlot(
@@ -211,11 +263,25 @@ export function storageTargetForSlot(
     );
   }
 
+  const mediaType = toCanonicalStorageMediaType(slot.type);
+  if (mediaType.ok) {
+    return buildMediaStoragePath(
+      submissionId,
+      applicantId,
+      mediaType.data,
+      slot.generatedFileName,
+    );
+  }
+  if (!isRejectedLegacyMediaType(slot.type)) {
+    throw new MediaStorageValidationError(mediaType.reason);
+  }
+
   return buildMediaStoragePath(
     submissionId,
     applicantId,
     slot.type,
     slot.generatedFileName,
+    { allowLegacyArchive: true },
   );
 }
 

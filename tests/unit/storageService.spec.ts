@@ -24,12 +24,12 @@ const applicant: Applicant = {
 
 describe("media storage contract", () => {
   test("builds stable generated-name storage paths", () => {
-    const slot = buildMediaSlot(applicant, "photo_white", "uploaded");
+    const slot = buildMediaSlot(applicant, "selfie", "uploaded");
     const target = storageTargetForSlot("VF-1044", "applicant-1", slot);
 
     expect(target).toEqual({
       bucket: mediaStorageBucket,
-      path: "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg",
+      path: "VF-1044/applicant-1/selfie/751234567_selfie.jpg",
     });
   });
 
@@ -101,8 +101,8 @@ describe("media storage contract", () => {
       buildMediaStoragePath(
         "VF-1044/escape",
         "applicant-1",
-        "photo_white",
-        "751234567_photo_white.jpg",
+        "selfie",
+        "751234567_selfie.jpg",
       ),
     ).toThrow(/submissionId/);
   });
@@ -112,12 +112,12 @@ describe("media storage contract", () => {
       buildMediaStoragePath(
         "ПД-1052",
         "з-1052-1",
-        "photo_white",
-        "v1900abcde_photo_white.jpg",
+        "selfie",
+        "v1900abcde_selfie.jpg",
       ),
     ).toEqual({
       bucket: mediaStorageBucket,
-      path: "ПД-1052/з-1052-1/photo_white/v1900abcde_photo_white.jpg",
+      path: "ПД-1052/з-1052-1/selfie/v1900abcde_selfie.jpg",
     });
   });
 
@@ -125,8 +125,8 @@ describe("media storage contract", () => {
     const target = buildMediaStoragePath(
       "VF-1044",
       "applicant-1",
-      "photo_white",
-      "751234567_photo_white.jpg",
+      "selfie",
+      "751234567_selfie.jpg",
     );
 
     expect(() =>
@@ -145,15 +145,15 @@ describe("media storage contract", () => {
     const target = buildMediaStoragePath(
       "VF-1044",
       "applicant-1",
-      "photo_white",
-      "751234567_photo_white.jpg",
+      "selfie",
+      "751234567_selfie.jpg",
     );
 
     expect(() =>
       validateMediaStorageTarget({
         target,
         file: {
-          name: "photo.png",
+          name: "selfie.png",
           size: 1024,
           type: "image/png",
         } as File,
@@ -165,15 +165,15 @@ describe("media storage contract", () => {
     const target = buildMediaStoragePath(
       "VF-1044",
       "applicant-1",
-      "photo_white",
-      "751234567_photo_white.jpg",
+      "selfie",
+      "751234567_selfie.jpg",
     );
 
     expect(
       validateMediaStorageTarget({
         target,
         file: {
-          name: "photo.jpg",
+          name: "selfie.jpg",
           size: 1024,
           type: "image/jpeg",
         } as File,
@@ -181,10 +181,10 @@ describe("media storage contract", () => {
     ).toBe(target);
   });
 
-  test("rejects wrong extension for slot type", () => {
+  test("rejects legacy video slot type", () => {
     expect(() =>
       buildMediaStoragePath("VF-1044", "applicant-1", "video", "751234567_video.mov"),
-    ).toThrow(/extension/);
+    ).toThrow(/invalid slot type/);
   });
 
   test("rejects oversize files", () => {
@@ -223,10 +223,10 @@ describe("media storage contract", () => {
         buildMediaStoragePath(
           "VF-1044",
           "applicant-1",
-          "photo_white",
-          "751234567_photo_white.jpg",
+          "selfie",
+          "751234567_selfie.jpg",
         ),
-        new File(["x"], "photo.jpg", { type: "image/jpeg" }),
+        new File(["x"], "selfie.jpg", { type: "image/jpeg" }),
       ),
     ).resolves.toBeNull();
   });
@@ -249,8 +249,8 @@ describe("media storage contract", () => {
     const target = buildMediaStoragePath(
       "VF-1044",
       "applicant-1",
-      "photo_white",
-      "751234567_photo_white.jpg",
+      "selfie",
+      "751234567_selfie.jpg",
     );
 
     await expect(deleteMediaFromStorage(target)).resolves.toBeUndefined();
