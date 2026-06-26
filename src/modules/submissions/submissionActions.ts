@@ -19,6 +19,10 @@ import {
 } from "./exportRules";
 import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { defaultLocalAgentOwnerId } from "./ownership";
+import {
+  CANONICAL_FRONTEND_MEDIA_TYPES,
+  toCanonicalStorageMediaType,
+} from "./domainContract";
 import type {
   City,
   AgentOwnerId,
@@ -117,17 +121,18 @@ export function mergeUploadedFileMetadataIntoSubmissions(
 }
 
 export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
-  if (type === "photo") return "photo_white" as const;
-  if (type === "selfie") return "selfie" as const;
-  if (type === "selfie_2") return "selfie_2" as const;
-  if (type === "passport_scan") return "passport_scan" as const;
-  return "selfie_2" as const;
+  const result = toCanonicalStorageMediaType(type);
+  if (!result.ok) throw new Error(result.reason);
+  return result.data;
 }
 
 export function cockpitUploadExtensionForMimeType(
   mimeType: string,
   fileType: SubmissionFileType,
-): "jpg" | "png" | "mp4" | "pdf" {
+): "jpg" | "png" | "pdf" {
+  if (!toCanonicalStorageMediaType(fileType).ok) {
+    throw new Error("Unsupported media type for Package 1 upload slot.");
+  }
   if (fileType === "passport_scan" && mimeType === "application/pdf") return "pdf";
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/jpeg") return "jpg";
@@ -755,6 +760,7 @@ function applicantFileStatus(files: SubmissionFile[]) {
 
 function fileTypeName(type: SubmissionFile["type"]) {
   if (type === "photo") return "Фото";
+  if (type === "photo_white") return "Фото";
   if (type === "selfie") return "Селфи N1";
   if (type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Загранпаспорт";
@@ -819,7 +825,7 @@ function requiredFilesForApplicants(
   idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
-    (["passport_scan", "photo", "selfie", "selfie_2"] as const).map(
+    CANONICAL_FRONTEND_MEDIA_TYPES.map(
       (type, fileIndex) => ({
         id:
           idScheme === "supabase"

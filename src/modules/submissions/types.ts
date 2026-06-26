@@ -3,6 +3,11 @@ import type {
   VisaApplicationPdfReviewData,
   VisaPdfFinding,
 } from "./visaApplicationPdfReviewTypes";
+import type {
+  CanonicalFrontendMediaType,
+  CanonicalSubmissionStatus,
+  RejectedLegacyMediaType,
+} from "./domainContract";
 
 export type Role = "agent" | "admin";
 
@@ -28,15 +33,7 @@ export const V19_FIXED_COUNTRY = {
   label: "Испания",
 } as const satisfies { code: SpainCountryCode; label: Submission["country"] };
 
-export type SubmissionStatus =
-  | "draft"
-  | "in_progress"
-  | "requires_action"
-  | "submitted_for_review"
-  | "returned"
-  | "corrections_received"
-  | "ready_for_export"
-  | "exported";
+export type SubmissionStatus = CanonicalSubmissionStatus | "requires_action";
 
 export type ApplicantRole = "main" | "spouse" | "child";
 
@@ -49,12 +46,7 @@ export type SubmissionFileStatus =
   | "pending_review"
   | "accepted";
 
-export type SubmissionFileType =
-  | "photo"
-  | "selfie"
-  | "selfie_2"
-  | "passport_scan"
-  | "video";
+export type SubmissionFileType = CanonicalFrontendMediaType | RejectedLegacyMediaType;
 
 export type IssueSeverity = "blocker" | "warning" | "info";
 

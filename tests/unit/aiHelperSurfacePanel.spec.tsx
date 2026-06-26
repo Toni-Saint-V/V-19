@@ -70,9 +70,9 @@ function submission(overrides: Partial<Submission> = {}): Submission {
       },
     ],
     files: [
-      { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
+      { id: "ф-ai-1", applicantId: "з-ai-1", type: "passport_scan", status: "accepted" },
       { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "missing" },
-      { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "missing" },
+      { id: "ф-ai-3", applicantId: "з-ai-1", type: "selfie_2", status: "missing" },
     ],
     completeness: { questionnaire: 50, files: 33, total: 42 },
     exportState: "not_ready",
@@ -81,6 +81,19 @@ function submission(overrides: Partial<Submission> = {}): Submission {
     history: [],
     ...overrides,
   };
+}
+
+function acceptedCanonicalFiles(): Submission["files"] {
+  return [
+    {
+      id: "ф-ai-1",
+      applicantId: "з-ai-1",
+      type: "passport_scan",
+      status: "accepted",
+    },
+    { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
+    { id: "ф-ai-3", applicantId: "з-ai-1", type: "selfie_2", status: "accepted" },
+  ];
 }
 
 function completedApplicants() {
@@ -146,11 +159,7 @@ describe("AI helper surface panel", () => {
         submission={submission({
           completeness: { questionnaire: 100, files: 100, total: 100 },
           applicants: completedApplicants(),
-          files: [
-            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
-            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
-            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
-          ],
+          files: acceptedCanonicalFiles(),
           issues: [],
           status: "submitted_for_review",
         })}
@@ -175,11 +184,7 @@ describe("AI helper surface panel", () => {
         submission={submission({
           applicants: completedApplicants(),
           completeness: { questionnaire: 100, files: 100, total: 100 },
-          files: [
-            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
-            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
-            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
-          ],
+          files: acceptedCanonicalFiles(),
           issues: [
             {
               id: "зм-ai-warning",
@@ -219,11 +224,7 @@ describe("AI helper surface panel", () => {
         submission={submission({
           applicants: completedApplicants(),
           completeness: { questionnaire: 100, files: 100, total: 100 },
-          files: [
-            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
-            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
-            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
-          ],
+          files: acceptedCanonicalFiles(),
           issues: [],
           status: "draft",
         })}
@@ -244,11 +245,7 @@ describe("AI helper surface panel", () => {
         role="admin"
         submission={submission({
           completeness: { questionnaire: 80, files: 100, total: 90 },
-          files: [
-            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
-            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
-            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
-          ],
+          files: acceptedCanonicalFiles(),
           issues: [],
           status: "submitted_for_review",
         })}
@@ -268,11 +265,7 @@ describe("AI helper surface panel", () => {
         role="admin"
         submission={submission({
           completeness: { questionnaire: 100, files: 100, total: 100 },
-          files: [
-            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
-            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
-            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
-          ],
+          files: acceptedCanonicalFiles(),
           issues: [],
           status: "exported",
         })}
@@ -293,11 +286,7 @@ describe("AI helper surface panel", () => {
         submission={submission({
           applicants: completedApplicants(),
           completeness: { questionnaire: 100, files: 100, total: 100 },
-          files: [
-            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
-            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
-            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
-          ],
+          files: acceptedCanonicalFiles(),
           issues: [],
           status: "in_progress",
         })}
@@ -328,11 +317,7 @@ describe("AI helper surface panel", () => {
         submission={submission({
           applicants: completedApplicants(),
           completeness: { questionnaire: 100, files: 100, total: 100 },
-          files: [
-            { id: "ф-ai-1", applicantId: "з-ai-1", type: "photo", status: "accepted" },
-            { id: "ф-ai-2", applicantId: "з-ai-1", type: "selfie", status: "accepted" },
-            { id: "ф-ai-3", applicantId: "з-ai-1", type: "video", status: "accepted" },
-          ],
+          files: acceptedCanonicalFiles(),
           issues: [],
           status: "submitted_for_review",
         })}

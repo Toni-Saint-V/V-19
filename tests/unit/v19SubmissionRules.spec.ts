@@ -79,6 +79,8 @@ import type {
 } from "../../src/modules/submissions/types";
 import { matchesReviewTab } from "../../src/modules/submissions/uiTypes";
 
+const canonicalMediaTypes = ["passport_scan", "selfie", "selfie_2"] as const;
+
 function byId(id: string) {
   const submission = initialSubmissions.find((item) => item.id === id);
   if (!submission) throw new Error(`Missing fixture ${id}`);
@@ -134,6 +136,18 @@ function readyClone(patch: Partial<Submission>): Submission {
   };
 }
 
+function canonicalMediaSubmission(submission: Submission): Submission {
+  const files = submission.files.filter((file) =>
+    canonicalMediaTypes.includes(file.type as (typeof canonicalMediaTypes)[number]),
+  );
+
+  return {
+    ...submission,
+    files,
+    completeness: { ...submission.completeness, files: 100, total: 100 },
+  };
+}
+
 function questionnaireCompleteness(submission: Submission) {
   const fields = submission.applicants.flatMap((applicant) =>
     applicant.sections.flatMap((section) => section.fields),
@@ -167,7 +181,7 @@ describe("V-19 submission status rules", () => {
         role: "agent",
       },
       submit_corrections: {
-        from: ["returned", "requires_action"],
+        from: ["returned"],
         to: "corrections_received",
         role: "agent",
       },
@@ -241,11 +255,13 @@ describe("V-19 submission status rules", () => {
   });
 
   it("blocks role-incompatible actions", () => {
-    expect(canPerformAction(byId("ПД-1053"), "accept", "agent")).toEqual({
+    const submitted = canonicalMediaSubmission(byId("ПД-1053"));
+
+    expect(canPerformAction(submitted, "accept", "agent")).toEqual({
       ok: false,
       reason: "Недостаточно прав",
     });
-    expect(canPerformAction(byId("ПД-1053"), "accept", "admin")).toEqual({ ok: true });
+    expect(canPerformAction(submitted, "accept", "admin")).toEqual({ ok: true });
   });
 
   it("blocks review submission while required work is missing", () => {
@@ -281,7 +297,6 @@ describe("V-19 submission status rules", () => {
     const statuses: SubmissionStatus[] = [
       "draft",
       "in_progress",
-      "requires_action",
       "submitted_for_review",
       "returned",
       "corrections_received",
@@ -625,45 +640,70 @@ describe("V-19 submission actions", () => {
   });
 
   it("derives submit corrections only after all targeted file replacements are uploaded", () => {
-    const returned = byId("ПД-1048");
-    const photoFile = returned.files.find(
-      (file) => file.applicantId === "з-1048-1" && file.type === "photo",
+    const legacyReturned = byId("ПД-1048");
+    const returned = {
+      ...legacyReturned,
+      files: legacyReturned.files
+        .filter((file) => file.type !== "photo")
+        .map((file) =>
+          file.applicantId === "з-1048-1" && file.type === "selfie_2"
+            ? {
+                ...file,
+                linkedIssueId: "зм-1048-1",
+                status: "needs_replacement" as const,
+              }
+            : file,
+        ),
+      issues: legacyReturned.issues.map((issue) =>
+        issue.id === "зм-1048-1"
+          ? {
+              ...issue,
+              target: {
+                ...issue.target,
+                fileType: "selfie_2" as const,
+              },
+            }
+          : issue,
+      ),
+    } satisfies Submission;
+    const selfieFile = returned.files.find(
+      (file) => file.applicantId === "з-1048-1" && file.type === "selfie_2",
     );
     const passportFile = returned.files.find(
       (file) => file.applicantId === "з-1048-3" && file.type === "passport_scan",
     );
-    if (!photoFile || !passportFile) throw new Error("Missing replacement files");
+    if (!selfieFile || !passportFile) throw new Error("Missing replacement files");
 
     expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
       ok: false,
       reason: "Сначала исправьте целевые замечания",
     });
 
-    const withPhotoReplacement = applyUploadedFileMetadata(returned, photoFile.id, {
-      generatedFileName: "v19replacement_photo_white.jpg",
+    const withSelfieReplacement = applyUploadedFileMetadata(returned, selfieFile.id, {
+      generatedFileName: "v19replacement_selfie_2.jpg",
       mimeType: "image/jpeg",
-      originalFileName: "photo-fixed.jpg",
+      originalFileName: "selfie-2-fixed.jpg",
       sizeBytes: 180_000,
       storageBucket: "submission-media",
-      storagePath: "ПД-1048/з-1048-1/photo_white/v19replacement_photo_white.jpg",
+      storagePath: "ПД-1048/з-1048-1/selfie_2/v19replacement_selfie_2.jpg",
       uploadedAtIso: "2026-06-21T10:00:00.000Z",
     });
 
     expect(
-      withPhotoReplacement.files.find((file) => file.id === photoFile.id),
+      withSelfieReplacement.files.find((file) => file.id === selfieFile.id),
     ).toMatchObject({
-      originalFileName: "photo-fixed.jpg",
+      originalFileName: "selfie-2-fixed.jpg",
       reviewStatus: "not_reviewed",
       reviewedBy: undefined,
       status: "uploaded",
     });
-    expect(canPerformAction(withPhotoReplacement, "submit_corrections", "agent")).toEqual({
+    expect(canPerformAction(withSelfieReplacement, "submit_corrections", "agent")).toEqual({
       ok: false,
       reason: "Сначала исправьте целевые замечания",
     });
 
     const withAllReplacements = applyUploadedFileMetadata(
-      withPhotoReplacement,
+      withSelfieReplacement,
       passportFile.id,
       {
         generatedFileName: "v19replacement_passport_scan.pdf",
@@ -765,7 +805,7 @@ describe("V-19 submission actions", () => {
     expect(draft.type).toBe("family");
     expect(draft.status).toBe("draft");
     expect(draft.applicants).toHaveLength(3);
-    expect(draft.files).toHaveLength(12);
+    expect(draft.files).toHaveLength(9);
     expect(draft.history[0].source).toBe("agent");
   });
 
@@ -835,21 +875,21 @@ describe("V-19 submission actions", () => {
   it("generates a new safe storage file name for each Supabase upload attempt", () => {
     const first = generatedCockpitMediaFileName({
       applicantId: "app-1059-1",
-      fileType: "photo",
+      fileType: "selfie_2",
       mimeType: "image/jpeg",
       submissionId: "VF-1059",
       uploadNonce: "2026-06-17T10:00:00.000Z:first",
     });
     const second = generatedCockpitMediaFileName({
       applicantId: "app-1059-1",
-      fileType: "photo",
+      fileType: "selfie_2",
       mimeType: "image/jpeg",
       submissionId: "VF-1059",
       uploadNonce: "2026-06-17T10:00:01.000Z:second",
     });
 
-    expect(first).toMatch(/^v19[a-z0-9]+_photo_white\.jpg$/);
-    expect(second).toMatch(/^v19[a-z0-9]+_photo_white\.jpg$/);
+    expect(first).toMatch(/^v19[a-z0-9]+_selfie_2\.jpg$/);
+    expect(second).toMatch(/^v19[a-z0-9]+_selfie_2\.jpg$/);
     expect(second).not.toBe(first);
   });
 
@@ -995,7 +1035,7 @@ describe("V-19 submission actions", () => {
     const updated = uploadRequiredFile(completeQuestionnaire(draft), firstFile.id);
 
     expect(updated.files[0]?.status).toBe("uploaded");
-    expect(updated.completeness.files).toBe(25);
+    expect(updated.completeness.files).toBe(33);
     expect(updated.applicants[0]?.fileStatus).toBe("partial");
     const inProgress = applySubmissionAction(updated, "save_progress", "agent");
 
@@ -1022,19 +1062,19 @@ describe("V-19 submission actions", () => {
     };
 
     const updated = applyUploadedFileMetadata(editedDuringUpload, firstFile.id, {
-      generatedFileName: "v19abc123_photo_white.jpg",
+      generatedFileName: "v19abc123_passport_scan.jpg",
       mimeType: "image/jpeg",
-      originalFileName: "phone-photo.jpg",
+      originalFileName: "passport-scan.jpg",
       sizeBytes: 2048,
       storageBucket: "submission-media",
-      storagePath: `${draft.id}/${firstFile.applicantId}/photo_white/v19abc123_photo_white.jpg`,
+      storagePath: `${draft.id}/${firstFile.applicantId}/passport_scan/v19abc123_passport_scan.jpg`,
       uploadedAtIso: "2026-06-17T10:00:00.000Z",
     });
 
     expect(updated.title).toBe("Edited while upload was in flight");
     expect(updated.files[0]).toMatchObject({
-      generatedFileName: "v19abc123_photo_white.jpg",
-      originalFileName: "phone-photo.jpg",
+      generatedFileName: "v19abc123_passport_scan.jpg",
+      originalFileName: "passport-scan.jpg",
       status: "uploaded",
       storageBucket: "submission-media",
       uploadStatus: "uploaded",
@@ -1053,12 +1093,12 @@ describe("V-19 submission actions", () => {
     const firstFile = draft.files[0];
     if (!firstFile) throw new Error("Missing draft file");
     const metadata = {
-      generatedFileName: "v19late01_photo_white.jpg",
+      generatedFileName: "v19late01_passport_scan.jpg",
       mimeType: "image/jpeg",
-      originalFileName: "late-edit-photo.jpg",
+      originalFileName: "late-edit-passport.jpg",
       sizeBytes: 4096,
       storageBucket: "submission-media",
-      storagePath: `${draft.id}/${firstFile.applicantId}/photo_white/v19late01_photo_white.jpg`,
+      storagePath: `${draft.id}/${firstFile.applicantId}/passport_scan/v19late01_passport_scan.jpg`,
       uploadedAtIso: "2026-06-17T11:00:00.000Z",
     };
     const savedBeforeLateEdit = applyUploadedFileMetadata(
@@ -1081,11 +1121,11 @@ describe("V-19 submission actions", () => {
     expect(result.submission?.title).toBe("Edited while remote save was pending");
     expect(result.submissions[0]).toBe(result.submission);
     expect(result.submission?.files[0]).toMatchObject({
-      generatedFileName: "v19late01_photo_white.jpg",
-      originalFileName: "late-edit-photo.jpg",
+      generatedFileName: "v19late01_passport_scan.jpg",
+      originalFileName: "late-edit-passport.jpg",
       status: "uploaded",
       storageBucket: "submission-media",
-      storagePath: `${draft.id}/${firstFile.applicantId}/photo_white/v19late01_photo_white.jpg`,
+      storagePath: `${draft.id}/${firstFile.applicantId}/passport_scan/v19late01_passport_scan.jpg`,
       uploadStatus: "uploaded",
     });
   });
@@ -1136,7 +1176,7 @@ describe("V-19 submission actions", () => {
   });
 
   it("adds a precise admin issue with a target", () => {
-    const submission = byId("ПД-1053");
+    const submission = canonicalMediaSubmission(byId("ПД-1053"));
     const updated = addPreciseAdminIssue(submission, routeIssueInput(submission));
     expect(updated.issues[0]).toMatchObject({
       severity: "blocker",
@@ -1152,7 +1192,7 @@ describe("V-19 submission actions", () => {
 
   it("records the admin reviewer when accepting uploaded media", () => {
     const adminProfileId = "00000000-0000-4000-8000-000000000002";
-    const submission = byId("ПД-1053");
+    const submission = canonicalMediaSubmission(byId("ПД-1053"));
     const reviewableFiles = submission.files.filter((file) =>
       ["uploaded", "pending_review", "accepted"].includes(file.status),
     );
@@ -1203,7 +1243,7 @@ describe("V-19 submission actions", () => {
       {
         applicantId: applicant.id,
         comment: "Замените фото и отправьте исправление.",
-        fileType: "photo",
+        fileType: "selfie_2",
         reason: "Файл требует замены",
         section: "Файлы",
         severity: "blocker",
@@ -1212,12 +1252,12 @@ describe("V-19 submission actions", () => {
       "00000000-0000-4000-8000-000000000002",
     );
 
-    expect(withIssue.files).toHaveLength(16);
-    expect(withIssue.completeness.files).toBe(94);
-    expect(withIssue.completeness.total).toBe(97);
+    expect(withIssue.files).toHaveLength(12);
+    expect(withIssue.completeness.files).toBe(92);
+    expect(withIssue.completeness.total).toBe(96);
     expect(
       withIssue.files.find(
-        (file) => file.applicantId === applicant.id && file.type === "photo",
+        (file) => file.applicantId === applicant.id && file.type === "selfie_2",
       ),
     ).toMatchObject({
       reviewStatus: "replace_required",
