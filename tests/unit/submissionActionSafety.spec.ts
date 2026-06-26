@@ -250,4 +250,31 @@ describe("submission action safety", () => {
       },
     });
   });
+
+  test("keeps workbook generation as a package-level action, not a submission mutation", () => {
+    const submitted = applySubmissionAction(
+      reviewReadySubmission(),
+      "submit_for_review",
+      "agent",
+    );
+    const accepted = applySubmissionAction(submitted, "accept", "admin");
+
+    expect(accepted).toMatchObject({
+      exportState: "ready",
+      status: "ready_for_export",
+    });
+    expect(canPerformAction(accepted, "generate_export", "admin")).toEqual({
+      ok: false,
+      reason: "Формирование Excel выполняется только через пакет выгрузки",
+    });
+    expect(
+      applySubmissionActionResult(accepted, "generate_export", "admin"),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "EXPORT_NOT_READY",
+        message: "Формирование Excel выполняется только через пакет выгрузки",
+      },
+    });
+  });
 });

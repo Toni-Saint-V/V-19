@@ -237,6 +237,9 @@ export const transitionMatrix: Record<
   },
 };
 
+const packageLevelExportActionReason =
+  "Формирование Excel выполняется только через пакет выгрузки";
+
 export function openIssueCount(submission: Submission) {
   return submission.issues.filter((issue) => issue.status === "open").length;
 }
@@ -342,6 +345,10 @@ export function canPerformAction(
   if (transition.role !== role) return { ok: false, reason: "Недостаточно прав" };
   if (!transition.from.includes(submission.status)) {
     return { ok: false, reason: "Действие недоступно в текущем статусе" };
+  }
+
+  if (action === "generate_export") {
+    return { ok: false, reason: packageLevelExportActionReason };
   }
 
   if (action === "save_progress" && !hasRequiredBasics(submission)) {
