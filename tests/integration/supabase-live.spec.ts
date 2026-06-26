@@ -229,12 +229,12 @@ async function trySaveDraft(
   return client.rpc("save_submission_draft", { payload });
 }
 
-describeLive("Supabase live persistence, RLS and Storage smoke", () => {
+describeLive("Legacy Supabase live archive smoke (not V-19 release proof)", () => {
   beforeAll(() => {
     assertSmokeEnvReady();
   });
 
-  test("enforces owner/admin boundaries and private media storage", async () => {
+  test("keeps old workflow/RPC compatibility behind sandbox-only smoke", async () => {
     const owner = await signInAs(
       "SUPABASE_SMOKE_AGENT_EMAIL",
       "SUPABASE_SMOKE_AGENT_PASSWORD",

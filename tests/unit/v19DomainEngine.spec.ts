@@ -69,13 +69,11 @@ function firstIssueInput(submission: Submission): IssueInput {
 }
 
 function completeInProgressSubmission(): Submission {
-  const base = byId("ПД-1056");
   return {
-    ...byId("ПД-1056"),
+    ...canonicalMediaSubmission(byId("ПД-1056")),
     id: "ПД-DOMAIN-READY",
     status: "in_progress",
     exportState: "not_ready",
-    files: base.files.filter((file) => file.type !== "photo"),
   };
 }
 
