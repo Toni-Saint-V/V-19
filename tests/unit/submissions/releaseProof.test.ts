@@ -9,8 +9,10 @@ import {
   normalizeLegacySubmissionStatus,
 } from "../../../src/modules/submissions/domainContract";
 
-const legacyStackImportPattern =
-  /src\/(?:types\/domain|lib\/workflow|services\/submissionService)|\.\.\/\.\.\/src\/(?:types\/domain|lib\/workflow|services\/submissionService)|\.\.\/\.\.\/\.\.\/src\/(?:types\/domain|lib\/workflow|services\/submissionService)/;
+const importFromPattern =
+  /^\s*import(?:\s+type)?[\s\S]*?\s+from\s+["']([^"']+)["'];?/gm;
+const legacyStackImportPathPattern =
+  /^(?:\.\.\/)+src\/(?:types\/domain|lib\/workflow|services\/submissionService)$/;
 
 const canonicalReleaseProofFiles = [
   "tests/unit/submissions/domainContract.test.ts",
@@ -30,7 +32,6 @@ const legacyArchiveOnlyTests = [
   "tests/unit/storageService.spec.ts",
   "tests/unit/submissionService.spec.ts",
   "tests/unit/supabasePersistenceFailurePaths.spec.ts",
-  "tests/unit/supabaseSecurityContract.spec.ts",
   "tests/unit/textIntakeReviewer.spec.ts",
   "tests/unit/workflow.spec.ts",
 ] as const;
@@ -48,9 +49,19 @@ function testFilesUnder(relativePath: string): string[] {
   });
 }
 
+function importedModulePaths(source: string): string[] {
+  return [...source.matchAll(importFromPattern)].map((match) => match[1] ?? "");
+}
+
+function hasLegacyStackImport(source: string): boolean {
+  return importedModulePaths(source).some((path) =>
+    legacyStackImportPathPattern.test(path),
+  );
+}
+
 function legacyStackTestFiles(): string[] {
   return testFilesUnder("tests")
-    .filter((filePath) => legacyStackImportPattern.test(readProjectFile(filePath)))
+    .filter((filePath) => hasLegacyStackImport(readProjectFile(filePath)))
     .sort();
 }
 
@@ -60,7 +71,7 @@ describe("Package 3 canonical release proof surface", () => {
       const source = readProjectFile(filePath);
 
       expect(source, filePath).toContain("src/modules/submissions");
-      expect(source, filePath).not.toMatch(legacyStackImportPattern);
+      expect(hasLegacyStackImport(source), filePath).toBe(false);
     }
   });
 
@@ -70,8 +81,16 @@ describe("Package 3 canonical release proof surface", () => {
     for (const filePath of legacyArchiveOnlyTests) {
       const source = readProjectFile(filePath);
 
-      expect(source, filePath).toMatch(legacyStackImportPattern);
+      expect(hasLegacyStackImport(source), filePath).toBe(true);
     }
+  });
+
+  test("legacy path mentions without imports do not reclassify release tests", () => {
+    const source = readProjectFile("tests/unit/supabaseSecurityContract.spec.ts");
+
+    expect(source).toContain("src/services/submissionService.ts");
+    expect(source).toContain("src/modules/submissions");
+    expect(hasLegacyStackImport(source)).toBe(false);
   });
 
   test("canonical runtime contract owns statuses, transitions, and media readiness", () => {
