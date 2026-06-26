@@ -1,6 +1,6 @@
 import { initialSubmissions } from "./mockData";
 import { defaultLocalAgentOwnerId, ensureSubmissionOwner } from "./ownership";
-import { normalizeSubmissionQuestionnaire } from "./questionnaire";
+import { normalizeSubmissionForCanonicalRuntime } from "./submissionActions";
 import type { Submission } from "./types";
 
 const storageKey = "visaflow.v19.submissions.v1";
@@ -13,26 +13,22 @@ type StorageLike = {
 
 export function loadSubmissions(): Submission[] {
   const storage = getStorage();
-  if (!storage) return initialSubmissions;
+  if (!storage) return normalizeLoadedSubmissions(initialSubmissions);
 
   try {
     const raw = storage.getItem(storageKey);
-    if (!raw) return initialSubmissions;
+    if (!raw) return normalizeLoadedSubmissions(initialSubmissions);
     const parsed = JSON.parse(raw) as unknown;
     if (
       !Array.isArray(parsed) ||
       parsed.length === 0 ||
       !parsed.every(isSubmissionLike)
     ) {
-      return initialSubmissions;
+      return normalizeLoadedSubmissions(initialSubmissions);
     }
-    return parsed.map((submission) =>
-      normalizeSubmissionQuestionnaire(
-        ensureSubmissionOwner(submission, defaultLocalAgentOwnerId),
-      ),
-    );
+    return normalizeLoadedSubmissions(parsed);
   } catch {
-    return initialSubmissions;
+    return normalizeLoadedSubmissions(initialSubmissions);
   }
 }
 
@@ -53,6 +49,14 @@ export function clearSubmissions() {
 
 function getStorage() {
   return (globalThis as unknown as { localStorage?: StorageLike }).localStorage;
+}
+
+function normalizeLoadedSubmissions(submissions: Submission[]): Submission[] {
+  return submissions.map((submission) =>
+    normalizeSubmissionForCanonicalRuntime(
+      ensureSubmissionOwner(submission, defaultLocalAgentOwnerId),
+    ),
+  );
 }
 
 function isSubmissionLike(value: unknown): value is Submission {
