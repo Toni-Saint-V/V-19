@@ -483,7 +483,7 @@ describe("local Case Copilot", () => {
     expect(adminReview.highlights.some((item) => item.kind === "export")).toBe(false);
     expect(adminReview.highlights.find((item) => item.kind === "files")).toMatchObject({
       status: "needs_review",
-      summary: expect.stringContaining("3"),
+      summary: expect.stringContaining("4"),
     });
     expect(adminReview.drafts.some((draft) => draft.audience === "admin")).toBe(true);
     expect(adminReview.drafts.map((draft) => draft.body).join(" ")).not.toContain(

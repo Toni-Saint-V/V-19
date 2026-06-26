@@ -56,7 +56,7 @@ export const activeMediaFileTypes: SubmissionFileType[] = [
   "passport_scan",
   "photo",
   "selfie",
-  "video",
+  "selfie_2",
 ];
 
 export function buildReadinessQueue(submission: Submission): ReadinessQueueItem[] {
@@ -92,7 +92,7 @@ export function tabForTarget(target: WorkspaceTarget): DrawerTab {
 export function fileLabel(type: SubmissionFileType) {
   if (type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Загранпаспорт";
-  if (type === "video") return "Видео";
+  if (type === "video") return "Селфи N2";
   return fileTypeLabels[type];
 }
 
@@ -101,7 +101,7 @@ export function fileShortLabel(type: SubmissionFileType) {
   if (type === "selfie") return "Селфи";
   if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";
-  return "Видео 1 мин";
+  return "Селфи 2";
 }
 
 export function fileStatusLabel(file: SubmissionFile | undefined) {

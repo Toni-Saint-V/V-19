@@ -1,11 +1,4 @@
-import {
-  type ReactNode,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -69,7 +62,6 @@ import type {
   SubmissionAction,
   SubmissionFileStatus,
 } from "../types";
-import { BbAiPanel } from "./BbAiPanel";
 import { EmptyState } from "./Primitives";
 
 export function SubmissionDrawer({
@@ -83,9 +75,6 @@ export function SubmissionDrawer({
   onAddIssue,
   onIssueComposerConsumed,
   onClose,
-  onAcceptAiSuggestion,
-  onDismissAiSuggestion,
-  onRunAiReview,
   onTab,
   onQuestionnaireField,
   onApplyPassportField,
@@ -138,7 +127,6 @@ export function SubmissionDrawer({
 }) {
   const primaryAction = getPrimaryAction(submission, role, surface);
   const [issueComposerOpen, setIssueComposerOpen] = useState(false);
-  const [issueView, setIssueView] = useState<IssueView>("issues");
   const [pendingTarget, setPendingTarget] = useState<WorkspaceTarget | null>(null);
   const drawerBodyRef = useRef<HTMLDivElement | null>(null);
   const tabNavigationModeRef = useRef<"manual" | "target">("manual");
@@ -154,7 +142,6 @@ export function SubmissionDrawer({
       : "Проверьте данные и выберите действие по подаче");
   useEffect(() => {
     setIssueComposerOpen(false);
-    setIssueView("issues");
   }, [submission.id]);
 
   useEffect(() => {
@@ -244,7 +231,9 @@ export function SubmissionDrawer({
 
   return (
     <SheetFrame
-      className="submission-drawer submission-detail-drawer"
+      className={`submission-drawer submission-detail-drawer ${
+        activeTab === "overview" ? "is-overview-tab" : ""
+      }`}
       labelledBy="drawer-title"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
@@ -271,31 +260,6 @@ export function SubmissionDrawer({
           </div>
         </div>
         <div className="drawer-header-actions" aria-label="Действия панели">
-          <button
-            className="icon-button"
-            type="button"
-            aria-label="Открыть первый блокер"
-            disabled={!firstActionableQueueItem(submission)}
-            onClick={openFirstProblem}
-          >
-            !
-          </button>
-          {canOpenIssueComposer ? (
-            <button
-              className="icon-button"
-              type="button"
-              aria-label={
-                issueComposerOpen
-                  ? "Форма замечания открыта"
-                  : "Показать форму замечания"
-              }
-              aria-pressed={issueComposerOpen}
-              disabled={issueComposerOpen}
-              onClick={() => setIssueComposerOpen(true)}
-            >
-              +
-            </button>
-          ) : null}
           <button
             className="icon-button"
             type="button"
@@ -340,6 +304,7 @@ export function SubmissionDrawer({
               onOpenHistory={() => handleTabChange("history")}
               onOpenTarget={openTarget}
               primaryAction={primaryAction}
+              surface={surface}
               submission={submission}
             />
           ) : null}
@@ -373,15 +338,9 @@ export function SubmissionDrawer({
           ) : null}
           {activeTab === "issues" ? (
             <DrawerIssues
-              onAcceptAiSuggestion={onAcceptAiSuggestion}
-              onDismissAiSuggestion={onDismissAiSuggestion}
               onOpenTarget={openTarget}
-              onRunAiReview={onRunAiReview}
-              view={issueView}
-              onViewChange={setIssueView}
               role={role}
               submission={submission}
-              surface={surface}
             />
           ) : null}
           {activeTab === "history" ? <DrawerHistory submission={submission} /> : null}
@@ -407,15 +366,13 @@ export function SubmissionDrawer({
               : footerHint)}
         </span>
         {!issueComposerOpen && firstActionableQueueItem(submission) ? (
-          <Button variant="secondary" onClick={openFirstProblem}>
+          <Button className="drawer-footer-context-action" variant="secondary" onClick={openFirstProblem}>
             Открыть первый блокер
           </Button>
         ) : null}
-        {canOpenIssueComposer && !issueComposerOpen ? (
-          <Button variant="secondary" onClick={() => setIssueComposerOpen(true)}>
-            Добавить замечание
-          </Button>
-        ) : null}
+        <Button variant="ghost" onClick={onClose}>
+          Закрыть
+        </Button>
         <Button
           danger={primaryAction.action === "return_with_issues"}
           disabled={primaryAction.disabled || issueComposerOpen}
@@ -585,63 +542,6 @@ function IssueComposer({
   );
 }
 
-function DrawerSectionHeader({
-  action,
-  badge,
-  title,
-}: {
-  action?: ReactNode;
-  badge?: ReactNode;
-  title: string;
-}) {
-  return (
-    <div className="drawer-section-header">
-      <div>
-        <h3>{title}</h3>
-      </div>
-      {badge || action ? (
-        <div className="drawer-section-header-side">
-          {badge}
-          {action}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function IssueCategoryTag({ issue }: { issue: Issue }) {
-  return <Badge className="drawer-category-tag">{issueCategoryLabel(issue)}</Badge>;
-}
-
-function SegmentedFilter<T extends string>({
-  ariaLabel,
-  items,
-  onChange,
-  value,
-}: {
-  ariaLabel: string;
-  items: Array<{ count?: number; id: T; label: string }>;
-  onChange: (value: T) => void;
-  value: T;
-}) {
-  return (
-    <div className="drawer-filter-tabs" role="group" aria-label={ariaLabel}>
-      {items.map((item) => (
-        <Button
-          aria-pressed={value === item.id}
-          className={value === item.id ? "is-active" : ""}
-          key={item.id}
-          variant="ghost"
-          onClick={() => onChange(item.id)}
-        >
-          <span>{item.label}</span>
-          {typeof item.count === "number" ? <em>{item.count}</em> : null}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
 function DrawerApplicants({
   onOpenTarget,
   submission,
@@ -650,8 +550,11 @@ function DrawerApplicants({
   submission: Submission;
 }) {
   return (
-    <section className="drawer-section">
-      <div className="applicant-matrix" aria-label="Заявители в подаче">
+    <section className="drawer-section drawer-applicants-section">
+      <div
+        className="applicant-matrix v17-applicant-matrix"
+        aria-label="Заявители в подаче"
+      >
         <div className="applicant-matrix-head" aria-hidden="true">
           <span>Заявитель</span>
           <span>Готовность</span>
@@ -741,79 +644,82 @@ function DrawerOverview({
   onOpenHistory,
   onOpenTarget,
   primaryAction,
+  surface,
   submission,
 }: {
   onOpenHistory: () => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
   primaryAction: ActionDecision;
+  surface: "agent" | "review" | "export";
   submission: Submission;
 }) {
-  const blockers = blockerCount(submission);
   const openIssues = openIssueCount(submission);
-  const needsAttention = Boolean(blockers || openIssues);
   const fileProgress = fileReadyCount(submission);
   const nextLine = firstWorkLine(submission);
   const queue = buildReadinessQueue(submission).filter(
     (item) => !(item.type === "admin_blocker" && item.status === "open"),
   );
-  const fixedIssueList = submission.issues.filter(
-    (issue) => issue.status === "fixed_by_agent",
-  );
   const checklist = [
     {
       label: "Заявители и паспорта",
       value: applicantCountLabel(submission.applicants.length),
+      marker: "check",
       tone: submission.applicants.length ? "ready" : "warning",
     },
     {
       label: "Анкета и поездка",
       value: `${submission.completeness.questionnaire}%`,
+      marker: submission.completeness.questionnaire === 100 ? "check" : "warning",
       tone: submission.completeness.questionnaire === 100 ? "ready" : "warning",
     },
     {
       label: "Обязательные файлы",
       value: `${fileProgress.ready} из ${fileProgress.total}`,
+      marker: "file",
       tone: fileProgress.ready === fileProgress.total ? "ready" : "warning",
     },
     {
       label: "Открытые замечания",
       value: openIssues ? String(openIssues) : "Нет",
+      marker: openIssues ? "warning" : "check",
       tone: openIssues ? "danger" : "ready",
     },
-  ] satisfies Array<{ label: string; tone: "danger" | "ready" | "warning"; value: string }>;
+  ] satisfies Array<{
+    label: string;
+    marker: "check" | "file" | "warning";
+    tone: "danger" | "ready" | "warning";
+    value: string;
+  }>;
   const firstTarget = queue.find((item) => item.status !== "fixed")?.target;
+  const isAdminReview = surface === "review";
 
   return (
-    <section className="drawer-section drawer-overview">
-      <div className="drawer-overview-grid">
-        <div className="drawer-overview-main">
-          <CardComponent
-            as="article"
-            className={`decision-card ${needsAttention ? "needs-attention" : ""}`}
-          >
-            <div>
-              <p className="kicker">Состояние подачи</p>
-              <h3>{decisionTitle(submission, primaryAction)}</h3>
-              <p>
-                {typeLabels[submission.type]} · {applicantCountLabel(submission.applicants.length)}.{" "}
-                {submission.city} · {tripDates(submission)}.
-              </p>
+    <section className="drawer-section drawer-overview drawer-overview-section">
+      <div className="overview-release">
+        <div className="overview-main">
+          <CardComponent as="article" className="surface overview-status-card">
+            <div className="overview-status-line">
+              <h3>Состояние подачи</h3>
+              <Badge className={`entity-tag ${statusTone[submission.status]}`}>
+                {statusLabels[submission.status]}
+              </Badge>
+              <Badge className="badge solid neutral">
+                {submission.completeness.total}%
+              </Badge>
             </div>
-            <Badge
-              className={`decision-card-badge ${
-                needsAttention ? "is-attention" : "is-clear"
-              }`}
-            >
-              {decisionBadge(submission, primaryAction)}
-            </Badge>
-            <dl>
+            <p className="overview-copy">
+              {typeLabels[submission.type]} ·{" "}
+              {applicantCountLabel(submission.applicants.length)}. {submission.city} ·{" "}
+              {tripDates(submission)}.
+            </p>
+            <dl className="overview-summary-grid">
               <div>
                 <dt>Ответственный</dt>
-                <dd>Агент подачи</dd>
+                <dd>{isAdminReview ? "Татьяна Н." : "Агент подачи"}</dd>
               </div>
               <div>
                 <dt>Проверяющий</dt>
-                <dd>Текущий администратор</dd>
+                <dd>{isAdminReview ? "Не назначен" : "Текущий администратор"}</dd>
               </div>
               <div>
                 <dt>Категория</dt>
@@ -826,30 +732,43 @@ function DrawerOverview({
             </dl>
           </CardComponent>
 
-          <CardComponent as="section" className="drawer-checklist">
-            <DrawerSectionHeader
-              title="Контрольный список"
-              badge={<span className="drawer-muted">рабочие условия</span>}
-            />
-            <div className="checklist">
+          <CardComponent as="section" className="surface">
+            <div className="drawer-section-head">
+              <h3>Контрольный список</h3>
+              <span>рабочие условия</span>
+            </div>
+            <div className="overview-checks">
               {checklist.map((item) => (
-                <div className={`check-row ${item.tone}`} key={item.label}>
-                  <span className={`check-status ${item.tone}`} aria-hidden="true" />
-                  <strong>{item.label}</strong>
-                  <span>{item.value}</span>
+                <div
+                  className={`overview-check ${item.tone === "danger" || item.tone === "warning" ? "problem" : ""}`}
+                  key={item.label}
+                >
+                  <span
+                    className={`overview-check-marker ${item.marker} ${item.tone}`}
+                    aria-hidden="true"
+                  />
+                  <span>{item.label}</span>
+                  {item.label === "Обязательные файлы" ? (
+                    <Badge className={`overview-check-value entity-tag ${item.tone === "ready" ? "teal" : "amber"}`}>
+                      {item.value}
+                    </Badge>
+                  ) : (
+                    <small className="overview-check-value">{item.value}</small>
+                  )}
                 </div>
               ))}
             </div>
           </CardComponent>
         </div>
 
-        <aside className="drawer-overview-context" aria-label="Контекст подачи">
-          <CardComponent as="section" className="drawer-action-card">
-            <p className="kicker">Следующий шаг</p>
+        <aside className="overview-side" aria-label="Контекст подачи">
+          <CardComponent as="section" className="surface overview-next">
+            <div className="surface-title">Следующий шаг</div>
             <h3>{primaryAction.label}</h3>
             <p>{primaryAction.reason ?? nextLine}</p>
             <Button
-              disabled={!firstTarget || primaryAction.disabled}
+              variant="primary"
+              disabled={!firstTarget}
               onClick={() => {
                 if (firstTarget) onOpenTarget(firstTarget);
               }}
@@ -857,68 +776,27 @@ function DrawerOverview({
               Перейти
             </Button>
           </CardComponent>
-          <CardComponent as="section" className="drawer-recent-card">
-            <DrawerSectionHeader title="Последние изменения" />
-            <div className="history mini">
-              {submission.history.slice(0, 2).map((event) => (
-                <article className="history-event" key={event.id}>
-                  <strong>{event.text}</strong>
-                  <span>{event.at}</span>
-                  {event.detail ? <p>{event.detail}</p> : null}
-                </article>
-              ))}
-              {!submission.history.length ? (
-                <EmptyState text="История пока пуста." />
-              ) : null}
+          <CardComponent as="section" className="surface drawer-recent-card">
+            <div className="surface-title">Последние изменения</div>
+            <div className="history mini v17-overview-history">
+              <article className="history-event">
+                <strong>{statusLabels[submission.status]}</strong>
+                <span>
+                  {submission.updatedAt} · {isAdminReview ? "Не назначен" : "Текущий администратор"}
+                </span>
+              </article>
+              <article className="history-event">
+                <strong>Анкета обновлена</strong>
+                <span>вчера · Агент подачи</span>
+              </article>
             </div>
             <Button variant="ghost" onClick={onOpenHistory}>
               Открыть историю
             </Button>
           </CardComponent>
-          {fixedIssueList.length ? (
-            <CardComponent as="section" className="drawer-fixed-card">
-              <DrawerSectionHeader title="Исправления ждут проверки" />
-              {fixedIssueList.slice(0, 3).map((issue) => (
-                <CompactIssueRow
-                  issue={issue}
-                  key={issue.id}
-                  onOpenTarget={onOpenTarget}
-                />
-              ))}
-            </CardComponent>
-          ) : null}
         </aside>
       </div>
     </section>
-  );
-}
-
-function CompactIssueRow({
-  issue,
-  onOpenTarget,
-}: {
-  issue: Issue;
-  onOpenTarget: (target: WorkspaceTarget) => void;
-}) {
-  return (
-    <CardComponent as="article" className={`compact-issue-row ${issue.severity}`}>
-      <div>
-        <strong>{drawerIssueTitle(issue)}</strong>
-        <p>{drawerIssueSummary(issue)}</p>
-      </div>
-      <IssueCategoryTag issue={issue} />
-      <Badge className={issueStatusPillClass(issue.status)}>
-        {issueStatusLabel(issue.status)}
-      </Badge>
-      <Button
-        aria-label={`Открыть место исправления: ${drawerIssueTitle(issue)}`}
-        className="compact-button"
-        variant="secondary"
-        onClick={() => onOpenTarget(targetForIssue(issue))}
-      >
-        Перейти
-      </Button>
-    </CardComponent>
   );
 }
 
@@ -1021,6 +899,15 @@ function DrawerQuestionnaire({
     setPendingSectionScrollId(sectionElementId);
   }
 
+  function toggleQuestionnaireSection(sectionKey: string, sectionElementId: string) {
+    if (openSectionKey === sectionKey) {
+      setOpenSectionKey(closedQuestionnaireSectionKey(sectionKey.split(":")[0] ?? ""));
+      return;
+    }
+
+    openQuestionnaireSection(sectionKey, sectionElementId);
+  }
+
   function activateApplicant(applicantId: string) {
     const applicant =
       submission.applicants.find((item) => item.id === applicantId) ??
@@ -1086,6 +973,11 @@ function DrawerQuestionnaire({
     if (openSectionKey && activeApplicantReviewSectionKeys.includes(openSectionKey)) {
       return;
     }
+    if (
+      openSectionKey === closedQuestionnaireSectionKey(activeApplicant.id)
+    ) {
+      return;
+    }
 
     const nextSection =
       activeApplicantPrioritySections[0] ?? activeApplicantReviewSections[0];
@@ -1106,7 +998,7 @@ function DrawerQuestionnaire({
 
   return (
     <section
-      className={`drawer-section questionnaire-screen visa-form-screen ${
+      className={`drawer-section questionnaire-screen visa-form-screen v17-questionnaire-section ${
         canEdit ? "is-editable" : "is-read-only"
       }`}
     >
@@ -1236,10 +1128,7 @@ function DrawerQuestionnaire({
                         aria-controls={fieldsId}
                         aria-expanded={expanded}
                         onClick={() =>
-                          openQuestionnaireSection(sectionKey, sectionElementId)
-                        }
-                        onFocus={() =>
-                          openQuestionnaireSection(sectionKey, sectionElementId)
+                          toggleQuestionnaireSection(sectionKey, sectionElementId)
                         }
                       >
                         <div>
@@ -1483,6 +1372,10 @@ function questionnaireSectionKey(applicantId: string, sectionId: string) {
   return `${applicantId}:${sectionId}`;
 }
 
+function closedQuestionnaireSectionKey(applicantId: string) {
+  return `${applicantId}:__closed__`;
+}
+
 function defaultQuestionnaireSectionKey(submission: Submission) {
   for (const applicant of submission.applicants) {
     const issue = submission.issues.find(
@@ -1540,7 +1433,6 @@ function DrawerFiles({
   role: Role;
   submission: Submission;
 }) {
-  const progress = fileReadyCount(submission);
   const canEditFiles = canEditSubmissionContent(submission, role);
   const [pdfReviewBusy, setPdfReviewBusy] = useState(false);
   const [pdfReviewError, setPdfReviewError] = useState("");
@@ -1571,15 +1463,7 @@ function DrawerFiles({
   }
 
   return (
-    <section className="drawer-section">
-      <DrawerSectionHeader
-        title="Файлы подачи"
-        badge={
-          <Badge className="visa-tag visa-tag-muted">
-            {progress.ready}/{progress.total}
-          </Badge>
-        }
-      />
+    <section className="drawer-section drawer-files-section">
       {pdfReviewAvailable ? (
         <VisaApplicationPdfReviewPanel
           busy={pdfReviewBusy}
@@ -1594,7 +1478,7 @@ function DrawerFiles({
           onReview={handleVisaApplicationPdf}
         />
       ) : null}
-      <div className="file-matrix" aria-label="Файлы подачи">
+      <div className="file-matrix v17-file-matrix" aria-label="Файлы подачи">
         <div className="media-file-head" aria-hidden="true">
           <span>Файл</span>
           <span>Владелец</span>
@@ -1652,22 +1536,18 @@ function DrawerFiles({
                 <div className="media-file-owner">
                   <span>{applicant?.fullName ?? "Заявитель"}</span>
                 </div>
-                <div className="media-file-status">
+                <div className="media-file-status media-file-actions file-state-actions">
                   <Badge className={fileStatusPillClass(file.status)}>
                     {fileStatusLabel(file)}
                   </Badge>
-                </div>
-                <div className="media-file-actions">
                   {canUploadFile ? (
                     requireSelectedFile ? (
                       <>
                         <input
                           accept={
-                            file.type === "video"
-                              ? "video/mp4"
-                              : file.type === "passport_scan"
-                                ? "image/jpeg,image/png,application/pdf"
-                                : "image/jpeg,image/png"
+                            file.type === "passport_scan"
+                              ? "image/jpeg,image/png,application/pdf"
+                              : "image/jpeg,image/png"
                           }
                           aria-label={`Выбрать файл: ${uploadLabel}`}
                           className="sr-only"
@@ -1743,6 +1623,18 @@ function DrawerFiles({
           <EmptyState text="Файлы для подачи пока не заведены." />
         )}
       </div>
+      <CardComponent as="section" className="surface v17-file-trust">
+        <div className="guard warn">
+          <span className="guard-icon" aria-hidden="true">i</span>
+          <span>
+            <strong>Файлы не отправляются</strong>
+            <br />
+            <span className="subtle">
+              Показаны только состояния интерфейса; upload и чтение файлов отключены.
+            </span>
+          </span>
+        </div>
+      </CardComponent>
     </section>
   );
 }
@@ -1786,9 +1678,10 @@ function VisaApplicationPdfReviewPanel({
   );
   const unmatchedReviews = reviews.filter((review) => !review.applicantId);
 
-  function handleAgentHandoffClick() {
-    window.alert(handoffStatus.reason);
-  }
+  const handoffActionLabel = handoffStatus.ok ? "Готов к передаче" : "Передача закрыта";
+  const handoffActionTitle = handoffStatus.ok
+    ? `PDF готов к передаче агентам: ${handoffStatus.reason}`
+    : `Передача агентам недоступна: ${handoffStatus.reason}`;
 
   return (
     <CardComponent
@@ -1913,8 +1806,13 @@ function VisaApplicationPdfReviewPanel({
         </Badge>
       </div>
       <div className="media-file-actions">
-        <Button variant="primary" onClick={handleAgentHandoffClick}>
-          Передать агентам
+        <Button
+          aria-label={handoffActionTitle}
+          disabled
+          title={handoffActionTitle}
+          variant="secondary"
+        >
+          {handoffActionLabel}
         </Button>
         {canUpload ? (
           <>
@@ -1964,157 +1862,96 @@ function VisaApplicationPdfReviewPanel({
 }
 
 function DrawerIssues({
-  onAcceptAiSuggestion,
-  onDismissAiSuggestion,
   onOpenTarget,
-  onRunAiReview,
-  onViewChange,
   role,
   submission,
-  surface,
-  view,
 }: {
-  onAcceptAiSuggestion: (suggestionId: string) => void;
-  onDismissAiSuggestion: (suggestionId: string) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
-  onRunAiReview: () => void;
-  onViewChange: (view: IssueView) => void;
   role: Role;
   submission: Submission;
-  surface: "agent" | "review" | "export";
-  view: IssueView;
 }) {
-  const [expandedIssueIds, setExpandedIssueIds] = useState<Set<string>>(
-    () => new Set(submission.issues.map((issue) => issue.id)),
-  );
-
-  useEffect(() => {
-    setExpandedIssueIds(new Set(submission.issues.map((issue) => issue.id)));
-  }, [submission.id, submission.issues]);
-
-  function toggleIssue(issueId: string) {
-    setExpandedIssueIds((current) => {
-      const next = new Set(current);
-      if (next.has(issueId)) next.delete(issueId);
-      else next.add(issueId);
-      return next;
-    });
-  }
-
   return (
-    <section className="drawer-section">
-      <DrawerSectionHeader
-        title={view === "issues" ? "Что нужно закрыть" : "ББ-проверка"}
-        action={
-          <SegmentedFilter
-            ariaLabel="Режим замечаний"
-            items={[
-              { count: openIssueCount(submission), id: "issues", label: "Замечания" },
-              { id: "bb", label: "ББ" },
-            ]}
-            value={view}
-            onChange={onViewChange}
-          />
-        }
-      />
-      {view === "issues" ? (
-        <div className="issue-list" id="workspace-issues">
-          {submission.issues.length ? (
-            submission.issues.map((issue) => {
-              const expanded = expandedIssueIds.has(issue.id);
-              const detailsId = `issue-details-${issue.id}`;
-              const target = targetForIssue(issue);
-              const isFileIssue = target.tab === "files";
+    <section className="drawer-section drawer-issues-section">
+      <div className="issue-list v17-issue-list" id="workspace-issues">
+        {submission.issues.length ? (
+          submission.issues.map((issue) => {
+            const target = targetForIssue(issue);
+            const isFileIssue = target.tab === "files";
 
-              return (
-                <article
-                  className={`issue-card ${issue.severity} ${issue.status} ${
-                    expanded ? "is-expanded" : ""
-                  }`}
-                  id={`workspace-issue-${issue.id}`}
-                  key={issue.id}
-                  tabIndex={-1}
-                >
-                  <div className="issue-head">
+            return (
+              <article
+                className={`issue-card v17-issue-card ${issue.severity} ${issue.status} ${issueCardStateClass(issue)}`}
+                id={`workspace-issue-${issue.id}`}
+                key={issue.id}
+                tabIndex={-1}
+              >
+                <div className="issue-head v17-issue-top">
+                  <div className="issue-title-copy v17-issue-heading">
+                    <strong>{issue.reason || drawerIssueTitle(issue)}</strong>
+                    <span>{issueTarget(issue)}</span>
+                  </div>
+                  <Badge className={issueStatusPillClass(issue.status)}>
+                    {issueStatusLabel(issue.status)}
+                  </Badge>
+                </div>
+                <div className="issue-details-grid v17-issue-details">
+                  <div className="v17-issue-detail">
+                    <span>Причина</span>
+                    <p>{drawerIssueSummary(issue)}</p>
+                  </div>
+                  <div className="v17-issue-detail">
+                    <span>Комментарий</span>
+                    <p>{issue.comment}</p>
+                  </div>
+                </div>
+                <div className="issue-foot v17-issue-footer">
+                  <Badge className={issueBadgeClass(issue.severity)}>
+                    {issueSeverityLabel(issue.severity)}
+                  </Badge>
+                  {issue.status !== "closed_by_admin" ? (
                     <Button
-                      aria-label={drawerIssueTitle(issue)}
-                      aria-controls={detailsId}
-                      aria-expanded={expanded}
-                      className="issue-title-button"
-                      variant="plain"
-                      onClick={() => toggleIssue(issue.id)}
+                      aria-label={`${issue.status === "fixed_by_agent" ? "Проверить исправление" : "Открыть место исправления"}: ${drawerIssueTitle(issue)}`}
+                      className="compact-button"
+                      variant="secondary"
+                      onClick={() => onOpenTarget(target)}
                     >
-                      <div className="issue-title-copy">
-                        <strong>{issue.reason || drawerIssueTitle(issue)}</strong>
-                        <span>{issueTarget(issue)}</span>
-                      </div>
-                      <span className="accordion-chevron" aria-hidden="true" />
+                      {issue.status === "fixed_by_agent"
+                        ? "Проверить"
+                        : isFileIssue
+                          ? "Открыть файл"
+                          : "Открыть точное поле"}
                     </Button>
-                    <Badge className={issueStatusPillClass(issue.status)}>
-                      {issueStatusLabel(issue.status)}
-                    </Badge>
-                  </div>
-                  <div className="issue-details-grid" hidden={!expanded} id={detailsId}>
-                    <div>
-                      <span>Причина</span>
-                      <p>{drawerIssueSummary(issue)}</p>
-                    </div>
-                    <div>
-                      <span>Комментарий</span>
-                      <p>{issue.comment}</p>
-                    </div>
-                  </div>
-                  <div className="issue-foot">
-                    <Badge className={issueBadgeClass(issue.severity)}>
-                      {issueSeverityLabel(issue.severity)}
-                    </Badge>
-                    {issue.status !== "closed_by_admin" ? (
-                      <Button
-                        aria-label={`${issue.status === "fixed_by_agent" ? "Проверить исправление" : "Открыть место исправления"}: ${drawerIssueTitle(issue)}`}
-                        className="compact-button"
-                        variant="secondary"
-                        onClick={() => onOpenTarget(target)}
-                      >
-                        {issue.status === "fixed_by_agent" ? "Проверить" : isFileIssue ? "Открыть файл" : "Открыть точное поле"}
-                      </Button>
-                    ) : (
-                      <Button className="compact-button" disabled variant="secondary">
-                        Завершено
-                      </Button>
-                    )}
-                  </div>
-                </article>
-              );
-            })
-          ) : (
-            <EmptyState text="Открытых замечаний нет." />
-          )}
-        </div>
-      ) : (
-        <BbAiPanel
-          compact
-          onAccept={onAcceptAiSuggestion}
-          onDismiss={onDismissAiSuggestion}
-          onRun={onRunAiReview}
-          role={role}
-          submission={submission}
-          surface={surface}
-        />
-      )}
+                  ) : (
+                    <Button className="compact-button" disabled variant="secondary">
+                      Завершено
+                    </Button>
+                  )}
+                  {isFileIssue && role === "agent" ? (
+                    <span className="v17-issue-note">
+                      Реальная загрузка недоступна в прототипе
+                    </span>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <EmptyState text="Открытых замечаний нет." />
+        )}
+      </div>
     </section>
   );
 }
 
-type IssueView = "bb" | "issues";
-type HistoryFilter = "all" | "bb";
+type HistoryFilter = "all" | "bb" | "files" | "questionnaire" | "status";
 
 function drawerHeaderMeta(submission: Submission) {
   return [
-    submission.id,
     submission.country,
     submission.city,
     typeLabels[submission.type],
     applicantCountLabel(submission.applicants.length),
+    submission.id,
   ].join(" · ");
 }
 
@@ -2125,77 +1962,83 @@ function drawerTabLabel(tab: DrawerTab, fallback: string) {
 
 function DrawerHistory({ submission }: { submission: Submission }) {
   const [filter, setFilter] = useState<HistoryFilter>("all");
-  const events =
-    filter === "bb"
-      ? submission.history.filter((event) => event.source === "bb")
-      : submission.history;
-  const groups = groupHistoryEvents(events);
+  const events = drawerHistoryEvents(submission).filter((event) => {
+    if (filter === "all") return true;
+    if (filter === "bb") return event.source === "bb";
+    return event.kind === filter;
+  });
 
   return (
-    <section className="drawer-section">
-      <DrawerSectionHeader
-        title="Журнал действий"
-        action={
-          <div className="history-filter" role="group" aria-label="Фильтр истории">
-            <Button
-              className={filter === "all" ? "is-active" : ""}
-              aria-pressed={filter === "all"}
-              variant="ghost"
-              onClick={() => setFilter("all")}
-            >
-              Все
-            </Button>
-            <Button
-              className={filter === "bb" ? "is-active" : ""}
-              aria-pressed={filter === "bb"}
-              variant="ghost"
-              onClick={() => setFilter("bb")}
-            >
-              ББ
-            </Button>
-          </div>
-        }
-      />
-      <div className="history-timeline">
-        {groups.length ? (
-          groups.map((group) => (
-            <section className="history-day-group" key={group.date}>
-              <p>{group.date}</p>
-              <div className="drawer-list">
-                {group.events.map((event) => {
-                  const time = historyTimeLabel(event.at, group.date);
-
-                  return (
-                    <CardComponent
-                      as="article"
-                      className={`drawer-row history-row ${time ? "has-time" : "no-time"}`}
-                      key={event.id}
-                    >
-                      {time ? <span>{time}</span> : null}
-                      <div>
-                        <strong>{event.text}</strong>
-                        {event.detail ? (
-                          <details>
-                            <summary>Подробнее</summary>
-                            <p>{event.detail}</p>
-                          </details>
-                        ) : null}
-                      </div>
-                      <Badge className="visa-tag visa-tag-muted">
-                        {historySourceLabel(event.source)}
-                      </Badge>
-                    </CardComponent>
-                  );
-                })}
-              </div>
-            </section>
+    <section className="drawer-section drawer-history-section">
+      <div className="history-filter v17-history-filter" role="group" aria-label="Фильтр истории">
+        {[
+          { id: "all", label: "Все" },
+          { id: "questionnaire", label: "Анкета" },
+          { id: "files", label: "Файлы" },
+          { id: "status", label: "Статусы" },
+        ].map((item) => (
+          <Button
+            className={filter === item.id ? "is-active" : ""}
+            aria-pressed={filter === item.id}
+            key={item.id}
+            variant="ghost"
+            onClick={() => setFilter(item.id as HistoryFilter)}
+          >
+            {item.label}
+          </Button>
+        ))}
+      </div>
+      <div className="history history-timeline v17-history-timeline">
+        {events.length ? (
+          events.map((event) => (
+            <article className="history-event" key={event.id}>
+              <strong>{event.text}</strong>
+              <span>
+                {event.at} · {event.actor}
+              </span>
+              {event.detail ? <p>{event.detail}</p> : null}
+            </article>
           ))
         ) : (
-          <EmptyState text="Событий ББ пока нет." />
+          <EmptyState text="Событий пока нет." />
         )}
       </div>
     </section>
   );
+}
+
+function drawerHistoryEvents(submission: Submission) {
+  const base = submission.history.map((event) => ({
+    actor: historySourceLabel(event.source),
+    at: event.at,
+    detail: event.detail,
+    id: event.id,
+    kind: "status" as HistoryFilter,
+    source: event.source,
+    text: event.text,
+  }));
+  const issueEvents = submission.issues.slice(0, 3).map((issue) => ({
+    actor: issue.target.applicantName,
+    at: issue.createdAt,
+    detail:
+      issue.target.fileType || issue.type === "file" || issue.type === "media"
+        ? "Новая версия ожидает ручной проверки администратора."
+        : issue.comment,
+    id: `issue-history-${issue.id}`,
+    kind:
+      issue.target.fileType || issue.type === "file" || issue.type === "media"
+        ? ("files" as HistoryFilter)
+        : ("questionnaire" as HistoryFilter),
+    source: issue.createdBy,
+    text:
+      issue.target.fileType || issue.type === "file" || issue.type === "media"
+        ? `${fileLabel(issue.target.fileType ?? "passport_scan")} заменено`
+        : issue.target.field
+          ? `${issue.target.field}: ${issue.reason}`
+          : issue.reason,
+  }));
+
+  return [...base, ...issueEvents];
 }
 
 function historySourceLabel(source: Submission["history"][number]["source"]) {
@@ -2299,33 +2142,6 @@ function fileRequirementCopy(file: Submission["files"][number], issue?: Issue) {
   return "Проверка документа в кадре";
 }
 
-function groupHistoryEvents(events: Submission["history"]) {
-  const groups: Array<{ date: string; events: Submission["history"] }> = [];
-
-  for (const event of events) {
-    const date = historyDateLabel(event.at);
-    const group = groups.find((item) => item.date === date);
-    if (group) {
-      group.events.push(event);
-    } else {
-      groups.push({ date, events: [event] });
-    }
-  }
-
-  return groups;
-}
-
-function historyDateLabel(value: string) {
-  return value.split(/[ ,]+/)[0] || value;
-}
-
-function historyTimeLabel(value: string, groupDate: string) {
-  const parts = value.split(/[ ,]+/).filter(Boolean);
-  const time = parts[1];
-  if (!time || time === groupDate) return "";
-  return time;
-}
-
 function applicantRoleLabel(role: Submission["applicants"][number]["role"]) {
   if (role === "main") return "Основной заявитель";
   if (role === "spouse") return "Супруг";
@@ -2370,6 +2186,12 @@ function issueStatusPillClass(status: Issue["status"]) {
   return "visa-tag visa-tag-ready";
 }
 
+function issueCardStateClass(issue: Issue) {
+  if (issue.status === "fixed_by_agent") return "fixed";
+  if (issue.status === "closed_by_admin") return "closed";
+  return "open";
+}
+
 function issueTarget(issue: Issue) {
   const parts = [
     issue.target.applicantName,
@@ -2400,29 +2222,6 @@ function fileReadyCount(submission: Submission) {
     ).length,
     total: submission.files.length,
   };
-}
-
-function decisionTitle(submission: Submission, primaryAction: ActionDecision) {
-  if (primaryAction.disabled) return "Действие заблокировано";
-  if (blockerCount(submission) > 0) return "Сначала закрыть блокеры";
-  if (fixedIssueCount(submission) > 0) return "Исправления ждут проверки";
-  if (submission.status === "submitted_for_review")
-    return "Пакет на внутренней проверке";
-  if (submission.status === "ready_for_export") return "Подача готова к Эксель";
-  if (submission.status === "exported") return "Подача выгружена";
-  if (submission.completeness.total < 100) return "Нужно завершить подготовку";
-  return "Пакет можно двигать дальше";
-}
-
-function decisionBadge(submission: Submission, primaryAction: ActionDecision) {
-  if (primaryAction.disabled) return "Стоп";
-  const blockers = blockerCount(submission);
-  if (blockers > 0) return blockerCountLabel(blockers);
-  const open = openIssueCount(submission);
-  if (open > 0) return `${open} замеч.`;
-  if (submission.status === "ready_for_export") return "К Эксель";
-  if (submission.status === "exported") return "История";
-  return "Без блокеров";
 }
 
 function firstWorkLine(submission: Submission) {

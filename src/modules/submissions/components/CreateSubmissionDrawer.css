@@ -1050,3 +1050,162 @@
     font-size: var(--v19-upload-title-size-mobile);
   }
 }
+
+/* Premium adaptive polish for create drawer cells and panels. */
+.create-drawer .drawer-header {
+  row-gap: 14px;
+}
+
+.create-drawer-header .cf-steps {
+  gap: 12px;
+}
+
+.create-drawer-header .cf-steps button {
+  min-height: 44px;
+  padding-inline: 18px;
+}
+
+.create-drawer-body {
+  padding: 22px 24px 98px;
+}
+
+.create-drawer .pi-board,
+.create-drawer .cf-grid {
+  gap: 16px;
+}
+
+.create-drawer .cf-panel,
+.create-drawer .pi-create-view-panel,
+.create-drawer .pi-scan-main,
+.create-drawer .pi-family-yes-no,
+.create-drawer .pi-passport-targets {
+  border-color: var(--v19-line-default);
+}
+
+.create-drawer .cf-panel,
+.create-drawer .pi-create-view-panel {
+  gap: 14px;
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.create-drawer .create-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.create-drawer .create-panel-head h3,
+.create-drawer .pi-passport-target strong,
+.create-drawer .qs-preview strong,
+.create-drawer .mr-list strong {
+  color: var(--v19-fg);
+  font-weight: 720;
+}
+
+.create-drawer .create-panel-head > span {
+  min-height: 28px;
+  padding-inline: 10px;
+  font-weight: 680;
+}
+
+.create-drawer .pi-passport-targets {
+  gap: 10px;
+  padding: 12px 0 16px;
+}
+
+.create-drawer .pi-passport-targets > div {
+  gap: 9px;
+}
+
+.create-drawer .pi-passport-target {
+  min-height: 64px;
+  padding: 12px 12px 12px 14px;
+}
+
+.create-drawer .pi-passport-target span {
+  gap: 5px;
+}
+
+.create-drawer .pi-passport-target strong {
+  font-size: 13.5px;
+}
+
+.create-drawer .pi-passport-target em {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.create-drawer .fyn-question,
+.create-drawer .qs-item,
+.create-drawer .mr-list div {
+  gap: 7px;
+  min-height: 62px;
+  padding: 13px 14px;
+  border-radius: 13px;
+}
+
+.create-drawer .qs-preview,
+.create-drawer .mr-list,
+.create-drawer .ef-preview {
+  gap: 10px;
+}
+
+.create-drawer .ef-preview label {
+  gap: 8px;
+}
+
+.create-drawer .ef-preview input {
+  min-height: 42px;
+  padding-inline: 12px;
+  border-radius: 10px;
+}
+
+.create-drawer .pi-empty-actions {
+  gap: 12px;
+}
+
+.create-drawer-footer {
+  gap: 12px;
+  padding: 14px 24px;
+}
+
+@media (max-width: 920px) {
+  .create-drawer-body {
+    padding: 18px 18px 94px;
+  }
+
+  .create-drawer .cf-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .create-drawer-header .cf-steps {
+    gap: 8px;
+  }
+
+  .create-drawer-header .cf-steps button {
+    min-height: 40px;
+    padding-inline: 13px;
+  }
+
+  .create-drawer-body {
+    padding: 14px 12px 92px;
+  }
+
+  .create-drawer .cf-panel,
+  .create-drawer .pi-create-view-panel {
+    padding: 15px;
+  }
+
+  .create-drawer .pi-passport-target {
+    min-height: 60px;
+  }
+
+  .create-drawer-footer {
+    padding: 10px 12px;
+  }
+}

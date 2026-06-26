@@ -90,10 +90,10 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     });
   }
 
-  if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
-  if (dates.size > 1) blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (types.size > 1)
     blockers.push({ reason: "Нельзя смешивать одинарные и семейные подачи" });
+  if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
+  if (dates.size > 1) blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (exportState === "mixed")
     blockers.push({ reason: "В выборке разные состояния выгрузки" });
 

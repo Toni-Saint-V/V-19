@@ -298,6 +298,24 @@ function SettingsSectionContent({
           onChange={(checked) => onSettings({ digest: checked ? "instant" : "daily" })}
         />
       </div>
+      <label className="settings-form-row" htmlFor="settings-action-digest">
+        <div>
+          <div className="settings-form-label">Сводка по действиям</div>
+          <div className="settings-form-help">Как часто показывать сводку задач агента.</div>
+        </div>
+        <select
+          aria-label="Сводка по действиям"
+          className="settings-field-control"
+          id="settings-action-digest"
+          value={settings.digest}
+          onChange={(event) =>
+            onSettings({ digest: event.currentTarget.value as WorkspaceSettings["digest"] })
+          }
+        >
+          <option value="instant">Сразу</option>
+          <option value="daily">Ежедневно</option>
+        </select>
+      </label>
       <div className="settings-form-row">
         <div>
           <div className="settings-form-label">Новые замечания</div>

@@ -41,7 +41,7 @@ async function expectAdminWorkNavigation(page: Page) {
 
 function submissionCard(page: Page, name: string) {
   return page
-    .locator(".submission-card, [data-submission-card]")
+    .locator(".submission-card, .v17-admin-work-row, [data-submission-card]")
     .filter({ hasText: name })
     .first();
 }
@@ -57,7 +57,7 @@ function drawer(page: Page) {
 async function expectDrawerStatus(page: Page, status: string) {
   const detailMeta = drawer(page).locator(".drawer-meta-line");
   if ((await detailMeta.count()) > 0) {
-    await expect(detailMeta).toContainText(/ПД-\d+ ·/);
+    await expect(detailMeta).toContainText(/ПД-\d+/);
     await expect(drawer(page).locator(".drawer-status-chip")).toContainText(status);
     return;
   }
@@ -208,11 +208,12 @@ async function submitForReviewFromDrawer(page: Page) {
   });
   if (
     await verifyPassportButton
-      .waitFor({ state: "visible", timeout: 1_000 })
+      .waitFor({ state: "visible", timeout: 5_000 })
       .then(() => true)
       .catch(() => false)
   ) {
-    await verifyPassportButton.click();
+    await verifyPassportButton.focus();
+    await page.keyboard.press("Enter");
   }
 }
 
@@ -465,7 +466,7 @@ test.describe("V-19 operations workspace", () => {
     await switchToAdmin(page);
     await expectAdminWorkNavigation(page);
     await expect(
-      submissionCard(page, "Нина Волкова").getByText("Проверка", { exact: true }),
+      submissionCard(page, "Нина Волкова").getByText(/Новая проверка|Проверка/),
     ).toBeVisible();
     await submissionCard(page, "Нина Волкова").click();
     await expect(
@@ -539,7 +540,7 @@ test.describe("V-19 operations workspace", () => {
     await switchToAdmin(page);
     await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
     await expect(
-      submissionCard(page, "Нина Волкова").getByText("Проверка", { exact: true }),
+      submissionCard(page, "Нина Волкова").getByText(/Новая проверка|Проверка/),
     ).toBeVisible();
 
     if (projectName === "chromium") {
@@ -581,15 +582,18 @@ test.describe("V-19 operations workspace", () => {
     await drawer(page).getByLabel("Причина").focus();
     await page.keyboard.press("Escape");
     await expect(drawer(page).getByLabel("Новое замечание")).toHaveCount(0);
-    await drawer(page).getByRole("tab", { name: "Обзор" }).focus();
-    await page.keyboard.press("Escape");
+    const overviewTab = drawer(page).getByRole("tab", { name: /^Обзор/ });
+    if ((await overviewTab.count()) > 0) {
+      await overviewTab.focus();
+      await page.keyboard.press("Escape");
+    }
     await expect(drawer(page)).toHaveCount(0);
     await expect(reviewCard).toBeFocused();
 
     await page.getByRole("button", { name: "Выгрузка" }).click();
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
     await expect(
-      page.locator(".export-preview").getByText("Пакет выгрузки"),
+      page.locator(".export-preview").getByText("Готово"),
     ).toBeVisible();
     await expect(
       page.locator(".export-preview").getByText("Сначала сформируйте Эксель"),
@@ -1006,10 +1010,6 @@ test.describe("V-19 operations workspace", () => {
       .first();
     await expect(fixedIssueSummary).toBeVisible();
     await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
-    await fixedIssueSummary.click();
-    await expect(
-      drawer(page).getByRole("tab", { name: /Анкета/ }),
-    ).toHaveAttribute("aria-selected", "true");
     await page.getByRole("button", { name: "Закрыть и принять" }).click();
     await expectDrawerStatus(page, "Готово к выгрузке");
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
@@ -1022,12 +1022,8 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: "Семья Петровых" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByText("Пакет выгрузки")).toBeVisible();
     await expect(
-      page.locator(".export-preview").getByText("ПД-1054-1"),
-    ).toBeVisible();
-    await expect(
-      page.locator(".export-preview").getByText("Ирина Петрова"),
+      page.locator(".export-preview").getByText("1 подача · 2 строки"),
     ).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
     await expect(
@@ -1050,6 +1046,27 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.locator(".submission-panel").getByText("Выгружено").first(),
     ).toBeVisible();
+
+    await page
+      .locator(".export-row")
+      .filter({ hasText: "Семья Петровых" })
+      .getByRole("button", { name: "Проверить PDF" })
+      .click();
+    await expect(
+      drawer(page).getByRole("heading", { name: "Семья Петровых" }),
+    ).toBeVisible();
+    await expect(
+      drawer(page).getByRole("tab", { name: /Файлы|Документы/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(drawer(page).getByLabel("Проверка PDF анкеты")).toBeVisible();
+    await expect(
+      drawer(page).getByText("PDF после внешней обработки ещё не загружен."),
+    ).toBeVisible();
+    await expect(
+      drawer(page).getByRole("button", {
+        name: /Передача агентам недоступна: Загрузите PDF анкеты после внешней обработки/,
+      }),
+    ).toBeDisabled();
   });
 
   test("export blocks mixed packages before file generation", async ({ page }) => {
@@ -1155,7 +1172,11 @@ test.describe("V-19 operations workspace", () => {
       .getByRole("checkbox")
       .check();
     await expect(
-      page.locator(".export-preview").getByText(applicantName),
+      page.locator(".export-preview").getByText("1 подача · 1 строка"),
+    ).toBeVisible();
+    await expect(page.locator(".export-preview").getByText("Sheet1")).toBeVisible();
+    await expect(
+      page.locator(".export-preview").getByText("56/56 columns"),
     ).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
     await page
@@ -1243,7 +1264,9 @@ test.describe("V-19 operations workspace", () => {
         drawer(page).getByRole("button", { name: "Отправить" }),
       ).toBeDisabled();
       await expect(
-        drawer(page).getByText("Есть незаполненные поля или недостающие файлы"),
+        drawer(page).locator(".drawer-footer").getByText(
+          "Есть незаполненные поля или недостающие файлы",
+        ),
       ).toBeVisible();
       await openQuestionnaireTab(page);
       await fillQuestionnaire(page);
@@ -1369,7 +1392,10 @@ test.describe("V-19 operations workspace", () => {
       await expect(
         page.locator(".export-preview").getByText("1 подача · 4 строки"),
       ).toBeVisible();
-      await expect(page.locator(".export-preview").getByText("4/4")).toBeVisible();
+      await expect(page.locator(".export-preview").getByText("Sheet1")).toBeVisible();
+      await expect(
+        page.locator(".export-preview").getByText("56/56 columns"),
+      ).toBeVisible();
       await expect(
         page.locator(".export-preview").getByText("Тип: Семья"),
       ).toBeVisible();

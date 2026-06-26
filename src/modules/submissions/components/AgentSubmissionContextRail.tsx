@@ -54,6 +54,7 @@ export function AgentSubmissionContextRail({
       className="v19-submissions-context"
       label="Контекст подачи"
       title={submission.title}
+      showHeader={false}
       onClose={onClose}
     >
       <section className="v19-rail-card v19-rail-card-primary">
@@ -78,42 +79,44 @@ export function AgentSubmissionContextRail({
         </p>
       </section>
 
-      <section className="v19-rail-card">
+      <section className="v19-rail-card v19-rail-next-card">
         <p className="v19-rail-label">Следующее действие</p>
         <h3>{nextAction.title}</h3>
-        <p>{nextAction.description}</p>
+        <p className="v19-rail-action-detail">{nextAction.description}</p>
         <Button variant="primary" onClick={nextAction.onOpen}>
           {nextAction.label}
         </Button>
       </section>
 
-      <section className="v19-rail-card">
-        <p className="v19-rail-label">Открытые замечания · {openIssueCount}</p>
-        <div className="v19-rail-issue-list">
-          {issues.map((issue) => (
-            <button
-              className="v19-rail-issue"
-              key={issue.id}
-              type="button"
-              onClick={issue.onOpen}
-            >
-              <span
-                className={`v19-rail-issue-dot tone-${issue.tone}`}
-                aria-hidden="true"
-              />
-              <span>
-                <strong>{issue.reason}</strong>
-                <small>{issue.targetLine}</small>
-              </span>
-              <SvgIcon>
-                <path d="M9 6l6 6-6 6" />
-              </SvgIcon>
-            </button>
-          ))}
-        </div>
-      </section>
+      {openIssueCount > 0 ? (
+        <section className="v19-rail-card v19-rail-issues-card">
+          <p className="v19-rail-label">Открытые замечания · {openIssueCount}</p>
+          <div className="v19-rail-issue-list">
+            {issues.map((issue) => (
+              <button
+                className="v19-rail-issue"
+                key={issue.id}
+                type="button"
+                onClick={issue.onOpen}
+              >
+                <span
+                  className={`v19-rail-issue-dot tone-${issue.tone}`}
+                  aria-hidden="true"
+                />
+                <span>
+                  <strong>{issue.reason}</strong>
+                  <small>{issue.targetLine}</small>
+                </span>
+                <SvgIcon>
+                  <path d="M9 6l6 6-6 6" />
+                </SvgIcon>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
-      <section className="v19-rail-card">
+      <section className="v19-rail-card v19-rail-quick-card">
         <p className="v19-rail-label">Быстрые переходы</p>
         <div className="v19-rail-quick-links">
           <Button variant="secondary" onClick={() => onOpenTab("questionnaire")}>
@@ -140,7 +143,7 @@ export function AgentSubmissionContextRail({
         </div>
       </section>
 
-      <section className="v19-rail-card">
+      <section className="v19-rail-card v19-rail-history-card">
         <p className="v19-rail-label">Последние изменения</p>
         <div className="v19-rail-history">
           {history.slice(0, 2).map((item) => (

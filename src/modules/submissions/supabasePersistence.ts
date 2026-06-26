@@ -294,7 +294,7 @@ function mediaTypeForFile(type: SubmissionFileType): MediaAssetInsert["type"] {
   if (type === "selfie") return "selfie";
   if (type === "selfie_2") return "selfie_2";
   if (type === "passport_scan") return "passport_scan";
-  return "video";
+  return "selfie_2";
 }
 
 function applicantRoleLabel(role: Applicant["role"]): string {

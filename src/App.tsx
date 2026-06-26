@@ -457,7 +457,9 @@ function MainApp() {
   const [agentTab, setAgentTab] = useState<AgentTab>("action");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
-  const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
+  const [selectedExportIds, setSelectedExportIds] = useState<string[]>([
+    "ПД-1056",
+  ]);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState("");
   const [issueComposerRequest, setIssueComposerRequest] =
@@ -1043,6 +1045,13 @@ function MainApp() {
     setActiveDrawerTab(tab);
     setDrawerInitialTarget(target ?? null);
     setDrawerMode("detail");
+  }
+
+  function openNextAdminWorkSubmission() {
+    const nextSubmission = reviewList[0] ?? searchedReviewQueue[0];
+    if (!nextSubmission) return;
+
+    openSubmission(nextSubmission, reviewTabForAdminWork(reviewTab) ? "overview" : defaultDrawerTab(nextSubmission));
   }
 
   function selectSubmission(submission: Submission) {
@@ -2265,7 +2274,7 @@ function MainApp() {
   const searchControl = (
     <SearchBar
       label="Поиск в текущем списке"
-      placeholder="Поиск по имени, ID или статусу"
+      placeholder="Подача, город или ID"
       value={query}
       onChange={setQuery}
     />
@@ -2326,13 +2335,13 @@ function MainApp() {
           )
           .map((item) => {
             if (item.id === "agent-inbox") {
-              return { ...item, meta: "события и мои действия" };
+              return { ...item, meta: "события и задачи" };
             }
 
             if (item.id === "agent-settings") {
               return {
                 ...item,
-                label: "Еще/Профиль",
+                label: "Настройки",
                 meta: "профиль и настройки",
               };
             }
@@ -2455,18 +2464,30 @@ function MainApp() {
           ) : null}
           <div className="topbar-heading">
             <h1>{workspaceSurfaceTitle}</h1>
-            {surface !== "agent-inbox" ? <p>{workspaceSurfaceDescription}</p> : null}
+            {surface !== "agent-inbox" &&
+            surface !== "agent-submissions" &&
+            surface !== "export" ? (
+              <p>{workspaceSurfaceDescription}</p>
+            ) : null}
           </div>
           {surface === "agent-inbox" ? (
             <div className="v19-topbar-city-filter">{cityFilterControl}</div>
-          ) : surface === "agent-submissions" ? (
-            <Button
-              className="v19-topbar-cta"
-              variant="primary"
-              onClick={openCreateSubmissionDrawer}
-            >
-              Новая подача
-            </Button>
+          ) : surface === "admin-review" && !isSupabaseMode ? (
+            <div className="topbar-actions v19-admin-topbar-actions">
+              <Button
+                className="v19-topbar-cta v19-admin-open-next"
+                disabled={!reviewList.length}
+                variant="primary"
+                onClick={openNextAdminWorkSubmission}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M6 4h12v16H6z" />
+                  <path d="M9 8h6M9 12h4" />
+                  <path d="m14 16 2 2 4-4" />
+                </svg>
+                Открыть следующую
+              </Button>
+            </div>
           ) : !isV19CollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
               {!isV19CollectionSurface ? (
@@ -2556,7 +2577,6 @@ function MainApp() {
         {surface === "admin-review" && activeSubmission ? (
           <AdminReviewScreen
             inboxEvents={searchedAdminInboxEvents}
-            filterControl={cityFilterControl}
             onAddIssue={openIssueComposer}
             onOpen={openSubmission}
             onSelect={selectSubmission}
@@ -2575,7 +2595,6 @@ function MainApp() {
             exportTab={exportTab}
             exportBusy={exportBusy}
             exportError={exportError}
-            filterControl={cityFilterControl}
             historyList={historyList}
             onDownload={downloadExport}
             onGenerate={generateExport}
