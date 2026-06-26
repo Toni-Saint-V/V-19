@@ -411,6 +411,66 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(loaded.ownerIdsBySubmissionId.get(submission.id)).toBe(otherAgentProfile.id);
   });
 
+  it("normalizes legacy snapshot status and drops legacy media before runtime use", async () => {
+    const sourceSubmission = initialSubmissions[1] as Submission;
+    const legacySnapshot: Submission = {
+      ...sourceSubmission,
+      status: "requires_action",
+      files: [
+        {
+          id: "legacy-photo",
+          applicantId: sourceSubmission.applicants[0]?.id ?? "applicant-1",
+          status: "uploaded",
+          type: "photo",
+        },
+        {
+          id: "legacy-photo-white",
+          applicantId: sourceSubmission.applicants[0]?.id ?? "applicant-1",
+          status: "uploaded",
+          type: "photo_white",
+        },
+        {
+          id: "legacy-video",
+          applicantId: sourceSubmission.applicants[0]?.id ?? "applicant-1",
+          status: "uploaded",
+          type: "video",
+        },
+      ],
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      sourceSubmission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: {
+          status: cockpitSnapshotStatus,
+          [cockpitSnapshotKey]: {
+            version: cockpitSnapshotVersion,
+            submission: legacySnapshot,
+          },
+        },
+        status: "requires_action",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const submission = loaded.submissions[0];
+
+    expect(submission?.status).toBe("returned");
+    expect(submission?.files.map((file) => file.type)).toEqual([
+      "passport_scan",
+      "selfie",
+      "selfie_2",
+    ]);
+    expect(submission?.files.every((file) => file.status === "missing")).toBe(true);
+    expect(submission?.completeness.files).toBe(0);
+  });
+
   it("does not load another agent row for agent profile", async () => {
     const submission = initialSubmissions[0] as Submission;
     const payload = toCockpitDraftPersistencePayload(

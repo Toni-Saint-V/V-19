@@ -53,6 +53,7 @@ import {
   createDraftSubmission,
   generatedCockpitMediaFileName,
   markSelectedExported,
+  mediaSlotTypeForSubmissionFileType,
   mergeUploadedFileMetadataIntoSubmissions,
   uploadRequiredFile,
   uploadRequiredFiles,
@@ -893,6 +894,21 @@ describe("V-19 submission actions", () => {
     expect(second).not.toBe(first);
   });
 
+  it("does not hard-throw for legacy local media slot names", () => {
+    expect(mediaSlotTypeForSubmissionFileType("photo")).toBe("photo");
+    expect(mediaSlotTypeForSubmissionFileType("photo_white")).toBe("photo_white");
+    expect(mediaSlotTypeForSubmissionFileType("video")).toBe("video");
+    expect(
+      generatedCockpitMediaFileName({
+        applicantId: "app-1059-1",
+        fileType: "video",
+        mimeType: "video/mp4",
+        submissionId: "VF-1059",
+        uploadNonce: "2026-06-17T10:00:00.000Z:legacy",
+      }),
+    ).toMatch(/^v19[a-z0-9]+_video\.mp4$/);
+  });
+
   it("fills a draft enough to submit it for review", () => {
     const draft = createDraftSubmission({
       city: "Москва",
@@ -1146,6 +1162,49 @@ describe("V-19 submission actions", () => {
     };
 
     expect(uploadRequiredFile(locked, firstFile.id)).toBe(locked);
+  });
+
+  it("does not mutate state for a legacy media upload target", () => {
+    const draft = completeQuestionnaire(
+      createDraftSubmission({
+        city: "Москва",
+        familyCount: 1,
+        submissions: initialSubmissions,
+        type: "single",
+      }),
+    );
+    const legacySubmission: Submission = {
+      ...draft,
+      files: [
+        {
+          id: "legacy-photo",
+          applicantId: draft.applicants[0]?.id ?? "applicant-1",
+          status: "missing",
+          type: "photo",
+        },
+      ],
+    };
+    const metadata = {
+      generatedFileName: "v19legacy_photo.jpg",
+      mimeType: "image/jpeg",
+      originalFileName: "legacy-photo.jpg",
+      sizeBytes: 2048,
+      storageBucket: "submission-media",
+      storagePath: `${draft.id}/${draft.applicants[0]?.id ?? "applicant-1"}/photo/v19legacy_photo.jpg`,
+      uploadedAtIso: "2026-06-17T10:00:00.000Z",
+    };
+
+    expect(uploadRequiredFile(legacySubmission, "legacy-photo", metadata)).toBe(
+      legacySubmission,
+    );
+    const result = mergeUploadedFileMetadataIntoSubmissions(
+      [legacySubmission],
+      legacySubmission.id,
+      "legacy-photo",
+      metadata,
+    );
+    expect(result.submission).toBe(legacySubmission);
+    expect(result.submissions[0]).toBe(legacySubmission);
   });
 
   it("updates questionnaire fields and recalculates readiness", () => {
@@ -1496,6 +1555,62 @@ describe("V-19 persistence boundary", () => {
     );
 
     expect(loadSubmissions()[0]?.agentId).toBe(defaultLocalAgentOwnerId);
+  });
+
+  it("normalizes legacy local status and media into canonical runtime slots", () => {
+    installStorageStub();
+    const draft = completeQuestionnaire(
+      createDraftSubmission({
+        city: "Москва",
+        familyCount: 1,
+        submissions: initialSubmissions,
+        type: "single",
+      }),
+    );
+    const legacySubmission: Submission = {
+      ...draft,
+      status: "requires_action",
+      files: [
+        {
+          id: "legacy-photo",
+          applicantId: draft.applicants[0]?.id ?? "applicant-1",
+          status: "uploaded",
+          type: "photo",
+        },
+        {
+          id: "legacy-photo-white",
+          applicantId: draft.applicants[0]?.id ?? "applicant-1",
+          status: "uploaded",
+          type: "photo_white",
+        },
+        {
+          id: "legacy-video",
+          applicantId: draft.applicants[0]?.id ?? "applicant-1",
+          status: "uploaded",
+          type: "video",
+        },
+      ],
+      completeness: { questionnaire: 100, files: 100, total: 100 },
+    };
+
+    testStorage().setItem(
+      "visaflow.v19.submissions.v1",
+      JSON.stringify([legacySubmission]),
+    );
+
+    const loaded = loadSubmissions()[0];
+    expect(loaded?.status).toBe("returned");
+    expect(loaded?.files.map((file) => file.type)).toEqual([
+      "passport_scan",
+      "selfie",
+      "selfie_2",
+    ]);
+    expect(loaded?.files.every((file) => file.status === "missing")).toBe(true);
+    expect(loaded?.completeness.files).toBe(0);
+    expect(
+      canPerformAction({ ...(loaded as Submission), status: "in_progress" }, "submit_for_review", "agent")
+        .ok,
+    ).toBe(false);
   });
 
   it("builds a Supabase draft payload from the current cockpit model", () => {

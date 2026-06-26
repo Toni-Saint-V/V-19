@@ -24,6 +24,7 @@ import {
   normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
 } from "./domainContract";
+import { normalizeSubmissionForCanonicalRuntime } from "./submissionActions";
 import type {
   Applicant,
   Issue,
@@ -148,12 +149,16 @@ function reconcileCockpitSnapshotWithSubmissionRow(
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
 ): Submission {
-  const normalizedSnapshot = attachNormalizedApplicantRows(
-    ensureSubmissionOwner(snapshot, row.agent_id),
-    applicants,
+  const rowStatus = fromSupabaseSubmissionRowStatus(row);
+  const normalizedSnapshot = normalizeSubmissionForCanonicalRuntime(
+    attachNormalizedApplicantRows(ensureSubmissionOwner(snapshot, row.agent_id), applicants),
+    {
+      exportedAt: row.exported_at,
+      statusFallback: rowStatus,
+    },
   );
 
-  if (row.status !== "exported") return normalizedSnapshot;
+  if (rowStatus !== "exported") return normalizedSnapshot;
   if (
     normalizedSnapshot.status === "exported" &&
     normalizedSnapshot.exportState === "marked_exported"

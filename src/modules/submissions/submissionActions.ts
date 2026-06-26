@@ -21,6 +21,10 @@ import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { defaultLocalAgentOwnerId } from "./ownership";
 import {
   CANONICAL_FRONTEND_MEDIA_TYPES,
+  isCanonicalFrontendMediaType,
+  isCanonicalSubmissionStatus,
+  isRejectedLegacyMediaType,
+  normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
 } from "./domainContract";
 import type {
@@ -38,6 +42,7 @@ import type {
   SubmissionFile,
   SubmissionFileStatus,
   SubmissionFileType,
+  SubmissionStatus,
 } from "./types";
 
 export type CreateDraftInput = {
@@ -86,7 +91,12 @@ export function mergeUploadedFileMetadataIntoSubmissions(
       return updated;
     }
 
-    if (!submission.files.some((file) => file.id === fileId)) {
+    const targetFile = submission.files.find((file) => file.id === fileId);
+    if (!targetFile) {
+      mergedSubmission = submission;
+      return submission;
+    }
+    if (!isCanonicalFrontendMediaType(targetFile.type)) {
       mergedSubmission = submission;
       return submission;
     }
@@ -122,18 +132,22 @@ export function mergeUploadedFileMetadataIntoSubmissions(
 
 export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
   const result = toCanonicalStorageMediaType(type);
-  if (!result.ok) throw new Error(result.reason);
+  if (!result.ok) return type as never;
   return result.data;
 }
 
 export function cockpitUploadExtensionForMimeType(
   mimeType: string,
   fileType: SubmissionFileType,
-): "jpg" | "png" | "pdf" {
-  if (!toCanonicalStorageMediaType(fileType).ok) {
+): "jpg" | "png" | "pdf" | "mp4" {
+  if (
+    !isCanonicalFrontendMediaType(fileType) &&
+    !isRejectedLegacyMediaType(fileType)
+  ) {
     throw new Error("Unsupported media type for Package 1 upload slot.");
   }
   if (fileType === "passport_scan" && mimeType === "application/pdf") return "pdf";
+  if (fileType === "video" && mimeType === "video/mp4") return "mp4";
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/jpeg") return "jpg";
   throw new Error("Unsupported media MIME type for this upload slot.");
@@ -387,6 +401,42 @@ export function uploadRequiredFiles(submission: Submission): Submission {
   );
 }
 
+export function normalizeSubmissionForCanonicalRuntime(
+  submission: Submission,
+  options: { exportedAt?: unknown; statusFallback?: SubmissionStatus } = {},
+): Submission {
+  const normalizedStatus = normalizeLegacySubmissionStatus(submission.status, {
+    exportedAt: options.exportedAt,
+  });
+  if (!normalizedStatus.ok && !options.statusFallback) {
+    throw new Error(normalizedStatus.reason);
+  }
+  const status = normalizedStatus.ok ? normalizedStatus.data : options.statusFallback;
+  if (!isCanonicalSubmissionStatus(status)) {
+    throw new Error("Unknown submission status.");
+  }
+
+  const files = canonicalRuntimeFiles(submission);
+  const filePercent = fileCompleteness(files);
+
+  return normalizeSubmissionQuestionnaire({
+    ...submission,
+    status,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      fileStatus: applicantFileStatus(
+        files.filter((file) => file.applicantId === applicant.id),
+      ),
+    })),
+    files,
+    completeness: {
+      ...submission.completeness,
+      files: filePercent,
+      total: Math.round((submission.completeness.questionnaire + filePercent) / 2),
+    },
+  });
+}
+
 export function uploadRequiredFile(
   submission: Submission,
   fileId: string,
@@ -396,6 +446,7 @@ export function uploadRequiredFile(
 
   const targetFile = submission.files.find((file) => file.id === fileId);
   if (!targetFile || !isFileUploadable(targetFile.status)) return submission;
+  if (!isCanonicalFrontendMediaType(targetFile.type)) return submission;
 
   const files = submission.files.map((file) =>
     file.id === fileId
@@ -765,6 +816,41 @@ function fileTypeName(type: SubmissionFile["type"]) {
   if (type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Загранпаспорт";
   return "Селфи N2";
+}
+
+function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {
+  const canonicalFiles = new Map<string, SubmissionFile>();
+  for (const file of submission.files) {
+    if (!isCanonicalFrontendMediaType(file.type)) continue;
+    const key = `${file.applicantId}:${file.type}`;
+    if (!canonicalFiles.has(key)) canonicalFiles.set(key, file);
+  }
+
+  const submissionIndex = submissionIndexFromId(submission.id);
+  const templates = requiredFilesForApplicants(
+    submission.applicants,
+    Number.isFinite(submissionIndex) ? submissionIndex : 0,
+    submission.id.startsWith("VF-") ? "supabase" : "local",
+  );
+  const templatesByKey = new Map(
+    templates.map((file) => [`${file.applicantId}:${file.type}`, file]),
+  );
+
+  return submission.applicants.flatMap((applicant) =>
+    CANONICAL_FRONTEND_MEDIA_TYPES.map((type) => {
+      const key = `${applicant.id}:${type}`;
+      const existing = canonicalFiles.get(key);
+      if (existing) return existing;
+      const template = templatesByKey.get(key);
+      if (template) return template;
+      return {
+        id: `ф-${submission.id}-${applicant.id}-${type}`,
+        applicantId: applicant.id,
+        type,
+        status: "missing" as const,
+      };
+    }),
+  );
 }
 
 function issueSnapshot(submission: Submission, input: IssueInput) {
