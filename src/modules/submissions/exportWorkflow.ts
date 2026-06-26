@@ -4,7 +4,11 @@ import {
   type ExportPackageCommitBatch,
   type ExportPackageCommitOutcome,
 } from "./exportPackagePersistence";
-import { buildExportPackageIdentity, exportSummary } from "./exportRules";
+import {
+  buildExportPackageIdentity,
+  exportPackageIdentityMatches,
+  exportSummary,
+} from "./exportRules";
 import { tripDates } from "./selectors";
 import { typeLabels } from "./status";
 import type { Submission } from "./types";
@@ -74,6 +78,9 @@ export async function completeExportPackage(
   const commit = await committer(batch);
   if (!commit) {
     throw new Error("Export package persistence did not return a commit result.");
+  }
+  if (!exportPackageIdentityMatches(packageIdentity, commit.batch)) {
+    throw new Error("Committed export package identity does not match selection.");
   }
 
   const exportedSubmissions = markSubmissionsExported(submissions, commit.batch);

@@ -129,6 +129,28 @@ describe("submission export workflow", () => {
     expect(selection[0]?.exportState).toBe("file_downloaded");
   });
 
+  test("does not mark exported when durable batch identity drifts", async () => {
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+      batch: {
+        ...batch,
+        contentFingerprint: `${batch.contentFingerprint}:tampered`,
+      },
+      changedSubmissions: 1,
+      duplicate: false,
+      statusHistory: 1,
+    }));
+    const selection = downloadedSelection();
+
+    await expect(
+      completeExportPackage(selection, options(commitPackage)),
+    ).rejects.toThrow("Committed export package identity does not match selection.");
+
+    expect(commitPackage).toHaveBeenCalledTimes(1);
+    expect(selection[0]?.status).toBe("ready_for_export");
+    expect(selection[0]?.exportState).toBe("file_downloaded");
+    expect(selection[0]?.history[0]?.text).not.toContain("visaflow-export-");
+  });
+
   test("fails closed when exported snapshot persistence fails after batch record", async () => {
     const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
       batch: {
