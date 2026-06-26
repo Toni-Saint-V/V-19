@@ -21,7 +21,22 @@ async function expectNoRetiredNavigation(page: Page) {
 
 async function switchToAdmin(page: Page) {
   await page.getByRole("button", { name: "Сменить роль" }).click();
-  await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { exact: true, level: 1, name: "Работа" }),
+  ).toBeVisible();
+}
+
+async function openAgentActionsTab(page: Page) {
+  const actionsTab = page.getByRole("tab", { name: /Мои действия/ });
+  await actionsTab.click();
+  await expect(actionsTab).toHaveAttribute("aria-selected", "true");
+}
+
+async function expectAdminWorkNavigation(page: Page) {
+  await expect(page.getByRole("button", { name: /Работа\. очередь проверки/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Выгрузка\. готово к Excel/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
 }
 
 function submissionCard(page: Page, name: string) {
@@ -37,6 +52,19 @@ function submissionCardById(page: Page, id: string) {
 
 function drawer(page: Page) {
   return page.getByRole("dialog").first();
+}
+
+async function expectDrawerStatus(page: Page, status: string) {
+  const detailMeta = drawer(page).locator(".drawer-meta-line");
+  if ((await detailMeta.count()) > 0) {
+    await expect(detailMeta).toContainText(/ПД-\d+ ·/);
+    await expect(drawer(page).locator(".drawer-status-chip")).toContainText(status);
+    return;
+  }
+
+  await expect(
+    drawer(page).getByText(new RegExp(`ПД-\\d+ · ${escapeRegex(status)}`)),
+  ).toBeVisible();
 }
 
 function returnedIvanovsAction(page: Page) {
@@ -79,6 +107,9 @@ async function openCorrectionsTab(page: Page) {
 
 function questionnaireValue(label: string, index: number) {
   if (label.includes("ФИО")) return "Иван Иванов";
+  if (label.includes("Номер паспорта")) return String(900_000_000 + index).slice(0, 9);
+  if (label.includes("Дата выдачи паспорта")) return "01.01.2020";
+  if (label.includes("Дата окончания паспорта")) return "01.01.2030";
   if (label.includes("Дата рождения")) return "01.01.1990";
   if (label.includes("Маршрут")) return "Москва, Мадрид, Москва";
   if (label.includes("Адрес")) return "Отель подтвержден";
@@ -138,30 +169,32 @@ async function fillQuestionnaire(page: Page) {
 }
 
 async function uploadAllVisibleFiles(page: Page) {
-  for (let pass = 0; pass < 12; pass += 1) {
-    let uploadedThisPass = false;
-    const categories = drawer(page)
-      .getByRole("group", { name: "Категории документов" })
-      .getByRole("button");
-    const categoryCount = await categories.count();
+  for (let pass = 0; pass < 40; pass += 1) {
+    const uploadButtons = drawer(page).getByRole("button", {
+      name: /^(Загрузить|Заменить)/,
+    });
 
-    for (let categoryIndex = 0; categoryIndex < categoryCount; categoryIndex += 1) {
-      await categories.nth(categoryIndex).click();
-
-      const uploadButtons = drawer(page).getByRole("button", {
-        name: /^(Загрузить|Заменить)/,
-      });
-
-      while ((await uploadButtons.count()) > 0) {
-        await uploadButtons.first().click();
-        uploadedThisPass = true;
-      }
+    if ((await uploadButtons.count()) === 0) {
+      return;
     }
 
-    if (!uploadedThisPass) return;
+    await uploadButtons.first().click();
   }
 
   throw new Error("Не удалось загрузить все видимые файлы");
+}
+
+async function acceptNonPassportBbSuggestion(page: Page) {
+  const nonPassportSuggestion = drawer(page)
+    .locator(".bb-suggestion")
+    .filter({ hasText: /Фото на белом фоне|Селфи|Видео/ })
+    .first();
+  const targetSuggestion =
+    (await nonPassportSuggestion.count()) > 0
+      ? nonPassportSuggestion
+      : drawer(page).locator(".bb-suggestion").first();
+
+  await targetSuggestion.getByRole("button", { name: "Добавить как замечание" }).click();
 }
 
 async function saveDraftFromDrawer(page: Page) {
@@ -217,9 +250,11 @@ async function fillFilesAndSubmit(page: Page, screenshotPath?: string) {
     await page.screenshot({ fullPage: true, path: screenshotPath });
   }
   await uploadAllVisibleFiles(page);
+  await openQuestionnaireTab(page);
+  await fillQuestionnaire(page);
   await saveDraftFromDrawer(page);
   await submitForReviewFromDrawer(page);
-  await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
+  await expectDrawerStatus(page, "На проверке");
   await page.getByRole("button", { name: "Закрыть подачу" }).click();
 }
 
@@ -257,14 +292,17 @@ test.describe("V-19 operations workspace", () => {
     await page.reload();
   });
 
-  test("agent surfaces expose inbox, actions and submissions cockpit", async ({
+  test("agent surfaces expose inbox with internal actions and submissions cockpit", async ({
     page,
   }, testInfo) => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Входящие" }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Входящие" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Мои действия" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { exact: true, name: "Мои действия" }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: /Мои действия/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Мои подачи" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Настройки" })).toBeVisible();
     await expect(
@@ -275,15 +313,16 @@ test.describe("V-19 operations workspace", () => {
       path: "docs/qa/v19-agent-inbox-restored-desktop.png",
     });
 
-    await page.getByRole("button", { name: "Мои действия" }).click();
+    await openAgentActionsTab(page);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Мои действия" }),
+      page.getByRole("heading", { level: 1, name: "Входящие" }),
     ).toBeVisible();
+    await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
     await expect(page.getByText("Открытые действия")).toBeVisible();
     await expect(page.locator(".v19-action-row").first()).toBeVisible();
     await page.screenshot({
       fullPage: true,
-      path: "docs/qa/v19-agent-actions-restored-desktop.png",
+      path: "docs/qa/v19-agent-inbox-actions-internal-desktop.png",
     });
 
     await page.getByRole("button", { name: "Мои подачи" }).click();
@@ -294,11 +333,11 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
     await expect(
-      submissionCardById(page, "ПД-1048").getByText("Возвращено 2", { exact: true }),
+      submissionCardById(page, "ПД-1048").getByText("Возвращено", { exact: true }),
     ).toBeVisible();
     await expect(
-      submissionCardById(page, "ПД-1048").getByText("2 блокера", { exact: true }),
-    ).toHaveCount(0);
+      submissionCardById(page, "ПД-1048").getByText(/2 блокера · 4 из 6/),
+    ).toBeVisible();
     await expect(submissionCard(page, "Дмитрий Орлов")).toHaveCount(0);
     await expect(submissionCard(page, "Артём Соколов")).toHaveCount(0);
     await page.getByRole("tab", { name: "В работе" }).click();
@@ -348,11 +387,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
 
     await switchToAdmin(page);
-    await expect(page.getByRole("button", { name: "Входящие" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Мои действия" })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Проверка. очередь проверки" }),
-    ).toBeVisible();
+    await expectAdminWorkNavigation(page);
     await page.getByRole("button", { name: "Выгрузка" }).click();
     await page.getByRole("tab", { name: "История" }).click();
 
@@ -360,10 +395,12 @@ test.describe("V-19 operations workspace", () => {
       page.locator(".export-row").filter({ hasText: "Ольга Морозова" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Входящие" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Входящие" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /ждёт проверки/ }).first()).toBeVisible();
-    await page.getByRole("button", { name: /Агент отправил исправления/ }).click();
+    await page.getByRole("button", { name: /Работа\. очередь проверки/ }).click();
+    await page.getByRole("tab", { name: "События" }).click();
+    await expect(
+      page.getByRole("button", { name: /Новая подача на проверке/ }).first(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /Исправления получены/ }).click();
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Петровых" }),
     ).toBeVisible();
@@ -372,68 +409,46 @@ test.describe("V-19 operations workspace", () => {
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/2026-06-21-v19-role-safe-admin-inbox-desktop.png",
+        path: "docs/qa/2026-06-21-v19-role-safe-admin-events-desktop.png",
       });
     }
 
-    await page.getByRole("button", { name: "Мои действия" }).click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Мои действия" }),
-    ).toBeVisible();
-    await expect(page.locator(".v19-action-row").first()).toBeVisible();
+    await page.getByRole("tab", { name: "Исправления" }).click();
+    await expect(page.locator(".v17-admin-work-row").first()).toBeVisible();
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
-        path: "docs/qa/2026-06-21-v19-role-safe-admin-actions-desktop.png",
+        path: "docs/qa/2026-06-21-v19-role-safe-admin-corrections-desktop.png",
       });
     }
-    await page.getByRole("button", { name: /Проверить исправления/ }).click();
+    await page.locator(".v17-admin-work-row").first().click();
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Петровых" }),
     ).toBeVisible();
     await expectDrawerTabSelected(page, "Замечания");
     await drawer(page).getByRole("button", { name: "Закрыть подачу" }).click();
-    await page.getByRole("tab", { name: "Выполненные" }).click();
-    await expect(page.getByRole("button", { name: /Пакет выгружен/ })).toBeVisible();
-
-    await page.getByRole("button", { name: "Настройки" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
-    await expect(
-      page.getByLabel("Параметры рабочего места").getByText("Администратор"),
-    ).toBeVisible();
-    if (testInfo.project.name === "chromium") {
-      await page.screenshot({
-        fullPage: true,
-        path: "docs/qa/2026-06-21-v19-role-safe-admin-settings-desktop.png",
-      });
-    }
+    await expectAdminWorkNavigation(page);
   });
 
   test("primary surfaces expose the 3-second decision frame", async ({ page }) => {
     await page.getByRole("button", { name: "Мои подачи" }).click();
     await expect(
-      submissionCardById(page, "ПД-1048").getByText("Возвращено 2", { exact: true }),
+      submissionCardById(page, "ПД-1048").getByText("Возвращено", { exact: true }),
     ).toBeVisible();
     await expect(
-      submissionCardById(page, "ПД-1048").getByText("2 блокера", { exact: true }),
-    ).toHaveCount(0);
+      submissionCardById(page, "ПД-1048").getByText(/2 блокера · 4 из 6/),
+    ).toBeVisible();
     await expect(submissionCardById(page, "ПД-1048").getByText("Дальше:")).toHaveCount(
       0,
     );
     await expect(
       submissionCardById(page, "ПД-1048").getByText(/Анкета \d+%/),
     ).toHaveCount(0);
-    await expect(
-      submissionCardById(page, "ПД-1048").locator(".v19-submission-file-tag", {
-        hasText: "Файлы 4/6",
-      }),
-    ).toBeVisible();
-
     await submissionCardById(page, "ПД-1048").click();
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
-    await expect(drawer(page).getByText("Возвращено")).toBeVisible();
+    await expectDrawerStatus(page, "Возвращено");
     const returnedFileIssue = drawer(page)
       .getByRole("button", { name: /Мария Иванова.*Фото на белом фоне/ })
       .first();
@@ -448,11 +463,7 @@ test.describe("V-19 operations workspace", () => {
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
     await switchToAdmin(page);
-    await expect(page.getByRole("button", { name: "Входящие" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Мои действия" })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /^Проверка\. очередь проверки$/ }),
-    ).toBeVisible();
+    await expectAdminWorkNavigation(page);
     await expect(
       submissionCard(page, "Нина Волкова").getByText("Проверка", { exact: true }),
     ).toBeVisible();
@@ -546,7 +557,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       drawer(page).getByRole("heading", { name: "Нина Волкова" }),
     ).toBeVisible();
-    await expect(drawer(page).getByText("На проверке")).toBeVisible();
+    await expectDrawerStatus(page, "На проверке");
 
     if (projectName === "chromium") {
       await page.waitForTimeout(250);
@@ -613,7 +624,7 @@ test.describe("V-19 operations workspace", () => {
     });
     await page.reload();
 
-    await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Работа" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Выгрузка" })).toBeVisible();
     await expect(page.getByText("Мои подачи", { exact: true })).toHaveCount(0);
   });
@@ -632,7 +643,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       drawer(page).getByRole("heading", { name: "Новая семейная подача" }),
     ).toBeVisible();
-    await expect(drawer(page).getByText(/ПД-\d+ · Черновик/)).toBeVisible();
+    await expectDrawerStatus(page, "Черновик");
     await openQuestionnaireTab(page);
     await expect(
       drawer(page).getByRole("button", { name: "Заполнить анкету" }),
@@ -644,9 +655,9 @@ test.describe("V-19 operations workspace", () => {
       drawer(page).getByRole("button", { name: /^(Загрузить|Заменить)/ }),
     ).toHaveCount(0);
     await saveDraftFromDrawer(page);
-    await expect(drawer(page).getByText(/ПД-\d+ · В работе/)).toBeVisible();
+    await expectDrawerStatus(page, "В работе");
     await submitForReviewFromDrawer(page);
-    await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
+    await expectDrawerStatus(page, "На проверке");
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
     await page.getByRole("button", { name: "Мои подачи" }).click();
@@ -702,7 +713,7 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await expect(
       drawer(page).getByRole("button", { name: "Смотреть статус" }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     const fixedReturnedIssue = drawer(page)
       .getByRole("button", { name: /Мария Иванова.*Фото на белом фоне/ })
       .first();
@@ -955,9 +966,7 @@ test.describe("V-19 operations workspace", () => {
 
   test("admin can add a precise issue and return a submission", async ({ page }) => {
     await switchToAdmin(page);
-    await expect(
-      page.getByRole("button", { name: /^Проверка\. очередь проверки$/ }),
-    ).toBeVisible();
+    await expectAdminWorkNavigation(page);
     await expect(page.getByRole("button", { name: "Выгрузка" })).toBeVisible();
     await expect(page.getByText("Мои подачи", { exact: true })).toHaveCount(0);
 
@@ -978,7 +987,7 @@ test.describe("V-19 operations workspace", () => {
       .first();
     await expect(issueSummary).toBeVisible();
     await drawer(page).getByRole("button", { name: "Вернуть", exact: true }).click();
-    await expect(drawer(page).getByText("Возвращено")).toBeVisible();
+    await expectDrawerStatus(page, "Возвращено");
   });
 
   test("admin accepts corrections and completes the export sequence", async ({
@@ -1002,7 +1011,7 @@ test.describe("V-19 operations workspace", () => {
       drawer(page).getByRole("tab", { name: /Анкета/ }),
     ).toHaveAttribute("aria-selected", "true");
     await page.getByRole("button", { name: "Закрыть и принять" }).click();
-    await expect(drawer(page).getByText(/ПД-\d+ · Готово к выгрузке/)).toBeVisible();
+    await expectDrawerStatus(page, "Готово к выгрузке");
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
     await page.getByRole("button", { name: "Выгрузка" }).click();
@@ -1087,11 +1096,11 @@ test.describe("V-19 operations workspace", () => {
     await uploadAllVisibleFiles(page);
     await saveDraftFromDrawer(page);
     await submitForReviewFromDrawer(page);
-    await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
+    await expectDrawerStatus(page, "На проверке");
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
     await switchToAdmin(page);
-    await page.getByRole("tab", { name: "Проверка" }).click();
+    await page.getByRole("tab", { name: "К проверке" }).click();
     await openAdminSubmission(page, submissionTitle);
     await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
     await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
@@ -1101,7 +1110,7 @@ test.describe("V-19 operations workspace", () => {
         .first(),
     ).toBeVisible();
     await drawer(page).getByRole("button", { name: "Вернуть", exact: true }).click();
-    await expect(drawer(page).getByText("Возвращено")).toBeVisible();
+    await expectDrawerStatus(page, "Возвращено");
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
     await expect(drawer(page)).toHaveCount(0);
 
@@ -1131,7 +1140,7 @@ test.describe("V-19 operations workspace", () => {
     await openCorrectionsTab(page);
     await openAdminSubmission(page, "Новая подача");
     await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
-    await expect(drawer(page).getByText(/ПД-\d+ · Готово к выгрузке/)).toBeVisible();
+    await expectDrawerStatus(page, "Готово к выгрузке");
     await page.getByRole("button", { name: "Закрыть подачу" }).click();
 
     await page.getByRole("button", { name: "Выгрузка" }).click();
@@ -1239,7 +1248,7 @@ test.describe("V-19 operations workspace", () => {
       await openQuestionnaireTab(page);
       await fillQuestionnaire(page);
       await submitForReviewFromDrawer(page);
-      await expect(drawer(page).getByText(/ПД-\d+ · На проверке/)).toBeVisible();
+      await expectDrawerStatus(page, "На проверке");
       await page.getByRole("button", { name: "Закрыть подачу" }).click();
     });
 
@@ -1252,7 +1261,7 @@ test.describe("V-19 operations workspace", () => {
 
     await test.step("admin returns first family with ББ and manual issues", async () => {
       await switchToAdmin(page);
-      await page.getByRole("tab", { name: "Проверка" }).click();
+      await page.getByRole("tab", { name: "К проверке" }).click();
       await openAdminSubmission(page, familyListTitle, familyTitle);
       await drawer(page)
         .getByRole("tab", { name: /Замечания/ })
@@ -1260,10 +1269,7 @@ test.describe("V-19 operations workspace", () => {
       await drawer(page).getByRole("button", { name: "ББ", exact: true }).click();
       await drawer(page).getByRole("button", { name: "Найти кандидаты" }).click();
       await expect(drawer(page).getByText(/Найдено \d+/)).toBeVisible();
-      await drawer(page)
-        .getByRole("button", { name: "Добавить как замечание" })
-        .first()
-        .click();
+      await acceptNonPassportBbSuggestion(page);
       await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
       await drawer(page)
         .getByLabel("Заявитель")
@@ -1286,7 +1292,7 @@ test.describe("V-19 operations workspace", () => {
         drawer(page).getByText("Кузнецова Анна · Данные · Домашний адрес").first(),
       ).toBeVisible();
       await drawer(page).getByRole("button", { name: "Вернуть", exact: true }).click();
-      await expect(drawer(page).getByText("Возвращено")).toBeVisible();
+      await expectDrawerStatus(page, "Возвращено");
       await page.getByRole("button", { name: "Закрыть подачу" }).click();
     });
 
@@ -1300,9 +1306,7 @@ test.describe("V-19 operations workspace", () => {
         await drawer(page)
           .getByRole("button", { name: "Принять", exact: true })
           .click();
-        await expect(
-          drawer(page).getByText(/ПД-\d+ · Готово к выгрузке/),
-        ).toBeVisible();
+        await expectDrawerStatus(page, "Готово к выгрузке");
         await page.getByRole("button", { name: "Закрыть подачу" }).click();
       }
     });
@@ -1332,7 +1336,7 @@ test.describe("V-19 operations workspace", () => {
       await openCorrectionsTab(page);
       await openAdminSubmission(page, familyListTitle, familyTitle);
       await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
-      await expect(drawer(page).getByText(/ПД-\d+ · Готово к выгрузке/)).toBeVisible();
+      await expectDrawerStatus(page, "Готово к выгрузке");
       await page.getByRole("button", { name: "Закрыть подачу" }).click();
     });
 

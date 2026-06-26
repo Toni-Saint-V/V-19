@@ -10,10 +10,7 @@ export type UserRole = Role;
 
 export type Surface =
   | "agent-inbox"
-  | "agent-actions"
   | "agent-submissions"
-  | "admin-inbox"
-  | "admin-actions"
   | "admin-review"
   | "export"
   | "settings";

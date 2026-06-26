@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import {
   Badge,
@@ -11,25 +11,23 @@ import type {
   OperationalInboxEvent,
 } from "../agentActions";
 import type { ExportSummary } from "../exportRules";
-import {
-  formatSubmissionListStatus,
-  formatSubmissionListTitle,
-} from "../listFormatters";
+import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, counts, tripDates } from "../selectors";
 import {
   adminIssueGuard,
+  adminWorkDrawerTabFor,
+  adminWorkEventTitle,
+  adminWorkPresentation,
   blockerCount,
   defaultDrawerTab,
   openIssueCount,
   statusLabels,
-  typeLabels,
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
 import {
   matchesReviewTab,
   type AgentTab,
   type ExportTab,
-  type ReviewTab,
 } from "../uiTypes";
 import { EmptyState, SummaryRow } from "../components/Primitives";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
@@ -38,7 +36,6 @@ import {
   CollectionGroupLabel,
   CollectionRow,
   CollectionToolbar,
-  ContextPanel,
   ContextRail,
   type CollectionActiveFilter,
   SubmissionCollectionRow,
@@ -512,9 +509,9 @@ export function AgentActionsScreen({
             ? "v19-collection-panel has-active-filters"
             : "v19-collection-panel"
         }
-        aria-labelledby="agent-actions-title"
+        aria-labelledby="agent-inbox-actions-title"
       >
-        <h2 id="agent-actions-title" className="sr-only">
+        <h2 id="agent-inbox-actions-title" className="sr-only">
           Мои действия
         </h2>
 
@@ -1592,38 +1589,49 @@ function submissionPriorityLine(submission: Submission) {
   return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
 }
 
+export type AdminWorkTab = "review" | "corrections" | "events";
+
 export function AdminReviewScreen({
+  error = "",
   filterControl,
+  inboxEvents,
+  loading = false,
   onAddIssue,
   onOpen,
   onSelect,
   onTab,
+  permissionDenied = false,
   reviewList,
   reviewSource,
   reviewTab,
   searchControl,
   visibleSubmission,
 }: {
+  error?: string;
   filterControl?: ReactNode;
+  inboxEvents: InboxEvent[];
+  loading?: boolean;
   onAddIssue: (submission: Submission) => void;
   onOpen: (submission: Submission, tab?: DrawerTab) => void;
   onSelect: (submission: Submission) => void;
-  onTab: (tab: ReviewTab) => void;
+  onTab: (tab: AdminWorkTab) => void;
+  permissionDenied?: boolean;
   reviewList: Submission[];
   reviewSource: Submission[];
-  reviewTab: ReviewTab;
+  reviewTab: AdminWorkTab;
   searchControl: ReactNode;
   visibleSubmission: Submission | null;
 }) {
   const [blockersOnly, setBlockersOnly] = useState(false);
-  const [comfortableView, setComfortableView] = useState(true);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [sortNewest, setSortNewest] = useState(true);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const reviewQueue = reviewSource.filter(matchesReviewTab("review"));
+  const correctionsQueue = reviewSource.filter(matchesReviewTab("corrections"));
   const tabCounts = {
-    all: reviewSource.length,
-    corrections: reviewSource.filter(matchesReviewTab("corrections")).length,
-    ready: reviewSource.filter(matchesReviewTab("ready")).length,
-    review: reviewSource.filter(matchesReviewTab("review")).length,
+    corrections: correctionsQueue.length,
+    events: inboxEvents.length,
+    review: reviewQueue.length,
   };
   const blockerSubmissions = reviewSource.filter(
     (submission) => blockerCount(submission) > 0,
@@ -1635,19 +1643,39 @@ export function AdminReviewScreen({
         : reviewList,
     [blockersOnly, reviewList],
   );
+  const filteredEvents = useMemo(
+    () =>
+      blockersOnly
+        ? inboxEvents.filter((event) => blockerCount(event.submission) > 0)
+        : inboxEvents,
+    [blockersOnly, inboxEvents],
+  );
   const visibleReviewList = useMemo(
     () => (sortNewest ? filteredReviewList : [...filteredReviewList].reverse()),
     [filteredReviewList, sortNewest],
+  );
+  const visibleEvents = useMemo(
+    () => (sortNewest ? filteredEvents : [...filteredEvents].reverse()),
+    [filteredEvents, sortNewest],
   );
   const visibleSelectedSubmission =
     visibleSubmission &&
     visibleReviewList.some((submission) => submission.id === visibleSubmission.id)
       ? visibleSubmission
       : null;
-  const prioritySubmission =
-    visibleSelectedSubmission ?? visibleReviewList[0] ?? null;
-  const addIssueGuard = prioritySubmission
-    ? adminIssueGuard(prioritySubmission, "admin")
+  const summaryPrioritySubmission =
+    visibleSelectedSubmission ??
+    visibleReviewList[0] ??
+    correctionsQueue[0] ??
+    reviewQueue[0] ??
+    reviewSource[0] ??
+    null;
+  const actionSubmission =
+    reviewTab === "events" || permissionDenied || loading || error
+      ? null
+      : visibleSelectedSubmission ?? visibleReviewList[0] ?? null;
+  const addIssueGuard = actionSubmission
+    ? adminIssueGuard(actionSubmission, "admin")
     : null;
   const canAddIssue = addIssueGuard?.ok === true;
   const addIssueReason = canAddIssue
@@ -1668,31 +1696,36 @@ export function AdminReviewScreen({
           label: "Обратный порядок",
           onRemove: () => transitionUiState(() => setSortNewest(true)),
         },
-    comfortableView
-      ? null
-      : {
-          id: "density",
-          label: "Компактный вид",
-          onRemove: () => transitionUiState(() => setComfortableView(true)),
-        },
   ] as Array<CollectionActiveFilter | null>
   ).filter((filter): filter is CollectionActiveFilter => filter !== null);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setBlockersOnly(false);
       setSortNewest(true);
-      setComfortableView(true);
     });
-  const panelToggleTool = (
-    <ToolbarIconButton
-      label={panelOpen ? "Скрыть сводку" : "Показать сводку"}
-      icon="panel"
-      pressed={panelOpen}
-      onClick={() => transitionUiState(() => setPanelOpen((value) => !value))}
-    />
-  );
-  const toolbarToolButtons = (
-    <>
+
+  useEffect(() => {
+    if (!summaryOpen) return;
+
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (!summaryRef.current?.contains(event.target as Node)) {
+        setSummaryOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSummaryOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [summaryOpen]);
+
+  const toolbarTools = (
+    <ToolbarTools>
       <ToolbarIconButton
         label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
         icon="filter"
@@ -1707,16 +1740,81 @@ export function AdminReviewScreen({
         pressed={!sortNewest}
         onClick={() => transitionUiState(() => setSortNewest((value) => !value))}
       />
-      {panelToggleTool}
-    </>
+      <div className="v17-admin-summary-tool" ref={summaryRef}>
+        <ToolbarIconButton
+          label={summaryOpen ? "Скрыть сводку" : "Показать сводку"}
+          icon="panel"
+          pressed={summaryOpen}
+          onClick={() => setSummaryOpen((value) => !value)}
+        />
+        {summaryOpen ? (
+          <div
+            className="v17-admin-summary-popover"
+            role="dialog"
+            aria-label="Сводка очереди"
+          >
+            <div className="v17-admin-summary-head">
+              <strong>Сводка очереди</strong>
+            </div>
+            <div className="v17-admin-summary-grid">
+              <div>
+                <strong>{tabCounts.review}</strong>
+                <span>Новая проверка</span>
+              </div>
+              <div>
+                <strong>{tabCounts.corrections}</strong>
+                <span>Исправления</span>
+              </div>
+              <div>
+                <strong>
+                  {summaryPrioritySubmission
+                    ? `с ${summaryPrioritySubmission.updatedAt}`
+                    : "-"}
+                </strong>
+                <span>Старейшая</span>
+              </div>
+              <div>
+                <strong>{blockerSubmissions}</strong>
+                <span>Блокеры</span>
+              </div>
+            </div>
+            {summaryPrioritySubmission ? (
+              <Button
+                className="v17-admin-summary-action"
+                variant="secondary"
+                onClick={() => {
+                  setSummaryOpen(false);
+                  onSelect(summaryPrioritySubmission);
+                  onOpen(
+                    summaryPrioritySubmission,
+                    adminWorkDrawerTabFor(summaryPrioritySubmission),
+                  );
+                }}
+              >
+                Проверить {summaryPrioritySubmission.title}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </ToolbarTools>
   );
-  const toolbarTools = <ToolbarTools>{toolbarToolButtons}</ToolbarTools>;
+
+  const renderBlockedState = (
+    title: string,
+    description: string,
+    tone: "danger" | "warning" = "warning",
+  ) => (
+    <AdminWorkEmptyState
+      description={description}
+      iconTone={tone}
+      title={title}
+    />
+  );
 
   return (
     <div
-      className={`v19-screen-grid v19-admin-review-screen ${
-        panelOpen ? "" : "is-panel-closed"
-      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+      className="v19-screen-grid v19-admin-review-screen v17-admin-work-screen is-panel-closed"
     >
       <CardComponent
         as="section"
@@ -1728,152 +1826,110 @@ export function AdminReviewScreen({
         aria-labelledby="review-title"
       >
         <h2 id="review-title" className="sr-only">
-          Очередь проверки администратора
+          Работа администратора
         </h2>
 
         <CollectionToolbar
           activeFilters={activeFilters}
-          ariaLabel="Инструменты проверки"
+          ariaLabel="Инструменты работы администратора"
           cityControl={filterControl}
+          className="v17-admin-work-toolbar"
           onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
           onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
           search={searchControl}
           tabs={[
-            { count: tabCounts.all, id: "all", label: "Все" },
-            { count: tabCounts.review, id: "review", label: "Проверка" },
+            { count: tabCounts.review, id: "review", label: "К проверке" },
             {
               count: tabCounts.corrections,
               id: "corrections",
               label: "Исправления",
             },
-            { count: tabCounts.ready, id: "ready", label: "К выгрузке" },
+            { count: tabCounts.events, id: "events", label: "События" },
           ]}
-          tabsAriaLabel="Состояние проверки"
+          tabsAriaLabel="Рабочая очередь администратора"
           tools={toolbarTools}
           value={reviewTab}
         />
 
-        {visibleReviewList.length ? (
-          <>
-            <div className="v19-submission-list-head" aria-hidden="true">
-              <span>Подача</span>
-              <span>Статус</span>
-              <span>Файлы</span>
-              <span>Готовность</span>
-              <span>Действие</span>
+        <div className="v17-admin-work-note">
+          <span>{adminWorkNoteCopy(reviewTab)}</span>
+        </div>
+
+        {permissionDenied ? (
+          renderBlockedState(
+            "Нет доступа к проверке",
+            "Текущая роль не может выполнять административную проверку подач.",
+            "danger",
+          )
+        ) : loading ? (
+          <AdminWorkLoadingState />
+        ) : error ? (
+          renderBlockedState("Очередь недоступна", error, "danger")
+        ) : reviewTab === "events" ? (
+          visibleEvents.length ? (
+            <div className="v17-admin-event-list" aria-label="События администратора">
+              {visibleEvents.map((event) => (
+                <AdminWorkEventRow
+                  event={event}
+                  key={event.id}
+                  onOpen={() => {
+                    onSelect(event.submission);
+                    onOpen(event.submission, event.tab);
+                  }}
+                />
+              ))}
             </div>
-            <div className="v19-event-list v19-submission-list">
+          ) : (
+              <AdminWorkEmptyState
+                description="События появятся после отправки подачи, получения исправлений или подготовки пакета."
+                actionLabel="К проверке"
+                title="Событий нет"
+                onShow={() => onTab("review")}
+              />
+          )
+        ) : visibleReviewList.length ? (
+          <>
+            <div className="v17-admin-work-list" aria-label="Очередь проверки">
               {visibleReviewList.map((submission) => (
-                <SubmissionCollectionRow
-                  action={adminReviewActionLabel(submission)}
-                  completeness={`${submission.completeness.total}%`}
-                  extraTagCount={submissionExtraTagCount(submission)}
-                  extraTagLabel={submissionExtraTagLabel(submission)}
-                  fileState={submissionFileStateLabel(submission)}
-                  fileTone={submissionFileStateTone(submission)}
+                <AdminWorkRow
+                  selected={visibleSelectedSubmission?.id === submission.id}
                   key={submission.id}
-                  meta={adminReviewMeta(submission)}
-                  status={submission.status}
-                  statusLabel={formatSubmissionListStatus(submission)}
-                  submissionId={submission.id}
-                  title={formatSubmissionListTitle(submission)}
+                  submission={submission}
                   onOpen={() => {
                     onSelect(submission);
-                    onOpen(submission, "overview");
+                    onOpen(submission, adminWorkDrawerTabFor(submission));
                   }}
                 />
               ))}
             </div>
           </>
         ) : (
-          <div className="v19-empty-state" key={`review-empty-${reviewTab}-${blockersOnly}`}>
-            <h3>Очередь проверки пуста</h3>
-            <p>
-              Новые подачи появятся здесь после отправки агентом или после исправлений.
-            </p>
-            <Button variant="secondary" onClick={() => onTab("all")}>
-              Показать все
-            </Button>
-          </div>
+          <AdminWorkEmptyState
+            description="Новые задачи появятся после отправки подачи агентом или получения исправлений."
+            actionLabel="Открыть соседнюю очередь"
+            title="Очередь пуста"
+            onShow={() => onTab(reviewTab === "review" ? "corrections" : "review")}
+          />
         )}
-      </CardComponent>
-
-      {panelOpen ? (
-        <ContextPanel className="v19-admin-context" label="Сводка проверки">
-          <p className="kicker">Сводка</p>
-          <div className="v19-unread-summary">
-            <strong>{tabCounts.all}</strong>
-            <span>
-              {pluralRu(tabCounts.all, "подача в очереди", "подачи в очереди", "подач в очереди")}
-            </span>
+        {actionSubmission ? (
+          <div className="v17-admin-primary-action">
+            <span>{adminReviewPriorityLine(actionSubmission)}</span>
+            <Button
+              aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
+              disabled={!canAddIssue}
+              variant="secondary"
+              onClick={() => onAddIssue(actionSubmission)}
+            >
+              Вернуть с замечанием
+            </Button>
+            {!canAddIssue ? (
+              <em id="admin-return-disabled-note">{addIssueReason}</em>
+            ) : null}
           </div>
-          <div className="v19-panel-metrics v19-admin-status-metrics">
-            <span>
-              На проверке
-              <strong>{tabCounts.review}</strong>
-            </span>
-            <span>
-              Исправления
-              <strong>{tabCounts.corrections}</strong>
-            </span>
-            <span>
-              К выгрузке
-              <strong>{tabCounts.ready}</strong>
-            </span>
-            <span>
-              Блокеры
-              <strong>{blockerSubmissions}</strong>
-            </span>
-          </div>
-          {prioritySubmission ? (
-            <div className="v19-next-card">
-              <span>Фокус проверки</span>
-              <strong>{prioritySubmission.title}</strong>
-              <p>{adminReviewPriorityLine(prioritySubmission)}</p>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  onSelect(prioritySubmission);
-                  onOpen(prioritySubmission, "overview");
-                }}
-              >
-                {adminReviewActionLabel(prioritySubmission)}
-              </Button>
-              <Button
-                aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
-                disabled={!canAddIssue}
-                variant="secondary"
-                onClick={() => prioritySubmission && onAddIssue(prioritySubmission)}
-              >
-                Вернуть с замечанием
-              </Button>
-              {!canAddIssue ? (
-                <em className="v19-admin-disabled-note" id="admin-return-disabled-note">
-                  {addIssueReason}
-                </em>
-              ) : null}
-            </div>
-          ) : null}
-        </ContextPanel>
         ) : null}
+      </CardComponent>
     </div>
   );
-}
-
-function adminReviewActionLabel(submission: Submission) {
-  if (submission.status === "corrections_received") return "Проверить";
-  if (submission.status === "ready_for_export") return "Пакет";
-  return "Открыть";
-}
-
-function adminReviewMeta(submission: Submission) {
-  const blockers = blockerCount(submission);
-  if (blockers > 0) return `${blockers} блокера · ${submission.updatedAt}`;
-
-  const open = openIssueCount(submission);
-  if (open > 0) return `${open} замечания · ${submission.updatedAt}`;
-
-  return `${submission.city} · ${typeLabels[submission.type]} · ${tripDates(submission)}`;
 }
 
 function adminReviewPriorityLine(submission: Submission) {
@@ -1884,6 +1940,190 @@ function adminReviewPriorityLine(submission: Submission) {
   if (open > 0) return `${open} замечания открыты`;
 
   return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
+}
+
+function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
+  if (reviewTab === "events") return "События открывают точный контекст подачи";
+  if (reviewTab === "corrections") return "Сначала исправления, затем новые проверки";
+  return "Очередь отсортирована по времени ожидания";
+}
+
+function AdminWorkLoadingState() {
+  return (
+    <div className="v17-admin-work-list" aria-busy="true" aria-label="Очередь загружается">
+      {["admin-loading-1", "admin-loading-2", "admin-loading-3"].map((item) => (
+        <div className="v17-admin-work-row is-loading" key={item}>
+          <span className="v17-admin-entity-icon" aria-hidden="true" />
+          <span className="v17-admin-identity">
+            <strong />
+            <em />
+          </span>
+          <span className="v17-admin-route-cell" />
+          <span className="v17-admin-wait-cell" />
+          <span className="v17-admin-readiness-cell" />
+          <span className="v17-admin-stage" />
+          <span className="v17-admin-row-action" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminWorkEmptyState({
+  actionLabel,
+  description,
+  iconTone = "warning",
+  onShow,
+  title,
+}: {
+  actionLabel?: string;
+  description: string;
+  iconTone?: "danger" | "warning";
+  onShow?: () => void;
+  title: string;
+}) {
+  return (
+    <div className={`v19-empty-state v17-admin-empty-state tone-${iconTone}`}>
+      <span className="v17-admin-empty-icon" aria-hidden="true">
+        <SvgIcon>
+          <path d="m5 12 4 4L19 6" />
+        </SvgIcon>
+      </span>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {onShow ? (
+        <Button variant="secondary" onClick={onShow}>
+          {actionLabel ?? "Открыть очередь"}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function AdminWorkRow({
+  onOpen,
+  selected,
+  submission,
+}: {
+  onOpen: () => void;
+  selected: boolean;
+  submission: Submission;
+}) {
+  const presentation = adminWorkPresentation(submission);
+  const family = submission.type === "family";
+
+  return (
+    <button
+      aria-current={selected ? "true" : undefined}
+      className={`v17-admin-work-row ${selected ? "is-selected" : ""}`}
+      data-submission-id={submission.id}
+      type="button"
+      onClick={onOpen}
+    >
+      <span
+        className={`v17-admin-entity-icon tone-${presentation.tone}`}
+        aria-hidden="true"
+      >
+        <SvgIcon>
+          {family ? (
+            <>
+              <circle cx="9" cy="8" r="3" />
+              <path d="M3 20a6 6 0 0 1 12 0" />
+              <circle cx="17" cy="9" r="2.5" />
+              <path d="M15 15a5 5 0 0 1 6 5" />
+            </>
+          ) : (
+            <>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M5 21a7 7 0 0 1 14 0" />
+            </>
+          )}
+        </SvgIcon>
+      </span>
+      <span className="v17-admin-identity">
+        <strong>{formatSubmissionListTitle(submission)}</strong>
+        <em>
+          <span className="mono">{submission.id}</span> ·{" "}
+          {applicantCountLabel(submission.applicants.length)}
+        </em>
+        <small className="v17-admin-mobile-meta">
+          {submission.city} · {applicantCountLabel(submission.applicants.length)} ·
+          ждет с {submission.updatedAt}
+        </small>
+      </span>
+      <span className="v17-admin-route-cell">
+        <em>Подача</em>
+        <strong>{submission.city}</strong>
+        <small>{tripDates(submission)}</small>
+      </span>
+      <span className="v17-admin-wait-cell">
+        <em>Ожидает</em>
+        <strong>с {submission.updatedAt}</strong>
+      </span>
+      <span className="v17-admin-readiness-cell">
+        <span>
+          <em>Готовность</em>
+          <strong>{submission.completeness.total}%</strong>
+        </span>
+        <i aria-hidden="true">
+          <b style={{ width: `${submission.completeness.total}%` }} />
+        </i>
+      </span>
+      <span className={`v17-admin-stage tone-${presentation.tone}`}>
+        <i aria-hidden="true" />
+        {presentation.stage}
+      </span>
+      <span className="v17-admin-row-action">
+        <span>{presentation.actionLabel}</span>
+        <SvgIcon>
+          <path d="m9 6 6 6-6 6" />
+        </SvgIcon>
+      </span>
+    </button>
+  );
+}
+
+function AdminWorkEventRow({
+  event,
+  onOpen,
+}: {
+  event: InboxEvent;
+  onOpen: () => void;
+}) {
+  return (
+    <button className="v17-admin-event-row" type="button" onClick={onOpen}>
+      <span
+        className={`v17-admin-event-dot tone-${event.tone}`}
+        aria-hidden="true"
+      />
+      <span className="v17-admin-event-copy">
+        <strong>{adminWorkEventTitle(event.submission, event.title)}</strong>
+        <em>{event.time}</em>
+      </span>
+      <span className="v17-admin-event-object">
+        <strong>{formatSubmissionListTitle(event.submission)}</strong>
+        <em>{event.context}</em>
+      </span>
+      <span className={`v17-admin-stage tone-${adminToneName(event.tone)}`}>
+        <i aria-hidden="true" />
+        {event.badge}
+      </span>
+      <span className="v17-admin-row-action">
+        <span>{event.action}</span>
+        <SvgIcon>
+          <path d="m9 6 6 6-6 6" />
+        </SvgIcon>
+      </span>
+    </button>
+  );
+}
+
+function adminToneName(tone: InboxEvent["tone"]) {
+  if (tone === "danger") return "danger";
+  if (tone === "teal") return "success";
+  if (tone === "blue") return "info";
+  if (tone === "amber") return "warning";
+  return "info";
 }
 
 export function ExportScreen({
@@ -1921,8 +2161,11 @@ export function ExportScreen({
 }) {
   const actionHint =
     exportError ||
-    (exportBusy ? "Фиксируем выгрузку..." : exportActionHint(exportPlan));
+    (exportBusy ? "Формируем и проверяем workbook..." : exportActionHint(exportPlan));
   const packageFacts = exportPackageFacts(exportPlan);
+  const previewColumns = exportPlan.preview.headers.slice(0, 9);
+  const previewRows = exportPlan.preview.rows.slice(0, 4);
+  const mappingRows = exportMappingRows(exportPlan);
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
@@ -1954,7 +2197,15 @@ export function ExportScreen({
             value={exportTab}
           />
           {exportTab === "ready" ? (
-            <div className="submission-list magic-export-list">
+            <div className="submission-list magic-export-list export-contract-table">
+              <div className="export-contract-head" aria-hidden="true">
+                <span />
+                <span>Подача</span>
+                <span>Город</span>
+                <span>Даты</span>
+                <span>Заявители</span>
+                <span>Состояние</span>
+              </div>
               {readyList.map((submission) => {
                 const selected = selectedExportIdSet.has(submission.id);
 
@@ -1964,7 +2215,7 @@ export function ExportScreen({
                     aria-label={`Пакет ${submission.title}${
                       selected ? ", выбран" : ""
                     }`}
-                    className={`export-row magic-export-row ${
+                    className={`export-row magic-export-row export-contract-row ${
                       selected ? "is-selected" : ""
                     }`}
                     key={submission.id}
@@ -1973,6 +2224,7 @@ export function ExportScreen({
                       <input
                         aria-label={`Выбрать пакет: ${submission.title}`}
                         checked={selected}
+                        disabled={exportBusy}
                         type="checkbox"
                         onChange={() => onToggle(submission.id)}
                       />
@@ -1986,11 +2238,12 @@ export function ExportScreen({
                       onClick={() => onOpen(submission)}
                     >
                       <strong>{submission.title}</strong>
-                      <span>
-                        {submission.id} · {typeLabels[submission.type]} ·{" "}
-                        {submission.city} · {tripDates(submission)}
-                      </span>
+                      <span>{submission.id}</span>
                     </Button>
+                    <span>{submission.city}</span>
+                    <span>{tripDates(submission)}</span>
+                    <span>{applicantCountLabel(submission.applicants.length)}</span>
+                    <Badge tone="teal">Готово</Badge>
                     <Button variant="secondary" onClick={() => onOpen(submission)}>
                       Смотреть пакет
                     </Button>
@@ -2031,22 +2284,23 @@ export function ExportScreen({
 
         <CardComponent
           as="aside"
-          className="export-side magic-export-side"
-          aria-label="Информация и предпросмотр выгрузки"
+          className="export-side magic-export-side v17-export-context-rail"
+          aria-label="Контекст выгрузки"
         >
           <CardComponent
             as="section"
             className="rail-panel rail-summary magic-export-summary"
           >
-            <p className="kicker">Сводка выгрузки</p>
+            <p className="kicker">Контракт выгрузки</p>
+            <h2>Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}</h2>
             <SummaryRow
               chips={[
                 [
                   "teal",
-                  String(readyList.length),
-                  pluralRu(readyList.length, "готова", "готовы", "готовых"),
+                  String(exportPlan.contract.columnCount),
+                  "columns",
                 ],
-                ["muted", String(historyList.length), "в истории"],
+                ["muted", exportPlan.contract.range, "range"],
                 [
                   "blue",
                   String(exportPlan.rowCount),
@@ -2062,7 +2316,7 @@ export function ExportScreen({
           >
             <div className="preview-header">
               <div>
-                <p className="kicker">Пакет выгрузки</p>
+                <p className="kicker">Текущий пакет</p>
                 <h2>{exportPackageTitle(exportPlan)}</h2>
                 <p className="export-package-line">{exportPackageLine(exportPlan)}</p>
               </div>
@@ -2071,6 +2325,20 @@ export function ExportScreen({
                   ? exportStateLabel(exportPlan.exportState)
                   : "Блокировано"}
               </Badge>
+            </div>
+            <div className="v17-export-summary">
+              <div className="v17-export-stat">
+                <strong>{mappingRows.filter((row) => row.state === "mapped").length}</strong>
+                <span>mapped</span>
+              </div>
+              <div className="v17-export-stat">
+                <strong>{mappingRows.filter((row) => row.state === "derived").length}</strong>
+                <span>derived</span>
+              </div>
+              <div className="v17-export-stat">
+                <strong>{mappingRows.filter((row) => row.state === "unresolved").length}</strong>
+                <span>unresolved</span>
+              </div>
             </div>
             <div
               aria-busy={exportBusy || undefined}
@@ -2133,37 +2401,52 @@ export function ExportScreen({
                 <span>{exportCheckLabel("Город", packageFacts.city)}</span>
                 <span>{exportCheckLabel("Даты", packageFacts.dates)}</span>
                 <span>{exportCheckLabel("Тип", packageFacts.type)}</span>
-                <span>Повторная выгрузка защищена</span>
+                <span>
+                  {exportPlan.contract.sheetName} · {exportPlan.contract.range} ·{" "}
+                  {exportPlan.contract.columnCount} columns
+                </span>
               </div>
             )}
-            <div className="excel-table">
-              <div className="excel-head">
-                <span>Подача</span>
-                <span>Заявитель</span>
-                <span>Город</span>
-                <span>Даты</span>
+            <div className="excel-table export-preview-sheet" aria-label="Sheet1 masked preview">
+              <div
+                className="excel-head"
+                style={{ gridTemplateColumns: `repeat(${previewColumns.length}, minmax(82px, 1fr))` }}
+              >
+                {previewColumns.map((header) => (
+                  <span key={header}>{header}</span>
+                ))}
               </div>
-              {exportPlan.rows.map((row) => (
+              {previewRows.map((row, rowIndex) => (
                 <div
-                  className={`excel-row ${row.applicantCount > 1 ? "is-family" : ""}`}
-                  key={`${row.submissionId}-${row.applicantName}`}
+                  className={`excel-row ${
+                    exportPlan.rows[rowIndex]?.applicantCount &&
+                    exportPlan.rows[rowIndex].applicantCount > 1
+                      ? "is-family"
+                      : ""
+                  }`}
+                  key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
+                  style={{ gridTemplateColumns: `repeat(${previewColumns.length}, minmax(82px, 1fr))` }}
                 >
-                  <span>
-                    {row.submissionCode}
-                    {row.applicantCount > 1 ? <em>{row.groupLabel}</em> : null}
-                  </span>
-                  <span>
-                    {row.applicantName}
-                    {row.applicantCount > 1 ? (
-                      <em>
-                        {row.applicantIndex}/{row.applicantCount}
-                      </em>
-                    ) : null}
-                  </span>
-                  <span>{row.city}</span>
-                  <span>{row.tripDates}</span>
+                  {row.slice(0, previewColumns.length).map((value, cellIndex) => (
+                    <span key={`${cellIndex}-${value}`}>{maskPreviewValue(value)}</span>
+                  ))}
                 </div>
               ))}
+            </div>
+            <div className="mapping-audit" aria-label="56-column export mapping audit">
+              <div className="mapping-audit-head">
+                <strong>Контракт A:BD</strong>
+                <span>{exportPlan.contract.columnCount}/56 columns</span>
+              </div>
+              <div className="mapping-audit-scroll">
+                {mappingRows.map((row) => (
+                  <div className="mapping-row" key={row.header}>
+                    <span className="mapping-index">{row.index}</span>
+                    <span className="mapping-name">{row.header}</span>
+                    <span className={`mapping-state ${row.state}`}>{row.state}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardComponent>
         </CardComponent>
@@ -2193,6 +2476,21 @@ function exportPackageFacts(plan: ExportSummary) {
       ["Тип", type],
     ] satisfies Array<[string, string]>,
   };
+}
+
+function exportMappingRows(plan: ExportSummary) {
+  return plan.preview.headers.map((header, index) => ({
+    header,
+    index: index + 1,
+    state: header.includes("Appointment Type") ? "derived" : "mapped",
+  }));
+}
+
+function maskPreviewValue(value: string) {
+  if (!value) return "—";
+  if (value.includes("@")) return value.replace(/(.{2}).+(@.+)/, "$1•••$2");
+  if (/^\d{7,}$/.test(value)) return `${value.slice(0, 2)}•••${value.slice(-2)}`;
+  return value;
 }
 
 function uniqueValues(values: string[]) {

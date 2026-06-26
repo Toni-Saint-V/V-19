@@ -2,17 +2,30 @@ import type {
   ExportBlocker,
   ExportPackageFormat,
   ExportPackageIdentity,
-  ExportRow,
   ExportState,
   Submission,
 } from "./types";
 import { tripDates } from "./selectors";
-import { typeLabels } from "./status";
+import {
+  buildExportContractRows,
+  buildExportPreview,
+  exportContractFingerprint,
+  type ExportContractPreview,
+  type ExportContractRow,
+  validateExportContractShape,
+} from "./exportContract";
 
 export type ExportSelectionState = ExportState | "mixed";
 export type ExportSummary = {
-  rows: ExportRow[];
+  rows: ExportContractRow[];
   blockers: ExportBlocker[];
+  contract: {
+    columnCount: number;
+    range: ExportContractPreview["range"];
+    sheetName: ExportContractPreview["sheetName"];
+    valid: boolean;
+  };
+  preview: ExportContractPreview;
   rowCount: number;
   ready: boolean;
   exportState: ExportSelectionState;
@@ -22,24 +35,11 @@ export type ExportSummary = {
   downloadPackageIdentity: ExportPackageIdentity | null;
 };
 
-const exportRowColumns: Array<keyof ExportRow> = [
-  "submissionCode",
-  "submissionId",
-  "submissionTitle",
-  "applicantName",
-  "city",
-  "tripDates",
-  "type",
-  "groupKey",
-  "groupLabel",
-  "applicantIndex",
-  "applicantCount",
-];
-
 export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   if (submissions.length === 0) return [{ reason: "Выберите хотя бы одну подачу" }];
 
   const blockers: ExportBlocker[] = [];
+  const contractValid = validateExportContractShape();
   const notReady = submissions.filter(
     (submission) => submission.status !== "ready_for_export",
   );
@@ -52,10 +52,21 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   );
   const rows = buildExportRows(submissions);
   const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
+  const openBlockingIssues = submissions.filter((submission) =>
+    submission.issues.some(
+      (issue) =>
+        issue.severity === "blocker" &&
+        (issue.status === "open" || issue.status === "fixed_by_agent"),
+    ),
+  );
   const cities = new Set(submissions.map((submission) => submission.city));
   const dates = new Set(submissions.map(tripDates));
   const types = new Set(submissions.map((submission) => submission.type));
   const exportState = getExportSelectionState(submissions);
+
+  if (!contractValid) {
+    blockers.push({ reason: "Контракт Excel A:BD не подтверждён" });
+  }
 
   if (notReady.length > 0) {
     blockers.push({ reason: "В выборке есть подачи не готовые к выгрузке" });
@@ -73,6 +84,12 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     blockers.push({ reason: "В строках выгрузки есть заявители без ФИО" });
   }
 
+  if (openBlockingIssues.length > 0) {
+    blockers.push({
+      reason: "В выборке есть блокирующие замечания, не закрытые администратором",
+    });
+  }
+
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
   if (dates.size > 1) blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (types.size > 1)
@@ -87,23 +104,8 @@ export function canGenerateExport(submissions: Submission[]) {
   return getExportBlockers(submissions).length === 0;
 }
 
-export function buildExportRows(submissions: Submission[]): ExportRow[] {
-  return submissions.flatMap((submission) =>
-    submission.applicants.map((applicant, index) => ({
-      submissionCode:
-        submission.type === "family" ? `${submission.id}-${index + 1}` : submission.id,
-      submissionId: submission.id,
-      submissionTitle: submission.title,
-      applicantName: applicant.fullName,
-      city: submission.city,
-      tripDates: tripDates(submission),
-      type: typeLabels[submission.type],
-      groupKey: submission.id,
-      groupLabel: submission.type === "family" ? "Семья" : "Один заявитель",
-      applicantIndex: index + 1,
-      applicantCount: submission.applicants.length,
-    })),
-  );
+export function buildExportRows(submissions: Submission[]): ExportContractRow[] {
+  return buildExportContractRows(submissions);
 }
 
 export function exportSummary(
@@ -114,6 +116,8 @@ export function exportSummary(
   const blockers = getExportBlockers(submissions);
   const exportState = getExportSelectionState(submissions);
   const packageIdentity = buildExportPackageIdentity(submissions, format);
+  const preview = buildExportPreview(rows);
+  const contractValid = validateExportContractShape();
   const packageStale =
     Boolean(packageIdentity) &&
     (exportState === "file_generated" || exportState === "file_downloaded") &&
@@ -125,12 +129,19 @@ export function exportSummary(
   const effectiveBlockers = packageStale
     ? [...blockers, { reason: "Состав выгрузки изменился после формирования файла" }]
     : blockers;
-  const ready = blockers.length === 0;
+  const ready = blockers.length === 0 && contractValid;
   const canDownload = ready && !packageStale && exportState === "file_generated";
 
   return {
     rows,
     blockers: effectiveBlockers,
+    contract: {
+      columnCount: preview.columnCount,
+      range: preview.range,
+      sheetName: preview.sheetName,
+      valid: contractValid,
+    },
+    preview,
     rowCount: rows.length,
     ready: ready && !packageStale,
     exportState,
@@ -139,6 +150,28 @@ export function exportSummary(
     canMarkExported: ready && !packageStale && exportState === "file_downloaded",
     downloadPackageIdentity: canDownload ? packageIdentity : null,
   };
+}
+
+export function selectedReadySubmissionsForExport(
+  submissions: Submission[],
+  selectedIds: readonly string[],
+): Submission[] {
+  const selectedIdSet = new Set(selectedIds);
+  return submissions.filter(
+    (submission) =>
+      submission.status === "ready_for_export" && selectedIdSet.has(submission.id),
+  );
+}
+
+export function exportSummaryForSelectedIds(
+  submissions: Submission[],
+  selectedIds: readonly string[],
+  format: ExportPackageFormat = "xlsx",
+): ExportSummary {
+  return exportSummary(
+    selectedReadySubmissionsForExport(submissions, selectedIds),
+    format,
+  );
 }
 
 export function buildExportPackageIdentity(
@@ -177,7 +210,7 @@ export function exportPackageIdentityMatches(
 }
 
 export function exportRowsMatchPackageIdentity(
-  rows: ExportRow[],
+  rows: ExportContractRow[],
   identity: ExportPackageIdentity | null,
 ): identity is ExportPackageIdentity {
   return Boolean(
@@ -210,19 +243,10 @@ function inferExportState(submission: Submission): ExportState {
 }
 
 function exportPackageContentFingerprint(
-  rows: ExportRow[],
+  rows: ExportContractRow[],
   format: ExportPackageFormat,
 ): string {
-  const orderedRows = [...rows].sort(
-    (left, right) =>
-      left.submissionId.localeCompare(right.submissionId) ||
-      left.applicantIndex - right.applicantIndex,
-  );
-  const source = orderedRows
-    .map((row) => exportRowColumns.map((column) => String(row[column])).join("\u001f"))
-    .join("|");
-
-  return [format, orderedRows.length, source].join("|");
+  return exportContractFingerprint(rows, format);
 }
 
 function sortedSubmissionIds(submissions: Submission[]): string[] {

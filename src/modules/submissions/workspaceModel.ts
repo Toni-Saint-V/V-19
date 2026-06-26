@@ -47,7 +47,7 @@ export const workspaceTabs: Array<{ id: DrawerTab; label: string }> = [
   { id: "overview", label: "Обзор" },
   { id: "applicants", label: "Заявители" },
   { id: "questionnaire", label: "Анкета" },
-  { id: "files", label: "Документы" },
+  { id: "files", label: "Файлы" },
   { id: "issues", label: "Замечания" },
   { id: "history", label: "История" },
 ];

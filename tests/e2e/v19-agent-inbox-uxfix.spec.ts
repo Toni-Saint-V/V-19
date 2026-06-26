@@ -141,7 +141,7 @@ test.describe("V-19 agent inbox triage UX", () => {
       });
       await openFreshAgentInbox(page);
 
-      await page.getByRole("button", { name: "Мои действия. точные шаги" }).click();
+      await page.getByRole("tab", { name: /Мои действия/ }).click();
       await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
       await expectNoHorizontalOverflow(page, `${viewport.label}: agent actions`);
 

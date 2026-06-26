@@ -4,6 +4,11 @@ import {
   applyExportPackageDraft,
   buildExportPackageDraft,
 } from "../../src/services/exportService";
+import {
+  EXPECTED_EXPORT_CONTRACT_HEADERS,
+  exportContractHeaders,
+} from "../../src/modules/submissions/exportContract";
+import { parseExportWorkbookArtifact } from "../../src/modules/submissions/exportWorkbook";
 import type { Applicant, ExportBatch, Submission } from "../../src/types/domain";
 
 const createdAt = "2026-06-16T06:30:00.000Z";
@@ -28,6 +33,7 @@ function applicant(overrides: Partial<Applicant> = {}): Applicant {
     country: "Испания",
     city: "Мадрид",
     tripDates: "2026-08-20 - 2026-08-30",
+    tripDuration: "10 дней",
     hotelName: "Madrid Central",
     hotelAddress: "Gran Via 21",
     ...overrides,
@@ -93,7 +99,7 @@ describe("durable export package service", () => {
     throw new Error("expected blocked draft");
   });
 
-  test("builds a durable xlsx package draft with stable submission identity", () => {
+  test("builds a durable xlsx package draft with parsed Sheet1 contract values", async () => {
     const first = acceptedSubmission({ id: "VF-1001", title: "Ivan Petrov" });
     const second = acceptedSubmission({
       id: "VF-1002",
@@ -138,10 +144,30 @@ describe("durable export package service", () => {
     expect(draft.artifact.fileName).toMatch(/^visaflow-export-[a-z0-9]+\.xlsx$/);
     expect(draft.artifact.blob.size).toBeGreaterThan(0);
     expect(draft.idempotencyKey).toBe(reordered.idempotencyKey);
-    expect(draft.rows.map((row) => row["ID заявки"])).toEqual(["VF-1001", "VF-1002"]);
-    expect(reordered.rows.map((row) => row["ID заявки"])).toEqual([
-      "VF-1001",
-      "VF-1002",
+    const parsed = await parseExportWorkbookArtifact({ blob: draft.artifact.blob });
+    const firstDataRow = parsed.rows[1] ?? [];
+    const headers = exportContractHeaders();
+    const valueFor = (header: string) => firstDataRow[headers.indexOf(header)] ?? "";
+
+    expect(parsed.sheetName).toBe("Sheet1");
+    expect(parsed.dimension).toBe("A1:BD3");
+    expect(parsed.rows[0]).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
+    expect(firstDataRow).toEqual(
+      headers.map((header) => draft.rows[0]?.[header] ?? ""),
+    );
+    expect(draft.rows).toHaveLength(2);
+    expect(Object.keys(draft.rows[0] ?? {})).toHaveLength(56);
+    expect(valueFor("TravelDate(YYYY-MM-DD)")).toBe("2026-08-20");
+    expect(valueFor("Intended Date Of Arrival")).toBe("2026-08-20");
+    expect(valueFor("Intended Date Of Departure")).toBe("2026-08-30");
+    expect(valueFor("Stay Duration in Days")).toBe("10");
+    expect(draft.rows.map((row) => row["Passport No"])).toEqual([
+      "751234567",
+      "767654321",
+    ]);
+    expect(reordered.rows.map((row) => row["Passport No"])).toEqual([
+      "751234567",
+      "767654321",
     ]);
     expect(draft.batch).toMatchObject({
       idempotencyKey: draft.idempotencyKey,

@@ -62,8 +62,17 @@ test.describe("V-19 UX state proof", () => {
     await expect(page.getByText("Сбросить фильтры")).toBeVisible();
     await saveScreenshot(page, "agent-submissions-no-results");
 
+    await page.getByRole("button", { name: "Настройки" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
+    await page.getByLabel("Сводка по действиям").selectOption("daily");
+    await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Сохранить" })).toBeEnabled();
+    await saveScreenshot(page, "settings-dirty");
+    await page.getByRole("button", { name: "Сохранить" }).click();
+    await expect(page.getByText("Настройки сохранены")).toBeVisible();
+
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Работа",
       workspaceEmail: "admin@visaflow.local",
     });
     await page.getByRole("button", { name: "Выгрузка" }).click();
@@ -83,15 +92,6 @@ test.describe("V-19 UX state proof", () => {
     ).toBeDisabled();
     await expect(page.getByRole("button", { name: "Скачать" })).toBeDisabled();
     await saveScreenshot(page, "export-disabled-reason");
-
-    await page.getByRole("button", { name: "Настройки" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
-    await page.getByLabel("Сводка по действиям").selectOption("daily");
-    await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Сохранить" })).toBeEnabled();
-    await saveScreenshot(page, "settings-dirty");
-    await page.getByRole("button", { name: "Сохранить" }).click();
-    await expect(page.getByText("Настройки сохранены")).toBeVisible();
 
     expect(problems).toEqual([]);
   });

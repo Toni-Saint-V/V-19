@@ -41,6 +41,12 @@ async function expectNoAxeViolations(page: Page, context: string) {
   ).toEqual([]);
 }
 
+async function openAgentActionsTab(page: Page) {
+  const actionsTab = page.getByRole("tab", { name: /Мои действия/ });
+  await actionsTab.click();
+  await expect(actionsTab).toHaveAttribute("aria-selected", "true");
+}
+
 test.describe("V-19 accessibility contract", () => {
   test("agent primary surfaces have no automated WCAG A/AA violations", async ({
     page,
@@ -48,10 +54,11 @@ test.describe("V-19 accessibility contract", () => {
     await openFreshWorkspace(page);
     await expectNoAxeViolations(page, "agent inbox");
 
-    await page.getByRole("button", { name: "Мои действия" }).click();
+    await openAgentActionsTab(page);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Мои действия" }),
+      page.getByRole("heading", { level: 1, name: "Входящие" }),
     ).toBeVisible();
+    await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
     await expectNoAxeViolations(page, "agent actions");
 
     await page.getByRole("button", { name: "Мои подачи" }).click();
@@ -65,37 +72,21 @@ test.describe("V-19 accessibility contract", () => {
     await expect(page.getByRole("button", { name: "Закрыть создание" })).toBeVisible();
     await expectNoAxeViolations(page, "create submission drawer");
     await page.getByRole("button", { name: "Закрыть создание" }).click();
-
-    await page.getByRole("button", { name: "Настройки" }).click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Настройки" }),
-    ).toBeVisible();
-    await expectNoAxeViolations(page, "agent settings");
   });
 
   test("admin primary surfaces, export, and submission drawer have no automated WCAG A/AA violations", async ({
     page,
   }) => {
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Работа",
       workspaceEmail: "admin@visaflow.local",
     });
     await expectNoAxeViolations(page, "admin review");
 
-    await page.getByRole("button", { name: "Входящие" }).click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Входящие" }),
-    ).toBeVisible();
-    await expectNoAxeViolations(page, "admin inbox");
-
-    await page.getByRole("button", { name: "Мои действия" }).click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Мои действия" }),
-    ).toBeVisible();
-    await expectNoAxeViolations(page, "admin actions");
-
-    await page.getByRole("button", { name: "Проверка. очередь проверки" }).click();
-    await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
+    await page.getByRole("button", { name: /Работа\. очередь проверки/ }).click();
+    await expect(page.getByRole("heading", { name: "Работа" })).toBeVisible();
 
     await page.locator(".submission-card, [data-submission-card]").first().click();
     await expect(page.getByRole("dialog").first()).toBeVisible();
@@ -105,11 +96,5 @@ test.describe("V-19 accessibility contract", () => {
     await page.getByRole("button", { name: "Выгрузка" }).click();
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
     await expectNoAxeViolations(page, "admin export");
-
-    await page.getByRole("button", { name: "Настройки" }).click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Настройки" }),
-    ).toBeVisible();
-    await expectNoAxeViolations(page, "admin settings");
   });
 });
