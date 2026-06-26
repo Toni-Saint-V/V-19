@@ -131,7 +131,7 @@ function testStorage() {
 
 function readyClone(patch: Partial<Submission>): Submission {
   return {
-    ...byId("ПД-1056"),
+    ...canonicalMediaSubmission(byId("ПД-1056")),
     id: patch.id ?? "ПД-ТЕСТ",
     title: patch.title ?? "Тестовая подача",
     ...patch,
@@ -362,7 +362,7 @@ describe("V-19 export rules", () => {
   });
 
   it("allows a single ready submission", () => {
-    expect(getExportBlockers([byId("ПД-1056")])).toEqual([]);
+    expect(getExportBlockers([readyClone({ id: "ПД-1056" })])).toEqual([]);
   });
 
   it("normalizes legacy statuses before export decisions", () => {
@@ -378,8 +378,51 @@ describe("V-19 export rules", () => {
     });
   });
 
+  it("treats legacy terminal statuses with exported timestamp as exported", () => {
+    const legacyExported = {
+      ...readyClone({
+        id: "ПД-LEGACY-EXPORTED",
+        status: "completed" as Submission["status"],
+      }),
+      exportedAt: "2026-06-26T10:00:00.000Z",
+    } as Submission;
+
+    expect(
+      exportSummary([legacyExported]).blockers.map((blocker) => blocker.reason),
+    ).toContain("В выборке есть уже выгруженные подачи");
+    expect(exportSummary([legacyExported])).toMatchObject({
+      canGenerate: false,
+      ready: false,
+    });
+  });
+
+  it("blocks export when legacy media remains attached to a canonical package", () => {
+    const canonical = readyClone({ id: "ПД-LEGACY-ATTACHED" });
+    const applicantId = canonical.applicants[0]?.id ?? "applicant-1";
+    const withLegacyMedia: Submission = {
+      ...canonical,
+      files: [
+        ...canonical.files,
+        {
+          applicantId,
+          id: "legacy-photo",
+          status: "accepted",
+          type: "photo",
+        },
+      ],
+    };
+
+    expect(
+      exportSummary([withLegacyMedia]).blockers.map((blocker) => blocker.reason),
+    ).toContain("В выборке есть подачи без полного канонического пакета медиа");
+    expect(exportSummary([withLegacyMedia])).toMatchObject({
+      canGenerate: false,
+      ready: false,
+    });
+  });
+
   it("does not let legacy media satisfy export readiness", () => {
-    const applicantId = byId("ПД-1056").applicants[0]?.id ?? "applicant-1";
+    const applicantId = readyClone({}).applicants[0]?.id ?? "applicant-1";
     const legacyMediaOnly = readyClone({
       id: "ПД-LEGACY-MEDIA",
       files: [
@@ -415,7 +458,7 @@ describe("V-19 export rules", () => {
 
   it("blocks mixed city, date, type, and already exported packages", () => {
     const blockers = getExportBlockers([
-      byId("ПД-1056"),
+      readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-ГОРОД", city: "Казань" }),
       readyClone({ id: "ПД-ДАТА", tripDateFrom: "10.10", tripDateTo: "20.10" }),
       readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
@@ -431,7 +474,7 @@ describe("V-19 export rules", () => {
 
   it("keeps download and exported actions locked to the generated selection", () => {
     const submissions = [
-      byId("ПД-1056"),
+      readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-1058", title: "Вторая готовая подача" }),
     ];
     const generated = applyExportStateToSelection(
@@ -464,7 +507,7 @@ describe("V-19 export rules", () => {
 
   it("rebuilds export readiness from current selected ids before async state changes", () => {
     const submissions = [
-      byId("ПД-1056"),
+      readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-1058", title: "Вторая готовая подача" }),
     ];
     const initialSubmission = submissions[0];
@@ -496,7 +539,7 @@ describe("V-19 export rules", () => {
 
   it("keeps export state unchanged for invalid package generation attempts", () => {
     const submissions = [
-      byId("ПД-1056"),
+      readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
       byId("ПД-1051"),
     ];
@@ -557,7 +600,7 @@ describe("V-19 export rules", () => {
   });
 
   it("keeps download state locked until the selected package is generated", () => {
-    const submissions = [byId("ПД-1056")];
+    const submissions = [readyClone({ id: "ПД-1056" })];
 
     expect(
       applyExportStateToSelection(submissions, ["ПД-1056"], "file_downloaded"),
@@ -581,7 +624,7 @@ describe("V-19 export rules", () => {
 
   it("blocks download and export when generated package content becomes stale", () => {
     const generated = applyExportStateToSelection(
-      [byId("ПД-1056")],
+      [readyClone({ id: "ПД-1056" })],
       ["ПД-1056"],
       "file_generated",
     );
@@ -618,7 +661,7 @@ describe("V-19 export rules", () => {
   });
 
   it("keeps exported state locked until the selected package is downloaded", () => {
-    const submissions = [byId("ПД-1056")];
+    const submissions = [readyClone({ id: "ПД-1056" })];
 
     expect(markSelectedExported(submissions, ["ПД-1056"])).toBe(submissions);
 
@@ -1368,7 +1411,7 @@ describe("V-19 submission actions", () => {
   });
 
   it("does not add issues to export-ready submissions", () => {
-    const submission = byId("ПД-1056");
+    const submission = readyClone({ id: "ПД-1056" });
     const updated = addPreciseAdminIssue(submission, routeIssueInput(submission));
 
     expect(updated).toBe(submission);
@@ -1459,8 +1502,11 @@ describe("V-19 submission actions", () => {
   });
 
   it("updates export state and marks downloaded submissions exported", () => {
+    const submissions = initialSubmissions.map((submission) =>
+      submission.id === "ПД-1056" ? readyClone({ id: "ПД-1056" }) : submission,
+    );
     const generated = applyExportStateToSelection(
-      initialSubmissions,
+      submissions,
       ["ПД-1056"],
       "file_generated",
     );

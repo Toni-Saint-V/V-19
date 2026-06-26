@@ -28,6 +28,22 @@ function byId(id: string): Submission {
   return submission;
 }
 
+function canonicalMediaSubmission(submission: Submission): Submission {
+  return {
+    ...submission,
+    files: submission.files.filter(
+      (file) =>
+        file.type === "passport_scan" ||
+        file.type === "selfie" ||
+        file.type === "selfie_2",
+    ),
+  };
+}
+
+function readySubmission(): Submission {
+  return canonicalMediaSubmission(byId("ПД-1056"));
+}
+
 function withoutQuestionnaireField(
   submission: Submission,
   fieldId: string,
@@ -66,7 +82,7 @@ function withQuestionnaireFieldValues(
 describe("V-19 export workbook contract", () => {
   test("generates a parseable Sheet1 workbook with exact A:BD 56-column shape", async () => {
     const selection = applyExportStateToSelection(
-      [byId("ПД-1056")],
+      [readySubmission()],
       ["ПД-1056"],
       "file_generated",
     );
@@ -115,7 +131,7 @@ describe("V-19 export workbook contract", () => {
 
   test("rejects parsed workbook proof when row count or header shape drifts", async () => {
     const selection = applyExportStateToSelection(
-      [byId("ПД-1056")],
+      [readySubmission()],
       ["ПД-1056"],
       "file_generated",
     );
@@ -143,7 +159,7 @@ describe("V-19 export workbook contract", () => {
 
   test("uses the same canonical row model for preview and workbook serialization", async () => {
     const selection = applyExportStateToSelection(
-      [byId("ПД-1056")],
+      [readySubmission()],
       ["ПД-1056"],
       "file_generated",
     );
@@ -167,7 +183,7 @@ describe("V-19 export workbook contract", () => {
 
   test("ties package identity to the full 56-column serialized row model", () => {
     const selection = applyExportStateToSelection(
-      [byId("ПД-1056")],
+      [readySubmission()],
       ["ПД-1056"],
       "file_generated",
     );
@@ -190,6 +206,7 @@ describe("V-19 export workbook contract", () => {
     const blockedByIssue = exportSummary([
       {
         ...byId("ПД-1056"),
+        ...readySubmission(),
         issues: [
           {
             ...byId("ПД-1048").issues[0]!,
@@ -215,7 +232,7 @@ describe("V-19 export workbook contract", () => {
   });
 
   test("does not start browser download when artifact identity is missing or stale", () => {
-    const selection = [byId("ПД-1056")];
+    const selection = [readySubmission()];
     const plan = exportSummary(selection);
     const createObjectURL = vi.fn();
     const originalUrl = globalThis.URL;
@@ -253,7 +270,7 @@ describe("V-19 export workbook contract", () => {
   });
 
   test("keeps spreadsheet formula-like values inert in generated cells", () => {
-    const plan = exportSummary([byId("ПД-1056")]);
+    const plan = exportSummary([readySubmission()]);
     const row = {
       ...plan.rows[0]!,
       applicantEmail: "=cmd|' /C calc'!A0",

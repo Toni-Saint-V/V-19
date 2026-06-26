@@ -19,9 +19,25 @@ function byId(id: string): Submission {
   return submission;
 }
 
+function canonicalMediaSubmission(submission: Submission): Submission {
+  return {
+    ...submission,
+    files: submission.files.filter(
+      (file) =>
+        file.type === "passport_scan" ||
+        file.type === "selfie" ||
+        file.type === "selfie_2",
+    ),
+  };
+}
+
+function readySubmission(): Submission {
+  return canonicalMediaSubmission(byId("ПД-1056"));
+}
+
 function downloadedSelection(): Submission[] {
   const generated = applyExportStateToSelection(
-    [byId("ПД-1056")],
+    [readySubmission()],
     ["ПД-1056"],
     "file_generated",
   );
@@ -92,7 +108,7 @@ describe("submission export workflow", () => {
   test("does not record or mutate when the package was not downloaded", async () => {
     const commitPackage = vi.fn<ExportPackageCommitter>();
 
-    const result = await completeExportPackage([byId("ПД-1056")], options(commitPackage));
+    const result = await completeExportPackage([readySubmission()], options(commitPackage));
 
     expect(result.status).toBe("blocked");
     expect(commitPackage).not.toHaveBeenCalled();

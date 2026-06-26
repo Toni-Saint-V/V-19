@@ -51,6 +51,18 @@ function byId(id: string): Submission {
   return submission;
 }
 
+function canonicalMediaSubmission(submission: Submission): Submission {
+  return {
+    ...submission,
+    files: submission.files.filter(
+      (file) =>
+        file.type === "passport_scan" ||
+        file.type === "selfie" ||
+        file.type === "selfie_2",
+    ),
+  };
+}
+
 function draftSubmission(type: Submission["type"] = "single"): Submission {
   return createDraftSubmission({
     applicantNames:
@@ -503,7 +515,7 @@ describe("local Case Copilot", () => {
 
     const readyExport = buildCaseCopilotBrief({
       role: "admin",
-      submission: byId("ПД-1056"),
+      submission: canonicalMediaSubmission(byId("ПД-1056")),
       surface: "export",
     });
     expect(readyExport.status).toBe("ready");

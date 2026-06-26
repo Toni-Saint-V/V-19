@@ -36,6 +36,18 @@ function byId(id: string): Submission {
   return structuredClone(submission);
 }
 
+function canonicalMediaSubmission(submission: Submission): Submission {
+  return {
+    ...submission,
+    files: submission.files.filter(
+      (file) =>
+        file.type === "passport_scan" ||
+        file.type === "selfie" ||
+        file.type === "selfie_2",
+    ),
+  };
+}
+
 function unwrap<T>(result: CommandResult<T>): T {
   if (!result.ok) throw new Error(result.error.code);
   return result.data;
@@ -287,7 +299,7 @@ describe("V-19 domain engine", () => {
   });
 
   it("uses fail-closed export guards and marks exported only after download", () => {
-    const ready = byId("ПД-1056");
+    const ready = canonicalMediaSubmission(byId("ПД-1056"));
     const notReady = completeInProgressSubmission();
 
     expect(generateExport([notReady], "admin")).toEqual({
