@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
@@ -22,14 +22,36 @@ const canonicalReleaseProofFiles = [
 
 const legacyArchiveOnlyTests = [
   "tests/integration/supabase-live.spec.ts",
+  "tests/unit/aiHelperFacade.spec.ts",
+  "tests/unit/aiHelperService.spec.ts",
+  "tests/unit/exportBatchPersistence.spec.ts",
   "tests/unit/exportService.spec.ts",
+  "tests/unit/smartCorrectionReturn.spec.ts",
   "tests/unit/storageService.spec.ts",
   "tests/unit/submissionService.spec.ts",
+  "tests/unit/supabasePersistenceFailurePaths.spec.ts",
+  "tests/unit/supabaseSecurityContract.spec.ts",
+  "tests/unit/textIntakeReviewer.spec.ts",
   "tests/unit/workflow.spec.ts",
 ] as const;
 
 function readProjectFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
+}
+
+function testFilesUnder(relativePath: string): string[] {
+  const absolutePath = join(process.cwd(), relativePath);
+  return readdirSync(absolutePath, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = `${relativePath}/${entry.name}`;
+    if (entry.isDirectory()) return testFilesUnder(entryPath);
+    return /\.(spec|test)\.tsx?$/.test(entry.name) ? [entryPath] : [];
+  });
+}
+
+function legacyStackTestFiles(): string[] {
+  return testFilesUnder("tests")
+    .filter((filePath) => legacyStackImportPattern.test(readProjectFile(filePath)))
+    .sort();
 }
 
 describe("Package 3 canonical release proof surface", () => {
@@ -43,6 +65,8 @@ describe("Package 3 canonical release proof surface", () => {
   });
 
   test("legacy stack tests remain archive-only and are not release proof", () => {
+    expect(legacyStackTestFiles()).toEqual([...legacyArchiveOnlyTests].sort());
+
     for (const filePath of legacyArchiveOnlyTests) {
       const source = readProjectFile(filePath);
 
