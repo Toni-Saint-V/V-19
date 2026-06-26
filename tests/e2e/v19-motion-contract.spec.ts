@@ -164,7 +164,7 @@ test.describe("V-19 motion contract", () => {
     const problems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Проверка",
+      heading: "Работа",
       workspaceEmail: "admin@visaflow.local",
     });
     await page.getByRole("button", { name: "Выгрузка" }).click();

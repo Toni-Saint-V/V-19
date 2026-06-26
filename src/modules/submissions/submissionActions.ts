@@ -1,5 +1,6 @@
 import {
   applySubmissionAction,
+  applySubmissionActionResult,
   canAddAdminIssue,
   canAgentEditSubmissionContent,
 } from "./status";
@@ -21,6 +22,7 @@ import { defaultLocalAgentOwnerId } from "./ownership";
 import type {
   City,
   AgentOwnerId,
+  CommandResult,
   ExportState,
   Issue,
   IssueInput,
@@ -519,11 +521,65 @@ export function applyActionToSubmissionList(
   role: Role,
   actorId?: string,
 ) {
-  return submissions.map((submission) =>
-    submission.id === submissionId
-      ? applySubmissionAction(submission, action, role, actorId)
-      : submission,
+  const result = applyActionToSubmissionListResult(
+    submissions,
+    submissionId,
+    action,
+    role,
+    actorId,
   );
+
+  return result.ok ? result.data : submissions;
+}
+
+export function applyActionToSubmissionListResult(
+  submissions: Submission[],
+  submissionId: string,
+  action: SubmissionAction,
+  role: Role,
+  actorId?: string,
+): CommandResult<Submission[]> {
+  let matchedSubmission = false;
+  const nextSubmissions: Submission[] = [];
+
+  for (const submission of submissions) {
+    if (submission.id !== submissionId) {
+      nextSubmissions.push(submission);
+      continue;
+    }
+
+    matchedSubmission = true;
+    const actionResult = applySubmissionActionResult(
+      submission,
+      action,
+      role,
+      actorId,
+    );
+
+    if (!actionResult.ok) {
+      return {
+        ok: false,
+        error: actionResult.error,
+      };
+    }
+
+    nextSubmissions.push(actionResult.data);
+  }
+
+  if (!matchedSubmission) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Подача не найдена",
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    data: nextSubmissions,
+  };
 }
 
 export function applyExportStateToSelection(

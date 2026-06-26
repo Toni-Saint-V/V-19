@@ -1,5 +1,7 @@
 import type {
   ActionDecision,
+  CommandResult,
+  DomainErrorCode,
   DrawerTab,
   Issue,
   Role,
@@ -57,6 +59,57 @@ export const statusTone = {
   ready_for_export: "teal",
   exported: "muted",
 } satisfies Record<SubmissionStatus, "amber" | "blue" | "danger" | "muted" | "teal">;
+
+export type AdminWorkTone = "info" | "success" | "warning";
+
+export function adminWorkDrawerTabFor(submission: Submission): DrawerTab {
+  if (submission.status === "corrections_received") return "issues";
+  return "overview";
+}
+
+export function adminWorkPresentation(submission: Submission): {
+  actionLabel: string;
+  stage: string;
+  tone: AdminWorkTone;
+} {
+  if (submission.status === "corrections_received") {
+    return {
+      actionLabel: "Проверить",
+      stage: "Исправления",
+      tone: "warning",
+    };
+  }
+
+  if (submission.status === "ready_for_export") {
+    return {
+      actionLabel: "Пакет",
+      stage: "К выгрузке",
+      tone: "success",
+    };
+  }
+
+  return {
+    actionLabel: "Открыть",
+    stage: "Новая проверка",
+    tone: "info",
+  };
+}
+
+export function adminWorkEventTitle(submission: Submission, fallback: string) {
+  if (submission.status === "corrections_received") {
+    return "Исправления получены";
+  }
+
+  if (submission.status === "submitted_for_review") {
+    return "Новая подача на проверке";
+  }
+
+  if (submission.status === "ready_for_export") {
+    return "Подача принята к выгрузке";
+  }
+
+  return fallback;
+}
 
 export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
   missing: "Нет файла",
@@ -397,11 +450,12 @@ export function getPrimaryAction(
       exported: { action: "open_history", label: "Открыть историю" },
     };
     const decision = byStatus[submission.status];
+    if (decision.action === "open_history") return decision;
+
     const guard = canPerformAction(submission, decision.action, role);
-    const waitsForPassportReview = requiresPassportExtractionReviewBeforeAction(
-      submission,
-      decision.action,
-    ) && guard.reason === "Проверьте распознанные паспортные данные перед отправкой";
+    const waitsForPassportReview =
+      requiresPassportExtractionReviewBeforeAction(submission, decision.action) &&
+      guard.reason === "Проверьте распознанные паспортные данные перед отправкой";
     return {
       ...decision,
       disabled: !guard.ok && !waitsForPassportReview,
@@ -442,130 +496,187 @@ export function applySubmissionAction(
   role: Role,
   actorId?: string,
 ): Submission {
+  const result = applySubmissionActionResult(submission, action, role, actorId);
+  return result.ok ? result.data : submission;
+}
+
+export function applySubmissionActionResult(
+  submission: Submission,
+  action: SubmissionAction,
+  role: Role,
+  actorId?: string,
+): CommandResult<Submission> {
   const guard = canPerformAction(submission, action, role);
-  if (!guard.ok) return submission;
-  if (action === "open_history") return submission;
+  if (!guard.ok) {
+    return submissionActionFailure(action, guard.reason);
+  }
+  if (action === "open_history") return { ok: true, data: submission };
 
   if (action === "submit_corrections") {
     const corrected = clearOpenQuestionnaireIssueErrors(submission);
 
     return {
-      ...corrected,
-      status: "corrections_received",
-      issues: corrected.issues.map((issue) =>
-        issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
-      ),
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-исправления`,
-          text: "Агент отправил исправления",
-          at: "сейчас",
-          source: "agent",
-        },
-        ...corrected.history,
-      ],
+      ok: true,
+      data: {
+        ...corrected,
+        status: "corrections_received",
+        issues: corrected.issues.map((issue) =>
+          issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
+        ),
+        updatedAt: "сейчас",
+        history: [
+          {
+            id: `и-${submission.id}-исправления`,
+            text: "Агент отправил исправления",
+            at: "сейчас",
+            source: "agent",
+          },
+          ...corrected.history,
+        ],
+      },
     };
   }
 
   if (action === "close_issues_accept") {
     const reviewedAtIso = new Date().toISOString();
     return {
-      ...submission,
-      status: "ready_for_export",
-      exportState: "ready",
-      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
-      issues: submission.issues.map((issue) =>
-        isFixedIssueStatus(issue.status)
-          ? { ...issue, status: "closed_by_admin" }
-          : issue,
-      ),
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-принято`,
-          text: "Администратор закрыл исправления и принял подачу",
-          at: "сейчас",
-          source: "admin",
-        },
-        ...submission.history,
-      ],
+      ok: true,
+      data: {
+        ...submission,
+        status: "ready_for_export",
+        exportState: "ready",
+        files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
+        issues: submission.issues.map((issue) =>
+          isFixedIssueStatus(issue.status)
+            ? { ...issue, status: "closed_by_admin" }
+            : issue,
+        ),
+        updatedAt: "сейчас",
+        history: [
+          {
+            id: `и-${submission.id}-принято`,
+            text: "Администратор закрыл исправления и принял подачу",
+            at: "сейчас",
+            source: "admin",
+          },
+          ...submission.history,
+        ],
+      },
     };
   }
 
   if (action === "accept") {
     const reviewedAtIso = new Date().toISOString();
     return {
-      ...submission,
-      status: "ready_for_export",
-      exportState: "ready",
-      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-принято`,
-          text: "Администратор принял подачу",
-          at: "сейчас",
-          source: "admin",
-        },
-        ...submission.history,
-      ],
+      ok: true,
+      data: {
+        ...submission,
+        status: "ready_for_export",
+        exportState: "ready",
+        files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
+        updatedAt: "сейчас",
+        history: [
+          {
+            id: `и-${submission.id}-принято`,
+            text: "Администратор принял подачу",
+            at: "сейчас",
+            source: "admin",
+          },
+          ...submission.history,
+        ],
+      },
     };
   }
 
   if (action === "submit_for_review") {
     return {
-      ...submission,
-      status: "submitted_for_review",
-      files: submission.files.map((file) =>
-        file.status === "uploaded" ? { ...file, status: "pending_review" } : file,
-      ),
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-на-проверку`,
-          text: "Агент отправил подачу на проверку",
-          at: "сейчас",
-          source: "agent",
-        },
-        ...submission.history,
-      ],
+      ok: true,
+      data: {
+        ...submission,
+        status: "submitted_for_review",
+        files: submission.files.map((file) =>
+          file.status === "uploaded" ? { ...file, status: "pending_review" } : file,
+        ),
+        updatedAt: "сейчас",
+        history: [
+          {
+            id: `и-${submission.id}-на-проверку`,
+            text: "Агент отправил подачу на проверку",
+            at: "сейчас",
+            source: "agent",
+          },
+          ...submission.history,
+        ],
+      },
     };
   }
 
   if (action === "mark_exported") {
     return {
-      ...submission,
-      status: "exported",
-      exportState: "marked_exported",
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-выгружено`,
-          text: "Подача отмечена выгруженной",
-          at: "сейчас",
-          source: "admin",
-        },
-        ...submission.history,
-      ],
+      ok: true,
+      data: {
+        ...submission,
+        status: "exported",
+        exportState: "marked_exported",
+        updatedAt: "сейчас",
+        history: [
+          {
+            id: `и-${submission.id}-выгружено`,
+            text: "Подача отмечена выгруженной",
+            at: "сейчас",
+            source: "admin",
+          },
+          ...submission.history,
+        ],
+      },
     };
   }
 
   const transition = transitionMatrix[action];
   return {
-    ...submission,
-    status: transition.to,
-    updatedAt: "сейчас",
-    history: [
-      {
-        id: `и-${submission.id}-${action}`,
-        text: `Статус изменен: ${statusLabels[transition.to]}`,
-        at: "сейчас",
-        source: role,
-      },
-      ...submission.history,
-    ],
+    ok: true,
+    data: {
+      ...submission,
+      status: transition.to,
+      updatedAt: "сейчас",
+      history: [
+        {
+          id: `и-${submission.id}-${action}`,
+          text: `Статус изменен: ${statusLabels[transition.to]}`,
+          at: "сейчас",
+          source: role,
+        },
+        ...submission.history,
+      ],
+    },
   };
+}
+
+function submissionActionFailure(
+  action: SubmissionAction,
+  reason = "Действие заблокировано доменными правилами.",
+): CommandResult<Submission> {
+  return {
+    ok: false,
+    error: {
+      code: domainErrorCodeForBlockedAction(action, reason),
+      message: reason,
+    },
+  };
+}
+
+function domainErrorCodeForBlockedAction(
+  action: SubmissionAction,
+  reason: string,
+): DomainErrorCode {
+  if (reason === "Недостаточно прав") return "PERMISSION_DENIED";
+  if (reason === "Действие недоступно в текущем статусе") {
+    return "INVALID_TRANSITION";
+  }
+  if (action === "generate_export" || action === "mark_exported") {
+    return "EXPORT_NOT_READY";
+  }
+  return "VALIDATION_ERROR";
 }
 
 function markReviewFilesAccepted(

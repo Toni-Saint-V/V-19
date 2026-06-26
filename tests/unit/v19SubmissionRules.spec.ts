@@ -14,8 +14,11 @@ import {
   agentActionQueue,
 } from "../../src/modules/submissions/agentActions";
 import {
+  buildExportPackageIdentity,
   buildExportRows,
+  exportPackageIdentityMatches,
   exportSummary,
+  exportSummaryForSelectedIds,
   getExportBlockers,
 } from "../../src/modules/submissions/exportRules";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
@@ -57,6 +60,9 @@ import {
 } from "../../src/modules/submissions/submissionActions";
 import {
   adminIssueGuard,
+  adminWorkDrawerTabFor,
+  adminWorkEventTitle,
+  adminWorkPresentation,
   applySubmissionAction,
   canAddAdminIssue,
   canEditSubmissionContent,
@@ -294,6 +300,36 @@ describe("V-19 submission status rules", () => {
     expect(matchingStatuses("corrections")).toEqual(["corrections_received"]);
     expect(matchingStatuses("ready")).toEqual(["ready_for_export"]);
   });
+
+  it("keeps admin work presentation decisions outside React screens", () => {
+    expect(adminWorkDrawerTabFor(byId("ПД-1053"))).toBe("overview");
+    expect(adminWorkDrawerTabFor(byId("ПД-1054"))).toBe("issues");
+    expect(adminWorkPresentation(byId("ПД-1053"))).toEqual({
+      actionLabel: "Открыть",
+      stage: "Новая проверка",
+      tone: "info",
+    });
+    expect(adminWorkPresentation(byId("ПД-1054"))).toEqual({
+      actionLabel: "Проверить",
+      stage: "Исправления",
+      tone: "warning",
+    });
+    expect(adminWorkPresentation(byId("ПД-1056"))).toEqual({
+      actionLabel: "Пакет",
+      stage: "К выгрузке",
+      tone: "success",
+    });
+    expect(adminWorkEventTitle(byId("ПД-1054"), "fallback")).toBe(
+      "Исправления получены",
+    );
+    expect(adminWorkEventTitle(byId("ПД-1053"), "fallback")).toBe(
+      "Новая подача на проверке",
+    );
+    expect(adminWorkEventTitle(byId("ПД-1056"), "fallback")).toBe(
+      "Подача принята к выгрузке",
+    );
+    expect(adminWorkEventTitle(byId("ПД-1048"), "fallback")).toBe("fallback");
+  });
 });
 
 describe("V-19 export rules", () => {
@@ -359,6 +395,38 @@ describe("V-19 export rules", () => {
     expect(
       exportSummary(generated).blockers.map((blocker) => blocker.reason),
     ).toContain("В выборке разные состояния выгрузки");
+  });
+
+  it("rebuilds export readiness from current selected ids before async state changes", () => {
+    const submissions = [
+      byId("ПД-1056"),
+      readyClone({ id: "ПД-1058", title: "Вторая готовая подача" }),
+    ];
+    const initialSubmission = submissions[0];
+    const currentSubmission = submissions[1];
+    if (!initialSubmission || !currentSubmission) {
+      throw new Error("Missing export fixtures");
+    }
+
+    const initialPlan = exportSummaryForSelectedIds(submissions, ["ПД-1056"]);
+    const currentPlan = exportSummaryForSelectedIds(submissions, ["ПД-1058"]);
+    const initialIdentity = buildExportPackageIdentity([initialSubmission]);
+    const currentIdentity = buildExportPackageIdentity([currentSubmission]);
+    if (!initialIdentity || !currentIdentity) {
+      throw new Error("Missing export package identity");
+    }
+
+    expect(initialPlan).toMatchObject({
+      canGenerate: true,
+      canDownload: false,
+      rowCount: 1,
+    });
+    expect(currentPlan).toMatchObject({
+      canGenerate: true,
+      canDownload: false,
+      rowCount: 1,
+    });
+    expect(exportPackageIdentityMatches(initialIdentity, currentIdentity)).toBe(false);
   });
 
   it("keeps export state unchanged for invalid package generation attempts", () => {
@@ -553,7 +621,7 @@ describe("V-19 submission actions", () => {
     expect(inbox.map((event) => event.badge)).toEqual(
       expect.arrayContaining(["Проверка", "Исправления", "К выгрузке"]),
     );
-    expect(inbox.every((event) => event.id.startsWith("admin-inbox-"))).toBe(true);
+    expect(inbox.every((event) => event.id.startsWith("admin-work-"))).toBe(true);
   });
 
   it("derives submit corrections only after all targeted file replacements are uploaded", () => {

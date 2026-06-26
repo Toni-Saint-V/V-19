@@ -24,8 +24,11 @@ import {
   openIssueCount,
   blockerCount,
   fixedIssueCount,
+  statusTone,
   statusLabels,
+  typeLabels,
 } from "../status";
+import { applicantCountLabel, tripDates } from "../selectors";
 import {
   questionnaireProblemCount,
   questionnaireProgressForApplicant,
@@ -49,7 +52,6 @@ import {
   targetElementId,
   targetForIssue,
   workspaceTabs,
-  type ReadinessQueueItem,
   type WorkspaceTarget,
 } from "../workspaceModel";
 import type {
@@ -66,14 +68,12 @@ import type {
   Submission,
   SubmissionAction,
   SubmissionFileStatus,
-  SubmissionFileType,
 } from "../types";
-import type { SubmissionNextStepAction } from "../submissionNextStepEngine";
-import { AiHelperSurfacePanel } from "./AiHelperSurfacePanel";
 import { BbAiPanel } from "./BbAiPanel";
 import { EmptyState } from "./Primitives";
 
 export function SubmissionDrawer({
+  actionError = "",
   activeTab,
   fileUploadBusy = false,
   initialTarget = null,
@@ -100,6 +100,7 @@ export function SubmissionDrawer({
   submission,
   surface,
 }: {
+  actionError?: string;
   activeTab: DrawerTab;
   fileUploadBusy?: boolean;
   initialTarget?: WorkspaceTarget | null;
@@ -241,20 +242,9 @@ export function SubmissionDrawer({
     if (first) openTarget(first.target);
   }
 
-  function handleAiPrimaryAction(action: SubmissionNextStepAction) {
-    if (action.disabled) return;
-    if (action.target) {
-      openTarget(action.target);
-      return;
-    }
-    if (action.submissionAction) {
-      onAction(action.submissionAction);
-    }
-  }
-
   return (
     <SheetFrame
-      className="submission-drawer"
+      className="submission-drawer submission-detail-drawer"
       labelledBy="drawer-title"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
@@ -266,35 +256,21 @@ export function SubmissionDrawer({
         onClose();
       }}
     >
-      <header className="drawer-header drawer-topbar">
-        <div className="drawer-title-block drawer-title-sr">
+      <header className="drawer-header">
+        <div className="drawer-title-block">
           <h2 id="drawer-title">{submission.title}</h2>
-          <p>
-            {submission.id} · {statusLabels[submission.status]}
-          </p>
+          <p className="drawer-meta-line">{drawerHeaderMeta(submission)}</p>
+          <div className="drawer-chips" aria-label="Состояние подачи">
+            <Badge className={`drawer-status-chip ${statusTone[submission.status]}`}>
+              {statusLabels[submission.status]}
+              {blockerCount(submission) ? ` · ${blockerCountLabel(blockerCount(submission))}` : ""}
+            </Badge>
+            <span className="drawer-readiness-chip">
+              {submission.completeness.total}% готово
+            </span>
+          </div>
         </div>
-        <DrawerTabs
-          ariaLabel="Разделы подачи"
-          autoFocusOnValueChange={tabNavigationModeRef.current !== "target"}
-          tabs={workspaceTabs.map((tab) => ({
-            ...tab,
-            meta: drawerTabValue(submission, tab.id),
-          }))}
-          value={activeTab}
-          onValueChange={handleTabChange}
-        />
-        <div className="drawer-topbar-actions" aria-label="Действия панели">
-          {activeTab === "issues" ? (
-            <SegmentedFilter
-              ariaLabel="Режим замечаний"
-              items={[
-                { count: openIssueCount(submission), id: "issues", label: "Замечания" },
-                { id: "bb", label: "ББ" },
-              ]}
-              value={issueView}
-              onChange={setIssueView}
-            />
-          ) : null}
+        <div className="drawer-header-actions" aria-label="Действия панели">
           <button
             className="icon-button"
             type="button"
@@ -323,6 +299,14 @@ export function SubmissionDrawer({
           <button
             className="icon-button"
             type="button"
+            aria-label="Дополнительные действия недоступны"
+            disabled
+          >
+            ···
+          </button>
+          <button
+            className="icon-button"
+            type="button"
             aria-label="Закрыть подачу"
             onClick={onClose}
           >
@@ -330,6 +314,18 @@ export function SubmissionDrawer({
           </button>
         </div>
       </header>
+
+      <DrawerTabs
+        ariaLabel="Разделы подачи"
+        autoFocusOnValueChange={tabNavigationModeRef.current !== "target"}
+        tabs={workspaceTabs.map((tab) => ({
+          ...tab,
+          label: drawerTabLabel(tab.id, tab.label),
+          meta: drawerTabValue(submission, tab.id),
+        }))}
+        value={activeTab}
+        onValueChange={handleTabChange}
+      />
 
       <div
         className="drawer-body workspace-drawer-body"
@@ -341,12 +337,10 @@ export function SubmissionDrawer({
         <div className="workspace-main">
           {activeTab === "overview" ? (
             <DrawerOverview
-              onAiPrimaryAction={handleAiPrimaryAction}
+              onOpenHistory={() => handleTabChange("history")}
               onOpenTarget={openTarget}
               primaryAction={primaryAction}
-              role={role}
               submission={submission}
-              surface={surface}
             />
           ) : null}
           {activeTab === "applicants" ? (
@@ -372,7 +366,6 @@ export function SubmissionDrawer({
               onReviewVisaApplicationPdf={onReviewVisaApplicationPdf}
               onUploadFile={onUploadFile}
               passportExtractionEnabled={passportExtractionEnabled}
-              pendingTarget={pendingTarget}
               requireSelectedFile={requireSelectedFile}
               role={role}
               submission={submission}
@@ -385,6 +378,7 @@ export function SubmissionDrawer({
               onOpenTarget={openTarget}
               onRunAiReview={onRunAiReview}
               view={issueView}
+              onViewChange={setIssueView}
               role={role}
               submission={submission}
               surface={surface}
@@ -406,10 +400,11 @@ export function SubmissionDrawer({
       ) : null}
 
       <footer className="drawer-footer">
-        <span>
-          {issueComposerOpen
-            ? "Сначала создайте или отмените новое замечание"
-            : footerHint}
+        <span role={submissionActionErrorRole(actionError)}>
+          {actionError ||
+            (issueComposerOpen
+              ? "Сначала создайте или отмените новое замечание"
+              : footerHint)}
         </span>
         {!issueComposerOpen && firstActionableQueueItem(submission) ? (
           <Button variant="secondary" onClick={openFirstProblem}>
@@ -431,6 +426,10 @@ export function SubmissionDrawer({
       </footer>
     </SheetFrame>
   );
+}
+
+function submissionActionErrorRole(actionError: string): "alert" | undefined {
+  return actionError ? "alert" : undefined;
 }
 
 function IssueComposer({
@@ -650,129 +649,104 @@ function DrawerApplicants({
   onOpenTarget: (target: WorkspaceTarget) => void;
   submission: Submission;
 }) {
-  const applicantsWithIssues = submission.applicants.filter((applicant) =>
-    submission.issues.some(
-      (issue) => issue.status === "open" && issue.target.applicantId === applicant.id,
-    ),
-  );
-  const [filter, setFilter] = useState<ApplicantFilter>(() =>
-    applicantsWithIssues.length ? "issues" : "all",
-  );
-  const visibleApplicants =
-    filter === "issues" && applicantsWithIssues.length
-      ? applicantsWithIssues
-      : submission.applicants;
-
-  useEffect(() => {
-    setFilter(applicantsWithIssues.length ? "issues" : "all");
-  }, [applicantsWithIssues.length, submission.id]);
-
   return (
     <section className="drawer-section">
-      <DrawerSectionHeader
-        title="Состояние по каждому человеку"
-        action={
-          <SegmentedFilter
-            ariaLabel="Фильтр заявителей"
-            items={[
-              { count: applicantsWithIssues.length, id: "issues", label: "Проблемы" },
-              { count: submission.applicants.length, id: "all", label: "Все" },
-            ]}
-            value={filter}
-            onChange={setFilter}
-          />
-        }
-      />
-      <div className="drawer-list applicant-work-list" aria-label="Заявители в подаче">
-        {visibleApplicants.map((applicant) => {
-          const openIssues = submission.issues.filter(
-            (issue) =>
-              issue.status === "open" && issue.target.applicantId === applicant.id,
-          );
-          const blockerTotal = openIssues.filter(
-            (issue) => issue.severity === "blocker",
-          ).length;
-          const fileIssue = openIssues.find((issue) => issue.target.fileType);
-          const firstIncompleteSection =
-            applicant.sections.find((section) => section.status !== "complete") ??
-            applicant.sections[0];
-          const questionnaireTarget: WorkspaceTarget = {
-            applicantId: applicant.id,
-            section: firstIncompleteSection?.title,
-            tab: "questionnaire",
-          };
-          const filesTarget: WorkspaceTarget | null = fileIssue?.target.fileType
-            ? {
-                applicantId: applicant.id,
-                fileType: fileIssue.target.fileType,
-                tab: "files",
-              }
-            : null;
-          const percent = questionnaireProgressForApplicant(applicant);
-          const visualState = applicantVisualState(submission, applicant);
+      <div className="applicant-matrix" aria-label="Заявители в подаче">
+        <div className="applicant-matrix-head" aria-hidden="true">
+          <span>Заявитель</span>
+          <span>Готовность</span>
+          <span>Состояние</span>
+        </div>
+        {submission.applicants.length ? (
+          submission.applicants.map((applicant) => {
+            const applicantIssues = submission.issues.filter(
+              (issue) =>
+                issue.status !== "closed_by_admin" &&
+                issue.target.applicantId === applicant.id,
+            );
+            const firstIssue = applicantIssues[0];
+            const firstIncompleteSection =
+              applicant.sections.find((section) => section.status !== "complete") ??
+              applicant.sections[0];
+            const questionnaireTarget: WorkspaceTarget = {
+              applicantId: applicant.id,
+              section: firstIssue?.target.section ?? firstIncompleteSection?.title,
+              field: firstIssue?.target.field,
+              tab: "questionnaire",
+            };
+            const files = submission.files.filter(
+              (file) => file.applicantId === applicant.id,
+            );
+            const readyFiles = files.filter(
+              (file) =>
+                file.status !== "missing" && file.status !== "needs_replacement",
+            ).length;
+            const percent = questionnaireProgressForApplicant(applicant);
+            const visualState = applicantVisualState(submission, applicant);
 
-          return (
-            <CardComponent
-              as="article"
-              aria-label={`${applicant.fullName}: ${percent}%, ${
-                blockerTotal
-                  ? blockerCountLabel(blockerTotal)
-                  : openIssues.length
-                    ? issueCountLabel(openIssues.length)
-                    : "без замечаний"
-              }`}
-              className={`applicant-work-card ${visualState.tone}`}
-              key={applicant.id}
-            >
-              <div className="applicant-work-main">
-                <div>
-                  <strong>{applicant.fullName}</strong>
-                  <p>{applicantRoleLabel(applicant.role)}</p>
-                </div>
-              </div>
-              <div className="applicant-work-tags">
-                <Badge className="visa-tag visa-tag-muted">{percent}%</Badge>
-                {blockerTotal ? (
-                  <Badge className="visa-tag visa-tag-danger">
-                    {blockerCountLabel(blockerTotal)}
-                  </Badge>
-                ) : null}
-              </div>
-              <div className="applicant-work-actions">
-                <Button
-                  variant="secondary"
+            return (
+              <article
+                aria-label={`${applicant.fullName}: анкета ${percent}%, файлы ${readyFiles}/${files.length}, ${visualState.label}`}
+                className="applicant-matrix-row"
+                key={applicant.id}
+              >
+                <button
+                  className="applicant-identity"
+                  type="button"
                   onClick={() => onOpenTarget(questionnaireTarget)}
                 >
-                  Анкета
-                </Button>
-                {filesTarget ? (
-                  <Button variant="secondary" onClick={() => onOpenTarget(filesTarget)}>
-                    Файл
-                  </Button>
-                ) : null}
-              </div>
-            </CardComponent>
-          );
-        })}
+                  <strong>{applicant.fullName}</strong>
+                  <span>{applicantRoleLabel(applicant.role)} · {applicantPassportHint(applicant)}</span>
+                </button>
+                <div className="applicant-readiness">
+                  <div className="readiness-top">
+                    <span>Анкета {percent}%</span>
+                    <Badge className={readyFiles === files.length ? "visa-tag visa-tag-ready" : "visa-tag visa-tag-attention"}>
+                      Файлы {readyFiles}/{files.length}
+                    </Badge>
+                  </div>
+                  <div className="progress" aria-hidden="true">
+                    <span style={{ width: `${Math.min(percent, 100)}%` }} />
+                  </div>
+                </div>
+                <div className="applicant-result">
+                  {applicantIssues.length ? (
+                    <Button
+                      className={`compact-button ${visualState.tone}`}
+                      variant="secondary"
+                      onClick={() =>
+                        firstIssue
+                          ? onOpenTarget(targetForIssue(firstIssue))
+                          : onOpenTarget(questionnaireTarget)
+                      }
+                    >
+                      {issueCountLabel(applicantIssues.length)}
+                    </Button>
+                  ) : (
+                    <Badge className="visa-tag visa-tag-ready">Готово</Badge>
+                  )}
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <EmptyState text="В подаче пока нет заявителей." />
+        )}
       </div>
     </section>
   );
 }
 
 function DrawerOverview({
-  onAiPrimaryAction,
+  onOpenHistory,
   onOpenTarget,
   primaryAction,
-  role,
   submission,
-  surface,
 }: {
-  onAiPrimaryAction: (action: SubmissionNextStepAction) => void;
+  onOpenHistory: () => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
   primaryAction: ActionDecision;
-  role: Role;
   submission: Submission;
-  surface: "agent" | "review" | "export";
 }) {
   const blockers = blockerCount(submission);
   const openIssues = openIssueCount(submission);
@@ -782,347 +756,140 @@ function DrawerOverview({
   const queue = buildReadinessQueue(submission).filter(
     (item) => !(item.type === "admin_blocker" && item.status === "open"),
   );
-  const openIssueList = submission.issues.filter((issue) => issue.status === "open");
   const fixedIssueList = submission.issues.filter(
     (issue) => issue.status === "fixed_by_agent",
   );
-  const [focus, setFocus] = useState<OverviewFocus>(() =>
-    openIssueList.length ? "issues" : "queue",
-  );
-
-  useEffect(() => {
-    setFocus(openIssueList.length ? "issues" : "queue");
-  }, [openIssueList.length, submission.id]);
-
-  if (surface === "review") {
-    return (
-      <AdminReviewOverview
-        fileProgress={fileProgress}
-        fixedIssueList={fixedIssueList}
-        needsAttention={needsAttention}
-        nextLine={nextLine}
-        onOpenTarget={onOpenTarget}
-        openIssueList={openIssueList}
-        primaryAction={primaryAction}
-        queue={queue}
-        submission={submission}
-      />
-    );
-  }
+  const checklist = [
+    {
+      label: "Заявители и паспорта",
+      value: applicantCountLabel(submission.applicants.length),
+      tone: submission.applicants.length ? "ready" : "warning",
+    },
+    {
+      label: "Анкета и поездка",
+      value: `${submission.completeness.questionnaire}%`,
+      tone: submission.completeness.questionnaire === 100 ? "ready" : "warning",
+    },
+    {
+      label: "Обязательные файлы",
+      value: `${fileProgress.ready} из ${fileProgress.total}`,
+      tone: fileProgress.ready === fileProgress.total ? "ready" : "warning",
+    },
+    {
+      label: "Открытые замечания",
+      value: openIssues ? String(openIssues) : "Нет",
+      tone: openIssues ? "danger" : "ready",
+    },
+  ] satisfies Array<{ label: string; tone: "danger" | "ready" | "warning"; value: string }>;
+  const firstTarget = queue.find((item) => item.status !== "fixed")?.target;
 
   return (
     <section className="drawer-section drawer-overview">
-      <CardComponent
-        as="article"
-        className={`decision-card ${needsAttention ? "needs-attention" : ""}`}
-      >
-        <div>
-          <p className="kicker">Решение</p>
-          <h3>{decisionTitle(submission, primaryAction)}</h3>
-          <p>{nextLine}</p>
-        </div>
-        <Badge
-          className={`decision-card-badge ${
-            needsAttention ? "is-attention" : "is-clear"
-          }`}
-        >
-          {decisionBadge(submission, primaryAction)}
-        </Badge>
-        <dl>
-          <div>
-            <dt>Статус</dt>
-            <dd>{reviewStageLabel(submission.status)}</dd>
-          </div>
-          <div>
-            <dt>Пакет</dt>
-            <dd>
-              {fileProgress.ready} из {fileProgress.total}
-            </dd>
-          </div>
-          <div>
-            <dt>Открыто</dt>
-            <dd>{openIssues ? issueCountLabel(openIssues) : "Нет замечаний"}</dd>
-          </div>
-          <div>
-            <dt>Анкета</dt>
-            <dd>{submission.completeness.questionnaire}%</dd>
-          </div>
-          <div>
-            <dt>Файлы</dt>
-            <dd>{submission.completeness.files}%</dd>
-          </div>
-          <div>
-            <dt>Действие</dt>
-            <dd>{primaryAction.label}</dd>
-          </div>
-        </dl>
-      </CardComponent>
-      <AiHelperSurfacePanel
-        compact
-        onPrimaryAction={onAiPrimaryAction}
-        role={role}
-        submission={submission}
-        surface={surface}
-      />
-      <section className="workspace-queue" aria-label="Фокус подачи">
-        <DrawerSectionHeader
-          title={focus === "issues" ? "Открытые препятствия" : "Очередь"}
-          action={
-            <SegmentedFilter
-              ariaLabel="Фокус подачи"
-              items={[
-                { count: openIssueList.length, id: "issues", label: "Замечания" },
-                { count: queue.length, id: "queue", label: "Очередь" },
-              ]}
-              value={focus}
-              onChange={setFocus}
+      <div className="drawer-overview-grid">
+        <div className="drawer-overview-main">
+          <CardComponent
+            as="article"
+            className={`decision-card ${needsAttention ? "needs-attention" : ""}`}
+          >
+            <div>
+              <p className="kicker">Состояние подачи</p>
+              <h3>{decisionTitle(submission, primaryAction)}</h3>
+              <p>
+                {typeLabels[submission.type]} · {applicantCountLabel(submission.applicants.length)}.{" "}
+                {submission.city} · {tripDates(submission)}.
+              </p>
+            </div>
+            <Badge
+              className={`decision-card-badge ${
+                needsAttention ? "is-attention" : "is-clear"
+              }`}
+            >
+              {decisionBadge(submission, primaryAction)}
+            </Badge>
+            <dl>
+              <div>
+                <dt>Ответственный</dt>
+                <dd>Агент подачи</dd>
+              </div>
+              <div>
+                <dt>Проверяющий</dt>
+                <dd>Текущий администратор</dd>
+              </div>
+              <div>
+                <dt>Категория</dt>
+                <dd>Туризм</dd>
+              </div>
+              <div>
+                <dt>ID</dt>
+                <dd>{submission.id}</dd>
+              </div>
+            </dl>
+          </CardComponent>
+
+          <CardComponent as="section" className="drawer-checklist">
+            <DrawerSectionHeader
+              title="Контрольный список"
+              badge={<span className="drawer-muted">рабочие условия</span>}
             />
-          }
-        />
-        {focus === "issues" ? (
-          <div className="compact-issue-list">
-            {openIssueList.length ? (
-              openIssueList.map((issue) => (
+            <div className="checklist">
+              {checklist.map((item) => (
+                <div className={`check-row ${item.tone}`} key={item.label}>
+                  <span className={`check-status ${item.tone}`} aria-hidden="true" />
+                  <strong>{item.label}</strong>
+                  <span>{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardComponent>
+        </div>
+
+        <aside className="drawer-overview-context" aria-label="Контекст подачи">
+          <CardComponent as="section" className="drawer-action-card">
+            <p className="kicker">Следующий шаг</p>
+            <h3>{primaryAction.label}</h3>
+            <p>{primaryAction.reason ?? nextLine}</p>
+            <Button
+              disabled={!firstTarget || primaryAction.disabled}
+              onClick={() => {
+                if (firstTarget) onOpenTarget(firstTarget);
+              }}
+            >
+              Перейти
+            </Button>
+          </CardComponent>
+          <CardComponent as="section" className="drawer-recent-card">
+            <DrawerSectionHeader title="Последние изменения" />
+            <div className="history mini">
+              {submission.history.slice(0, 2).map((event) => (
+                <article className="history-event" key={event.id}>
+                  <strong>{event.text}</strong>
+                  <span>{event.at}</span>
+                  {event.detail ? <p>{event.detail}</p> : null}
+                </article>
+              ))}
+              {!submission.history.length ? (
+                <EmptyState text="История пока пуста." />
+              ) : null}
+            </div>
+            <Button variant="ghost" onClick={onOpenHistory}>
+              Открыть историю
+            </Button>
+          </CardComponent>
+          {fixedIssueList.length ? (
+            <CardComponent as="section" className="drawer-fixed-card">
+              <DrawerSectionHeader title="Исправления ждут проверки" />
+              {fixedIssueList.slice(0, 3).map((issue) => (
                 <CompactIssueRow
                   issue={issue}
                   key={issue.id}
                   onOpenTarget={onOpenTarget}
                 />
-              ))
-            ) : (
-              <EmptyState text="Открытых замечаний нет." />
-            )}
-          </div>
-        ) : (
-          <div className="workspace-queue-list">
-            {queue.length ? (
-              queue.map((item) => (
-                <QueueItemCard item={item} key={item.id} onOpenTarget={onOpenTarget} />
-              ))
-            ) : (
-              <EmptyState text="Активных шагов нет." />
-            )}
-          </div>
-        )}
-      </section>
-    </section>
-  );
-}
-
-function AdminReviewOverview({
-  fileProgress,
-  fixedIssueList,
-  needsAttention,
-  nextLine,
-  onOpenTarget,
-  openIssueList,
-  primaryAction,
-  queue,
-  submission,
-}: {
-  fileProgress: { ready: number; total: number };
-  fixedIssueList: Issue[];
-  needsAttention: boolean;
-  nextLine: string;
-  onOpenTarget: (target: WorkspaceTarget) => void;
-  openIssueList: Issue[];
-  primaryAction: ActionDecision;
-  queue: ReadinessQueueItem[];
-  submission: Submission;
-}) {
-  const nextQueueItems = queue.slice(0, 4);
-  const questionnaireTarget = reviewQuestionnaireTarget(submission, queue);
-  const fileTarget = reviewFileTarget(submission, queue);
-  const evidenceReady = submission.completeness.total >= 100 && fileProgress.ready === fileProgress.total;
-
-  return (
-    <section className="drawer-section admin-review-overview">
-      <aside className="admin-review-spine" aria-label="Карта проверки">
-        <div>
-          <p className="kicker">Карта</p>
-          <strong>{submission.id}</strong>
-          <span>{reviewStageLabel(submission.status)}</span>
-        </div>
-        <ol>
-          <li className={openIssueList.length ? "is-alert" : "is-clear"}>
-            <span>01</span>
-            <strong>Блокеры</strong>
-            <em>{openIssueList.length ? `${openIssueList.length} открыто` : "чисто"}</em>
-          </li>
-          <li className={evidenceReady ? "is-clear" : "is-alert"}>
-            <span>02</span>
-            <strong>Доказательства</strong>
-            <em>{fileProgress.ready}/{fileProgress.total} файлов</em>
-          </li>
-          <li className={primaryAction.disabled ? "is-alert" : "is-clear"}>
-            <span>03</span>
-            <strong>Решение</strong>
-            <em>{primaryAction.label}</em>
-          </li>
-        </ol>
-      </aside>
-
-      <div className="admin-review-board">
-        <CardComponent
-          as="article"
-          className={`admin-review-command ${needsAttention ? "needs-attention" : ""}`}
-        >
-          <div className="admin-review-command-copy">
-            <p className="kicker">Решение администратора</p>
-            <h3>{decisionTitle(submission, primaryAction)}</h3>
-            <p>{nextLine}</p>
-          </div>
-          <Badge
-            className={`decision-card-badge ${
-              needsAttention ? "is-attention" : "is-clear"
-            }`}
-          >
-            {decisionBadge(submission, primaryAction)}
-          </Badge>
-          <dl className="admin-review-command-metrics">
-            <div>
-              <dt>Блокеры</dt>
-              <dd>{openIssueList.length ? `${openIssueList.length} открыто` : "нет"}</dd>
-            </div>
-            <div>
-              <dt>Доказательства</dt>
-              <dd>
-                {fileProgress.ready}/{fileProgress.total}
-              </dd>
-            </div>
-            <div>
-              <dt>Действие</dt>
-              <dd>{primaryAction.label}</dd>
-            </div>
-          </dl>
-        </CardComponent>
-
-        <div className="admin-review-workspace">
-          <section className="admin-review-lane is-primary" aria-label="Что проверить">
-            <DrawerSectionHeader
-              title={openIssueList.length ? "Препятствия" : "Следующая проверка"}
-              badge={
-                <Badge className={openIssueList.length ? "visa-tag-danger" : "visa-tag-muted"}>
-                  {openIssueList.length || nextQueueItems.length}
-                </Badge>
-              }
-            />
-            {openIssueList.length ? (
-              <div className="compact-issue-list">
-                {openIssueList.map((issue) => (
-                  <CompactIssueRow
-                    issue={issue}
-                    key={issue.id}
-                    onOpenTarget={onOpenTarget}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="workspace-queue-list">
-                {nextQueueItems.length ? (
-                  nextQueueItems.map((item) => (
-                    <QueueItemCard item={item} key={item.id} onOpenTarget={onOpenTarget} />
-                  ))
-                ) : (
-                  <div className="admin-review-clear-state">
-                    <strong>Активных препятствий нет</strong>
-                    <p>Проверьте доказательства справа и выберите итоговое действие.</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          <section className="admin-review-lane" aria-label="Доказательства">
-            <DrawerSectionHeader title="Доказательства" />
-            <div className="admin-review-evidence-grid">
-              <ReviewEvidenceTile
-                actionLabel={`Открыть анкету: ${submission.title}`}
-                ctaLabel="Анкета"
-                detail={`${submission.completeness.questionnaire}% заполнено`}
-                label="Анкета"
-                value={`${submission.applicants.length} заявит.`}
-                onOpen={questionnaireTarget ? () => onOpenTarget(questionnaireTarget) : undefined}
-              />
-              <ReviewEvidenceTile
-                actionLabel={`Открыть файлы: ${submission.title}`}
-                ctaLabel="Файлы"
-                detail={`${submission.completeness.files}% готовность`}
-                label="Файлы"
-                value={`${fileProgress.ready}/${fileProgress.total}`}
-                onOpen={fileTarget ? () => onOpenTarget(fileTarget) : undefined}
-              />
-              <ReviewEvidenceTile
-                actionLabel={`Проверить исправления: ${submission.title}`}
-                ctaLabel="Проверить"
-                detail={fixedIssueList.length ? "Есть исправления агента" : "Нет ожидания"}
-                label="Исправления"
-                value={String(fixedIssueList.length)}
-                onOpen={
-                  fixedIssueList[0]
-                    ? () => onOpenTarget(targetForIssue(fixedIssueList[0]))
-                    : undefined
-                }
-              />
-            </div>
-            <div className="admin-review-fixed-list">
-              {fixedIssueList.slice(0, 3).map((issue) => (
-                <article className="admin-review-fixed-row" key={issue.id}>
-                  <div>
-                    <strong>{drawerIssueTitle(issue)}</strong>
-                    <p>Исправлено агентом · {issue.target.applicantName}</p>
-                  </div>
-                  <Button
-                    aria-label={`Проверить исправление: ${drawerIssueTitle(issue)}`}
-                    className="compact-button"
-                    variant="secondary"
-                    onClick={() => onOpenTarget(targetForIssue(issue))}
-                  >
-                    Проверить
-                  </Button>
-                </article>
               ))}
-            </div>
-          </section>
-        </div>
+            </CardComponent>
+          ) : null}
+        </aside>
       </div>
     </section>
-  );
-}
-
-function ReviewEvidenceTile({
-  actionLabel,
-  ctaLabel = "Открыть",
-  detail,
-  label,
-  onOpen,
-  value,
-}: {
-  actionLabel?: string;
-  ctaLabel?: string;
-  detail: string;
-  label: string;
-  onOpen?: () => void;
-  value: string;
-}) {
-  return (
-    <article className="admin-review-evidence-tile">
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <p>{detail}</p>
-      </div>
-      {onOpen ? (
-        <Button
-          aria-label={actionLabel ?? `Открыть: ${label}`}
-          className="compact-button"
-          variant="secondary"
-          onClick={onOpen}
-        >
-          {ctaLabel}
-        </Button>
-      ) : null}
-    </article>
   );
 }
 
@@ -1140,8 +907,11 @@ function CompactIssueRow({
         <p>{drawerIssueSummary(issue)}</p>
       </div>
       <IssueCategoryTag issue={issue} />
+      <Badge className={issueStatusPillClass(issue.status)}>
+        {issueStatusLabel(issue.status)}
+      </Badge>
       <Button
-        aria-label="Открыть место исправления"
+        aria-label={`Открыть место исправления: ${drawerIssueTitle(issue)}`}
         className="compact-button"
         variant="secondary"
         onClick={() => onOpenTarget(targetForIssue(issue))}
@@ -1150,38 +920,6 @@ function CompactIssueRow({
       </Button>
     </CardComponent>
   );
-}
-
-function QueueItemCard({
-  item,
-  onOpenTarget,
-}: {
-  item: ReadinessQueueItem;
-  onOpenTarget: (target: WorkspaceTarget) => void;
-}) {
-  return (
-    <CardComponent as="article" className={`workspace-queue-item ${item.tone}`}>
-      <div>
-        <strong>{item.title}</strong>
-        <p>{item.body}</p>
-      </div>
-      <Badge className={queueBadgeClass(item)}>{queueSourceLabel(item)}</Badge>
-      <Button
-        aria-label={item.actionLabel}
-        className="compact-button"
-        variant="secondary"
-        onClick={() => onOpenTarget(item.target)}
-      >
-        {queueActionLabel(item.actionLabel)}
-      </Button>
-    </CardComponent>
-  );
-}
-
-function queueActionLabel(label: string) {
-  if (label === "Открыть место исправления") return "Перейти";
-  if (label === "Открыть раздел") return "Раздел";
-  return label;
 }
 
 function DrawerQuestionnaire({
@@ -1741,15 +1479,6 @@ function PassportExtractionReviewPanel({
   );
 }
 
-function reviewStageLabel(status: Submission["status"]) {
-  if (status === "submitted_for_review") return "Внутренняя проверка";
-  if (status === "requires_action" || status === "returned") return "Нужны исправления";
-  if (status === "corrections_received") return "Исправления получены";
-  if (status === "ready_for_export") return "Экспортный пакет готов";
-  if (status === "exported") return "Архив выгрузки";
-  return statusLabels[status];
-}
-
 function questionnaireSectionKey(applicantId: string, sectionId: string) {
   return `${applicantId}:${sectionId}`;
 }
@@ -1795,7 +1524,6 @@ function DrawerFiles({
   onReviewVisaApplicationPdf,
   onUploadFile,
   passportExtractionEnabled = false,
-  pendingTarget,
   requireSelectedFile = false,
   role,
   submission,
@@ -1808,28 +1536,12 @@ function DrawerFiles({
   onReviewVisaApplicationPdf: (file: File) => Promise<void>;
   onUploadFile: (fileId: string, file?: File) => void;
   passportExtractionEnabled?: boolean;
-  pendingTarget: WorkspaceTarget | null;
   requireSelectedFile?: boolean;
   role: Role;
   submission: Submission;
 }) {
   const progress = fileReadyCount(submission);
   const canEditFiles = canEditSubmissionContent(submission, role);
-  const initialCategory = initialFileCategory(submission);
-  const [activeCategory, setActiveCategory] = useState<FileCategoryId>(
-    () => initialCategory,
-  );
-  const activeCategoryConfig =
-    fileCategoryConfigs.find((category) => category.id === activeCategory) ??
-    fileCategoryConfigs[0];
-  const fileTypes = activeCategoryConfig.types;
-  const categoryProgress = fileCategoryProgress(submission, activeCategoryConfig);
-  const categoryHasIssue = submission.issues.some(
-    (issue) =>
-      issue.status === "open" &&
-      issue.target.fileType &&
-      activeCategoryConfig.types.includes(issue.target.fileType),
-  );
   const [pdfReviewBusy, setPdfReviewBusy] = useState(false);
   const [pdfReviewError, setPdfReviewError] = useState("");
   const pdfReviewAvailable = submission.status === "exported";
@@ -1858,21 +1570,10 @@ function DrawerFiles({
     }
   }
 
-  useEffect(() => {
-    setActiveCategory(initialCategory);
-  }, [initialCategory, submission.id]);
-
-  useLayoutEffect(() => {
-    if (pendingTarget?.tab !== "files") return;
-
-    const category = fileCategoryForType(pendingTarget.fileType);
-    if (category) setActiveCategory(category.id);
-  }, [pendingTarget]);
-
   return (
     <section className="drawer-section">
       <DrawerSectionHeader
-        title="Паспорт, фото и селфи"
+        title="Файлы подачи"
         badge={
           <Badge className="visa-tag visa-tag-muted">
             {progress.ready}/{progress.total}
@@ -1893,126 +1594,71 @@ function DrawerFiles({
           onReview={handleVisaApplicationPdf}
         />
       ) : null}
-      <div
-        className="document-category-tabs"
-        role="group"
-        aria-label="Категории документов"
-      >
-        {fileCategoryConfigs.map((category) => {
-          const categoryStats = fileCategoryProgress(submission, category);
-          const hasIssue = submission.issues.some(
-            (issue) =>
-              issue.status === "open" &&
-              issue.target.fileType &&
-              category.types.includes(issue.target.fileType),
-          );
-
-          return (
-            <Button
-              aria-pressed={activeCategory === category.id}
-              className={activeCategory === category.id ? "is-active" : ""}
-              key={category.id}
-              variant="plain"
-              onClick={() => setActiveCategory(category.id)}
-            >
-              <span>{category.label}</span>
-              <em>
-                {categoryStats.ready}/{categoryStats.total}
-              </em>
-              {hasIssue ? <i aria-label="Есть замечание" /> : null}
-            </Button>
-          );
-        })}
-      </div>
-      <DrawerSectionHeader
-        title={activeCategoryConfig.title}
-        badge={
-          <Badge
-            className={
-              categoryHasIssue
-                ? "visa-tag visa-tag-danger"
-                : categoryProgress.ready === categoryProgress.total
-                  ? "visa-tag visa-tag-ready"
-                  : "visa-tag visa-tag-attention"
-            }
-          >
-            {categoryHasIssue
-              ? "Есть замечание"
-              : `${categoryProgress.ready}/${categoryProgress.total}`}
-          </Badge>
-        }
-      />
-      <div className="drawer-list media-file-list" aria-label="Файлы подачи">
+      <div className="file-matrix" aria-label="Файлы подачи">
         <div className="media-file-head" aria-hidden="true">
-          <span>Заявитель</span>
-          <span>Статус</span>
-          <span>Действие</span>
+          <span>Файл</span>
+          <span>Владелец</span>
+          <span>Состояние</span>
         </div>
-        {submission.applicants.flatMap((applicant) =>
-          fileTypes.map((type) => {
-            const file = submission.files.find(
-              (item) => item.applicantId === applicant.id && item.type === type,
+        {submission.files.length ? (
+          submission.files.map((file) => {
+            const applicant =
+              submission.applicants.find((item) => item.id === file.applicantId) ??
+              submission.applicants[0];
+            const issue = submission.issues.find(
+              (item) =>
+                item.status !== "closed_by_admin" &&
+                (item.id === file.linkedIssueId ||
+                  (item.target.applicantId === file.applicantId &&
+                    item.target.fileType === file.type)),
             );
-            const issue = file
-              ? submission.issues.find(
-                  (item) =>
-                    item.id === file.linkedIssueId && item.status !== "closed_by_admin",
-                )
-              : undefined;
             const canUploadFile =
-              Boolean(file) &&
               canEditFiles &&
-              (file?.status === "missing" || file?.status === "needs_replacement");
-            const uploadDisabled = fileUploadBusy || !file;
-            const extractionState = applicant.passportExtraction;
-            const hasLocalPassportFile = file
-              ? localPassportFileIds.includes(file.id)
-              : false;
+              (file.status === "missing" || file.status === "needs_replacement");
+            const uploadDisabled = fileUploadBusy;
+            const extractionState = applicant?.passportExtraction;
+            const hasLocalPassportFile = localPassportFileIds.includes(file.id);
             const canExtractPassport =
               passportExtractionEnabled &&
               canEditFiles &&
-              Boolean(file) &&
-              file?.type === "passport_scan" &&
+              file.type === "passport_scan" &&
               (Boolean(file.storagePath) || hasLocalPassportFile) &&
               (file.status === "uploaded" ||
                 file.status === "pending_review" ||
                 file.status === "accepted") &&
+              Boolean(applicant) &&
               canStartPassportExtraction(applicant);
-            const inputId = file ? `file-upload-${submission.id}-${file.id}` : "";
-            const uploadLabel = `${file?.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileLabel(type)}: ${applicant.fullName}`;
-
-            const rowId = file?.id ?? `${applicant.id}-${type}`;
+            const inputId = `file-upload-${submission.id}-${file.id}`;
+            const uploadLabel = `${file.status === "needs_replacement" ? "Заменить" : "Загрузить"} ${fileLabel(file.type)}: ${applicant?.fullName ?? "заявитель"}`;
 
             return (
-              <CardComponent
-                as="article"
-                aria-label={`${applicant.fullName}: ${fileLabel(type)}, ${fileStatusLabel(file)}`}
+              <article
+                aria-label={`${fileLabel(file.type)}: ${applicant?.fullName ?? "заявитель"}, ${fileStatusLabel(file)}`}
                 className={`media-file-row ${issue ? "has-issue" : ""} ${
-                  file?.status ?? "missing"
+                  file.status
                 }`}
                 id={targetElementId({
-                  applicantId: applicant.id,
-                  fileType: type,
+                  applicantId: file.applicantId,
+                  fileType: file.type,
                   tab: "files",
                 })}
-                key={rowId}
+                key={file.id}
                 tabIndex={-1}
               >
                 <div className="media-file-main">
-                  <strong>{applicant.fullName}</strong>
-                  <p>{mediaFileRowSubtitle(applicant, issue)}</p>
+                  <strong>{fileLabel(file.type)}</strong>
+                  <p>{fileRequirementCopy(file, issue)}</p>
+                </div>
+                <div className="media-file-owner">
+                  <span>{applicant?.fullName ?? "Заявитель"}</span>
                 </div>
                 <div className="media-file-status">
-                  <Badge
-                    className={
-                      file ? fileStatusPillClass(file.status) : "status-pill muted"
-                    }
-                  >
+                  <Badge className={fileStatusPillClass(file.status)}>
                     {fileStatusLabel(file)}
                   </Badge>
                 </div>
                 <div className="media-file-actions">
-                  {canUploadFile && file ? (
+                  {canUploadFile ? (
                     requireSelectedFile ? (
                       <>
                         <input
@@ -2070,7 +1716,7 @@ function DrawerFiles({
                       </Button>
                     )
                   ) : null}
-                  {canExtractPassport && file ? (
+                  {canExtractPassport ? (
                     <Button
                       className="compact-button"
                       variant="secondary"
@@ -2081,13 +1727,20 @@ function DrawerFiles({
                         : "Распознать"}
                     </Button>
                   ) : extractionState?.status === "extracting" &&
-                    file?.type === "passport_scan" ? (
+                    file.type === "passport_scan" ? (
                     <Badge className="visa-tag">Распознавание</Badge>
                   ) : null}
+                  {issue ? (
+                    <Badge className="visa-tag visa-tag-attention">
+                      К замечанию
+                    </Badge>
+                  ) : null}
                 </div>
-              </CardComponent>
+              </article>
             );
-          }),
+          })
+        ) : (
+          <EmptyState text="Файлы для подачи пока не заведены." />
         )}
       </div>
     </section>
@@ -2315,6 +1968,7 @@ function DrawerIssues({
   onDismissAiSuggestion,
   onOpenTarget,
   onRunAiReview,
+  onViewChange,
   role,
   submission,
   surface,
@@ -2324,18 +1978,19 @@ function DrawerIssues({
   onDismissAiSuggestion: (suggestionId: string) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
   onRunAiReview: () => void;
+  onViewChange: (view: IssueView) => void;
   role: Role;
   submission: Submission;
   surface: "agent" | "review" | "export";
   view: IssueView;
 }) {
   const [expandedIssueIds, setExpandedIssueIds] = useState<Set<string>>(
-    () => new Set(),
+    () => new Set(submission.issues.map((issue) => issue.id)),
   );
 
   useEffect(() => {
-    setExpandedIssueIds(new Set());
-  }, [submission.id]);
+    setExpandedIssueIds(new Set(submission.issues.map((issue) => issue.id)));
+  }, [submission.id, submission.issues]);
 
   function toggleIssue(issueId: string) {
     setExpandedIssueIds((current) => {
@@ -2350,61 +2005,85 @@ function DrawerIssues({
     <section className="drawer-section">
       <DrawerSectionHeader
         title={view === "issues" ? "Что нужно закрыть" : "ББ-проверка"}
+        action={
+          <SegmentedFilter
+            ariaLabel="Режим замечаний"
+            items={[
+              { count: openIssueCount(submission), id: "issues", label: "Замечания" },
+              { id: "bb", label: "ББ" },
+            ]}
+            value={view}
+            onChange={onViewChange}
+          />
+        }
       />
       {view === "issues" ? (
-        <div className="drawer-list">
+        <div className="issue-list" id="workspace-issues">
           {submission.issues.length ? (
             submission.issues.map((issue) => {
               const expanded = expandedIssueIds.has(issue.id);
               const detailsId = `issue-details-${issue.id}`;
+              const target = targetForIssue(issue);
+              const isFileIssue = target.tab === "files";
 
               return (
-                <CardComponent
-                  as="article"
-                  className={`issue-row compact ${issue.severity} ${
+                <article
+                  className={`issue-card ${issue.severity} ${issue.status} ${
                     expanded ? "is-expanded" : ""
                   }`}
                   id={`workspace-issue-${issue.id}`}
                   key={issue.id}
                   tabIndex={-1}
                 >
-                  <div className="issue-row-main">
+                  <div className="issue-head">
                     <Button
+                      aria-label={drawerIssueTitle(issue)}
                       aria-controls={detailsId}
                       aria-expanded={expanded}
-                      className="issue-row-summary"
+                      className="issue-title-button"
                       variant="plain"
                       onClick={() => toggleIssue(issue.id)}
                     >
-                      <div>
-                        <strong>{drawerIssueTitle(issue)}</strong>
-                        <IssueCategoryTag issue={issue} />
+                      <div className="issue-title-copy">
+                        <strong>{issue.reason || drawerIssueTitle(issue)}</strong>
+                        <span>{issueTarget(issue)}</span>
                       </div>
-                      <p>{drawerIssueSummary(issue)}</p>
                       <span className="accordion-chevron" aria-hidden="true" />
                     </Button>
+                    <Badge className={issueStatusPillClass(issue.status)}>
+                      {issueStatusLabel(issue.status)}
+                    </Badge>
+                  </div>
+                  <div className="issue-details-grid" hidden={!expanded} id={detailsId}>
+                    <div>
+                      <span>Причина</span>
+                      <p>{drawerIssueSummary(issue)}</p>
+                    </div>
+                    <div>
+                      <span>Комментарий</span>
+                      <p>{issue.comment}</p>
+                    </div>
+                  </div>
+                  <div className="issue-foot">
+                    <Badge className={issueBadgeClass(issue.severity)}>
+                      {issueSeverityLabel(issue.severity)}
+                    </Badge>
                     {issue.status !== "closed_by_admin" ? (
                       <Button
                         aria-label={`${issue.status === "fixed_by_agent" ? "Проверить исправление" : "Открыть место исправления"}: ${drawerIssueTitle(issue)}`}
-                        className="issue-row-target"
+                        className="compact-button"
                         variant="secondary"
-                        onClick={() => onOpenTarget(targetForIssue(issue))}
+                        onClick={() => onOpenTarget(target)}
                       >
-                        {issue.status === "fixed_by_agent" ? "Проверить" : "Перейти"}
+                        {issue.status === "fixed_by_agent" ? "Проверить" : isFileIssue ? "Открыть файл" : "Открыть точное поле"}
                       </Button>
-                    ) : null}
+                    ) : (
+                      <Button className="compact-button" disabled variant="secondary">
+                        Завершено
+                      </Button>
+                    )}
                   </div>
-                  <div className="issue-row-details" hidden={!expanded} id={detailsId}>
-                    <p>{issue.comment}</p>
-                    <div className="issue-row-meta">
-                      <Badge className={issueBadgeClass(issue.severity)}>
-                        {issueSeverityLabel(issue.severity)}
-                      </Badge>
-                      <span>{issueStatusLabel(issue.status)}</span>
-                      <span>{issueTarget(issue)}</span>
-                    </div>
-                  </div>
-                </CardComponent>
+                </article>
               );
             })
           ) : (
@@ -2426,10 +2105,23 @@ function DrawerIssues({
   );
 }
 
-type ApplicantFilter = "all" | "issues";
 type IssueView = "bb" | "issues";
-type OverviewFocus = "issues" | "queue";
 type HistoryFilter = "all" | "bb";
+
+function drawerHeaderMeta(submission: Submission) {
+  return [
+    submission.id,
+    submission.country,
+    submission.city,
+    typeLabels[submission.type],
+    applicantCountLabel(submission.applicants.length),
+  ].join(" · ");
+}
+
+function drawerTabLabel(tab: DrawerTab, fallback: string) {
+  if (tab === "files") return "Файлы";
+  return fallback;
+}
 
 function DrawerHistory({ submission }: { submission: Submission }) {
   const [filter, setFilter] = useState<HistoryFilter>("all");
@@ -2530,14 +2222,6 @@ function blockerCountLabel(count: number) {
   return `${count} блокеров`;
 }
 
-function toneTagClass(tone: "amber" | "blue" | "danger" | "muted" | "teal") {
-  if (tone === "teal") return "visa-tag-ready";
-  if (tone === "amber") return "visa-tag-attention";
-  if (tone === "danger") return "visa-tag-danger";
-  if (tone === "blue") return "visa-tag-info";
-  return "visa-tag-muted";
-}
-
 function applicantVisualState(
   submission: Submission,
   applicant: Applicant,
@@ -2603,80 +2287,16 @@ function drawerIssueTitle(issue: Issue) {
   const target = issue.target.fileType
     ? fileLabel(issue.target.fileType)
     : (issue.target.field ?? issue.target.section ?? "Данные");
-  return `${issue.target.applicantName} · ${target}`;
+  return `${issue.target.applicantName} · ${issueCategoryLabel(issue)} · ${target}`;
 }
 
-function mediaFileRowSubtitle(applicant: Applicant, issue?: Issue) {
+function fileRequirementCopy(file: Submission["files"][number], issue?: Issue) {
   if (issue) return drawerIssueSummary(issue);
-  return applicantRoleLabel(applicant.role);
-}
-
-function queueTone(
-  item: ReadinessQueueItem,
-): "amber" | "blue" | "danger" | "muted" | "teal" {
-  if (item.status === "fixed") return "teal";
-  if (item.tone === "danger") return "danger";
-  if (item.tone === "warning") return "amber";
-  if (item.tone === "success") return "teal";
-  return "blue";
-}
-
-function queueBadgeClass(item: ReadinessQueueItem) {
-  return `visa-tag ${toneTagClass(queueTone(item))}`;
-}
-
-type FileCategoryId = "passport" | "photo" | "selfie";
-
-type FileCategoryConfig = {
-  id: FileCategoryId;
-  label: string;
-  title: string;
-  types: SubmissionFileType[];
-};
-
-const fileCategoryConfigs: FileCategoryConfig[] = [
-  {
-    id: "passport",
-    label: "Паспорт",
-    title: "Паспорт",
-    types: ["passport_scan"],
-  },
-  {
-    id: "photo",
-    label: "Фото",
-    title: "Фото на белом фоне",
-    types: ["photo"],
-  },
-  {
-    id: "selfie",
-    label: "Селфи",
-    title: "Селфи и видео",
-    types: ["selfie", "selfie_2", "video"],
-  },
-];
-
-function initialFileCategory(submission: Submission): FileCategoryId {
-  const issueFileType = submission.issues.find(
-    (issue) => issue.status === "open" && issue.target.fileType,
-  )?.target.fileType;
-  const category = fileCategoryConfigs.find(
-    (item) => issueFileType && item.types.includes(issueFileType),
-  );
-  return category?.id ?? "passport";
-}
-
-function fileCategoryForType(type: SubmissionFileType) {
-  return fileCategoryConfigs.find((category) => category.types.includes(type));
-}
-
-function fileCategoryProgress(submission: Submission, category: FileCategoryConfig) {
-  const files = submission.files.filter((file) => category.types.includes(file.type));
-  return {
-    ready: files.filter(
-      (file) => file.status !== "missing" && file.status !== "needs_replacement",
-    ).length,
-    total: files.length,
-  };
+  if (file.type === "passport_scan") return "Разворот с персональными данными";
+  if (file.type === "photo") return "Обязательный файл";
+  if (file.type === "selfie") return "Проверка владельца документа";
+  if (file.type === "selfie_2") return "Дополнительная проверка владельца";
+  return "Проверка документа в кадре";
 }
 
 function groupHistoryEvents(events: Submission["history"]) {
@@ -2713,6 +2333,16 @@ function applicantRoleLabel(role: Submission["applicants"][number]["role"]) {
   return "Заявитель";
 }
 
+function applicantPassportHint(applicant: Applicant) {
+  const passportValue = applicant.sections
+    .flatMap((section) => section.fields)
+    .find((field) => field.id === "passport-no" || field.label.includes("паспорта"))
+    ?.value.trim();
+
+  if (!passportValue) return "паспорт не указан";
+  return `паспорт **** ${passportValue.slice(-3)}`;
+}
+
 function questionnaireLabel(
   status: Submission["applicants"][number]["questionnaireStatus"],
 ) {
@@ -2732,6 +2362,12 @@ function issueStatusLabel(status: Issue["status"]) {
   if (status === "open") return "Открыто";
   if (status === "fixed_by_agent") return "Исправлено агентом";
   return "Закрыто администратором";
+}
+
+function issueStatusPillClass(status: Issue["status"]) {
+  if (status === "open") return "visa-tag visa-tag-danger";
+  if (status === "fixed_by_agent") return "visa-tag visa-tag-attention";
+  return "visa-tag visa-tag-ready";
 }
 
 function issueTarget(issue: Issue) {
@@ -2810,46 +2446,6 @@ function firstWorkLine(submission: Submission) {
   }
 
   return nextProblem(submission);
-}
-
-function reviewQuestionnaireTarget(
-  submission: Submission,
-  queue: ReadinessQueueItem[],
-): WorkspaceTarget | null {
-  const queuedTarget = queue.find((item) => item.target.tab === "questionnaire")?.target;
-  if (queuedTarget) return queuedTarget;
-
-  const applicant = submission.applicants[0];
-  if (!applicant) return null;
-
-  const section =
-    applicant.sections.find((item) => item.status !== "complete") ?? applicant.sections[0];
-
-  return {
-    applicantId: applicant.id,
-    section: section?.title,
-    tab: "questionnaire",
-  };
-}
-
-function reviewFileTarget(
-  submission: Submission,
-  queue: ReadinessQueueItem[],
-): WorkspaceTarget | null {
-  const queuedTarget = queue.find((item) => item.target.tab === "files")?.target;
-  if (queuedTarget) return queuedTarget;
-
-  const file =
-    submission.files.find((item) => item.status === "needs_replacement") ??
-    submission.files.find((item) => item.status === "missing") ??
-    submission.files[0];
-  if (!file) return null;
-
-  return {
-    applicantId: file.applicantId,
-    fileType: file.type,
-    tab: "files",
-  };
 }
 
 function sectionIssue(
@@ -2939,11 +2535,4 @@ function aggregateVisaPdfReviewStatus(
     return "needs_review";
   }
   return "clear";
-}
-
-function queueSourceLabel(item: ReadinessQueueItem) {
-  if (item.type === "admin_blocker") return "Блокер";
-  if (item.type === "ai_suggestion") return "ИИ";
-  if (item.type === "fixed_waiting_admin") return "Проверка";
-  return "Система";
 }

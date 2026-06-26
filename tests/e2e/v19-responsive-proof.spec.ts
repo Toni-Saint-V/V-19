@@ -140,11 +140,21 @@ async function screenshot(page: Page, viewport: ViewportProof, name: string) {
   });
 }
 
+async function clickOperationalNav(page: Page, name: RegExp) {
+  const visibleButton = page.getByRole("button", { name }).first();
+
+  if ((await visibleButton.count()) > 0 && (await visibleButton.isVisible())) {
+    await visibleButton.click();
+    return;
+  }
+
+  await page.getByRole("button", { name: "Меню" }).click();
+  await page.getByRole("button", { name }).first().click();
+}
+
 async function expectSettingsReady(page: Page) {
-  await expect(
-    page.getByRole("heading", { level: 2, name: "Настройки доступа" }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Сводка по действиям")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Уведомления" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Возврат подачи" })).toBeVisible();
 }
 
 test.describe("V-19 responsive proof", () => {
@@ -164,17 +174,19 @@ test.describe("V-19 responsive proof", () => {
       await openFreshWorkspace(page);
       await expect(page.getByRole("button", { name: "Выгрузка" })).toHaveCount(0);
       await expect(page.getByRole("button", { name: /^Проверка/ })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent inbox`);
       await screenshot(page, viewport, "agent-inbox");
 
-      await page.getByRole("button", { name: "Мои действия" }).click();
+      await page.getByRole("tab", { name: /Мои действия/ }).click();
       await expect(
-        page.getByRole("heading", { level: 1, name: "Мои действия" }),
+        page.getByRole("heading", { level: 1, name: "Входящие" }),
       ).toBeVisible();
+      await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent actions`);
-      await screenshot(page, viewport, "agent-actions");
+      await screenshot(page, viewport, "agent-inbox-actions");
 
-      await page.getByRole("button", { name: "Мои подачи" }).click();
+      await clickOperationalNav(page, /^Мои подачи/);
       await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Новая подача" }).first()).toBeVisible();
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent submissions`);
@@ -194,13 +206,14 @@ test.describe("V-19 responsive proof", () => {
       await screenshot(page, viewport, "create-submission-drawer");
       await page.getByRole("button", { name: "Закрыть создание" }).click();
 
-      await page.locator('[data-submission-id="ПД-1048"]').first().click();
+      await page.locator('[data-submission-id="ПД-1048"]').first().press("Enter");
       await expectDrawerFitsViewport(page, `${viewport.label}: submission drawer`);
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: drawer`);
       await screenshot(page, viewport, "submission-drawer");
-      await page.getByRole("button", { name: "Закрыть подачу" }).click();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
 
-      await page.getByRole("button", { name: "Настройки" }).click();
+      await clickOperationalNav(page, /^Настройки/);
       await expect(
         page.getByRole("heading", { level: 1, name: "Настройки" }),
       ).toBeVisible();
@@ -209,7 +222,7 @@ test.describe("V-19 responsive proof", () => {
       await screenshot(page, viewport, "agent-settings");
 
       await openFreshWorkspace(page, {
-        heading: "Проверка",
+        heading: "Работа",
         workspaceEmail: "admin@visaflow.local",
       });
       await expect(page.getByText("Мои подачи", { exact: true })).toHaveCount(0);
@@ -217,35 +230,25 @@ test.describe("V-19 responsive proof", () => {
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
       await screenshot(page, viewport, "admin-review");
 
-      await page.getByRole("button", { name: "Входящие" }).click();
-      await expect(
-        page.getByRole("heading", { level: 1, name: "Входящие" }),
-      ).toBeVisible();
-      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin inbox`);
-      await screenshot(page, viewport, "admin-inbox");
+      await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
+      await page.getByRole("tab", { name: "События" }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "Работа" })).toBeVisible();
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin events`);
+      await screenshot(page, viewport, "admin-events");
 
-      await page.getByRole("button", { name: "Мои действия" }).click();
-      await expect(
-        page.getByRole("heading", { level: 1, name: "Мои действия" }),
-      ).toBeVisible();
-      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin actions`);
-      await screenshot(page, viewport, "admin-actions");
+      await page.getByRole("tab", { name: "Исправления" }).click();
+      await expect(page.locator(".v17-admin-work-row").first()).toBeVisible();
+      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin corrections`);
+      await screenshot(page, viewport, "admin-corrections");
 
-      await page.getByRole("button", { name: "Выгрузка" }).click();
+      await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
       const generateButton = page.getByRole("button", { name: "Сформировать Эксель" });
       await generateButton.scrollIntoViewIfNeeded();
       await expect(generateButton).toBeVisible();
       await screenshot(page, viewport, "export");
-
-      await page.getByRole("button", { name: "Настройки" }).click();
-      await expect(
-        page.getByRole("heading", { level: 1, name: "Настройки" }),
-      ).toBeVisible();
-      await expectSettingsReady(page);
-      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin settings`);
-      await screenshot(page, viewport, "admin-settings");
     }
 
     expect(problems).toEqual([]);

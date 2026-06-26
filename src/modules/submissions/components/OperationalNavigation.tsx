@@ -95,6 +95,38 @@ export function OperationalSidebar({
   );
 }
 
+export function OperationalMobileTabBar({
+  items,
+}: {
+  items: OperationalNavItem[];
+}) {
+  return (
+    <nav className="ops-mobile-tabbar" aria-label="Мобильная навигация агента">
+      {items.map((item) => (
+        <button
+          aria-current={item.active ? "page" : undefined}
+          aria-label={`${item.label}. ${item.meta}`}
+          className={`ops-mobile-tabbar-item ${item.active ? "is-active" : ""} ${
+            item.tone ? `tone-${item.tone}` : ""
+          }`}
+          disabled={item.disabled}
+          key={item.id}
+          type="button"
+          onClick={item.onClick}
+        >
+          <span className="ops-mobile-tabbar-icon" aria-hidden="true">
+            <OperationalIcon id={item.id} fallback={item.icon} />
+          </span>
+          <span className="ops-mobile-tabbar-label">{item.label}</span>
+          {typeof item.count === "number" ? (
+            <NavCount label={`${item.count}`}>{item.count}</NavCount>
+          ) : null}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {
   const common = {
     fill: "none",
