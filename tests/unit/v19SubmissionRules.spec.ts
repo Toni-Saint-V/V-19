@@ -40,6 +40,7 @@ import {
   readCockpitSnapshot,
   toCockpitDraftPersistencePayload,
 } from "../../src/modules/submissions/supabasePersistence";
+import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStorage";
 import {
   failPassportExtraction,
   finishPassportExtraction,
@@ -362,6 +363,54 @@ describe("V-19 export rules", () => {
 
   it("allows a single ready submission", () => {
     expect(getExportBlockers([byId("ПД-1056")])).toEqual([]);
+  });
+
+  it("normalizes legacy statuses before export decisions", () => {
+    const legacyReady = readyClone({
+      id: "ПД-LEGACY-READY",
+      status: "ready_for_excel" as Submission["status"],
+    });
+
+    expect(exportSummary([legacyReady])).toMatchObject({
+      canGenerate: true,
+      ready: true,
+      rowCount: 1,
+    });
+  });
+
+  it("does not let legacy media satisfy export readiness", () => {
+    const applicantId = byId("ПД-1056").applicants[0]?.id ?? "applicant-1";
+    const legacyMediaOnly = readyClone({
+      id: "ПД-LEGACY-MEDIA",
+      files: [
+        {
+          applicantId,
+          id: "legacy-photo",
+          status: "accepted",
+          type: "photo",
+        },
+        {
+          applicantId,
+          id: "legacy-photo-white",
+          status: "accepted",
+          type: "photo_white",
+        },
+        {
+          applicantId,
+          id: "legacy-video",
+          status: "accepted",
+          type: "video",
+        },
+      ],
+    });
+
+    expect(
+      exportSummary([legacyMediaOnly]).blockers.map((blocker) => blocker.reason),
+    ).toContain("В выборке есть подачи без полного канонического пакета медиа");
+    expect(exportSummary([legacyMediaOnly])).toMatchObject({
+      canGenerate: false,
+      ready: false,
+    });
   });
 
   it("blocks mixed city, date, type, and already exported packages", () => {
@@ -925,6 +974,30 @@ describe("V-19 submission actions", () => {
         uploadNonce: "2026-06-17T10:00:00.000Z:legacy",
       }),
     ).toMatch(/^v19[a-z0-9]+_video\.mp4$/);
+  });
+
+  it("rejects legacy media slots at the Supabase storage boundary", () => {
+    for (const type of ["photo", "photo_white", "video"] as const) {
+      expect(() =>
+        buildMediaStoragePath(
+          "VF-1059",
+          "app-1059-1",
+          type,
+          `v19legacy_${type}.jpg`,
+        ),
+      ).toThrow(/invalid slot type|not canonical/i);
+    }
+
+    expect(
+      buildMediaStoragePath(
+        "VF-1059",
+        "app-1059-1",
+        "selfie_2",
+        "v19canonical_selfie_2.jpg",
+      ),
+    ).toMatchObject({
+      path: "VF-1059/app-1059-1/selfie_2/v19canonical_selfie_2.jpg",
+    });
   });
 
   it("fills a draft enough to submit it for review", () => {

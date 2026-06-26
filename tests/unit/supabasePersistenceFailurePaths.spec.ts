@@ -76,7 +76,7 @@ describe("Supabase persistence failure paths", () => {
 
   test("does not overwrite an existing Storage object during media upload", async () => {
     const upload = vi.fn(async () => ({
-      data: { path: "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg" },
+      data: { path: "VF-1044/applicant-1/selfie/751234567_selfie.jpg" },
       error: null,
     }));
     supabaseMock.client = {
@@ -89,10 +89,10 @@ describe("Supabase persistence failure paths", () => {
     const target = buildMediaStoragePath(
       "VF-1044",
       "applicant-1",
-      "photo_white",
-      "751234567_photo_white.jpg",
+      "selfie",
+      "751234567_selfie.jpg",
     );
-    const file = new File(["x"], "photo.jpg", { type: "image/jpeg" });
+    const file = new File(["x"], "selfie.jpg", { type: "image/jpeg" });
 
     await expect(uploadMediaToStorage(target, file)).resolves.toEqual({
       path: target.path,
@@ -123,14 +123,14 @@ describe("Supabase persistence failure paths", () => {
     const target = buildMediaStoragePath(
       "VF-1044",
       "applicant-1",
-      "photo_white",
-      "751234567_photo_white.jpg",
+      "selfie",
+      "751234567_selfie.jpg",
     );
 
     await expect(
       uploadMediaToStorage(
         target,
-        new File(["x"], "photo.jpg", { type: "image/jpeg" }),
+        new File(["x"], "selfie.jpg", { type: "image/jpeg" }),
       ),
     ).rejects.toMatchObject({
       diagnostics: {
@@ -163,8 +163,8 @@ describe("Supabase persistence failure paths", () => {
     const target = buildMediaStoragePath(
       "VF-1044",
       "applicant-1",
-      "photo_white",
-      "751234567_photo_white.jpg",
+      "selfie",
+      "751234567_selfie.jpg",
     );
 
     await expect(deleteMediaFromStorage(target)).rejects.toMatchObject({
