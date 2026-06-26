@@ -9,7 +9,6 @@ import { tripDates } from "./selectors";
 import {
   type CanonicalSubmissionStatus,
   canonicalRequiredMediaReadiness,
-  isCanonicalFrontendMediaType,
   normalizeLegacySubmissionStatus,
 } from "./domainContract";
 import {
@@ -263,7 +262,9 @@ function inferExportState(submission: Submission): ExportState {
 function statusForExportDecision(
   submission: Submission,
 ): CanonicalSubmissionStatus | null {
-  const status = normalizeLegacySubmissionStatus(submission.status);
+  const status = normalizeLegacySubmissionStatus(submission.status, {
+    exportedAt: exportedAtForDecision(submission),
+  });
   return status.ok ? status.data : null;
 }
 
@@ -271,12 +272,18 @@ function canonicalMediaReadyForExport(submission: Submission): boolean {
   return canonicalRequiredMediaReadiness(
     {
       applicants: submission.applicants,
-      files: submission.files.filter((file) =>
-        isCanonicalFrontendMediaType(file.type),
-      ),
+      files: submission.files,
     },
     { requireAccepted: true },
   ).ok;
+}
+
+function exportedAtForDecision(submission: Submission): unknown {
+  const legacy = submission as Submission & {
+    exportedAt?: unknown;
+    exported_at?: unknown;
+  };
+  return legacy.exportedAt ?? legacy.exported_at;
 }
 
 function exportPackageContentFingerprint(
