@@ -25,6 +25,8 @@
     "verify:production-readiness": "node scripts/verify-production-readiness.mjs",
     "verify:production-packet": "node scripts/verify-production-readiness.mjs --expect-blocked",
     "verify:security": "npm audit --omit=dev",
+    "v19:e2e:lanes": "node scripts/launch-v19-parallel-e2e.mjs",
+    "v19:e2e:4": "node scripts/launch-v19-parallel-e2e.mjs --allow-dirty-source",
     "verify": "npm run typecheck && npm run lint && npm run verify:safety && npm run verify:codex-hook && npm run verify:agent-screen-system && npm run verify:v19-boundary && npm run verify:v19-ui-proof && npm run test && npm run build && npm run verify:performance",
     "verify:local-readiness": "npm run verify && npm run verify:security && npm run test:e2e",
     "verify:full": "npm run verify:local-readiness && npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet"

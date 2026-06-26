@@ -124,7 +124,7 @@ export const fileTypeLabels = {
   selfie: "Селфи",
   selfie_2: "Селфи N2",
   passport_scan: "Загранпаспорт",
-  video: "Видео 1 минута",
+  video: "Селфи N2",
 } satisfies Record<Submission["files"][number]["type"], string>;
 
 export const typeLabels = {

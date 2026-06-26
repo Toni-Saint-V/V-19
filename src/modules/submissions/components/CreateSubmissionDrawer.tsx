@@ -206,6 +206,15 @@ function passportStatusClassName(
   return "is-idle";
 }
 
+function e2ePassportNumber(fileName: string) {
+  const hash = [...fileName].reduce(
+    (current, character) => (current * 31 + character.charCodeAt(0)) % 1_000_000,
+    0,
+  );
+
+  return `900${String(hash).padStart(6, "0")}`.slice(0, 9);
+}
+
 function e2ePassportMockFields(fileName: string): PassportExtractedField[] | null {
   if (!e2ePassportMockEnabled) return null;
 
@@ -217,7 +226,6 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
     .trim()
     .split(/\s+/);
   const firstName = givenParts.join(" ") || "заявитель";
-  const base = Date.now().toString().slice(-6).padStart(6, "0");
   const values: Array<
     [PassportExtractedFieldKey, string, PassportExtractedField["confidence"]]
   > = [
@@ -229,7 +237,7 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
     ["citizenship", "Russian Federation", "medium"],
     ["gender", "Male - Мужской", "medium"],
     ["passportType", "Ordinary Passport", "medium"],
-    ["passportNumber", `900${base}`.slice(0, 9), "high"],
+    ["passportNumber", e2ePassportNumber(fileName), "high"],
     ["passportIssueCountry", "Russian Federation", "medium"],
     ["passportIssuedAt", "01.01.2020", "medium"],
     ["passportIssuePlace", "FMS 77001", "low"],

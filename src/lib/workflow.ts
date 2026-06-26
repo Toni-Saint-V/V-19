@@ -422,7 +422,7 @@ export function getGeneratedFileName(
   if (mediaType === "selfie") return `${passport}_selfie.jpg`;
   if (mediaType === "selfie_2") return `${passport}_selfie_2.jpg`;
   if (mediaType === "passport_scan") return `${passport}_passport_scan.jpg`;
-  return `${passport}_video.mp4`;
+  return `${passport}_selfie_2.jpg`;
 }
 
 function mediaReviewStatusForState(state: MediaState): MediaSlot["reviewStatus"] {

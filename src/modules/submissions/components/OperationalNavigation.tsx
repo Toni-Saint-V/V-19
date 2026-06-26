@@ -44,7 +44,8 @@ export function OperationalSidebar({
       <div className="ops-brand" aria-label={brand}>
         <img className="ops-brand-logo" src={logoUrl} alt="" aria-hidden="true" />
         <div className="ops-brand-copy">
-          <strong>VisaFlow</strong>
+          <strong>VisaFlow V-19</strong>
+          <em>Операции по Испании</em>
         </div>
       </div>
       <nav className="ops-nav" aria-label="Операционные разделы">

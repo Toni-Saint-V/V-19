@@ -40,7 +40,7 @@ export function surfaceTitle(surface: Surface) {
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка подач";
   if (surface === "settings") return "Настройки";
-  return "Выгрузка пакетов";
+  return "Выгрузка";
 }
 
 export function surfaceDescription(surface: Surface) {
@@ -60,5 +60,5 @@ export function surfaceDescription(surface: Surface) {
     return "Роль, режим данных и безопасный выход.";
   }
 
-  return "Проверка пакета перед Excel.";
+  return "Безопасный Excel preview";
 }

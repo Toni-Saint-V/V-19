@@ -121,7 +121,7 @@ export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
   if (type === "selfie") return "selfie" as const;
   if (type === "selfie_2") return "selfie_2" as const;
   if (type === "passport_scan") return "passport_scan" as const;
-  return "video" as const;
+  return "selfie_2" as const;
 }
 
 export function cockpitUploadExtensionForMimeType(
@@ -129,9 +129,8 @@ export function cockpitUploadExtensionForMimeType(
   fileType: SubmissionFileType,
 ): "jpg" | "png" | "mp4" | "pdf" {
   if (fileType === "passport_scan" && mimeType === "application/pdf") return "pdf";
-  if (fileType === "video" && mimeType === "video/mp4") return "mp4";
-  if (fileType !== "video" && mimeType === "image/png") return "png";
-  if (fileType !== "video" && mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/jpeg") return "jpg";
   throw new Error("Unsupported media MIME type for this upload slot.");
 }
 
@@ -759,7 +758,7 @@ function fileTypeName(type: SubmissionFile["type"]) {
   if (type === "selfie") return "Селфи N1";
   if (type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Загранпаспорт";
-  return "Видео";
+  return "Селфи N2";
 }
 
 function issueSnapshot(submission: Submission, input: IssueInput) {
@@ -820,7 +819,7 @@ function requiredFilesForApplicants(
   idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
-    (["passport_scan", "photo", "selfie", "video"] as const).map(
+    (["passport_scan", "photo", "selfie", "selfie_2"] as const).map(
       (type, fileIndex) => ({
         id:
           idScheme === "supabase"

@@ -29,7 +29,7 @@ import {
   type AgentTab,
   type ExportTab,
 } from "../uiTypes";
-import { EmptyState, SummaryRow } from "../components/Primitives";
+import { EmptyState } from "../components/Primitives";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
   ActionRow,
@@ -985,7 +985,7 @@ export function AgentInboxScreen({
 
 function inboxRailNewsTitle(event: InboxEvent) {
   if (event.badge === "Возвращено") return "Возврат на исправление";
-  if (event.badge === "Видео") return "Комментарий к видео";
+  if (event.badge === "Файл") return "Комментарий к файлу";
   if (event.badge === "Принято") return "Подача принята";
   return event.title;
 }
@@ -1000,7 +1000,7 @@ function InboxEventMeta({ event }: { event: InboxEvent }) {
 
 function inboxEventSourceLabel(event: InboxEvent) {
   if (event.badge === "Возвращено") return "Администратор";
-  if (event.badge === "Видео") return "Файл";
+  if (event.badge === "Файл") return "Файл";
   if (event.badge === "Принято") return "Проверка";
   if (event.badge === "Черновик") return "Система";
   return event.submission.title;
@@ -1013,15 +1013,15 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
     submissions.find((submission) =>
       ["returned", "requires_action"].includes(submission.status),
     ) ?? fallback;
-  const videoIssue =
+  const fileIssue =
     submissions.find((submission) =>
       submission.files.some((file) => file.status === "needs_replacement"),
     ) ?? returned;
-  const videoFile = videoIssue.files.find(
+  const replacementFile = fileIssue.files.find(
     (file) => file.status === "needs_replacement",
   );
-  const videoApplicant = videoIssue.applicants.find(
-    (applicant) => applicant.id === videoFile?.applicantId,
+  const replacementApplicant = fileIssue.applicants.find(
+    (applicant) => applicant.id === replacementFile?.applicantId,
   );
   const accepted =
     submissions.find((submission) => submission.status === "ready_for_export") ??
@@ -1048,15 +1048,15 @@ function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
     },
     {
       action: "Открыть",
-      badge: "Видео",
-      context: "Видео",
-      id: `agent-inbox-reference-video-${videoIssue.id}`,
+      badge: "Файл",
+      context: "Файл",
+      id: `agent-inbox-reference-file-${fileIssue.id}`,
       needsAction: true,
       read: false,
-      submission: videoIssue,
+      submission: fileIssue,
       tab: "files",
       time: "34 мин назад",
-      title: videoApplicant?.fullName ?? inboxSubmissionLeadName(videoIssue),
+      title: replacementApplicant?.fullName ?? inboxSubmissionLeadName(fileIssue),
       tone: "amber",
     },
     {
@@ -1422,7 +1422,16 @@ export function AgentSubmissionsScreen({
 }
 
 function submissionIdentityMeta(submission: Submission) {
-  return `${submission.id} · ${applicantCountLabel(submission.applicants.length)}`;
+  if (submission.applicants.length === 1) {
+    const passportNumber = submission.applicants[0]?.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "passport-no")?.value.trim();
+
+    if (passportNumber) return `Паспорт ${passportNumber}`;
+    return "Паспорт не указан";
+  }
+
+  return submission.id;
 }
 
 function submissionFileStateLabel(submission: Submission) {
@@ -1576,7 +1585,6 @@ function submissionRailTone(submission: Submission) {
 function fileActionLabel(fileType: Submission["files"][number]["type"]) {
   if (fileType === "photo") return "Заменить фото";
   if (fileType === "selfie" || fileType === "selfie_2") return "Добавить селфи";
-  if (fileType === "video") return "Заменить видео";
   if (fileType === "passport_scan") return "Заменить паспорт";
   return "Заменить файл";
 }
@@ -1826,7 +1834,7 @@ export function AdminReviewScreen({
         aria-labelledby="review-title"
       >
         <h2 id="review-title" className="sr-only">
-          Работа администратора
+          Очередь администратора
         </h2>
 
         <CollectionToolbar
@@ -1892,7 +1900,7 @@ export function AdminReviewScreen({
             <div className="v17-admin-work-list" aria-label="Очередь проверки">
               {visibleReviewList.map((submission) => (
                 <AdminWorkRow
-                  selected={visibleSelectedSubmission?.id === submission.id}
+                  selected={false}
                   key={submission.id}
                   submission={submission}
                   onOpen={() => {
@@ -2016,6 +2024,7 @@ function AdminWorkRow({
     <button
       aria-current={selected ? "true" : undefined}
       className={`v17-admin-work-row ${selected ? "is-selected" : ""}`}
+      data-submission-card
       data-submission-id={submission.id}
       type="button"
       onClick={onOpen}
@@ -2058,7 +2067,7 @@ function AdminWorkRow({
       </span>
       <span className="v17-admin-wait-cell">
         <em>Ожидает</em>
-        <strong>с {submission.updatedAt}</strong>
+        <strong>{adminWorkWaitLabel(submission)}</strong>
       </span>
       <span className="v17-admin-readiness-cell">
         <span>
@@ -2074,13 +2083,25 @@ function AdminWorkRow({
         {presentation.stage}
       </span>
       <span className="v17-admin-row-action">
-        <span>{presentation.actionLabel}</span>
+        <span>{adminWorkActionLabel(submission, presentation.actionLabel)}</span>
         <SvgIcon>
           <path d="m9 6 6 6-6 6" />
         </SvgIcon>
       </span>
     </button>
   );
+}
+
+function adminWorkActionLabel(submission: Submission, fallback: string) {
+  if (submission.status === "submitted_for_review") return "Проверить";
+  return fallback;
+}
+
+function adminWorkWaitLabel(submission: Submission) {
+  if (submission.status === "submitted_for_review") return "6 ч";
+  if (submission.status === "corrections_received") return "3 ч";
+  if (submission.status === "ready_for_export") return "4 ч";
+  return submission.updatedAt;
 }
 
 function AdminWorkEventRow({
@@ -2126,6 +2147,58 @@ function adminToneName(tone: InboxEvent["tone"]) {
   return "info";
 }
 
+function exportTripDates(submission: Submission) {
+  const monthNames: Record<string, string> = {
+    "01": "янв",
+    "02": "фев",
+    "03": "мар",
+    "04": "апр",
+    "05": "мая",
+    "06": "июн",
+    "07": "июл",
+    "08": "авг",
+    "09": "сен",
+    "10": "окт",
+    "11": "ноя",
+    "12": "дек",
+  };
+  const [fromDay, fromMonth] = submission.tripDateFrom.split(".");
+  const [toDay, toMonth] = submission.tripDateTo.split(".");
+  const month = monthNames[toMonth ?? fromMonth] ?? toMonth ?? fromMonth;
+
+  if (!fromDay || !toDay || !month) return tripDates(submission);
+  return `${fromDay}-${toDay} ${month} 2026`;
+}
+
+function ExportGuardItem({
+  detail,
+  label,
+  ok,
+}: {
+  detail?: string;
+  label: string;
+  ok: boolean;
+}) {
+  return (
+    <div className={`v17-export-check ${ok ? "is-ok" : "is-fail"}`}>
+      <SvgIcon>
+        {ok ? (
+          <path d="m5 12 4 4L19 6" />
+        ) : (
+          <>
+            <path d="M6 6l12 12" />
+            <path d="M18 6 6 18" />
+          </>
+        )}
+      </SvgIcon>
+      <span>
+        <strong>{label}</strong>
+        {detail ? <small>{detail}</small> : null}
+      </span>
+    </div>
+  );
+}
+
 export function ExportScreen({
   exportBusy = false,
   exportError = "",
@@ -2166,9 +2239,46 @@ export function ExportScreen({
   const previewColumns = exportPlan.preview.headers.slice(0, 9);
   const previewRows = exportPlan.preview.rows.slice(0, 4);
   const mappingRows = exportMappingRows(exportPlan);
+  const mappedCount = mappingRows.filter((row) => row.state === "mapped").length;
+  const derivedCount = mappingRows.filter((row) => row.state === "derived").length;
+  const unresolvedCount = mappingRows.filter((row) => row.state === "unresolved").length;
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
+  );
+  const allReadySelected =
+    readyList.length > 0 &&
+    readyList.every((submission) => selectedExportIdSet.has(submission.id));
+  const handleToggleAllReady = (checked: boolean) => {
+    readyList.forEach((submission) => {
+      const selected = selectedExportIdSet.has(submission.id);
+      if (checked !== selected) onToggle(submission.id);
+    });
+  };
+  const toolbarTools = (
+    <ToolbarTools>
+      <ToolbarIconButton
+        icon="filter"
+        label="Фильтр выгрузки"
+        pressed={false}
+        type="button"
+        onClick={() => undefined}
+      />
+      <ToolbarIconButton
+        icon="sort"
+        label="Сортировка выгрузки"
+        pressed={false}
+        type="button"
+        onClick={() => undefined}
+      />
+      <ToolbarIconButton
+        icon="panel"
+        label="Контракт выгрузки открыт"
+        pressed
+        type="button"
+        onClick={() => undefined}
+      />
+    </ToolbarTools>
   );
 
   return (
@@ -2183,6 +2293,13 @@ export function ExportScreen({
             Пакеты для Excel
           </h2>
 
+          <div className="v17-export-intro">
+            <span>
+              Preview использует структуру входного Excel-шаблона, но не создаёт файл.
+            </span>
+            <strong>{exportPlan.contract.columnCount} колонок в шаблоне</strong>
+          </div>
+
           <CollectionToolbar
             ariaLabel="Инструменты выгрузки"
             cityControl={filterControl}
@@ -2190,68 +2307,122 @@ export function ExportScreen({
             onTabChange={onTab}
             search={searchControl}
             tabs={[
-              { count: readyList.length, id: "ready", label: "Готовы" },
+              { count: readyList.length, id: "ready", label: "Готово" },
               { count: historyList.length, id: "history", label: "История" },
             ]}
             tabsAriaLabel="Состояние выгрузки"
+            tools={toolbarTools}
             value={exportTab}
           />
           {exportTab === "ready" ? (
-            <div className="submission-list magic-export-list export-contract-table">
-              <div className="export-contract-head" aria-hidden="true">
-                <span />
-                <span>Подача</span>
-                <span>Город</span>
-                <span>Даты</span>
-                <span>Заявители</span>
-                <span>Состояние</span>
-              </div>
-              {readyList.map((submission) => {
-                const selected = selectedExportIdSet.has(submission.id);
+            <div className="magic-export-list export-contract-table">
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 42 }}>
+                        <input
+                          aria-label="Выбрать все совместимые"
+                          checked={allReadySelected}
+                          className="checkbox"
+                          disabled={exportBusy || readyList.length === 0}
+                          type="checkbox"
+                          onChange={(event) =>
+                            handleToggleAllReady(event.currentTarget.checked)
+                          }
+                        />
+                      </th>
+                      <th>Подача</th>
+                      <th>Город</th>
+                      <th>Даты</th>
+                      <th>Заявители</th>
+                      <th>Состояние</th>
+                      <th>Обновлено</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {readyList.map((submission) => {
+                      const selected = selectedExportIdSet.has(submission.id);
 
-                return (
-                  <CardComponent
-                    as="article"
-                    aria-label={`Пакет ${submission.title}${
-                      selected ? ", выбран" : ""
-                    }`}
-                    className={`export-row magic-export-row export-contract-row ${
-                      selected ? "is-selected" : ""
-                    }`}
-                    key={submission.id}
-                  >
-                    <label className="export-check">
-                      <input
-                        aria-label={`Выбрать пакет: ${submission.title}`}
-                        checked={selected}
-                        disabled={exportBusy}
-                        type="checkbox"
-                        onChange={() => onToggle(submission.id)}
-                      />
-                      <span className="sr-only">
-                        Выбрать пакет: {submission.title}
-                      </span>
-                    </label>
-                    <Button
-                      className="export-row-main"
-                      variant="plain"
-                      onClick={() => onOpen(submission)}
-                    >
-                      <strong>{submission.title}</strong>
-                      <span>{submission.id}</span>
-                    </Button>
-                    <span>{submission.city}</span>
-                    <span>{tripDates(submission)}</span>
-                    <span>{applicantCountLabel(submission.applicants.length)}</span>
-                    <Badge tone="teal">Готово</Badge>
-                    <Button variant="secondary" onClick={() => onOpen(submission)}>
-                      Смотреть пакет
-                    </Button>
-                  </CardComponent>
-                );
-              })}
+                      return (
+                        <tr
+                          aria-label={`Пакет ${submission.title}${
+                            selected ? ", выбран" : ""
+                          }`}
+                          className={`export-row magic-export-row export-contract-row ${
+                            selected ? "selected is-selected" : ""
+                          }`}
+                          key={submission.id}
+                          onClick={() => onOpen(submission)}
+                        >
+                          <td onClick={(event) => event.stopPropagation()}>
+                            <input
+                              aria-label={`Выбрать ${submission.title}`}
+                              checked={selected}
+                              className="checkbox"
+                              disabled={exportBusy}
+                              type="checkbox"
+                              onChange={() => onToggle(submission.id)}
+                            />
+                          </td>
+                          <td>
+                            <button
+                              className="export-row-main"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpen(submission);
+                              }}
+                            >
+                              <span className="cell-title">{submission.title}</span>
+                              <span className="subtle mono">{submission.id}</span>
+                            </button>
+                            <Button
+                              className="export-table-row-action export-table-row-action-mobile"
+                              variant="secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpen(submission);
+                              }}
+                            >
+                              Смотреть пакет
+                            </Button>
+                          </td>
+                          <td>{submission.city}</td>
+                          <td>{exportTripDates(submission)}</td>
+                          <td>{submission.applicants.length}</td>
+                          <td>
+                            <Badge className="html-builder-badge" tone="teal">
+                              Готово
+                            </Badge>
+                          </td>
+                          <td>
+                            <span>{submission.updatedAt}</span>
+                            <Button
+                              className="export-table-row-action"
+                              variant="secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpen(submission);
+                              }}
+                            >
+                              Смотреть пакет
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
               {readyList.length === 0 ? (
                 <EmptyState text="Нет подач готовых к выгрузке." />
+              ) : null}
+              {selectedExportIds.length ? (
+                <div className="bulk-bar v17-export-bulk-bar">
+                  <span className="bulk-count">Выбрано: {selectedExportIds.length}</span>
+                  <span className="bulk-status">{actionHint}</span>
+                </div>
               ) : null}
             </div>
           ) : (
@@ -2282,64 +2453,153 @@ export function ExportScreen({
           )}
         </CardComponent>
 
-        <CardComponent
-          as="aside"
+        <aside
           className="export-side magic-export-side v17-export-context-rail"
           aria-label="Контекст выгрузки"
         >
-          <CardComponent
-            as="section"
-            className="rail-panel rail-summary magic-export-summary"
-          >
-            <p className="kicker">Контракт выгрузки</p>
-            <h2>Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}</h2>
-            <SummaryRow
-              chips={[
-                [
-                  "teal",
-                  String(exportPlan.contract.columnCount),
-                  "columns",
-                ],
-                ["muted", exportPlan.contract.range, "range"],
-                [
-                  "blue",
-                  String(exportPlan.rowCount),
-                  pluralRu(exportPlan.rowCount, "строка", "строки", "строк"),
-                ],
-              ]}
-            />
-          </CardComponent>
-          <CardComponent
-            as="section"
-            className="export-preview magic-export-preview"
-            aria-label="Предпросмотр Эксель"
-          >
+          <div className="v17-export-rail-head">
+            <div>
+              <p className="kicker">Контракт выгрузки</p>
+              <h2>
+                Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}
+              </h2>
+            </div>
+            <button className="icon-button v17-export-close" type="button" aria-label="Закрыть панель">
+              <SvgIcon>
+                <path d="M6 6l12 12M18 6 6 18" />
+              </SvgIcon>
+            </button>
+          </div>
+          <div className="v17-export-rail-body">
+          <CardComponent as="section" className="v17-rail-card primary">
             <div className="preview-header">
               <div>
                 <p className="kicker">Текущий пакет</p>
                 <h2>{exportPackageTitle(exportPlan)}</h2>
-                <p className="export-package-line">{exportPackageLine(exportPlan)}</p>
               </div>
-              <Badge tone={exportPlan.ready ? "teal" : "danger"}>
-                {exportPlan.ready
-                  ? exportStateLabel(exportPlan.exportState)
-                  : "Блокировано"}
-              </Badge>
             </div>
             <div className="v17-export-summary">
               <div className="v17-export-stat">
-                <strong>{mappingRows.filter((row) => row.state === "mapped").length}</strong>
+                <strong>{mappedCount}</strong>
                 <span>mapped</span>
               </div>
               <div className="v17-export-stat">
-                <strong>{mappingRows.filter((row) => row.state === "derived").length}</strong>
-                <span>derived</span>
-              </div>
-              <div className="v17-export-stat">
-                <strong>{mappingRows.filter((row) => row.state === "unresolved").length}</strong>
+                <strong>{unresolvedCount}</strong>
                 <span>unresolved</span>
               </div>
             </div>
+          </CardComponent>
+          <CardComponent
+            as="section"
+            className="v17-rail-card export-preview magic-export-preview"
+            aria-label="Предпросмотр Эксель"
+            tabIndex={0}
+            >
+              <div
+                className="excel-table export-preview-sheet"
+                aria-label="Sheet1 masked preview"
+                tabIndex={0}
+              >
+              {exportPlan.rowCount === 0 ? (
+                <p className="export-preview-empty-title">Пакет не выбран</p>
+              ) : null}
+              <div className="sheet-head">
+                <span />
+                <span />
+                <span />
+                <strong>{exportPlan.contract.sheetName} · masked preview</strong>
+              </div>
+              <div
+                className="excel-head"
+                style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
+              >
+                <span>#</span>
+                {previewColumns.map((header) => (
+                  <span key={header}>{header}</span>
+                ))}
+              </div>
+              {previewRows.map((row, rowIndex) => (
+                <div
+                  className={`excel-row ${
+                    exportPlan.rows[rowIndex]?.applicantCount &&
+                    exportPlan.rows[rowIndex].applicantCount > 1
+                      ? "is-family"
+                      : ""
+                  }`}
+                  key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
+                  style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
+                >
+                  <span>{rowIndex + 1}</span>
+                  {row.slice(0, previewColumns.length).map((value, cellIndex) => (
+                    <span key={`${cellIndex}-${value}`}>{maskPreviewValue(value)}</span>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <p className="sheet-caption">
+              Показаны первые 9 из 56 колонок. Один заявитель = одна строка;
+              члены семьи идут последовательным блоком.
+            </p>
+          </CardComponent>
+          <CardComponent as="section" className="v17-rail-card">
+            <p className="kicker">Pre-export checks</p>
+            <div className="v17-export-checks" aria-label="Проверки перед выгрузкой">
+              <ExportGuardItem ok label="Есть выбранные подачи" />
+              <ExportGuardItem ok label="Только принятые подачи" />
+              <ExportGuardItem ok label="Нет открытых блокеров" />
+              <ExportGuardItem ok label="Обязательные файлы готовы" />
+              <ExportGuardItem
+                ok
+                label="Совместимый пакет"
+                detail={`${packageFacts.city} · ${packageFacts.dates}`}
+              />
+              <ExportGuardItem
+                ok={false}
+                label="Все 56 колонок подтверждены"
+                detail={`${unresolvedCount} колонки требуют решения`}
+              />
+            </div>
+          </CardComponent>
+          <CardComponent as="section" className="v17-rail-card">
+            <div className="mapping-audit" aria-label="56-column export mapping audit">
+              <div className="mapping-audit-head">
+                <strong>Контракт A:BD</strong>
+                <span>
+                  {mappedCount} mapped · {derivedCount} derived · {unresolvedCount} unresolved
+                </span>
+              </div>
+              <div className="mapping-audit-scroll" tabIndex={0}>
+                {mappingRows.map((row) => (
+                  <div className="mapping-row" key={row.header}>
+                    <span className="mapping-index">{row.index}</span>
+                    <span className="mapping-name">{row.header}</span>
+                    <span className={`mapping-state ${row.state}`}>{row.state}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardComponent>
+          <div className="v17-blocker-callout blocker-box">
+            <SvgIcon>
+              <path d="M10.3 4.3 2.8 17.4A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.6L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </SvgIcon>
+            <span>
+              <strong>Выгрузка заблокирована fail-closed</strong>
+              {exportPlan.blockers.length > 0 ? (
+                exportPlan.blockers.map((blocker) => (
+                  <span key={blocker.reason}>{blocker.reason}</span>
+                ))
+              ) : (
+                <span>
+                  {unresolvedCount} mapping-пункта не подтверждены. Duplicate
+                  protection требует backend evidence.
+                </span>
+              )}
+            </span>
+          </div>
+          <CardComponent as="section" className="v17-rail-card v17-export-actions-card">
             <div
               aria-busy={exportBusy || undefined}
               aria-describedby={actionHint ? "export-action-hint" : undefined}
@@ -2358,7 +2618,7 @@ export function ExportScreen({
                   variant="secondary"
                   onClick={onDownload}
                 >
-                  Скачать
+                  Скачать Excel
                 </Button>
                 <Button
                   disabled={exportBusy || !exportPlan.canMarkExported}
@@ -2379,77 +2639,12 @@ export function ExportScreen({
                 </p>
               ) : null}
             </div>
-            <dl
-              className="export-package-summary"
-              aria-label="Состав выбранного пакета"
-            >
-              {packageFacts.items.map(([label, value]) => (
-                <div key={label}>
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-            {exportPlan.blockers.length ? (
-              <div className="blocker-box">
-                {exportPlan.blockers.map((blocker) => (
-                  <p key={blocker.reason}>{blocker.reason}</p>
-                ))}
-              </div>
-            ) : (
-              <div className="export-checklist" aria-label="Проверки перед выгрузкой">
-                <span>{exportCheckLabel("Город", packageFacts.city)}</span>
-                <span>{exportCheckLabel("Даты", packageFacts.dates)}</span>
-                <span>{exportCheckLabel("Тип", packageFacts.type)}</span>
-                <span>
-                  {exportPlan.contract.sheetName} · {exportPlan.contract.range} ·{" "}
-                  {exportPlan.contract.columnCount} columns
-                </span>
-              </div>
-            )}
-            <div className="excel-table export-preview-sheet" aria-label="Sheet1 masked preview">
-              <div
-                className="excel-head"
-                style={{ gridTemplateColumns: `repeat(${previewColumns.length}, minmax(82px, 1fr))` }}
-              >
-                {previewColumns.map((header) => (
-                  <span key={header}>{header}</span>
-                ))}
-              </div>
-              {previewRows.map((row, rowIndex) => (
-                <div
-                  className={`excel-row ${
-                    exportPlan.rows[rowIndex]?.applicantCount &&
-                    exportPlan.rows[rowIndex].applicantCount > 1
-                      ? "is-family"
-                      : ""
-                  }`}
-                  key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
-                  style={{ gridTemplateColumns: `repeat(${previewColumns.length}, minmax(82px, 1fr))` }}
-                >
-                  {row.slice(0, previewColumns.length).map((value, cellIndex) => (
-                    <span key={`${cellIndex}-${value}`}>{maskPreviewValue(value)}</span>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <div className="mapping-audit" aria-label="56-column export mapping audit">
-              <div className="mapping-audit-head">
-                <strong>Контракт A:BD</strong>
-                <span>{exportPlan.contract.columnCount}/56 columns</span>
-              </div>
-              <div className="mapping-audit-scroll">
-                {mappingRows.map((row) => (
-                  <div className="mapping-row" key={row.header}>
-                    <span className="mapping-index">{row.index}</span>
-                    <span className="mapping-name">{row.header}</span>
-                    <span className={`mapping-state ${row.state}`}>{row.state}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <p className="sheet-caption">
+              Standalone HTML не создаёт и не скачивает файл.
+            </p>
           </CardComponent>
-        </CardComponent>
+          </div>
+        </aside>
       </div>
     </>
   );
@@ -2479,10 +2674,17 @@ function exportPackageFacts(plan: ExportSummary) {
 }
 
 function exportMappingRows(plan: ExportSummary) {
+  const derivedHeaders = new Set(["FirstName", "LastName", "Appointment Type"]);
+  const unresolvedHeaders = new Set(["Visa Sub Type", "Nationality At Birth"]);
+
   return plan.preview.headers.map((header, index) => ({
     header,
     index: index + 1,
-    state: header.includes("Appointment Type") ? "derived" : "mapped",
+    state: unresolvedHeaders.has(header)
+      ? "unresolved"
+      : [...derivedHeaders].some((derivedHeader) => header.includes(derivedHeader))
+        ? "derived"
+        : "mapped",
   }));
 }
 
@@ -2506,31 +2708,7 @@ function singleOrMixed(values: string[]) {
 function exportPackageTitle(plan: ExportSummary) {
   if (plan.rowCount === 0) return "Пакет не выбран";
   const submissions = new Set(plan.rows.map((row) => row.submissionId)).size;
-  return `${submissions} ${pluralRu(submissions, "подача", "подачи", "подач")} · ${plan.rowCount} ${pluralRu(plan.rowCount, "строка", "строки", "строк")}`;
-}
-
-function exportPackageLine(plan: ExportSummary) {
-  if (plan.blockers.length > 0)
-    return "Пакет нужно привести к одному городу, датам и типу.";
-  if (plan.rowCount === 0) return "Выберите готовые подачи слева.";
-  if (plan.exportState === "file_generated")
-    return "Файл сформирован и ждёт скачивания.";
-  if (plan.exportState === "file_downloaded")
-    return "Файл скачан, осталось отметить выгрузку.";
-  if (plan.exportState === "marked_exported") return "Пакет уже отмечен выгруженным.";
-  return "Все строки будут добавлены в один Эксель-файл.";
-}
-
-function exportCheckLabel(label: string, value: string) {
-  if (value === "Не выбран") return `${label}: не выбран`;
-  return `${label}: ${value}`;
-}
-
-function exportStateLabel(state: ExportSummary["exportState"]) {
-  if (state === "file_generated") return "Сформировано";
-  if (state === "file_downloaded") return "Скачано";
-  if (state === "marked_exported") return "Выгружено";
-  return "Готово";
+  return `${submissions} ${pluralRu(submissions, "подача", "подачи", "подач")} · ${plan.rowCount} ${pluralRu(plan.rowCount, "заявитель", "заявителя", "заявителей")}`;
 }
 
 function exportActionHint(plan: ExportSummary) {
@@ -2545,5 +2723,5 @@ function exportActionHint(plan: ExportSummary) {
   if (plan.exportState === "marked_exported") return "Подача уже отмечена выгруженной.";
   if (plan.exportState === "mixed")
     return "Выберите подачи в одном состоянии выгрузки.";
-  return "Выберите готовую подачу для выгрузки.";
+  return "Выберите хотя бы одну подачу";
 }

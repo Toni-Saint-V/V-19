@@ -296,32 +296,36 @@ export function ContextRail({
   className,
   label,
   onClose,
+  showHeader = true,
   title,
 }: {
   children: ReactNode;
   className?: string;
   label: string;
   onClose: () => void;
+  showHeader?: boolean;
   title: string;
 }) {
   return (
     <ContextPanel className={cn("v19-context-rail", className)} label={label}>
-      <div className="v19-rail-header">
-        <div>
-          <p className="kicker">{label}</p>
-          <h2>{title}</h2>
+      {showHeader ? (
+        <div className="v19-rail-header">
+          <div>
+            <p className="kicker">{label}</p>
+            <h2>{title}</h2>
+          </div>
+          <button
+            className="v19-rail-close"
+            type="button"
+            aria-label="Скрыть контекст"
+            onClick={onClose}
+          >
+            <SvgIcon>
+              <path d="m6 6 12 12M18 6 6 18" />
+            </SvgIcon>
+          </button>
         </div>
-        <button
-          className="v19-rail-close"
-          type="button"
-          aria-label="Скрыть контекст"
-          onClick={onClose}
-        >
-          <SvgIcon>
-            <path d="m6 6 12 12M18 6 6 18" />
-          </SvgIcon>
-        </button>
-      </div>
+      ) : null}
       {children}
     </ContextPanel>
   );
@@ -496,6 +500,7 @@ export function SubmissionCollectionRow({
       className={cn(
         "v19-submission-row",
         compact ? "is-rail-compact" : "is-rail-full",
+        `status-${status}`,
         (status === "returned" || status === "requires_action") && "is-attention",
       )}
       data-submission-card=""

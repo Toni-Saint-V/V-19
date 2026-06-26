@@ -465,7 +465,7 @@ function isMissingAgentFile(file: SubmissionFile) {
 }
 
 function shortFileTypeLabel(type: SubmissionFile["type"]) {
-  if (type === "video") return "Видео";
+  if (type === "video" || type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";
   if (type === "photo") return "Фото";
   return "Файлы";
