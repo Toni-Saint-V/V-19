@@ -901,6 +901,24 @@ describe("V-19 submission actions", () => {
     expect(
       generatedCockpitMediaFileName({
         applicantId: "app-1059-1",
+        fileType: "photo",
+        mimeType: "image/jpeg",
+        submissionId: "VF-1059",
+        uploadNonce: "2026-06-17T10:00:00.000Z:legacy-photo",
+      }),
+    ).toMatch(/^v19[a-z0-9]+_photo\.jpg$/);
+    expect(
+      generatedCockpitMediaFileName({
+        applicantId: "app-1059-1",
+        fileType: "photo_white",
+        mimeType: "image/png",
+        submissionId: "VF-1059",
+        uploadNonce: "2026-06-17T10:00:00.000Z:legacy-photo-white",
+      }),
+    ).toMatch(/^v19[a-z0-9]+_photo_white\.png$/);
+    expect(
+      generatedCockpitMediaFileName({
+        applicantId: "app-1059-1",
         fileType: "video",
         mimeType: "video/mp4",
         submissionId: "VF-1059",
@@ -1164,7 +1182,7 @@ describe("V-19 submission actions", () => {
     expect(uploadRequiredFile(locked, firstFile.id)).toBe(locked);
   });
 
-  it("does not mutate state for a legacy media upload target", () => {
+  it("does not mutate state for legacy media upload targets", () => {
     const draft = completeQuestionnaire(
       createDraftSubmission({
         city: "Москва",
@@ -1173,17 +1191,6 @@ describe("V-19 submission actions", () => {
         type: "single",
       }),
     );
-    const legacySubmission: Submission = {
-      ...draft,
-      files: [
-        {
-          id: "legacy-photo",
-          applicantId: draft.applicants[0]?.id ?? "applicant-1",
-          status: "missing",
-          type: "photo",
-        },
-      ],
-    };
     const metadata = {
       generatedFileName: "v19legacy_photo.jpg",
       mimeType: "image/jpeg",
@@ -1194,17 +1201,31 @@ describe("V-19 submission actions", () => {
       uploadedAtIso: "2026-06-17T10:00:00.000Z",
     };
 
-    expect(uploadRequiredFile(legacySubmission, "legacy-photo", metadata)).toBe(
-      legacySubmission,
-    );
-    const result = mergeUploadedFileMetadataIntoSubmissions(
-      [legacySubmission],
-      legacySubmission.id,
-      "legacy-photo",
-      metadata,
-    );
-    expect(result.submission).toBe(legacySubmission);
-    expect(result.submissions[0]).toBe(legacySubmission);
+    for (const type of ["photo", "photo_white", "video"] as const) {
+      const legacySubmission: Submission = {
+        ...draft,
+        files: [
+          {
+            id: `legacy-${type}`,
+            applicantId: draft.applicants[0]?.id ?? "applicant-1",
+            status: "missing",
+            type,
+          },
+        ],
+      };
+
+      expect(uploadRequiredFile(legacySubmission, `legacy-${type}`, metadata)).toBe(
+        legacySubmission,
+      );
+      const result = mergeUploadedFileMetadataIntoSubmissions(
+        [legacySubmission],
+        legacySubmission.id,
+        `legacy-${type}`,
+        metadata,
+      );
+      expect(result.submission).toBe(legacySubmission);
+      expect(result.submissions[0]).toBe(legacySubmission);
+    }
   });
 
   it("updates questionnaire fields and recalculates readiness", () => {
@@ -1633,7 +1654,7 @@ describe("V-19 persistence boundary", () => {
     expect(payload.media_assets).toEqual([]);
   });
 
-  it("round-trips the exact cockpit snapshot without relying on fake uploads", () => {
+  it("returns a canonical cockpit snapshot without relying on fake uploads", () => {
     const submission = byId("ПД-1051");
     const payload = toCockpitDraftPersistencePayload(
       submission,
@@ -1641,12 +1662,67 @@ describe("V-19 persistence boundary", () => {
       "00000000-0000-4000-8000-000000000001",
     );
 
-    expect(readCockpitSnapshot(payload.submission.family_intelligence as Json)).toEqual(
-      {
-        ...submission,
-        agentId: "00000000-0000-4000-8000-000000000001",
-      },
+    const snapshot = readCockpitSnapshot(
+      payload.submission.family_intelligence as Json,
     );
+
+    expect(snapshot).toMatchObject({
+      agentId: "00000000-0000-4000-8000-000000000001",
+      id: submission.id,
+      status: submission.status,
+    });
+    expect(snapshot?.files.map((file) => file.type)).toEqual([
+      "passport_scan",
+      "selfie",
+      "selfie_2",
+    ]);
+  });
+
+  it("normalizes legacy cockpit snapshots before returning them", () => {
+    const submission = byId("ПД-1051");
+    const applicantId = submission.applicants[0]?.id ?? "applicant-1";
+    const legacySnapshot: Submission = {
+      ...submission,
+      status: "requires_action",
+      files: [
+        {
+          id: "legacy-photo",
+          applicantId,
+          status: "uploaded",
+          type: "photo",
+        },
+        {
+          id: "legacy-photo-white",
+          applicantId,
+          status: "uploaded",
+          type: "photo_white",
+        },
+        {
+          id: "legacy-video",
+          applicantId,
+          status: "uploaded",
+          type: "video",
+        },
+      ],
+      completeness: { questionnaire: 100, files: 100, total: 100 },
+    };
+
+    const snapshot = readCockpitSnapshot({
+      status: cockpitSnapshotStatus,
+      [cockpitSnapshotKey]: {
+        version: cockpitSnapshotVersion,
+        submission: legacySnapshot as unknown as Json,
+      },
+    });
+
+    expect(snapshot?.status).toBe("returned");
+    expect(snapshot?.files.map((file) => file.type)).toEqual([
+      "passport_scan",
+      "selfie",
+      "selfie_2",
+    ]);
+    expect(snapshot?.files.every((file) => file.status === "missing")).toBe(true);
+    expect(snapshot?.completeness.files).toBe(0);
   });
 
   it("keeps the cockpit snapshot storage contract explicit", () => {

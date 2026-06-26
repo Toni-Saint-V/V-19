@@ -140,6 +140,21 @@ describe("Package 1 canonical domain contract", () => {
     expect(
       canonicalRequiredMediaReadiness({
         ...ready,
+        files: [...ready.files, { applicantId: "app-1", status: "uploaded", type: "photo" }],
+      }).ok,
+    ).toBe(false);
+    expect(
+      canonicalRequiredMediaReadiness({
+        ...ready,
+        files: [
+          ...ready.files,
+          { applicantId: "app-1", status: "uploaded", type: "photo_white" },
+        ],
+      }).ok,
+    ).toBe(false);
+    expect(
+      canonicalRequiredMediaReadiness({
+        ...ready,
         files: [...ready.files, { applicantId: "app-1", status: "uploaded", type: "video" }],
       }).ok,
     ).toBe(false);
