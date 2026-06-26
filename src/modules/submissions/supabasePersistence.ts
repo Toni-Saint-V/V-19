@@ -20,6 +20,10 @@ import type { AppProfile } from "../../types/session";
 import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
+import {
+  normalizeLegacySubmissionStatus,
+  toCanonicalStorageMediaType,
+} from "./domainContract";
 import type {
   Applicant,
   Issue,
@@ -225,6 +229,10 @@ function tripDate(submission: Submission): string {
 }
 
 function toSupabaseStatus(status: SubmissionStatus): SupabaseSubmissionStatus {
+  if (status === "requires_action") {
+    throw new Error("Legacy status cannot be written by canonical submissions flow.");
+  }
+
   switch (status) {
     case "draft":
       return "draft";
@@ -233,7 +241,6 @@ function toSupabaseStatus(status: SubmissionStatus): SupabaseSubmissionStatus {
     case "submitted_for_review":
       return "waiting_review";
     case "returned":
-    case "requires_action":
       return "returned";
     case "corrections_received":
       return "waiting_review";
@@ -244,28 +251,14 @@ function toSupabaseStatus(status: SubmissionStatus): SupabaseSubmissionStatus {
   }
 }
 
-function fromSupabaseStatus(status: SupabaseSubmissionStatus): SubmissionStatus {
-  switch (status) {
-    case "draft":
-      return "draft";
-    case "filling":
-      return "in_progress";
-    case "ready_for_review":
-    case "waiting_review":
-    case "in_review":
-      return "submitted_for_review";
-    case "returned":
-    case "attention_required":
-      return "returned";
-    case "exported":
-      return "exported";
-    case "accepted":
-    case "ready_for_excel":
-    case "sent_to_appointment":
-    case "appointment_scheduled":
-    case "completed":
-      return "ready_for_export";
-  }
+function fromSupabaseSubmissionRowStatus(
+  row: Pick<SubmissionRow, "exported_at" | "status">,
+): SubmissionStatus {
+  const normalized = normalizeLegacySubmissionStatus(row.status, {
+    exportedAt: row.exported_at,
+  });
+  if (!normalized.ok) throw new Error(normalized.reason);
+  return normalized.data;
 }
 
 function appointmentStatusForSubmission(submission: Submission): AppointmentStatus {
@@ -281,20 +274,16 @@ function issueStatusToCorrectionStatus(
 }
 
 function mediaTypeForIssue(type: SubmissionFileType | undefined) {
-  if (type === "photo") return "photo_white";
-  if (type === "selfie") return "selfie";
-  if (type === "selfie_2") return "selfie_2";
-  if (type === "passport_scan") return "passport_scan";
-  if (type === "video") return "video";
-  return null;
+  if (!type) return null;
+  const mediaType = toCanonicalStorageMediaType(type);
+  return mediaType.ok ? mediaType.data : null;
 }
 
-function mediaTypeForFile(type: SubmissionFileType): MediaAssetInsert["type"] {
-  if (type === "photo") return "photo_white";
-  if (type === "selfie") return "selfie";
-  if (type === "selfie_2") return "selfie_2";
-  if (type === "passport_scan") return "passport_scan";
-  return "selfie_2";
+function mediaTypeForFile(
+  type: SubmissionFileType,
+): MediaAssetInsert["type"] | null {
+  const mediaType = toCanonicalStorageMediaType(type);
+  return mediaType.ok ? mediaType.data : null;
 }
 
 function applicantRoleLabel(role: Applicant["role"]): string {
@@ -393,13 +382,15 @@ function toCockpitMediaAssetInserts(submission: Submission): MediaAssetInsert[] 
     ) {
       return [];
     }
+    const mediaType = mediaTypeForFile(file.type);
+    if (!mediaType) return [];
 
     return [
       {
         id: stableUuid(`media:${submission.id}:${file.applicantId}:${file.type}`),
         applicant_id: file.applicantId,
         submission_id: submission.id,
-        type: mediaTypeForFile(file.type),
+        type: mediaType,
         original_file_name: file.originalFileName ?? null,
         generated_file_name: file.generatedFileName,
         storage_bucket: file.storageBucket,
@@ -537,7 +528,7 @@ function fallbackSubmissionFromRows(
         : "Москва",
     tripDateFrom: row.travel_date,
     tripDateTo: row.travel_date,
-    status: fromSupabaseStatus(row.status),
+    status: fromSupabaseSubmissionRowStatus(row),
     applicants: applicantItems,
     issues: [],
     files: [],

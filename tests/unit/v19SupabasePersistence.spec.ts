@@ -446,20 +446,24 @@ describe("V-19 Supabase cockpit persistence", () => {
     });
     expect(withoutStorageMetadata.media_assets).toEqual([]);
 
+    const passportFile = submission.files.find((file) => file.type === "passport_scan");
+    if (!passportFile) throw new Error("Missing passport file");
+
     const withStorageMetadata = draftPayload({
       ...submission,
       files: [
         {
-          ...submission.files[0],
-          generatedFileName: "v1900abcde_photo_white.jpg",
+          ...passportFile,
+          generatedFileName: "v1900abcde_passport_scan.jpg",
           mimeType: "image/jpeg",
-          originalFileName: "phone-photo.jpg",
+          originalFileName: "passport-scan.jpg",
           reviewedBy: adminProfile.id,
           reviewStatus: "accepted",
           sizeBytes: 2048,
           status: "accepted",
           storageBucket: "submission-media",
-          storagePath: "ПД-1052/з-1052-1/photo_white/v1900abcde_photo_white.jpg",
+          storagePath:
+            "ПД-1052/з-1052-1/passport_scan/v1900abcde_passport_scan.jpg",
           uploadedAtIso: "2026-06-16T10:00:00.000Z",
           uploadStatus: "uploaded",
         },
@@ -468,14 +472,15 @@ describe("V-19 Supabase cockpit persistence", () => {
 
     expect(withStorageMetadata.media_assets[0]).toMatchObject({
       applicant_id: "з-1052-1",
-      generated_file_name: "v1900abcde_photo_white.jpg",
-      original_file_name: "phone-photo.jpg",
+      generated_file_name: "v1900abcde_passport_scan.jpg",
+      original_file_name: "passport-scan.jpg",
       review_status: "accepted",
       reviewed_by: adminProfile.id,
       storage_bucket: "submission-media",
-      storage_path: "ПД-1052/з-1052-1/photo_white/v1900abcde_photo_white.jpg",
+      storage_path:
+        "ПД-1052/з-1052-1/passport_scan/v1900abcde_passport_scan.jpg",
       submission_id: "ПД-1052",
-      type: "photo_white",
+      type: "passport_scan",
       upload_status: "uploaded",
     });
   });

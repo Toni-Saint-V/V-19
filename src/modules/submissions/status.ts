@@ -16,6 +16,13 @@ import {
   requiresPassportExtractionReviewBeforeAction,
   requiresPassportGateBeforeAction,
 } from "./passportExtractionGuards";
+import {
+  canonicalRequiredMediaReadiness,
+  isCanonicalSubmissionStatus,
+  isIssueTransitionAllowed,
+  isKnownContractRole,
+  isStatusTransitionAllowed,
+} from "./domainContract";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -121,6 +128,7 @@ export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
 
 export const fileTypeLabels = {
   photo: "Фото на белом фоне",
+  photo_white: "Фото на белом фоне",
   selfie: "Селфи",
   selfie_2: "Селфи N2",
   passport_scan: "Загранпаспорт",
@@ -140,7 +148,6 @@ export const roleLabels: Record<Role, string> = {
 export const agentEditableStatuses: SubmissionStatus[] = [
   "draft",
   "in_progress",
-  "requires_action",
   "returned",
 ];
 
@@ -196,7 +203,7 @@ export const transitionMatrix: Record<
     role: "agent",
   },
   submit_corrections: {
-    from: ["returned", "requires_action"],
+    from: ["returned"],
     to: "corrections_received",
     role: "agent",
   },
@@ -275,9 +282,12 @@ export function hasRequiredBasics(submission: Submission) {
 }
 
 export function hasMissingRequiredWork(submission: Submission) {
+  const media = canonicalRequiredMediaReadiness(submission);
+
   return (
     submission.completeness.questionnaire < 100 ||
     submission.completeness.files < 100 ||
+    !media.ok ||
     submission.files.some(
       (file) => file.status === "missing" || file.status === "needs_replacement",
     )
@@ -341,9 +351,21 @@ export function canPerformAction(
   action: SubmissionAction,
   role: Role,
 ): { ok: boolean; reason?: string } {
+  if (!isKnownContractRole(role)) return { ok: false, reason: "Недостаточно прав" };
+  if (!isCanonicalSubmissionStatus(submission.status)) {
+    return { ok: false, reason: "Действие недоступно в текущем статусе" };
+  }
   const transition = transitionMatrix[action];
   if (transition.role !== role) return { ok: false, reason: "Недостаточно прав" };
   if (!transition.from.includes(submission.status)) {
+    return { ok: false, reason: "Действие недоступно в текущем статусе" };
+  }
+  if (
+    action !== "open_history" &&
+    !isStatusTransitionAllowed(submission.status, transition.to, {
+      mutating: true,
+    })
+  ) {
     return { ok: false, reason: "Действие недоступно в текущем статусе" };
   }
 
@@ -395,6 +417,13 @@ export function canPerformAction(
 
   if (action === "accept" && acceptanceBlockingIssueCount(submission) > 0) {
     return { ok: false, reason: "Есть незакрытые замечания" };
+  }
+
+  if (
+    (action === "accept" || action === "close_issues_accept") &&
+    !canonicalRequiredMediaReadiness(submission, { requireAccepted: false }).ok
+  ) {
+    return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
   if (action === "close_issues_accept" && openIssueCount(submission) > 0) {
@@ -528,7 +557,9 @@ export function applySubmissionActionResult(
         ...corrected,
         status: "corrections_received",
         issues: corrected.issues.map((issue) =>
-          issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
+          isIssueTransitionAllowed(issue.status, "fixed_by_agent")
+            ? { ...issue, status: "fixed_by_agent" }
+            : issue,
         ),
         updatedAt: "сейчас",
         history: [
@@ -554,7 +585,7 @@ export function applySubmissionActionResult(
         exportState: "ready",
         files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
         issues: submission.issues.map((issue) =>
-          isFixedIssueStatus(issue.status)
+          isIssueTransitionAllowed(issue.status, "closed_by_admin")
             ? { ...issue, status: "closed_by_admin" }
             : issue,
         ),

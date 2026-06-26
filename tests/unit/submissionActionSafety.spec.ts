@@ -102,11 +102,11 @@ describe("submission action safety", () => {
       ...staleSubmission,
       city: "Казань",
       files: staleSubmission.files.map((file) =>
-        file.type === "photo"
+        file.type === "selfie_2"
           ? {
               ...file,
-              originalFileName: "fresh-photo.jpg",
-              storagePath: "fresh/photo.jpg",
+              originalFileName: "fresh-selfie-2.jpg",
+              storagePath: "fresh/selfie_2.jpg",
               uploadedAtIso: "2026-06-25T10:00:00.000Z",
             }
           : file,
@@ -133,9 +133,9 @@ describe("submission action safety", () => {
     });
     expect(updated.files).toContainEqual(
       expect.objectContaining({
-        originalFileName: "fresh-photo.jpg",
+        originalFileName: "fresh-selfie-2.jpg",
         status: "pending_review",
-        storagePath: "fresh/photo.jpg",
+        storagePath: "fresh/selfie_2.jpg",
         uploadedAtIso: "2026-06-25T10:00:00.000Z",
       }),
     );

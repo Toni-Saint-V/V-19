@@ -6,6 +6,12 @@ import {
 } from "./exportRules";
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
 import { defaultDrawerTab, isFixedIssueStatus } from "./status";
+import {
+  canonicalRequiredMediaReadiness,
+  isCanonicalSubmissionStatus,
+  isExportedTerminal,
+  isIssueTransitionAllowed,
+} from "./domainContract";
 import type {
   ActionDecision,
   CommandResult,
@@ -56,9 +62,7 @@ export function updateSubmission(
       "Admin cannot edit agent-owned submission data.",
     );
   }
-  if (
-    !["draft", "in_progress", "requires_action", "returned"].includes(submission.status)
-  ) {
+  if (!["draft", "in_progress", "returned"].includes(submission.status)) {
     return failure(
       "INVALID_TRANSITION",
       "Submission data is not editable in this status.",
@@ -91,7 +95,7 @@ export function submitForReview(
   }
 
   const completeness = getCompleteness(submission);
-  if (completeness.total < 100) {
+  if (completeness.total < 100 || !canonicalRequiredMediaReadiness(submission).ok) {
     return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
   }
 
@@ -183,7 +187,9 @@ export function markIssueFixed(
     withDerivedState({
       ...submission,
       issues: submission.issues.map((item) =>
-        item.id === issueId ? { ...item, status: "fixed_by_agent" } : item,
+        item.id === issueId && isIssueTransitionAllowed(item.status, "fixed_by_agent")
+          ? { ...item, status: "fixed_by_agent" }
+          : item,
       ),
       updatedAt: "сейчас",
     }),
@@ -199,7 +205,7 @@ export function resubmitCorrections(
   if (role !== "agent") {
     return failure("PERMISSION_DENIED", "Only agent can resubmit corrections.");
   }
-  if (!["returned", "requires_action"].includes(submission.status)) {
+  if (submission.status !== "returned") {
     return failure("INVALID_TRANSITION", "Submission is not waiting for corrections.");
   }
   if (submission.issues.some((issue) => issue.status === "open")) {
@@ -247,7 +253,9 @@ export function closeIssue(
     withDerivedState({
       ...submission,
       issues: submission.issues.map((item) =>
-        item.id === issueId ? { ...item, status: "closed_by_admin" } : item,
+        item.id === issueId && isIssueTransitionAllowed(item.status, "closed_by_admin")
+          ? { ...item, status: "closed_by_admin" }
+          : item,
       ),
       updatedAt: "сейчас",
     }),
@@ -271,6 +279,9 @@ export function acceptSubmission(
       "ACCEPTANCE_BLOCKED",
       "Acceptance is blocked until all issues are closed by admin.",
     );
+  }
+  if (!canonicalRequiredMediaReadiness(submission).ok) {
+    return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
   }
 
   return success(
@@ -401,7 +412,7 @@ export function getOpenIssues(submission: Submission) {
 }
 
 export function getRequiresAction(submission: Submission) {
-  if (["requires_action", "returned"].includes(submission.status)) return true;
+  if (submission.status === "returned") return true;
   if (getOpenIssues(submission).length > 0) return true;
   if (
     getFileState(submission) === "missing" ||
@@ -438,7 +449,7 @@ export function getNextAction(
         reason: complete ? undefined : "Есть незаполненные поля или недостающие файлы",
       };
     }
-    if (["returned", "requires_action"].includes(submission.status)) {
+    if (submission.status === "returned") {
       const hasOpen = getOpenIssues(submission).length > 0;
       return {
         action: "submit_corrections",
@@ -487,7 +498,10 @@ function withDerivedState(submission: Submission): Submission {
 }
 
 function ensureNotTerminal(submission: Submission): CommandResult<Submission> | null {
-  if (terminalStatuses.has(submission.status)) {
+  if (!isCanonicalSubmissionStatus(submission.status)) {
+    return failure("INVALID_TRANSITION", "Submission status is not canonical.");
+  }
+  if (terminalStatuses.has(submission.status) || isExportedTerminal(submission.status)) {
     return failure("EXPORTED_TERMINAL", "Exported is terminal for V-19.");
   }
   return null;
