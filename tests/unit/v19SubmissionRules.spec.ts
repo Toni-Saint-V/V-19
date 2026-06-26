@@ -365,6 +365,34 @@ describe("V-19 export rules", () => {
     expect(getExportBlockers([readyClone({ id: "ПД-1056" })])).toEqual([]);
   });
 
+  it("exports only ready_for_export submissions", () => {
+    for (const status of [
+      "submitted_for_review",
+      "returned",
+      "corrections_received",
+      "exported",
+    ] as const) {
+      const blocked = readyClone({
+        id: `ПД-${status}`,
+        exportState: status === "exported" ? "marked_exported" : "ready",
+        status,
+      });
+      const summary = exportSummary([blocked]);
+
+      expect(summary).toMatchObject({
+        canGenerate: false,
+        canDownload: false,
+        canMarkExported: false,
+        ready: false,
+      });
+      expect(summary.blockers.map((blocker) => blocker.reason)).toContain(
+        status === "exported"
+          ? "В выборке есть уже выгруженные подачи"
+          : "В выборке есть подачи не готовые к выгрузке",
+      );
+    }
+  });
+
   it("normalizes legacy statuses before export decisions", () => {
     const legacyReady = readyClone({
       id: "ПД-LEGACY-READY",
