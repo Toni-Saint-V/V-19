@@ -3,7 +3,6 @@ import {
   vfFilterWorkItems,
   vfMakeWorkItemFromAction,
   vfMakeWorkItemFromEvent,
-  vfWorkStats,
   type VfActionInput,
   type VfEventInput,
   type VfTone,
@@ -111,7 +110,6 @@ export function VfAgentWorkCenter<TSubmission = unknown>({
     ],
     [events, openActions, completedActions],
   );
-  const stats = useMemo(() => vfWorkStats(items), [items]);
   const visibleItems = useMemo(() => vfFilterWorkItems(items, tab, query), [items, query, tab]);
   const counts: Record<VfWorkTab, number> = {
     now: vfFilterWorkItems(items, "now").length,
@@ -123,20 +121,6 @@ export function VfAgentWorkCenter<TSubmission = unknown>({
 
   return (
     <section className="v19-ideal-work" aria-label="Работа агента">
-      <header className="v19-ideal-hero">
-        <div>
-          <span className="v19-ideal-kicker"><Dot tone="info" /> Единый рабочий центр агента</span>
-          <h2>Работа без развилок: что случилось → объект → точное действие</h2>
-          <p>События и действия собраны в один приоритетный поток. Каждая строка ведёт в существующий drawer и не меняет бизнес-логику.</p>
-        </div>
-        <div className="v19-ideal-stats" aria-label="Сводка работы">
-          <div><strong>{stats.critical}</strong><span>критичных</span></div>
-          <div><strong>{stats.today}</strong><span>сегодня</span></div>
-          <div><strong>{stats.unread}</strong><span>непрочитанных</span></div>
-          <div><strong>{stats.done}</strong><span>готово</span></div>
-        </div>
-      </header>
-
       {mainFocus ? (
         <div className="v19-ideal-focus">
           <div><Dot tone={mainFocus.tone} /><strong>Главный фокус:</strong><span>{mainFocus.objectTitle} · {mainFocus.objectMeta || mainFocus.dueValue}</span></div>
@@ -167,7 +151,14 @@ export function VfAgentWorkCenter<TSubmission = unknown>({
         </label>
       </div>
 
-      <div className="v19-ideal-section-label"><span>{tabLabels.find((item) => item.id === tab)?.label}</span><span>{visibleItems.length}</span></div>
+      <div className="v19-ideal-cols" aria-hidden="true">
+        <span />
+        <span>Работа</span>
+        <span>Объект</span>
+        <span>Срок</span>
+        <span>Состояние</span>
+        <span />
+      </div>
       <div className="v19-ideal-list">
         {visibleItems.length ? visibleItems.map((item) => <WorkRow key={item.id} item={item} onOpen={onOpen} renderIcon={renderIcon} />) : (
           <div className="v19-ideal-empty"><strong>Очередь пуста</strong><span>Новые события и действия появятся после изменений в подачах.</span></div>

@@ -68,6 +68,26 @@ export type VfActionInput<TSubmission = unknown> = {
   target?: unknown;
 };
 
+// Display-only copy guard. The Work Center never renders forbidden media
+// wording. This rewrites visible labels at the view layer; it does not touch
+// domain data, statuses, or persistence.
+const VF_COPY_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/Проверить\s+заменённое\s+видео/gi, "Проверить selfie_2"],
+  [/Комментарий\s+к\s+видео/gi, "Комментарий к selfie_2"],
+  [/Файлы\s*·\s*Видео/gi, "Файлы · selfie_2"],
+  [/заменённое\s+видео/gi, "selfie_2"],
+  [/видео/gi, "selfie_2"],
+];
+
+function vfSafeCopy(value: string | undefined): string | undefined {
+  if (!value) return value;
+  let next = value;
+  for (const [pattern, replacement] of VF_COPY_REPLACEMENTS) {
+    next = next.replace(pattern, replacement);
+  }
+  return next;
+}
+
 type VfSubmissionLike = {
   id?: string;
   title?: string;
@@ -153,15 +173,15 @@ export function vfMakeWorkItemFromEvent<TSubmission>(
     kind: "event",
     tone,
     unread,
-    title: event.title,
-    meta: event.badge,
+    title: vfSafeCopy(event.title) ?? event.title,
+    meta: vfSafeCopy(event.badge),
     objectTitle: objectTitleFor(submission),
     objectMeta: objectMetaFor(submission),
     dueLabel: "Источник",
-    dueValue: event.time ?? "только что",
-    stateLabel: event.badge ?? "Событие",
+    dueValue: vfSafeCopy(event.time) ?? "только что",
+    stateLabel: vfSafeCopy(event.badge) ?? "Событие",
     stateTone: tone,
-    cta: ctaForTab(event.tab, event.action),
+    cta: vfSafeCopy(ctaForTab(event.tab, event.action)) ?? ctaForTab(event.tab, event.action),
     open: {
       submission: event.submission,
       submissionId: event.submissionId ?? submission.id,
@@ -190,15 +210,15 @@ export function vfMakeWorkItemFromAction<TSubmission>(
     kind: "action",
     tone,
     unread: false,
-    title: action.title,
-    meta: action.badges?.[0]?.label,
+    title: vfSafeCopy(action.title) ?? action.title,
+    meta: vfSafeCopy(action.badges?.[0]?.label),
     objectTitle: objectTitleFor(submission),
-    objectMeta: action.context || objectMetaFor(submission),
+    objectMeta: vfSafeCopy(action.context || objectMetaFor(submission)),
     dueLabel: completed ? "Статус" : "Срок",
-    dueValue: action.dueLabel ?? (completed ? "Выполнено" : "В работе"),
-    stateLabel: action.dueLabel ?? action.badges?.[0]?.label ?? "Действие",
+    dueValue: vfSafeCopy(action.dueLabel) ?? (completed ? "Выполнено" : "В работе"),
+    stateLabel: vfSafeCopy(action.dueLabel ?? action.badges?.[0]?.label) ?? "Действие",
     stateTone: tone,
-    cta: completed ? "Смотреть" : ctaForTab(action.tab, action.cta),
+    cta: completed ? "Смотреть" : vfSafeCopy(ctaForTab(action.tab, action.cta)) ?? ctaForTab(action.tab, action.cta),
     open: {
       submission: action.submission,
       submissionId: action.submissionId ?? submission.id,
