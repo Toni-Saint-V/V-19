@@ -173,6 +173,52 @@ describe("V-19 Supabase cockpit persistence", () => {
     });
   });
 
+  it("persists returned common appointment PDF in the cockpit snapshot", async () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-PDF-PACKAGE",
+      returnedPdfPackage: {
+        commonAppointmentPdf: {
+          fileName: "appointment-list.pdf",
+          mimeType: "application/pdf",
+          sha256: "a".repeat(64),
+          sizeBytes: 24_000,
+          storageBucket: "submission-media",
+          storagePath:
+            "ПД-PDF-PACKAGE/common/appointment_pdf/aaaaaaaaaaaaaaaa_appointment_pdf.pdf",
+          uploadedAtIso: "2026-06-27T10:00:00.000Z",
+          uploadedBy: adminProfile.id,
+        },
+        reviewedAtIso: "2026-06-27T10:05:00.000Z",
+        reviewedBy: adminProfile.id,
+      },
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+    const snapshot = readCockpitSnapshot(
+      payload.submission.family_intelligence as Json,
+    );
+
+    expect(snapshot?.returnedPdfPackage).toEqual(submission.returnedPdfPackage);
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-27T10:00:00.000Z",
+        updated_at: "2026-06-27T10:05:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions[0]?.returnedPdfPackage).toEqual(
+      submission.returnedPdfPackage,
+    );
+  });
+
   it("keeps submissions created by different agents under their own owners", async () => {
     const firstAgentSubmission = {
       ...(initialSubmissions[0] as Submission),
@@ -196,10 +242,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       new Map(),
     );
 
-    expect(rpcNames()).toEqual([
-      "save_submission_draft",
-      "save_submission_draft",
-    ]);
+    expect(rpcNames()).toEqual(["save_submission_draft", "save_submission_draft"]);
     expect(payloadSubmission(0)).toMatchObject({
       agent_id: agentProfile.id,
       id: firstAgentSubmission.id,
@@ -291,9 +334,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       agentProfile.id,
       agentProfile.id,
     );
-    const sourceAnswer = payload.questionnaire_answers?.find(
-      (answer) => answer.value,
-    );
+    const sourceAnswer = payload.questionnaire_answers?.find((answer) => answer.value);
     if (!sourceAnswer) throw new Error("expected questionnaire answer");
     mockState.submissionRows = [
       {
@@ -336,6 +377,172 @@ describe("V-19 Supabase cockpit persistence", () => {
       label: sourceAnswer.label,
       value: sourceAnswer.value,
     });
+  });
+
+  it("persists and hydrates questionnaire review metadata in answer values", async () => {
+    const sourceSubmission = initialSubmissions[0] as Submission;
+    const sourceApplicant = sourceSubmission.applicants[0];
+    const sourceSection = sourceApplicant?.sections[0];
+    const sourceField = sourceSection?.fields[0];
+    if (!sourceApplicant || !sourceSection || !sourceField) {
+      throw new Error("expected source questionnaire field");
+    }
+
+    const submission: Submission = {
+      ...sourceSubmission,
+      applicants: sourceSubmission.applicants.map((applicant) =>
+        applicant.id === sourceApplicant.id
+          ? {
+              ...applicant,
+              sections: applicant.sections.map((section) =>
+                section.id === sourceSection.id
+                  ? {
+                      ...section,
+                      fields: section.fields.map((field) =>
+                        field.id === sourceField.id
+                          ? {
+                              ...field,
+                              reviewOriginSource: "passport_ocr",
+                              reviewSource: "passport_ocr",
+                              reviewState: "needs_review",
+                            }
+                          : field,
+                      ),
+                    }
+                  : section,
+              ),
+            }
+          : applicant,
+      ),
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    const sourceAnswer = payload.questionnaire_answers?.find(
+      (answer) => answer.field_id === sourceField.id,
+    );
+    if (!sourceAnswer) throw new Error("expected questionnaire answer");
+
+    expect(sourceAnswer.value).toEqual({
+      kind: "v19_questionnaire_field",
+      reviewOriginSource: "passport_ocr",
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+      value: sourceField.value,
+      version: 1,
+    });
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.applicantRows = [
+      {
+        id: sourceApplicant.id,
+        submission_id: submission.id,
+        full_name: sourceApplicant.fullName,
+        questionnaire_percent: 100,
+        media_percent: 100,
+      },
+    ];
+    mockState.questionnaireRows = [
+      {
+        ...sourceAnswer,
+        id: "00000000-0000-4000-8000-000000000444",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const field = loaded.submissions[0]?.applicants[0]?.sections
+      .flatMap((section) => section.fields)
+      .find((candidate) => candidate.id === sourceField.id);
+
+    expect(field).toMatchObject({
+      id: sourceField.id,
+      reviewOriginSource: "passport_ocr",
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+      value: sourceField.value,
+    });
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.questionnaireRows = [
+      {
+        ...sourceAnswer,
+        id: "00000000-0000-4000-8000-000000000445",
+        value: {
+          kind: "v19_questionnaire_field",
+          reviewConfirmedAtIso: "2026-06-27T08:10:00.000Z",
+          reviewConfirmedBy: agentProfile.id,
+          reviewOriginSource: "passport_ocr",
+          reviewSource: "manual",
+          reviewState: "confirmed",
+          value: "ROW OVERRIDE",
+          version: 1,
+        },
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-27T08:10:00.000Z",
+      },
+    ];
+
+    const loadedFromSnapshot = await loadCockpitSubmissionsForProfile(agentProfile);
+    const overlaidField = loadedFromSnapshot.submissions[0]?.applicants[0]?.sections
+      .flatMap((section) => section.fields)
+      .find((candidate) => candidate.id === sourceField.id);
+
+    expect(overlaidField).toMatchObject({
+      id: sourceField.id,
+      reviewConfirmedAtIso: "2026-06-27T08:10:00.000Z",
+      reviewConfirmedBy: agentProfile.id,
+      reviewOriginSource: "passport_ocr",
+      reviewSource: "manual",
+      reviewState: "confirmed",
+      value: "ROW OVERRIDE",
+    });
+
+    mockState.questionnaireRows = [
+      {
+        ...sourceAnswer,
+        id: "00000000-0000-4000-8000-000000000446",
+        value: {
+          kind: "v19_questionnaire_field",
+          reviewSource: "passport_ocr",
+          reviewState: "needs_review",
+          value: "UNSUPPORTED VERSION VALUE",
+          version: 999,
+        },
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-27T08:20:00.000Z",
+      },
+    ];
+
+    const loadedUnsupportedVersion =
+      await loadCockpitSubmissionsForProfile(agentProfile);
+    const unsupportedVersionField =
+      loadedUnsupportedVersion.submissions[0]?.applicants[0]?.sections
+        .flatMap((section) => section.fields)
+        .find((candidate) => candidate.id === sourceField.id);
+
+    expect(unsupportedVersionField).toMatchObject({
+      id: sourceField.id,
+      value: "UNSUPPORTED VERSION VALUE",
+    });
+    expect(unsupportedVersionField?.reviewSource).toBeUndefined();
+    expect(unsupportedVersionField?.reviewState).toBeUndefined();
   });
 
   it("does not reuse normalized applicant rows after loading remote data", async () => {
@@ -522,8 +729,7 @@ describe("V-19 Supabase cockpit persistence", () => {
           sizeBytes: 2048,
           status: "accepted",
           storageBucket: "submission-media",
-          storagePath:
-            "ПД-1052/з-1052-1/passport_scan/v1900abcde_passport_scan.jpg",
+          storagePath: "ПД-1052/з-1052-1/passport_scan/v1900abcde_passport_scan.jpg",
           uploadedAtIso: "2026-06-16T10:00:00.000Z",
           uploadStatus: "uploaded",
         },
@@ -537,8 +743,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       review_status: "accepted",
       reviewed_by: adminProfile.id,
       storage_bucket: "submission-media",
-      storage_path:
-        "ПД-1052/з-1052-1/passport_scan/v1900abcde_passport_scan.jpg",
+      storage_path: "ПД-1052/з-1052-1/passport_scan/v1900abcde_passport_scan.jpg",
       submission_id: "ПД-1052",
       type: "passport_scan",
       upload_status: "uploaded",

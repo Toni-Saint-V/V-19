@@ -3,14 +3,34 @@ import { EXPORT_WORKBOOK_SHEET_NAME } from "./exportContractCore";
 export const EXPORT_WORKBOOK_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+export type ExportWorkbookRowFill = "blue" | "green" | "yellow";
+
 export type ParsedExportWorkbook = {
   dimension: string;
+  rowFills: Array<ExportWorkbookRowFill | null>;
   rows: string[][];
   sheetName: string;
 };
 
+export type CreateExportWorkbookBlobOptions = {
+  rowFills?: readonly (ExportWorkbookRowFill | null | undefined)[];
+};
+
+const rowFillStyleIds: Record<ExportWorkbookRowFill, number> = {
+  green: 1,
+  yellow: 2,
+  blue: 3,
+};
+
+const styleIdRowFills: Record<number, ExportWorkbookRowFill> = {
+  1: "green",
+  2: "yellow",
+  3: "blue",
+};
+
 export function createExportWorkbookBlob(
   workbookRows: readonly (readonly string[])[],
+  options: CreateExportWorkbookBlobOptions = {},
 ): Blob {
   const files: Record<string, string> = {
     "[Content_Types].xml": contentTypesXml(),
@@ -18,7 +38,7 @@ export function createExportWorkbookBlob(
     "xl/workbook.xml": workbookXml(),
     "xl/_rels/workbook.xml.rels": workbookRelsXml(),
     "xl/styles.xml": stylesXml(),
-    "xl/worksheets/sheet1.xml": worksheetXml(workbookRows),
+    "xl/worksheets/sheet1.xml": worksheetXml(workbookRows, options.rowFills ?? []),
   };
   const zip = zipStore(files);
   const buffer = new ArrayBuffer(zip.byteLength);
@@ -27,7 +47,9 @@ export function createExportWorkbookBlob(
   return new Blob([buffer], { type: EXPORT_WORKBOOK_CONTENT_TYPE });
 }
 
-export async function parseExportWorkbookBlob(blob: Blob): Promise<ParsedExportWorkbook> {
+export async function parseExportWorkbookBlob(
+  blob: Blob,
+): Promise<ParsedExportWorkbook> {
   const files = unzipStore(await blob.arrayBuffer());
   const workbook = files["xl/workbook.xml"] ?? "";
   const worksheet = files["xl/worksheets/sheet1.xml"] ?? "";
@@ -36,6 +58,7 @@ export async function parseExportWorkbookBlob(blob: Blob): Promise<ParsedExportW
 
   return {
     dimension,
+    rowFills: parseWorksheetRowFills(worksheet),
     rows: parseWorksheetRows(worksheet),
     sheetName,
   };
@@ -58,18 +81,24 @@ function workbookRelsXml(): string {
 }
 
 function stylesXml(): string {
-  return '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  return '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEB9C"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="0" fillId="1" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
 }
 
-function worksheetXml(rows: readonly (readonly string[])[]): string {
+function worksheetXml(
+  rows: readonly (readonly string[])[],
+  rowFills: readonly (ExportWorkbookRowFill | null | undefined)[],
+): string {
   const dimension = `A1:BD${Math.max(rows.length, 1)}`;
   const sheetRows = rows
     .map((row, rowIndex) => {
       const rowNumber = rowIndex + 1;
+      const fill = rowFills[rowIndex] ?? null;
+      const styleId = fill ? rowFillStyleIds[fill] : 0;
+      const styleAttribute = styleId ? ` s="${styleId}"` : "";
       const cells = row
         .map((value, columnIndex) => {
           const cellRef = `${columnName(columnIndex + 1)}${rowNumber}`;
-          return `<c r="${cellRef}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+          return `<c r="${cellRef}"${styleAttribute} t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
         })
         .join("");
       return `<row r="${rowNumber}">${cells}</row>`;
@@ -130,6 +159,14 @@ function parseWorksheetRows(xml: string): string[][] {
     return [...cells.matchAll(/<t>(.*?)<\/t>/g)].map((cellMatch) =>
       unescapeXml(cellMatch[1] ?? ""),
     );
+  });
+}
+
+function parseWorksheetRowFills(xml: string): Array<ExportWorkbookRowFill | null> {
+  return [...xml.matchAll(/<row[^>]*>(.*?)<\/row>/g)].map((rowMatch) => {
+    const cells = rowMatch[1] ?? "";
+    const styleId = Number(cells.match(/<c\b[^>]*\bs="(\d+)"/)?.[1] ?? 0);
+    return styleIdRowFills[styleId] ?? null;
   });
 }
 

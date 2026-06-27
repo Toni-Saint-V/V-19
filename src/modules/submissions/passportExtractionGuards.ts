@@ -22,6 +22,15 @@ export type PassportGateIssue = {
   message: string;
 };
 
+const passportQuestionnaireFieldIds: Partial<
+  Record<PassportExtractedFieldKey, string>
+> = {
+  passportExpiresAt: "passport-expiry-date",
+  passportIssuedAt: "passport-issue-date",
+  passportNumber: "passport-no",
+  passportType: "passport-type",
+};
+
 const passportGateActions = new Set<SubmissionAction>([
   "submit_for_review",
   "submit_corrections",
@@ -89,13 +98,12 @@ export function requiresPassportGateBeforeAction(
   action: SubmissionAction,
   now: Date = new Date(),
 ) {
-  return passportGateActions.has(action) && passportGateIssues(submission, now).length > 0;
+  return (
+    passportGateActions.has(action) && passportGateIssues(submission, now).length > 0
+  );
 }
 
-export function passportGateReason(
-  submission: Submission,
-  now: Date = new Date(),
-) {
+export function passportGateReason(submission: Submission, now: Date = new Date()) {
   const firstIssue = passportGateIssues(submission, now)[0];
   return firstIssue?.message ?? "Паспортные данные не прошли боевую проверку.";
 }
@@ -130,17 +138,12 @@ function applicantPassportGateIssues(
     ];
   }
 
-  if (state.status === "failed" || state.status === "unavailable") {
-    return [
-      issue(
-        applicant,
-        "passport_not_confirmed",
-        "Файл не подтвержден как загранпаспорт. Загрузите разворот паспорта с MRZ.",
-      ),
-    ];
-  }
+  const canUseQuestionnaireFallback =
+    state.status === "ready" ||
+    state.status === "failed" ||
+    state.status === "unavailable";
 
-  if (!state.extractedFields.length) {
+  if (state.status === "ready" && !state.extractedFields.length) {
     return [
       issue(
         applicant,
@@ -152,16 +155,25 @@ function applicantPassportGateIssues(
 
   const issues: PassportGateIssue[] = [];
   const passportNumber = normalizePassportNumber(
-    passportValue(applicant, "passportNumber"),
+    passportGateValue(applicant, "passportNumber", canUseQuestionnaireFallback),
   );
-  const passportType = normalizeText(passportValue(applicant, "passportType"));
-  const issuedAt = parseDate(passportValue(applicant, "passportIssuedAt"));
-  const expiresAt = parseDate(passportValue(applicant, "passportExpiresAt"));
-  const tripDate = parseDate(questionnaireValue(applicant, "travel-date")) ??
+  const passportType = normalizeText(
+    passportGateValue(applicant, "passportType", canUseQuestionnaireFallback),
+  );
+  const issuedAt = parseDate(
+    passportGateValue(applicant, "passportIssuedAt", canUseQuestionnaireFallback),
+  );
+  const expiresAt = parseDate(
+    passportGateValue(applicant, "passportExpiresAt", canUseQuestionnaireFallback),
+  );
+  const tripDate =
+    parseDate(questionnaireValue(applicant, "travel-date")) ??
     parseDate(submission.tripDateFrom);
 
   if (!passportNumber) {
-    issues.push(issue(applicant, "passport_number_missing", "Не найден номер загранпаспорта."));
+    issues.push(
+      issue(applicant, "passport_number_missing", "Не найден номер загранпаспорта."),
+    );
   } else if (!/^\d{8,9}$/.test(passportNumber)) {
     issues.push(
       issue(
@@ -230,10 +242,7 @@ function applicantPassportGateIssues(
   return issues;
 }
 
-function passportNumberForDuplicateCheck(
-  applicant: Applicant,
-  submission: Submission,
-) {
+function passportNumberForDuplicateCheck(applicant: Applicant, submission: Submission) {
   const extracted = normalizePassportNumber(passportValue(applicant, "passportNumber"));
   if (extracted) return extracted;
 
@@ -253,13 +262,13 @@ function passportFileForApplicant(submission: Submission, applicantId: string) {
 function hasRealPassportUpload(file: SubmissionFile | undefined) {
   return Boolean(
     file &&
-      file.status !== "missing" &&
-      file.status !== "needs_replacement" &&
-      (file.mimeType ||
-        file.originalFileName ||
-        file.generatedFileName ||
-        file.storagePath ||
-        file.storageBucket),
+    file.status !== "missing" &&
+    file.status !== "needs_replacement" &&
+    (file.mimeType ||
+      file.originalFileName ||
+      file.generatedFileName ||
+      file.storagePath ||
+      file.storageBucket),
   );
 }
 
@@ -281,6 +290,20 @@ function passportValue(applicant: Applicant, key: PassportExtractedFieldKey) {
     applicant.passportExtraction?.extractedFields.find((field) => field.key === key)
       ?.value ?? ""
   );
+}
+
+function passportGateValue(
+  applicant: Applicant,
+  key: PassportExtractedFieldKey,
+  useQuestionnaireFallback: boolean,
+) {
+  const extracted = passportValue(applicant, key).trim();
+  if (extracted || !useQuestionnaireFallback) return extracted;
+
+  const fieldId = passportQuestionnaireFieldIds[key];
+  if (!fieldId) return extracted;
+
+  return questionnaireValue(applicant, fieldId);
 }
 
 function questionnaireValue(applicant: Applicant, fieldId: string) {

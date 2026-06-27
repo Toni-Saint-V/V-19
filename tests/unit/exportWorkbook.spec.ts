@@ -5,6 +5,7 @@ import {
   exportSummary,
 } from "../../src/modules/submissions/exportRules";
 import {
+  buildExportWorkbookRowFills,
   buildExportWorkbookRows,
   createExportWorkbookArtifact,
   default as downloadExportWorkbook,
@@ -20,7 +21,10 @@ import {
 } from "../../src/modules/submissions/exportContract";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
-import type { Submission } from "../../src/modules/submissions/types";
+import type {
+  ExportPackageIdentity,
+  Submission,
+} from "../../src/modules/submissions/types";
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -179,6 +183,63 @@ describe("V-19 export workbook contract", () => {
     expect(plan.preview.rows[0]).toEqual(
       expect.arrayContaining(["Москва", "Schengen", "Tourism", "Normal"]),
     );
+  });
+
+  test("writes family row fills into the parsed workbook artifact", async () => {
+    const baseRow = exportSummary([readySubmission()]).rows[0];
+    if (!baseRow) throw new Error("expected base export row");
+    const rows = [
+      {
+        ...baseRow,
+        applicantIndex: 1,
+        appointmentType: "Family",
+        submissionId: "family-1",
+        type: "Семья",
+      },
+      {
+        ...baseRow,
+        applicantIndex: 2,
+        appointmentType: "Family",
+        submissionId: "family-1",
+        type: "Семья",
+      },
+      {
+        ...baseRow,
+        applicantIndex: 1,
+        appointmentType: "Family",
+        submissionId: "family-2",
+        type: "Семья",
+      },
+      {
+        ...baseRow,
+        applicantIndex: 1,
+        appointmentType: "Individual",
+        submissionId: "single-1",
+        type: "Один заявитель",
+      },
+    ];
+    const identity: ExportPackageIdentity = {
+      contentFingerprint: "style-proof",
+      fileName: "style-proof.xlsx",
+      format: "xlsx",
+      idempotencyKey: "style-proof",
+      rowCount: rows.length,
+      submissionIds: ["family-1", "family-2", "single-1"],
+    };
+
+    const artifact = createExportWorkbookArtifact(rows, identity);
+    const parsed = await parseExportWorkbookArtifact(artifact);
+
+    expect(buildExportWorkbookRowFills(rows)).toEqual([
+      null,
+      "green",
+      "green",
+      "yellow",
+      null,
+    ]);
+    expect(artifact.rowFills).toEqual([null, "green", "green", "yellow", null]);
+    expect(parsed.rowFills).toEqual(artifact.rowFills);
+    expect(await verifyExportWorkbookArtifact(artifact)).toBe(true);
   });
 
   test("ties package identity to the full 56-column serialized row model", () => {

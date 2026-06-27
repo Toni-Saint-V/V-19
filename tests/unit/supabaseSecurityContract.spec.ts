@@ -104,7 +104,9 @@ describe("Supabase security contract", () => {
       "supabase/migrations/20260624001000_questionnaire_answers_persistence.sql",
     );
 
-    expect(migration).toContain("create table if not exists public.questionnaire_answers");
+    expect(migration).toContain(
+      "create table if not exists public.questionnaire_answers",
+    );
     expect(migration).toContain("unique (applicant_id, section_id, field_id)");
     expect(migration).toContain(
       "alter table public.questionnaire_answers enable row level security",
@@ -152,7 +154,9 @@ describe("Supabase security contract", () => {
       "create or replace function public.save_submission_draft(payload jsonb)",
     );
     expect(questionnaireMigration).toContain("payload ? 'questionnaire_answers'");
-    expect(questionnaireMigration).toContain("insert into public.questionnaire_answers");
+    expect(questionnaireMigration).toContain(
+      "insert into public.questionnaire_answers",
+    );
     expect(questionnaireMigration).toContain(
       "delete from public.questionnaire_answers qa",
     );
@@ -265,7 +269,9 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("new.exported_at < old.exported_at");
     expect(migration).toContain("Exported timestamp cannot move backwards");
     expect(migration).toContain("create trigger submissions_export_regression_guard");
-    expect(migration).toContain("before update of status, exported_at on public.submissions");
+    expect(migration).toContain(
+      "before update of status, exported_at on public.submissions",
+    );
   });
 
   test("keeps corrections scoped to applicants in the same submission", () => {
@@ -376,7 +382,9 @@ describe("Supabase security contract", () => {
     );
     expect(handoffMigration).toContain("for update");
     expect(handoffMigration).toContain("perform public.save_submission_draft");
-    expect(handoffMigration).toContain("result := public.save_submission_draft(payload)");
+    expect(handoffMigration).toContain(
+      "result := public.save_submission_draft(payload)",
+    );
     expect(handoffMigration).toContain(
       "Correction handoff requires an existing returned submission",
     );
@@ -396,9 +404,7 @@ describe("Supabase security contract", () => {
     expect(profilePreservationMigration).toContain(
       "create or replace function public.save_submission_draft(payload jsonb)",
     );
-    expect(profilePreservationMigration).toContain(
-      "full_name = excluded.full_name",
-    );
+    expect(profilePreservationMigration).toContain("full_name = excluded.full_name");
     expect(profilePreservationMigration).toContain(
       "questionnaire_percent = excluded.questionnaire_percent",
     );
@@ -410,6 +416,151 @@ describe("Supabase security contract", () => {
     expect(profilePreservationMigration).not.toContain("address = excluded.address");
     expect(profilePreservationMigration).not.toContain(
       "birth_date = excluded.birth_date",
+    );
+  });
+
+  test("keeps returned PDF storage policies aligned with generated client paths", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260627001000_returned_pdf_storage_policies.sql",
+    );
+    const readPolicy =
+      sqlStatements(migration).find((statement) =>
+        statement.includes('create policy "media storage read owner or admin"'),
+      ) ?? "";
+
+    for (const policyName of [
+      'create policy "media storage read owner or admin"',
+      'create policy "media storage write editable owner or admin"',
+      'create policy "media storage update editable owner or admin"',
+      'create policy "media storage delete editable owner or admin"',
+    ]) {
+      expect(migration).toContain(policyName);
+    }
+
+    expect(migration).toContain(
+      "create table if not exists public.returned_pdf_handoff_artifacts",
+    );
+    expect(migration).toContain(
+      "alter table public.returned_pdf_handoff_artifacts enable row level security",
+    );
+    expect(migration).toContain(
+      'create policy "returned pdf handoff artifacts read owner or admin"',
+    );
+    expect(migration).toContain("applicants_id_submission_id_uidx");
+    expect(migration).toContain(
+      "constraint returned_pdf_handoff_artifacts_applicant_submission_fkey",
+    );
+    expect(migration).toContain("split_part(storage_path, '/', 1) = submission_id");
+    expect(migration).toContain("split_part(storage_path, '/', 2) = applicant_id");
+    expect(migration).toContain("returned_pdf_handoff_artifacts_storage_uidx");
+    expect(migration).toContain("returned_pdf_handoff_artifacts_submission_idx");
+    expect(migration).toContain("returned_pdf_handoff_artifacts_applicant_idx");
+    expect(migration).toContain(
+      "create or replace function public.publish_returned_pdf_handoff(payload jsonb)",
+    );
+    expect(migration).toContain("security definer");
+    expect(migration).toContain(
+      "revoke all on public.returned_pdf_handoff_artifacts from anon, authenticated",
+    );
+    expect(migration).toContain(
+      "grant select on public.returned_pdf_handoff_artifacts to authenticated",
+    );
+    expect(migration).not.toContain(
+      "grant select, insert, update, delete on public.returned_pdf_handoff_artifacts to authenticated",
+    );
+    expect(migration).toContain("for update");
+    expect(migration).toContain("actor_role <> 'admin'");
+    expect(migration).toContain(
+      "Returned PDF mismatch issues must be closed before handoff",
+    );
+    expect(migration).toContain(
+      "Returned PDF blocked reviews must be resolved before handoff",
+    );
+    expect(migration).toContain(
+      "Returned PDF handoff requires exactly one ready application PDF per applicant",
+    );
+    expect(migration).toContain("ready_application_pdfs jsonb");
+    expect(migration).toContain("into ready_application_pdfs");
+    expect(migration).toContain("from jsonb_array_elements(ready_application_pdfs)");
+    expect(migration).toContain(
+      "expected_handoff_count := current_applicant_count + 1",
+    );
+    expect(migration).toContain("existing_handoff_count > 0");
+    expect(migration).toContain("'duplicate', true");
+    expect(migration).toContain(
+      "Returned PDF handoff was already published with different artifacts",
+    );
+    expect(migration).not.toContain(
+      "delete from public.returned_pdf_handoff_artifacts",
+    );
+    expect(migration).toContain("from storage.objects stored_common_pdf");
+    expect(migration).toContain(
+      "stored_common_pdf.bucket_id = common_artifact ->> 'storageBucket'",
+    );
+    expect(migration).toContain("from storage.objects stored_application_pdf");
+    expect(migration).toContain(
+      "stored_application_pdf.name = application_pdf.artifact ->> 'storagePath'",
+    );
+    expect(migration).toContain("lower(left(common_artifact ->> 'sha256', 16))");
+    expect(migration).toContain(
+      "lower(left(application_pdf.artifact ->> 'sha256', 16))",
+    );
+    expect(migration).toContain("_appointment_pdf\\\\.pdf$");
+    expect(migration).toContain("_visa_application_pdf\\\\.pdf$");
+    expect(migration).not.toContain("limit 1");
+    expect(migration).toContain(
+      "insert into public.returned_pdf_handoff_artifacts (\n    submission_id,",
+    );
+    expect(migration).toContain(
+      "select\n    target_submission_id,\n    ready_application_pdf.value ->> 'applicantId'",
+    );
+    expect(migration).not.toContain(
+      "insert into public.returned_pdf_handoff_artifacts (\n    target_submission_id,",
+    );
+    expect(migration).toContain(
+      "grant execute on function public.publish_returned_pdf_handoff(jsonb) to authenticated",
+    );
+    expect(migration).toContain("'visa_application_pdf'");
+    expect(migration).toContain("'appointment_pdf'");
+    expect(migration).toContain("split_part(name, '/', 2) = 'common'");
+    expect(migration).toContain("split_part(name, '/', 3) = 'appointment_pdf'");
+    expect(migration).toContain(
+      "split_part(name, '/', 3) = 'visa_application_pdf' and storage.extension(name) = 'pdf'",
+    );
+    expect(migration).toContain("storage.extension(name) = 'pdf'");
+    expect(migration).toContain("a.id = split_part(name, '/', 2)");
+    expect(migration).toContain("a.submission_id = split_part(name, '/', 1)");
+    expect(migration).toContain(
+      "select id from public.submissions where agent_id = (select auth.uid())",
+    );
+    expect(migration).toContain(
+      "split_part(name, '/', 3) in ('selfie', 'selfie_2', 'passport_scan')",
+    );
+    expect(readPolicy).toContain(
+      normalizeSql("from public.returned_pdf_handoff_artifacts h"),
+    );
+    expect(readPolicy).toContain(normalizeSql("h.storage_path = name"));
+    expect(readPolicy).toContain(normalizeSql("s.agent_id = (select auth.uid())"));
+    expect(migration).toContain(
+      "from public.returned_pdf_handoff_artifacts published_handoff",
+    );
+    expect(migration).toContain("published_handoff.storage_bucket = bucket_id");
+    expect(migration).toContain("published_handoff.storage_path = name");
+    expect(migration).not.toContain("photo_white");
+    expect(migration).not.toContain("video");
+    expect(migration).not.toContain("storage.extension(name) = 'mp4'");
+    expect(readPolicy).toContain(
+      normalizeSql(
+        "split_part(name, '/', 3) in ('selfie', 'selfie_2', 'passport_scan') and split_part(name, '/', 1) in ( select id from public.submissions where agent_id = (select auth.uid()) )",
+      ),
+    );
+    expect(readPolicy).not.toContain(
+      normalizeSql(
+        "or split_part(name, '/', 1) in ( select id from public.submissions where agent_id = (select auth.uid()) )",
+      ),
+    );
+    expect(migration).toContain(
+      "status in ('draft', 'filling', 'returned', 'ready_for_review')",
     );
   });
 

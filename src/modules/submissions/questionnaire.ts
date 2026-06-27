@@ -742,6 +742,11 @@ function mergeSeedField(
     ...seeded,
     value: existing.value,
     error: existing.error,
+    reviewConfirmedAtIso: existing.reviewConfirmedAtIso,
+    reviewConfirmedBy: existing.reviewConfirmedBy,
+    reviewOriginSource: existing.reviewOriginSource,
+    reviewState: existing.reviewState,
+    reviewSource: existing.reviewSource,
   };
 }
 

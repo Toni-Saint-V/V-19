@@ -39,6 +39,29 @@ export type ApplicantRole = "main" | "spouse" | "child";
 
 export type QuestionnaireStatus = "empty" | "partial" | "complete" | "needs_fix";
 
+export const questionnaireReviewStates = ["confirmed", "needs_review"] as const;
+export type QuestionnaireReviewState = (typeof questionnaireReviewStates)[number];
+
+export const questionnaireReviewSources = [
+  "manual",
+  "passport_ocr",
+  "family_shared",
+  "pdf_reconciliation",
+] as const;
+export type QuestionnaireReviewSource = (typeof questionnaireReviewSources)[number];
+
+export function isQuestionnaireReviewState(
+  value: unknown,
+): value is QuestionnaireReviewState {
+  return questionnaireReviewStates.some((state) => state === value);
+}
+
+export function isQuestionnaireReviewSource(
+  value: unknown,
+): value is QuestionnaireReviewSource {
+  return questionnaireReviewSources.some((source) => source === value);
+}
+
 export type SubmissionFileStatus =
   | "missing"
   | "uploaded"
@@ -172,6 +195,23 @@ export type VisaApplicationPdfReviewState = {
   status: "clear" | "blocked" | "needs_review";
 };
 
+export type ReturnedPdfArtifact = {
+  fileName: string;
+  mimeType: string;
+  sha256: string;
+  sizeBytes: number;
+  storageBucket?: string;
+  storagePath?: string;
+  uploadedAtIso?: string;
+  uploadedBy?: string;
+};
+
+export type ReturnedPdfPackageState = {
+  commonAppointmentPdf?: ReturnedPdfArtifact;
+  reviewedAtIso?: string;
+  reviewedBy?: string;
+};
+
 export type PassportUploadDraft = {
   applicantIndex: number;
   extractedFields: PassportExtractedField[];
@@ -239,6 +279,11 @@ export type QuestionnaireField = {
   placeholder?: string;
   span?: "full";
   error?: string;
+  reviewConfirmedAtIso?: string;
+  reviewConfirmedBy?: string;
+  reviewOriginSource?: QuestionnaireReviewSource;
+  reviewState?: QuestionnaireReviewState;
+  reviewSource?: QuestionnaireReviewSource;
 };
 
 export type QuestionnaireSection = {
@@ -341,6 +386,7 @@ export type Submission = {
   tripDateFrom: string;
   tripDateTo: string;
   status: SubmissionStatus;
+  returnedPdfPackage?: ReturnedPdfPackageState;
   visaApplicationPdfReview?: VisaApplicationPdfReviewState;
   visaApplicationPdfReviews?: VisaApplicationPdfReviewState[];
   applicants: Applicant[];

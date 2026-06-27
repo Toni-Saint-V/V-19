@@ -16,6 +16,7 @@ export const requiredMigrationOrder = [
   "20260617005000_passport_extraction_audit_quota_contract.sql",
   "20260622000100_ai_helper_audit_event_metadata.sql",
   "20260624001000_questionnaire_answers_persistence.sql",
+  "20260627001000_returned_pdf_storage_policies.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -44,6 +45,7 @@ export function requiredMigrationsInActualOrder(migrationFiles) {
 
 export function undeclaredMigrationFiles(migrationFiles) {
   return migrationFiles.filter(
-    (fileName) => fileName.endsWith(".sql") && !requiredMigrationOrder.includes(fileName),
+    (fileName) =>
+      fileName.endsWith(".sql") && !requiredMigrationOrder.includes(fileName),
   );
 }

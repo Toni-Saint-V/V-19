@@ -14,6 +14,7 @@ export type SupabasePersistenceOperation =
   | "export_batches.list"
   | "export_batches.read_duplicate"
   | "rpc.complete_export_package"
+  | "rpc.publish_returned_pdf_handoff"
   | "rpc.upsert_questionnaire_answers"
   | "status_history.list"
   | "status_history.insert"

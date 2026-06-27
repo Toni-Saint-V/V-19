@@ -5,7 +5,6 @@ import type {
   ExportState,
   Submission,
 } from "./types";
-import { tripDates } from "./selectors";
 import {
   type CanonicalSubmissionStatus,
   canonicalRequiredMediaReadiness,
@@ -69,8 +68,6 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     ),
   );
   const cities = new Set(submissions.map((submission) => submission.city));
-  const dates = new Set(submissions.map(tripDates));
-  const types = new Set(submissions.map((submission) => submission.type));
   const exportState = getExportSelectionState(submissions);
 
   if (!contractValid) {
@@ -105,10 +102,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     });
   }
 
-  if (types.size > 1)
-    blockers.push({ reason: "Нельзя смешивать одинарные и семейные подачи" });
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
-  if (dates.size > 1) blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (exportState === "mixed")
     blockers.push({ reason: "В выборке разные состояния выгрузки" });
 
@@ -120,7 +114,23 @@ export function canGenerateExport(submissions: Submission[]) {
 }
 
 export function buildExportRows(submissions: Submission[]): ExportContractRow[] {
-  return buildExportContractRows(submissions);
+  return buildExportContractRows(orderSubmissionsForExportRows(submissions));
+}
+
+function orderSubmissionsForExportRows(submissions: Submission[]): Submission[] {
+  return submissions
+    .map((submission, index) => ({ index, submission }))
+    .sort((left, right) => {
+      const leftFamilyOrder = left.submission.type === "family" ? 0 : 1;
+      const rightFamilyOrder = right.submission.type === "family" ? 0 : 1;
+
+      if (leftFamilyOrder !== rightFamilyOrder) {
+        return leftFamilyOrder - rightFamilyOrder;
+      }
+
+      return left.index - right.index;
+    })
+    .map((item) => item.submission);
 }
 
 export function exportSummary(
