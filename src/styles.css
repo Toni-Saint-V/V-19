@@ -8405,8 +8405,8 @@ p {
   padding: 0;
 }
 
-.v17-rail-card .excel-head span,
-.v17-rail-card .excel-row span {
+  .v17-rail-card .excel-head span,
+  .v17-rail-card .excel-row span {
   min-height: 38px;
   margin-top: 0;
   padding: 11px 12px;
@@ -8415,7 +8415,9 @@ p {
   color: #333743;
   font-size: 11px;
   font-weight: 680;
-}
+  text-transform: none;
+  letter-spacing: 0;
+  }
 
 .v17-rail-card .excel-head span:first-child,
 .v17-rail-card .excel-row span:first-child {

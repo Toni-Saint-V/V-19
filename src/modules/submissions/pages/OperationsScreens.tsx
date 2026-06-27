@@ -2232,6 +2232,8 @@ export function ExportScreen({
   searchControl: ReactNode;
   selectedExportIds: string[];
 }) {
+  const failClosedHint =
+    "Выгрузка заблокирована fail-closed: контракт A:BD не подтверждён, защита от дублей требует backend evidence.";
   const actionHint =
     exportError ||
     (exportBusy ? "Формируем и проверяем workbook..." : exportActionHint(exportPlan));
@@ -2242,6 +2244,9 @@ export function ExportScreen({
   const mappedCount = mappingRows.filter((row) => row.state === "mapped").length;
   const derivedCount = mappingRows.filter((row) => row.state === "derived").length;
   const unresolvedCount = mappingRows.filter((row) => row.state === "unresolved").length;
+  // Fail-closed: пока контракт A:BD не подтверждён (есть unresolved-колонки) или нет
+  // backend-доказательства защиты от дублей, выгрузка остаётся заблокированной.
+  const failClosed = unresolvedCount > 0;
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
@@ -2421,7 +2426,11 @@ export function ExportScreen({
               {selectedExportIds.length ? (
                 <div className="bulk-bar v17-export-bulk-bar">
                   <span className="bulk-count">Выбрано: {selectedExportIds.length}</span>
-                  <span className="bulk-status">{actionHint}</span>
+                  <span className="bulk-status">
+                    {failClosed
+                      ? "Пакет заблокирован — откройте причины справа"
+                      : actionHint}
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -2608,20 +2617,20 @@ export function ExportScreen({
             >
               <div className="mp-action-dock-actions export-actions">
                 <Button
-                  disabled={exportBusy || !exportPlan.canGenerate}
+                  disabled={exportBusy || failClosed || !exportPlan.canGenerate}
                   onClick={onGenerate}
                 >
-                  Сформировать Эксель
+                  Проверить пакет
                 </Button>
                 <Button
-                  disabled={exportBusy || !exportPlan.canDownload}
+                  disabled={exportBusy || failClosed || !exportPlan.canDownload}
                   variant="secondary"
                   onClick={onDownload}
                 >
                   Скачать Excel
                 </Button>
                 <Button
-                  disabled={exportBusy || !exportPlan.canMarkExported}
+                  disabled={exportBusy || failClosed || !exportPlan.canMarkExported}
                   loading={exportBusy}
                   variant="secondary"
                   onClick={onMarkExported}
@@ -2635,7 +2644,7 @@ export function ExportScreen({
                   className="mp-action-dock-hint export-action-hint"
                   id="export-action-hint"
                 >
-                  {actionHint}
+                  {failClosed ? failClosedHint : actionHint}
                 </p>
               ) : null}
             </div>
