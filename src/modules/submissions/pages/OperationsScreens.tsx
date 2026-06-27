@@ -1006,7 +1006,7 @@ function inboxEventSourceLabel(event: InboxEvent) {
   return event.submission.title;
 }
 
-function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
+export function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
   const fallback = submissions[0];
   if (!fallback) return [];
   const returned =
@@ -1865,7 +1865,7 @@ export function AdminReviewScreen({
 
         {permissionDenied ? (
           renderBlockedState(
-            "Нет доступа к проверке",
+            "Нет доступа к п��оверке",
             "Текущая роль не может выполнять административную проверку подач.",
             "danger",
           )

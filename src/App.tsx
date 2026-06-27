@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
-import { Button, SearchBar, StateTabs } from "./shared/ui/primitives";
+import { Button, SearchBar } from "./shared/ui/primitives";
 import {
   acceptAiSuggestionAsIssue,
   canRunAiReview,
@@ -100,12 +100,14 @@ import { ConfirmationDialog } from "./modules/submissions/components/Primitives"
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
   AdminReviewScreen,
-  AgentActionsScreen,
-  AgentInboxScreen,
   AgentSubmissionsScreen,
+  buildAgentInboxEvents,
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
+import { VfAgentWorkCenter } from "./shared/ui/visaflow-v19-ui-ideal-work-center-v17.3";
+import type { VfWorkOpenTarget } from "./shared/ui/visaflow-v19-ui-ideal-adapter-v17.3";
+import "./shared/ui/visaflow-v19-ui-ideal-v17.3.css";
 import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import { CANONICAL_CITIES } from "./modules/submissions/types";
 import type {
@@ -171,8 +173,6 @@ type WorkspaceSettings = {
   digest: "instant" | "daily";
   drawerHints: boolean;
 };
-
-type AgentInboxMode = "actions" | "events";
 
 const defaultWorkspaceSettings: WorkspaceSettings = {
   compactLists: true,
@@ -453,7 +453,6 @@ function MainApp() {
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState<City | "Все города">("Все города");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [agentInboxMode, setAgentInboxMode] = useState<AgentInboxMode>("events");
   const [agentTab, setAgentTab] = useState<AgentTab>("action");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
@@ -587,7 +586,9 @@ function MainApp() {
     surface === "agent-submissions" ||
     surface === "admin-review";
   const workspaceSurfaceTitle =
-    surface === "admin-review" ? "Работа" : surfaceTitle(surface);
+    surface === "admin-review" || surface === "agent-inbox"
+      ? "Работа"
+      : surfaceTitle(surface);
   const workspaceSurfaceDescription =
     surface === "admin-review" ? "Проверка и события" : surfaceDescription(surface);
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
@@ -625,8 +626,8 @@ function MainApp() {
             count: agentInboxUnreadCount,
             icon: "В",
             id: "agent-inbox",
-            label: "Входящие",
-            meta: "новые события",
+            label: "Работа",
+            meta: "события и действия",
             onClick: showAgentInbox,
             tone: agentInboxUnreadCount > 0 ? "danger" : "default",
           },
@@ -963,10 +964,6 @@ function MainApp() {
     );
   }
 
-  function firstAgentActionSubmission() {
-    return searchedOpenAgentActions[0]?.submission ?? searchedAgentQueue[0];
-  }
-
   function firstReviewSubmissionForTab(tab: AdminWorkTab) {
     const nextReviewFilterTab = reviewTabForAdminWork(tab);
 
@@ -982,7 +979,6 @@ function MainApp() {
   function showAgentInbox() {
     requestSettingsLeave(() => {
       setSurface("agent-inbox");
-      setAgentInboxMode("events");
       setAgentTab("action");
       setDrawerMode("closed");
       const nextSubmission =
@@ -1045,6 +1041,22 @@ function MainApp() {
     setActiveDrawerTab(tab);
     setDrawerInitialTarget(target ?? null);
     setDrawerMode("detail");
+  }
+
+  function openWorkTarget(target: VfWorkOpenTarget<Submission>) {
+    if (target.route) {
+      setSurface(target.route as Surface);
+      return;
+    }
+    const submission =
+      target.submission ??
+      submissions.find((item) => item.id === target.submissionId);
+    if (!submission) return;
+    openSubmission(
+      submission,
+      (target.tab as DrawerTab | undefined) ?? defaultDrawerTab(submission),
+      (target.target as WorkspaceTarget | undefined) ?? undefined,
+    );
   }
 
   function openNextAdminWorkSubmission() {
@@ -2294,22 +2306,6 @@ function MainApp() {
       onChange={setCityFilter}
     />
   );
-  const inboxSearchControl = (
-    <SearchBar
-      label="Поиск по входящим"
-      placeholder="Поиск"
-      value={query}
-      onChange={setQuery}
-    />
-  );
-  const agentActionsSearchControl = (
-    <SearchBar
-      label="Поиск по действиям"
-      placeholder="Поиск"
-      value={query}
-      onChange={setQuery}
-    />
-  );
   const agentSubmissionsSearchControl = (
     <SearchBar
       label="Поиск по подачам"
@@ -2515,46 +2511,17 @@ function MainApp() {
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
         ) : surface === "agent-inbox" ? (
-          <>
-            <div className="v19-inbox-mode-tabs">
-              <StateTabs<AgentInboxMode>
-                ariaLabel="Раздел входящих"
-                tabs={[
-                  { count: agentInboxUnreadCount, id: "events", label: "Входящие" },
-                  {
-                    count: agentActions.summary.open,
-                    id: "actions",
-                    label: "Мои действия",
-                  },
-                ]}
-                value={agentInboxMode}
-                onValueChange={(nextMode) => {
-                  setAgentInboxMode(nextMode);
-                  if (nextMode === "actions") {
-                    const nextSubmission = firstAgentActionSubmission();
-                    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-                  }
-                }}
-              />
-            </div>
-            {agentInboxMode === "events" ? (
-              <AgentInboxScreen
-                contextRailEnabled
-                onOpen={openSubmission}
-                searchControl={inboxSearchControl}
-                submissions={searchedAgentQueue}
-                summary={summary}
-              />
-            ) : (
-              <AgentActionsScreen
-                completedActions={searchedCompletedAgentActions}
-                onOpen={openSubmission}
-                openActions={searchedOpenAgentActions}
-                searchControl={agentActionsSearchControl}
-                summary={agentActions.summary}
-              />
-            )}
-          </>
+          <VfAgentWorkCenter
+            events={buildAgentInboxEvents(searchedAgentQueue)}
+            openActions={searchedOpenAgentActions}
+            completedActions={searchedCompletedAgentActions}
+            searchValue={query}
+            onSearchChange={setQuery}
+            onOpen={openWorkTarget}
+            onRoute={(route) => {
+              if (route === "agent-submissions") showAgentTab("action");
+            }}
+          />
         ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
             activeTab={agentTab}
