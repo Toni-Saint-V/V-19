@@ -2,7 +2,7 @@ import type { Applicant, Submission, VisaApplicationPdfReviewState } from "./typ
 import {
   assertVisaApplicationPdfSha256,
   mediaStorageBucket,
-  validateMediaStorageTarget,
+  validateVisaApplicationPdfStorageTarget,
 } from "./mediaStoragePolicy";
 import type {
   VisaApplicationPdfExtractionSource,
@@ -193,7 +193,8 @@ function reconcileVisaApplicationPdfData(
     findings.push({
       code: "pdf_travel_dates_in_address",
       field: "travelDatesInAddress",
-      message: "Даты поездки обнаружены в домашнем адресе, а не в поле дат въезда/выезда.",
+      message:
+        "Даты поездки обнаружены в домашнем адресе, а не в поле дат въезда/выезда.",
       severity: "critical",
       value: data.travelDatesInAddress,
     });
@@ -243,9 +244,13 @@ export function applyVisaApplicationPdfReview(
   const data = extractVisaApplicationPdfData(pdfText);
   const applicantIndex =
     options.applicantIndex ?? matchingApplicantIndexForPdfData(submission, data);
-  const applicant = applicantIndex >= 0 ? submission.applicants[applicantIndex] : undefined;
+  const applicant =
+    applicantIndex >= 0 ? submission.applicants[applicantIndex] : undefined;
   const review = applicant
-    ? reconcileVisaApplicationPdfData(data, referenceDataFromSubmission(submission, applicantIndex))
+    ? reconcileVisaApplicationPdfData(
+        data,
+        referenceDataFromSubmission(submission, applicantIndex),
+      )
     : unmatchedApplicantReview(data);
   const { rawText: _rawText, ...safeData } = review.data;
   const checkedAtIso = new Date().toISOString();
@@ -253,6 +258,12 @@ export function applyVisaApplicationPdfReview(
   const artifact = normalizeVisaApplicationPdfArtifact(
     options.artifact,
     checkedAtIso,
+    applicant
+      ? {
+          applicantId: applicant.id,
+          submissionId: submission.id,
+        }
+      : undefined,
   );
   const nextReview: VisaApplicationPdfReviewState = {
     applicantId: applicant?.id,
@@ -269,7 +280,10 @@ export function applyVisaApplicationPdfReview(
   const existingReviews = visaApplicationPdfReviewsForSubmission(submission);
   const nextReviews = [
     ...existingReviews.filter((existingReview) => {
-      if (nextReview.applicantId && existingReview.applicantId === nextReview.applicantId) {
+      if (
+        nextReview.applicantId &&
+        existingReview.applicantId === nextReview.applicantId
+      ) {
         return false;
       }
       if (
@@ -295,7 +309,8 @@ export function applyVisaApplicationPdfReview(
 export function visaApplicationPdfReviewsForSubmission(
   submission: Submission,
 ): VisaApplicationPdfReviewState[] {
-  const reviews = submission.visaApplicationPdfReviews?.map(normalizeVisaPdfReview) ?? [];
+  const reviews =
+    submission.visaApplicationPdfReviews?.map(normalizeVisaPdfReview) ?? [];
   if (!submission.visaApplicationPdfReview) return reviews;
 
   const legacyReview = normalizeVisaPdfReview(submission.visaApplicationPdfReview);
@@ -330,8 +345,9 @@ export function confirmVisaApplicationPdfManualReview(
       : review,
   );
   const nextCurrentReview =
-    nextReviews.find((review) => review.id === submission.visaApplicationPdfReview?.id) ??
-    nextReviews.at(-1);
+    nextReviews.find(
+      (review) => review.id === submission.visaApplicationPdfReview?.id,
+    ) ?? nextReviews.at(-1);
 
   return {
     ...submission,
@@ -358,8 +374,9 @@ export function dismissVisaApplicationPdfReview(
 
   const nextReviews = existingReviews.filter((review) => review.id !== reviewId);
   const nextCurrentReview =
-    nextReviews.find((review) => review.id === submission.visaApplicationPdfReview?.id) ??
-    nextReviews.at(-1);
+    nextReviews.find(
+      (review) => review.id === submission.visaApplicationPdfReview?.id,
+    ) ?? nextReviews.at(-1);
 
   return {
     ...submission,
@@ -441,7 +458,8 @@ export function visaApplicationPdfAgentHandoffStatus(
   ) {
     return {
       ok: false,
-      reason: "Есть предупреждения PDF, подтвердите ручную проверку перед передачей агентам.",
+      reason:
+        "Есть предупреждения PDF, подтвердите ручную проверку перед передачей агентам.",
       status: "needs_manual_confirmation",
     };
   }
@@ -453,7 +471,9 @@ export function visaApplicationPdfAgentHandoffStatus(
   };
 }
 
-function unmatchedApplicantReview(data: VisaApplicationPdfData): VisaPdfReconciliationResult {
+function unmatchedApplicantReview(
+  data: VisaApplicationPdfData,
+): VisaPdfReconciliationResult {
   return {
     data,
     findings: [
@@ -516,6 +536,7 @@ function reviewHandoffStatus(status: VisaPdfReconciliationResult["status"]) {
 function normalizeVisaApplicationPdfArtifact(
   artifact: VisaApplicationPdfArtifactInput | undefined,
   checkedAtIso: string,
+  storageIdentity?: { applicantId: string; submissionId: string },
 ): VisaApplicationPdfReviewState["artifact"] {
   if (!artifact) return undefined;
 
@@ -527,12 +548,21 @@ function normalizeVisaApplicationPdfArtifact(
       );
     }
 
-    validateMediaStorageTarget({
+    if (!storageIdentity) {
+      throw new Error(
+        "PDF анкеты с private storage identity должен быть сопоставлен с заявителем.",
+      );
+    }
+
+    validateVisaApplicationPdfStorageTarget({
+      applicantId: storageIdentity.applicantId,
       file: {
         name: artifact.fileName,
         size: artifact.sizeBytes,
         type: artifact.mimeType,
-      } as File,
+      },
+      sha256,
+      submissionId: storageIdentity.submissionId,
       target: {
         bucket: mediaStorageBucket,
         path: artifact.storagePath,
@@ -620,7 +650,9 @@ function numberedSections(text: string, start: number, end: number) {
   for (let number = start; number <= end; number += 1) {
     const current = numberedFieldRegex(number);
     const next =
-      number === end ? /No se requiere|$/.source : numberedFieldRegex(number + 1).source;
+      number === end
+        ? /No se requiere|$/.source
+        : numberedFieldRegex(number + 1).source;
     const match = new RegExp(`${current.source}([\\s\\S]*?)(?=${next})`).exec(text);
     if (match?.[1]) sections.set(number, match[1].trim());
   }
@@ -701,7 +733,10 @@ function selectedTripPurpose(section: string) {
 }
 
 function selectedPaymentCoverage(section: string) {
-  if (/By the applicant himself\/herself/.test(section) && hasSelectionSignal(section)) {
+  if (
+    /By the applicant himself\/herself/.test(section) &&
+    hasSelectionSignal(section)
+  ) {
     return "applicant";
   }
   if (/por un patrocinador/.test(section) && hasSelectionSignal(section)) {

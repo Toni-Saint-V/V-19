@@ -147,6 +147,8 @@ import {
   uploadMediaToStorage,
   type MediaStorageTarget,
 } from "./modules/submissions/mediaStorage";
+import { buildAgentHandoffPackage } from "./modules/submissions/operationalWorkflow";
+import { publishReturnedPdfAgentHandoff } from "./modules/submissions/returnedPdfHandoffPersistence";
 import type { AppProfile } from "./types/session";
 
 const SettingsScreen = lazy(() => import("./modules/submissions/pages/SettingsScreen"));
@@ -457,9 +459,7 @@ function MainApp() {
   const [agentTab, setAgentTab] = useState<AgentTab>("action");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
-  const [selectedExportIds, setSelectedExportIds] = useState<string[]>([
-    "ПД-1056",
-  ]);
+  const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState("");
   const [issueComposerRequest, setIssueComposerRequest] =
@@ -1051,7 +1051,10 @@ function MainApp() {
     const nextSubmission = reviewList[0] ?? searchedReviewQueue[0];
     if (!nextSubmission) return;
 
-    openSubmission(nextSubmission, reviewTabForAdminWork(reviewTab) ? "overview" : defaultDrawerTab(nextSubmission));
+    openSubmission(
+      nextSubmission,
+      reviewTabForAdminWork(reviewTab) ? "overview" : defaultDrawerTab(nextSubmission),
+    );
   }
 
   function selectSubmission(submission: Submission) {
@@ -1157,11 +1160,13 @@ function MainApp() {
     );
 
     if (!result.ok) {
-      setSubmissionActionError(createSubmissionActionErrorState({
-        action,
-        error: result.error,
-        submission: currentSubmission,
-      }));
+      setSubmissionActionError(
+        createSubmissionActionErrorState({
+          action,
+          error: result.error,
+          submission: currentSubmission,
+        }),
+      );
       return;
     }
 
@@ -1704,9 +1709,80 @@ function MainApp() {
   function confirmVisaApplicationPdfReviewForActiveSubmission(reviewId: string) {
     if (!activeSubmission) return;
     updateActiveSubmission((submission) =>
-      confirmVisaApplicationPdfManualReview(submission, reviewId, workspaceEmail || role),
+      confirmVisaApplicationPdfManualReview(
+        submission,
+        reviewId,
+        workspaceEmail || role,
+      ),
     );
     setActiveDrawerTab("files");
+  }
+
+  async function publishReturnedPdfHandoffForActiveSubmission() {
+    if (!activeSubmission) return;
+
+    if (role !== "admin") {
+      const message = "Только администратор может открыть комплект PDF агенту.";
+      setRemoteSaveState("error");
+      setRemoteSaveError(message);
+      throw new Error(message);
+    }
+
+    const handoffPackage = buildAgentHandoffPackage(activeSubmission);
+    if (!handoffPackage.ready) {
+      const message = handoffPackage.blockers[0] ?? "Комплект PDF ещё не готов.";
+      setRemoteSaveState("error");
+      setRemoteSaveError(message);
+      throw new Error(message);
+    }
+
+    if (!isSupabaseMode || !remoteProfile) {
+      const message =
+        "Сначала войдите в Supabase, чтобы открыть returned PDF комплект агенту.";
+      setRemoteSaveState("error");
+      setRemoteSaveError(message);
+      throw new Error(message);
+    }
+
+    setRemoteSaveState("saving");
+    setRemoteSaveError("");
+    try {
+      await drainRemoteSavesBeforeExport(remoteProfile, submissionsRef.current);
+      const latestSubmission = submissionsRef.current.find(
+        (submission) => submission.id === activeSubmission.id,
+      );
+      if (!latestSubmission) {
+        throw new Error("Подача больше не найдена перед публикацией PDF комплекта.");
+      }
+
+      const latestHandoffPackage = buildAgentHandoffPackage(latestSubmission);
+      if (!latestHandoffPackage.ready) {
+        throw new Error(
+          latestHandoffPackage.blockers[0] ?? "Комплект PDF больше не готов.",
+        );
+      }
+
+      const published = await publishReturnedPdfAgentHandoff(latestSubmission.id);
+      if (!published) {
+        throw new Error("Supabase не вернул подтверждение публикации PDF комплекта.");
+      }
+
+      setRemoteSaveState("idle");
+      setActiveDrawerTab("files");
+    } catch (error) {
+      const message =
+        error && typeof error === "object" && "diagnostics" in error
+          ? formatPersistenceFailureForUser(
+              error,
+              "Комплект PDF не опубликован агенту.",
+            )
+          : error instanceof Error
+            ? error.message
+            : "Комплект PDF не опубликован агенту.";
+      setRemoteSaveState("error");
+      setRemoteSaveError(message);
+      throw new Error(message);
+    }
   }
 
   function dismissVisaApplicationPdfReviewForActiveSubmission(reviewId: string) {
@@ -2288,11 +2364,7 @@ function MainApp() {
     />
   );
   const cityFilterControl = (
-    <CityFilterMenu
-      options={cities}
-      value={cityFilter}
-      onChange={setCityFilter}
-    />
+    <CityFilterMenu options={cities} value={cityFilter} onChange={setCityFilter} />
   );
   const inboxSearchControl = (
     <SearchBar
@@ -2318,8 +2390,7 @@ function MainApp() {
       onChange={setQuery}
     />
   );
-  const showMobileCreateDock =
-    role === "agent" && surface === "agent-submissions";
+  const showMobileCreateDock = role === "agent" && surface === "agent-submissions";
   const mobileAwareOperationalNavItems = operationalNavItems.map((item) => ({
     ...item,
     onClick: () => {
@@ -2417,8 +2488,12 @@ function MainApp() {
               >
                 <span>{role === "agent" ? "ТП" : "АД"}</span>
                 <div>
-                  <strong>{role === "agent" ? "Татьяна Новикова" : "Ирина Лебедева"}</strong>
-                  <small>{role === "agent" ? "Агент" : "Админ"} · VisaFlow Operations</small>
+                  <strong>
+                    {role === "agent" ? "Татьяна Новикова" : "Ирина Лебедева"}
+                  </strong>
+                  <small>
+                    {role === "agent" ? "Агент" : "Админ"} · VisaFlow Operations
+                  </small>
                 </div>
                 <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
                   <circle cx="5" cy="12" r="1" />
@@ -2665,6 +2740,7 @@ function MainApp() {
           onDismissVisaApplicationPdfReview={
             dismissVisaApplicationPdfReviewForActiveSubmission
           }
+          onPublishReturnedPdfHandoff={publishReturnedPdfHandoffForActiveSubmission}
           onRunAiReview={runAiReviewForActiveSubmission}
           onTab={setActiveDrawerTab}
           onQuestionnaireField={updateActiveQuestionnaireField}
@@ -2953,7 +3029,9 @@ function WorkspaceAccessGate({
               variant="ghost"
               onClick={() => onMode?.(mode === "sign-up" ? "sign-in" : "sign-up")}
             >
-              {mode === "sign-up" ? "У меня уже есть доступ" : "Создать агентский доступ"}
+              {mode === "sign-up"
+                ? "У меня уже есть доступ"
+                : "Создать агентский доступ"}
             </Button>
           ) : null}
         </form>

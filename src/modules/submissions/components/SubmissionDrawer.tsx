@@ -35,6 +35,7 @@ import {
   visaApplicationPdfAgentHandoffStatus,
   visaApplicationPdfReviewsForSubmission,
 } from "../visaApplicationPdfReconciliation";
+import { buildAgentHandoffPackage } from "../operationalWorkflow";
 import {
   activeMediaFileTypes,
   buildReadinessQueue,
@@ -81,6 +82,7 @@ export function SubmissionDrawer({
   onExtractPassport,
   onConfirmVisaApplicationPdfReview,
   onDismissVisaApplicationPdfReview,
+  onPublishReturnedPdfHandoff,
   onReviewVisaApplicationPdf,
   onUploadFile,
   passportExtractionEnabled = false,
@@ -116,6 +118,7 @@ export function SubmissionDrawer({
   onExtractPassport: (fileId: string) => void;
   onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
   onDismissVisaApplicationPdfReview: (reviewId: string) => void;
+  onPublishReturnedPdfHandoff: () => Promise<void>;
   onReviewVisaApplicationPdf: (file: File) => Promise<void>;
   onTab: (tab: DrawerTab) => void;
   onUploadFile: (fileId: string, file?: File) => void;
@@ -252,7 +255,9 @@ export function SubmissionDrawer({
           <div className="drawer-chips" aria-label="Состояние подачи">
             <Badge className={`drawer-status-chip ${statusTone[submission.status]}`}>
               {statusLabels[submission.status]}
-              {blockerCount(submission) ? ` · ${blockerCountLabel(blockerCount(submission))}` : ""}
+              {blockerCount(submission)
+                ? ` · ${blockerCountLabel(blockerCount(submission))}`
+                : ""}
             </Badge>
             <span className="drawer-readiness-chip">
               {submission.completeness.total}% готово
@@ -328,6 +333,7 @@ export function SubmissionDrawer({
               onConfirmVisaApplicationPdfReview={onConfirmVisaApplicationPdfReview}
               onDismissVisaApplicationPdfReview={onDismissVisaApplicationPdfReview}
               onExtractPassport={onExtractPassport}
+              onPublishReturnedPdfHandoff={onPublishReturnedPdfHandoff}
               onReviewVisaApplicationPdf={onReviewVisaApplicationPdf}
               onUploadFile={onUploadFile}
               passportExtractionEnabled={passportExtractionEnabled}
@@ -366,7 +372,11 @@ export function SubmissionDrawer({
               : footerHint)}
         </span>
         {!issueComposerOpen && firstActionableQueueItem(submission) ? (
-          <Button className="drawer-footer-context-action" variant="secondary" onClick={openFirstProblem}>
+          <Button
+            className="drawer-footer-context-action"
+            variant="secondary"
+            onClick={openFirstProblem}
+          >
             Открыть первый блокер
           </Button>
         ) : null}
@@ -599,12 +609,21 @@ function DrawerApplicants({
                   onClick={() => onOpenTarget(questionnaireTarget)}
                 >
                   <strong>{applicant.fullName}</strong>
-                  <span>{applicantRoleLabel(applicant.role)} · {applicantPassportHint(applicant)}</span>
+                  <span>
+                    {applicantRoleLabel(applicant.role)} ·{" "}
+                    {applicantPassportHint(applicant)}
+                  </span>
                 </button>
                 <div className="applicant-readiness">
                   <div className="readiness-top">
                     <span>Анкета {percent}%</span>
-                    <Badge className={readyFiles === files.length ? "visa-tag visa-tag-ready" : "visa-tag visa-tag-attention"}>
+                    <Badge
+                      className={
+                        readyFiles === files.length
+                          ? "visa-tag visa-tag-ready"
+                          : "visa-tag visa-tag-attention"
+                      }
+                    >
                       Файлы {readyFiles}/{files.length}
                     </Badge>
                   </div>
@@ -749,7 +768,9 @@ function DrawerOverview({
                   />
                   <span>{item.label}</span>
                   {item.label === "Обязательные файлы" ? (
-                    <Badge className={`overview-check-value entity-tag ${item.tone === "ready" ? "teal" : "amber"}`}>
+                    <Badge
+                      className={`overview-check-value entity-tag ${item.tone === "ready" ? "teal" : "amber"}`}
+                    >
                       {item.value}
                     </Badge>
                   ) : (
@@ -782,7 +803,8 @@ function DrawerOverview({
               <article className="history-event">
                 <strong>{statusLabels[submission.status]}</strong>
                 <span>
-                  {submission.updatedAt} · {isAdminReview ? "Не назначен" : "Текущий администратор"}
+                  {submission.updatedAt} ·{" "}
+                  {isAdminReview ? "Не назначен" : "Текущий администратор"}
                 </span>
               </article>
               <article className="history-event">
@@ -973,9 +995,7 @@ function DrawerQuestionnaire({
     if (openSectionKey && activeApplicantReviewSectionKeys.includes(openSectionKey)) {
       return;
     }
-    if (
-      openSectionKey === closedQuestionnaireSectionKey(activeApplicant.id)
-    ) {
+    if (openSectionKey === closedQuestionnaireSectionKey(activeApplicant.id)) {
       return;
     }
 
@@ -1414,6 +1434,7 @@ function DrawerFiles({
   onConfirmVisaApplicationPdfReview,
   onDismissVisaApplicationPdfReview,
   onExtractPassport,
+  onPublishReturnedPdfHandoff,
   onReviewVisaApplicationPdf,
   onUploadFile,
   passportExtractionEnabled = false,
@@ -1426,6 +1447,7 @@ function DrawerFiles({
   onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
   onDismissVisaApplicationPdfReview: (reviewId: string) => void;
   onExtractPassport: (fileId: string) => void;
+  onPublishReturnedPdfHandoff: () => Promise<void>;
   onReviewVisaApplicationPdf: (file: File) => Promise<void>;
   onUploadFile: (fileId: string, file?: File) => void;
   passportExtractionEnabled?: boolean;
@@ -1436,18 +1458,31 @@ function DrawerFiles({
   const canEditFiles = canEditSubmissionContent(submission, role);
   const [pdfReviewBusy, setPdfReviewBusy] = useState(false);
   const [pdfReviewError, setPdfReviewError] = useState("");
+  const [pdfHandoffBusy, setPdfHandoffBusy] = useState(false);
+  const [pdfHandoffMessage, setPdfHandoffMessage] = useState("");
   const pdfReviewAvailable = submission.status === "exported";
   const pdfReviews = visaApplicationPdfReviewsForSubmission(submission);
   const pdfHandoffStatus = visaApplicationPdfAgentHandoffStatus(submission);
+  const agentHandoffPackage = buildAgentHandoffPackage(submission);
   const canReviewVisaPdf =
     pdfReviewAvailable &&
     !fileUploadBusy &&
     !pdfReviewBusy &&
+    !pdfHandoffBusy &&
     role === "admin";
+  const canPublishReturnedPdfHandoff = canReviewVisaPdf && agentHandoffPackage.ready;
+
+  useEffect(() => {
+    setPdfReviewBusy(false);
+    setPdfReviewError("");
+    setPdfHandoffBusy(false);
+    setPdfHandoffMessage("");
+  }, [submission.id]);
 
   async function handleVisaApplicationPdf(file: File) {
     setPdfReviewBusy(true);
     setPdfReviewError("");
+    setPdfHandoffMessage("");
     try {
       await onReviewVisaApplicationPdf(file);
     } catch (error) {
@@ -1462,19 +1497,41 @@ function DrawerFiles({
     }
   }
 
+  async function handlePublishReturnedPdfHandoff() {
+    setPdfHandoffBusy(true);
+    setPdfReviewError("");
+    setPdfHandoffMessage("");
+    try {
+      await onPublishReturnedPdfHandoff();
+      setPdfHandoffMessage("Комплект PDF опубликован агенту.");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Комплект PDF не удалось открыть агенту.";
+      setPdfReviewError(message);
+    } finally {
+      setPdfHandoffBusy(false);
+    }
+  }
+
   return (
     <section className="drawer-section drawer-files-section">
       {pdfReviewAvailable ? (
         <VisaApplicationPdfReviewPanel
-          busy={pdfReviewBusy}
+          busy={pdfReviewBusy || pdfHandoffBusy}
+          canPublish={canPublishReturnedPdfHandoff}
           canUpload={canReviewVisaPdf}
           error={pdfReviewError}
+          handoffBlockers={agentHandoffPackage.blockers}
+          handoffMessage={pdfHandoffMessage}
           handoffStatus={pdfHandoffStatus}
           applicants={submission.applicants}
           reviews={pdfReviews}
           submissionId={submission.id}
           onConfirm={onConfirmVisaApplicationPdfReview}
           onDismiss={onDismissVisaApplicationPdfReview}
+          onPublish={handlePublishReturnedPdfHandoff}
           onReview={handleVisaApplicationPdf}
         />
       ) : null}
@@ -1518,9 +1575,7 @@ function DrawerFiles({
             return (
               <article
                 aria-label={`${fileLabel(file.type)}: ${applicant?.fullName ?? "заявитель"}, ${fileStatusLabel(file)}`}
-                className={`media-file-row ${issue ? "has-issue" : ""} ${
-                  file.status
-                }`}
+                className={`media-file-row ${issue ? "has-issue" : ""} ${file.status}`}
                 id={targetElementId({
                   applicantId: file.applicantId,
                   fileType: file.type,
@@ -1611,9 +1666,7 @@ function DrawerFiles({
                     <Badge className="visa-tag">Распознавание</Badge>
                   ) : null}
                   {issue ? (
-                    <Badge className="visa-tag visa-tag-attention">
-                      К замечанию
-                    </Badge>
+                    <Badge className="visa-tag visa-tag-attention">К замечанию</Badge>
                   ) : null}
                 </div>
               </article>
@@ -1625,7 +1678,9 @@ function DrawerFiles({
       </div>
       <CardComponent as="section" className="surface v17-file-trust">
         <div className="guard warn">
-          <span className="guard-icon" aria-hidden="true">i</span>
+          <span className="guard-icon" aria-hidden="true">
+            i
+          </span>
           <span>
             <strong>Файлы не отправляются</strong>
             <br />
@@ -1642,22 +1697,30 @@ function DrawerFiles({
 function VisaApplicationPdfReviewPanel({
   applicants,
   busy,
+  canPublish,
   canUpload,
   error,
+  handoffBlockers,
+  handoffMessage,
   handoffStatus,
   onConfirm,
   onDismiss,
+  onPublish,
   onReview,
   reviews,
   submissionId,
 }: {
   applicants: Submission["applicants"];
   busy: boolean;
+  canPublish: boolean;
   canUpload: boolean;
   error: string;
+  handoffBlockers: string[];
+  handoffMessage: string;
   handoffStatus: ReturnType<typeof visaApplicationPdfAgentHandoffStatus>;
   onConfirm: (reviewId: string) => void;
   onDismiss: (reviewId: string) => void;
+  onPublish: () => void;
   onReview: (file: File) => void;
   reviews: NonNullable<Submission["visaApplicationPdfReviews"]>;
   submissionId: string;
@@ -1673,15 +1736,19 @@ function VisaApplicationPdfReviewPanel({
     })),
   );
   const missingApplicants = applicants.filter(
-    (applicant) =>
-      !reviews.some((review) => review.applicantId === applicant.id),
+    (applicant) => !reviews.some((review) => review.applicantId === applicant.id),
   );
   const unmatchedReviews = reviews.filter((review) => !review.applicantId);
 
-  const handoffActionLabel = handoffStatus.ok ? "Готов к передаче" : "Передача закрыта";
-  const handoffActionTitle = handoffStatus.ok
-    ? `PDF готов к передаче агентам: ${handoffStatus.reason}`
-    : `Передача агентам недоступна: ${handoffStatus.reason}`;
+  const handoffBlocker = handoffBlockers[0] ?? handoffStatus.reason;
+  const handoffActionLabel = busy
+    ? "Передача"
+    : canPublish
+      ? "Передать агенту"
+      : "Передача закрыта";
+  const handoffActionTitle = canPublish
+    ? `Открыть агенту комплект PDF: ${handoffStatus.reason}`
+    : `Передача агентам недоступна: ${handoffBlocker}`;
 
   return (
     <CardComponent
@@ -1708,7 +1775,9 @@ function VisaApplicationPdfReviewPanel({
         {applicants.map((applicant) => {
           const review = reviews.find((item) => item.applicantId === applicant.id);
           const data = review?.data ?? {};
-          const extractedName = [data.surname, data.firstName].filter(Boolean).join(" ");
+          const extractedName = [data.surname, data.firstName]
+            .filter(Boolean)
+            .join(" ");
 
           return (
             <p key={applicant.id}>
@@ -1722,10 +1791,14 @@ function VisaApplicationPdfReviewPanel({
           );
         })}
         {missingApplicants.length ? (
-          <p>Не хватает PDF: {missingApplicants.map((item) => item.fullName).join(", ")}.</p>
+          <p>
+            Не хватает PDF: {missingApplicants.map((item) => item.fullName).join(", ")}.
+          </p>
         ) : null}
         {unmatchedReviews.length ? (
-          <p>Есть PDF, который не сопоставился с заявителем: {unmatchedReviews.length}.</p>
+          <p>
+            Есть PDF, который не сопоставился с заявителем: {unmatchedReviews.length}.
+          </p>
         ) : null}
         {reviews.some((review) => review.artifact?.extractionSource === "local_ocr") ? (
           <p>Источник текста: локальный OCR. Проверьте поля вручную перед передачей.</p>
@@ -1738,6 +1811,7 @@ function VisaApplicationPdfReviewPanel({
           <p>Предупреждения подтверждены вручную.</p>
         ) : null}
         {error ? <p role="alert">{error}</p> : null}
+        {handoffMessage ? <p role="status">{handoffMessage}</p> : null}
         {findings.length ? (
           <ul aria-label="Ошибки PDF анкеты">
             {findings.map((finding, index) => (
@@ -1765,7 +1839,8 @@ function VisaApplicationPdfReviewPanel({
               const needsConfirmation =
                 review.status === "needs_review" &&
                 review.handoffStatus !== "ready_for_agent";
-              const canDismissReview = !review.applicantId || review.status === "blocked";
+              const canDismissReview =
+                !review.applicantId || review.status === "blocked";
               if (!needsConfirmation && !canDismissReview) return null;
 
               return (
@@ -1808,7 +1883,8 @@ function VisaApplicationPdfReviewPanel({
       <div className="media-file-actions">
         <Button
           aria-label={handoffActionTitle}
-          disabled
+          disabled={!canPublish || busy}
+          onClick={onPublish}
           title={handoffActionTitle}
           variant="secondary"
         >
@@ -1970,7 +2046,11 @@ function DrawerHistory({ submission }: { submission: Submission }) {
 
   return (
     <section className="drawer-section drawer-history-section">
-      <div className="history-filter v17-history-filter" role="group" aria-label="Фильтр истории">
+      <div
+        className="history-filter v17-history-filter"
+        role="group"
+        aria-label="Фильтр истории"
+      >
         {[
           { id: "all", label: "Все" },
           { id: "questionnaire", label: "Анкета" },
@@ -2318,7 +2398,8 @@ function aggregateVisaPdfReviewStatus(
     applicants.some(
       (applicant) =>
         !reviews.some(
-          (review) => review.applicantId === applicant.id && review.status !== "blocked",
+          (review) =>
+            review.applicantId === applicant.id && review.status !== "blocked",
         ),
     )
   ) {
@@ -2327,8 +2408,7 @@ function aggregateVisaPdfReviewStatus(
   if (
     reviews.some(
       (review) =>
-        review.status === "needs_review" &&
-        review.handoffStatus !== "ready_for_agent",
+        review.status === "needs_review" && review.handoffStatus !== "ready_for_agent",
     )
   ) {
     return "needs_review";

@@ -12,6 +12,7 @@ import {
   createExportWorkbookBlob,
   EXPORT_WORKBOOK_CONTENT_TYPE,
   parseExportWorkbookBlob,
+  type ExportWorkbookRowFill,
   type ParsedExportWorkbook,
 } from "../../lib/export/exportWorkbookCore";
 import type { ExportPackageIdentity } from "./types";
@@ -28,6 +29,7 @@ export type ExportWorkbookArtifact = {
   contentType: string;
   fileName: string;
   range: typeof EXPORT_WORKBOOK_RANGE;
+  rowFills: Array<ExportWorkbookRowFill | null>;
   rows: string[][];
   sheetName: typeof EXPORT_WORKBOOK_SHEET_NAME;
 };
@@ -63,8 +65,33 @@ type BrowserDownloadRuntime = typeof globalThis & {
   setTimeout(callback: () => void, timeout: number): unknown;
 };
 
+const familyFillSequence: ExportWorkbookRowFill[] = ["green", "yellow", "blue"];
+
 export function buildExportWorkbookRows(rows: ExportContractRow[]): string[][] {
   return buildExportWorkbookMatrix(rows);
+}
+
+export function buildExportWorkbookRowFills(
+  rows: ExportContractRow[],
+): Array<ExportWorkbookRowFill | null> {
+  const familyFillsBySubmission = new Map<string, ExportWorkbookRowFill>();
+  let familyIndex = 0;
+
+  return [
+    null,
+    ...rows.map((row) => {
+      if (row.appointmentType !== "Family") return null;
+
+      const existing = familyFillsBySubmission.get(row.submissionId);
+      if (existing) return existing;
+
+      const fill =
+        familyFillSequence[familyIndex % familyFillSequence.length] ?? "green";
+      familyFillsBySubmission.set(row.submissionId, fill);
+      familyIndex += 1;
+      return fill;
+    }),
+  ];
 }
 
 export function createExportWorkbookArtifact(
@@ -72,13 +99,15 @@ export function createExportWorkbookArtifact(
   identity: ExportPackageIdentity,
 ): ExportWorkbookArtifact {
   const workbookRows = buildExportWorkbookRows(rows);
-  const blob = createExportWorkbookBlob(workbookRows);
+  const rowFills = buildExportWorkbookRowFills(rows);
+  const blob = createExportWorkbookBlob(workbookRows, { rowFills });
 
   return {
     blob,
     contentType: EXPORT_WORKBOOK_CONTENT_TYPE,
     fileName: identity.fileName,
     range: EXPORT_WORKBOOK_RANGE,
+    rowFills,
     rows: workbookRows,
     sheetName: EXPORT_WORKBOOK_SHEET_NAME,
   };
@@ -105,6 +134,8 @@ export async function verifyExportWorkbookArtifact(
       (value, index) => value === EXPECTED_EXPORT_CONTRACT_HEADERS[index],
     ) &&
     parsed.rows.length === artifact.rows.length &&
+    parsed.rowFills.length === artifact.rowFills.length &&
+    parsed.rowFills.every((fill, rowIndex) => fill === artifact.rowFills[rowIndex]) &&
     parsed.rows.every(
       (row, rowIndex) =>
         row.length === artifact.rows[rowIndex]?.length &&

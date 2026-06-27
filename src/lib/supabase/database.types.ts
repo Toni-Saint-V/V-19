@@ -55,6 +55,12 @@ export type Database = {
         Update: Partial<QuestionnaireAnswerInsert>;
         Relationships: [];
       };
+      returned_pdf_handoff_artifacts: {
+        Row: ReturnedPdfHandoffArtifactRow;
+        Insert: ReturnedPdfHandoffArtifactInsert;
+        Update: Partial<ReturnedPdfHandoffArtifactInsert>;
+        Relationships: [];
+      };
       export_batches: {
         Row: ExportBatchRow;
         Insert: ExportBatchInsert;
@@ -81,6 +87,12 @@ export type Database = {
           payload: ExportPackageCommitPayload;
         };
         Returns: ExportPackageCommitResult;
+      };
+      publish_returned_pdf_handoff: {
+        Args: {
+          payload: ReturnedPdfHandoffPublishPayload;
+        };
+        Returns: ReturnedPdfHandoffPublishResult;
       };
       save_submission_draft: {
         Args: {
@@ -283,6 +295,27 @@ export type QuestionnaireAnswerInsert = Omit<
   updated_at?: string;
 };
 
+export interface ReturnedPdfHandoffArtifactRow extends DbRecord {
+  id: string;
+  submission_id: string;
+  applicant_id: string | null;
+  artifact_kind: "appointment_pdf" | "visa_application_pdf";
+  storage_bucket: "submission-media";
+  storage_path: string;
+  file_name: string;
+  sha256: string;
+  released_by: string;
+  released_at: string;
+}
+
+export type ReturnedPdfHandoffArtifactInsert = Omit<
+  ReturnedPdfHandoffArtifactRow,
+  "id" | "released_at"
+> & {
+  id?: string;
+  released_at?: string;
+};
+
 export interface ExportBatchRow extends DbRecord {
   id: string;
   created_by: string;
@@ -329,6 +362,16 @@ export interface ExportPackageCommitResult extends DbRecord {
   submissions: number;
   statusHistory: number;
   duplicate: boolean;
+}
+
+export interface ReturnedPdfHandoffPublishPayload extends DbRecord {
+  submissionId: string;
+}
+
+export interface ReturnedPdfHandoffPublishResult extends DbRecord {
+  submissionId: string;
+  artifactCount: number;
+  duplicate?: boolean;
 }
 
 export interface AppointmentRow extends DbRecord {

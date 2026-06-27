@@ -10,11 +10,19 @@ import {
   type VisaApplicationReferenceData,
 } from "../../src/modules/submissions/visaApplicationPdfReconciliation";
 import {
+  buildVisaApplicationPdfStorageTarget,
+  mediaStorageBucket,
+  validateVisaApplicationPdfStorageTarget,
+} from "../../src/modules/submissions/mediaStoragePolicy";
+import {
   completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
-import { applySubmissionAction, canPerformAction } from "../../src/modules/submissions/status";
+import {
+  applySubmissionAction,
+  canPerformAction,
+} from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
 
 const pdfTextFrom669308614 = `
@@ -480,7 +488,8 @@ destino, si procede)/
 
     expect(visaApplicationPdfAgentHandoffStatus(withPdfReview)).toEqual({
       ok: false,
-      reason: "Есть предупреждения PDF, подтвердите ручную проверку перед передачей агентам.",
+      reason:
+        "Есть предупреждения PDF, подтвердите ручную проверку перед передачей агентам.",
       status: "needs_manual_confirmation",
     });
   });
@@ -576,6 +585,38 @@ destino, si procede)/
     ).toThrow(/storage path/);
   });
 
+  test("rejects returned PDF artifact storage identity for another applicant", () => {
+    const exported = exportedFixture();
+    const artifactTarget = buildVisaApplicationPdfStorageTarget({
+      applicantId: "other-applicant",
+      sha256: fullSha256,
+      submissionId: exported.id,
+    });
+
+    expect(() =>
+      applyVisaApplicationPdfReview(exported, completeCriticalPdfText, {
+        artifact: {
+          extractionSource: "text_layer",
+          fileName: "volkov-warning.pdf",
+          mimeType: "application/pdf",
+          sha256: fullSha256,
+          sizeBytes: 19570,
+          storageBucket: mediaStorageBucket,
+          storagePath: artifactTarget.path,
+        },
+      }),
+    ).toThrow(/current submission/);
+
+    expect(() =>
+      validateVisaApplicationPdfStorageTarget({
+        applicantId: exported.applicants[0]?.id ?? "",
+        sha256: fullSha256,
+        submissionId: exported.id,
+        target: artifactTarget,
+      }),
+    ).toThrow(/current submission/);
+  });
+
   test("matches returned PDFs to the right applicant and requires every family member", () => {
     const exported = exportedFixture(
       submittedFixture([matchingReference, bogdanovReference]),
@@ -586,9 +627,8 @@ destino, si procede)/
       clearPdfTextFor(bogdanovReference),
       { fileName: "bogdanov.pdf" },
     );
-    const secondReview = visaApplicationPdfReviewsForSubmission(
-      withSecondApplicantPdf,
-    )[0];
+    const secondReview =
+      visaApplicationPdfReviewsForSubmission(withSecondApplicantPdf)[0];
 
     expect(secondReview).toMatchObject({
       applicantId: secondApplicant?.id,

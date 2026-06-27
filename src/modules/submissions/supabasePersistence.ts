@@ -20,6 +20,7 @@ import type { AppProfile } from "../../types/session";
 import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
+import { isQuestionnaireReviewSource, isQuestionnaireReviewState } from "./types";
 import {
   normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
@@ -28,6 +29,9 @@ import { normalizeSubmissionForCanonicalRuntime } from "./submissionActions";
 import type {
   Applicant,
   Issue,
+  QuestionnaireField,
+  QuestionnaireReviewSource,
+  QuestionnaireReviewState,
   IssueStatus,
   Submission,
   SubmissionFile,
@@ -65,6 +69,27 @@ type CockpitQuestionnaireAnswerRow = Pick<
   QuestionnaireAnswerRow,
   "applicant_id" | "field_id" | "label" | "section_id" | "submission_id" | "value"
 >;
+type QuestionnaireAnswerValueEnvelope = {
+  kind: typeof questionnaireAnswerEnvelopeKind;
+  reviewConfirmedAtIso?: string;
+  reviewConfirmedBy?: string;
+  reviewOriginSource?: QuestionnaireReviewSource;
+  reviewSource?: QuestionnaireReviewSource;
+  reviewState?: QuestionnaireReviewState;
+  value: string;
+  version: typeof questionnaireAnswerEnvelopeVersion;
+};
+type QuestionnaireAnswerValueResult = {
+  reviewConfirmedAtIso?: string;
+  reviewConfirmedBy?: string;
+  reviewOriginSource?: QuestionnaireReviewSource;
+  reviewSource?: QuestionnaireReviewSource;
+  reviewState?: QuestionnaireReviewState;
+  value: string;
+};
+
+const questionnaireAnswerEnvelopeKind = "v19_questionnaire_field";
+const questionnaireAnswerEnvelopeVersion = 1;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -150,14 +175,57 @@ function attachNormalizedApplicantRows(
   };
 }
 
+function attachQuestionnaireAnswerRows(
+  submission: Submission,
+  answers: CockpitQuestionnaireAnswerRow[],
+): Submission {
+  if (!answers.length) return submission;
+
+  const answersByApplicantField = new Map(
+    answers.map((answer) => [`${answer.applicant_id}:${answer.field_id}`, answer]),
+  );
+
+  return normalizeSubmissionQuestionnaire({
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          const answer = answersByApplicantField.get(`${applicant.id}:${field.id}`);
+          if (!answer) return field;
+
+          const value = questionnaireAnswerFieldValue(answer.value);
+          return {
+            ...field,
+            reviewConfirmedAtIso: value.reviewConfirmedAtIso,
+            reviewConfirmedBy: value.reviewConfirmedBy,
+            reviewOriginSource: value.reviewOriginSource,
+            reviewSource: value.reviewSource,
+            reviewState: value.reviewState,
+            value: value.value,
+          };
+        }),
+      })),
+    })),
+  });
+}
+
 function reconcileCockpitSnapshotWithSubmissionRow(
   row: Pick<SubmissionRow, "agent_id" | "exported_at" | "status" | "updated_at">,
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
+  questionnaireAnswers: CockpitQuestionnaireAnswerRow[],
 ): Submission {
   const rowStatus = fromSupabaseSubmissionRowStatus(row);
   const normalizedSnapshot = normalizeSubmissionForCanonicalRuntime(
-    attachNormalizedApplicantRows(ensureSubmissionOwner(snapshot, row.agent_id), applicants),
+    attachQuestionnaireAnswerRows(
+      attachNormalizedApplicantRows(
+        ensureSubmissionOwner(snapshot, row.agent_id),
+        applicants,
+      ),
+      questionnaireAnswers,
+    ),
     {
       exportedAt: row.exported_at,
       statusFallback: rowStatus,
@@ -290,9 +358,7 @@ function mediaTypeForIssue(type: SubmissionFileType | undefined) {
   return mediaType.ok ? mediaType.data : null;
 }
 
-function mediaTypeForFile(
-  type: SubmissionFileType,
-): MediaAssetInsert["type"] | null {
+function mediaTypeForFile(type: SubmissionFileType): MediaAssetInsert["type"] | null {
   const mediaType = toCanonicalStorageMediaType(type);
   return mediaType.ok ? mediaType.data : null;
 }
@@ -430,7 +496,7 @@ export function toCockpitQuestionnaireAnswerInserts(
         section_id: section.id,
         field_id: field.id,
         label: field.label,
-        value: field.value,
+        value: questionnaireAnswerJsonForField(field),
         updated_by: actorId,
       })),
     ),
@@ -570,19 +636,98 @@ function questionnaireSectionsFromAnswerRows(
     id: sectionId,
     title: sectionId,
     status: "partial" as const,
-    fields: sectionAnswers.map((answer) => ({
-      id: answer.field_id,
-      label: answer.label,
-      value: questionnaireAnswerValue(answer.value),
-      required: true,
-    })),
+    fields: sectionAnswers.map((answer) => {
+      const value = questionnaireAnswerFieldValue(answer.value);
+
+      return {
+        id: answer.field_id,
+        label: answer.label,
+        required: true,
+        reviewConfirmedAtIso: value.reviewConfirmedAtIso,
+        reviewConfirmedBy: value.reviewConfirmedBy,
+        reviewOriginSource: value.reviewOriginSource,
+        reviewSource: value.reviewSource,
+        reviewState: value.reviewState,
+        value: value.value,
+      };
+    }),
   }));
 }
 
-function questionnaireAnswerValue(value: Json): string {
-  if (typeof value === "string") return value;
-  if (value === null) return "";
-  return JSON.stringify(value);
+function questionnaireAnswerJsonForField(field: QuestionnaireField): Json {
+  if (
+    !field.reviewState &&
+    !field.reviewSource &&
+    !field.reviewOriginSource &&
+    !field.reviewConfirmedAtIso &&
+    !field.reviewConfirmedBy
+  ) {
+    return field.value;
+  }
+
+  const envelope: QuestionnaireAnswerValueEnvelope = {
+    kind: questionnaireAnswerEnvelopeKind,
+    value: field.value,
+    version: questionnaireAnswerEnvelopeVersion,
+  };
+
+  if (field.reviewConfirmedAtIso) {
+    envelope.reviewConfirmedAtIso = field.reviewConfirmedAtIso;
+  }
+
+  if (field.reviewConfirmedBy) {
+    envelope.reviewConfirmedBy = field.reviewConfirmedBy;
+  }
+
+  if (field.reviewOriginSource) {
+    envelope.reviewOriginSource = field.reviewOriginSource;
+  }
+
+  if (field.reviewState) {
+    envelope.reviewState = field.reviewState;
+  }
+
+  if (field.reviewSource) {
+    envelope.reviewSource = field.reviewSource;
+  }
+
+  return envelope;
+}
+
+function questionnaireAnswerFieldValue(value: Json): QuestionnaireAnswerValueResult {
+  if (isRecord(value) && value.kind === questionnaireAnswerEnvelopeKind) {
+    if (
+      value.version !== undefined &&
+      value.version !== questionnaireAnswerEnvelopeVersion
+    ) {
+      return { value: typeof value.value === "string" ? value.value : "" };
+    }
+
+    return {
+      reviewConfirmedAtIso:
+        typeof value.reviewConfirmedAtIso === "string"
+          ? value.reviewConfirmedAtIso
+          : undefined,
+      reviewConfirmedBy:
+        typeof value.reviewConfirmedBy === "string"
+          ? value.reviewConfirmedBy
+          : undefined,
+      reviewOriginSource: isQuestionnaireReviewSource(value.reviewOriginSource)
+        ? value.reviewOriginSource
+        : undefined,
+      reviewSource: isQuestionnaireReviewSource(value.reviewSource)
+        ? value.reviewSource
+        : undefined,
+      reviewState: isQuestionnaireReviewState(value.reviewState)
+        ? value.reviewState
+        : undefined,
+      value: typeof value.value === "string" ? value.value : "",
+    };
+  }
+
+  if (typeof value === "string") return { value };
+  if (value === null) return { value: "" };
+  return { value: JSON.stringify(value) };
 }
 
 export async function loadCockpitSubmissionsForProfile(
@@ -658,6 +803,7 @@ export async function loadCockpitSubmissionsForProfile(
         row,
         snapshot,
         submissionApplicants,
+        submissionQuestionnaireAnswers,
       );
     }
 

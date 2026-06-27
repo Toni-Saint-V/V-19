@@ -484,7 +484,7 @@ describe("V-19 export rules", () => {
     });
   });
 
-  it("blocks mixed city, date, type, and already exported packages", () => {
+  it("blocks mixed city and already exported packages", () => {
     const blockers = getExportBlockers([
       readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-ГОРОД", city: "Казань" }),
@@ -496,8 +496,34 @@ describe("V-19 export rules", () => {
     expect(blockers).toContain("В выборке есть подачи не готовые к выгрузке");
     expect(blockers).toContain("В выборке есть уже выгруженные подачи");
     expect(blockers).toContain("Нельзя смешивать разные города");
-    expect(blockers).toContain("Нельзя смешивать разные даты поездки");
-    expect(blockers).toContain("Нельзя смешивать одинарные и семейные подачи");
+    expect(blockers).not.toContain("Нельзя смешивать разные даты поездки");
+    expect(blockers).not.toContain("Нельзя смешивать одинарные и семейные подачи");
+  });
+
+  it("allows one city export batch to mix family and single submissions", () => {
+    const submissions = [
+      readyClone({ id: "ПД-1056" }),
+      readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
+    ];
+    const summary = exportSummary(submissions);
+    const generated = applyExportStateToSelection(
+      submissions,
+      ["ПД-1056", "ПД-СЕМЬЯ"],
+      "file_generated",
+    );
+
+    expect(summary).toMatchObject({
+      canGenerate: true,
+      ready: true,
+      rowCount: 2,
+    });
+    expect(summary.rows.map((row) => row.submissionId)).toEqual([
+      "ПД-СЕМЬЯ",
+      "ПД-1056",
+    ]);
+    expect(generated).not.toBe(submissions);
+    expect(generated[0]?.exportState).toBe("file_generated");
+    expect(generated[1]?.exportState).toBe("file_generated");
   });
 
   it("keeps download and exported actions locked to the generated selection", () => {
@@ -568,14 +594,14 @@ describe("V-19 export rules", () => {
   it("keeps export state unchanged for invalid package generation attempts", () => {
     const submissions = [
       readyClone({ id: "ПД-1056" }),
-      readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
+      readyClone({ id: "ПД-ГОРОД", city: "Казань" }),
       byId("ПД-1051"),
     ];
 
     expect(
       applyExportStateToSelection(
         submissions,
-        ["ПД-1056", "ПД-СЕМЬЯ"],
+        ["ПД-1056", "ПД-ГОРОД"],
         "file_generated",
       ),
     ).toBe(submissions);
@@ -818,7 +844,9 @@ describe("V-19 submission actions", () => {
       reviewedBy: undefined,
       status: "uploaded",
     });
-    expect(canPerformAction(withSelfieReplacement, "submit_corrections", "agent")).toEqual({
+    expect(
+      canPerformAction(withSelfieReplacement, "submit_corrections", "agent"),
+    ).toEqual({
       ok: false,
       reason: "Сначала исправьте целевые замечания",
     });
@@ -832,12 +860,13 @@ describe("V-19 submission actions", () => {
         originalFileName: "passport-fixed.pdf",
         sizeBytes: 420_000,
         storageBucket: "submission-media",
-        storagePath:
-          "ПД-1048/з-1048-3/passport_scan/v19replacement_passport_scan.pdf",
+        storagePath: "ПД-1048/з-1048-3/passport_scan/v19replacement_passport_scan.pdf",
         uploadedAtIso: "2026-06-21T10:01:00.000Z",
       },
     );
-    expect(canPerformAction(withAllReplacements, "submit_corrections", "agent")).toEqual({
+    expect(
+      canPerformAction(withAllReplacements, "submit_corrections", "agent"),
+    ).toEqual({
       ok: false,
       reason: "Загранпаспорт не подтвержден: распознавание еще не выполнено.",
     });
@@ -873,7 +902,9 @@ describe("V-19 submission actions", () => {
     );
     const queue = agentActionQueue([withVerifiedPassport]);
 
-    expect(canPerformAction(withVerifiedPassport, "submit_corrections", "agent")).toEqual({
+    expect(
+      canPerformAction(withVerifiedPassport, "submit_corrections", "agent"),
+    ).toEqual({
       ok: true,
     });
     expect(queue.open).toHaveLength(1);
@@ -1050,12 +1081,7 @@ describe("V-19 submission actions", () => {
   it("rejects legacy media slots at the Supabase storage boundary", () => {
     for (const type of ["photo", "photo_white", "video"] as const) {
       expect(() =>
-        buildMediaStoragePath(
-          "VF-1059",
-          "app-1059-1",
-          type,
-          `v19legacy_${type}.jpg`,
-        ),
+        buildMediaStoragePath("VF-1059", "app-1059-1", type, `v19legacy_${type}.jpg`),
       ).toThrow(/invalid slot type|not canonical/i);
     }
 
@@ -1103,8 +1129,7 @@ describe("V-19 submission actions", () => {
     const filled = uploadRequiredFiles(completeQuestionnaire(draft));
     const passportFile = filled.files.find(
       (file) =>
-        file.type === "passport_scan" &&
-        file.applicantId === filled.applicants[0]?.id,
+        file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
     );
     if (!passportFile) throw new Error("Missing passport file");
 
@@ -1152,7 +1177,7 @@ describe("V-19 submission actions", () => {
     });
   });
 
-  it("blocks real passport uploads until extraction confirms the document", () => {
+  it("allows manual review submission when OCR fails after passport upload", () => {
     const draft = createDraftSubmission({
       applicantNames: ["IVANOV IVAN"],
       city: "Москва",
@@ -1163,8 +1188,7 @@ describe("V-19 submission actions", () => {
     const filled = uploadRequiredFiles(completeQuestionnaire(draft));
     const passportFile = filled.files.find(
       (file) =>
-        file.type === "passport_scan" &&
-        file.applicantId === filled.applicants[0]?.id,
+        file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
     );
     if (!passportFile) throw new Error("Missing passport file");
 
@@ -1195,8 +1219,7 @@ describe("V-19 submission actions", () => {
 
     const failed = failPassportExtraction(inProgress, passportFile, "Не распознано");
     expect(canPerformAction(failed, "submit_for_review", "agent")).toEqual({
-      ok: false,
-      reason: "Файл не подтвержден как загранпаспорт. Загрузите разворот паспорта с MRZ.",
+      ok: true,
     });
   });
 
@@ -1776,8 +1799,11 @@ describe("V-19 persistence boundary", () => {
     expect(loaded?.files.every((file) => file.status === "missing")).toBe(true);
     expect(loaded?.completeness.files).toBe(0);
     expect(
-      canPerformAction({ ...(loaded as Submission), status: "in_progress" }, "submit_for_review", "agent")
-        .ok,
+      canPerformAction(
+        { ...(loaded as Submission), status: "in_progress" },
+        "submit_for_review",
+        "agent",
+      ).ok,
     ).toBe(false);
   });
 

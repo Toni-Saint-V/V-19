@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { buildMediaSlot } from "../../src/lib/workflow";
 import {
+  buildAppointmentPdfStorageTarget,
   buildMediaStoragePath,
   buildVisaApplicationPdfStorageTarget,
   createMediaSignedUrl,
@@ -8,7 +9,9 @@ import {
   mediaStorageBucket,
   storageTargetForSlot,
   uploadMediaToStorage,
+  validateAppointmentPdfStorageTarget,
   validateMediaStorageTarget,
+  validateVisaApplicationPdfStorageTarget,
 } from "../../src/services/storageService";
 import type { Applicant } from "../../src/types/domain";
 
@@ -84,6 +87,62 @@ describe("media storage contract", () => {
         target,
       }),
     ).toThrow(/MIME type/);
+    expect(() =>
+      validateVisaApplicationPdfStorageTarget({
+        applicantId: "applicant-1",
+        file: new File(["%PDF"], "returned.pdf", { type: "application/pdf" }),
+        sha256,
+        submissionId: "VF-1044",
+        target,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateVisaApplicationPdfStorageTarget({
+        applicantId: "applicant-2",
+        sha256,
+        submissionId: "VF-1044",
+        target,
+      }),
+    ).toThrow(/current submission/);
+    expect(() =>
+      validateVisaApplicationPdfStorageTarget({
+        applicantId: "applicant-1",
+        sha256: "b".repeat(64),
+        submissionId: "VF-1044",
+        target,
+      }),
+    ).toThrow(/current submission/);
+  });
+
+  test("scopes returned appointment PDFs to one submission and checksum", () => {
+    const sha256 = "c".repeat(64);
+    const target = buildAppointmentPdfStorageTarget({
+      nonce: "2026-06-27T10:11:12.000Z",
+      sha256,
+      submissionId: "VF-1044",
+    });
+
+    expect(target).toEqual({
+      bucket: mediaStorageBucket,
+      path: "VF-1044/common/appointment_pdf/cccccccccccccccc_20260627T101112000Z_appointment_pdf.pdf",
+    });
+    expect(() =>
+      validateAppointmentPdfStorageTarget({
+        file: new File(["%PDF"], "appointment-list.pdf", {
+          type: "application/pdf",
+        }),
+        sha256,
+        submissionId: "VF-1044",
+        target,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateAppointmentPdfStorageTarget({
+        sha256,
+        submissionId: "VF-9999",
+        target,
+      }),
+    ).toThrow(/current submission/);
   });
 
   test("rejects returned visa application PDF storage targets without full SHA-256", () => {
@@ -109,12 +168,7 @@ describe("media storage contract", () => {
 
   test("accepts existing cockpit Cyrillic ids without allowing path escapes", () => {
     expect(
-      buildMediaStoragePath(
-        "ПД-1052",
-        "з-1052-1",
-        "selfie",
-        "v1900abcde_selfie.jpg",
-      ),
+      buildMediaStoragePath("ПД-1052", "з-1052-1", "selfie", "v1900abcde_selfie.jpg"),
     ).toEqual({
       bucket: mediaStorageBucket,
       path: "ПД-1052/з-1052-1/selfie/v1900abcde_selfie.jpg",

@@ -7,12 +7,15 @@ import {
 
 export {
   assertVisaApplicationPdfSha256,
+  buildAppointmentPdfStorageTarget,
   buildMediaStoragePath,
   buildVisaApplicationPdfStorageTarget,
   mediaStorageBucket,
   MediaStorageValidationError,
   storageTargetForSlot,
+  validateAppointmentPdfStorageTarget,
   validateMediaStorageTarget,
+  validateVisaApplicationPdfStorageTarget,
   type MediaStorageTarget,
   type MediaStorageObjectType,
   type MediaStorageValidationInput,

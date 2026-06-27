@@ -298,6 +298,79 @@ function verifyWorkspaceMediaSlotContract() {
   );
 }
 
+function verifyReturnedPdfHandoffContract() {
+  const returnedPdfStoragePolicies = readProjectFile(
+    resolve(migrationsDir, "20260627001000_returned_pdf_storage_policies.sql"),
+    "Returned PDF storage policy migration exists",
+  );
+
+  expectContains(
+    returnedPdfStoragePolicies,
+    "from storage.objects stored_common_pdf",
+    "Returned PDF handoff verifies common PDF storage object",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "stored_common_pdf.name = common_artifact ->> 'storagePath'",
+    "Returned PDF handoff matches common PDF storage path",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "from storage.objects stored_application_pdf",
+    "Returned PDF handoff verifies application PDF storage objects",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "stored_application_pdf.name = application_pdf.artifact ->> 'storagePath'",
+    "Returned PDF handoff matches application PDF storage paths",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "existing_handoff_count > 0",
+    "Returned PDF handoff treats republish as idempotent or blocked",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "'duplicate', true",
+    "Returned PDF handoff returns duplicate status for identical republish",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "Returned PDF handoff was already published with different artifacts",
+    "Returned PDF handoff blocks changed republish",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "lower(left(common_artifact ->> 'sha256', 16))",
+    "Returned PDF handoff binds common PDF path to checksum prefix",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "lower(left(application_pdf.artifact ->> 'sha256', 16))",
+    "Returned PDF handoff binds application PDF paths to checksum prefixes",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "_appointment_pdf\\\\.pdf$",
+    "Returned PDF handoff enforces appointment PDF generated suffix",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "_visa_application_pdf\\\\.pdf$",
+    "Returned PDF handoff enforces application PDF generated suffix",
+  );
+  expectContains(
+    returnedPdfStoragePolicies,
+    "from public.returned_pdf_handoff_artifacts published_handoff",
+    "Returned PDF handoff artifacts lock published storage objects",
+  );
+  expectNoSqlStatement(
+    returnedPdfStoragePolicies,
+    "delete from public.returned_pdf_handoff_artifacts where returned_pdf_handoff_artifacts.submission_id = target_submission_id",
+    "Returned PDF handoff does not delete published artifacts during normal publish",
+  );
+}
+
 function verifyAiHelperSecurityHardening() {
   const quotaMigration = readProjectFile(
     resolve(migrationsDir, "20260614000000_ai_helper_audit_quota.sql"),
@@ -691,11 +764,20 @@ function verifyDocsAndScripts() {
     expectContains(runbook, expected, `Production runbook documents ${expected}`);
   }
 
+  for (const migration of requiredMigrationOrder) {
+    expectContains(
+      runbook,
+      migration,
+      `Production runbook documents required migration ${migration}`,
+    );
+  }
+
   for (const expected of [
     "768a3a4 Harden Supabase workspace write guards",
     "5d73f7d Add Supabase production promotion gate",
     "7f715e7 Harden AI helper Supabase security",
     "20260615000000_ai_helper_security_advisor_hardening.sql",
+    "20260627001000_returned_pdf_storage_policies.sql",
     "npm run verify:local-readiness",
     "production activation requires a pass only after production packet evidence is refreshed",
     "Ready for PR review",
@@ -707,22 +789,6 @@ function verifyDocsAndScripts() {
   for (const expected of [
     "Production project id:",
     "Rollout owner:",
-    "20260611000000_visaflow_mvp_foundation.sql",
-    "20260612000000_visaflow_rls_performance_hardening.sql",
-    "20260612001000_visaflow_rpc_corrections_persistence.sql",
-    "20260613005039_visaflow_runtime_write_guards.sql",
-    "20260613010029_visaflow_rpc_submit_boundary.sql",
-    "20260614000000_ai_helper_audit_quota.sql",
-    "20260615000000_ai_helper_security_advisor_hardening.sql",
-    "20260616000000_export_batch_identity.sql",
-    "20260616001000_complete_export_package_rpc.sql",
-    "20260616002000_prevent_export_regression.sql",
-    "20260617001000_submit_corrections_handoff_rpc.sql",
-    "20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
-    "20260617003000_passport_workspace_media_slots.sql",
-    "20260617004000_complete_export_package_workspace_media_slots.sql",
-    "20260617005000_passport_extraction_audit_quota_contract.sql",
-    "20260622000100_ai_helper_audit_event_metadata.sql",
     "Agent smoke account exists.",
     "Backup owner:",
     "npm run verify:local-readiness",
@@ -739,6 +805,14 @@ function verifyDocsAndScripts() {
       approvalChecklist,
       expected,
       `Production approval checklist documents ${expected}`,
+    );
+  }
+
+  for (const migration of requiredMigrationOrder) {
+    expectContains(
+      approvalChecklist,
+      migration,
+      `Production approval checklist documents required migration ${migration}`,
     );
   }
 }
@@ -762,6 +836,7 @@ function report() {
 verifyMigrationOrder();
 verifyRuntimeGuards();
 verifyWorkspaceMediaSlotContract();
+verifyReturnedPdfHandoffContract();
 verifyAiHelperSecurityHardening();
 verifySmokeGuard();
 verifyDocsAndScripts();
