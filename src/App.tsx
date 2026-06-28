@@ -473,7 +473,7 @@ function MainApp() {
   const [submissionActionError, setSubmissionActionError] =
     useState<SubmissionActionErrorState | null>(null);
   const [createType, setCreateType] = useState<Submission["type"]>("single");
-  const [createCity, setCreateCity] = useState<City>("Москва");
+  const [createCity] = useState<City>("Москва");
   const [createFamilyCount, setCreateFamilyCount] = useState(2);
   const [createApplicantNames, setCreateApplicantNames] = useState<string[]>([
     "Новый заявитель",
@@ -1821,10 +1821,11 @@ function MainApp() {
   }
 
   function passportSlotForUpload(submission: Submission, upload: PassportUploadDraft) {
-    const applicant =
-      submission.applicants[
-        Math.min(upload.applicantIndex, submission.applicants.length - 1)
-      ];
+    if (upload.applicantIndex < 0 || upload.applicantIndex >= submission.applicants.length) {
+      return null;
+    }
+
+    const applicant = submission.applicants[upload.applicantIndex];
     if (!applicant) return null;
     return (
       submission.files.find(
@@ -2773,23 +2774,8 @@ function MainApp() {
       {drawerMode === "create" ? (
         <Suspense fallback={null}>
           <CreateSubmissionDrawer
-            applicantNames={createApplicantNames}
-            city={createCity}
-            dirty={dirty}
             familyCount={createFamilyCount}
             focusCloseToken={createCloseFocusToken}
-            onApplicantName={(index, name) => {
-              setCreateApplicantNames((current) => {
-                const next = normalizeCreateApplicantNames(current, createFamilyCount);
-                next[index] = name;
-                return next;
-              });
-              setDirty(true);
-            }}
-            onCity={(city) => {
-              setCreateCity(city);
-              setDirty(true);
-            }}
             onClose={closeDrawer}
             onCreate={createDraft}
             onFamilyCount={(count) => {

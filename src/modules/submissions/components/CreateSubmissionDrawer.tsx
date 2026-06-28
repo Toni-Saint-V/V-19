@@ -12,7 +12,6 @@ import {
 import { invokePassportExtraction } from "../passportExtractionService";
 import "./CreateSubmissionDrawer.css";
 import {
-  type City,
   type PassportExtractedField,
   type PassportExtractedFieldKey,
   type PassportUploadDraft,
@@ -199,13 +198,8 @@ export function CreateSubmissionDrawer({
   onType,
   type,
 }: {
-  applicantNames?: string[];
-  city: City;
-  dirty: boolean;
   familyCount: number;
   focusCloseToken?: number;
-  onApplicantName?: (index: number, name: string) => void;
-  onCity: (city: City) => void;
   onClose: () => void;
   onCreate: (
     passportUploads?: PassportUploadDraft[],
@@ -223,7 +217,6 @@ export function CreateSubmissionDrawer({
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [passportFileError, setPassportFileError] = useState("");
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
-  const [, setHighlightedApplicantIndex] = useState<number | null>(null);
   const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
   const [isDragging, setIsDragging] = useState(false);
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
@@ -236,17 +229,16 @@ export function CreateSubmissionDrawer({
   const activeUpload = passportUploads.find(
     (upload) => upload.applicantIndex === safeActiveApplicantIndex,
   );
-  const passportReady =
-    passportUploads.length > 0 &&
-    passportUploads.every(isPassportUploadReady);
+  const passportReady = allApplicantPassportsReady(passportUploads, applicantCount);
 
   function selectType(nextType: Submission["type"]) {
+    const nextApplicantCount = nextType === "family" ? Math.max(2, familyCount) : 1;
     onType(nextType);
     if (nextType === "family") {
-      onFamilyCount(Math.max(2, familyCount));
+      onFamilyCount(nextApplicantCount);
     }
     setActiveApplicantIndex(0);
-    setHighlightedApplicantIndex(null);
+    setPassportUploads((current) => prunePassportUploads(current, nextApplicantCount));
   }
 
   function updatePreliminaryIntake<Key extends keyof PreliminaryIntakeDraft>(
@@ -261,7 +253,6 @@ export function CreateSubmissionDrawer({
       onType("family");
       onFamilyCount(Math.max(2, familyCount));
       setActiveApplicantIndex(1);
-      setHighlightedApplicantIndex(1);
       return;
     }
 
@@ -269,7 +260,6 @@ export function CreateSubmissionDrawer({
     const nextIndex = nextCount - 1;
     onFamilyCount(nextCount);
     setActiveApplicantIndex(nextIndex);
-    setHighlightedApplicantIndex(nextIndex);
   }
 
   async function addPassportFiles(files: FileList | null) {
@@ -310,7 +300,6 @@ export function CreateSubmissionDrawer({
       mergePassportUploads(current, nextUploads, applicantCount),
     );
     setActiveApplicantIndex(nextUploads[0]?.applicantIndex ?? safeActiveApplicantIndex);
-    setHighlightedApplicantIndex(null);
     onPassportFilesSelected();
 
     await Promise.all(
@@ -424,10 +413,7 @@ export function CreateSubmissionDrawer({
     setActiveApplicantIndex((current) =>
       boundedApplicantIndex(current, applicantCount),
     );
-    setHighlightedApplicantIndex((current) => {
-      if (current === null) return null;
-      return current < applicantCount ? current : null;
-    });
+    setPassportUploads((current) => prunePassportUploads(current, applicantCount));
   }, [applicantCount]);
 
   return (
@@ -644,9 +630,9 @@ export function CreateSubmissionDrawer({
                     Перетащите файлы
                   </h3>
                   <p className="text-[12px] text-white/30 max-w-[240px] mb-8 font-light relative z-10 leading-relaxed">
-                    PDF, JPG, PNG.
+                    JPEG, PNG.
                     <br />
-                    До 50 МБ каждый.
+                    Разворот загранпаспорта с MRZ.
                   </p>
                   {passportFileError ? (
                     <p className="mb-4 text-[12px] text-red-400 relative z-10" role="alert">
@@ -663,7 +649,7 @@ export function CreateSubmissionDrawer({
                 </div>
               </div>
 
-              <div className="flex flex-col h-full max-h-[800px] lg:border-l border-[#202124] lg:pl-10">
+              <div className="hidden lg:flex flex-col h-full max-h-[800px] border-l border-[#202124] pl-10">
                 <section
                   className="mb-5 rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
                   aria-label="Заявители и общие семейные ответы"
@@ -1017,6 +1003,26 @@ function mergePassportUploads(
     (first: PassportUploadDraft, second: PassportUploadDraft) =>
       first.applicantIndex - second.applicantIndex,
   );
+}
+
+function prunePassportUploads(
+  uploads: PassportUploadDraft[],
+  applicantCount: number,
+) {
+  return uploads.filter(
+    (upload) => upload.applicantIndex >= 0 && upload.applicantIndex < applicantCount,
+  );
+}
+
+function allApplicantPassportsReady(
+  passportUploads: PassportUploadDraft[],
+  applicantCount: number,
+) {
+  return Array.from({ length: applicantCount }, (_, index) =>
+    isPassportUploadReady(
+      passportUploads.find((upload) => upload.applicantIndex === index),
+    ),
+  ).every(Boolean);
 }
 
 function applicantLabel(index: number, type: Submission["type"]) {
