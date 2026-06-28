@@ -103,6 +103,8 @@ function reviewReadySubmission(): Submission {
   return {
     ...uploadRequiredFiles(completeQuestionnaire(draftSubmission())),
     status: "in_progress",
+    tripDateFrom: "2026-07-10",
+    tripDateTo: "2026-07-18",
   };
 }
 

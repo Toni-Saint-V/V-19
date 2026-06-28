@@ -712,7 +712,11 @@ function submittedFixture(
       };
     }),
   };
-  const withFiles = uploadRequiredFiles(withPassportFields);
+  const withFiles = {
+    ...uploadRequiredFiles(withPassportFields),
+    tripDateFrom: "2026-07-10",
+    tripDateTo: "2026-07-18",
+  };
   const inProgress = applySubmissionAction(withFiles, "save_progress", "agent");
   return applySubmissionAction(inProgress, "submit_for_review", "agent");
 }

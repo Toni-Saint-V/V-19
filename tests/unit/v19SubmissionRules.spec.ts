@@ -56,6 +56,7 @@ import {
   markSelectedExported,
   mediaSlotTypeForSubmissionFileType,
   mergeUploadedFileMetadataIntoSubmissions,
+  normalizeSubmissionForCanonicalRuntime,
   uploadRequiredFile,
   uploadRequiredFiles,
   updateQuestionnaireField,
@@ -70,6 +71,7 @@ import {
   canEditSubmissionContent,
   canPerformAction,
   defaultDrawerTab,
+  markSubmissionIssueFixedResult,
   transitionMatrix,
 } from "../../src/modules/submissions/status";
 import type {
@@ -135,6 +137,22 @@ function readyClone(patch: Partial<Submission>): Submission {
     id: patch.id ?? "ПД-ТЕСТ",
     title: patch.title ?? "Тестовая подача",
     ...patch,
+  };
+}
+
+function datedPreliminaryIntake() {
+  return {
+    arrivalPlace: "",
+    homeAddress: "",
+    sameArrivalPlace: false,
+    sameHomeAddress: false,
+    sameSpainStay: false,
+    sameTripDates: true,
+    spainStayAddress: "",
+    spainStayCity: "",
+    spainStayName: "",
+    tripDateFrom: "2026-08-11",
+    tripDateTo: "2026-08-20",
   };
 }
 
@@ -273,6 +291,26 @@ describe("V-19 submission status rules", () => {
     });
   });
 
+  it("blocks review submission while trip dates are missing", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      submissions: [],
+      type: "single",
+    });
+    const filled = {
+      ...uploadRequiredFiles(completeQuestionnaire(draft)),
+      status: "in_progress" as const,
+      tripDateFrom: "не указано",
+      tripDateTo: "не указано",
+    };
+
+    expect(canPerformAction(filled, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Укажите даты поездки перед отправкой",
+    });
+  });
+
   it("allows admin issues only while a submission is under active review", () => {
     expect(canAddAdminIssue(byId("ПД-1053"), "admin")).toBe(true);
     expect(canAddAdminIssue(byId("ПД-1056"), "admin")).toBe(false);
@@ -363,6 +401,18 @@ describe("V-19 export rules", () => {
 
   it("allows a single ready submission", () => {
     expect(getExportBlockers([readyClone({ id: "ПД-1056" })])).toEqual([]);
+  });
+
+  it("blocks export when trip dates are missing", () => {
+    const blockers = getExportBlockers([
+      readyClone({
+        id: "ПД-БЕЗ-ДАТ",
+        tripDateFrom: "не указано",
+        tripDateTo: "",
+      }),
+    ]).map((blocker) => blocker.reason);
+
+    expect(blockers).toContain("В выборке есть подачи без дат поездки");
   });
 
   it("exports only ready_for_export submissions", () => {
@@ -484,7 +534,7 @@ describe("V-19 export rules", () => {
     });
   });
 
-  it("blocks mixed city and already exported packages", () => {
+  it("blocks mixed city, trip date, and already exported packages", () => {
     const blockers = getExportBlockers([
       readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-ГОРОД", city: "Казань" }),
@@ -496,7 +546,7 @@ describe("V-19 export rules", () => {
     expect(blockers).toContain("В выборке есть подачи не готовые к выгрузке");
     expect(blockers).toContain("В выборке есть уже выгруженные подачи");
     expect(blockers).toContain("Нельзя смешивать разные города");
-    expect(blockers).not.toContain("Нельзя смешивать разные даты поездки");
+    expect(blockers).toContain("Нельзя смешивать разные даты поездки");
     expect(blockers).not.toContain("Нельзя смешивать одинарные и семейные подачи");
   });
 
@@ -823,7 +873,7 @@ describe("V-19 submission actions", () => {
 
     expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
       ok: false,
-      reason: "Сначала исправьте целевые замечания",
+      reason: "Сначала отметьте замечания исправленными",
     });
 
     const withSelfieReplacement = applyUploadedFileMetadata(returned, selfieFile.id, {
@@ -848,7 +898,7 @@ describe("V-19 submission actions", () => {
       canPerformAction(withSelfieReplacement, "submit_corrections", "agent"),
     ).toEqual({
       ok: false,
-      reason: "Сначала исправьте целевые замечания",
+      reason: "Сначала отметьте замечания исправленными",
     });
 
     const withAllReplacements = applyUploadedFileMetadata(
@@ -900,10 +950,31 @@ describe("V-19 submission actions", () => {
       withExtractedPassport,
       "verified",
     );
-    const queue = agentActionQueue([withVerifiedPassport]);
 
     expect(
       canPerformAction(withVerifiedPassport, "submit_corrections", "agent"),
+    ).toEqual({
+      ok: false,
+      reason: "Сначала отметьте замечания исправленными",
+    });
+
+    const firstFixed = markSubmissionIssueFixedResult(
+      withVerifiedPassport,
+      "зм-1048-1",
+      "agent",
+    );
+    if (!firstFixed.ok) throw new Error(firstFixed.error.code);
+    const secondFixed = markSubmissionIssueFixedResult(
+      firstFixed.data,
+      "зм-1048-2",
+      "agent",
+    );
+    if (!secondFixed.ok) throw new Error(secondFixed.error.code);
+    const withFixedIssues = secondFixed.data;
+    const queue = agentActionQueue([withFixedIssues]);
+
+    expect(
+      canPerformAction(withFixedIssues, "submit_corrections", "agent"),
     ).toEqual({
       ok: true,
     });
@@ -916,7 +987,7 @@ describe("V-19 submission actions", () => {
     });
 
     const submittedCorrections = applySubmissionAction(
-      withVerifiedPassport,
+      withFixedIssues,
       "submit_corrections",
       "agent",
     );
@@ -1101,6 +1172,7 @@ describe("V-19 submission actions", () => {
     const draft = createDraftSubmission({
       city: "Москва",
       familyCount: 2,
+      preliminaryIntake: datedPreliminaryIntake(),
       submissions: initialSubmissions,
       type: "single",
     });
@@ -1123,6 +1195,7 @@ describe("V-19 submission actions", () => {
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
       familyCount: 1,
+      preliminaryIntake: datedPreliminaryIntake(),
       submissions: initialSubmissions,
       type: "single",
     });
@@ -1182,6 +1255,7 @@ describe("V-19 submission actions", () => {
       applicantNames: ["IVANOV IVAN"],
       city: "Москва",
       familyCount: 1,
+      preliminaryIntake: datedPreliminaryIntake(),
       submissions: initialSubmissions,
       type: "single",
     });
@@ -1422,6 +1496,36 @@ describe("V-19 submission actions", () => {
     expect(canPerformAction(updated, "submit_for_review", "agent").ok).toBe(false);
   });
 
+  it("syncs questionnaire trip fields into the submission trip range", () => {
+    const draft = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const applicant = draft.applicants[0];
+    const tripSection = applicant?.sections.find((section) =>
+      section.id.endsWith("-trip"),
+    );
+    if (!applicant || !tripSection) throw new Error("Missing trip section");
+
+    const withArrival = updateQuestionnaireField(draft, {
+      applicantId: applicant.id,
+      sectionId: tripSection.id,
+      fieldId: "arrival-date",
+      value: "19.08.2026",
+    });
+    const withDeparture = updateQuestionnaireField(withArrival, {
+      applicantId: applicant.id,
+      sectionId: tripSection.id,
+      fieldId: "departure-date",
+      value: "27.08.2026",
+    });
+
+    expect(withDeparture.tripDateFrom).toBe("19.08.2026");
+    expect(withDeparture.tripDateTo).toBe("27.08.2026");
+  });
+
   it("adds a precise admin issue with a target", () => {
     const submission = canonicalMediaSubmission(byId("ПД-1053"));
     const updated = addPreciseAdminIssue(submission, routeIssueInput(submission));
@@ -1476,6 +1580,7 @@ describe("V-19 submission actions", () => {
     const draft = createDraftSubmission({
       city: "Москва",
       familyCount: 4,
+      preliminaryIntake: datedPreliminaryIntake(),
       submissions: initialSubmissions,
       type: "family",
     });
@@ -1513,7 +1618,7 @@ describe("V-19 submission actions", () => {
     });
   });
 
-  it("keeps a field issue open until the agent submits corrections", () => {
+  it("keeps a field issue open until the agent marks it fixed and submits corrections", () => {
     const submission = byId("ПД-1053");
     const withIssue = addPreciseAdminIssue(submission, routeIssueInput(submission));
     const applicant = withIssue.applicants[0];
@@ -1541,7 +1646,22 @@ describe("V-19 submission actions", () => {
     ).toBe("Нужно уточнить маршрут поездки");
 
     const returned = applySubmissionAction(edited, "return_with_issues", "admin");
-    const corrected = applySubmissionAction(returned, "submit_corrections", "agent");
+    expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
+      ok: false,
+      reason: "Сначала отметьте замечания исправленными",
+    });
+
+    const fixed = markSubmissionIssueFixedResult(
+      returned,
+      returned.issues[0]?.id ?? "",
+      "agent",
+    );
+    if (!fixed.ok) throw new Error(fixed.error.code);
+    const corrected = applySubmissionAction(
+      fixed.data,
+      "submit_corrections",
+      "agent",
+    );
 
     expect(corrected.issues[0]?.status).toBe("fixed_by_agent");
     expect(
@@ -1550,6 +1670,26 @@ describe("V-19 submission actions", () => {
         ?.fields.find((field) => field.label === "Маршрут поездки")?.error,
     ).toBeUndefined();
     expect(corrected.applicants[0]?.questionnaireStatus).toBe("complete");
+  });
+
+  it("blocks marking a returned issue fixed until its target changes", () => {
+    const submission = byId("ПД-1053");
+    const withIssue = addPreciseAdminIssue(submission, routeIssueInput(submission));
+    const returned = applySubmissionAction(
+      withIssue,
+      "return_with_issues",
+      "admin",
+    );
+    const issueId = returned.issues[0]?.id;
+    if (!issueId) throw new Error("Missing issue");
+
+    expect(markSubmissionIssueFixedResult(returned, issueId, "agent")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target must be corrected before it can be marked fixed.",
+      },
+    });
   });
 
   it("updates export state and marks downloaded submissions exported", () => {
@@ -1807,6 +1947,37 @@ describe("V-19 persistence boundary", () => {
     ).toBe(false);
   });
 
+  it("maps legacy returned media issues to a canonical replacement slot", () => {
+    const normalized = normalizeSubmissionForCanonicalRuntime(byId("ПД-1048"));
+    const issue = normalized.issues.find((item) => item.id === "зм-1048-1");
+    if (!issue) throw new Error("Missing returned issue");
+
+    expect(issue.target.fileType).toBe("selfie_2");
+    const targetFile = normalized.files.find(
+      (file) =>
+        file.applicantId === issue.target.applicantId &&
+        file.type === issue.target.fileType,
+    );
+    if (!targetFile) throw new Error("Missing canonical replacement file");
+
+    expect(targetFile).toMatchObject({
+      linkedIssueId: issue.id,
+      status: "needs_replacement",
+    });
+    expect(markSubmissionIssueFixedResult(normalized, issue.id, "agent")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target must be corrected before it can be marked fixed.",
+      },
+    });
+
+    const uploaded = uploadRequiredFile(normalized, targetFile.id);
+    const fixed = markSubmissionIssueFixedResult(uploaded, issue.id, "agent");
+
+    expect(fixed.ok).toBe(true);
+  });
+
   it("builds a Supabase draft payload from the current cockpit model", () => {
     const submission = byId("ПД-1048");
     const payload = toCockpitDraftPersistencePayload(
@@ -1823,7 +1994,7 @@ describe("V-19 persistence boundary", () => {
     });
     expect(payload.applicants).toHaveLength(submission.applicants.length);
     expect(payload.corrections).toHaveLength(submission.issues.length);
-    expect(payload.status_history).toHaveLength(submission.history.length);
+    expect(payload.status_history).toHaveLength(0);
     expect(payload.media_assets).toEqual([]);
   });
 

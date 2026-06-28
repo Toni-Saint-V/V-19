@@ -73,6 +73,14 @@ function expectContains(content, expected, label) {
   }
 }
 
+function expectNotContains(content, forbidden, label) {
+  if (content.includes(forbidden)) {
+    fail(label, `Forbidden text found: ${forbidden}`);
+  } else {
+    pass(label);
+  }
+}
+
 function normalizeSql(content) {
   return content.replace(/--.*$/gm, " ").replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -293,8 +301,23 @@ function verifyWorkspaceMediaSlotContract() {
   );
   expectContains(
     exportPackageSlots,
-    "and m.type in ('photo_white', 'selfie', 'selfie_2', 'passport_scan')",
-    "Export package RPC includes workspace media slot types",
+    "file.value ->> 'type' in ('selfie', 'selfie_2', 'passport_scan')",
+    "Export package RPC requires canonical cockpit media slot types",
+  );
+  expectContains(
+    exportPackageSlots,
+    "cockpit.snapshot -> 'exportPackage'",
+    "Export package RPC compares cockpit package identity",
+  );
+  expectContains(
+    exportPackageSlots,
+    "export_identity.export_package ->> 'contentFingerprint' is distinct from batch_record.content_fingerprint",
+    "Export package RPC compares cockpit content fingerprint",
+  );
+  expectNotContains(
+    exportPackageSlots,
+    "count(distinct type) as type_count",
+    "Export package RPC allows same-trip mixed family and single package types",
   );
 }
 
@@ -466,6 +489,61 @@ function verifySmokeGuard() {
     ".env.supabase-smoke.local",
     "Live smoke reads only the dedicated smoke env file",
   );
+  expectContains(
+    liveSmoke,
+    'describeLive("V-19 canonical Supabase live smoke"',
+    "Live smoke includes V-19 canonical release smoke",
+  );
+  expectContains(
+    liveSmoke,
+    "VITEST_SUPABASE_LEGACY_ARCHIVE",
+    "Legacy archive smoke is gated behind an explicit opt-in flag",
+  );
+  expectContains(
+    liveSmoke,
+    "otherRows",
+    "Canonical live smoke proves cross-agent submission table denial",
+  );
+  expectContains(
+    liveSmoke,
+    "otherMediaRows",
+    "Canonical live smoke proves cross-agent media table denial",
+  );
+  expectContains(
+    liveSmoke,
+    "crossAgentSaveDraftError",
+    "Canonical live smoke proves wrong-owner save RPC denial",
+  );
+  expectContains(
+    liveSmoke,
+    "wrongApplicantStorageError",
+    "Canonical live smoke proves wrong applicant storage denial",
+  );
+  expectContains(
+    liveSmoke,
+    "wrongMediaSlotError",
+    "Canonical live smoke proves wrong media slot denial",
+  );
+  expectContains(
+    liveSmoke,
+    "wrongExtensionError",
+    "Canonical live smoke proves wrong extension denial",
+  );
+  expectContains(
+    liveSmoke,
+    "pathTraversalError",
+    "Canonical live smoke proves path traversal denial",
+  );
+  expectContains(
+    liveSmoke,
+    "agentExportInsertError",
+    "Canonical live smoke proves agent export batch table denial",
+  );
+  expectContains(
+    liveSmoke,
+    "agentExportRpcError",
+    "Canonical live smoke proves agent export RPC denial",
+  );
 
   if (liveSmoke.includes('".env.local"') || liveSmoke.includes('".env"')) {
     fail(
@@ -479,7 +557,7 @@ function verifySmokeGuard() {
   expectContains(
     liveSmoke,
     "ownerOverwriteAfterHandoffError",
-    "Live smoke proves owner storage overwrite is blocked after handoff",
+    "Legacy archive live smoke retains owner overwrite denial coverage",
   );
   expectContains(
     liveSmoke,

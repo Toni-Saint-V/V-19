@@ -90,6 +90,17 @@ describe("Supabase submission mapping", () => {
     expect(insert.accepted_at).toBe("2026-06-12T10:00:00.000Z");
   });
 
+  test("splits legacy submission travel date ranges into durable endpoints", () => {
+    const insert = toSubmissionInsert({
+      ...makeSubmission(),
+      travelDate: "2026-08-11 - 2026-08-20",
+    });
+
+    expect(insert.travel_date).toBe("2026-08-11 - 2026-08-20");
+    expect(insert.trip_date_from).toBe("2026-08-11");
+    expect(insert.trip_date_to).toBe("2026-08-20");
+  });
+
   test("persists normalized applicant completion and safe dates", () => {
     const insert = toApplicantInsert("VF-1044", {
       ...applicant,

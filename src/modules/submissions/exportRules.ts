@@ -10,6 +10,7 @@ import {
   canonicalRequiredMediaReadiness,
   normalizeLegacySubmissionStatus,
 } from "./domainContract";
+import { hasUsableTripDateRange } from "./status";
 import {
   buildExportContractRows,
   buildExportPreview,
@@ -58,6 +59,9 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   const emptyApplicantSubmissions = submissions.filter(
     (submission) => submission.applicants.length === 0,
   );
+  const missingTripDateRange = submissions.filter(
+    (submission) => !hasUsableTripDateRange(submission),
+  );
   const rows = buildExportRows(submissions);
   const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
   const openBlockingIssues = submissions.filter((submission) =>
@@ -68,6 +72,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     ),
   );
   const cities = new Set(submissions.map((submission) => submission.city));
+  const tripDateRanges = new Set(submissions.map(tripDateRangeKey));
   const exportState = getExportSelectionState(submissions);
 
   if (!contractValid) {
@@ -92,6 +97,10 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     blockers.push({ reason: "В выборке есть подачи без заявителей" });
   }
 
+  if (missingTripDateRange.length > 0) {
+    blockers.push({ reason: "В выборке есть подачи без дат поездки" });
+  }
+
   if (rowsWithMissingApplicantName.length > 0) {
     blockers.push({ reason: "В строках выгрузки есть заявители без ФИО" });
   }
@@ -103,6 +112,8 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   }
 
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
+  if (tripDateRanges.size > 1)
+    blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (exportState === "mixed")
     blockers.push({ reason: "В выборке разные состояния выгрузки" });
 
@@ -131,6 +142,10 @@ function orderSubmissionsForExportRows(submissions: Submission[]): Submission[] 
       return left.index - right.index;
     })
     .map((item) => item.submission);
+}
+
+function tripDateRangeKey(submission: Submission): string {
+  return `${submission.tripDateFrom.trim()}|${submission.tripDateTo.trim()}`;
 }
 
 export function exportSummary(

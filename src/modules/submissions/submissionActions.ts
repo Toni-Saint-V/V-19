@@ -382,7 +382,27 @@ export function updateQuestionnaireField(
   submission: Submission,
   update: QuestionnaireFieldUpdate,
 ): Submission {
-  return updateQuestionnaireFieldInSubmission(submission, update);
+  const updated = updateQuestionnaireFieldInSubmission(submission, update);
+  return syncTripDateRangeFromQuestionnaireUpdate(updated, update);
+}
+
+function syncTripDateRangeFromQuestionnaireUpdate(
+  submission: Submission,
+  update: QuestionnaireFieldUpdate,
+): Submission {
+  if (update.fieldId === "arrival-date") {
+    return { ...submission, tripDateFrom: normalizedTripDateValue(update.value) };
+  }
+
+  if (update.fieldId === "departure-date") {
+    return { ...submission, tripDateTo: normalizedTripDateValue(update.value) };
+  }
+
+  return submission;
+}
+
+function normalizedTripDateValue(value: string) {
+  return value.trim() || "не указано";
 }
 
 export function uploadRequiredFiles(submission: Submission): Submission {
@@ -416,12 +436,18 @@ export function normalizeSubmissionForCanonicalRuntime(
     throw new Error("Unknown submission status.");
   }
 
-  const files = canonicalRuntimeFiles(submission);
+  const issues = canonicalRuntimeIssues(submission.issues);
+  const files = applyCanonicalIssueReplacementState(
+    canonicalRuntimeFiles(submission),
+    submission.files,
+    issues,
+  );
   const filePercent = fileCompleteness(files);
 
   return normalizeSubmissionQuestionnaire({
     ...submission,
     status,
+    issues,
     applicants: submission.applicants.map((applicant) => ({
       ...applicant,
       fileStatus: applicantFileStatus(
@@ -816,6 +842,71 @@ function fileTypeName(type: SubmissionFile["type"]) {
   if (type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Загранпаспорт";
   return "Селфи N2";
+}
+
+function canonicalRuntimeIssues(issues: Submission["issues"]): Submission["issues"] {
+  return issues.map((issue) => {
+    const legacyFileType = issue.target.fileType;
+    const fileType = legacyFileType
+      ? canonicalRuntimeIssueFileType(legacyFileType)
+      : legacyFileType;
+
+    if (fileType === legacyFileType) return issue;
+
+    return {
+      ...issue,
+      target: {
+        ...issue.target,
+        fileType,
+      },
+    };
+  });
+}
+
+function canonicalRuntimeIssueFileType(type: SubmissionFileType): SubmissionFileType {
+  if (isCanonicalFrontendMediaType(type)) return type;
+  if (isRejectedLegacyMediaType(type)) return "selfie_2";
+  return type;
+}
+
+function applyCanonicalIssueReplacementState(
+  files: SubmissionFile[],
+  sourceFiles: SubmissionFile[],
+  issues: Submission["issues"],
+): SubmissionFile[] {
+  const replacementByCanonicalKey = new Map<string, SubmissionFile>();
+
+  for (const file of sourceFiles) {
+    if (!isRejectedLegacyMediaType(file.type)) continue;
+    if (file.status !== "needs_replacement") continue;
+
+    const canonicalType = canonicalRuntimeIssueFileType(file.type);
+    const hasMappedIssue = issues.some(
+      (issue) =>
+        issue.id === file.linkedIssueId &&
+        issue.target.applicantId === file.applicantId &&
+        issue.target.fileType === canonicalType,
+    );
+    if (!hasMappedIssue) continue;
+
+    replacementByCanonicalKey.set(`${file.applicantId}:${canonicalType}`, file);
+  }
+
+  if (replacementByCanonicalKey.size === 0) return files;
+
+  return files.map((file) => {
+    const replacement = replacementByCanonicalKey.get(`${file.applicantId}:${file.type}`);
+    if (!replacement) return file;
+
+    return {
+      ...file,
+      status: "needs_replacement",
+      linkedIssueId: replacement.linkedIssueId,
+      reviewedAtIso: replacement.reviewedAtIso,
+      reviewedBy: replacement.reviewedBy,
+      reviewStatus: replacement.reviewStatus ?? "replace_required",
+    };
+  });
 }
 
 function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {

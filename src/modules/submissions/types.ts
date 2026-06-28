@@ -371,7 +371,9 @@ export type SubmissionHistoryItem = {
   text: string;
   at: string;
   detail?: string;
+  fromStatus?: SubmissionStatus;
   source?: SubmissionHistorySource;
+  toStatus?: SubmissionStatus;
 };
 
 export type Submission = {

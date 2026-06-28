@@ -42,6 +42,7 @@ Apply migrations only in the repository order declared by
 - `20260622000100_ai_helper_audit_event_metadata.sql`
 - `20260624001000_questionnaire_answers_persistence.sql`
 - `20260627001000_returned_pdf_storage_policies.sql`
+- `20260628000100_trip_date_range_persistence.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

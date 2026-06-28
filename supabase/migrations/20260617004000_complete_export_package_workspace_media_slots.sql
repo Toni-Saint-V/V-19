@@ -35,7 +35,6 @@ declare
   current_applicant_count integer := 0;
   cockpit_snapshot_count integer := 0;
   changed_submission_count integer := 0;
-  expected_content_fingerprint text;
   status_history_count integer := 0;
   duplicate_batch boolean := false;
 begin
@@ -145,16 +144,14 @@ begin
     from (
       select
         count(distinct city) as city_count,
-        count(distinct travel_date) as travel_date_count,
-        count(distinct type) as type_count
+        count(distinct travel_date) as travel_date_count
       from public.submissions
       where id = any(submission_ids)
     ) as group_shape
     where group_shape.city_count <> 1
       or group_shape.travel_date_count <> 1
-      or group_shape.type_count <> 1
   ) then
-    raise exception 'Export package cannot mix city, travel date, or submission type';
+    raise exception 'Export package cannot mix city or travel date';
   end if;
 
   select count(*)
@@ -232,53 +229,46 @@ begin
           ) as file(value)
           where file.value ->> 'applicantId' = applicant.value ->> 'id'
             and file.value ->> 'status' = 'accepted'
-            and file.value ->> 'type' in ('photo', 'selfie', 'selfie_2', 'passport_scan')
-        ) <> 4
+            and file.value ->> 'type' in ('selfie', 'selfie_2', 'passport_scan')
+        ) <> 3
     ) then
       raise exception 'All cockpit applicant files must be accepted before export';
     end if;
 
-    select batch_record.format || '|' || batch_record.row_count::text || '|' || coalesce(string_agg(row_source, '|' order by submission_id, applicant_index), '')
-    into expected_content_fingerprint
-    from (
-      select
-        s.id as submission_id,
-        applicant.ordinality as applicant_index,
-        concat_ws(
-          chr(31),
-          case
-            when cockpit.snapshot ->> 'type' = 'family'
-              then s.id || '-' || applicant.ordinality::text
-            else s.id
-          end,
-          s.id,
-          cockpit.snapshot ->> 'title',
-          applicant.value ->> 'fullName',
-          cockpit.snapshot ->> 'city',
-          (cockpit.snapshot ->> 'tripDateFrom') || '-' || (cockpit.snapshot ->> 'tripDateTo'),
-          case
-            when cockpit.snapshot ->> 'type' = 'family' then 'Семья'
-            else 'Один заявитель'
-          end,
-          s.id,
-          case
-            when cockpit.snapshot ->> 'type' = 'family' then 'Семья'
-            else 'Один заявитель'
-          end,
-          applicant.ordinality::text,
-          jsonb_array_length(coalesce(cockpit.snapshot -> 'applicants', '[]'::jsonb))::text
-        ) as row_source
+    if exists (
+      select 1
       from public.submissions s
       cross join lateral (
         select s.family_intelligence -> 'v19CockpitSnapshot' -> 'submission' as snapshot
       ) as cockpit
-      cross join lateral jsonb_array_elements(
-        coalesce(cockpit.snapshot -> 'applicants', '[]'::jsonb)
-      ) with ordinality as applicant(value, ordinality)
+      cross join lateral (
+        select cockpit.snapshot -> 'exportPackage' as export_package
+      ) as export_identity
       where s.id = any(submission_ids)
-    ) as cockpit_rows;
-
-    if expected_content_fingerprint is distinct from batch_record.content_fingerprint then
+        and (
+          jsonb_typeof(export_identity.export_package) is distinct from 'object'
+          or export_identity.export_package ->> 'contentFingerprint' is distinct from batch_record.content_fingerprint
+          or export_identity.export_package ->> 'format' is distinct from batch_record.format
+          or export_identity.export_package ->> 'fileName' is distinct from batch_record.file_name
+          or export_identity.export_package ->> 'idempotencyKey' is distinct from batch_record.idempotency_key
+          or case
+            when export_identity.export_package ->> 'rowCount' ~ '^[0-9]+$'
+              then (export_identity.export_package ->> 'rowCount')::integer = batch_record.row_count
+            else false
+          end is not true
+          or (
+            select array_agg(id_value order by id_value)
+            from jsonb_array_elements_text(
+              case
+                when jsonb_typeof(export_identity.export_package -> 'submissionIds') = 'array'
+                  then export_identity.export_package -> 'submissionIds'
+                else '[]'::jsonb
+              end
+            ) as package_ids(id_value)
+            where btrim(id_value) <> ''
+          ) is distinct from submission_ids
+        )
+    ) then
       raise exception 'Export package content fingerprint does not match current cockpit snapshot';
     end if;
   else

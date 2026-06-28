@@ -69,7 +69,11 @@ import {
   type SubmissionActionErrorState,
 } from "./modules/submissions/submissionActionErrors";
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
-import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
+import {
+  canAddAdminIssue,
+  defaultDrawerTab,
+  markSubmissionIssueFixedResult,
+} from "./modules/submissions/status";
 import {
   applySafePassportExtractionFields,
   applyPassportExtractionField,
@@ -1248,6 +1252,36 @@ function MainApp() {
     updateActiveSubmission((submission) =>
       addPreciseAdminIssue(submission, input, remoteProfile?.id),
     );
+    setActiveDrawerTab("issues");
+    setDrawerMode("detail");
+  }
+
+  function markActiveIssueFixed(issueId: string) {
+    if (!activeSubmission) return;
+    const currentSubmission =
+      submissionsRef.current.find(
+        (submission) => submission.id === activeSubmission.id,
+      ) ?? activeSubmission;
+    const result = markSubmissionIssueFixedResult(
+      currentSubmission,
+      issueId,
+      role,
+    );
+    if (!result.ok) {
+      setSubmissionActionError(
+        createSubmissionActionErrorState({
+          action: "mark_issue_fixed",
+          error: result.error,
+          submission: currentSubmission,
+        }),
+      );
+      setActiveDrawerTab("issues");
+      setDrawerMode("detail");
+      return;
+    }
+
+    updateActiveSubmission(() => result.data);
+    setSubmissionActionError(null);
     setActiveDrawerTab("issues");
     setDrawerMode("detail");
   }
@@ -2732,6 +2766,7 @@ function MainApp() {
           onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
           onClose={closeDrawer}
           onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
+          onMarkIssueFixed={markActiveIssueFixed}
           onApplyPassportField={applyPassportFieldForActiveSubmission}
           onExtractPassport={extractPassportForActiveSubmission}
           onConfirmVisaApplicationPdfReview={

@@ -378,6 +378,8 @@ describe("passport extraction state", () => {
         status: "accepted" as const,
       })),
       status: "in_progress" as const,
+      tripDateFrom: "2026-07-10",
+      tripDateTo: "2026-07-18",
     };
     const ready = finishPassportExtraction(
       draft,

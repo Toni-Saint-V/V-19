@@ -3,6 +3,7 @@ import type {
   ApplicantInsert,
   ApplicantRow,
   CorrectionInsert,
+  ExportBatchRow,
   Json,
   MediaAssetInsert,
   QuestionnaireAnswerRow,
@@ -15,16 +16,21 @@ import type {
   AppointmentStatus,
   SubmissionStatus as SupabaseSubmissionStatus,
 } from "../../types/domain";
-import { mapSupabasePersistenceError } from "../../services/persistenceObservability";
+import {
+  mapSupabasePersistenceError,
+  PersistenceObservableError,
+} from "../../services/persistenceObservability";
 import type { AppProfile } from "../../types/session";
 import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
 import { isQuestionnaireReviewSource, isQuestionnaireReviewState } from "./types";
 import {
+  canonicalRequiredMediaReadiness,
   normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
 } from "./domainContract";
+import { isSubmissionIssueResolved, transitionMatrix } from "./status";
 import { normalizeSubmissionForCanonicalRuntime } from "./submissionActions";
 import type {
   Applicant,
@@ -33,9 +39,12 @@ import type {
   QuestionnaireReviewSource,
   QuestionnaireReviewState,
   IssueStatus,
+  Role,
   Submission,
+  ExportPackageIdentity,
   SubmissionFile,
   SubmissionFileType,
+  SubmissionHistorySource,
   SubmissionStatus,
 } from "./types";
 
@@ -46,11 +55,13 @@ export const cockpitSnapshotStorageField =
 export const cockpitSnapshotStatus = "unreviewed";
 const submissionListLimit = 100;
 const submissionSelect =
-  "id,agent_id,type,title,country,city,travel_date,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
+  "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const applicantSelect =
   "id,submission_id,full_name,questionnaire_percent,media_percent,created_at,updated_at" as const;
 const questionnaireAnswerSelect =
   "id,submission_id,applicant_id,section_id,field_id,label,value,updated_by,created_at,updated_at" as const;
+const exportBatchSelect =
+  "id,created_at,file_name,format,content_fingerprint,idempotency_key,row_count,submission_ids" as const;
 
 export interface CockpitLoadResult {
   ownerIdsBySubmissionId: Map<string, string>;
@@ -68,6 +79,17 @@ type CockpitApplicantRow = Pick<
 type CockpitQuestionnaireAnswerRow = Pick<
   QuestionnaireAnswerRow,
   "applicant_id" | "field_id" | "label" | "section_id" | "submission_id" | "value"
+>;
+type CockpitExportBatchRow = Pick<
+  ExportBatchRow,
+  | "content_fingerprint"
+  | "created_at"
+  | "file_name"
+  | "format"
+  | "id"
+  | "idempotency_key"
+  | "row_count"
+  | "submission_ids"
 >;
 type QuestionnaireAnswerValueEnvelope = {
   kind: typeof questionnaireAnswerEnvelopeKind;
@@ -211,11 +233,96 @@ function attachQuestionnaireAnswerRows(
   });
 }
 
+function exportPackageFromBatchRow(
+  row: CockpitExportBatchRow,
+): ExportPackageIdentity | undefined {
+  if (
+    !row.content_fingerprint ||
+    !row.file_name ||
+    !row.idempotency_key ||
+    row.row_count < 1 ||
+    row.submission_ids.length < 1
+  ) {
+    return undefined;
+  }
+
+  return {
+    contentFingerprint: row.content_fingerprint,
+    fileName: row.file_name,
+    format: row.format,
+    idempotencyKey: row.idempotency_key,
+    rowCount: row.row_count,
+    submissionIds: [...row.submission_ids].sort(),
+  };
+}
+
+function latestExportBatchForSubmission(
+  submissionId: string,
+  rows: CockpitExportBatchRow[],
+): CockpitExportBatchRow | undefined {
+  return rows
+    .filter((row) => row.format === "xlsx" && row.submission_ids.includes(submissionId))
+    .sort(
+      (left, right) =>
+        right.created_at.localeCompare(left.created_at) ||
+        right.id.localeCompare(left.id),
+    )[0];
+}
+
+function exportStateFromDurableRowStatus(
+  rowStatus: SubmissionStatus,
+): Submission["exportState"] {
+  if (rowStatus === "exported") return "marked_exported";
+  if (rowStatus === "ready_for_export") return "ready";
+  return "not_ready";
+}
+
+function clearSnapshotExportPackage(
+  submission: Submission,
+  rowStatus: SubmissionStatus,
+): Submission {
+  return {
+    ...submission,
+    exportPackage: undefined,
+    exportState: exportStateFromDurableRowStatus(rowStatus),
+  };
+}
+
+function attachExportPackageRow(
+  submission: Submission,
+  rowStatus: SubmissionStatus,
+  exportBatches: CockpitExportBatchRow[],
+  options: { restoreGeneratedState?: boolean } = {},
+): Submission {
+  const durableExportState = exportStateFromDurableRowStatus(rowStatus);
+  if (durableExportState === "not_ready") {
+    return clearSnapshotExportPackage(submission, rowStatus);
+  }
+
+  const exportBatch = latestExportBatchForSubmission(submission.id, exportBatches);
+  if (!exportBatch) return clearSnapshotExportPackage(submission, rowStatus);
+
+  const exportPackage = exportPackageFromBatchRow(exportBatch);
+  if (!exportPackage) return clearSnapshotExportPackage(submission, rowStatus);
+
+  return {
+    ...submission,
+    exportPackage,
+    exportState:
+      rowStatus === "exported"
+        ? "marked_exported"
+        : options.restoreGeneratedState
+          ? "file_generated"
+          : durableExportState,
+  };
+}
+
 function reconcileCockpitSnapshotWithSubmissionRow(
   row: Pick<SubmissionRow, "agent_id" | "exported_at" | "status" | "updated_at">,
   snapshot: Submission,
   applicants: CockpitApplicantRow[],
   questionnaireAnswers: CockpitQuestionnaireAnswerRow[],
+  exportBatches: CockpitExportBatchRow[],
 ): Submission {
   const rowStatus = fromSupabaseSubmissionRowStatus(row);
   const normalizedSnapshot = normalizeSubmissionForCanonicalRuntime(
@@ -232,12 +339,18 @@ function reconcileCockpitSnapshotWithSubmissionRow(
     },
   );
 
-  if (rowStatus !== "exported") return normalizedSnapshot;
+  if (rowStatus !== "exported") {
+    return attachExportPackageRow(normalizedSnapshot, rowStatus, exportBatches, {
+      restoreGeneratedState: true,
+    });
+  }
   if (
     normalizedSnapshot.status === "exported" &&
     normalizedSnapshot.exportState === "marked_exported"
   ) {
-    return normalizedSnapshot;
+    return attachExportPackageRow(normalizedSnapshot, rowStatus, exportBatches, {
+      restoreGeneratedState: true,
+    });
   }
 
   const syncedAt = row.exported_at ?? row.updated_at;
@@ -254,13 +367,18 @@ function reconcileCockpitSnapshotWithSubmissionRow(
         ...normalizedSnapshot.history,
       ];
 
-  return {
-    ...normalizedSnapshot,
-    status: "exported",
-    exportState: "marked_exported",
-    updatedAt: syncedAt,
-    history: syncedHistory,
-  };
+  return attachExportPackageRow(
+    {
+      ...normalizedSnapshot,
+      status: "exported",
+      exportState: "marked_exported",
+      updatedAt: syncedAt,
+      history: syncedHistory,
+    },
+    rowStatus,
+    exportBatches,
+    { restoreGeneratedState: true },
+  );
 }
 
 function cockpitSnapshotFamilyIntelligence(submission: Submission): Json {
@@ -305,6 +423,27 @@ function timestampOrNow(value: string | undefined): string {
 function tripDate(submission: Submission): string {
   if (submission.tripDateFrom === submission.tripDateTo) return submission.tripDateFrom;
   return `${submission.tripDateFrom} - ${submission.tripDateTo}`;
+}
+
+function splitLegacyTripDateRange(value: string) {
+  const normalized = value.trim();
+  const rangeMatch = normalized.match(/^(.+?)\s+-\s+(.+)$/);
+  if (!rangeMatch) return { from: normalized, to: normalized };
+
+  const from = rangeMatch[1]?.trim() ?? normalized;
+  const to = rangeMatch[2]?.trim() ?? normalized;
+  return { from: from || normalized, to: to || normalized };
+}
+
+function tripDateRangeFromRow(
+  row: Pick<SubmissionRow, "travel_date" | "trip_date_from" | "trip_date_to">,
+) {
+  const legacy = row.travel_date.trim();
+  const legacyRange = splitLegacyTripDateRange(legacy);
+  return {
+    from: row.trip_date_from?.trim() || legacyRange.from,
+    to: row.trip_date_to?.trim() || legacyRange.to,
+  };
 }
 
 function toSupabaseStatus(status: SubmissionStatus): SupabaseSubmissionStatus {
@@ -426,19 +565,30 @@ function toCorrectionInsert(
 
 function toStatusHistoryInsert(
   submission: Submission,
-  item: Submission["history"][number],
+  item: PersistableStatusHistoryItem,
   actorId: string,
 ): StatusHistoryInsert {
   return {
     id: stableUuid(`history:${submission.id}:${item.id}`),
     entity_type: "submission",
     entity_id: submission.id,
-    from_status: null,
-    to_status: toSupabaseStatus(submission.status),
+    from_status: item.fromStatus,
+    to_status: item.toStatus,
     comment: item.detail ? `${item.text} — ${item.detail}` : item.text,
     changed_by: actorId,
     changed_at: timestampOrNow(item.at),
   };
+}
+
+type PersistableStatusHistoryItem = Submission["history"][number] & {
+  fromStatus: SubmissionStatus;
+  toStatus: SubmissionStatus;
+};
+
+function isPersistableStatusHistoryItem(
+  item: Submission["history"][number],
+): item is PersistableStatusHistoryItem {
+  return Boolean(item.fromStatus && item.toStatus);
 }
 
 function reviewStatusForFile(file: SubmissionFile): MediaAssetInsert["review_status"] {
@@ -507,6 +657,8 @@ export function toCockpitDraftPersistencePayload(
   submission: Submission,
   actorId: string,
   ownerId: string,
+  actorHistorySource: Extract<SubmissionHistorySource, "agent" | "admin"> =
+    actorId === ownerId ? "agent" : "admin",
 ): SubmissionDraftPersistencePayload {
   const ownedSubmission = assignSubmissionOwner(
     ensureSubmissionOwner(submission, ownerId),
@@ -522,6 +674,8 @@ export function toCockpitDraftPersistencePayload(
       country: ownedSubmission.country,
       city: ownedSubmission.city,
       travel_date: tripDate(ownedSubmission),
+      trip_date_from: ownedSubmission.tripDateFrom,
+      trip_date_to: ownedSubmission.tripDateTo,
       status: toSupabaseStatus(ownedSubmission.status),
       priority:
         ownedSubmission.status === "returned" ||
@@ -558,9 +712,10 @@ export function toCockpitDraftPersistencePayload(
     corrections: ownedSubmission.issues.map((issue) =>
       toCorrectionInsert(ownedSubmission, issue, actorId),
     ),
-    status_history: ownedSubmission.history.map((item) =>
-      toStatusHistoryInsert(ownedSubmission, item, actorId),
-    ),
+    status_history: ownedSubmission.history
+      .filter(isPersistableStatusHistoryItem)
+      .filter((item) => item.source === actorHistorySource)
+      .map((item) => toStatusHistoryInsert(ownedSubmission, item, actorId)),
   };
 }
 
@@ -571,11 +726,205 @@ function requiresCorrectionHandoff(submission: Submission): boolean {
   );
 }
 
+export function reviewHandoffPersistenceIssues(
+  submission: Submission,
+  role?: Role,
+): string[] {
+  const openIssues = submission.issues.filter((issue) => issue.status === "open");
+  const fixedIssues = submission.issues.filter(
+    (issue) => issue.status === "fixed_by_agent",
+  );
+  const unresolvedIssues = [...openIssues, ...fixedIssues];
+  const issues: string[] = [];
+
+  if (submission.status === "submitted_for_review") {
+    if (unresolvedIssues.length > 0) {
+      issues.push("submitted_for_review cannot carry unresolved issues");
+    }
+    const mediaReadiness = canonicalRequiredMediaReadiness(submission, {
+      requireStorageIdentity: true,
+    });
+    if (!mediaReadiness.ok) {
+      issues.push(
+        `submitted_for_review requires canonical media: ${mediaReadiness.reason}`,
+      );
+    }
+    if (!hasHandoffHistory(submission, "submitted_for_review", "agent", role)) {
+      issues.push("submitted_for_review requires matching agent history");
+    }
+  }
+
+  if (submission.status === "returned") {
+    if (openIssues.length === 0) {
+      issues.push("returned requires at least one open issue");
+    }
+    if (!hasHandoffHistory(submission, "returned", "admin", role)) {
+      issues.push("returned requires matching admin history");
+    }
+  }
+
+  if (submission.status === "corrections_received") {
+    const unresolvedFixedTargets = fixedIssues.filter(
+      (issue) => !isSubmissionIssueResolved(submission, issue),
+    );
+    if (openIssues.length > 0) {
+      issues.push("corrections_received cannot persist open issues");
+    }
+    if (fixedIssues.length === 0) {
+      issues.push("corrections_received requires fixed_by_agent issues");
+    }
+    if (unresolvedFixedTargets.length > 0) {
+      issues.push("corrections_received fixed issues must resolve their targets");
+    }
+    if (!hasHandoffHistory(submission, "corrections_received", "agent", role)) {
+      issues.push("corrections_received requires matching agent history");
+    }
+  }
+
+  if (submission.status === "ready_for_export") {
+    if (unresolvedIssues.length > 0) {
+      issues.push("ready_for_export cannot persist unresolved issues");
+    }
+    const mediaReadiness = canonicalRequiredMediaReadiness(submission, {
+      requireAccepted: true,
+      requireStorageIdentity: true,
+    });
+    if (!mediaReadiness.ok) {
+      issues.push(
+        `ready_for_export requires accepted canonical media: ${mediaReadiness.reason}`,
+      );
+    }
+    if (!hasHandoffHistory(submission, "ready_for_export", "admin", role)) {
+      issues.push("ready_for_export requires matching admin history");
+    }
+  }
+
+  return issues;
+}
+
+function assertReviewHandoffPersistenceConsistency(
+  submission: Submission,
+  role: Role,
+): void {
+  if (!isReviewHandoffCommandWrite(submission, role)) return;
+
+  const issues = reviewHandoffPersistenceIssues(submission, role);
+  if (issues.length === 0) return;
+  const operation = requiresCorrectionHandoff(submission)
+    ? "rpc.submit_corrections_handoff"
+    : "rpc.save_submission_draft";
+
+  throw new PersistenceObservableError(
+    `${operation} failed safely (${operation}:save:HANDOFF_CONSISTENCY).`,
+    {
+      operation,
+      kind: "save",
+      safeCode: `${operation}:save:HANDOFF_CONSISTENCY`,
+      retryable: false,
+    },
+    {
+      cause: new Error(issues.join("; ")),
+    },
+  );
+}
+
+function hasHandoffHistory(
+  submission: Submission,
+  toStatus: SubmissionStatus,
+  source: NonNullable<Submission["history"][number]["source"]>,
+  role?: Role,
+): boolean {
+  const allowedFromStatuses = handoffAllowedFromStatuses[toStatus] ?? [];
+  const hasTypedHistory = submission.history.some(
+    (item) => item.fromStatus || item.toStatus,
+  );
+  const hasExactTypedHistory = submission.history.some(
+    (item) =>
+      item.toStatus === toStatus &&
+      item.source === source &&
+      Boolean(item.fromStatus) &&
+      allowedFromStatuses.includes(item.fromStatus as SubmissionStatus),
+  );
+  if (hasExactTypedHistory) return true;
+  if (hasTypedHistory || (role && isCurrentLocalHandoffWrite(submission, role))) {
+    return false;
+  }
+
+  return submission.history.some((item) => {
+    if (item.source !== source) return false;
+
+    const text = item.text.toLowerCase();
+    if (toStatus === "submitted_for_review") {
+      return text.includes("провер");
+    }
+    if (toStatus === "returned") {
+      return text.includes("вернул") || text.includes("возврат");
+    }
+    if (toStatus === "corrections_received") {
+      return text.includes("исправ");
+    }
+    if (toStatus === "ready_for_export") {
+      return text.includes("прин") || text.includes("готов");
+    }
+
+    return false;
+  });
+}
+
+const handoffAllowedFromStatuses: Partial<
+  Record<SubmissionStatus, SubmissionStatus[]>
+> = {
+  submitted_for_review: transitionMatrix.submit_for_review.from,
+  returned: [
+    ...transitionMatrix.return_with_issues.from,
+    ...transitionMatrix.return_again.from,
+  ],
+  corrections_received: transitionMatrix.submit_corrections.from,
+  ready_for_export: [
+    ...transitionMatrix.accept.from,
+    ...transitionMatrix.close_issues_accept.from,
+  ],
+};
+
+function isCurrentLocalHandoffWrite(submission: Submission, role: Role): boolean {
+  if (submission.updatedAt !== "сейчас") return false;
+
+  if (submission.status === "submitted_for_review") {
+    return role === "agent";
+  }
+  if (submission.status === "returned") {
+    return role === "admin" && submission.issues.some(
+      (issue) =>
+        issue.status === "open" &&
+        issue.createdAt === "сейчас" &&
+        issue.createdBy === "admin",
+    );
+  }
+  if (submission.status === "corrections_received") {
+    return role === "agent";
+  }
+  if (submission.status === "ready_for_export") {
+    return role === "admin" && submission.exportState === "ready";
+  }
+
+  return false;
+}
+
+function isReviewHandoffCommandWrite(submission: Submission, role: Role): boolean {
+  if (!handoffAllowedFromStatuses[submission.status]) return false;
+  if (submission.history[0]?.toStatus === submission.status) {
+    return true;
+  }
+
+  return isCurrentLocalHandoffWrite(submission, role);
+}
+
 function fallbackSubmissionFromRows(
   row: SubmissionRow,
   applicants: CockpitApplicantRow[],
   questionnaireAnswers: CockpitQuestionnaireAnswerRow[],
 ): Submission {
+  const tripDateRange = tripDateRangeFromRow(row);
   const applicantItems: Applicant[] = applicants.map((applicant) => ({
     id: applicant.id,
     fullName: applicant.full_name,
@@ -603,8 +952,8 @@ function fallbackSubmissionFromRows(
       row.city === "Москва" || row.city === "Санкт-Петербург" || row.city === "Казань"
         ? row.city
         : "Москва",
-    tripDateFrom: row.travel_date,
-    tripDateTo: row.travel_date,
+    tripDateFrom: tripDateRange.from,
+    tripDateTo: tripDateRange.to,
     status: fromSupabaseSubmissionRowStatus(row),
     applicants: applicantItems,
     issues: [],
@@ -788,6 +1137,11 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
+  const exportBatchRows =
+    profile.role === "admin"
+      ? await loadExportBatchRowsForSubmissions(submissionIds)
+      : [];
+
   const ownerIdsBySubmissionId = new Map<string, string>();
   const submissions = rows.map((row) => {
     ownerIdsBySubmissionId.set(row.id, row.agent_id);
@@ -797,6 +1151,9 @@ export async function loadCockpitSubmissionsForProfile(
     const submissionQuestionnaireAnswers = (questionnaireRows ?? []).filter(
       (answer) => answer.submission_id === row.id,
     );
+    const submissionExportBatches = exportBatchRows.filter((batch) =>
+      batch.submission_ids.includes(row.id),
+    );
     const snapshot = readCockpitSnapshot(row.family_intelligence);
     if (snapshot) {
       return reconcileCockpitSnapshotWithSubmissionRow(
@@ -804,13 +1161,18 @@ export async function loadCockpitSubmissionsForProfile(
         snapshot,
         submissionApplicants,
         submissionQuestionnaireAnswers,
+        submissionExportBatches,
       );
     }
 
-    return fallbackSubmissionFromRows(
-      row,
-      submissionApplicants,
-      submissionQuestionnaireAnswers,
+    return attachExportPackageRow(
+      fallbackSubmissionFromRows(
+        row,
+        submissionApplicants,
+        submissionQuestionnaireAnswers,
+      ),
+      fromSupabaseSubmissionRowStatus(row),
+      submissionExportBatches,
     );
   });
 
@@ -818,6 +1180,29 @@ export async function loadCockpitSubmissionsForProfile(
     ownerIdsBySubmissionId,
     submissions,
   };
+}
+
+async function loadExportBatchRowsForSubmissions(
+  submissionIds: string[],
+): Promise<CockpitExportBatchRow[]> {
+  if (!submissionIds.length) return [];
+
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  const { data, error } = await client
+    .from("export_batches")
+    .select(exportBatchSelect)
+    .overlaps("submission_ids", submissionIds);
+
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "export_batches.list",
+      fallbackKind: "database",
+    });
+  }
+
+  return data ?? [];
 }
 
 export async function saveCockpitSubmissionsForProfile(
@@ -831,11 +1216,18 @@ export async function saveCockpitSubmissionsForProfile(
   const nextOwnerIds = new Map(ownerIdsBySubmissionId);
 
   for (const submission of submissions) {
+    assertReviewHandoffPersistenceConsistency(submission, profile.role);
+
     const ownerId =
       profile.role === "admin"
         ? (nextOwnerIds.get(submission.id) ?? submission.agentId ?? profile.id)
         : profile.id;
-    const payload = toCockpitDraftPersistencePayload(submission, profile.id, ownerId);
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      profile.id,
+      ownerId,
+      profile.role,
+    );
     const { error } = requiresCorrectionHandoff(submission)
       ? await client.rpc("submit_corrections_handoff", { payload })
       : await client.rpc("save_submission_draft", { payload });

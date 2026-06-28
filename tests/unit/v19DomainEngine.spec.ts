@@ -232,7 +232,16 @@ describe("V-19 domain engine", () => {
     const returned = unwrap(
       returnWithIssues(submitted, "admin", [firstIssueInput(submitted)]),
     );
-    const corrected = applySubmissionAction(returned, "submit_corrections", "agent");
+    const issueId = returned.issues[0]?.id;
+    if (!issueId) throw new Error("Missing issue");
+
+    expect(canPerformAction(returned, "submit_corrections", "agent")).toEqual({
+      ok: false,
+      reason: "Сначала отметьте замечания исправленными",
+    });
+
+    const fixed = unwrap(markIssueFixed(returned, "agent", issueId));
+    const corrected = applySubmissionAction(fixed, "submit_corrections", "agent");
 
     expect(corrected.status).toBe("corrections_received");
     expect(corrected.issues[0]?.status).toBe("fixed_by_agent");

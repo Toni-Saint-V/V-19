@@ -5,7 +5,7 @@ import {
   type ExportSummary,
 } from "./exportRules";
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
-import { defaultDrawerTab, isFixedIssueStatus } from "./status";
+import { defaultDrawerTab, hasUsableTripDateRange, isFixedIssueStatus } from "./status";
 import {
   canonicalRequiredMediaReadiness,
   isCanonicalSubmissionStatus,
@@ -97,6 +97,9 @@ export function submitForReview(
   const completeness = getCompleteness(submission);
   if (completeness.total < 100 || !canonicalRequiredMediaReadiness(submission).ok) {
     return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
+  }
+  if (!hasUsableTripDateRange(submission)) {
+    return failure("VALIDATION_ERROR", "Trip dates must be complete.");
   }
 
   return success(
@@ -282,6 +285,9 @@ export function acceptSubmission(
   }
   if (!canonicalRequiredMediaReadiness(submission).ok) {
     return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
+  }
+  if (!hasUsableTripDateRange(submission)) {
+    return failure("VALIDATION_ERROR", "Trip dates must be complete.");
   }
 
   return success(
@@ -501,7 +507,10 @@ function ensureNotTerminal(submission: Submission): CommandResult<Submission> | 
   if (!isCanonicalSubmissionStatus(submission.status)) {
     return failure("INVALID_TRANSITION", "Submission status is not canonical.");
   }
-  if (terminalStatuses.has(submission.status) || isExportedTerminal(submission.status)) {
+  if (
+    terminalStatuses.has(submission.status) ||
+    isExportedTerminal(submission.status)
+  ) {
     return failure("EXPORTED_TERMINAL", "Exported is terminal for V-19.");
   }
   return null;
