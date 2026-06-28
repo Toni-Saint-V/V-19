@@ -2601,7 +2601,7 @@ function MainApp() {
 
       <section className="workspace">
         <header className="topbar">
-          {isV19CollectionSurface && !isFigmaVisualSurface ? (
+          {isV19CollectionSurface ? (
             <button
               className="v19-topbar-menu"
               type="button"
