@@ -2518,7 +2518,10 @@ function MainApp() {
                 className="ops-session"
                 aria-label="Сменить роль"
                 variant="ghost"
-                onClick={() => chooseRole(role === "agent" ? "admin" : "agent")}
+                onClick={() => {
+                  chooseRole(role === "agent" ? "admin" : "agent");
+                  setMobileNavOpen(false);
+                }}
               >
                 <span>{role === "agent" ? "ТП" : "АД"}</span>
                 <div>

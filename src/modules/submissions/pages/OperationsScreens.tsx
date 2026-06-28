@@ -2242,6 +2242,7 @@ export function ExportScreen({
   const mappedCount = mappingRows.filter((row) => row.state === "mapped").length;
   const derivedCount = mappingRows.filter((row) => row.state === "derived").length;
   const unresolvedCount = mappingRows.filter((row) => row.state === "unresolved").length;
+  const [exportPanelOpen, setExportPanelOpen] = useState(true);
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
@@ -2273,10 +2274,10 @@ export function ExportScreen({
       />
       <ToolbarIconButton
         icon="panel"
-        label="Контракт выгрузки открыт"
-        pressed
+        label={exportPanelOpen ? "Контракт выгрузки открыт" : "Открыть контракт выгрузки"}
+        pressed={exportPanelOpen}
         type="button"
-        onClick={() => undefined}
+        onClick={() => setExportPanelOpen((open) => !open)}
       />
     </ToolbarTools>
   );
@@ -2453,10 +2454,11 @@ export function ExportScreen({
           )}
         </CardComponent>
 
-        <aside
-          className="export-side magic-export-side v17-export-context-rail"
-          aria-label="Контекст выгрузки"
-        >
+        {exportPanelOpen ? (
+          <aside
+            className="export-side magic-export-side v17-export-context-rail"
+            aria-label="Контекст выгрузки"
+          >
           <div className="v17-export-rail-head">
             <div>
               <p className="kicker">Контракт выгрузки</p>
@@ -2464,7 +2466,12 @@ export function ExportScreen({
                 Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}
               </h2>
             </div>
-            <button className="icon-button v17-export-close" type="button" aria-label="Закрыть панель">
+            <button
+              className="icon-button v17-export-close"
+              type="button"
+              aria-label="Закрыть панель"
+              onClick={() => setExportPanelOpen(false)}
+            >
               <SvgIcon>
                 <path d="M6 6l12 12M18 6 6 18" />
               </SvgIcon>
@@ -2645,6 +2652,7 @@ export function ExportScreen({
           </CardComponent>
           </div>
         </aside>
+        ) : null}
       </div>
     </>
   );
