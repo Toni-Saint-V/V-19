@@ -28,9 +28,13 @@ const scopedDiffPaths = [
   "package.json",
   "scripts/verify-production-readiness.mjs",
   "scripts/verify-supabase-release.mjs",
+  "docs/release/auth-data-production-readiness.md",
+  "docs/release/supabase-production-readiness.json",
   "docs/release/supabase-production-approval-checklist.md",
   "docs/release/supabase-production-promotion.md",
   "docs/release/supabase-workspace-pr-package.md",
+  "docs/qa/release-ai-gate-20260627T200633.md",
+  "docs/qa/release-ai-gate-browser-key-audit-unverified-20260627T200633.md",
   "docs/qa/supabase-security-advisor-hardening-2026-06-15.md",
   "production-readiness-audit.md",
 ];
@@ -169,11 +173,6 @@ function requireEqual(value, expected, label) {
   else block(label, "mismatch");
 }
 
-function requireTrue(value, label) {
-  if (bool(value)) pass(label);
-  else block(label, "not confirmed");
-}
-
 function requireActivationPresent(value, label) {
   if (present(value)) pass(label);
   else activationBlock(label, "missing");
@@ -184,6 +183,27 @@ function requireActivationTrue(value, label) {
   else activationBlock(label, "not confirmed");
 }
 
+function requireActivationEqual(value, expected, label) {
+  if (value === expected) pass(label);
+  else activationBlock(label, "mismatch");
+}
+
+function requireActivationExistingProjectFile(value, label) {
+  if (!present(value)) {
+    activationBlock(label, "missing");
+    return false;
+  }
+
+  const path = resolve(repoRoot, value);
+  if (existsSync(path)) {
+    pass(label);
+    return true;
+  }
+
+  activationBlock(label, `${value} does not exist`);
+  return false;
+}
+
 function requireNonNegativeInteger(value, label) {
   if (Number.isInteger(value) && value >= 0) pass(label);
   else block(label, "missing or invalid count");
@@ -192,12 +212,32 @@ function requireNonNegativeInteger(value, label) {
 function requireExistingProjectFile(value, label) {
   if (!present(value)) {
     block(label, "missing");
-    return;
+    return false;
   }
 
   const path = resolve(repoRoot, value);
-  if (existsSync(path)) pass(label);
-  else block(label, `${value} does not exist`);
+  if (existsSync(path)) {
+    pass(label);
+    return true;
+  }
+
+  block(label, `${value} does not exist`);
+  return false;
+}
+
+function verifyBrowserKeyAuditEvidence(sandbox) {
+  const evidenceArtifact = present(sandbox.browserKeyAuditEvidenceArtifact)
+    ? sandbox.browserKeyAuditEvidenceArtifact
+    : sandbox.browserKeyAuditScreenshot;
+
+  requireExistingProjectFile(
+    evidenceArtifact,
+    "Sandbox browser key audit evidence artifact exists",
+  );
+  requireActivationExistingProjectFile(
+    sandbox.browserKeyAuditScreenshot,
+    "Sandbox browser key audit screenshot exists",
+  );
 }
 
 function requireSnippet(content, snippet, label) {
@@ -262,7 +302,7 @@ function verifyMigrationOrder(packet) {
   if (remoteOrder.join("\n") === requiredRemoteMigrationOrder.join("\n")) {
     pass("Production packet records the exact applied remote migration order");
   } else {
-    block(
+    activationBlock(
       "Production packet records the exact applied remote migration order",
       "mismatch",
     );
@@ -279,6 +319,14 @@ function verifyPackageScript() {
 }
 
 function verifyProductionMigrationEvidence(packet) {
+  if (packet.productionEnvEvidence?.migrationsApplied !== true) {
+    activationBlock(
+      "Production migration evidence artifact exists",
+      "migrations not confirmed",
+    );
+    return;
+  }
+
   const artifact = packet.productionEnvEvidence?.productionMigrationEvidenceArtifact;
   requireExistingProjectFile(artifact, "Production migration evidence artifact exists");
   if (!present(artifact)) return;
@@ -351,6 +399,14 @@ function verifyProductionMigrationEvidence(packet) {
 }
 
 function verifySmokeDiscoveryEvidence(packet, smokeDiscovery) {
+  if (smokeDiscovery.checked !== true) {
+    activationBlock(
+      "Production smoke account discovery evidence artifact exists",
+      "discovery not confirmed",
+    );
+    return;
+  }
+
   const artifact = smokeDiscovery.evidenceArtifact;
   requireExistingProjectFile(
     artifact,
@@ -482,33 +538,39 @@ function verifyPreActivationCheck(pre, key, command, label, verifierSha256) {
 
 function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
   const scopedDiffSha256 = currentScopedDiffSha256();
-  requireEqual(
+  requireActivationEqual(
     pre.readinessContractVersion,
     readinessContractVersion,
     "Pre-activation verification is bound to the current readiness contract",
   );
-  requirePresent(
+  requireActivationPresent(
     pre.readinessVerifierSha256,
     "Pre-activation readiness verifier hash is recorded",
   );
-  requireEqual(
+  requireActivationEqual(
     pre.readinessVerifierSha256,
     verifierSha256,
     "Pre-activation readiness verifier hash is current",
   );
-  requirePresent(pre.checkedAt, "Pre-activation verification timestamp is recorded");
-  requirePresent(pre.gitHead, "Pre-activation verification git head is recorded");
-  requireEqual(
+  requireActivationPresent(
+    pre.checkedAt,
+    "Pre-activation verification timestamp is recorded",
+  );
+  requireActivationPresent(
+    pre.gitHead,
+    "Pre-activation verification git head is recorded",
+  );
+  requireActivationEqual(
     pre.gitHead,
     gitHead,
     "Pre-activation verification git head matches current HEAD",
   );
-  requireEqual(
+  requireActivationEqual(
     pre.scopedDiffSha256,
     scopedDiffSha256,
     "Pre-activation verification scoped diff hash is current",
   );
-  requirePresent(
+  requireActivationPresent(
     pre.verificationScope,
     "Pre-activation verification scope is recorded",
   );
@@ -723,85 +785,119 @@ function verifyPacket(packet, rawContent) {
     sandbox.evidenceArtifact,
     "Sandbox evidence artifact exists",
   );
-  requireExistingProjectFile(
-    sandbox.browserKeyAuditScreenshot,
-    "Sandbox browser key audit screenshot exists",
-  );
+  verifyBrowserKeyAuditEvidence(sandbox);
 
   const target = packet.productionTarget ?? {};
-  requirePresent(target.projectId, "Production project id is recorded");
-  requirePresent(target.projectUrl, "Production project URL is recorded");
-  requirePresent(target.supabaseOrganization, "Supabase organization is recorded");
-  if (target.projectId && target.projectId !== sandboxProjectId) {
+  requireActivationPresent(target.projectId, "Production project id is recorded");
+  requireActivationPresent(target.projectUrl, "Production project URL is recorded");
+  requireActivationPresent(
+    target.supabaseOrganization,
+    "Supabase organization is recorded",
+  );
+  if (!present(target.projectId)) {
+    activationBlock("Production project is not the sandbox project", "missing");
+  } else if (target.projectId !== sandboxProjectId) {
     pass("Production project is not the sandbox project");
   } else {
-    block("Production project is not the sandbox project", "missing or sandbox id");
+    block("Production project is not the sandbox project", "sandbox id");
   }
-  if (target.activationTarget === "production") {
+  if (!present(target.activationTarget)) {
+    activationBlock("Production activation target is explicit", "missing");
+  } else if (target.activationTarget === "production") {
     pass("Production activation target is explicit");
   } else {
     block("Production activation target is explicit", "must be production");
   }
 
   const owners = packet.owners ?? {};
-  requirePresent(owners.rolloutOwner, "Rollout owner is recorded");
-  requirePresent(owners.technicalApprover, "Technical approver is recorded");
-  requirePresent(owners.businessApprover, "Business approver is recorded");
-  requirePresent(owners.rollbackDecisionOwner, "Rollback decision owner is recorded");
+  requireActivationPresent(owners.rolloutOwner, "Rollout owner is recorded");
+  requireActivationPresent(owners.technicalApprover, "Technical approver is recorded");
+  requireActivationPresent(owners.businessApprover, "Business approver is recorded");
+  requireActivationPresent(
+    owners.rollbackDecisionOwner,
+    "Rollback decision owner is recorded",
+  );
   requireActivationPresent(
     owners.plannedPromotionWindow,
     "Promotion window is recorded",
   );
 
   const migration = packet.migrationContract ?? {};
-  requireTrue(migration.targetHistoryChecked, "Target migration history was checked");
-  requireTrue(
+  requireActivationTrue(
+    migration.targetHistoryChecked,
+    "Target migration history was checked",
+  );
+  requireActivationTrue(
     migration.targetHistoryCompatible,
     "Target migration history is compatible",
   );
-  requireTrue(
+  requireActivationTrue(
     migration.ownerApprovedExactMigrationContract,
     "Owner approved exact migration contract",
   );
-  requirePresent(
+  requireActivationPresent(
     migration.migrationApplyOperator,
     "Migration apply operator is recorded",
   );
-  requireTrue(
+  requireActivationTrue(
     migration.expectedPostApplyMigrationListRecorded,
     "Expected post-apply migration list is recorded",
   );
 
   const smoke = packet.smokeAccounts ?? {};
   const smokeDiscovery = packet.smokeAccountDiscovery ?? {};
-  requireTrue(smokeDiscovery.checked, "Production smoke account discovery was checked");
-  requirePresent(
+  requireActivationTrue(
+    smokeDiscovery.checked,
+    "Production smoke account discovery was checked",
+  );
+  requireActivationPresent(
     smokeDiscovery.checkedAt,
     "Production smoke account discovery timestamp is recorded",
   );
-  requireNonNegativeInteger(
-    smokeDiscovery.authUserCount,
-    "Production auth user count is recorded",
-  );
-  requireNonNegativeInteger(
-    smokeDiscovery.confirmedAuthUserCount,
-    "Production confirmed auth user count is recorded",
-  );
-  requireNonNegativeInteger(
-    smokeDiscovery.profileCount,
-    "Production profile count is recorded",
-  );
-  requireNonNegativeInteger(
-    smokeDiscovery.orphanAuthUsersWithoutProfileCount,
-    "Production orphan auth user count is recorded",
-  );
-  verifySmokeDiscoveryEvidence(packet, smokeDiscovery);
-  if (smokeDiscovery.orphanAuthUsersWithoutProfileCount === 0) {
-    pass("Production has no auth users without profiles");
+  if (smokeDiscovery.checked === true) {
+    requireNonNegativeInteger(
+      smokeDiscovery.authUserCount,
+      "Production auth user count is recorded",
+    );
+    requireNonNegativeInteger(
+      smokeDiscovery.confirmedAuthUserCount,
+      "Production confirmed auth user count is recorded",
+    );
+    requireNonNegativeInteger(
+      smokeDiscovery.profileCount,
+      "Production profile count is recorded",
+    );
+    requireNonNegativeInteger(
+      smokeDiscovery.orphanAuthUsersWithoutProfileCount,
+      "Production orphan auth user count is recorded",
+    );
+    verifySmokeDiscoveryEvidence(packet, smokeDiscovery);
+    if (smokeDiscovery.orphanAuthUsersWithoutProfileCount === 0) {
+      pass("Production has no auth users without profiles");
+    } else {
+      activationBlock(
+        "Production has no auth users without profiles",
+        `${smokeDiscovery.orphanAuthUsersWithoutProfileCount} orphan auth user(s)`,
+      );
+    }
   } else {
     activationBlock(
+      "Production auth user count is recorded",
+      "discovery not confirmed",
+    );
+    activationBlock(
+      "Production confirmed auth user count is recorded",
+      "discovery not confirmed",
+    );
+    activationBlock("Production profile count is recorded", "discovery not confirmed");
+    activationBlock(
+      "Production orphan auth user count is recorded",
+      "discovery not confirmed",
+    );
+    verifySmokeDiscoveryEvidence(packet, smokeDiscovery);
+    activationBlock(
       "Production has no auth users without profiles",
-      `${smokeDiscovery.orphanAuthUsersWithoutProfileCount} orphan auth user(s)`,
+      "discovery not confirmed",
     );
   }
   for (const [key, label] of [
@@ -818,7 +914,7 @@ function verifyPacket(packet, rawContent) {
   }
 
   const backup = packet.backupRestore ?? {};
-  requirePresent(backup.backupOwner, "Backup owner is recorded");
+  requireActivationPresent(backup.backupOwner, "Backup owner is recorded");
   requireActivationPresent(backup.backupMechanism, "Backup mechanism is recorded");
   requireActivationPresent(
     backup.latestBackupTimestamp,
@@ -827,22 +923,26 @@ function verifyPacket(packet, rawContent) {
   requireActivationTrue(backup.restorePathConfirmed, "Restore path is confirmed");
   requireActivationTrue(backup.restoreEvidenceRecorded, "Restore evidence is recorded");
   requireActivationTrue(backup.rpoRtoAcceptedByOwner, "RPO/RTO is accepted by owner");
-  requirePresent(
+  requireActivationPresent(
     backup.rollbackCommunicationOwner,
     "Rollback communication owner is recorded",
   );
 
   const pre = packet.preActivationVerification ?? {};
   verifyPreActivationFreshness(pre, verifierSha256, gitHead);
-  requireTrue(pre.verifySupabaseReleasePassed, "verify:supabase-release passed");
-  requireTrue(pre.testSupabaseLivePassed, "test:supabase-live passed");
+  requireActivationTrue(pre.verifySupabaseReleasePassed, "verify:supabase-release passed");
+  requireActivationTrue(pre.testSupabaseLivePassed, "test:supabase-live passed");
   requireActivationTrue(pre.testE2eSupabasePassed, "test:e2e:supabase passed");
   requireActivationTrue(pre.verifyFullPassed, "verify:full passed");
   requireActivationTrue(pre.finalDiffReviewed, "Final diff was reviewed");
-  requireExistingProjectFile(
-    pre.evidenceArtifact,
-    "Pre-activation evidence artifact exists",
-  );
+  if (present(pre.evidenceArtifact)) {
+    requireExistingProjectFile(
+      pre.evidenceArtifact,
+      "Pre-activation evidence artifact exists",
+    );
+  } else {
+    activationBlock("Pre-activation evidence artifact exists", "missing");
+  }
 
   const env = packet.productionEnvEvidence ?? {};
   for (const [key, label] of [
@@ -860,41 +960,36 @@ function verifyPacket(packet, rawContent) {
     ["productionApproved", "Production approval evidence is true"],
     ["publicConfigRecorded", "Production public config is recorded"],
   ]) {
-    if (
-      [
-        "migrationApproved",
-        "migrationsApplied",
-        "rlsPolicyTestsPassed",
-        "storagePolicyTestsPassed",
-        "publicConfigRecorded",
-      ].includes(key)
-    ) {
-      requireTrue(env[key], label);
-    } else {
-      requireActivationTrue(env[key], label);
-    }
+    requireActivationTrue(env[key], label);
   }
   verifyProductionMigrationEvidence(packet);
 
   const authSecurity = packet.authSecurity ?? {};
-  requireTrue(
+  requireActivationTrue(
     authSecurity.securityAdvisorsChecked,
     "Supabase security advisors were checked",
   );
-  if (authSecurity.projectId === packet.productionTarget?.projectId) {
-    pass("Supabase security advisors were checked against production");
+  if (authSecurity.securityAdvisorsChecked === true) {
+    if (authSecurity.projectId === packet.productionTarget?.projectId) {
+      pass("Supabase security advisors were checked against production");
+    } else {
+      block(
+        "Supabase security advisors were checked against production",
+        "project id mismatch",
+      );
+    }
+    verifyAuthSecurityEvidence(packet, authSecurity);
   } else {
-    block(
+    activationBlock(
       "Supabase security advisors were checked against production",
-      "project id mismatch",
+      "not confirmed",
     );
   }
-  verifyAuthSecurityEvidence(packet, authSecurity);
-  requireTrue(
+  requireActivationTrue(
     authSecurity.planEligibilityChecked,
     "Supabase Auth leaked password protection plan eligibility was checked",
   );
-  requirePresent(
+  requireActivationPresent(
     authSecurity.organizationPlan,
     "Supabase Auth security organization plan is recorded",
   );
