@@ -10181,7 +10181,7 @@ p {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 90;
   display: grid;
   place-items: center;
   padding: 18px;
@@ -12522,9 +12522,9 @@ p {
     .mobile-create-dock {
     position: fixed;
     right: 12px;
-    bottom: max(94px, calc(env(safe-area-inset-bottom) + 94px));
+    bottom: max(108px, calc(env(safe-area-inset-bottom) + 108px));
     left: 12px;
-    z-index: 90;
+    z-index: 140;
     display: block;
   }
 
