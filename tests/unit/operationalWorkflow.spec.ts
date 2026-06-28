@@ -912,7 +912,7 @@ function unwrap<T>(result: CommandResult<T>): T {
 
 function completeInProgressSubmission(): Submission {
   return {
-    ...uploadRequiredFiles(
+    ...uploadRequiredFilesWithRealPassportScan(
       setApplicantFieldValues(
         completeQuestionnaire(
           createDraftSubmission({
@@ -942,6 +942,21 @@ function completeInProgressSubmission(): Submission {
     tripDateFrom: "2026-07-10",
     tripDateTo: "2026-07-18",
   };
+}
+
+function uploadRequiredFilesWithRealPassportScan(submission: Submission): Submission {
+  const passportScan = submission.files.find((file) => file.type === "passport_scan");
+  const withPassportScan = passportScan
+    ? uploadRequiredFile(submission, passportScan.id, {
+        generatedFileName: "passport-scan.pdf",
+        mimeType: "application/pdf",
+        originalFileName: "passport-scan.pdf",
+        sizeBytes: 150_000,
+        uploadedAtIso: "2026-06-27T08:00:00.000Z",
+      })
+    : submission;
+
+  return uploadRequiredFiles(withPassportScan);
 }
 
 function draftWithUploadedPassportScan(): Submission {

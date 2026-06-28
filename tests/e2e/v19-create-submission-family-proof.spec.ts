@@ -12,16 +12,21 @@ function e2ePassportFile(name: string) {
 }
 
 async function clickFirstVisible(locator: Locator) {
-  const count = await locator.count();
-  for (let index = 0; index < count; index += 1) {
-    const candidate = locator.nth(index);
-    if (await candidate.isVisible()) {
-      await candidate.click();
-      return;
-    }
-  }
+  let visibleIndex = -1;
+  await expect
+    .poll(async () => {
+      const count = await locator.count();
+      for (let index = 0; index < count; index += 1) {
+        if (await locator.nth(index).isVisible()) {
+          visibleIndex = index;
+          return index;
+        }
+      }
+      return -1;
+    })
+    .not.toBe(-1);
 
-  throw new Error("No visible locator matched");
+  await locator.nth(visibleIndex).click();
 }
 
 async function openMySubmissions(page: Page, mobile: boolean) {
@@ -35,7 +40,7 @@ async function openMySubmissions(page: Page, mobile: boolean) {
   }
 
   await clickFirstVisible(
-    page.getByRole("button", { name: /Мои подачи(\.|$)/ }),
+    page.getByRole("button", { name: /Мои подачи/ }),
   );
   await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
 }

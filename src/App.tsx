@@ -112,7 +112,6 @@ import {
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
-import { FigmaActionQueueVisual } from "./modules/submissions/pages/FigmaVisualScreens";
 import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import { CANONICAL_CITIES } from "./modules/submissions/types";
 import type {
@@ -149,11 +148,11 @@ import {
   authRepository,
   type AccessRequest,
   type Session as LocalAuthSession,
-} from "./services/authRegistration";
+} from "./shared/authRegistration";
 import {
   canShowLocalDemoRoleSwitch,
   canUseLocalDemoSeedAutoLogin,
-} from "./services/pilotAccessGate";
+} from "./shared/pilotAccessGate";
 import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
 import { invokePassportExtraction } from "./modules/submissions/passportExtractionService";
 import {
@@ -169,6 +168,11 @@ import { publishReturnedPdfAgentHandoff } from "./modules/submissions/returnedPd
 import type { AppProfile } from "./types/session";
 
 const SettingsScreen = lazy(() => import("./modules/submissions/pages/SettingsScreen"));
+const FigmaActionQueueVisual = lazy(() =>
+  import("./modules/submissions/pages/FigmaVisualScreens").then((module) => ({
+    default: module.FigmaActionQueueVisual,
+  })),
+);
 const CreateSubmissionDrawer = lazy(() =>
   import("./modules/submissions/components/CreateSubmissionDrawer").then((module) => ({
     default: module.CreateSubmissionDrawer,
@@ -2864,7 +2868,9 @@ function MainApp() {
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
         ) : surface === "agent-actions" ? (
-          <FigmaActionQueueVisual onOpen={openVisualSubmission} />
+          <Suspense fallback={null}>
+            <FigmaActionQueueVisual onOpen={openVisualSubmission} />
+          </Suspense>
         ) : surface === "agent-inbox" ? (
           <>
             <div className="v19-inbox-mode-tabs">
