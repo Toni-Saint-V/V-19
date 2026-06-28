@@ -17,6 +17,7 @@ import {
   runAiReview,
 } from "./modules/submissions/aiSuggestions";
 import {
+  adminInboxEvents,
   agentActionQueue,
   searchAgentActions,
 } from "./modules/submissions/agentActions";
@@ -104,15 +105,14 @@ import { FigmaQuestionnaireScreen } from "./modules/submissions/components/Figma
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
+  AdminReviewScreen,
   AgentActionsScreen,
   AgentInboxScreen,
+  AgentSubmissionsScreen,
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
-import {
-  FigmaActionQueueVisual,
-  FigmaApplicantsVisual,
-} from "./modules/submissions/pages/FigmaVisualScreens";
+import { FigmaActionQueueVisual } from "./modules/submissions/pages/FigmaVisualScreens";
 import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import { CANONICAL_CITIES } from "./modules/submissions/types";
 import type {
@@ -174,6 +174,7 @@ const CreateSubmissionDrawer = lazy(() =>
 const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
 const fallbackAdminEmails = ["admin@visaflow.local"];
+const fallbackAgentEmails = ["agent@visaflow.local"];
 
 type IssueComposerRequest = {
   submissionId: string;
@@ -445,7 +446,7 @@ function MainApp() {
   const [settingsSaveState, setSettingsSaveState] = useState<"idle" | "saved">("idle");
   const [confirmSettingsLeave, setConfirmSettingsLeave] = useState(false);
   const [surface, setSurface] = useState<Surface>(
-    initialWorkspaceRole === "admin" ? "admin-review" : "agent-actions",
+    initialWorkspaceRole === "admin" ? "admin-review" : "agent-inbox",
   );
   const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(() => {
@@ -548,6 +549,10 @@ function MainApp() {
     () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
     [cityFilter, query, submissions],
   );
+  const searchedAdminInboxEvents = useMemo(
+    () => adminInboxEvents(searchedReviewQueue),
+    [searchedReviewQueue],
+  );
   const adminWorkSubmissionCount = useMemo(
     () =>
       searchedReviewQueue.filter(
@@ -566,6 +571,14 @@ function MainApp() {
       ? searchedReviewQueue.filter(matchesReviewTab(reviewFilterTab))
       : [],
   );
+  const visibleAgentSubmission =
+    agentList.find((submission) => submission.id === selectedSubmissionId) ??
+    agentList[0] ??
+    null;
+  const visibleReviewSubmission =
+    reviewList.find((submission) => submission.id === selectedSubmissionId) ??
+    reviewList[0] ??
+    null;
   const searchedExportSubmissions = useMemo(
     () => searchSubmissions(submissions, query, cityFilter),
     [cityFilter, query, submissions],
@@ -580,17 +593,15 @@ function MainApp() {
   const showRoleSwitcher =
     !isSupabaseMode &&
     Boolean(localAuthSession) &&
-    import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true";
+    (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
   const isV19CollectionSurface =
     surface === "agent-actions" ||
     surface === "agent-inbox" ||
     surface === "agent-submissions" ||
     surface === "admin-review";
-  const isFigmaVisualSurface =
-    surface === "agent-actions" ||
-    surface === "agent-submissions" ||
-    surface === "admin-review";
-  const workspaceSurfaceTitle = surfaceTitle(surface);
+  const isFigmaVisualSurface = surface === "agent-actions";
+  const workspaceSurfaceTitle =
+    surface === "admin-review" ? "Работа" : surfaceTitle(surface);
   const workspaceSurfaceDescription =
     surface === "admin-review" ? "Проверка и события" : surfaceDescription(surface);
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
@@ -631,8 +642,18 @@ function MainApp() {
     role === "agent"
       ? [
           {
+            active: surface === "agent-inbox",
+            count: agentInboxUnreadCount,
+            icon: "С",
+            id: "agent-inbox",
+            label: "Входящие",
+            meta: "новые события",
+            onClick: showAgentInbox,
+            tone: agentInboxUnreadCount > 0 ? "danger" : "default",
+          },
+          {
             active: surface === "agent-actions",
-            count: 20,
+            count: agentActions.summary.open,
             icon: "М",
             id: "agent-actions",
             label: "Мои действия",
@@ -640,20 +661,20 @@ function MainApp() {
             onClick: showAgentActions,
           },
           {
-            active: surface === "agent-inbox",
-            icon: "С",
-            id: "agent-inbox",
-            label: "Сбор документов",
-            meta: "новые события",
-            onClick: showAgentInbox,
-          },
-          {
             active: surface === "agent-submissions",
             icon: "П",
             id: "agent-submissions",
             label: "Мои подачи",
-            meta: "профили и семьи",
+            meta: "все рабочие подачи",
             onClick: () => showAgentTab("action"),
+          },
+          {
+            active: surface === "settings",
+            icon: "Н",
+            id: "agent-settings",
+            label: "Настройки",
+            meta: "роль и доступ",
+            onClick: showSettingsSurface,
           },
         ]
       : [
@@ -662,8 +683,8 @@ function MainApp() {
             count: adminWorkSubmissionCount,
             icon: "М",
             id: "admin-work",
-            label: "Проверка",
-            meta: "визуал очереди",
+            label: "Работа",
+            meta: "очередь проверки",
             onClick: () => showReviewTab("review"),
           },
           {
@@ -763,10 +784,14 @@ function MainApp() {
       setAuthChecked(false);
       setWorkspaceAccessError("");
       try {
+        const requestedWorkspaceEmail = loadWorkspaceEmail();
         const restoredSession = await authRepository.restoreSession();
         if (cancelled) return;
 
-        if (restoredSession) {
+        if (
+          restoredSession &&
+          (!requestedWorkspaceEmail || requestedWorkspaceEmail === restoredSession.email)
+        ) {
           setLocalAuthSession(restoredSession);
           setRole(restoredSession.role);
           setSurface(restoredSession.role === "admin" ? "admin-review" : "agent-inbox");
@@ -778,6 +803,25 @@ function MainApp() {
               await accessRequestRepository.listPendingAccessRequests(),
             );
           }
+          return;
+        }
+
+        const bootstrapEmail = requestedWorkspaceEmail || fallbackAgentEmails[0];
+        const bootstrapSession = await authRepository.loginApprovedUser(bootstrapEmail);
+        if (cancelled) return;
+
+        setLocalAuthSession(bootstrapSession);
+        setRole(bootstrapSession.role);
+        setSurface(
+          bootstrapSession.role === "admin" ? "admin-review" : "agent-inbox",
+        );
+        setWorkspaceEmail(bootstrapSession.email);
+        setWorkspaceEmailDraft(bootstrapSession.email);
+        saveWorkspaceEmail(bootstrapSession.email);
+        if (bootstrapSession.role === "admin") {
+          setPendingAccessRequests(
+            await accessRequestRepository.listPendingAccessRequests(),
+          );
         }
       } catch (error) {
         if (!cancelled) {
@@ -996,7 +1040,8 @@ function MainApp() {
       setAgentQuestionnaireOpen(false);
       setDirty(false);
       if (nextRole === "agent") {
-        setSurface("agent-actions");
+        setSurface("agent-inbox");
+        setAgentInboxMode("events");
         setAgentTab("action");
         setSelectedSubmissionId(
           firstSubmissionForRole(submissions, "agent", defaultLocalAgentOwnerId)?.id ??
@@ -1091,6 +1136,14 @@ function MainApp() {
     });
   }
 
+  function showSettingsSurface() {
+    requestSettingsLeave(() => {
+      setSurface("settings");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+    });
+  }
+
   function openCreateSubmissionDrawer() {
     rememberReturnFocus();
     setDrawerMode("create");
@@ -1113,6 +1166,13 @@ function MainApp() {
     setDrawerInitialTarget(target ?? null);
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
+  }
+
+  function selectSubmission(submission: Submission) {
+    setSubmissionActionError(null);
+    setSelectedSubmissionId(submission.id);
+    setActiveDrawerTab(defaultDrawerTab(submission));
+    setDrawerInitialTarget(null);
   }
 
   function openVisualSubmission(visualId: string, intent?: "detail" | "issues") {
@@ -1140,6 +1200,22 @@ function MainApp() {
     setActiveDrawerTab("questionnaire");
     setDrawerMode("closed");
     setAgentQuestionnaireOpen(true);
+  }
+
+  function openIssueComposer(submission: Submission) {
+    if (!canAddAdminIssue(submission, "admin")) {
+      openSubmission(submission, "issues");
+      return;
+    }
+
+    rememberReturnFocus();
+    setSelectedSubmissionId(submission.id);
+    setActiveDrawerTab("issues");
+    setDrawerMode("detail");
+    setIssueComposerRequest((current) => ({
+      submissionId: submission.id,
+      token: (current?.token ?? 0) + 1,
+    }));
   }
 
   const closeDrawer = useCallback(() => {
@@ -2503,6 +2579,14 @@ function MainApp() {
       onChange={setQuery}
     />
   );
+  const adminReviewSearchControl = (
+    <SearchBar
+      label="Поиск в текущем списке"
+      placeholder="Поиск по имени или ID"
+      value={query}
+      onChange={setQuery}
+    />
+  );
   const cityFilterControl = (
     <CityFilterMenu options={cities} value={cityFilter} onChange={setCityFilter} />
   );
@@ -2518,6 +2602,14 @@ function MainApp() {
     <SearchBar
       label="Поиск по действиям"
       placeholder="Поиск"
+      value={query}
+      onChange={setQuery}
+    />
+  );
+  const agentSubmissionsSearchControl = (
+    <SearchBar
+      label="Поиск по подачам"
+      placeholder="Поиск по подачам"
       value={query}
       onChange={setQuery}
     />
@@ -2699,7 +2791,12 @@ function MainApp() {
           </div>
           {isFigmaVisualSurface ? (
             <div className="topbar-actions vf-figma-topbar-actions">
-              <Button className="v19-topbar-cta is-secondary" variant="secondary">
+              <Button
+                className="v19-topbar-cta is-secondary"
+                disabled
+                title="Загрузка доступна через создание подачи"
+                variant="secondary"
+              >
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M12 16V4" />
                   <path d="m8 8 4-4 4 4" />
@@ -2798,12 +2895,38 @@ function MainApp() {
               />
             )}
           </>
-        ) : surface === "agent-submissions" ? (
-          <FigmaApplicantsVisual onOpen={openVisualSubmission} />
+        ) : surface === "agent-submissions" && activeSubmission ? (
+          <AgentSubmissionsScreen
+            activeTab={agentTab}
+            agentList={agentList}
+            hasSearchQuery={query.trim().length > 0}
+            onCreate={openCreateSubmissionDrawer}
+            onClearFilters={() => {
+              setQuery("");
+              setCityFilter("Все города");
+            }}
+            onOpen={openSubmission}
+            onSelect={selectSubmission}
+            onTab={showAgentTab}
+            searchControl={agentSubmissionsSearchControl}
+            visibleSubmission={visibleAgentSubmission}
+            summary={summary}
+          />
         ) : null}
 
         {surface === "admin-review" && activeSubmission ? (
-          <FigmaActionQueueVisual onOpen={openVisualSubmission} />
+          <AdminReviewScreen
+            inboxEvents={searchedAdminInboxEvents}
+            onAddIssue={openIssueComposer}
+            onOpen={openSubmission}
+            onSelect={selectSubmission}
+            onTab={showReviewTab}
+            reviewList={reviewList}
+            reviewSource={searchedReviewQueue}
+            reviewTab={reviewTab}
+            searchControl={adminReviewSearchControl}
+            visibleSubmission={visibleReviewSubmission}
+          />
         ) : null}
 
         {surface === "export" ? (
@@ -2869,7 +2992,10 @@ function MainApp() {
         />
       ) : null}
 
-      {drawerMode === "detail" && activeSubmission && role === "agent" ? (
+      {drawerMode === "detail" &&
+      activeSubmission &&
+      role === "agent" &&
+      isFigmaVisualSurface ? (
         <FigmaSubmissionDrawer
           actionError={activeSubmissionActionError}
           activeTab={activeDrawerTab}
@@ -2882,7 +3008,9 @@ function MainApp() {
         />
       ) : null}
 
-      {drawerMode === "detail" && activeSubmission && role !== "agent" ? (
+      {drawerMode === "detail" &&
+      activeSubmission &&
+      !(role === "agent" && isFigmaVisualSurface) ? (
         <SubmissionDrawer
           actionError={activeSubmissionActionError}
           activeTab={activeDrawerTab}

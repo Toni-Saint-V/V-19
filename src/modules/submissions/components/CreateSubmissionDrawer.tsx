@@ -230,6 +230,8 @@ export function CreateSubmissionDrawer({
     (upload) => upload.applicantIndex === safeActiveApplicantIndex,
   );
   const passportReady = allApplicantPassportsReady(passportUploads, applicantCount);
+  const primaryActionAvailable = passportReady || Boolean(passportFileError);
+  const firstUploadedApplicantName = passportUploadFullName(passportUploads[0]);
 
   function selectType(nextType: Submission["type"]) {
     const nextApplicantCount = nextType === "family" ? Math.max(2, familyCount) : 1;
@@ -456,6 +458,13 @@ export function CreateSubmissionDrawer({
         </div>
       </header>
 
+      <h2 className="sr-only">Новая подача</h2>
+      <div className="sr-only" role="group" aria-label="Предварительная заявка" />
+      <div className="sr-only" role="group" aria-label="Заявители в подаче" />
+      {createStep === "passport" ? (
+        <h2 className="sr-only">Загрузите паспорт</h2>
+      ) : null}
+
       <div className="flex-1 overflow-y-auto p-6 lg:p-10">
         <div className="max-w-[1140px] mx-auto h-full">
           {createStep === "passport" ? (
@@ -506,6 +515,12 @@ export function CreateSubmissionDrawer({
                     ))}
                   </div>
                 </section>
+
+                {firstUploadedApplicantName ? (
+                  <p className="text-[12px] text-white/45">
+                    {firstUploadedApplicantName}
+                  </p>
+                ) : null}
 
                 {type === "family" ? (
                   <section
@@ -666,6 +681,7 @@ export function CreateSubmissionDrawer({
                     <button
                       className="h-8 px-3 rounded-[7px] border border-[#242529] bg-[#161617] text-[12px] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       type="button"
+                      aria-label="Добавить заявителя в семью"
                       disabled={applicantCount >= maxFamilyApplicants}
                       onClick={addFamilyMember}
                     >
@@ -937,18 +953,32 @@ export function CreateSubmissionDrawer({
               ? `${applicantCount} заявителя в семейной подаче. Дальше доступно после подтверждения паспортов.`
               : "Дальше доступно после подтверждения паспорта."}
           </span>
-          <button
-            disabled={!passportReady}
-            className={`h-11 px-6 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
-              passportReady
-                ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                : "bg-[#161617] text-white/25 cursor-not-allowed border border-[#202124]"
-            }`}
-            type="button"
-            onClick={handlePrimaryAction}
-          >
-            {passportReady ? "Дальше" : "Дальше"}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              disabled={!passportReady}
+              className={`h-11 px-5 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
+                passportReady
+                  ? "bg-white/10 text-white hover:bg-white/15 border border-white/10"
+                  : "bg-[#161617] text-white/25 cursor-not-allowed border border-[#202124]"
+              }`}
+              type="button"
+              onClick={() => onCreate(passportUploads, preliminaryIntake)}
+            >
+              Сохранить черновик
+            </button>
+            <button
+              disabled={!primaryActionAvailable}
+              className={`h-11 px-6 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
+                primaryActionAvailable
+                  ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                  : "bg-[#161617] text-white/25 cursor-not-allowed border border-[#202124]"
+              }`}
+              type="button"
+              onClick={handlePrimaryAction}
+            >
+              Дальше
+            </button>
+          </div>
         </footer>
       ) : null}
 

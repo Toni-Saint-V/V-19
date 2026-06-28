@@ -72,7 +72,7 @@ interface LocalDevAuthState {
 
 const localDevAuthStorageKey = "visaflow.auth.localDev.v1";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const localDevAdminUsers: User[] = [
+const localDevApprovedUsers: User[] = [
   {
     id: "admin-local-1",
     email: "admin@visaflow.local",
@@ -84,6 +84,13 @@ const localDevAdminUsers: User[] = [
     id: "admin-demo-ops",
     email: "ops@visaflow.demo",
     role: "admin",
+    status: "active",
+    createdAt: "2026-06-28T00:00:00.000Z",
+  },
+  {
+    id: "agent-local-1",
+    email: "agent@visaflow.local",
+    role: "agent",
     status: "active",
     createdAt: "2026-06-28T00:00:00.000Z",
   },
@@ -132,7 +139,7 @@ function createId(prefix: string): string {
 function defaultLocalDevState(): LocalDevAuthState {
   return {
     accessRequests: [],
-    users: [...localDevAdminUsers],
+    users: [...localDevApprovedUsers],
     session: null,
   };
 }
@@ -143,9 +150,10 @@ function readLocalDevState(): LocalDevAuthState {
     if (!raw) return defaultLocalDevState();
     const parsed = JSON.parse(raw) as Partial<LocalDevAuthState>;
     const users = [
-      ...localDevAdminUsers,
+      ...localDevApprovedUsers,
       ...(Array.isArray(parsed.users) ? parsed.users : []).filter(
-        (user) => !localDevAdminUsers.some((admin) => admin.email === user.email),
+        (user) =>
+          !localDevApprovedUsers.some((approved) => approved.email === user.email),
       ),
     ];
 

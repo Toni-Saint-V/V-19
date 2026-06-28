@@ -25,6 +25,15 @@ describe("admin-approved local/dev auth registration", () => {
     );
   });
 
+  test("seeds approved local demo agent for the default workspace", async () => {
+    await expect(
+      authRepository.loginApprovedUser("agent@visaflow.local"),
+    ).resolves.toMatchObject({
+      email: "agent@visaflow.local",
+      role: "agent",
+    });
+  });
+
   test("creates one pending access request for duplicate agent email", async () => {
     const first = await accessRequestRepository.submitAccessRequest(
       "New.Agent@Example.com",
