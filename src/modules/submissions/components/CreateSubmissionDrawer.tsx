@@ -1,5 +1,5 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -637,70 +637,76 @@ export function CreateSubmissionDrawer({
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[#2a2a2e]">
                   {passportUploads.length ? (
-                    passportUploads.map((upload) => {
-                      const visualStatus = passportUploadVisualStatus(upload);
-                      const isProcessing = visualStatus === "extracting";
-                      const isReady = visualStatus === "ready";
-                      return (
-                        <article
-                          key={upload.id}
-                          className="p-3.5 rounded-[12px] bg-[#141416] border border-[#202124] relative overflow-hidden group hover:border-[#2a2a2e] transition-colors"
-                        >
-                          {isProcessing ? (
-                            <div className="absolute bottom-0 left-0 h-[1px] bg-white/20 w-full animate-pulse" />
-                          ) : null}
-                          <div className="flex items-start gap-3">
-                            <div className="w-9 h-9 shrink-0 rounded-[8px] bg-[#1a1a1d] border border-[#242529] flex items-center justify-center mt-0.5">
-                              {upload.file?.type.startsWith("image/") ? (
-                                <ImageIcon className="w-4 h-4 text-white/30" />
-                              ) : (
-                                <FileText className="w-4 h-4 text-white/30" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="text-[13.5px] font-medium text-white/80 truncate tracking-tight">
-                                  {upload.fileName}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[11px] font-mono text-white/30">
-                                  {formatFileSize(upload.file?.size)}
-                                </span>
-                                <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
-                                {isProcessing ? (
-                                  <span className="text-[11px] text-white/60 flex items-center gap-1.5 font-medium tracking-wide uppercase">
-                                    <ScanLine className="w-3 h-3 animate-pulse opacity-50" />
-                                    Processing
-                                  </span>
-                                ) : isReady ? (
-                                  <span className="text-[11px] text-white/40 flex items-center gap-1 font-medium tracking-wide uppercase">
-                                    <CheckCircle2 className="w-3 h-3 opacity-50" />
-                                    Done
-                                  </span>
+                    <AnimatePresence>
+                      {passportUploads.map((upload) => {
+                        const visualStatus = passportUploadVisualStatus(upload);
+                        const isProcessing = visualStatus === "extracting";
+                        const isReady = visualStatus === "ready";
+                        return (
+                          <motion.div
+                            key={upload.id}
+                            layout
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-3.5 rounded-[12px] bg-[#141416] border border-[#202124] relative overflow-hidden group hover:border-[#2a2a2e] transition-colors"
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            initial={{ opacity: 0, y: 10 }}
+                          >
+                            {isProcessing ? (
+                              <div className="absolute bottom-0 left-0 h-[1px] bg-white/20 w-full animate-pulse" />
+                            ) : null}
+                            <div className="flex items-start gap-3">
+                              <div className="w-9 h-9 shrink-0 rounded-[8px] bg-[#1a1a1d] border border-[#242529] flex items-center justify-center mt-0.5">
+                                {upload.file?.type.startsWith("image/") ? (
+                                  <ImageIcon className="w-4 h-4 text-white/30" />
                                 ) : (
-                                  <span className="text-[11px] text-white/40 tracking-wide uppercase">
-                                    Waiting
-                                  </span>
+                                  <FileText className="w-4 h-4 text-white/30" />
                                 )}
                               </div>
-                              {upload.extractedFields.length ? (
-                                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                                  {upload.extractedFields.slice(0, 3).map((field) => (
-                                    <span
-                                      key={`${upload.id}-${field.key}`}
-                                      className="px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-[10px] text-white/50 font-medium"
-                                    >
-                                      {field.value}
-                                    </span>
-                                  ))}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="text-[13.5px] font-medium text-white/80 truncate tracking-tight">
+                                    {upload.fileName}
+                                  </div>
                                 </div>
-                              ) : null}
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[11px] font-mono text-white/30">
+                                    {formatFileSize(upload.file?.size)}
+                                  </span>
+                                  <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
+                                  {isProcessing ? (
+                                    <span className="text-[11px] text-white/60 flex items-center gap-1.5 font-medium tracking-wide uppercase">
+                                      <ScanLine className="w-3 h-3 animate-pulse opacity-50" />
+                                      Processing
+                                    </span>
+                                  ) : isReady ? (
+                                    <span className="text-[11px] text-white/40 flex items-center gap-1 font-medium tracking-wide uppercase">
+                                      <CheckCircle2 className="w-3 h-3 opacity-50" />
+                                      Done
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-white/40 tracking-wide uppercase">
+                                      Waiting
+                                    </span>
+                                  )}
+                                </div>
+                                {upload.extractedFields.length ? (
+                                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                                    {upload.extractedFields.slice(0, 3).map((field) => (
+                                      <span
+                                        key={`${upload.id}-${field.key}`}
+                                        className="px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-[10px] text-white/50 font-medium"
+                                      >
+                                        {field.value}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
                             </div>
-                          </div>
-                        </article>
-                      );
-                    })
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   ) : (
                     <div className="h-full min-h-[240px] flex flex-col items-center justify-center text-center px-4">
                       <div className="w-10 h-10 rounded-full bg-[#161617] border border-[#202124] flex items-center justify-center mb-3">

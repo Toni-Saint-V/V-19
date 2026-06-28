@@ -270,7 +270,11 @@ const OverviewTab = ({ data }: { data: FigmaSubmissionDetail }) => (
   </div>
 );
 
-const QuestionnaireTab = () => (
+const QuestionnaireTab = ({
+  onOpenQuestionnaire,
+}: {
+  onOpenQuestionnaire: () => void;
+}) => (
   <div className="space-y-6">
     <div className="flex items-center justify-between">
       <div>
@@ -280,8 +284,8 @@ const QuestionnaireTab = () => (
         </p>
       </div>
       <button
-        aria-disabled="true"
         className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
+        onClick={onOpenQuestionnaire}
         type="button"
       >
         <Edit3 className="w-4 h-4" /> Открыть анкету
@@ -305,7 +309,15 @@ const QuestionnaireTab = () => (
       ].map((section) => (
         <div
           key={section.title}
-          className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors"
+          className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={onOpenQuestionnaire}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            onOpenQuestionnaire();
+          }}
         >
           <div
             className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
@@ -711,7 +723,11 @@ export function FigmaSubmissionDrawer({
                   transition={{ duration: 0.2 }}
                 >
                   {tab === "overview" ? <OverviewTab data={data} /> : null}
-                  {tab === "questionnaire" ? <QuestionnaireTab /> : null}
+                  {tab === "questionnaire" ? (
+                    <QuestionnaireTab
+                      onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
+                    />
+                  ) : null}
                   {tab === "issues" ? (
                     <IssuesTab
                       data={data}

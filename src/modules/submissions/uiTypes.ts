@@ -38,7 +38,7 @@ export function matchesReviewTab(tab: ReviewTab) {
 export function surfaceTitle(surface: Surface) {
   if (surface === "agent-actions") return "Мои действия";
   if (surface === "agent-inbox") return "Входящие";
-  if (surface === "agent-submissions") return "Заявители и Семьи";
+  if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка";
   if (surface === "settings") return "Настройки";
   return "Выгрузка";

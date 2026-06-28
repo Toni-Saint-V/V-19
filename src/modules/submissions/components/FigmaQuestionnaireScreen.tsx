@@ -584,7 +584,7 @@ export function FigmaQuestionnaireScreen({
   return (
     <motion.div
       animate={{ opacity: 1, x: 0 }}
-      className="vf-figma-surface fixed inset-0 z-[60] bg-[#101011] flex flex-col overflow-hidden"
+      className="vf-figma-surface vf-figma-questionnaire-screen fixed inset-0 z-[60] bg-[#101011] flex flex-col overflow-hidden"
       exit={{ opacity: 0, x: -20 }}
       initial={{ opacity: 0, x: 20 }}
       transition={{ damping: 25, stiffness: 250, type: "spring" }}
