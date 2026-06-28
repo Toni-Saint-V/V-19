@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "scope": "supabase-production-activation",
+  "status": "NO_GO",
+  "recordedAt": "2026-06-27",
+  "runId": "20260627T200633",
+  "sandboxReference": {
+    "projectId": "oevvaowoklqttqkraxho",
+    "activationTarget": "sandbox",
+    "evidenceArtifact": "docs/qa/release-ai-gate-20260627T200633.md",
+    "browserKeyAuditEvidenceArtifact": "docs/qa/release-ai-gate-browser-key-audit-unverified-20260627T200633.md",
+    "browserKeyAuditScreenshot": ""
+  },
+  "productionTarget": {
+    "projectId": "",
+    "projectUrl": "",
+    "supabaseOrganization": "",
+    "activationTarget": ""
+  },
+  "owners": {
+    "rolloutOwner": "",
+    "technicalApprover": "",
+    "businessApprover": "",
+    "rollbackDecisionOwner": "",
+    "plannedPromotionWindow": ""
+  },
+  "migrationContract": {
+    "requiredOrder": [
+      "20260611000000_visaflow_mvp_foundation.sql",
+      "20260612000000_visaflow_rls_performance_hardening.sql",
+      "20260612001000_visaflow_rpc_corrections_persistence.sql",
+      "20260613005039_visaflow_runtime_write_guards.sql",
+      "20260613010029_visaflow_rpc_submit_boundary.sql",
+      "20260614000000_ai_helper_audit_quota.sql",
+      "20260615000000_ai_helper_security_advisor_hardening.sql",
+      "20260616000000_export_batch_identity.sql",
+      "20260616001000_complete_export_package_rpc.sql",
+      "20260616002000_prevent_export_regression.sql",
+      "20260617001000_submit_corrections_handoff_rpc.sql",
+      "20260617002000_preserve_applicant_profile_on_cockpit_save.sql",
+      "20260617003000_passport_workspace_media_slots.sql",
+      "20260617004000_complete_export_package_workspace_media_slots.sql",
+      "20260617005000_passport_extraction_audit_quota_contract.sql",
+      "20260622000100_ai_helper_audit_event_metadata.sql",
+      "20260624001000_questionnaire_answers_persistence.sql",
+      "20260627001000_returned_pdf_storage_policies.sql"
+    ],
+    "appliedRemoteOrder": [],
+    "targetHistoryChecked": false,
+    "targetHistoryCompatible": false,
+    "ownerApprovedExactMigrationContract": false,
+    "migrationApplyOperator": "",
+    "expectedPostApplyMigrationListRecorded": false
+  },
+  "smokeAccountDiscovery": {
+    "checked": false,
+    "checkedAt": "",
+    "projectId": "",
+    "authUserCount": 0,
+    "confirmedAuthUserCount": 0,
+    "profileCount": 0,
+    "orphanAuthUsersWithoutProfileCount": 0,
+    "evidenceArtifact": ""
+  },
+  "smokeAccounts": {
+    "agent": {
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
+    },
+    "otherAgent": {
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
+    },
+    "admin": {
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
+    }
+  },
+  "backupRestore": {
+    "backupOwner": "",
+    "backupMechanism": "",
+    "latestBackupTimestamp": "",
+    "restorePathConfirmed": false,
+    "restoreEvidenceRecorded": false,
+    "rpoRtoAcceptedByOwner": false,
+    "rollbackCommunicationOwner": ""
+  },
+  "preActivationVerification": {
+    "readinessContractVersion": "2026-06-16-production-readiness-v2",
+    "readinessVerifierSha256": "",
+    "checkedAt": "",
+    "gitHead": "",
+    "scopedDiffSha256": "",
+    "verificationScope": "",
+    "verifySupabaseReleasePassed": false,
+    "testSupabaseLivePassed": false,
+    "testE2eSupabasePassed": false,
+    "verifyFullPassed": false,
+    "finalDiffReviewed": false,
+    "evidenceArtifact": ""
+  },
+  "productionEnvEvidence": {
+    "backendTargetSupabase": false,
+    "activationTargetProduction": false,
+    "releaseEnabled": false,
+    "transactionalPersistenceTested": false,
+    "migrationApproved": false,
+    "migrationsApplied": false,
+    "rlsPolicyTestsPassed": false,
+    "storagePolicyTestsPassed": false,
+    "edgeFunctionDryRunsPassed": false,
+    "browserQaPassed": false,
+    "browserKeyAudited": false,
+    "productionApproved": false,
+    "publicConfigRecorded": false,
+    "productionMigrationEvidenceArtifact": ""
+  },
+  "authSecurity": {
+    "securityAdvisorsChecked": false,
+    "projectId": "",
+    "checkedAt": "",
+    "planEligibilityChecked": false,
+    "organizationPlan": "",
+    "leakedPasswordProtectionPlanEligible": false,
+    "leakedPasswordProtectionEnabled": false,
+    "noBlockingSecurityAdvisorWarnings": false,
+    "openWarnings": [],
+    "advisorSnapshot": {},
+    "evidenceArtifact": ""
+  },
+  "postActivationChecks": {
+    "agentSignInWorks": false,
+    "adminSignInWorks": false,
+    "agentCanCreateDraft": false,
+    "agentCanUploadRequiredMedia": false,
+    "incompleteWaitingReviewRejected": false,
+    "validWaitingReviewReachesQueue": false,
+    "adminCanAcceptOrReturnCase": false,
+    "postHandoffAgentMutationBlocked": false,
+    "privateMediaSignedUrlScoped": false,
+    "logsAndErrorRateChecked": false
+  },
+  "goNoGo": {
+    "decision": "NO_GO",
+    "reason": "Owner approval, production target evidence, live Supabase proof, Edge dry-runs, browser QA, backup/restore evidence, and final diff review are not recorded."
+  }
+}
