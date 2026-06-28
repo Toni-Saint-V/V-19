@@ -27,6 +27,10 @@ import {
   normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
 } from "./domainContract";
+import {
+  applicantFileStatusForFiles,
+  fileCompletenessPercent,
+} from "./fileAsset";
 import type {
   City,
   AgentOwnerId,
@@ -40,6 +44,7 @@ import type {
   SubmissionAction,
   Role,
   SubmissionFile,
+  FileAssetStorageAdapter,
   SubmissionFileStatus,
   SubmissionFileType,
   SubmissionStatus,
@@ -61,6 +66,7 @@ export type UploadedFileMetadata = {
   mimeType: string;
   originalFileName: string;
   sizeBytes: number;
+  storageAdapter?: FileAssetStorageAdapter;
   storageBucket?: string;
   storagePath?: string;
   uploadedAtIso: string;
@@ -486,6 +492,7 @@ export function uploadRequiredFile(
           reviewedBy: undefined,
           reviewStatus: "not_reviewed" as const,
           sizeBytes: metadata?.sizeBytes ?? file.sizeBytes,
+          storageAdapter: metadata?.storageAdapter ?? file.storageAdapter ?? "local-dev",
           storageBucket: metadata?.storageBucket ?? file.storageBucket,
           storagePath: metadata?.storagePath ?? file.storagePath,
           uploadedAtIso: metadata?.uploadedAtIso ?? file.uploadedAtIso,
@@ -801,6 +808,7 @@ function mergeUploadedStorageFields(
     mimeType: metadata.mimeType,
     originalFileName: metadata.originalFileName,
     sizeBytes: metadata.sizeBytes,
+    storageAdapter: metadata.storageAdapter ?? file.storageAdapter ?? "local-dev",
     storageBucket: metadata.storageBucket,
     storagePath: metadata.storagePath,
     uploadedAtIso: metadata.uploadedAtIso,
@@ -821,18 +829,11 @@ function stableAsciiToken(value: string): string {
 }
 
 function fileCompleteness(files: SubmissionFile[]) {
-  if (!files.length) return 0;
-  const ready = files.filter((file) => !isFileUploadable(file.status)).length;
-  return Math.round((ready / files.length) * 100);
+  return fileCompletenessPercent(files);
 }
 
 function applicantFileStatus(files: SubmissionFile[]) {
-  if (!files.length || files.every((file) => file.status === "missing"))
-    return "empty" as const;
-  if (files.some((file) => file.status === "needs_replacement"))
-    return "needs_fix" as const;
-  if (files.every((file) => !isFileUploadable(file.status))) return "complete" as const;
-  return "partial" as const;
+  return applicantFileStatusForFiles(files);
 }
 
 function fileTypeName(type: SubmissionFile["type"]) {

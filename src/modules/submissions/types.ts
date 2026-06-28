@@ -70,6 +70,15 @@ export type SubmissionFileStatus =
   | "pending_review"
   | "accepted";
 
+export type FileAssetUploadStatus =
+  | "none"
+  | "pending"
+  | "uploaded"
+  | "failed"
+  | "deleted";
+
+export type FileAssetStorageAdapter = "local-dev" | "supabase-private";
+
 export type SubmissionFileType = CanonicalFrontendMediaType | RejectedLegacyMediaType;
 
 export type IssueSeverity = "blocker" | "warning" | "info";
@@ -358,10 +367,11 @@ export type SubmissionFile = {
   reviewedBy?: string;
   reviewStatus?: "not_reviewed" | "accepted" | "replace_required" | "poor_quality";
   sizeBytes?: number;
+  storageAdapter?: FileAssetStorageAdapter;
   storageBucket?: string;
   storagePath?: string;
   uploadedAtIso?: string;
-  uploadStatus?: "none" | "uploaded";
+  uploadStatus?: FileAssetUploadStatus;
   uploadedBy?: string;
   uploadedAt?: string;
   linkedIssueId?: string;
