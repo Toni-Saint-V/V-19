@@ -6,6 +6,7 @@ import type {
   ExportBatchRow,
   Json,
   MediaAssetInsert,
+  MediaAssetRow,
   QuestionnaireAnswerRow,
   QuestionnaireAnswerInsert,
   StatusHistoryInsert,
@@ -27,9 +28,15 @@ import { normalizeSubmissionQuestionnaire } from "./questionnaire";
 import { isQuestionnaireReviewSource, isQuestionnaireReviewState } from "./types";
 import {
   canonicalRequiredMediaReadiness,
+  isCanonicalFrontendMediaType,
+  isRejectedLegacyMediaType,
   normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
 } from "./domainContract";
+import {
+  isPersistablePrivateFileAsset,
+  withRecomputedFileCompletion,
+} from "./fileAsset";
 import { isSubmissionIssueResolved, transitionMatrix } from "./status";
 import { normalizeSubmissionForCanonicalRuntime } from "./submissionActions";
 import type {
@@ -60,6 +67,8 @@ const applicantSelect =
   "id,submission_id,full_name,questionnaire_percent,media_percent,created_at,updated_at" as const;
 const questionnaireAnswerSelect =
   "id,submission_id,applicant_id,section_id,field_id,label,value,updated_by,created_at,updated_at" as const;
+const mediaAssetSelect =
+  "id,applicant_id,submission_id,type,original_file_name,generated_file_name,storage_bucket,storage_path,mime_type,size_bytes,upload_status,review_status,uploaded_at,reviewed_at,reviewed_by" as const;
 const exportBatchSelect =
   "id,created_at,file_name,format,content_fingerprint,idempotency_key,row_count,submission_ids" as const;
 
@@ -90,6 +99,24 @@ type CockpitExportBatchRow = Pick<
   | "idempotency_key"
   | "row_count"
   | "submission_ids"
+>;
+type CockpitMediaAssetRow = Pick<
+  MediaAssetRow,
+  | "applicant_id"
+  | "generated_file_name"
+  | "id"
+  | "mime_type"
+  | "original_file_name"
+  | "review_status"
+  | "reviewed_at"
+  | "reviewed_by"
+  | "size_bytes"
+  | "storage_bucket"
+  | "storage_path"
+  | "submission_id"
+  | "type"
+  | "upload_status"
+  | "uploaded_at"
 >;
 type QuestionnaireAnswerValueEnvelope = {
   kind: typeof questionnaireAnswerEnvelopeKind;
@@ -230,6 +257,90 @@ function attachQuestionnaireAnswerRows(
         }),
       })),
     })),
+  });
+}
+
+function fileStatusFromMediaAssetRow(
+  row: CockpitMediaAssetRow,
+): SubmissionFile["status"] {
+  if (row.review_status === "accepted") return "accepted";
+  if (
+    row.review_status === "replace_required" ||
+    row.review_status === "poor_quality"
+  ) {
+    return "needs_replacement";
+  }
+  return row.upload_status === "uploaded" ? "uploaded" : "missing";
+}
+
+function submissionFileTypeFromMediaAssetRow(
+  row: CockpitMediaAssetRow,
+): SubmissionFileType | null {
+  if (isCanonicalFrontendMediaType(row.type) || isRejectedLegacyMediaType(row.type)) {
+    return row.type;
+  }
+  return null;
+}
+
+function submissionFileFromMediaAssetRow(
+  row: CockpitMediaAssetRow,
+): SubmissionFile | null {
+  const type = submissionFileTypeFromMediaAssetRow(row);
+  if (!type) return null;
+
+  return {
+    id: row.id,
+    applicantId: row.applicant_id,
+    type,
+    status: fileStatusFromMediaAssetRow(row),
+    generatedFileName: row.generated_file_name ?? undefined,
+    mimeType: row.mime_type ?? undefined,
+    originalFileName: row.original_file_name ?? undefined,
+    reviewedAtIso: row.reviewed_at ?? undefined,
+    reviewedBy: row.reviewed_by ?? undefined,
+    reviewStatus: row.review_status,
+    sizeBytes: row.size_bytes ?? undefined,
+    storageAdapter:
+      row.upload_status === "uploaded" && row.storage_path
+        ? "supabase-private"
+        : undefined,
+    storageBucket: row.storage_bucket || undefined,
+    storagePath: row.storage_path || undefined,
+    uploadedAtIso: row.uploaded_at ?? undefined,
+    uploadStatus: row.upload_status,
+  };
+}
+
+function attachDurableMediaAssetRows(
+  submission: Submission,
+  mediaRows: CockpitMediaAssetRow[],
+): Submission {
+  if (!mediaRows.length) return withRecomputedFileCompletion(submission);
+
+  const durableFiles = mediaRows
+    .map(submissionFileFromMediaAssetRow)
+    .filter((file): file is SubmissionFile => Boolean(file));
+  if (!durableFiles.length) return withRecomputedFileCompletion(submission);
+
+  const durableFilesByApplicantType = new Map(
+    durableFiles.map((file) => [`${file.applicantId}:${file.type}`, file]),
+  );
+  const overlayedFiles = submission.files.map((file) => {
+    const durableFile = durableFilesByApplicantType.get(
+      `${file.applicantId}:${file.type}`,
+    );
+    return durableFile ? { ...file, ...durableFile, id: file.id } : file;
+  });
+  const existingKeys = new Set(
+    overlayedFiles.map((file) => `${file.applicantId}:${file.type}`),
+  );
+  const missingDurableFiles = durableFiles.filter(
+    (file) => !existingKeys.has(`${file.applicantId}:${file.type}`),
+  );
+
+  return withRecomputedFileCompletion({
+    ...submission,
+    files: [...overlayedFiles, ...missingDurableFiles],
   });
 }
 
@@ -601,14 +712,8 @@ function reviewStatusForFile(file: SubmissionFile): MediaAssetInsert["review_sta
 
 function toCockpitMediaAssetInserts(submission: Submission): MediaAssetInsert[] {
   return submission.files.flatMap((file) => {
-    if (
-      !file.generatedFileName ||
-      !file.storageBucket ||
-      !file.storagePath ||
-      file.status === "missing"
-    ) {
-      return [];
-    }
+    if (!isPersistablePrivateFileAsset(file)) return [];
+
     const mediaType = mediaTypeForFile(file.type);
     if (!mediaType) return [];
 
@@ -624,7 +729,7 @@ function toCockpitMediaAssetInserts(submission: Submission): MediaAssetInsert[] 
         storage_path: file.storagePath,
         mime_type: file.mimeType ?? null,
         size_bytes: file.sizeBytes ?? null,
-        upload_status: file.uploadStatus ?? "uploaded",
+        upload_status: "uploaded",
         review_status: reviewStatusForFile(file),
         uploaded_at: timestampOrNow(file.uploadedAtIso ?? file.uploadedAt),
         reviewed_at: file.reviewedAtIso ? timestampOrNow(file.reviewedAtIso) : null,
@@ -1137,6 +1242,18 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
+  const { data: mediaRows, error: mediaError } = await client
+    .from("media_assets")
+    .select(mediaAssetSelect)
+    .in("submission_id", submissionIds);
+
+  if (mediaError) {
+    throw mapSupabasePersistenceError(mediaError, {
+      operation: "media_assets.list",
+      fallbackKind: "database",
+    });
+  }
+
   const exportBatchRows =
     profile.role === "admin"
       ? await loadExportBatchRowsForSubmissions(submissionIds)
@@ -1154,25 +1271,34 @@ export async function loadCockpitSubmissionsForProfile(
     const submissionExportBatches = exportBatchRows.filter((batch) =>
       batch.submission_ids.includes(row.id),
     );
+    const submissionMediaRows = (mediaRows ?? []).filter(
+      (media) => media.submission_id === row.id,
+    );
     const snapshot = readCockpitSnapshot(row.family_intelligence);
     if (snapshot) {
-      return reconcileCockpitSnapshotWithSubmissionRow(
-        row,
-        snapshot,
-        submissionApplicants,
-        submissionQuestionnaireAnswers,
-        submissionExportBatches,
+      return attachDurableMediaAssetRows(
+        reconcileCockpitSnapshotWithSubmissionRow(
+          row,
+          snapshot,
+          submissionApplicants,
+          submissionQuestionnaireAnswers,
+          submissionExportBatches,
+        ),
+        submissionMediaRows,
       );
     }
 
-    return attachExportPackageRow(
-      fallbackSubmissionFromRows(
-        row,
-        submissionApplicants,
-        submissionQuestionnaireAnswers,
+    return attachDurableMediaAssetRows(
+      attachExportPackageRow(
+        fallbackSubmissionFromRows(
+          row,
+          submissionApplicants,
+          submissionQuestionnaireAnswers,
+        ),
+        fromSupabaseSubmissionRowStatus(row),
+        submissionExportBatches,
       ),
-      fromSupabaseSubmissionRowStatus(row),
-      submissionExportBatches,
+      submissionMediaRows,
     );
   });
 

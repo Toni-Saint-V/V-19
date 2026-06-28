@@ -445,6 +445,15 @@ describe("Supabase security contract", () => {
     expect(rpcBoundary).toContain("insert into public.status_history");
   });
 
+  test("keeps media access private with signed URLs instead of public URLs", () => {
+    const mediaStorage = readProjectFile("src/modules/submissions/mediaStorage.ts");
+    const appSource = readProjectFile("src/App.tsx");
+
+    expect(mediaStorage).toContain(".createSignedUrl(");
+    expect(mediaStorage).not.toContain(".getPublicUrl(");
+    expect(appSource).not.toContain("/storage/v1/object/public/");
+  });
+
   test("keeps correction handoff server-authoritative and atomic", () => {
     const handoffMigration = readProjectFile(
       "supabase/migrations/20260617001000_submit_corrections_handoff_rpc.sql",
