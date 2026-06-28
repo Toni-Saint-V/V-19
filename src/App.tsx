@@ -633,7 +633,7 @@ function MainApp() {
       ? [
           {
             active: surface === "agent-actions",
-            count: 12,
+            count: 20,
             icon: "М",
             id: "agent-actions",
             label: "Мои действия",
@@ -652,26 +652,9 @@ function MainApp() {
             active: surface === "agent-submissions",
             icon: "П",
             id: "agent-submissions",
-            label: "Заявители / Семьи",
+            label: "Мои подачи",
             meta: "профили и семьи",
             onClick: () => showAgentTab("action"),
-          },
-          {
-            active: false,
-            icon: "Ф",
-            id: "agent-media",
-            label: "Файлы / Медиа",
-            meta: "визуальный раздел",
-            onClick: () => undefined,
-          },
-          {
-            active: false,
-            icon: "З",
-            id: "agent-issues",
-            label: "Замечания",
-            meta: "визуальный раздел",
-            onClick: () => undefined,
-            tone: "danger",
           },
         ]
       : [
@@ -1094,9 +1077,28 @@ function MainApp() {
     setAgentQuestionnaireOpen(false);
   }
 
+  function openVisualSubmission(visualId: string, intent?: "detail" | "issues") {
+    const exactSubmission = visibleSubmissionsForRole.find(
+      (submission) => submission.id === visualId,
+    );
+    const fallbackSubmission =
+      role === "admin"
+        ? firstReviewSubmissionForTab(reviewTab) ?? activeSubmission
+        : firstAgentActionSubmission() ?? activeSubmission;
+    const targetSubmission = exactSubmission ?? fallbackSubmission;
+
+    if (!targetSubmission) return;
+
+    openSubmission(
+      targetSubmission,
+      intent === "issues" ? "issues" : defaultDrawerTab(targetSubmission),
+    );
+  }
+
   function openAgentQuestionnaireWorkspace() {
-    if (!activeSubmission) return;
-    setSelectedSubmissionId(activeSubmission.id);
+    const targetSubmission = activeSubmission ?? firstAgentActionSubmission();
+    if (!targetSubmission) return;
+    setSelectedSubmissionId(targetSubmission.id);
     setActiveDrawerTab("questionnaire");
     setDrawerMode("closed");
     setAgentQuestionnaireOpen(true);
@@ -2669,7 +2671,7 @@ function MainApp() {
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
         ) : surface === "agent-actions" ? (
-          <FigmaActionQueueVisual onOpen={(id) => void id} />
+          <FigmaActionQueueVisual onOpen={openVisualSubmission} />
         ) : surface === "agent-inbox" ? (
           <>
             <div className="v19-inbox-mode-tabs">
@@ -2712,11 +2714,11 @@ function MainApp() {
             )}
           </>
         ) : surface === "agent-submissions" ? (
-          <FigmaApplicantsVisual onOpen={(id) => void id} />
+          <FigmaApplicantsVisual onOpen={openVisualSubmission} />
         ) : null}
 
         {surface === "admin-review" && activeSubmission ? (
-          <FigmaActionQueueVisual onOpen={(id) => void id} />
+          <FigmaActionQueueVisual onOpen={openVisualSubmission} />
         ) : null}
 
         {surface === "export" ? (
