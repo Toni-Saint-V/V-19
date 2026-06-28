@@ -17,7 +17,6 @@ import {
   runAiReview,
 } from "./modules/submissions/aiSuggestions";
 import {
-  adminInboxEvents,
   agentActionQueue,
   searchAgentActions,
 } from "./modules/submissions/agentActions";
@@ -57,6 +56,7 @@ import {
   applyExportStateToSelection,
   createDraftSubmission,
   generatedCockpitMediaFileName,
+  markSubmissionFileAccepted,
   mergeUploadedFileMetadataIntoSubmissions,
   mediaSlotTypeForSubmissionFileType,
   updateQuestionnaireField,
@@ -69,7 +69,7 @@ import {
   type SubmissionActionErrorState,
 } from "./modules/submissions/submissionActionErrors";
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
-import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
+import { defaultDrawerTab } from "./modules/submissions/status";
 import {
   applySafePassportExtractionFields,
   applyPassportExtractionField,
@@ -99,12 +99,11 @@ import {
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
+import { AdminReviewDrawer } from "./modules/submissions/components/AdminReviewDrawer";
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
-  AdminReviewScreen,
   AgentActionsScreen,
   AgentInboxScreen,
-  AgentSubmissionsScreen,
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
@@ -545,10 +544,6 @@ function MainApp() {
     () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
     [cityFilter, query, submissions],
   );
-  const searchedAdminInboxEvents = useMemo(
-    () => adminInboxEvents(searchedReviewQueue),
-    [searchedReviewQueue],
-  );
   const adminWorkSubmissionCount = useMemo(
     () =>
       searchedReviewQueue.filter(
@@ -567,14 +562,6 @@ function MainApp() {
       ? searchedReviewQueue.filter(matchesReviewTab(reviewFilterTab))
       : [],
   );
-  const visibleAgentSubmission =
-    agentList.find((submission) => submission.id === selectedSubmissionId) ??
-    agentList[0] ??
-    null;
-  const visibleReviewSubmission =
-    reviewList.find((submission) => submission.id === selectedSubmissionId) ??
-    reviewList[0] ??
-    null;
   const searchedExportSubmissions = useMemo(
     () => searchSubmissions(submissions, query, cityFilter),
     [cityFilter, query, submissions],
@@ -1047,17 +1034,11 @@ function MainApp() {
     });
   }
 
-  function showSettingsSurface() {
-    setSurface("settings");
-    setDrawerMode("closed");
-    setAgentQuestionnaireOpen(false);
-  }
-
   function openCreateSubmissionDrawer() {
     rememberReturnFocus();
     setDrawerMode("create");
     setAgentQuestionnaireOpen(false);
-    setCreateType("single");
+    setCreateType("family");
     setCreateFamilyCount(2);
     setCreateApplicantNames(["Новый заявитель", "Супруг", "Ребёнок 1", "Ребёнок 2"]);
     setDirty(false);
@@ -1091,7 +1072,11 @@ function MainApp() {
 
     openSubmission(
       targetSubmission,
-      intent === "issues" ? "issues" : defaultDrawerTab(targetSubmission),
+      intent === "issues"
+        ? "issues"
+        : role === "admin" && surface === "admin-review"
+          ? "questionnaire"
+          : defaultDrawerTab(targetSubmission),
     );
   }
 
@@ -1102,23 +1087,6 @@ function MainApp() {
     setActiveDrawerTab("questionnaire");
     setDrawerMode("closed");
     setAgentQuestionnaireOpen(true);
-  }
-
-  function openNextAdminWorkSubmission() {
-    const nextSubmission = reviewList[0] ?? searchedReviewQueue[0];
-    if (!nextSubmission) return;
-
-    openSubmission(
-      nextSubmission,
-      reviewTabForAdminWork(reviewTab) ? "overview" : defaultDrawerTab(nextSubmission),
-    );
-  }
-
-  function selectSubmission(submission: Submission) {
-    setSubmissionActionError(null);
-    setSelectedSubmissionId(submission.id);
-    setActiveDrawerTab(defaultDrawerTab(submission));
-    setDrawerInitialTarget(null);
   }
 
   const closeDrawer = useCallback(() => {
@@ -1286,27 +1254,24 @@ function MainApp() {
     ].join("|");
   }
 
-  function openIssueComposer(submission: Submission) {
-    if (!canAddAdminIssue(submission, "admin")) {
-      openSubmission(submission, "issues");
-      return;
-    }
-    rememberReturnFocus();
-    setSelectedSubmissionId(submission.id);
-    setActiveDrawerTab("issues");
-    setDrawerMode("detail");
-    setIssueComposerRequest((current) => ({
-      submissionId: submission.id,
-      token: (current?.token ?? 0) + 1,
-    }));
-  }
-
   function addAdminIssue(input: IssueInput) {
     updateActiveSubmission((submission) =>
       addPreciseAdminIssue(submission, input, remoteProfile?.id),
     );
     setActiveDrawerTab("issues");
     setDrawerMode("detail");
+  }
+
+  function acceptAdminReviewFile(input: {
+    applicantId: string;
+    fileType: "passport_scan" | "selfie" | "selfie_2";
+  }) {
+    updateActiveSubmission((submission) =>
+      markSubmissionFileAccepted(submission, {
+        ...input,
+        reviewedBy: remoteProfile?.id,
+      }),
+    );
   }
 
   async function performSupabaseMediaUpload(
@@ -2412,14 +2377,6 @@ function MainApp() {
       onChange={setQuery}
     />
   );
-  const adminReviewSearchControl = (
-    <SearchBar
-      label="Поиск в текущем списке"
-      placeholder="Поиск по имени или ID"
-      value={query}
-      onChange={setQuery}
-    />
-  );
   const cityFilterControl = (
     <CityFilterMenu options={cities} value={cityFilter} onChange={setCityFilter} />
   );
@@ -2435,14 +2392,6 @@ function MainApp() {
     <SearchBar
       label="Поиск по действиям"
       placeholder="Поиск"
-      value={query}
-      onChange={setQuery}
-    />
-  );
-  const agentSubmissionsSearchControl = (
-    <SearchBar
-      label="Поиск по подачам"
-      placeholder="Поиск по подачам"
       value={query}
       onChange={setQuery}
     />
@@ -2797,7 +2746,21 @@ function MainApp() {
         />
       ) : null}
 
-      {drawerMode === "detail" && activeSubmission && role !== "agent" ? (
+      {drawerMode === "detail" &&
+      activeSubmission &&
+      role !== "agent" &&
+      surface === "admin-review" ? (
+        <AdminReviewDrawer
+          actionError={activeSubmissionActionError}
+          activeTab={activeDrawerTab}
+          onAction={updateSubmission}
+          onAddIssue={addAdminIssue}
+          onClose={closeDrawer}
+          onReviewFileAccept={acceptAdminReviewFile}
+          onTab={setActiveDrawerTab}
+          submission={activeSubmission}
+        />
+      ) : drawerMode === "detail" && activeSubmission && role !== "agent" ? (
         <SubmissionDrawer
           actionError={activeSubmissionActionError}
           activeTab={activeDrawerTab}
@@ -2828,13 +2791,7 @@ function MainApp() {
           passportExtractionEnabled={passportExtractionEnabled}
           requireSelectedFile={isSupabaseMode}
           role={role}
-          surface={
-            surface === "export"
-              ? "export"
-              : surface === "admin-review"
-                ? "review"
-                : "agent"
-          }
+          surface={surface === "export" ? "export" : "agent"}
           submission={activeSubmission}
         />
       ) : null}

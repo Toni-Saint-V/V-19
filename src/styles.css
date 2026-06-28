@@ -16520,3 +16520,174 @@ p {
     grid-auto-columns: minmax(292px, calc(100vw - 64px)) !important;
   }
 }
+
+/* My Actions scoped mobile convergence. Keeps the Figma visual shell intact. */
+@media (max-width: 1100px) {
+  .ops-shell.surface-agent-actions .vf-figma-actions-toolbar {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 94px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-meta,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates {
+    display: grid !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status {
+    display: inline-flex !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .ops-shell.surface-agent-actions .vf-figma-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+    width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+    padding: 0 8px !important;
+    line-height: 1.05 !important;
+    white-space: normal !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ops-shell.surface-agent-actions .vf-figma-tabs {
+    overflow-x: auto !important;
+    scroll-padding-inline: 4px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs button {
+    padding: 0 4px !important;
+    font-size: 11.5px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs button span {
+    min-width: 18px !important;
+    height: 18px !important;
+    margin-left: 6px !important;
+    border-radius: 6px !important;
+    font-size: 10px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-title strong,
+  .ops-shell.surface-agent-actions .vf-figma-action-meta strong,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates strong {
+    white-space: normal !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-title em,
+  .ops-shell.surface-agent-actions .vf-figma-action-meta em,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates em {
+    white-space: normal !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status {
+    max-width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status {
+    height: 26px !important;
+    padding: 0 10px !important;
+    font-size: 10px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column-board {
+    gap: 14px !important;
+    padding-top: 1px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column {
+    gap: 9px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column header {
+    min-height: 31px !important;
+    padding: 0 2px 3px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column header span {
+    color: rgb(255 255 255 / 0.66) !important;
+    font-size: 12px !important;
+    font-weight: 620 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column header em {
+    width: 28px !important;
+    min-width: 28px !important;
+    height: 28px !important;
+    font-size: 11px !important;
+  }
+}
+
+/* Export screen responsive convergence. Keep export logic intact; only fix layout geometry. */
+@media (max-width: 1120px) {
+  .surface-export .export-grid.magic-export-stage {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .surface-export .magic-export-queue,
+  .surface-export .v17-export-context-rail {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .surface-export .magic-export-queue {
+    order: 1 !important;
+  }
+
+  .surface-export .v17-export-context-rail {
+    order: 2 !important;
+  }
+
+  .surface-export .export-contract-table,
+  .surface-export .table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .surface-export .export-contract-table {
+    grid-template-columns: minmax(0, 1fr) !important;
+    justify-items: stretch !important;
+  }
+
+  .surface-export .table-wrap {
+    justify-self: stretch !important;
+    overflow-x: auto !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .surface-export .magic-export-queue {
+    padding: 18px 16px 0 !important;
+  }
+
+  .surface-export .v17-export-context-rail {
+    border-radius: 14px !important;
+  }
+
+  .surface-export .data-table {
+    min-width: 620px;
+  }
+
+  .surface-export .v17-export-bulk-bar,
+  .surface-export .bulk-bar {
+    min-width: 0 !important;
+  }
+}
