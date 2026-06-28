@@ -6,7 +6,7 @@ import {
   resetLocalDevAuthRegistrationForTests,
   sessionRepository,
   userRepository,
-} from "../../src/services/authRegistration";
+} from "../../src/shared/authRegistration";
 
 describe("admin-approved local/dev auth registration", () => {
   beforeEach(() => {

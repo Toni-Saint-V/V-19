@@ -9,8 +9,16 @@ if (!root) {
   throw new Error("Root element not found");
 }
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+const appRoot = root;
+
+function renderApp() {
+  createRoot(appRoot).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}
+
+void import("./styles.deferred-a.css")
+  .then(() => import("./styles.deferred-b.css"))
+  .then(renderApp, renderApp);

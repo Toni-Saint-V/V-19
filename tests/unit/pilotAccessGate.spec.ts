@@ -3,7 +3,7 @@ import {
   canShowLocalDemoRoleSwitch,
   canUseLocalDemoSeedAutoLogin,
   isExplicitLocalDemoAuthBypassEnabled,
-} from "../../src/services/pilotAccessGate";
+} from "../../src/shared/pilotAccessGate";
 
 describe("pilot access gate policy", () => {
   test("keeps fresh pilot sessions behind the access gate by default", () => {
