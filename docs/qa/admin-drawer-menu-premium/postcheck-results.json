@@ -1,0 +1,42 @@
+{
+  "desktop1440": {
+    "title": "Проверка",
+    "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+    "drawer": true,
+    "legacyDrawer": false,
+    "tabs": [
+      "Паспорт",
+      "Селфи",
+      "Анкета51",
+      "Замечания0"
+    ],
+    "tabsWidth": {
+      "scrollWidth": 979,
+      "clientWidth": 979
+    },
+    "activeTab": "Замечания0",
+    "primary": "Принять",
+    "overflowX": 0,
+    "errors": []
+  },
+  "mobile390": {
+    "title": "Проверка",
+    "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+    "drawer": true,
+    "legacyDrawer": false,
+    "tabs": [
+      "Паспорт",
+      "Селфи",
+      "Анкета51",
+      "Замечания0"
+    ],
+    "tabsWidth": {
+      "scrollWidth": 350,
+      "clientWidth": 350
+    },
+    "activeTab": "Замечания0",
+    "primary": "Принять",
+    "overflowX": 0,
+    "errors": []
+  }
+}

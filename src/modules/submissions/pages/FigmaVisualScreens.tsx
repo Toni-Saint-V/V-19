@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -757,9 +757,18 @@ export function FigmaActionQueueVisual({
   onOpen?: VisualOpenHandler;
 }) {
   const [viewMode, setViewMode] = useState<"columns" | "list">("list");
+  const screenRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    screenRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [viewMode]);
 
   return (
-    <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
+    <section
+      ref={screenRef}
+      className="vf-figma-screen vf-figma-actions-screen"
+      aria-label="Мои действия"
+    >
       <VisualToolbar viewMode={viewMode} onViewMode={setViewMode} />
 
       <div className={`vf-figma-view-stage is-${viewMode}`} key={viewMode}>

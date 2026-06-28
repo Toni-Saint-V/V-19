@@ -1,0 +1,1412 @@
+{
+  "desktop1440": {
+    "width": 1440,
+    "height": 900,
+    "passport": {
+      "label": "desktop1440:passport",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 431,
+          "w": 101,
+          "right": 532
+        },
+        {
+          "text": "Селфи",
+          "x": 534,
+          "w": 89,
+          "right": 623
+        },
+        {
+          "text": "Анкета51",
+          "x": 625,
+          "w": 128,
+          "right": 753
+        },
+        {
+          "text": "Замечания0",
+          "x": 755,
+          "w": 148,
+          "right": 903
+        }
+      ],
+      "tabsViewport": {
+        "x": 431,
+        "right": 1410,
+        "w": 979,
+        "scrollWidth": 979,
+        "clientWidth": 979
+      },
+      "activeTab": "Паспорт",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "selfie": {
+      "label": "desktop1440:selfie",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 431,
+          "w": 101,
+          "right": 532
+        },
+        {
+          "text": "Селфи",
+          "x": 534,
+          "w": 89,
+          "right": 623
+        },
+        {
+          "text": "Анкета51",
+          "x": 625,
+          "w": 128,
+          "right": 753
+        },
+        {
+          "text": "Замечания0",
+          "x": 755,
+          "w": 148,
+          "right": 903
+        }
+      ],
+      "tabsViewport": {
+        "x": 431,
+        "right": 1410,
+        "w": 979,
+        "scrollWidth": 979,
+        "clientWidth": 979
+      },
+      "activeTab": "Селфи",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "questionnaire": {
+      "label": "desktop1440:questionnaire",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 431,
+          "w": 101,
+          "right": 532
+        },
+        {
+          "text": "Селфи",
+          "x": 534,
+          "w": 89,
+          "right": 623
+        },
+        {
+          "text": "Анкета51",
+          "x": 625,
+          "w": 128,
+          "right": 753
+        },
+        {
+          "text": "Замечания0",
+          "x": 755,
+          "w": 148,
+          "right": 903
+        }
+      ],
+      "tabsViewport": {
+        "x": 431,
+        "right": 1410,
+        "w": 979,
+        "scrollWidth": 979,
+        "clientWidth": 979
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "remark": {
+      "label": "desktop1440:remark",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 431,
+          "w": 101,
+          "right": 532
+        },
+        {
+          "text": "Селфи",
+          "x": 534,
+          "w": 89,
+          "right": 623
+        },
+        {
+          "text": "Анкета51",
+          "x": 625,
+          "w": 128,
+          "right": 753
+        },
+        {
+          "text": "Замечания0",
+          "x": 755,
+          "w": 148,
+          "right": 903
+        }
+      ],
+      "tabsViewport": {
+        "x": 431,
+        "right": 1410,
+        "w": 979,
+        "scrollWidth": 979,
+        "clientWidth": 979
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": true,
+      "overflowX": 0
+    },
+    "issues": {
+      "label": "desktop1440:issues",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 431,
+          "w": 101,
+          "right": 532
+        },
+        {
+          "text": "Селфи",
+          "x": 534,
+          "w": 89,
+          "right": 623
+        },
+        {
+          "text": "Анкета51",
+          "x": 625,
+          "w": 128,
+          "right": 753
+        },
+        {
+          "text": "Замечания0",
+          "x": 755,
+          "w": 148,
+          "right": 903
+        }
+      ],
+      "tabsViewport": {
+        "x": 431,
+        "right": 1410,
+        "w": 979,
+        "scrollWidth": 979,
+        "clientWidth": 979
+      },
+      "activeTab": "Замечания0",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "errors": []
+  },
+  "tablet768": {
+    "width": 768,
+    "height": 1024,
+    "passport": {
+      "label": "tablet768:passport",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 101,
+          "right": 121
+        },
+        {
+          "text": "Селфи",
+          "x": 123,
+          "w": 89,
+          "right": 212
+        },
+        {
+          "text": "Анкета51",
+          "x": 214,
+          "w": 128,
+          "right": 342
+        },
+        {
+          "text": "Замечания0",
+          "x": 344,
+          "w": 148,
+          "right": 492
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 748,
+        "w": 728,
+        "scrollWidth": 728,
+        "clientWidth": 728
+      },
+      "activeTab": "Паспорт",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "selfie": {
+      "label": "tablet768:selfie",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 101,
+          "right": 121
+        },
+        {
+          "text": "Селфи",
+          "x": 123,
+          "w": 89,
+          "right": 212
+        },
+        {
+          "text": "Анкета51",
+          "x": 214,
+          "w": 128,
+          "right": 342
+        },
+        {
+          "text": "Замечания0",
+          "x": 344,
+          "w": 148,
+          "right": 492
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 748,
+        "w": 728,
+        "scrollWidth": 728,
+        "clientWidth": 728
+      },
+      "activeTab": "Селфи",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "questionnaire": {
+      "label": "tablet768:questionnaire",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 101,
+          "right": 121
+        },
+        {
+          "text": "Селфи",
+          "x": 123,
+          "w": 89,
+          "right": 212
+        },
+        {
+          "text": "Анкета51",
+          "x": 214,
+          "w": 128,
+          "right": 342
+        },
+        {
+          "text": "Замечания0",
+          "x": 344,
+          "w": 148,
+          "right": 492
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 748,
+        "w": 728,
+        "scrollWidth": 728,
+        "clientWidth": 728
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "remark": {
+      "label": "tablet768:remark",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 101,
+          "right": 121
+        },
+        {
+          "text": "Селфи",
+          "x": 123,
+          "w": 89,
+          "right": 212
+        },
+        {
+          "text": "Анкета51",
+          "x": 214,
+          "w": 128,
+          "right": 342
+        },
+        {
+          "text": "Замечания0",
+          "x": 344,
+          "w": 148,
+          "right": 492
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 748,
+        "w": 728,
+        "scrollWidth": 728,
+        "clientWidth": 728
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": true,
+      "overflowX": 0
+    },
+    "issues": {
+      "label": "tablet768:issues",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 101,
+          "right": 121
+        },
+        {
+          "text": "Селфи",
+          "x": 123,
+          "w": 89,
+          "right": 212
+        },
+        {
+          "text": "Анкета51",
+          "x": 214,
+          "w": 128,
+          "right": 342
+        },
+        {
+          "text": "Замечания0",
+          "x": 344,
+          "w": 148,
+          "right": 492
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 748,
+        "w": 728,
+        "scrollWidth": 728,
+        "clientWidth": 728
+      },
+      "activeTab": "Замечания0",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "errors": []
+  },
+  "mobile430": {
+    "width": 430,
+    "height": 932,
+    "passport": {
+      "label": "mobile430:passport",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 116,
+          "w": 47,
+          "right": 163
+        },
+        {
+          "text": "Анкета51",
+          "x": 201,
+          "w": 77,
+          "right": 278
+        },
+        {
+          "text": "Замечания0",
+          "x": 316,
+          "w": 94,
+          "right": 410
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 410,
+        "w": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      },
+      "activeTab": "Паспорт",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "selfie": {
+      "label": "mobile430:selfie",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 116,
+          "w": 47,
+          "right": 163
+        },
+        {
+          "text": "Анкета51",
+          "x": 201,
+          "w": 77,
+          "right": 278
+        },
+        {
+          "text": "Замечания0",
+          "x": 316,
+          "w": 94,
+          "right": 410
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 410,
+        "w": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      },
+      "activeTab": "Селфи",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "questionnaire": {
+      "label": "mobile430:questionnaire",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 116,
+          "w": 47,
+          "right": 163
+        },
+        {
+          "text": "Анкета51",
+          "x": 201,
+          "w": 77,
+          "right": 278
+        },
+        {
+          "text": "Замечания0",
+          "x": 316,
+          "w": 94,
+          "right": 410
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 410,
+        "w": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "remark": {
+      "label": "mobile430:remark",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 116,
+          "w": 47,
+          "right": 163
+        },
+        {
+          "text": "Анкета51",
+          "x": 201,
+          "w": 77,
+          "right": 278
+        },
+        {
+          "text": "Замечания0",
+          "x": 316,
+          "w": 94,
+          "right": 410
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 410,
+        "w": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": true,
+      "overflowX": 0
+    },
+    "issues": {
+      "label": "mobile430:issues",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 116,
+          "w": 47,
+          "right": 163
+        },
+        {
+          "text": "Анкета51",
+          "x": 201,
+          "w": 77,
+          "right": 278
+        },
+        {
+          "text": "Замечания0",
+          "x": 316,
+          "w": 94,
+          "right": 410
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 410,
+        "w": 390,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      },
+      "activeTab": "Замечания0",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "errors": []
+  },
+  "mobile390": {
+    "width": 390,
+    "height": 844,
+    "passport": {
+      "label": "mobile390:passport",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 102,
+          "w": 47,
+          "right": 149
+        },
+        {
+          "text": "Анкета51",
+          "x": 174,
+          "w": 77,
+          "right": 251
+        },
+        {
+          "text": "Замечания0",
+          "x": 276,
+          "w": 94,
+          "right": 370
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 370,
+        "w": 350,
+        "scrollWidth": 350,
+        "clientWidth": 350
+      },
+      "activeTab": "Паспорт",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "selfie": {
+      "label": "mobile390:selfie",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 102,
+          "w": 47,
+          "right": 149
+        },
+        {
+          "text": "Анкета51",
+          "x": 174,
+          "w": 77,
+          "right": 251
+        },
+        {
+          "text": "Замечания0",
+          "x": 276,
+          "w": 94,
+          "right": 370
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 370,
+        "w": 350,
+        "scrollWidth": 350,
+        "clientWidth": 350
+      },
+      "activeTab": "Селфи",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "questionnaire": {
+      "label": "mobile390:questionnaire",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 102,
+          "w": 47,
+          "right": 149
+        },
+        {
+          "text": "Анкета51",
+          "x": 174,
+          "w": 77,
+          "right": 251
+        },
+        {
+          "text": "Замечания0",
+          "x": 276,
+          "w": 94,
+          "right": 370
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 370,
+        "w": 350,
+        "scrollWidth": 350,
+        "clientWidth": 350
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "remark": {
+      "label": "mobile390:remark",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 102,
+          "w": 47,
+          "right": 149
+        },
+        {
+          "text": "Анкета51",
+          "x": 174,
+          "w": 77,
+          "right": 251
+        },
+        {
+          "text": "Замечания0",
+          "x": 276,
+          "w": 94,
+          "right": 370
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 370,
+        "w": 350,
+        "scrollWidth": 350,
+        "clientWidth": 350
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": true,
+      "overflowX": 0
+    },
+    "issues": {
+      "label": "mobile390:issues",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 102,
+          "w": 47,
+          "right": 149
+        },
+        {
+          "text": "Анкета51",
+          "x": 174,
+          "w": 77,
+          "right": 251
+        },
+        {
+          "text": "Замечания0",
+          "x": 276,
+          "w": 94,
+          "right": 370
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 370,
+        "w": 350,
+        "scrollWidth": 350,
+        "clientWidth": 350
+      },
+      "activeTab": "Замечания0",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "errors": []
+  },
+  "mobile375": {
+    "width": 375,
+    "height": 812,
+    "passport": {
+      "label": "mobile375:passport",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 97,
+          "w": 47,
+          "right": 144
+        },
+        {
+          "text": "Анкета51",
+          "x": 164,
+          "w": 77,
+          "right": 241
+        },
+        {
+          "text": "Замечания0",
+          "x": 261,
+          "w": 94,
+          "right": 355
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 355,
+        "w": 335,
+        "scrollWidth": 335,
+        "clientWidth": 335
+      },
+      "activeTab": "Паспорт",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "selfie": {
+      "label": "mobile375:selfie",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 97,
+          "w": 47,
+          "right": 144
+        },
+        {
+          "text": "Анкета51",
+          "x": 164,
+          "w": 77,
+          "right": 241
+        },
+        {
+          "text": "Замечания0",
+          "x": 261,
+          "w": 94,
+          "right": 355
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 355,
+        "w": 335,
+        "scrollWidth": 335,
+        "clientWidth": 335
+      },
+      "activeTab": "Селфи",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "questionnaire": {
+      "label": "mobile375:questionnaire",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 97,
+          "w": 47,
+          "right": 144
+        },
+        {
+          "text": "Анкета51",
+          "x": 164,
+          "w": 77,
+          "right": 241
+        },
+        {
+          "text": "Замечания0",
+          "x": 261,
+          "w": 94,
+          "right": 355
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 355,
+        "w": 335,
+        "scrollWidth": 335,
+        "clientWidth": 335
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "remark": {
+      "label": "mobile375:remark",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 97,
+          "w": 47,
+          "right": 144
+        },
+        {
+          "text": "Анкета51",
+          "x": 164,
+          "w": 77,
+          "right": 241
+        },
+        {
+          "text": "Замечания0",
+          "x": 261,
+          "w": 94,
+          "right": 355
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 355,
+        "w": 335,
+        "scrollWidth": 335,
+        "clientWidth": 335
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": true,
+      "overflowX": 0
+    },
+    "issues": {
+      "label": "mobile375:issues",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 97,
+          "w": 47,
+          "right": 144
+        },
+        {
+          "text": "Анкета51",
+          "x": 164,
+          "w": 77,
+          "right": 241
+        },
+        {
+          "text": "Замечания0",
+          "x": 261,
+          "w": 94,
+          "right": 355
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 355,
+        "w": 335,
+        "scrollWidth": 335,
+        "clientWidth": 335
+      },
+      "activeTab": "Замечания0",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "errors": []
+  },
+  "mobile320": {
+    "width": 320,
+    "height": 720,
+    "passport": {
+      "label": "mobile320:passport",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 79,
+          "w": 47,
+          "right": 126
+        },
+        {
+          "text": "Анкета51",
+          "x": 127,
+          "w": 77,
+          "right": 205
+        },
+        {
+          "text": "Замечания0",
+          "x": 206,
+          "w": 94,
+          "right": 300
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 300,
+        "w": 280,
+        "scrollWidth": 280,
+        "clientWidth": 280
+      },
+      "activeTab": "Паспорт",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "selfie": {
+      "label": "mobile320:selfie",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 79,
+          "w": 47,
+          "right": 126
+        },
+        {
+          "text": "Анкета51",
+          "x": 127,
+          "w": 77,
+          "right": 205
+        },
+        {
+          "text": "Замечания0",
+          "x": 206,
+          "w": 94,
+          "right": 300
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 300,
+        "w": 280,
+        "scrollWidth": 280,
+        "clientWidth": 280
+      },
+      "activeTab": "Селфи",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "questionnaire": {
+      "label": "mobile320:questionnaire",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 79,
+          "w": 47,
+          "right": 126
+        },
+        {
+          "text": "Анкета51",
+          "x": 127,
+          "w": 77,
+          "right": 205
+        },
+        {
+          "text": "Замечания0",
+          "x": 206,
+          "w": 94,
+          "right": 300
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 300,
+        "w": 280,
+        "scrollWidth": 280,
+        "clientWidth": 280
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "remark": {
+      "label": "mobile320:remark",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 79,
+          "w": 47,
+          "right": 126
+        },
+        {
+          "text": "Анкета51",
+          "x": 127,
+          "w": 77,
+          "right": 205
+        },
+        {
+          "text": "Замечания0",
+          "x": 206,
+          "w": 94,
+          "right": 300
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 300,
+        "w": 280,
+        "scrollWidth": 280,
+        "clientWidth": 280
+      },
+      "activeTab": "Анкета51",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": true,
+      "overflowX": 0
+    },
+    "issues": {
+      "label": "mobile320:issues",
+      "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+      "title": "Проверка",
+      "drawer": true,
+      "legacyDrawer": false,
+      "tabs": [
+        {
+          "text": "Паспорт",
+          "x": 20,
+          "w": 58,
+          "right": 78
+        },
+        {
+          "text": "Селфи",
+          "x": 79,
+          "w": 47,
+          "right": 126
+        },
+        {
+          "text": "Анкета51",
+          "x": 127,
+          "w": 77,
+          "right": 205
+        },
+        {
+          "text": "Замечания0",
+          "x": 206,
+          "w": 94,
+          "right": 300
+        }
+      ],
+      "tabsViewport": {
+        "x": 20,
+        "right": 300,
+        "w": 280,
+        "scrollWidth": 280,
+        "clientWidth": 280
+      },
+      "activeTab": "Замечания0",
+      "footer": "Паспорт, селфи и анкета готовы к решению администратора.ОтложитьПринять",
+      "primary": "Принять",
+      "primaryClass": "admin-review-primary ",
+      "remarkForm": false,
+      "overflowX": 0
+    },
+    "errors": []
+  }
+}

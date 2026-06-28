@@ -1,0 +1,145 @@
+{
+  "errors": [],
+  "draftSavedVisible": true,
+  "nextDisabled": true,
+  "uploadCountAfterTrial": 0,
+  "overflow": {
+    "body": 0,
+    "doc": 0
+  },
+  "viewportResults": [
+    {
+      "width": 320,
+      "titleVisible": true,
+      "closeVisible": true,
+      "tabsUsable": true,
+      "uploadVisible": true,
+      "statusVisible": true,
+      "nextDisabled": true,
+      "familyVisible": true,
+      "firstQuestionAboveFooter": true,
+      "applicant2Visible": true,
+      "addVisible": true,
+      "saveVisible": true,
+      "overflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "consoleMessages": []
+    },
+    {
+      "width": 375,
+      "titleVisible": true,
+      "closeVisible": true,
+      "tabsUsable": true,
+      "uploadVisible": true,
+      "statusVisible": true,
+      "nextDisabled": true,
+      "familyVisible": true,
+      "firstQuestionAboveFooter": true,
+      "applicant2Visible": true,
+      "addVisible": true,
+      "saveVisible": true,
+      "overflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "consoleMessages": []
+    },
+    {
+      "width": 390,
+      "titleVisible": true,
+      "closeVisible": true,
+      "tabsUsable": true,
+      "uploadVisible": true,
+      "statusVisible": true,
+      "nextDisabled": true,
+      "familyVisible": true,
+      "firstQuestionAboveFooter": true,
+      "applicant2Visible": true,
+      "addVisible": true,
+      "saveVisible": true,
+      "overflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "consoleMessages": []
+    },
+    {
+      "width": 430,
+      "titleVisible": true,
+      "closeVisible": true,
+      "tabsUsable": true,
+      "uploadVisible": true,
+      "statusVisible": true,
+      "nextDisabled": true,
+      "familyVisible": true,
+      "firstQuestionAboveFooter": true,
+      "applicant2Visible": true,
+      "addVisible": true,
+      "saveVisible": true,
+      "overflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "consoleMessages": []
+    },
+    {
+      "width": 768,
+      "titleVisible": true,
+      "closeVisible": true,
+      "tabsUsable": true,
+      "uploadVisible": true,
+      "statusVisible": true,
+      "nextDisabled": true,
+      "familyVisible": true,
+      "firstQuestionAboveFooter": true,
+      "applicant2Visible": true,
+      "addVisible": true,
+      "saveVisible": true,
+      "overflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "consoleMessages": []
+    },
+    {
+      "width": 1024,
+      "titleVisible": true,
+      "closeVisible": true,
+      "tabsUsable": true,
+      "uploadVisible": true,
+      "statusVisible": true,
+      "nextDisabled": true,
+      "familyVisible": true,
+      "firstQuestionAboveFooter": true,
+      "applicant2Visible": true,
+      "addVisible": true,
+      "saveVisible": true,
+      "overflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "consoleMessages": []
+    },
+    {
+      "width": 1440,
+      "titleVisible": true,
+      "closeVisible": true,
+      "tabsUsable": true,
+      "uploadVisible": true,
+      "statusVisible": true,
+      "nextDisabled": true,
+      "familyVisible": true,
+      "firstQuestionAboveFooter": true,
+      "applicant2Visible": true,
+      "addVisible": true,
+      "saveVisible": true,
+      "overflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "consoleMessages": []
+    }
+  ]
+}

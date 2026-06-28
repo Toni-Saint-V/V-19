@@ -1,0 +1,362 @@
+{
+  "desktop1440": {
+    "shellClass": "ops-shell surface-export  role-admin  ",
+    "title": "Выгрузка",
+    "overflowX": 0,
+    "body": {
+      "sw": 1440,
+      "cw": 1440
+    },
+    "grid": {
+      "x": 281,
+      "y": 9,
+      "w": 1150,
+      "h": 882
+    },
+    "gridStyle": {
+      "display": "grid",
+      "overflowX": "hidden",
+      "overflowY": "hidden",
+      "grid": "790px 360px"
+    },
+    "queue": {
+      "x": 281,
+      "y": 9,
+      "w": 790,
+      "h": 882
+    },
+    "rail": {
+      "x": 1071,
+      "y": 9,
+      "w": 360,
+      "h": 882
+    },
+    "table": {
+      "x": 297,
+      "y": 230,
+      "w": 758,
+      "h": 633
+    },
+    "tableWrap": {
+      "x": 297,
+      "y": 230,
+      "w": 760,
+      "h": 276
+    },
+    "toolbar": {
+      "x": 297,
+      "y": 131,
+      "w": 758,
+      "h": 87
+    },
+    "actionDock": {
+      "x": 1113,
+      "y": 1447,
+      "w": 277,
+      "h": 155
+    },
+    "rowCount": 4,
+    "errorsVisible": [],
+    "errors": []
+  },
+  "tablet768": {
+    "shellClass": "ops-shell surface-export  role-admin  ",
+    "title": "Выгрузка",
+    "overflowX": 0,
+    "body": {
+      "sw": 768,
+      "cw": 768
+    },
+    "grid": {
+      "x": 281,
+      "y": 73,
+      "w": 478,
+      "h": 942
+    },
+    "gridStyle": {
+      "display": "grid",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "grid": "478px"
+    },
+    "queue": {
+      "x": 281,
+      "y": 73,
+      "w": 478,
+      "h": 525
+    },
+    "rail": {
+      "x": 281,
+      "y": 598,
+      "w": 478,
+      "h": 417
+    },
+    "table": {
+      "x": 297,
+      "y": 307,
+      "w": 446,
+      "h": 263
+    },
+    "tableWrap": {
+      "x": 297,
+      "y": 307,
+      "w": 760,
+      "h": 276
+    },
+    "toolbar": {
+      "x": 297,
+      "y": 208,
+      "w": 446,
+      "h": 87
+    },
+    "actionDock": {
+      "x": 323,
+      "y": 1726,
+      "w": 394,
+      "h": 137
+    },
+    "rowCount": 4,
+    "errorsVisible": [],
+    "errors": []
+  },
+  "mobile430": {
+    "shellClass": "ops-shell surface-export  role-admin  ",
+    "title": "Выгрузка",
+    "overflowX": 0,
+    "body": {
+      "sw": 430,
+      "cw": 430
+    },
+    "grid": {
+      "x": 9,
+      "y": 73,
+      "w": 412,
+      "h": 2365
+    },
+    "gridStyle": {
+      "display": "grid",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "grid": "412px"
+    },
+    "queue": {
+      "x": 9,
+      "y": 73,
+      "w": 412,
+      "h": 739
+    },
+    "rail": {
+      "x": 9,
+      "y": 812,
+      "w": 412,
+      "h": 1626
+    },
+    "table": {
+      "x": 25,
+      "y": 319,
+      "w": 380,
+      "h": 493
+    },
+    "tableWrap": {
+      "x": 25,
+      "y": 319,
+      "w": 378,
+      "h": 405
+    },
+    "toolbar": {
+      "x": 25,
+      "y": 173,
+      "w": 380,
+      "h": 134
+    },
+    "actionDock": {
+      "x": 41,
+      "y": 1894,
+      "w": 348,
+      "h": 165
+    },
+    "rowCount": 4,
+    "errorsVisible": [],
+    "errors": []
+  },
+  "mobile390": {
+    "shellClass": "ops-shell surface-export  role-admin  ",
+    "title": "Выгрузка",
+    "overflowX": 0,
+    "body": {
+      "sw": 390,
+      "cw": 390
+    },
+    "grid": {
+      "x": 9,
+      "y": 73,
+      "w": 372,
+      "h": 2437
+    },
+    "gridStyle": {
+      "display": "grid",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "grid": "372px"
+    },
+    "queue": {
+      "x": 9,
+      "y": 73,
+      "w": 372,
+      "h": 739
+    },
+    "rail": {
+      "x": 9,
+      "y": 812,
+      "w": 372,
+      "h": 1698
+    },
+    "table": {
+      "x": 25,
+      "y": 319,
+      "w": 340,
+      "h": 493
+    },
+    "tableWrap": {
+      "x": 25,
+      "y": 319,
+      "w": 338,
+      "h": 405
+    },
+    "toolbar": {
+      "x": 25,
+      "y": 173,
+      "w": 340,
+      "h": 134
+    },
+    "actionDock": {
+      "x": 41,
+      "y": 1931,
+      "w": 308,
+      "h": 183
+    },
+    "rowCount": 4,
+    "errorsVisible": [],
+    "errors": []
+  },
+  "mobile375": {
+    "shellClass": "ops-shell surface-export  role-admin  ",
+    "title": "Выгрузка",
+    "overflowX": 0,
+    "body": {
+      "sw": 375,
+      "cw": 375
+    },
+    "grid": {
+      "x": 9,
+      "y": 73,
+      "w": 357,
+      "h": 2458
+    },
+    "gridStyle": {
+      "display": "grid",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "grid": "357px"
+    },
+    "queue": {
+      "x": 9,
+      "y": 73,
+      "w": 357,
+      "h": 739
+    },
+    "rail": {
+      "x": 9,
+      "y": 812,
+      "w": 357,
+      "h": 1719
+    },
+    "table": {
+      "x": 25,
+      "y": 319,
+      "w": 325,
+      "h": 493
+    },
+    "tableWrap": {
+      "x": 25,
+      "y": 319,
+      "w": 323,
+      "h": 405
+    },
+    "toolbar": {
+      "x": 25,
+      "y": 173,
+      "w": 325,
+      "h": 134
+    },
+    "actionDock": {
+      "x": 41,
+      "y": 1951,
+      "w": 293,
+      "h": 183
+    },
+    "rowCount": 4,
+    "errorsVisible": [],
+    "errors": []
+  },
+  "mobile320": {
+    "shellClass": "ops-shell surface-export  role-admin  ",
+    "title": "Выгрузка",
+    "overflowX": 0,
+    "body": {
+      "sw": 320,
+      "cw": 320
+    },
+    "grid": {
+      "x": 9,
+      "y": 73,
+      "w": 302,
+      "h": 2529
+    },
+    "gridStyle": {
+      "display": "grid",
+      "overflowX": "visible",
+      "overflowY": "visible",
+      "grid": "302px"
+    },
+    "queue": {
+      "x": 9,
+      "y": 73,
+      "w": 302,
+      "h": 739
+    },
+    "rail": {
+      "x": 9,
+      "y": 812,
+      "w": 302,
+      "h": 1790
+    },
+    "table": {
+      "x": 25,
+      "y": 319,
+      "w": 270,
+      "h": 493
+    },
+    "tableWrap": {
+      "x": 25,
+      "y": 319,
+      "w": 268,
+      "h": 405
+    },
+    "toolbar": {
+      "x": 25,
+      "y": 173,
+      "w": 270,
+      "h": 134
+    },
+    "actionDock": {
+      "x": 41,
+      "y": 2003,
+      "w": 238,
+      "h": 183
+    },
+    "rowCount": 4,
+    "errorsVisible": [],
+    "errors": []
+  }
+}

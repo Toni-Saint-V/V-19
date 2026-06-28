@@ -5,11 +5,9 @@ import {
   CheckCircle2,
   FileText,
   Image as ImageIcon,
+  Plus,
   ScanLine,
-  Search,
-  UploadCloud,
 } from "lucide-react";
-import { Button } from "../../../shared/ui/primitives";
 import { invokePassportExtraction } from "../passportExtractionService";
 import "./CreateSubmissionDrawer.css";
 import {
@@ -23,7 +21,36 @@ import {
 
 const maxFamilyApplicants = 6;
 
-type CreateSubmissionStep = "passport" | "questionnaire";
+type CreateSubmissionStep = "passport-family" | "questionnaire-files";
+type CreateMode = "applicant" | "family";
+type CreateApplicantRole = "primary" | "secondary";
+type CreatePassportStatus =
+  | "missing"
+  | "waiting"
+  | "processing"
+  | "uploaded"
+  | "error";
+type CreateUploadState = "idle" | "waiting" | "processing" | "error" | "complete";
+type CreateDraftState = "dirty" | "saving" | "saved" | "error";
+
+type CreateSubmissionState = {
+  applicants: Array<{
+    id: string;
+    label: string;
+    passportStatus: CreatePassportStatus;
+    role: CreateApplicantRole;
+    selected: boolean;
+  }>;
+  canGoNext: boolean;
+  currentStep: CreateSubmissionStep;
+  draftState: CreateDraftState;
+  familyAnswers: {
+    sameRussiaAddress?: boolean;
+    sameSpainResidence?: boolean;
+  };
+  mode: CreateMode;
+  uploadState: CreateUploadState;
+};
 
 const createSteps: Array<{
   ariaLabel?: string;
@@ -33,24 +60,28 @@ const createSteps: Array<{
 }> = [
   {
     ariaLabel: "Шаг 1: паспорт и семья",
-    id: "passport",
+    id: "passport-family",
     label: "Паспорт и семья",
     number: "1",
   },
-  { id: "questionnaire", label: "Анкета и файлы", number: "2" },
-];
-
-const submissionTypeOptions: Array<{ label: string; value: Submission["type"] }> = [
-  { label: "Заявитель", value: "single" },
-  { label: "Семья", value: "family" },
+  { id: "questionnaire-files", label: "Анкета и файлы", number: "2" },
 ];
 
 const firstStepFamilyQuestions: Array<{
-  key: Extract<keyof PreliminaryIntakeDraft, "sameHomeAddress" | "sameSpainStay">;
+  answerKey: keyof CreateSubmissionState["familyAnswers"];
+  intakeKey: Extract<keyof PreliminaryIntakeDraft, "sameHomeAddress" | "sameSpainStay">;
   label: string;
 }> = [
-  { key: "sameHomeAddress", label: "Один адрес проживания в России у всех?" },
-  { key: "sameSpainStay", label: "Одно проживание в Испании у всех?" },
+  {
+    answerKey: "sameRussiaAddress",
+    intakeKey: "sameHomeAddress",
+    label: "Один адрес проживания в России?",
+  },
+  {
+    answerKey: "sameSpainResidence",
+    intakeKey: "sameSpainStay",
+    label: "Одно проживание в Испании?",
+  },
 ];
 
 const extractedFieldPreviewItems: Array<{
@@ -150,10 +181,32 @@ function passportUploadVisualStatus(
   return "selected";
 }
 
+function createPassportStatusFromUpload(
+  upload: PassportUploadDraft | undefined,
+): CreatePassportStatus {
+  if (!upload) return "missing";
+  if (upload.status === "extracting") return "processing";
+  if (isPassportUploadReady(upload)) return "uploaded";
+  if (upload.status === "failed" || upload.status === "unavailable") return "error";
+  return "waiting";
+}
+
+function createUploadStateFromUploads(
+  passportUploads: PassportUploadDraft[],
+): CreateUploadState {
+  if (!passportUploads.length) return "idle";
+  if (passportUploads.some((upload) => upload.status === "extracting")) {
+    return "processing";
+  }
+  if (passportUploads.some((upload) => upload.status === "failed")) return "error";
+  if (passportUploads.every(isPassportUploadReady)) return "complete";
+  return "waiting";
+}
+
 function passportUploadStatusText(upload: PassportUploadDraft | undefined) {
   const fullName = passportUploadFullName(upload);
   if (fullName) return fullName;
-  if (!upload) return "Паспорт не загружен";
+  if (!upload) return "Паспорт не добавлен";
   if (upload.status === "extracting") return "Распознаем MRZ";
   if (upload.status === "unavailable" || upload.status === "failed") {
     return "Не подтвержден как паспорт";
@@ -172,7 +225,7 @@ function passportUploadFieldValue(
 function passportUploadsStatus(passportUploads: PassportUploadDraft[]) {
   if (!passportUploads.length) {
     return {
-      label: "Паспорт нужен для автозаполнения анкеты",
+      label: "Файл не отправляется",
       tone: "idle" as const,
       title: "Ожидает файл",
     };
@@ -265,7 +318,6 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
 }
 
 export function CreateSubmissionDrawer({
-  dirty,
   familyCount,
   focusCloseToken = 0,
   onClose,
@@ -296,13 +348,20 @@ export function CreateSubmissionDrawer({
   const passportFileInputRef = useRef<HTMLInputElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const uploadBatchRef = useRef(0);
+  const draftTimerRef = useRef<number | null>(null);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [passportFileError, setPassportFileError] = useState("");
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
   const [highlightedApplicantIndex, setHighlightedApplicantIndex] = useState<
     number | null
   >(null);
-  const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
+  const [createStep, setCreateStep] =
+    useState<CreateSubmissionStep>("passport-family");
+  const [createMode, setCreateMode] = useState<CreateMode>("applicant");
+  const [familyAnswers, setFamilyAnswers] = useState<
+    CreateSubmissionState["familyAnswers"]
+  >({});
+  const [draftState, setDraftState] = useState<CreateDraftState>("dirty");
   const [isDragging, setIsDragging] = useState(false);
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
     emptyPreliminaryIntakeDraft,
@@ -314,31 +373,57 @@ export function CreateSubmissionDrawer({
   const activeUpload = passportUploads.find(
     (upload) => upload.applicantIndex === safeActiveApplicantIndex,
   );
-  const firstStepFamilyAnswerCount = [
-    preliminaryIntake.sameHomeAddress,
-    preliminaryIntake.sameSpainStay,
-  ].filter(Boolean).length;
   const passportReady =
     passportUploads.length > 0 &&
     passportUploads.every(isPassportUploadReady);
   const passportStatus = passportUploadsStatus(passportUploads);
   const passportStatusClass = passportStatusClassName(passportStatus.tone);
   const hasActiveUpload = Boolean(activeUpload);
-  const activeUploadReady = isPassportUploadReady(activeUpload);
   const uploadButtonLabel = hasActiveUpload
     ? `Заменить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`
     : `Загрузить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`;
-  function selectType(nextType: Submission["type"]) {
-    onType(nextType);
-    setActiveApplicantIndex(0);
-    setHighlightedApplicantIndex(null);
+  const createState: CreateSubmissionState = {
+    applicants: Array.from({ length: applicantCount }, (_, index) => {
+      const upload = passportUploads.find(
+        (candidate) => candidate.applicantIndex === index,
+      );
+
+      return {
+        id: `applicant-${index + 1}`,
+        label: applicantLabel(index, "family"),
+        passportStatus: createPassportStatusFromUpload(upload),
+        role: index === 0 ? "primary" : "secondary",
+        selected: index === safeActiveApplicantIndex,
+      };
+    }),
+    canGoNext: passportReady,
+    currentStep: createStep,
+    draftState,
+    familyAnswers,
+    mode: createMode,
+    uploadState: createUploadStateFromUploads(passportUploads),
+  };
+
+  function markDraftDirty() {
+    setDraftState("dirty");
   }
 
   function updatePreliminaryIntake<Key extends keyof PreliminaryIntakeDraft>(
     key: Key,
     value: PreliminaryIntakeDraft[Key],
   ) {
+    markDraftDirty();
     setPreliminaryIntake((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateFamilyAnswer(
+    answerKey: keyof CreateSubmissionState["familyAnswers"],
+    intakeKey: Extract<keyof PreliminaryIntakeDraft, "sameHomeAddress" | "sameSpainStay">,
+    value: boolean,
+  ) {
+    markDraftDirty();
+    setFamilyAnswers((current) => ({ ...current, [answerKey]: value }));
+    updatePreliminaryIntake(intakeKey, value);
   }
 
   async function addPassportFiles(files: FileList | null) {
@@ -355,6 +440,7 @@ export function CreateSubmissionDrawer({
       rejectedCount ? "Паспорт принимается только в формате JPEG или PNG." : "",
     );
     if (!selectedFiles.length) return;
+    markDraftDirty();
     const nextBatch = uploadBatchRef.current + 1;
     uploadBatchRef.current = nextBatch;
 
@@ -449,6 +535,7 @@ export function CreateSubmissionDrawer({
   }
 
   function addFamilyMember() {
+    markDraftDirty();
     if (type !== "family") {
       onType("family");
       onFamilyCount(Math.max(2, familyCount));
@@ -476,13 +563,25 @@ export function CreateSubmissionDrawer({
       return;
     }
 
-    setCreateStep("questionnaire");
+    setCreateStep("questionnaire-files");
   }
 
   function handlePrimaryAction() {
-    if (createStep === "passport") return openQuestionnaireStep();
+    if (createStep === "passport-family") return openQuestionnaireStep();
 
     onCreate(passportUploads, preliminaryIntake);
+  }
+
+  function handleSaveDraft() {
+    if (draftTimerRef.current !== null) {
+      window.clearTimeout(draftTimerRef.current);
+    }
+
+    setDraftState("saving");
+    draftTimerRef.current = window.setTimeout(() => {
+      setDraftState("saved");
+      draftTimerRef.current = null;
+    }, 420);
   }
 
   function handleDragOver(event: DragEvent) {
@@ -515,10 +614,19 @@ export function CreateSubmissionDrawer({
     });
   }, [applicantCount]);
 
+  useEffect(
+    () => () => {
+      if (draftTimerRef.current !== null) {
+        window.clearTimeout(draftTimerRef.current);
+      }
+    },
+    [],
+  );
+
   return (
     <motion.div
       animate={{ opacity: 1, y: 0 }}
-      className="vf-figma-surface fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden"
+      className="vf-figma-surface create-flow-shell fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden"
       exit={{ opacity: 0, y: 20 }}
       initial={{ opacity: 0, y: 20 }}
       role="dialog"
@@ -531,45 +639,79 @@ export function CreateSubmissionDrawer({
         onClose();
       }}
     >
-      <header className="h-[64px] shrink-0 border-b border-[#202124] flex items-center px-6 gap-4 bg-[#0e0e10]/80 backdrop-blur-xl">
-        <button
-          ref={closeButtonRef}
-          className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[10px] text-white/50 hover:text-white hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
-          type="button"
-          aria-label="Закрыть создание"
-          onClick={onClose}
-        >
-          <ArrowLeft className="w-[18px] h-[18px]" />
-        </button>
-
-        <div className="flex-1 min-w-0 flex items-center gap-3">
-          <h1
-            id="create-title"
-            className="text-[15px] font-medium tracking-wide text-white m-0 truncate"
+      <header className="create-flow-header">
+        <div className="create-flow-title-row">
+          <button
+            ref={closeButtonRef}
+            className="create-flow-close"
+            type="button"
+            aria-label="Закрыть создание"
+            onClick={onClose}
           >
-            Сборка документов
-          </h1>
-          <span className="px-2 py-0.5 rounded-[4px] bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider text-white/40 font-mono">
-            Шаг&nbsp; {createStep === "passport" ? "1" : "2"}/2
-          </span>
+            <ArrowLeft aria-hidden="true" />
+          </button>
+
+          <div className="create-flow-title">
+            <h1 id="create-title">Новая подача</h1>
+            <p>Испания · Семья · {applicantCount} заявителя · Черновик</p>
+          </div>
         </div>
+
+        <ol className="cf-steps create-flow-steps" aria-label="Шаги создания подачи">
+          {createSteps.map((step) => {
+            const isActive = step.id === createState.currentStep;
+            const isDisabled =
+              step.id === "questionnaire-files" && !createState.canGoNext;
+
+            return (
+              <li key={step.id} className={isActive ? "is-active" : ""}>
+                <button
+                  type="button"
+                  aria-current={isActive ? "step" : undefined}
+                  aria-label={step.ariaLabel ?? `Шаг ${step.number}: ${step.label}`}
+                  disabled={isDisabled}
+                  onClick={() => {
+                    if (step.id === "passport-family") {
+                      setCreateStep("passport-family");
+                      return;
+                    }
+
+                    openQuestionnaireStep();
+                  }}
+                >
+                  <span>{step.number}</span>
+                  <strong>{step.label}</strong>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 lg:p-10">
-        <div className="max-w-[1140px] mx-auto h-full">
-          {createStep === "passport" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
-              <div className="flex flex-col gap-6">
-                <div>
-                  <h2 className="text-[20px] font-medium text-white/90 tracking-tight">
-                    Исходные файлы
-                  </h2>
-                  <p className="text-[13px] text-white/40 mt-2 leading-relaxed max-w-md font-light">
-                    Загрузите оригиналы документов заявителей. Модуль AI автоматически
-                    извлечет данные, классифицирует файлы и подготовит драфты анкет.
-                  </p>
-                </div>
-
+      <div className="create-flow-body">
+        <div className="create-flow-container">
+          {createStep === "passport-family" ? (
+            <section
+              className={[
+                "create-passport-layout",
+                createState.mode === "family" ? "is-family-mode" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-label="Паспорт и семья"
+            >
+              <article
+                className={[
+                  "create-upload-panel",
+                  isDragging ? "is-dragging" : "",
+                  passportUploads.length ? "has-passport" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <input
                   ref={passportFileInputRef}
                   className="pi-file-input"
@@ -585,159 +727,173 @@ export function CreateSubmissionDrawer({
                   }}
                 />
 
-                <div
-                  className={`flex-1 min-h-[360px] rounded-[16px] transition-all duration-300 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden ${
-                    isDragging
-                      ? "border border-white/20 bg-[#161617] shadow-[0_0_40px_rgba(255,255,255,0.03)] scale-[1.01]"
-                      : "border border-[#202124] bg-[#121214] hover:border-white/10 hover:bg-[#141416]"
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <div className="absolute inset-4 rounded-[12px] border border-dashed border-white/5 pointer-events-none" />
-                  <div className="w-14 h-14 rounded-full bg-[#18181b] border border-[#2a2a2e] flex items-center justify-center mb-5 shadow-inner relative z-10">
-                    <UploadCloud className="w-6 h-6 text-white/40" />
-                  </div>
-                  <h3
-                    id="passport-intake-title"
-                    className="text-[15px] font-medium text-white/80 mb-1.5 relative z-10"
-                  >
-                    Перетащите файлы
-                  </h3>
-                  <p className="text-[12px] text-white/30 max-w-[240px] mb-8 font-light relative z-10 leading-relaxed">
-                    PDF, JPG, PNG.
-                    <br />
-                    До 50 МБ каждый.
+                <div className="create-upload-visual" aria-hidden="true">
+                  <FileText />
+                  <span />
+                </div>
+                <p className="kicker">Паспортная точка входа</p>
+                <h2>Добавьте паспорт</h2>
+                <p>
+                  Загрузите скан или фото разворота паспорта. Файл останется в
+                  черновике, а распознавание не отправит данные дальше без
+                  подтверждения агента.
+                </p>
+                {passportFileError ? (
+                  <p className="create-upload-error" role="alert">
+                    {passportFileError}
                   </p>
-                  {passportFileError ? (
-                    <p className="mb-4 text-[12px] text-red-400 relative z-10" role="alert">
-                      {passportFileError}
-                    </p>
-                  ) : null}
+                ) : null}
+                <div className="create-upload-actions">
                   <button
-                    className="h-10 px-6 bg-white text-black hover:bg-white/90 font-medium text-[13px] rounded-[8px] transition-all relative z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                    className="create-upload-button"
                     type="button"
+                    aria-label={uploadButtonLabel}
                     onClick={() => passportFileInputRef.current?.click()}
                   >
-                    Выбрать файлы
+                    {hasActiveUpload ? "Заменить паспорт" : "Выбрать паспорт"}
                   </button>
-                </div>
-              </div>
-
-              <div className="flex flex-col h-full max-h-[800px] lg:border-l border-[#202124] lg:pl-10">
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-[13px] uppercase tracking-widest font-medium text-white/40">
-                    Очередь обработки
-                  </h3>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-white/50">
-                    {passportUploads.length} ITEMS
+                  <span className={`pi-extraction-status ${passportStatusClass}`}>
+                    <span aria-hidden="true" />
+                    <strong>{passportStatus.title}</strong>
+                    <p>{passportStatus.label}</p>
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[#2a2a2e]">
-                  {passportUploads.length ? (
-                    <AnimatePresence>
-                      {passportUploads.map((upload) => {
-                        const visualStatus = passportUploadVisualStatus(upload);
-                        const isProcessing = visualStatus === "extracting";
-                        const isReady = visualStatus === "ready";
-                        return (
-                          <motion.div
-                            key={upload.id}
-                            layout
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-3.5 rounded-[12px] bg-[#141416] border border-[#202124] relative overflow-hidden group hover:border-[#2a2a2e] transition-colors"
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            initial={{ opacity: 0, y: 10 }}
-                          >
-                            {isProcessing ? (
-                              <div className="absolute bottom-0 left-0 h-[1px] bg-white/20 w-full animate-pulse" />
-                            ) : null}
-                            <div className="flex items-start gap-3">
-                              <div className="w-9 h-9 shrink-0 rounded-[8px] bg-[#1a1a1d] border border-[#242529] flex items-center justify-center mt-0.5">
-                                {upload.file?.type.startsWith("image/") ? (
-                                  <ImageIcon className="w-4 h-4 text-white/30" />
-                                ) : (
-                                  <FileText className="w-4 h-4 text-white/30" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="text-[13.5px] font-medium text-white/80 truncate tracking-tight">
-                                    {upload.fileName}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[11px] font-mono text-white/30">
-                                    {formatFileSize(upload.file?.size)}
-                                  </span>
-                                  <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
-                                  {isProcessing ? (
-                                    <span className="text-[11px] text-white/60 flex items-center gap-1.5 font-medium tracking-wide uppercase">
-                                      <ScanLine className="w-3 h-3 animate-pulse opacity-50" />
-                                      Processing
-                                    </span>
-                                  ) : isReady ? (
-                                    <span className="text-[11px] text-white/40 flex items-center gap-1 font-medium tracking-wide uppercase">
-                                      <CheckCircle2 className="w-3 h-3 opacity-50" />
-                                      Done
-                                    </span>
-                                  ) : (
-                                    <span className="text-[11px] text-white/40 tracking-wide uppercase">
-                                      Waiting
-                                    </span>
-                                  )}
-                                </div>
-                                {upload.extractedFields.length ? (
-                                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                                    {upload.extractedFields.slice(0, 3).map((field) => (
-                                      <span
-                                        key={`${upload.id}-${field.key}`}
-                                        className="px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-[10px] text-white/50 font-medium"
-                                      >
-                                        {field.value}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  ) : (
-                    <div className="h-full min-h-[240px] flex flex-col items-center justify-center text-center px-4">
-                      <div className="w-10 h-10 rounded-full bg-[#161617] border border-[#202124] flex items-center justify-center mb-3">
-                        <Search className="w-4 h-4 text-white/20" />
-                      </div>
-                      <p className="text-[12px] text-white/30 font-light">
-                        Локальная очередь пуста.
-                      </p>
-                    </div>
-                  )}
+                {passportUploads.length ? (
+                  <div className="create-upload-list" aria-label="Загруженные паспорта">
+                    {passportUploads.map((upload) => {
+                      const visualStatus = passportUploadVisualStatus(upload);
+                      const isProcessing = visualStatus === "extracting";
+                      const isReady = visualStatus === "ready";
+
+                      return (
+                        <motion.div
+                          key={upload.id}
+                          layout
+                          animate={{ opacity: 1, y: 0 }}
+                          className="create-upload-file"
+                          initial={{ opacity: 0, y: 8 }}
+                        >
+                          {upload.file?.type.startsWith("image/") ? (
+                            <ImageIcon aria-hidden="true" />
+                          ) : (
+                            <FileText aria-hidden="true" />
+                          )}
+                          <div>
+                            <strong>{upload.fileName}</strong>
+                            <span>
+                              {formatFileSize(upload.file?.size)} ·{" "}
+                              {isProcessing ? "Processing" : isReady ? "Done" : "Waiting"}
+                            </span>
+                          </div>
+                          {isProcessing ? <ScanLine aria-hidden="true" /> : null}
+                          {isReady ? <CheckCircle2 aria-hidden="true" /> : null}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </article>
+
+              <aside className="create-family-panel" aria-label="Заявитель и семья">
+                <div className="create-panel-head">
+                  <div>
+                    <p className="kicker">Семья</p>
+                    <h3>Кто подает документы</h3>
+                  </div>
+                  <span>{createState.applicants.length} заяв.</span>
                 </div>
 
-                <div className="mt-5 pt-5 border-t border-[#202124]">
+                <div className="create-mode-tabs" role="tablist" aria-label="Режим панели">
                   <button
-                    disabled={!passportReady}
-                    className={`w-full h-11 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
-                      passportReady
-                        ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                        : "bg-[#161617] text-white/20 cursor-not-allowed border border-[#202124]"
-                    }`}
+                    className={createState.mode === "applicant" ? "is-active" : ""}
                     type="button"
-                    onClick={handlePrimaryAction}
+                    role="tab"
+                    aria-selected={createState.mode === "applicant"}
+                    onClick={() => setCreateMode("applicant")}
                   >
-                    {passportReady ? "Сформировать пакет" : "Ожидание обработки"}
+                    Заявитель
+                  </button>
+                  <button
+                    className={createState.mode === "family" ? "is-active" : ""}
+                    type="button"
+                    role="tab"
+                    aria-selected={createState.mode === "family"}
+                    onClick={() => setCreateMode("family")}
+                  >
+                    Семья
                   </button>
                 </div>
-              </div>
-            </div>
+
+                <AnimatePresence mode="wait" initial={false}>
+                  {createState.mode === "applicant" ? (
+                    <motion.div
+                      key="applicant"
+                      animate={{ opacity: 1, y: 0 }}
+                      className="create-panel-mode"
+                      exit={{ opacity: 0, y: -6 }}
+                      initial={{ opacity: 0, y: 6 }}
+                      transition={{ duration: 0.16, ease: "easeOut" }}
+                    >
+                      <PassportTargetList
+                        activeApplicantIndex={safeActiveApplicantIndex}
+                        applicantCount={applicantCount}
+                        highlightedApplicantIndex={highlightedApplicantIndex}
+                        passportUploads={passportUploads}
+                        type="family"
+                        onSelect={(index) => {
+                          setActiveApplicantIndex(index);
+                          setHighlightedApplicantIndex(null);
+                        }}
+                      />
+                      <button
+                        className="create-add-applicant"
+                        type="button"
+                        disabled={applicantCount >= maxFamilyApplicants}
+                        onClick={addFamilyMember}
+                      >
+                        <Plus aria-hidden="true" />
+                        Добавить заявителя
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="family"
+                      animate={{ opacity: 1, y: 0 }}
+                      className="create-panel-mode pi-family-yes-no"
+                      exit={{ opacity: 0, y: -6 }}
+                      initial={{ opacity: 0, y: 6 }}
+                      transition={{ duration: 0.16, ease: "easeOut" }}
+                    >
+                      <div className="create-panel-head">
+                        <div>
+                          <p className="kicker">Общие ответы</p>
+                          <h3>Семейные условия</h3>
+                        </div>
+                        <span>2 вопроса</span>
+                      </div>
+                      {firstStepFamilyQuestions.map((question) => (
+                        <FamilyYesNoQuestion
+                          key={question.answerKey}
+                          label={question.label}
+                          value={familyAnswers[question.answerKey]}
+                          onChecked={(value) =>
+                            updateFamilyAnswer(
+                              question.answerKey,
+                              question.intakeKey,
+                              value,
+                            )
+                          }
+                        />
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </aside>
+            </section>
           ) : null}
 
-          {createStep === "questionnaire" ? (
+          {createStep === "questionnaire-files" ? (
             <section className="cf-grid" aria-label="Следующие шаги анкеты">
               <article className="cf-panel extraction-review-placeholder">
                 <div className="create-panel-head">
@@ -820,36 +976,42 @@ export function CreateSubmissionDrawer({
         </div>
       </div>
 
-      {createStep === "questionnaire" ? (
-        <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/90 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-[12px] text-white/40">
-            Создайте черновик, чтобы загрузить фото и селфи в файлах.
+      <footer className="create-flow-footer">
+        {createStep === "passport-family" ? (
+          <span>
+            Черновик хранится только в текущей browser session.
           </span>
-          <div className="flex gap-3">
+        ) : (
+          <span>Создайте черновик, чтобы загрузить фото и селфи в файлах.</span>
+        )}
+        <div>
+          {createStep === "questionnaire-files" ? (
             <button
-              className="h-10 px-4 rounded-[8px] bg-[#161617] border border-[#202124] text-white/60 hover:text-white hover:bg-[#1a1a1d] text-[13px] font-medium transition-colors"
+              className="create-secondary-action"
               type="button"
-              onClick={() => setCreateStep("passport")}
+              onClick={() => setCreateStep("passport-family")}
             >
               Назад
             </button>
-            <button
-              className="h-10 px-5 rounded-[8px] bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium transition-colors"
-              type="button"
-              onClick={() => onCreate(passportUploads, preliminaryIntake)}
-            >
-              Сохранить черновик
-            </button>
-            <button
-              className="h-10 px-5 rounded-[8px] bg-white text-black hover:bg-white/90 text-[13px] font-medium transition-colors"
-              type="button"
-              onClick={handlePrimaryAction}
-            >
-              Создать и открыть
-            </button>
-          </div>
-        </footer>
-      ) : null}
+          ) : null}
+          <button
+            className="create-secondary-action"
+            type="button"
+            disabled={draftState === "saving"}
+            onClick={handleSaveDraft}
+          >
+            {draftState === "saving" ? "Сохраняем" : "Сохранить черновик"}
+          </button>
+          <button
+            className="create-primary-action"
+            type="button"
+            disabled={!createState.canGoNext}
+            onClick={handlePrimaryAction}
+          >
+            {createStep === "passport-family" ? "Дальше" : "Создать и открыть"}
+          </button>
+        </div>
+      </footer>
     </motion.div>
   );
 }
@@ -929,30 +1091,30 @@ function PassportTargetList({
 }
 
 function FamilyYesNoQuestion({
-  checked,
   label,
   onChecked,
+  value,
 }: {
-  checked: boolean;
   label: string;
   onChecked: (checked: boolean) => void;
+  value?: boolean;
 }) {
   return (
     <div className="fyn-question">
       <span>{label}</span>
       <div role="group" aria-label={label}>
         <button
-          className={checked ? "is-active" : ""}
+          className={value === true ? "is-active" : ""}
           type="button"
-          aria-pressed={checked}
+          aria-pressed={value === true}
           onClick={() => onChecked(true)}
         >
           Да
         </button>
         <button
-          className={!checked ? "is-active" : ""}
+          className={value === false ? "is-active" : ""}
           type="button"
-          aria-pressed={!checked}
+          aria-pressed={value === false}
           onClick={() => onChecked(false)}
         >
           Нет

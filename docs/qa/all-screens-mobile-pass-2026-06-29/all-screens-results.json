@@ -1,0 +1,334 @@
+{
+  "desktop1440": {
+    "results": [
+      {
+        "label": "agent-actions",
+        "title": "Мои действия",
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 1440,
+          "cw": 1440
+        }
+      },
+      {
+        "label": "agent-submissions",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 1440,
+          "cw": 1440
+        }
+      },
+      {
+        "label": "create-submission",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 1440,
+          "cw": 1440
+        }
+      },
+      {
+        "label": "admin-review",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 1440,
+          "cw": 1440
+        }
+      },
+      {
+        "label": "admin-review-drawer",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": true,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 1440,
+          "cw": 1440
+        }
+      },
+      {
+        "label": "export",
+        "title": "Выгрузка",
+        "shellClass": "ops-shell surface-export  role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 1440,
+          "cw": 1440
+        }
+      }
+    ],
+    "errors": []
+  },
+  "tablet768": {
+    "results": [
+      {
+        "label": "agent-actions",
+        "title": "Мои действия",
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 768,
+          "cw": 768
+        }
+      },
+      {
+        "label": "agent-submissions",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 768,
+          "cw": 768
+        }
+      },
+      {
+        "label": "create-submission",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 768,
+          "cw": 768
+        }
+      },
+      {
+        "label": "admin-review",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 768,
+          "cw": 768
+        }
+      },
+      {
+        "label": "admin-review-drawer",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": true,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 768,
+          "cw": 768
+        }
+      },
+      {
+        "label": "export",
+        "title": "Выгрузка",
+        "shellClass": "ops-shell surface-export  role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 768,
+          "cw": 768
+        }
+      }
+    ],
+    "errors": []
+  },
+  "mobile390": {
+    "results": [
+      {
+        "label": "agent-actions",
+        "title": "Мои действия",
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 390,
+          "cw": 390
+        }
+      },
+      {
+        "label": "agent-submissions",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 390,
+          "cw": 390
+        }
+      },
+      {
+        "label": "create-submission",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 390,
+          "cw": 390
+        }
+      },
+      {
+        "label": "admin-review",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 390,
+          "cw": 390
+        }
+      },
+      {
+        "label": "admin-review-drawer",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": true,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 390,
+          "cw": 390
+        }
+      },
+      {
+        "label": "export",
+        "title": "Выгрузка",
+        "shellClass": "ops-shell surface-export  role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 390,
+          "cw": 390
+        }
+      }
+    ],
+    "errors": []
+  },
+  "mobile320": {
+    "results": [
+      {
+        "label": "agent-actions",
+        "title": "Мои действия",
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 320,
+          "cw": 320
+        }
+      },
+      {
+        "label": "agent-submissions",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 320,
+          "cw": 320
+        }
+      },
+      {
+        "label": "create-submission",
+        "title": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 320,
+          "cw": 320
+        }
+      },
+      {
+        "label": "admin-review",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 320,
+          "cw": 320
+        }
+      },
+      {
+        "label": "admin-review-drawer",
+        "title": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface role-admin has-open-drawer ",
+        "overflowX": 0,
+        "adminDrawer": true,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 320,
+          "cw": 320
+        }
+      },
+      {
+        "label": "export",
+        "title": "Выгрузка",
+        "shellClass": "ops-shell surface-export  role-admin  ",
+        "overflowX": 0,
+        "adminDrawer": false,
+        "createDrawer": false,
+        "legacyDrawer": false,
+        "body": {
+          "sw": 320,
+          "cw": 320
+        }
+      }
+    ],
+    "errors": []
+  }
+}
