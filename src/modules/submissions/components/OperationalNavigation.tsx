@@ -1,6 +1,5 @@
 import { Button, NavCount } from "../../../shared/ui/primitives";
 import type { ReactNode, SVGProps } from "react";
-import logoUrl from "../../../assets/visaflow-logo.png";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
 
@@ -42,12 +41,22 @@ export function OperationalSidebar({
         </div>
       ) : null}
       <div className="ops-brand" aria-label={brand}>
-        <img className="ops-brand-logo" src={logoUrl} alt="" aria-hidden="true" />
+        <span className="ops-brand-logo ops-brand-mark" aria-hidden="true">
+          V
+        </span>
         <div className="ops-brand-copy">
           <strong>VisaFlow V-19</strong>
-          <em>Операции по Испании</em>
+          <em>Workspace</em>
         </div>
       </div>
+      <button className="ops-sidebar-command" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <span>Поиск...</span>
+        <kbd>⌘K</kbd>
+      </button>
       <nav className="ops-nav" aria-label="Операционные разделы">
         {items.map((item) => (
           <Button
@@ -165,9 +174,30 @@ function OperationalIcon({ fallback, id }: { fallback: string; id: string }) {
   if (id.includes("submissions")) {
     return (
       <svg {...common}>
-        <path d="M6 3h8l4 4v14H6z" />
-        <path d="M14 3v5h5" />
-        <path d="M9 13h6M9 17h6" />
+        <path d="M16.9 20a5 5 0 0 0-9.8 0" />
+        <circle cx="12" cy="8" r="4" />
+        <path d="M20 19a4 4 0 0 0-3-3.8" />
+        <path d="M4 19a4 4 0 0 1 3-3.8" />
+      </svg>
+    );
+  }
+
+  if (id.includes("media")) {
+    return (
+      <svg {...common}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="m7 15 3-3 2 2 3-4 2 5" />
+        <circle cx="8" cy="9" r="1" />
+      </svg>
+    );
+  }
+
+  if (id.includes("issues")) {
+    return (
+      <svg {...common}>
+        <path d="M12 8v5" />
+        <path d="M12 17h.01" />
+        <rect x="5" y="3" width="14" height="18" rx="2" />
       </svg>
     );
   }
