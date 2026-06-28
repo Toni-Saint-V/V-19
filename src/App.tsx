@@ -150,6 +150,10 @@ import {
   type AccessRequest,
   type Session as LocalAuthSession,
 } from "./services/authRegistration";
+import {
+  canShowLocalDemoRoleSwitch,
+  canUseLocalDemoSeedAutoLogin,
+} from "./services/pilotAccessGate";
 import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
 import { invokePassportExtraction } from "./modules/submissions/passportExtractionService";
 import {
@@ -414,6 +418,7 @@ function reviewTabForAdminWork(tab: AdminWorkTab): ReviewTab | null {
 
 function MainApp() {
   const isSupabaseMode = supabaseRuntimeConfig.selected === "supabase";
+  const localDemoSeedAutoLoginEnabled = canUseLocalDemoSeedAutoLogin(import.meta.env);
   const passportExtractionEnabled = passportExtractionEnabledFromEnv(
     import.meta.env as { readonly VITE_PASSPORT_EXTRACTION_ENABLED?: string },
   );
@@ -590,10 +595,11 @@ function MainApp() {
   );
   const selectedVisibleExportIds = selectedForExport.map((submission) => submission.id);
   const exportPlan = exportSummary(selectedForExport);
-  const showRoleSwitcher =
-    !isSupabaseMode &&
-    Boolean(localAuthSession) &&
-    (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
+  const showRoleSwitcher = canShowLocalDemoRoleSwitch({
+    env: import.meta.env,
+    isSupabaseMode,
+    session: localAuthSession,
+  });
   const isV19CollectionSurface =
     surface === "agent-actions" ||
     surface === "agent-inbox" ||
@@ -806,6 +812,8 @@ function MainApp() {
           return;
         }
 
+        if (!localDemoSeedAutoLoginEnabled) return;
+
         const bootstrapEmail = requestedWorkspaceEmail || fallbackAgentEmails[0];
         const bootstrapSession = await authRepository.loginApprovedUser(bootstrapEmail);
         if (cancelled) return;
@@ -841,7 +849,7 @@ function MainApp() {
     return () => {
       cancelled = true;
     };
-  }, [isSupabaseMode]);
+  }, [isSupabaseMode, localDemoSeedAutoLoginEnabled]);
 
   useEffect(() => {
     let cancelled = false;
