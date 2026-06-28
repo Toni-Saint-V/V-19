@@ -268,6 +268,86 @@ p {
   box-shadow: 0 14px 28px rgba(222, 111, 104, 0.18);
 }
 
+.access-queue-panel {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 14px;
+  background: var(--vf-surface-card);
+}
+
+.access-queue-head,
+.access-queue-row,
+.access-queue-actions {
+  display: flex;
+  align-items: center;
+}
+
+.access-queue-head,
+.access-queue-row {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.access-queue-head h2 {
+  margin: 3px 0 0;
+  color: var(--vf-text-primary);
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.access-queue-head > span {
+  display: inline-flex;
+  min-width: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 999px;
+  color: var(--vf-text-primary);
+  background: var(--vf-surface-control);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.access-queue-list {
+  display: grid;
+  gap: 8px;
+}
+
+.access-queue-row {
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 10px;
+  background: var(--vf-bg-row);
+}
+
+.access-queue-row strong,
+.access-queue-row small {
+  display: block;
+}
+
+.access-queue-row strong {
+  color: var(--vf-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.access-queue-row small,
+.access-queue-empty {
+  color: var(--vf-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.access-queue-actions {
+  flex: none;
+  gap: 8px;
+}
+
 .workspace-empty-state {
   display: grid;
   align-content: center;
