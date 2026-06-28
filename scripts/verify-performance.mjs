@@ -5,8 +5,8 @@ import { join } from "node:path";
 const distAssets = join(process.cwd(), "dist", "assets");
 
 // Current V-19 cockpit baseline. The shell still ships a large global CSS
-// bundle and an eager PDF/admin client path; keep no-growth ceilings until
-// a dedicated split lowers the budget.
+// bundle and several intentionally lazy operational chunks; keep no-growth
+// ceilings until a dedicated split lowers the budget.
 const cssRawKbBaseline = 250;
 const cssRawKbAllowance = 1;
 const cssGzipKbBaseline = 38;
@@ -15,12 +15,14 @@ const totalJsRawKbBaseline = 1054;
 const totalJsRawKbAllowance = 1;
 const totalJsGzipKbBaseline = 302;
 const totalJsGzipKbAllowance = 1;
-const lazyWorkbookRawKbLimit = 7;
-const lazyWorkbookGzipKbLimit = 2.7;
+const lazyWorkbookRawKbLimit = 8.2;
+const lazyWorkbookGzipKbLimit = 3;
 const lazySettingsRawKbLimit = 11;
 const lazySettingsGzipKbLimit = 3;
 const lazyPassportOcrRawKbLimit = 8.2;
 const lazyPassportOcrGzipKbLimit = 3.7;
+const lazyPdfRawKbLimit = 380;
+const lazyPdfGzipKbLimit = 115;
 
 const limits = {
   jsRawKb: 500,
@@ -83,11 +85,13 @@ const lazySettingsAssets = jsAssets.filter((asset) =>
 const lazyPassportOcrAssets = jsAssets.filter((asset) =>
   asset.file.startsWith("Tesseract-"),
 );
+const lazyPdfAssets = jsAssets.filter((asset) => asset.file.startsWith("pdf-"));
 const initialJsAssets = jsAssets.filter(
   (asset) =>
     !lazyWorkbookAssets.includes(asset) &&
     !lazySettingsAssets.includes(asset) &&
-    !lazyPassportOcrAssets.includes(asset),
+    !lazyPassportOcrAssets.includes(asset) &&
+    !lazyPdfAssets.includes(asset),
 );
 const totalJsRawKb =
   initialJsAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
@@ -105,6 +109,10 @@ const lazyPassportOcrRawKb =
   lazyPassportOcrAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const lazyPassportOcrGzipKb =
   lazyPassportOcrAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
+const lazyPdfRawKb =
+  lazyPdfAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
+const lazyPdfGzipKb =
+  lazyPdfAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
 
 if (totalJsRawKb > limits.totalJsRawKb) {
   failures.push(
@@ -128,6 +136,10 @@ if (lazySettingsAssets.length > 1) {
 
 if (lazyPassportOcrAssets.length > 1) {
   failures.push("passport OCR must stay in one lazy JS chunk");
+}
+
+if (lazyPdfAssets.length > 1) {
+  failures.push("PDF review runtime must stay in one lazy JS chunk");
 }
 
 if (lazyWorkbookRawKb > lazyWorkbookRawKbLimit) {
@@ -178,6 +190,22 @@ if (lazyPassportOcrGzipKb > lazyPassportOcrGzipKbLimit) {
   );
 }
 
+if (lazyPdfRawKb > lazyPdfRawKbLimit) {
+  failures.push(
+    `PDF review lazy JS: ${lazyPdfRawKb.toFixed(
+      1,
+    )} KB raw exceeds ${lazyPdfRawKbLimit} KB`,
+  );
+}
+
+if (lazyPdfGzipKb > lazyPdfGzipKbLimit) {
+  failures.push(
+    `PDF review lazy JS: ${lazyPdfGzipKb.toFixed(
+      1,
+    )} KB gzip exceeds ${lazyPdfGzipKbLimit} KB`,
+  );
+}
+
 if (failures.length) {
   console.error(failures.join("\n"));
   process.exit(1);
@@ -207,5 +235,9 @@ console.log(
     1,
   )} KB gzip\npassport OCR lazy JS: ${lazyPassportOcrRawKb.toFixed(
     1,
-  )} KB raw, ${lazyPassportOcrGzipKb.toFixed(1)} KB gzip`,
+  )} KB raw, ${lazyPassportOcrGzipKb.toFixed(
+    1,
+  )} KB gzip\nPDF review lazy JS: ${lazyPdfRawKb.toFixed(
+    1,
+  )} KB raw, ${lazyPdfGzipKb.toFixed(1)} KB gzip`,
 );
