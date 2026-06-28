@@ -1,4 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  FileText,
+  Image as ImageIcon,
+  ScanLine,
+  Search,
+  UploadCloud,
+} from "lucide-react";
 import { Button } from "../../../shared/ui/primitives";
 import { invokePassportExtraction } from "../passportExtractionService";
 import "./CreateSubmissionDrawer.css";
@@ -293,6 +303,7 @@ export function CreateSubmissionDrawer({
     number | null
   >(null);
   const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
+  const [isDragging, setIsDragging] = useState(false);
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
     emptyPreliminaryIntakeDraft,
   );
@@ -474,6 +485,21 @@ export function CreateSubmissionDrawer({
     onCreate(passportUploads, preliminaryIntake);
   }
 
+  function handleDragOver(event: DragEvent) {
+    event.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave() {
+    setIsDragging(false);
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    setIsDragging(false);
+    void addPassportFiles(event.dataTransfer.files);
+  }
+
   useEffect(() => {
     if (!focusCloseToken) return;
     closeButtonRef.current?.focus({ preventScroll: true });
@@ -490,184 +516,60 @@ export function CreateSubmissionDrawer({
   }, [applicantCount]);
 
   return (
-    <div
-      className="submission-drawer create-drawer"
+    <motion.div
+      animate={{ opacity: 1, y: 0 }}
+      className="vf-figma-surface fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden"
+      exit={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 20 }}
       role="dialog"
-      aria-modal="false"
+      aria-modal="true"
       aria-labelledby="create-title"
+      transition={{ damping: 25, stiffness: 250, type: "spring" }}
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
         event.stopPropagation();
         onClose();
       }}
     >
-      <header className="drawer-header drawer-topbar create-drawer-header">
-        <div className="drawer-title-block drawer-title-sr">
-          <p className="kicker">Предварительный черновик</p>
-          <h2 id="create-title">Новая подача</h2>
-          <p>
-            {createStep === "passport" ? "Загрузка паспорта" : "Анкета, фото и селфи"} ·{" "}
-            {type === "family" ? "Семья" : "Один заявитель"}
-          </p>
-        </div>
-        <ol className="cf-steps" aria-label="Шаги создания подачи">
-          {createSteps.map((step) => (
-            <li key={step.id} className={createStep === step.id ? "is-active" : ""}>
-              <button
-                type="button"
-                aria-label={step.ariaLabel}
-                onClick={() => {
-                  if (step.id === "questionnaire") {
-                    openQuestionnaireStep();
-                    return;
-                  }
+      <header className="h-[64px] shrink-0 border-b border-[#202124] flex items-center px-6 gap-4 bg-[#0e0e10]/80 backdrop-blur-xl">
+        <button
+          ref={closeButtonRef}
+          className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[10px] text-white/50 hover:text-white hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+          type="button"
+          aria-label="Закрыть создание"
+          onClick={onClose}
+        >
+          <ArrowLeft className="w-[18px] h-[18px]" />
+        </button>
 
-                  setCreateStep(step.id);
-                }}
-              >
-                <span>{step.number}</span>
-                <strong>{step.label}</strong>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <div className="drawer-topbar-actions drawer-header-actions">
-          <span className="status-chip amber">
-            {dirty ? "Есть изменения" : "Черновик"}
-          </span>
-          <button
-            ref={closeButtonRef}
-            className="icon-button"
-            type="button"
-            aria-label="Закрыть создание"
-            onClick={onClose}
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          <h1
+            id="create-title"
+            className="text-[15px] font-medium tracking-wide text-white m-0 truncate"
           >
-            ×
-          </button>
+            Сборка документов
+          </h1>
+          <span className="px-2 py-0.5 rounded-[4px] bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider text-white/40 font-mono">
+            Шаг&nbsp; {createStep === "passport" ? "1" : "2"}/2
+          </span>
         </div>
       </header>
-      <div className="drawer-body create-drawer-body">
-        <section
-          className={`pi-board ${createStep === "passport" ? "is-passport-step" : ""}`}
-          aria-label="Предварительная заявка"
-        >
-          {createStep === "passport" ? (
-            <section
-              className={`pi-scan-section ${passportReady ? "has-passport" : ""}`}
-              aria-labelledby="passport-intake-title"
-            >
-              <div className="pi-create-view-panel">
-                <div className="pi-scan-toolbar" aria-label="Заявители в подаче">
-                  <div
-                    className={`pi-mode-tags ${
-                      type === "family" ? "has-add-person" : ""
-                    }`}
-                    aria-label="Тип подачи"
-                  >
-                    {submissionTypeOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        className={type === option.value ? "is-active" : ""}
-                        type="button"
-                        onClick={() => selectType(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                    {type === "family" ? (
-                      <>
-                        <span className="pi-family-count-pill" aria-live="polite">
-                          {applicantCount} чел.
-                        </span>
-                        <Button
-                          className="pi-add-person-button"
-                          variant="icon"
-                          type="button"
-                          aria-label={`Добавить заявителя в семью. Сейчас ${applicantCount}`}
-                          disabled={applicantCount >= maxFamilyApplicants}
-                          title={
-                            applicantCount >= maxFamilyApplicants
-                              ? "Максимум 6 заявителей"
-                              : "Добавить заявителя"
-                          }
-                          onClick={addFamilyMember}
-                        >
-                          +
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-                <PassportTargetList
-                  activeApplicantIndex={safeActiveApplicantIndex}
-                  applicantCount={applicantCount}
-                  highlightedApplicantIndex={highlightedApplicantIndex}
-                  passportUploads={passportUploads}
-                  type={type}
-                  onSelect={(index) => {
-                    setActiveApplicantIndex(index);
-                    setHighlightedApplicantIndex(null);
-                  }}
-                />
-                {type === "family" ? (
-                  <section
-                    className="pi-family-yes-no"
-                    aria-labelledby="pi-family-yes-no-title"
-                  >
-                    <div className="create-panel-head">
-                      <div>
-                        <p className="kicker">Семейные данные</p>
-                        <h3 id="pi-family-yes-no-title">Общие ответы</h3>
-                      </div>
-                      <span>
-                        {firstStepFamilyAnswerCount
-                          ? `${firstStepFamilyAnswerCount}/2`
-                          : "Нет"}
-                      </span>
-                    </div>
-                    {firstStepFamilyQuestions.map((question) => (
-                      <FamilyYesNoQuestion
-                        key={question.key}
-                        checked={preliminaryIntake[question.key]}
-                        label={question.label}
-                        onChecked={(checked) =>
-                          updatePreliminaryIntake(question.key, checked)
-                        }
-                      />
-                    ))}
-                  </section>
-                ) : null}
-              </div>
 
-              <div className="pi-scan-main">
-                <div className="pi-document-visual" aria-hidden="true">
-                  <svg viewBox="0 0 180 150" role="img">
-                    <path
-                      className="pi-visual-page"
-                      d="M52 26 H128 Q140 26 140 38 V112 Q140 124 128 124 H52 Q40 124 40 112 V38 Q40 26 52 26Z"
-                    />
-                    <path
-                      className="pi-visual-page-edge"
-                      d="M57 48 H116 M57 62 H102 M57 96 H123"
-                    />
-                    <path
-                      className="pi-visual-chip"
-                      d="M58 74 H84 Q90 74 90 80 V96 Q90 102 84 102 H58 Q52 102 52 96 V80 Q52 74 58 74Z"
-                    />
-                    <path className="pi-visual-scan" d="M35 72 H146" />
-                  </svg>
-                </div>
-                <p className="kicker">Паспортная точка входа</p>
-                <h3 id="passport-intake-title">Загрузите паспорт</h3>
-                <p>
-                  На этом шаге ничего не заполняется вручную. Выберите JPEG или PNG,
-                  а черновик анкеты соберется после обработки.
-                </p>
-                {passportFileError ? (
-                  <p className="form-error" role="alert">
-                    {passportFileError}
+      <div className="flex-1 overflow-y-auto p-6 lg:p-10">
+        <div className="max-w-[1140px] mx-auto h-full">
+          {createStep === "passport" ? (
+            <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-[20px] font-medium text-white/90 tracking-tight">
+                    Исходные файлы
+                  </h2>
+                  <p className="text-[13px] text-white/40 mt-2 leading-relaxed max-w-md font-light">
+                    Загрузите оригиналы документов заявителей. Модуль AI автоматически
+                    извлечет данные, классифицирует файлы и подготовит драфты анкет.
                   </p>
-                ) : null}
+                </div>
+
                 <input
                   ref={passportFileInputRef}
                   className="pi-file-input"
@@ -682,58 +584,151 @@ export function CreateSubmissionDrawer({
                     event.currentTarget.value = "";
                   }}
                 />
-                <div className="pi-empty-actions">
-                  <Button
-                    className={`pi-upload-button ${
-                      hasActiveUpload ? "" : "is-attention"
-                    }`}
-                    variant="primary"
+
+                <div
+                  className={`flex-1 min-h-[360px] rounded-[16px] transition-all duration-300 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden ${
+                    isDragging
+                      ? "border border-white/20 bg-[#161617] shadow-[0_0_40px_rgba(255,255,255,0.03)] scale-[1.01]"
+                      : "border border-[#202124] bg-[#121214] hover:border-white/10 hover:bg-[#141416]"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <div className="absolute inset-4 rounded-[12px] border border-dashed border-white/5 pointer-events-none" />
+                  <div className="w-14 h-14 rounded-full bg-[#18181b] border border-[#2a2a2e] flex items-center justify-center mb-5 shadow-inner relative z-10">
+                    <UploadCloud className="w-6 h-6 text-white/40" />
+                  </div>
+                  <h3
+                    id="passport-intake-title"
+                    className="text-[15px] font-medium text-white/80 mb-1.5 relative z-10"
+                  >
+                    Перетащите файлы
+                  </h3>
+                  <p className="text-[12px] text-white/30 max-w-[240px] mb-8 font-light relative z-10 leading-relaxed">
+                    PDF, JPG, PNG.
+                    <br />
+                    До 50 МБ каждый.
+                  </p>
+                  {passportFileError ? (
+                    <p className="mb-4 text-[12px] text-red-400 relative z-10" role="alert">
+                      {passportFileError}
+                    </p>
+                  ) : null}
+                  <button
+                    className="h-10 px-6 bg-white text-black hover:bg-white/90 font-medium text-[13px] rounded-[8px] transition-all relative z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
                     type="button"
-                    disabled={activeUploadReady}
-                    title={
-                      activeUploadReady
-                        ? "Паспорт уже распознан. Чтобы заменить, создайте новый черновик или выберите другого заявителя."
-                        : undefined
-                    }
                     onClick={() => passportFileInputRef.current?.click()}
                   >
-                    {uploadButtonLabel}
-                  </Button>
-                  <Button
-                    variant="secondary"
+                    Выбрать файлы
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col h-full max-h-[800px] lg:border-l border-[#202124] lg:pl-10">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-[13px] uppercase tracking-widest font-medium text-white/40">
+                    Очередь обработки
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-white/50">
+                    {passportUploads.length} ITEMS
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[#2a2a2e]">
+                  {passportUploads.length ? (
+                    passportUploads.map((upload) => {
+                      const visualStatus = passportUploadVisualStatus(upload);
+                      const isProcessing = visualStatus === "extracting";
+                      const isReady = visualStatus === "ready";
+                      return (
+                        <article
+                          key={upload.id}
+                          className="p-3.5 rounded-[12px] bg-[#141416] border border-[#202124] relative overflow-hidden group hover:border-[#2a2a2e] transition-colors"
+                        >
+                          {isProcessing ? (
+                            <div className="absolute bottom-0 left-0 h-[1px] bg-white/20 w-full animate-pulse" />
+                          ) : null}
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 shrink-0 rounded-[8px] bg-[#1a1a1d] border border-[#242529] flex items-center justify-center mt-0.5">
+                              {upload.file?.type.startsWith("image/") ? (
+                                <ImageIcon className="w-4 h-4 text-white/30" />
+                              ) : (
+                                <FileText className="w-4 h-4 text-white/30" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="text-[13.5px] font-medium text-white/80 truncate tracking-tight">
+                                  {upload.fileName}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[11px] font-mono text-white/30">
+                                  {formatFileSize(upload.file?.size)}
+                                </span>
+                                <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
+                                {isProcessing ? (
+                                  <span className="text-[11px] text-white/60 flex items-center gap-1.5 font-medium tracking-wide uppercase">
+                                    <ScanLine className="w-3 h-3 animate-pulse opacity-50" />
+                                    Processing
+                                  </span>
+                                ) : isReady ? (
+                                  <span className="text-[11px] text-white/40 flex items-center gap-1 font-medium tracking-wide uppercase">
+                                    <CheckCircle2 className="w-3 h-3 opacity-50" />
+                                    Done
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-white/40 tracking-wide uppercase">
+                                    Waiting
+                                  </span>
+                                )}
+                              </div>
+                              {upload.extractedFields.length ? (
+                                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                                  {upload.extractedFields.slice(0, 3).map((field) => (
+                                    <span
+                                      key={`${upload.id}-${field.key}`}
+                                      className="px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-[10px] text-white/50 font-medium"
+                                    >
+                                      {field.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })
+                  ) : (
+                    <div className="h-full min-h-[240px] flex flex-col items-center justify-center text-center px-4">
+                      <div className="w-10 h-10 rounded-full bg-[#161617] border border-[#202124] flex items-center justify-center mb-3">
+                        <Search className="w-4 h-4 text-white/20" />
+                      </div>
+                      <p className="text-[12px] text-white/30 font-light">
+                        Локальная очередь пуста.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-5 pt-5 border-t border-[#202124]">
+                  <button
+                    disabled={!passportReady}
+                    className={`w-full h-11 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
+                      passportReady
+                        ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                        : "bg-[#161617] text-white/20 cursor-not-allowed border border-[#202124]"
+                    }`}
                     type="button"
                     onClick={handlePrimaryAction}
                   >
-                    Дальше
-                  </Button>
+                    {passportReady ? "Сформировать пакет" : "Ожидание обработки"}
+                  </button>
                 </div>
               </div>
-
-              <div
-                className={`pi-extraction-status ${passportStatusClass}`}
-                aria-live="polite"
-              >
-                <span aria-hidden="true" />
-                <strong>{passportStatus.title}</strong>
-                <p>{passportStatus.label}</p>
-              </div>
-
-              {passportUploads.length ? (
-                <div className="pu-list" aria-label="Загруженные паспорта">
-                  <p>{`Выбрано локально: ${passportUploads.length} паспортов`}</p>
-                  {passportUploads.map((upload, index) => (
-                    <article key={upload.id}>
-                      <div>
-                        <strong>{applicantLabel(upload.applicantIndex, type)}</strong>
-                        <p>{upload.fileName}</p>
-                      </div>
-                      <span>Выбрано локально · загрузите после сохранения</span>
-                      {index === 0 ? <em>Основной</em> : null}
-                    </article>
-                  ))}
-                </div>
-              ) : null}
-            </section>
+            </div>
           ) : null}
 
           {createStep === "questionnaire" ? (
@@ -816,39 +811,40 @@ export function CreateSubmissionDrawer({
               </article>
             </section>
           ) : null}
-        </section>
+        </div>
       </div>
-      <footer
-        className={`drawer-footer create-drawer-footer ${
-          createStep === "passport" ? "is-passport-step" : ""
-        }`}
-      >
-        <span>
-          {createStep === "passport"
-            ? passportUploads.length
-              ? `Выбрано паспортов: ${passportUploads.length}`
-              : "Сначала загрузите паспорт"
-            : "Создайте черновик, чтобы загрузить фото и селфи в файлах"}
-        </span>
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={!passportReady}
-          onClick={() => onCreate(passportUploads, preliminaryIntake)}
-        >
-          Сохранить черновик
-        </button>
-        {createStep === "questionnaire" ? (
-          <button
-            className="primary-button"
-            type="button"
-            onClick={handlePrimaryAction}
-          >
-            Создать и открыть
-          </button>
-        ) : null}
-      </footer>
-    </div>
+
+      {createStep === "questionnaire" ? (
+        <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/90 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-[12px] text-white/40">
+            Создайте черновик, чтобы загрузить фото и селфи в файлах.
+          </span>
+          <div className="flex gap-3">
+            <button
+              className="h-10 px-4 rounded-[8px] bg-[#161617] border border-[#202124] text-white/60 hover:text-white hover:bg-[#1a1a1d] text-[13px] font-medium transition-colors"
+              type="button"
+              onClick={() => setCreateStep("passport")}
+            >
+              Назад
+            </button>
+            <button
+              className="h-10 px-5 rounded-[8px] bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium transition-colors"
+              type="button"
+              onClick={() => onCreate(passportUploads, preliminaryIntake)}
+            >
+              Сохранить черновик
+            </button>
+            <button
+              className="h-10 px-5 rounded-[8px] bg-white text-black hover:bg-white/90 text-[13px] font-medium transition-colors"
+              type="button"
+              onClick={handlePrimaryAction}
+            >
+              Создать и открыть
+            </button>
+          </div>
+        </footer>
+      ) : null}
+    </motion.div>
   );
 }
 
@@ -964,4 +960,10 @@ function applicantLabel(index: number, type: Submission["type"]) {
   if (type === "single") return "Заявитель";
   if (index === 0) return "Основной заявитель";
   return `Заявитель ${index + 1}`;
+}
+
+function formatFileSize(size = 0) {
+  if (size >= 1_000_000) return `${(size / 1_000_000).toFixed(1)} MB`;
+  if (size >= 1_000) return `${Math.round(size / 1_000)} KB`;
+  return `${size} B`;
 }

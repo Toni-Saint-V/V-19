@@ -1,5 +1,1140 @@
 @import "./shared/ui/tokens.css";
 
+.vf-figma-surface,
+.vf-figma-surface * {
+  box-sizing: border-box;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review) {
+  --v19-sidebar-width: 288px;
+  background: #101011;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .workspace {
+  background: #141416;
+  grid-template-rows: 64px minmax(0, 1fr);
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .topbar {
+  height: 64px;
+  min-height: 64px;
+  padding: 0 36px;
+  border-bottom-color: #202124;
+  background: #141416;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .topbar h1 {
+  color: #f3f3f5;
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar {
+  width: 288px;
+  padding: 16px 12px 12px;
+  border-right-color: #202124;
+  background: #161617;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-brand {
+  height: auto;
+  min-height: 54px;
+  padding: 0 4px 16px;
+  gap: 12px;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-brand-logo {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  color: #0a0a0b;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-brand-copy strong {
+  color: #f3f3f5;
+  font-size: 15px;
+  font-weight: 660;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-brand-copy em {
+  color: rgb(255 255 255 / 0.5);
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.25;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav {
+  gap: 2px;
+  margin-top: 24px;
+  padding: 0;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar-command {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 4px);
+  height: 40px;
+  margin: 0 2px;
+  padding: 0 12px;
+  border: 1px solid #242529;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.05);
+  color: rgb(255 255 255 / 0.5);
+  font-size: 14px;
+  text-align: left;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar-command
+  svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar-command
+  span {
+  flex: 1;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar-command
+  kbd {
+  padding: 3px 7px;
+  border: 1px solid #242529;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.4);
+  color: rgb(255 255 255 / 0.45);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav::before {
+  content: "Работа";
+  display: block;
+  padding: 0 12px 8px;
+  color: rgb(255 255 255 / 0.4);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav-item {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  color: rgb(255 255 255 / 0.7);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 560;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav-item.is-active {
+  color: #fff;
+  background: #27272b;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav-icon {
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+  background: transparent;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav-copy strong {
+  color: currentColor;
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav-count {
+  width: auto;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgb(255 255 255 / 0.05);
+  border-radius: 999px;
+  background: #18181b;
+  color: rgb(255 255 255 / 0.8);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar-footer {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-top-color: #202124;
+}
+
+.vf-figma-admin-zone.secondary-button {
+  width: 100%;
+  height: 40px;
+  justify-content: center;
+  gap: 10px;
+  border-color: #242529;
+  border-radius: 12px;
+  background: #1e1e21;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.vf-figma-admin-zone svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: rgb(255 255 255 / 0.55);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-session {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-session > span {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2a2a30, #1a1a20);
+  color: rgb(255 255 255 / 0.7);
+  font-size: 12px;
+}
+
+.vf-figma-topbar-actions {
+  gap: 10px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.vf-figma-topbar-actions .v19-topbar-cta.primary-button,
+.vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.vf-figma-topbar-actions .v19-topbar-cta.is-secondary {
+  height: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 560;
+}
+
+.vf-figma-topbar-actions .v19-topbar-cta.primary-button {
+  min-width: 154px;
+  background: #3a45b4;
+}
+
+.vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.vf-figma-topbar-actions .v19-topbar-cta.is-secondary {
+  min-width: 128px;
+  border-color: #242529;
+  background: #1e1e21;
+  color: #fff;
+}
+
+.vf-figma-screen {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 32px 36px;
+  color: #f3f3f5;
+  background: #141416;
+}
+
+.vf-figma-actions-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+}
+
+.vf-figma-actions-toolbar,
+.vf-figma-tools,
+.vf-figma-tabs,
+.vf-figma-view-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.vf-figma-actions-toolbar {
+  gap: 24px;
+  min-height: 48px;
+}
+
+.vf-figma-tabs {
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #202124;
+  border-radius: 11px;
+  background: #161617;
+}
+
+.vf-figma-tabs button {
+  min-height: 36px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1;
+}
+
+.vf-figma-tabs button.is-active {
+  border-color: #2e2f34;
+  background: #27272b;
+  color: #fff;
+}
+
+.vf-figma-tabs button span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  border-radius: 7px;
+  background: rgb(239 68 68 / 0.2);
+  color: #f87171;
+  font-size: 11px;
+}
+
+.vf-figma-tools {
+  gap: 10px;
+  margin-left: auto;
+}
+
+.vf-figma-search {
+  position: relative;
+  width: 260px;
+  height: 40px;
+}
+
+.vf-figma-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  color: rgb(255 255 255 / 0.4);
+  transform: translateY(-50%);
+}
+
+.vf-figma-search input {
+  width: 100%;
+  height: 100%;
+  padding: 0 12px 0 36px;
+  border: 1px solid #242529;
+  border-radius: 10px;
+  outline: none;
+  background: #1e1e21;
+  color: #fff;
+  font-size: 14px;
+}
+
+.vf-figma-icon-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid #242529;
+  border-radius: 10px;
+  background: #1e1e21;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.vf-figma-view-toggle {
+  gap: 4px;
+  height: 40px;
+  padding: 4px;
+  border: 1px solid #242529;
+  border-radius: 10px;
+  background: #1e1e21;
+}
+
+.vf-figma-view-toggle button {
+  padding: 0 10px;
+  border-radius: 7px;
+  color: rgb(255 255 255 / 0.48);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.vf-figma-view-toggle button.is-active {
+  background: #27272b;
+  color: #fff;
+}
+
+.vf-figma-action-list {
+  display: grid;
+  gap: 12px;
+}
+
+.vf-figma-section-rule {
+  display: grid;
+  grid-template-columns: minmax(60px, 1fr) auto minmax(60px, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.vf-figma-section-rule span {
+  height: 1px;
+  background: #202124;
+}
+
+.vf-figma-section-rule strong {
+  color: rgb(255 255 255 / 0.4);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.vf-figma-action-row {
+  display: grid;
+  grid-template-columns: 28px minmax(280px, 1fr) 190px 126px 150px 166px;
+  align-items: center;
+  gap: 14px;
+  min-height: 92px;
+  padding: 0 12px 0 24px;
+  border: 1px solid #242529;
+  border-radius: 15px;
+  background: linear-gradient(180deg, #161617, #0e0e10);
+  color: inherit;
+  text-align: left;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.026);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.vf-figma-action-row:hover {
+  border-color: #2e2f34;
+  background: linear-gradient(180deg, #1a1a1d, #0f0f11);
+}
+
+.vf-figma-action-row:active {
+  transform: scale(0.998);
+}
+
+.vf-figma-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgb(0 0 0 / 0.2);
+}
+
+.vf-figma-dot-warning {
+  background: #fb8c00;
+}
+
+.vf-figma-dot-blue {
+  background: #60a5fa;
+}
+
+.vf-figma-dot-indigo {
+  background: #8fa3ff;
+}
+
+.vf-figma-dot-green {
+  background: #10d39a;
+}
+
+.vf-figma-action-title,
+.vf-figma-action-meta,
+.vf-figma-action-dates {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.vf-figma-action-title strong,
+.vf-figma-action-meta strong,
+.vf-figma-action-dates strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 650;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-figma-action-title em,
+.vf-figma-action-meta em,
+.vf-figma-action-dates em {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.4);
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-figma-action-title span {
+  color: rgb(255 255 255 / 0.6);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.vf-figma-action-meta {
+  padding-left: 18px;
+  border-left: 1px solid #202124;
+}
+
+.vf-figma-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vf-figma-status.is-warning {
+  border: 1px solid rgb(249 115 22 / 0.2);
+  background: rgb(249 115 22 / 0.1);
+  color: #fb923c;
+}
+
+.vf-figma-status.is-blue {
+  border: 1px solid rgb(59 130 246 / 0.2);
+  background: rgb(59 130 246 / 0.1);
+  color: #60a5fa;
+}
+
+.vf-figma-status.is-indigo {
+  border: 1px solid rgb(58 69 180 / 0.3);
+  background: rgb(58 69 180 / 0.2);
+  color: #8fa3ff;
+}
+
+.vf-figma-status.is-green {
+  border: 1px solid rgb(16 211 154 / 0.2);
+  background: rgb(16 211 154 / 0.1);
+  color: #10d39a;
+}
+
+.vf-figma-open-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  width: 118px;
+  height: 40px;
+  border: 1px solid #242529;
+  border-radius: 10px;
+  background: #1e1e21;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1;
+}
+
+.vf-figma-column-board {
+  display: grid;
+  grid-auto-columns: minmax(280px, 1fr);
+  grid-auto-flow: column;
+  gap: 22px;
+  min-height: 0;
+  overflow-x: auto;
+  padding-bottom: 18px;
+}
+
+.vf-figma-column {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 280px;
+  max-width: 340px;
+}
+
+.vf-figma-column header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.vf-figma-column header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgb(255 255 255 / 0.6);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.vf-figma-column header i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgb(229 115 115 / 0.8);
+  box-shadow: 0 0 8px rgb(229 115 115 / 0.4);
+}
+
+.vf-figma-column header em {
+  display: grid;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #222225;
+  border-radius: 999px;
+  background: #151517;
+  color: rgb(255 255 255 / 0.4);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.vf-figma-column-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.vf-figma-column-card {
+  position: relative;
+  display: grid;
+  gap: 9px;
+  min-height: 126px;
+  overflow: hidden;
+  padding: 14px;
+  border: 1px solid #222225;
+  border-radius: 10px;
+  background: #151517;
+  color: inherit;
+  text-align: left;
+}
+
+.vf-figma-column-card:hover {
+  border-color: rgb(255 255 255 / 0.15);
+  background: #18181b;
+}
+
+.vf-figma-card-rail {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+}
+
+.vf-figma-card-rail.is-danger {
+  background: rgb(229 115 115 / 0.7);
+}
+
+.vf-figma-card-rail.is-warning {
+  background: rgb(255 183 77 / 0.7);
+}
+
+.vf-figma-column-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgb(255 255 255 / 0.4);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+.vf-figma-column-card-head em {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid rgb(255 255 255 / 0.05);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.05);
+  font-style: normal;
+}
+
+.vf-figma-column-card > strong {
+  color: rgb(255 255 255 / 0.9);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.vf-figma-column-subline,
+.vf-figma-column-footer,
+.vf-figma-column-footer span {
+  display: flex;
+  align-items: center;
+}
+
+.vf-figma-column-subline {
+  gap: 9px;
+  color: rgb(255 255 255 / 0.4);
+  font-size: 11.5px;
+}
+
+.vf-figma-column-subline i {
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.vf-figma-column-footer {
+  gap: 8px;
+  min-height: 26px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(255 255 255 / 0.05);
+}
+
+.vf-figma-column-footer span {
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.vf-figma-column-footer .is-danger {
+  color: rgb(229 115 115 / 0.9);
+}
+
+.vf-figma-column-footer .is-warning {
+  color: rgb(255 183 77 / 0.9);
+}
+
+.vf-figma-progress {
+  flex: 1;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.4);
+}
+
+.vf-figma-progress span {
+  display: block;
+  height: 100%;
+  background: rgb(255 255 255 / 0.3);
+}
+
+.vf-figma-column-footer em {
+  color: rgb(255 255 255 / 0.3);
+  font-style: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+}
+
+.vf-figma-applicants-screen {
+  display: grid;
+  align-content: start;
+  gap: 34px;
+  padding-top: 30px;
+}
+
+.vf-figma-applicants-section {
+  display: grid;
+  gap: 20px;
+}
+
+.vf-figma-applicants-section h2 {
+  margin: 0;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vf-figma-family-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  gap: 24px;
+  max-width: 1030px;
+}
+
+.vf-figma-family-card,
+.vf-figma-individual-card {
+  display: grid;
+  gap: 22px;
+  min-height: 350px;
+  padding: 32px;
+  border: 1px solid #242529;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #1a1a1d, #141416);
+  color: inherit;
+  text-align: left;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.02),
+    0 4px 20px rgb(0 0 0 / 0.2);
+}
+
+.vf-figma-family-card:hover,
+.vf-figma-individual-card:hover {
+  border-color: rgb(58 69 180 / 0.4);
+}
+
+.vf-figma-family-head {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.vf-figma-family-icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.05);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.05);
+  color: rgb(255 255 255 / 0.7);
+}
+
+.vf-figma-family-head strong,
+.vf-figma-individual-card strong {
+  display: block;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.vf-figma-family-head em {
+  display: block;
+  margin-top: 6px;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.vf-figma-member-list {
+  display: grid;
+  gap: 6px;
+}
+
+.vf-figma-member-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 86px 22px;
+  align-items: center;
+  gap: 14px;
+  min-height: 36px;
+  color: rgb(255 255 255 / 0.8);
+}
+
+.vf-figma-member-row em {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.05);
+  border-radius: 999px;
+  background: #202024;
+  color: rgb(255 255 255 / 0.6);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.vf-figma-member-row strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-figma-member-row small {
+  color: rgb(255 255 255 / 0.4);
+  font-size: 11px;
+}
+
+.vf-figma-member-ready {
+  color: #10d39a;
+}
+
+.vf-figma-member-issue {
+  color: #ff5c67;
+}
+
+.vf-figma-member-progress {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #60a5fa;
+  box-shadow: 0 0 0 4px #161617;
+}
+
+.vf-figma-family-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 22px;
+  border-top: 1px solid #242529;
+  color: rgb(255 255 255 / 0.4);
+  font-size: 12px;
+}
+
+.vf-figma-family-footer em {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border: 1px solid #242529;
+  border-radius: 8px;
+  background: #1e1e21;
+  color: rgb(255 255 255 / 0.5);
+  font-style: normal;
+  font-weight: 560;
+}
+
+.vf-figma-applicants-divider {
+  height: 1px;
+  background: #202124;
+}
+
+.vf-figma-individual-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 360px));
+  gap: 24px;
+}
+
+.vf-figma-individual-card {
+  min-height: 190px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.vf-figma-avatar {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2a2a30, #1a1a20);
+  color: rgb(255 255 255 / 0.7);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.vf-figma-individual-card > span:nth-child(2) em {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.vf-figma-individual-card .vf-figma-family-footer {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .vf-figma-action-row {
+    grid-template-columns: 24px minmax(220px, 1fr) 160px 140px;
+  }
+
+  .vf-figma-action-dates,
+  .vf-figma-action-status {
+    display: none;
+  }
+
+  .vf-figma-family-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .topbar {
+    padding: 0 18px;
+  }
+
+  .vf-figma-screen {
+    padding: 22px 18px 96px;
+  }
+
+  .vf-figma-actions-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vf-figma-tools {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .vf-figma-search {
+    flex: 1;
+    width: auto;
+  }
+
+  .vf-figma-action-row {
+    grid-template-columns: 16px minmax(0, 1fr);
+    min-height: 124px;
+    padding: 16px;
+  }
+
+  .vf-figma-action-meta,
+  .vf-figma-open-button {
+    grid-column: 2;
+  }
+
+  .vf-figma-action-meta {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .vf-figma-open-button {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .vf-figma-column-board {
+    grid-auto-columns: minmax(276px, 82vw);
+  }
+
+  .vf-figma-individual-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+  .vf-figma-topbar-actions .v19-topbar-cta.is-secondary {
+    display: none;
+  }
+
+  .vf-figma-tabs {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .vf-figma-tabs button {
+    padding: 0 14px;
+    white-space: nowrap;
+  }
+
+  .vf-figma-view-toggle {
+    display: none;
+  }
+
+  .vf-figma-family-card,
+  .vf-figma-individual-card {
+    padding: 22px;
+  }
+
+  .vf-figma-member-row {
+    grid-template-columns: 30px minmax(0, 1fr) 22px;
+  }
+
+  .vf-figma-member-row small {
+    display: none;
+  }
+}
+
+.vf-figma-surface {
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --tw-border-style: solid;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  line-height: 1.5;
+}
+
+.vf-figma-surface :where(.border) {
+  border-style: solid;
+}
+
+.vf-figma-surface :where(.border-0) {
+  border-style: none;
+}
+
+.vf-figma-surface :where(button) {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.vf-figma-surface :where(button:disabled) {
+  cursor: not-allowed;
+}
+
+@tailwind utilities;
+
+.scrollbar-hide {
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -9975,6 +11110,227 @@ p {
   .issue-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* Figma Make transfer layer: kept at EOF to beat the legacy submissions surface rules. */
+.ops-shell.surface-agent-actions,
+.ops-shell.surface-agent-submissions,
+.ops-shell.surface-admin-review {
+  --v19-sidebar-width: 288px;
+  grid-template-columns: var(--v19-sidebar-width) minmax(0, 1fr);
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #101011;
+}
+
+.ops-shell.surface-agent-actions .ops-sidebar,
+.ops-shell.surface-agent-submissions .ops-sidebar,
+.ops-shell.surface-admin-review .ops-sidebar {
+  width: 288px !important;
+  padding: 16px 12px 12px !important;
+  border-right: 1px solid #202124 !important;
+  background: #161617 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand,
+.ops-shell.surface-agent-submissions .ops-brand,
+.ops-shell.surface-admin-review .ops-brand {
+  min-height: 54px !important;
+  padding: 0 4px 16px !important;
+  gap: 12px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-logo,
+.ops-shell.surface-agent-submissions .ops-brand-logo,
+.ops-shell.surface-admin-review .ops-brand-logo {
+  display: grid !important;
+  width: 40px !important;
+  height: 40px !important;
+  place-items: center !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #0a0a0b !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-copy strong,
+.ops-shell.surface-agent-submissions .ops-brand-copy strong,
+.ops-shell.surface-admin-review .ops-brand-copy strong {
+  color: #f3f3f5 !important;
+  font-size: 15px !important;
+  font-weight: 660 !important;
+  line-height: 1.15 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-copy em,
+.ops-shell.surface-agent-submissions .ops-brand-copy em,
+.ops-shell.surface-admin-review .ops-brand-copy em {
+  color: rgb(255 255 255 / 0.5) !important;
+  font-size: 11px !important;
+  font-weight: 450 !important;
+}
+
+.ops-shell.surface-agent-actions .workspace,
+.ops-shell.surface-agent-submissions .workspace,
+.ops-shell.surface-admin-review .workspace {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: 64px minmax(0, 1fr) !important;
+  min-width: 0;
+  min-height: 0;
+  background: #141416 !important;
+}
+
+.ops-shell.surface-agent-actions .workspace > .topbar,
+.ops-shell.surface-agent-submissions .workspace > .topbar,
+.ops-shell.surface-admin-review .workspace > .topbar {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  padding: 0 36px !important;
+  border-bottom: 1px solid #202124 !important;
+  background: #141416 !important;
+}
+
+.ops-shell.surface-agent-actions .workspace > .vf-figma-screen,
+.ops-shell.surface-agent-submissions .workspace > .vf-figma-screen,
+.ops-shell.surface-admin-review .workspace > .vf-figma-screen {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  margin: 0 !important;
+}
+
+.ops-shell.surface-agent-actions .topbar-heading p,
+.ops-shell.surface-agent-submissions .topbar-heading p,
+.ops-shell.surface-admin-review .topbar-heading p {
+  display: none !important;
+}
+
+.ops-shell.surface-agent-actions .topbar h1,
+.ops-shell.surface-agent-submissions .topbar h1,
+.ops-shell.surface-admin-review .topbar h1 {
+  color: #f3f3f5 !important;
+  font-size: 21px !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-left: auto !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 18px !important;
+  border-radius: 10px !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  font-weight: 560 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta svg,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta svg,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.8 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta path,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta path,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta path {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta.primary-button,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta.primary-button,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta.primary-button {
+  min-width: 154px !important;
+  border-color: #4651c9 !important;
+  background: #3a45b4 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta.is-secondary,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta.is-secondary,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta.is-secondary {
+  min-width: 128px !important;
+  border-color: #242529 !important;
+  background: #1e1e21 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav-item[id],
+.ops-shell.surface-agent-submissions .ops-nav-item[id],
+.ops-shell.surface-admin-review .ops-nav-item[id] {
+  letter-spacing: 0 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav-item:has(.ops-nav-copy strong:first-child),
+.ops-shell.surface-agent-submissions .ops-nav-item:has(.ops-nav-copy strong:first-child),
+.ops-shell.surface-admin-review .ops-nav-item:has(.ops-nav-copy strong:first-child) {
+  min-height: 38px;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-tabs button,
+.ops-shell.surface-agent-submissions .vf-figma-tabs button,
+.ops-shell.surface-admin-review .vf-figma-tabs button,
+.ops-shell.surface-agent-actions .vf-figma-view-toggle button,
+.ops-shell.surface-admin-review .vf-figma-view-toggle button {
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-row,
+.ops-shell.surface-admin-review .vf-figma-action-row {
+  grid-template-columns:
+    24px minmax(210px, 1fr) minmax(132px, 160px) minmax(118px, 136px)
+    minmax(112px, 140px) minmax(116px, 128px) !important;
+  gap: 12px !important;
+  padding: 0 12px 0 20px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-meta,
+.ops-shell.surface-admin-review .vf-figma-action-meta {
+  padding-left: 14px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-open-button,
+.ops-shell.surface-admin-review .vf-figma-open-button {
+  width: 100% !important;
+  min-width: 0 !important;
 }
 
 @media (max-width: 1179px) {
