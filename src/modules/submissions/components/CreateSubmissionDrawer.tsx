@@ -9,7 +9,6 @@ import {
   Search,
   UploadCloud,
 } from "lucide-react";
-import { Button } from "../../../shared/ui/primitives";
 import { invokePassportExtraction } from "../passportExtractionService";
 import "./CreateSubmissionDrawer.css";
 import {
@@ -24,21 +23,6 @@ import {
 const maxFamilyApplicants = 6;
 
 type CreateSubmissionStep = "passport" | "questionnaire";
-
-const createSteps: Array<{
-  ariaLabel?: string;
-  id: CreateSubmissionStep;
-  label: string;
-  number: string;
-}> = [
-  {
-    ariaLabel: "Шаг 1: паспорт и семья",
-    id: "passport",
-    label: "Паспорт и семья",
-    number: "1",
-  },
-  { id: "questionnaire", label: "Анкета и файлы", number: "2" },
-];
 
 const submissionTypeOptions: Array<{ label: string; value: Submission["type"] }> = [
   { label: "Заявитель", value: "single" },
@@ -150,70 +134,11 @@ function passportUploadVisualStatus(
   return "selected";
 }
 
-function passportUploadStatusText(upload: PassportUploadDraft | undefined) {
-  const fullName = passportUploadFullName(upload);
-  if (fullName) return fullName;
-  if (!upload) return "Паспорт не загружен";
-  if (upload.status === "extracting") return "Распознаем MRZ";
-  if (upload.status === "unavailable" || upload.status === "failed") {
-    return "Не подтвержден как паспорт";
-  }
-
-  return upload.fileName;
-}
-
 function passportUploadFieldValue(
   upload: PassportUploadDraft | undefined,
   key: PassportExtractedFieldKey,
 ) {
   return upload?.extractedFields.find((field) => field.key === key)?.value.trim() ?? "";
-}
-
-function passportUploadsStatus(passportUploads: PassportUploadDraft[]) {
-  if (!passportUploads.length) {
-    return {
-      label: "Паспорт нужен для автозаполнения анкеты",
-      tone: "idle" as const,
-      title: "Ожидает файл",
-    };
-  }
-
-  if (passportUploads.some((upload) => upload.status === "extracting")) {
-    return {
-      label: "Распознаем данные паспорта. ФИО подставится в слот, если OCR увидит MRZ.",
-      tone: "processing" as const,
-      title: "Обработка",
-    };
-  }
-
-  const extractedCount = passportUploads.filter(isPassportUploadReady).length;
-
-  if (extractedCount) {
-    return {
-      label:
-        extractedCount === passportUploads.length
-          ? "ФИО подставлено из MRZ. Проверьте данные после создания черновика."
-          : `ФИО найдено: ${extractedCount}/${passportUploads.length}. Остальные паспорта требуют проверки.`,
-      tone: "success" as const,
-      title: "Готово",
-    };
-  }
-
-  return {
-    label:
-      "Файл не подтвержден как паспорт. Загрузите разворот загранпаспорта с MRZ.",
-    tone: "selected" as const,
-    title: "Не принято",
-  };
-}
-
-function passportStatusClassName(
-  tone: ReturnType<typeof passportUploadsStatus>["tone"],
-) {
-  if (tone === "success") return "is-success";
-  if (tone === "processing") return "is-processing";
-  if (tone === "selected") return "is-selected";
-  return "is-idle";
 }
 
 function e2ePassportNumber(fileName: string) {
@@ -265,7 +190,6 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
 }
 
 export function CreateSubmissionDrawer({
-  dirty,
   familyCount,
   focusCloseToken = 0,
   onClose,
@@ -299,9 +223,7 @@ export function CreateSubmissionDrawer({
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [passportFileError, setPassportFileError] = useState("");
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
-  const [highlightedApplicantIndex, setHighlightedApplicantIndex] = useState<
-    number | null
-  >(null);
+  const [, setHighlightedApplicantIndex] = useState<number | null>(null);
   const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
   const [isDragging, setIsDragging] = useState(false);
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
@@ -314,22 +236,15 @@ export function CreateSubmissionDrawer({
   const activeUpload = passportUploads.find(
     (upload) => upload.applicantIndex === safeActiveApplicantIndex,
   );
-  const firstStepFamilyAnswerCount = [
-    preliminaryIntake.sameHomeAddress,
-    preliminaryIntake.sameSpainStay,
-  ].filter(Boolean).length;
   const passportReady =
     passportUploads.length > 0 &&
     passportUploads.every(isPassportUploadReady);
-  const passportStatus = passportUploadsStatus(passportUploads);
-  const passportStatusClass = passportStatusClassName(passportStatus.tone);
-  const hasActiveUpload = Boolean(activeUpload);
-  const activeUploadReady = isPassportUploadReady(activeUpload);
-  const uploadButtonLabel = hasActiveUpload
-    ? `Заменить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`
-    : `Загрузить паспорт: ${applicantLabel(safeActiveApplicantIndex, type)}`;
+
   function selectType(nextType: Submission["type"]) {
     onType(nextType);
+    if (nextType === "family") {
+      onFamilyCount(Math.max(2, familyCount));
+    }
     setActiveApplicantIndex(0);
     setHighlightedApplicantIndex(null);
   }
@@ -339,6 +254,22 @@ export function CreateSubmissionDrawer({
     value: PreliminaryIntakeDraft[Key],
   ) {
     setPreliminaryIntake((current) => ({ ...current, [key]: value }));
+  }
+
+  function addFamilyMember() {
+    if (type !== "family") {
+      onType("family");
+      onFamilyCount(Math.max(2, familyCount));
+      setActiveApplicantIndex(1);
+      setHighlightedApplicantIndex(1);
+      return;
+    }
+
+    const nextCount = Math.min(maxFamilyApplicants, applicantCount + 1);
+    const nextIndex = nextCount - 1;
+    onFamilyCount(nextCount);
+    setActiveApplicantIndex(nextIndex);
+    setHighlightedApplicantIndex(nextIndex);
   }
 
   async function addPassportFiles(files: FileList | null) {
@@ -448,22 +379,6 @@ export function CreateSubmissionDrawer({
     );
   }
 
-  function addFamilyMember() {
-    if (type !== "family") {
-      onType("family");
-      onFamilyCount(Math.max(2, familyCount));
-      setActiveApplicantIndex(1);
-      setHighlightedApplicantIndex(1);
-      return;
-    }
-
-    const nextCount = Math.min(maxFamilyApplicants, applicantCount + 1);
-    const nextIndex = nextCount - 1;
-    onFamilyCount(nextCount);
-    setActiveApplicantIndex(nextIndex);
-    setHighlightedApplicantIndex(nextIndex);
-  }
-
   function showPassportNotReadyAlert() {
     window.alert(
       "Паспорт еще не подтвержден. Загрузите разворот загранпаспорта с MRZ и дождитесь зеленого статуса.",
@@ -570,6 +485,129 @@ export function CreateSubmissionDrawer({
                   </p>
                 </div>
 
+                <section
+                  className="rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
+                  aria-label="Тип подачи"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-medium">
+                        Заявитель / Семья
+                      </p>
+                      <h3 className="text-[13px] text-white/80 font-medium mt-1">
+                        Структура подачи
+                      </h3>
+                    </div>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-white/50">
+                      {applicantCount} чел.
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {submissionTypeOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        className={`h-10 rounded-[8px] border text-[13px] font-medium transition-colors ${
+                          type === option.value
+                            ? "border-white/18 bg-white/10 text-white"
+                            : "border-[#242529] bg-[#161617] text-white/45 hover:text-white/75 hover:border-white/12"
+                        }`}
+                        type="button"
+                        aria-pressed={type === option.value}
+                        onClick={() => selectType(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                {type === "family" ? (
+                  <section
+                    className="lg:hidden rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
+                    aria-label="Заявители семьи и общие ответы"
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-medium">
+                          Семья
+                        </p>
+                        <h3 className="text-[13px] text-white/80 font-medium mt-1">
+                          Заявители и общие ответы
+                        </h3>
+                      </div>
+                      <button
+                        className="h-8 px-3 rounded-[7px] border border-[#242529] bg-[#161617] text-[12px] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        type="button"
+                        disabled={applicantCount >= maxFamilyApplicants}
+                        onClick={addFamilyMember}
+                      >
+                        + заявитель
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
+                      {Array.from({ length: applicantCount }, (_, index) => {
+                        const upload = passportUploads.find(
+                          (candidate) => candidate.applicantIndex === index,
+                        );
+
+                        return (
+                          <button
+                            key={index}
+                            className={`rounded-[10px] border px-3 py-2 text-left transition-colors ${
+                              safeActiveApplicantIndex === index
+                                ? "border-white/16 bg-white/8"
+                                : "border-[#202124] bg-[#151517] hover:border-white/10"
+                            }`}
+                            type="button"
+                            aria-pressed={safeActiveApplicantIndex === index}
+                            onClick={() => setActiveApplicantIndex(index)}
+                          >
+                            <strong className="block truncate text-[13px] text-white/78 font-medium">
+                              {applicantLabel(index, type)}
+                            </strong>
+                            <em className="block truncate text-[11px] not-italic text-white/35 mt-0.5">
+                              {upload?.fileName ?? "Паспорт не загружен"}
+                            </em>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 grid gap-2 border-t border-[#202124] pt-3">
+                      {firstStepFamilyQuestions.map((question) => (
+                        <div
+                          key={question.key}
+                          className="grid gap-2 rounded-[10px] bg-[#151517] px-3 py-2"
+                        >
+                          <span className="text-[12px] leading-snug text-white/58">
+                            {question.label}
+                          </span>
+                          <span className="grid grid-cols-2 rounded-[7px] border border-[#242529] bg-[#101012] p-0.5">
+                            {[true, false].map((value) => (
+                              <button
+                                key={String(value)}
+                                className={`h-8 rounded-[6px] px-2 text-[12px] font-medium transition-colors ${
+                                  preliminaryIntake[question.key] === value
+                                    ? "bg-white/12 text-white"
+                                    : "text-white/38 hover:text-white/75"
+                                }`}
+                                type="button"
+                                aria-pressed={preliminaryIntake[question.key] === value}
+                                onClick={() =>
+                                  updatePreliminaryIntake(question.key, value)
+                                }
+                              >
+                                {value ? "Да" : "Нет"}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
                 <input
                   ref={passportFileInputRef}
                   className="pi-file-input"
@@ -626,6 +664,106 @@ export function CreateSubmissionDrawer({
               </div>
 
               <div className="flex flex-col h-full max-h-[800px] lg:border-l border-[#202124] lg:pl-10">
+                <section
+                  className="mb-5 rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
+                  aria-label="Заявители и общие семейные ответы"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-medium">
+                        {type === "family" ? "Семья" : "Заявитель"}
+                      </p>
+                      <h3 className="text-[13px] text-white/80 font-medium mt-1">
+                        {type === "family" ? "Заявители в семье" : "Один заявитель"}
+                      </h3>
+                    </div>
+                    <button
+                      className="h-8 px-3 rounded-[7px] border border-[#242529] bg-[#161617] text-[12px] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      type="button"
+                      disabled={applicantCount >= maxFamilyApplicants}
+                      onClick={addFamilyMember}
+                    >
+                      + заявитель
+                    </button>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {Array.from({ length: applicantCount }, (_, index) => {
+                      const upload = passportUploads.find(
+                        (candidate) => candidate.applicantIndex === index,
+                      );
+                      const visualStatus = passportUploadVisualStatus(upload);
+
+                      return (
+                        <button
+                          key={index}
+                          className={`flex items-center justify-between gap-3 rounded-[10px] border px-3 py-2 text-left transition-colors ${
+                            safeActiveApplicantIndex === index
+                              ? "border-white/16 bg-white/8"
+                              : "border-[#202124] bg-[#151517] hover:border-white/10"
+                          }`}
+                          type="button"
+                          aria-pressed={safeActiveApplicantIndex === index}
+                          onClick={() => setActiveApplicantIndex(index)}
+                        >
+                          <span className="min-w-0">
+                            <strong className="block truncate text-[13px] text-white/78 font-medium">
+                              {applicantLabel(index, type)}
+                            </strong>
+                            <em className="block truncate text-[11px] not-italic text-white/35 mt-0.5">
+                              {upload?.fileName ?? "Паспорт не загружен"}
+                            </em>
+                          </span>
+                          <i
+                            className={`h-2 w-2 rounded-full ${
+                              visualStatus === "ready"
+                                ? "bg-emerald-400"
+                                : visualStatus === "extracting"
+                                  ? "bg-amber-400"
+                                  : "bg-white/18"
+                            }`}
+                            aria-hidden="true"
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {type === "family" ? (
+                    <div className="mt-4 grid gap-2 border-t border-[#202124] pt-3">
+                      {firstStepFamilyQuestions.map((question) => (
+                        <div
+                          key={question.key}
+                          className="flex items-center justify-between gap-3 rounded-[10px] bg-[#151517] px-3 py-2"
+                        >
+                          <span className="text-[12px] leading-snug text-white/58">
+                            {question.label}
+                          </span>
+                          <span className="flex shrink-0 rounded-[7px] border border-[#242529] bg-[#101012] p-0.5">
+                            {[true, false].map((value) => (
+                              <button
+                                key={String(value)}
+                                className={`h-7 min-w-10 rounded-[6px] px-2 text-[12px] font-medium transition-colors ${
+                                  preliminaryIntake[question.key] === value
+                                    ? "bg-white/12 text-white"
+                                    : "text-white/38 hover:text-white/75"
+                                }`}
+                                type="button"
+                                aria-pressed={preliminaryIntake[question.key] === value}
+                                onClick={() =>
+                                  updatePreliminaryIntake(question.key, value)
+                                }
+                              >
+                                {value ? "Да" : "Нет"}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="text-[13px] uppercase tracking-widest font-medium text-white/40">
                     Очередь обработки
@@ -719,20 +857,6 @@ export function CreateSubmissionDrawer({
                   )}
                 </div>
 
-                <div className="mt-5 pt-5 border-t border-[#202124]">
-                  <button
-                    disabled={!passportReady}
-                    className={`w-full h-11 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
-                      passportReady
-                        ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                        : "bg-[#161617] text-white/20 cursor-not-allowed border border-[#202124]"
-                    }`}
-                    type="button"
-                    onClick={handlePrimaryAction}
-                  >
-                    {passportReady ? "Сформировать пакет" : "Ожидание обработки"}
-                  </button>
-                </div>
               </div>
             </div>
           ) : null}
@@ -820,6 +944,28 @@ export function CreateSubmissionDrawer({
         </div>
       </div>
 
+      {createStep === "passport" ? (
+        <footer className="shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-[12px] text-white/40">
+            {type === "family"
+              ? `${applicantCount} заявителя в семейной подаче. Дальше доступно после подтверждения паспортов.`
+              : "Дальше доступно после подтверждения паспорта."}
+          </span>
+          <button
+            disabled={!passportReady}
+            className={`h-11 px-6 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
+              passportReady
+                ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                : "bg-[#161617] text-white/25 cursor-not-allowed border border-[#202124]"
+            }`}
+            type="button"
+            onClick={handlePrimaryAction}
+          >
+            {passportReady ? "Дальше" : "Дальше"}
+          </button>
+        </footer>
+      ) : null}
+
       {createStep === "questionnaire" ? (
         <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/90 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span className="text-[12px] text-white/40">
@@ -870,95 +1016,6 @@ function mergePassportUploads(
   return mergedUploads.sort(
     (first: PassportUploadDraft, second: PassportUploadDraft) =>
       first.applicantIndex - second.applicantIndex,
-  );
-}
-
-function PassportTargetList({
-  activeApplicantIndex,
-  applicantCount,
-  highlightedApplicantIndex,
-  passportUploads,
-  type,
-  onSelect,
-}: {
-  activeApplicantIndex: number;
-  applicantCount: number;
-  highlightedApplicantIndex: number | null;
-  passportUploads: PassportUploadDraft[];
-  type: Submission["type"];
-  onSelect: (index: number) => void;
-}) {
-  return (
-    <div className="pi-passport-targets" aria-label="Кому загружается паспорт">
-      <p className="kicker">Паспорта</p>
-      <div>
-        {Array.from({ length: applicantCount }, (_, index) => {
-          const upload = passportUploads.find(
-            (candidate) => candidate.applicantIndex === index,
-          );
-          const status = passportUploadVisualStatus(upload);
-          const isActive = index === activeApplicantIndex;
-          const isHighlighted = index === highlightedApplicantIndex;
-
-          return (
-            <button
-              key={index}
-              className={[
-                "pi-passport-target",
-                `is-${status}`,
-                isActive ? "is-active" : "",
-                isHighlighted ? "is-highlighted" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              type="button"
-              aria-pressed={isActive}
-              onClick={() => onSelect(index)}
-            >
-              <span>
-                <strong>{applicantLabel(index, type)}</strong>
-                <em>{passportUploadStatusText(upload)}</em>
-              </span>
-              <i aria-hidden="true" />
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function FamilyYesNoQuestion({
-  checked,
-  label,
-  onChecked,
-}: {
-  checked: boolean;
-  label: string;
-  onChecked: (checked: boolean) => void;
-}) {
-  return (
-    <div className="fyn-question">
-      <span>{label}</span>
-      <div role="group" aria-label={label}>
-        <button
-          className={checked ? "is-active" : ""}
-          type="button"
-          aria-pressed={checked}
-          onClick={() => onChecked(true)}
-        >
-          Да
-        </button>
-        <button
-          className={!checked ? "is-active" : ""}
-          type="button"
-          aria-pressed={!checked}
-          onClick={() => onChecked(false)}
-        >
-          Нет
-        </button>
-      </div>
-    </div>
   );
 }
 

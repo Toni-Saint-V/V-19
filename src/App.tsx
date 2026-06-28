@@ -17,7 +17,6 @@ import {
   runAiReview,
 } from "./modules/submissions/aiSuggestions";
 import {
-  adminInboxEvents,
   agentActionQueue,
   searchAgentActions,
 } from "./modules/submissions/agentActions";
@@ -69,7 +68,7 @@ import {
   type SubmissionActionErrorState,
 } from "./modules/submissions/submissionActionErrors";
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
-import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
+import { defaultDrawerTab } from "./modules/submissions/status";
 import {
   applySafePassportExtractionFields,
   applyPassportExtractionField,
@@ -101,10 +100,8 @@ import { FigmaQuestionnaireScreen } from "./modules/submissions/components/Figma
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
-  AdminReviewScreen,
   AgentActionsScreen,
   AgentInboxScreen,
-  AgentSubmissionsScreen,
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
@@ -545,10 +542,6 @@ function MainApp() {
     () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
     [cityFilter, query, submissions],
   );
-  const searchedAdminInboxEvents = useMemo(
-    () => adminInboxEvents(searchedReviewQueue),
-    [searchedReviewQueue],
-  );
   const adminWorkSubmissionCount = useMemo(
     () =>
       searchedReviewQueue.filter(
@@ -567,14 +560,6 @@ function MainApp() {
       ? searchedReviewQueue.filter(matchesReviewTab(reviewFilterTab))
       : [],
   );
-  const visibleAgentSubmission =
-    agentList.find((submission) => submission.id === selectedSubmissionId) ??
-    agentList[0] ??
-    null;
-  const visibleReviewSubmission =
-    reviewList.find((submission) => submission.id === selectedSubmissionId) ??
-    reviewList[0] ??
-    null;
   const searchedExportSubmissions = useMemo(
     () => searchSubmissions(submissions, query, cityFilter),
     [cityFilter, query, submissions],
@@ -1047,12 +1032,6 @@ function MainApp() {
     });
   }
 
-  function showSettingsSurface() {
-    setSurface("settings");
-    setDrawerMode("closed");
-    setAgentQuestionnaireOpen(false);
-  }
-
   function openCreateSubmissionDrawer() {
     rememberReturnFocus();
     setDrawerMode("create");
@@ -1102,23 +1081,6 @@ function MainApp() {
     setActiveDrawerTab("questionnaire");
     setDrawerMode("closed");
     setAgentQuestionnaireOpen(true);
-  }
-
-  function openNextAdminWorkSubmission() {
-    const nextSubmission = reviewList[0] ?? searchedReviewQueue[0];
-    if (!nextSubmission) return;
-
-    openSubmission(
-      nextSubmission,
-      reviewTabForAdminWork(reviewTab) ? "overview" : defaultDrawerTab(nextSubmission),
-    );
-  }
-
-  function selectSubmission(submission: Submission) {
-    setSubmissionActionError(null);
-    setSelectedSubmissionId(submission.id);
-    setActiveDrawerTab(defaultDrawerTab(submission));
-    setDrawerInitialTarget(null);
   }
 
   const closeDrawer = useCallback(() => {
@@ -1284,21 +1246,6 @@ function MainApp() {
       localFile?.size ?? "",
       localFile?.lastModified ?? "",
     ].join("|");
-  }
-
-  function openIssueComposer(submission: Submission) {
-    if (!canAddAdminIssue(submission, "admin")) {
-      openSubmission(submission, "issues");
-      return;
-    }
-    rememberReturnFocus();
-    setSelectedSubmissionId(submission.id);
-    setActiveDrawerTab("issues");
-    setDrawerMode("detail");
-    setIssueComposerRequest((current) => ({
-      submissionId: submission.id,
-      token: (current?.token ?? 0) + 1,
-    }));
   }
 
   function addAdminIssue(input: IssueInput) {
@@ -2412,14 +2359,6 @@ function MainApp() {
       onChange={setQuery}
     />
   );
-  const adminReviewSearchControl = (
-    <SearchBar
-      label="Поиск в текущем списке"
-      placeholder="Поиск по имени или ID"
-      value={query}
-      onChange={setQuery}
-    />
-  );
   const cityFilterControl = (
     <CityFilterMenu options={cities} value={cityFilter} onChange={setCityFilter} />
   );
@@ -2435,14 +2374,6 @@ function MainApp() {
     <SearchBar
       label="Поиск по действиям"
       placeholder="Поиск"
-      value={query}
-      onChange={setQuery}
-    />
-  );
-  const agentSubmissionsSearchControl = (
-    <SearchBar
-      label="Поиск по подачам"
-      placeholder="Поиск по подачам"
       value={query}
       onChange={setQuery}
     />
