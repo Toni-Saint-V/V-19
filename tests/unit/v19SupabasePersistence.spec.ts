@@ -6,6 +6,7 @@ import type { Json } from "../../src/lib/supabase/database.types";
 
 const mockState = vi.hoisted(() => ({
   applicantRows: [] as unknown[],
+  exportBatchRows: [] as unknown[],
   fromCalls: [] as string[],
   questionnaireRows: [] as unknown[],
   rpcCalls: [] as Array<{
@@ -31,6 +32,17 @@ vi.mock("../../src/lib/supabase/client", () => {
       in: (column: string, values: unknown[]) =>
         Promise.resolve({
           data: rows.filter((row) => values.includes(fieldValue(row, column))),
+          error: null,
+        }),
+      overlaps: (column: string, values: unknown[]) =>
+        Promise.resolve({
+          data: rows.filter((row) => {
+            const rowValue = fieldValue(row, column);
+            return (
+              Array.isArray(rowValue) &&
+              rowValue.some((value) => values.includes(value))
+            );
+          }),
           error: null,
         }),
       limit() {
@@ -59,7 +71,9 @@ vi.mock("../../src/lib/supabase/client", () => {
                 ? mockState.submissionRows
                 : table === "applicants"
                   ? mockState.applicantRows
-                  : mockState.questionnaireRows,
+                  : table === "questionnaire_answers"
+                    ? mockState.questionnaireRows
+                    : mockState.exportBatchRows,
             ),
         };
       },
@@ -72,6 +86,10 @@ vi.mock("../../src/lib/supabase/client", () => {
 });
 
 import {
+  buildExportPackageIdentity,
+  exportSummaryForSelectedIds,
+} from "../../src/modules/submissions/exportRules";
+import {
   changedCockpitSubmissions,
   cockpitSnapshotKey,
   cockpitSnapshotStatus,
@@ -79,6 +97,7 @@ import {
   cockpitSubmissionFingerprintMap,
   loadCockpitSubmissionsForProfile,
   readCockpitSnapshot,
+  reviewHandoffPersistenceIssues,
   saveCockpitSubmissionsForProfile,
   toCockpitDraftPersistencePayload,
   toCockpitQuestionnaireAnswerInserts,
@@ -126,6 +145,7 @@ function draftPayload(submission: Submission) {
 
 beforeEach(() => {
   mockState.applicantRows = [];
+  mockState.exportBatchRows = [];
   mockState.fromCalls = [];
   mockState.questionnaireRows = [];
   mockState.rpcCalls = [];
@@ -170,6 +190,25 @@ describe("V-19 Supabase cockpit persistence", () => {
       agent_id: agentProfile.id,
       id: changedSubmission.id,
       title: changedSubmission.title,
+    });
+  });
+
+  it("writes separate trip date range columns while keeping legacy travel_date", () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      tripDateFrom: "2026-08-11",
+      tripDateTo: "2026-08-20",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    expect(payload.submission).toMatchObject({
+      travel_date: "2026-08-11 - 2026-08-20",
+      trip_date_from: "2026-08-11",
+      trip_date_to: "2026-08-20",
     });
   });
 
@@ -261,10 +300,34 @@ describe("V-19 Supabase cockpit persistence", () => {
     ) as Submission;
     const correctedSubmission: Submission = {
       ...returnedSubmission,
+      updatedAt: "сейчас",
       status: "corrections_received",
       issues: returnedSubmission.issues.map((issue) =>
         issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
       ),
+      files: returnedSubmission.files.map((file) =>
+        file.linkedIssueId
+          ? {
+              ...file,
+              reviewStatus: "accepted",
+              status: "accepted",
+              storageBucket: "visa-documents",
+              storagePath: `submissions/${returnedSubmission.id}/${file.id}`,
+              uploadedAtIso: "2026-06-27T10:00:00.000Z",
+            }
+          : file,
+      ),
+      history: [
+        {
+          id: "и-corrections-handoff",
+          text: "Агент отправил исправления",
+          at: "сейчас",
+          fromStatus: "returned",
+          source: "agent",
+          toStatus: "corrections_received",
+        },
+        ...returnedSubmission.history,
+      ],
     };
 
     await saveCockpitSubmissionsForProfile(
@@ -280,8 +343,200 @@ describe("V-19 Supabase cockpit persistence", () => {
           ?.args.payload as {
           submission: { status: string };
         }
-      ).submission.status,
+    ).submission.status,
     ).toBe("waiting_review");
+  });
+
+  it("fails closed before RPC when fixed issues do not resolve their targets", async () => {
+    const returnedSubmission = initialSubmissions.find(
+      (submission) => submission.status === "returned",
+    ) as Submission;
+    const invalidCorrections: Submission = {
+      ...returnedSubmission,
+      updatedAt: "сейчас",
+      status: "corrections_received",
+      issues: returnedSubmission.issues.map((issue) =>
+        issue.status === "open" ? { ...issue, status: "fixed_by_agent" } : issue,
+      ),
+      history: [
+        {
+          id: "и-corrections-invalid-target",
+          text: "Агент отправил исправления",
+          at: "сейчас",
+          fromStatus: "returned",
+          source: "agent",
+          toStatus: "corrections_received",
+        },
+        ...returnedSubmission.history,
+      ],
+    };
+
+    expect(reviewHandoffPersistenceIssues(invalidCorrections)).toContain(
+      "corrections_received fixed issues must resolve their targets",
+    );
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        agentProfile,
+        [invalidCorrections],
+        new Map(),
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        safeCode: "rpc.submit_corrections_handoff:save:HANDOFF_CONSISTENCY",
+      },
+    });
+    expect(rpcNames()).toEqual([]);
+  });
+
+  it("persists admin return handoff history as a matching status row", async () => {
+    const submitted = initialSubmissions.find(
+      (submission) => submission.status === "submitted_for_review",
+    ) as Submission;
+    const applicant = submitted.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const returned: Submission = {
+      ...submitted,
+      status: "returned",
+      updatedAt: "сейчас",
+      issues: [
+        {
+          id: "зм-return-contract",
+          type: "field",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Маршрут поездки",
+            section: "Анкета",
+          },
+          reason: "Маршрут не конкретен",
+          comment: "Нужно уточнить маршрут.",
+          severity: "blocker",
+          status: "open",
+          createdBy: "admin",
+          createdAt: "сейчас",
+        },
+      ],
+      history: [
+        {
+          id: "и-return-contract",
+          text: "Администратор вернул подачу с замечаниями",
+          at: "сейчас",
+          fromStatus: "submitted_for_review",
+          source: "admin",
+          toStatus: "returned",
+        },
+        ...submitted.history,
+      ],
+    };
+
+    await saveCockpitSubmissionsForProfile(
+      adminProfile,
+      [returned],
+      new Map([[returned.id, returned.agentId]]),
+    );
+
+    expect(rpcNames()).toEqual(["save_submission_draft"]);
+    expect(
+      (
+        mockState.rpcCalls[0]?.args.payload as {
+          status_history: Array<{ from_status: string | null; to_status: string }>;
+        }
+      ).status_history[0],
+    ).toMatchObject({
+      from_status: "submitted_for_review",
+      to_status: "returned",
+    });
+  });
+
+  it("fails closed before RPC when a current return omits typed handoff history", async () => {
+    const submitted = initialSubmissions.find(
+      (submission) => submission.status === "submitted_for_review",
+    ) as Submission;
+    const applicant = submitted.applicants[0];
+    if (!applicant) throw new Error("Missing applicant");
+    const invalidReturned: Submission = {
+      ...submitted,
+      status: "returned",
+      updatedAt: "сейчас",
+      issues: [
+        {
+          id: "зм-missing-handoff-history",
+          type: "field",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Маршрут поездки",
+            section: "Анкета",
+          },
+          reason: "Маршрут не конкретен",
+          comment: "Нужно уточнить маршрут.",
+          severity: "blocker",
+          status: "open",
+          createdBy: "admin",
+          createdAt: "сейчас",
+        },
+      ],
+      history: submitted.history,
+    };
+
+    expect(reviewHandoffPersistenceIssues(invalidReturned)).toContain(
+      "returned requires matching admin history",
+    );
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        adminProfile,
+        [invalidReturned],
+        new Map([[invalidReturned.id, invalidReturned.agentId]]),
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        safeCode: "rpc.save_submission_draft:save:HANDOFF_CONSISTENCY",
+      },
+    });
+    expect(rpcNames()).toEqual([]);
+  });
+
+  it("fails closed before RPC when acceptance keeps fixed issues unresolved", async () => {
+    const corrections = initialSubmissions.find(
+      (submission) => submission.status === "corrections_received",
+    ) as Submission;
+    const invalidAccepted: Submission = {
+      ...corrections,
+      status: "ready_for_export",
+      exportState: "ready",
+      updatedAt: "сейчас",
+      issues: corrections.issues.map((issue) => ({
+        ...issue,
+        status: "fixed_by_agent",
+      })),
+      history: [
+        {
+          id: "и-accept-with-unresolved",
+          text: "Администратор закрыл исправления и принял подачу",
+          at: "сейчас",
+          fromStatus: "corrections_received",
+          source: "admin",
+          toStatus: "ready_for_export",
+        },
+        ...corrections.history,
+      ],
+    };
+
+    expect(reviewHandoffPersistenceIssues(invalidAccepted)).toContain(
+      "ready_for_export cannot persist unresolved issues",
+    );
+    await expect(
+      saveCockpitSubmissionsForProfile(
+        adminProfile,
+        [invalidAccepted],
+        new Map([[invalidAccepted.id, invalidAccepted.agentId]]),
+      ),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        safeCode: "rpc.save_submission_draft:save:HANDOFF_CONSISTENCY",
+      },
+    });
+    expect(rpcNames()).toEqual([]);
   });
 
   it("keeps normalized applicant projection out of the cockpit payload and snapshot", async () => {
@@ -376,6 +631,96 @@ describe("V-19 Supabase cockpit persistence", () => {
       id: sourceAnswer.field_id,
       label: sourceAnswer.label,
       value: sourceAnswer.value,
+    });
+  });
+
+  it("hydrates normalized trip date range without relying on cockpit snapshot", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        travel_date: "legacy collapsed date",
+        trip_date_from: "2026-08-11",
+        trip_date_to: "2026-08-20",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.applicantRows = [
+      {
+        id: submission.applicants[0]?.id,
+        submission_id: submission.id,
+        full_name: submission.applicants[0]?.fullName,
+        questionnaire_percent: 100,
+        media_percent: 100,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      tripDateFrom: "2026-08-11",
+      tripDateTo: "2026-08-20",
+    });
+  });
+
+  it("keeps backward-compatible trip date fallback for legacy rows", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        travel_date: "2026-08-11",
+        trip_date_from: null,
+        trip_date_to: null,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      tripDateFrom: "2026-08-11",
+      tripDateTo: "2026-08-11",
+    });
+  });
+
+  it("splits legacy travel_date ranges when trip date columns are absent", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        travel_date: "2026-08-11 - 2026-08-20",
+        trip_date_from: null,
+        trip_date_to: null,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      tripDateFrom: "2026-08-11",
+      tripDateTo: "2026-08-20",
     });
   });
 
@@ -747,6 +1092,366 @@ describe("V-19 Supabase cockpit persistence", () => {
       submission_id: "ПД-1052",
       type: "passport_scan",
       upload_status: "uploaded",
+    });
+  });
+
+  it("keeps durable export batch metadata on the admin-only read path", async () => {
+    const submission = initialSubmissions.find(
+      (item) => item.id === "ПД-1056",
+    ) as Submission;
+    const identity = buildExportPackageIdentity([submission], "xlsx");
+    if (!identity) throw new Error("Expected export package identity");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        status: "ready_for_excel",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000905",
+        content_fingerprint: identity.contentFingerprint,
+        created_at: "2026-06-16T09:30:00.000Z",
+        file_name: identity.fileName,
+        format: "xlsx",
+        idempotency_key: identity.idempotencyKey,
+        row_count: identity.rowCount,
+        submission_ids: identity.submissionIds,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+    const plan = exportSummaryForSelectedIds(loaded.submissions, [submission.id]);
+
+    expect(mockState.fromCalls).toEqual([
+      "submissions",
+      "applicants",
+      "questionnaire_answers",
+      "export_batches",
+    ]);
+    expect(loaded.submissions[0]).toMatchObject({
+      id: submission.id,
+      exportPackage: identity,
+      exportState: "file_generated",
+      status: "ready_for_export",
+    });
+    expect(plan).toMatchObject({
+      canDownload: true,
+      downloadPackageIdentity: identity,
+      exportState: "file_generated",
+      ready: true,
+    });
+  });
+
+  it("does not expose durable export batch membership during agent load", async () => {
+    const submission = initialSubmissions.find(
+      (item) => item.id === "ПД-1056",
+    ) as Submission;
+    const identity = buildExportPackageIdentity([submission], "xlsx");
+    if (!identity) throw new Error("Expected export package identity");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        status: "ready_for_excel",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000908",
+        content_fingerprint: identity.contentFingerprint,
+        created_at: "2026-06-16T09:30:00.000Z",
+        file_name: identity.fileName,
+        format: "xlsx",
+        idempotency_key: identity.idempotencyKey,
+        row_count: identity.rowCount,
+        submission_ids: [...identity.submissionIds, "OTHER-AGENT-SUBMISSION"],
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(mockState.fromCalls).toEqual([
+      "submissions",
+      "applicants",
+      "questionnaire_answers",
+    ]);
+    expect(loaded.submissions[0]).toMatchObject({
+      exportPackage: undefined,
+      exportState: "ready",
+      status: "ready_for_export",
+    });
+  });
+
+  it("rehydrates the latest durable xlsx export package identity after admin reload", async () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-EXPORT-RELOAD",
+      exportPackage: undefined,
+      exportState: "ready",
+      status: "ready_for_export",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        status: "ready_for_excel",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000902",
+        content_fingerprint: "older-fingerprint",
+        created_at: "2026-06-16T08:00:00.000Z",
+        file_name: "visaflow-export-older.xlsx",
+        format: "xlsx",
+        idempotency_key: "older-key",
+        row_count: 1,
+        submission_ids: [submission.id],
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000903",
+        content_fingerprint: "latest-fingerprint",
+        created_at: "2026-06-16T09:30:00.000Z",
+        file_name: "visaflow-export-latest.xlsx",
+        format: "xlsx",
+        idempotency_key: "latest-key",
+        row_count: 1,
+        submission_ids: [submission.id],
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      id: submission.id,
+      exportPackage: {
+        contentFingerprint: "latest-fingerprint",
+        fileName: "visaflow-export-latest.xlsx",
+        format: "xlsx",
+        idempotencyKey: "latest-key",
+        rowCount: 1,
+        submissionIds: [submission.id],
+      },
+      exportState: "ready",
+      status: "ready_for_export",
+    });
+  });
+
+  it("ignores newer legacy csv batches in the Excel-only pilot", async () => {
+    const submission = initialSubmissions.find(
+      (item) => item.id === "ПД-1056",
+    ) as Submission;
+    const identity = buildExportPackageIdentity([submission], "xlsx");
+    if (!identity) throw new Error("Expected export package identity");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        status: "ready_for_excel",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000906",
+        content_fingerprint: identity.contentFingerprint,
+        created_at: "2026-06-16T09:30:00.000Z",
+        file_name: identity.fileName,
+        format: "xlsx",
+        idempotency_key: identity.idempotencyKey,
+        row_count: identity.rowCount,
+        submission_ids: identity.submissionIds,
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000907",
+        content_fingerprint: "legacy-csv-fingerprint",
+        created_at: "2026-06-16T10:30:00.000Z",
+        file_name: "legacy-export.csv",
+        format: "csv",
+        idempotency_key: "legacy-csv-key",
+        row_count: identity.rowCount,
+        submission_ids: identity.submissionIds,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+    const plan = exportSummaryForSelectedIds(loaded.submissions, [submission.id]);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      exportPackage: identity,
+      exportState: "file_generated",
+      status: "ready_for_export",
+    });
+    expect(plan).toMatchObject({
+      canDownload: true,
+      downloadPackageIdentity: identity,
+    });
+  });
+
+  it("clears snapshot-only export package identity when no durable batch exists", async () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-EXPORT-NO-BATCH",
+      exportPackage: {
+        contentFingerprint: "snapshot-only-fingerprint",
+        fileName: "visaflow-export-snapshot.xlsx",
+        format: "xlsx",
+        idempotencyKey: "snapshot-only-key",
+        rowCount: 1,
+        submissionIds: ["ПД-EXPORT-NO-BATCH"],
+      },
+      exportState: "file_downloaded",
+      status: "ready_for_export",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        status: "ready_for_excel",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      id: submission.id,
+      exportPackage: undefined,
+      exportState: "ready",
+      status: "ready_for_export",
+    });
+  });
+
+  it("ignores incomplete durable export batch identity after reload", async () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-EXPORT-INCOMPLETE-BATCH",
+      exportPackage: {
+        contentFingerprint: "snapshot-fingerprint",
+        fileName: "visaflow-export-snapshot.xlsx",
+        format: "xlsx",
+        idempotencyKey: "snapshot-key",
+        rowCount: 1,
+        submissionIds: ["ПД-EXPORT-INCOMPLETE-BATCH"],
+      },
+      exportState: "file_downloaded",
+      status: "ready_for_export",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        status: "ready_for_excel",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000904",
+        content_fingerprint: "durable-fingerprint",
+        created_at: "2026-06-16T09:30:00.000Z",
+        file_name: "visaflow-export-empty.xlsx",
+        format: "xlsx",
+        idempotency_key: "durable-key",
+        row_count: 0,
+        submission_ids: [submission.id],
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      id: submission.id,
+      exportPackage: undefined,
+      exportState: "ready",
+      status: "ready_for_export",
+    });
+  });
+
+  it("ignores durable export batch identity when the row is no longer export-ready", async () => {
+    const submission: Submission = {
+      ...(initialSubmissions[0] as Submission),
+      id: "ПД-EXPORT-REGRESSED",
+      exportPackage: undefined,
+      exportState: "not_ready",
+      status: "returned",
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        status: "returned",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.exportBatchRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000909",
+        content_fingerprint: "regressed-fingerprint",
+        created_at: "2026-06-16T09:30:00.000Z",
+        file_name: "visaflow-export-regressed.xlsx",
+        format: "xlsx",
+        idempotency_key: "regressed-key",
+        row_count: 1,
+        submission_ids: [submission.id],
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      id: submission.id,
+      exportPackage: undefined,
+      exportState: "not_ready",
+      status: "returned",
     });
   });
 

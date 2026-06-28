@@ -64,6 +64,7 @@ import type {
   SubmissionFileStatus,
 } from "../types";
 import { EmptyState } from "./Primitives";
+import { BbAiPanel } from "./BbAiPanel";
 
 export function SubmissionDrawer({
   actionError = "",
@@ -74,9 +75,13 @@ export function SubmissionDrawer({
   localPassportFileIds = [],
   onAction,
   onAddIssue,
+  onAcceptAiSuggestion,
   onIssueComposerConsumed,
   onClose,
+  onDismissAiSuggestion,
+  onMarkIssueFixed,
   onTab,
+  onRunAiReview,
   onQuestionnaireField,
   onApplyPassportField,
   onExtractPassport,
@@ -103,6 +108,7 @@ export function SubmissionDrawer({
   onAcceptAiSuggestion: (suggestionId: string) => void;
   onClose: () => void;
   onDismissAiSuggestion: (suggestionId: string) => void;
+  onMarkIssueFixed: (issueId: string) => void;
   onRunAiReview: () => void;
   onQuestionnaireField: (input: {
     applicantId: string;
@@ -344,9 +350,16 @@ export function SubmissionDrawer({
           ) : null}
           {activeTab === "issues" ? (
             <DrawerIssues
+              canAddIssue={canOpenIssueComposer}
+              onAcceptAiSuggestion={onAcceptAiSuggestion}
+              onAddIssue={() => setIssueComposerOpen(true)}
+              onDismissAiSuggestion={onDismissAiSuggestion}
+              onMarkIssueFixed={onMarkIssueFixed}
               onOpenTarget={openTarget}
+              onRunAiReview={onRunAiReview}
               role={role}
               submission={submission}
+              surface={surface}
             />
           ) : null}
           {activeTab === "history" ? <DrawerHistory submission={submission} /> : null}
@@ -1938,16 +1951,48 @@ function VisaApplicationPdfReviewPanel({
 }
 
 function DrawerIssues({
+  canAddIssue,
+  onAcceptAiSuggestion,
+  onAddIssue,
+  onDismissAiSuggestion,
+  onMarkIssueFixed,
   onOpenTarget,
+  onRunAiReview,
   role,
   submission,
+  surface,
 }: {
+  canAddIssue: boolean;
+  onAcceptAiSuggestion: (suggestionId: string) => void;
+  onAddIssue: () => void;
+  onDismissAiSuggestion: (suggestionId: string) => void;
+  onMarkIssueFixed: (issueId: string) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
+  onRunAiReview: () => void;
   role: Role;
   submission: Submission;
+  surface: "agent" | "review" | "export";
 }) {
   return (
     <section className="drawer-section drawer-issues-section">
+      {canAddIssue ? (
+        <div className="drawer-issues-actions">
+          <Button variant="secondary" onClick={onAddIssue}>
+            Добавить замечание
+          </Button>
+        </div>
+      ) : null}
+      {surface !== "export" ? (
+        <BbAiPanel
+          compact
+          onAccept={onAcceptAiSuggestion}
+          onDismiss={onDismissAiSuggestion}
+          onRun={onRunAiReview}
+          role={role}
+          submission={submission}
+          surface={surface}
+        />
+      ) : null}
       <div className="issue-list v17-issue-list" id="workspace-issues">
         {submission.issues.length ? (
           submission.issues.map((issue) => {
@@ -2002,6 +2047,18 @@ function DrawerIssues({
                       Завершено
                     </Button>
                   )}
+                  {role === "agent" &&
+                  submission.status === "returned" &&
+                  issue.status === "open" ? (
+                    <Button
+                      aria-label={`Отметить замечание исправленным: ${drawerIssueTitle(issue)}`}
+                      className="compact-button"
+                      variant="secondary"
+                      onClick={() => onMarkIssueFixed(issue.id)}
+                    >
+                      Отметить исправленным
+                    </Button>
+                  ) : null}
                   {isFileIssue && role === "agent" ? (
                     <span className="v17-issue-note">
                       Реальная загрузка недоступна в прототипе

@@ -3640,8 +3640,8 @@ p {
 }
 
 .v19-inbox-mode-tabs .v19-state-tabs button.active {
-  color: var(--v19-accent);
-  background: rgb(var(--accent) / 0.12);
+  color: var(--v19-fg);
+  background: var(--v19-selected);
 }
 
 .v19-inbox-mode-tabs .v19-tab-count {
@@ -3651,8 +3651,17 @@ p {
   font-weight: 700;
 }
 
+.v19-inbox-mode-tabs .v19-state-tabs button.active .v19-tab-count {
+  color: var(--v19-fg);
+}
+
 .v19-inbox-mode-tabs .v19-state-tabs button:not(.active) .v19-tab-count {
   color: var(--v19-fg-tertiary);
+}
+
+.v19-inbox-mode-tabs .v19-state-tabs .tab.active .v19-tab-count,
+.v19-actions-screen .v19-state-tabs .tab.active .v19-tab-count {
+  color: var(--v19-fg);
 }
 
 .ops-shell:is(.surface-agent-inbox, .surface-agent-inbox)
@@ -4829,6 +4838,11 @@ p {
   color: rgb(var(--fg));
   background: rgb(var(--selected));
   box-shadow: none;
+}
+
+.tabs button.active .v19-tab-count,
+.tabs button.is-active .v19-tab-count {
+  color: currentColor;
 }
 
 .v19-inbox-mode-tabs .tabs button.is-active {
@@ -12783,6 +12797,16 @@ p {
 .submission-detail-drawer .issue-list {
   display: grid;
   gap: 12px;
+}
+
+.submission-detail-drawer .drawer-issues-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.submission-detail-drawer .drawer-issues-section .bb-panel {
+  margin-bottom: 12px;
 }
 
 .submission-detail-drawer .issue-card {

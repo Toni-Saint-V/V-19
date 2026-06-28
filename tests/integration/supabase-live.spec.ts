@@ -15,6 +15,10 @@ import type { Applicant, Submission } from "../../src/types/domain";
 
 const liveEnabled = process.env.VITEST_SUPABASE_LIVE === "1";
 const describeLive = liveEnabled ? describe : describe.skip;
+const describeLegacyArchiveLive =
+  liveEnabled && process.env.VITEST_SUPABASE_LEGACY_ARCHIVE === "1"
+    ? describe
+    : describe.skip;
 const smokeEnv = loadSmokeEnv();
 const allowedSmokeProjectId = "oevvaowoklqttqkraxho";
 const requiredSmokeEnv = [
@@ -210,6 +214,66 @@ function makeSmokeSubmission(agent: AppProfile): {
   };
 }
 
+function makeCanonicalSmokeSubmission(agent: AppProfile): {
+  submission: Submission;
+  applicant: Applicant;
+} {
+  const id = `SMOKE-V19-${agent.id.slice(0, 8)}`;
+  const applicant: Applicant = {
+    id: `${id}-1`,
+    name: "Supabase Canonical Smoke Applicant",
+    role: "Заявитель",
+    roleConfirmed: true,
+    passport: "70 9002002",
+    form: 100,
+    media: 0,
+    mediaRequired: 3,
+    birthDate: "1990-01-01",
+    citizenship: "РФ",
+    address: "Moscow, Canonical Smoke 1",
+    phone: "+7 900 200 20 02",
+    email: "canonical-smoke@example.com",
+    passportIssuedAt: "2020-01-01",
+    passportExpiresAt: "2030-01-01",
+    country: "Spain",
+    city: "Madrid",
+    tripDates: "2026-08-20 - 2026-08-30",
+    hotelName: "Smoke Hotel",
+    hotelAddress: "Gran Via 1, Madrid",
+  };
+  const mediaSlots = [
+    buildMediaSlot(applicant, "passport_scan", "missing"),
+    buildMediaSlot(applicant, "selfie", "missing"),
+    buildMediaSlot(applicant, "selfie_2", "missing"),
+  ];
+
+  const submission = normalizeSubmission({
+    id,
+    title: applicant.name,
+    type: "single",
+    agentId: agent.id,
+    agentName: agent.organizationName ?? agent.displayName,
+    country: "Spain",
+    city: "Madrid",
+    travelDate: "2026-08-20",
+    updated: new Date().toISOString(),
+    status: "draft",
+    appointment: "not_started",
+    priority: "Средний",
+    fields: 100,
+    media: 0,
+    mediaRequired: 3,
+    applicants: [{ ...applicant, mediaSlots }],
+    mediaRows: [],
+    notes: [],
+  });
+
+  return {
+    submission,
+    applicant: submission.applicants[0],
+  };
+}
+
 async function saveDraft(
   client: SupabaseClient<Database>,
   submission: Submission,
@@ -229,12 +293,12 @@ async function trySaveDraft(
   return client.rpc("save_submission_draft", { payload });
 }
 
-describeLive("Legacy Supabase live archive smoke (not V-19 release proof)", () => {
+describeLive("V-19 canonical Supabase live smoke", () => {
   beforeAll(() => {
     assertSmokeEnvReady();
   });
 
-  test("keeps old workflow/RPC compatibility behind sandbox-only smoke", async () => {
+  test("proves canonical media storage and adversarial RLS denial paths", async () => {
     const owner = await signInAs(
       "SUPABASE_SMOKE_AGENT_EMAIL",
       "SUPABASE_SMOKE_AGENT_PASSWORD",
@@ -252,46 +316,25 @@ describeLive("Legacy Supabase live archive smoke (not V-19 release proof)", () =
     expect(otherAgent.profile.role).toBe("agent");
     expect(admin.profile.role).toBe("admin");
 
-    const { submission, applicant } = makeSmokeSubmission(owner.profile);
-    const blockedId = `${submission.id}-BLOCKED`;
-    const blockedSubmission = normalizeSubmission({
-      ...submission,
-      id: blockedId,
-      applicants: [
-        {
-          ...applicant,
-          id: `${blockedId}-1`,
-          address: "",
-          mediaSlots: [
-            buildMediaSlot(
-              {
-                ...applicant,
-                id: `${blockedId}-1`,
-                address: "",
-              },
-              "photo_white",
-              "missing",
-            ),
-          ],
-        },
-      ],
-    });
-    await saveDraft(owner.client, blockedSubmission, owner.profile.id);
-    const { error: blockedReviewError } = await trySaveDraft(
-      owner.client,
-      normalizeSubmission({
-        ...blockedSubmission,
-        status: "waiting_review",
-        submittedAt: new Date().toISOString(),
-      }),
-      owner.profile.id,
-    );
-    expect(blockedReviewError).toBeTruthy();
-    expect(blockedReviewError?.message).toContain("required fields");
+    const { submission, applicant } = makeCanonicalSmokeSubmission(owner.profile);
+    const uploadedSlots = [
+      buildMediaSlot(applicant, "passport_scan", "uploaded"),
+      buildMediaSlot(applicant, "selfie", "uploaded"),
+      buildMediaSlot(applicant, "selfie_2", "uploaded"),
+    ];
+    const uploadedTargets = uploadedSlots.map((slot) => ({
+      slot,
+      target: storageTargetForSlot(submission.id, applicant.id ?? "", slot),
+      file: new Blob(["supabase-canonical-smoke-image"], { type: "image/jpeg" }),
+    }));
+    const selfieTarget =
+      uploadedTargets.find(({ slot }) => slot.type === "selfie")?.target ??
+      uploadedTargets[0].target;
 
-    // The smoke uses one deterministic submission id. Admin reset keeps repeated
-    // runs stable without adding runtime delete permissions to the app role.
     await saveDraft(admin.client, submission, admin.profile.id);
+    await admin.client.storage
+      .from(mediaStorageBucket)
+      .remove(uploadedTargets.map(({ target }) => target.path));
     await saveDraft(owner.client, submission, owner.profile.id);
 
     const { data: ownerRows, error: ownerReadError } = await owner.client
@@ -301,6 +344,13 @@ describeLive("Legacy Supabase live archive smoke (not V-19 release proof)", () =
     expect(ownerReadError).toBeNull();
     expect(ownerRows).toHaveLength(1);
 
+    const { data: adminRows, error: adminReadError } = await admin.client
+      .from("submissions")
+      .select("id,status,agent_id")
+      .eq("id", submission.id);
+    expect(adminReadError).toBeNull();
+    expect(adminRows).toHaveLength(1);
+
     const { data: otherRows, error: otherReadError } = await otherAgent.client
       .from("submissions")
       .select("id")
@@ -308,44 +358,84 @@ describeLive("Legacy Supabase live archive smoke (not V-19 release proof)", () =
     expect(otherReadError).toBeNull();
     expect(otherRows).toEqual([]);
 
+    const { data: otherMediaRows, error: otherMediaReadError } = await otherAgent.client
+      .from("media_assets")
+      .select("id")
+      .eq("submission_id", submission.id);
+    expect(otherMediaReadError).toBeNull();
+    expect(otherMediaRows).toEqual([]);
+
     const crossAgentPayload = toSubmissionDraftPersistencePayload(
       submission,
       otherAgent.profile.id,
     );
-    const { error: crossAgentWriteError } = await otherAgent.client.rpc(
+    const { error: crossAgentSaveDraftError } = await otherAgent.client.rpc(
       "save_submission_draft",
       { payload: crossAgentPayload },
     );
-    expect(crossAgentWriteError).toBeTruthy();
+    expect(crossAgentSaveDraftError).toBeTruthy();
 
-    const agentAcceptedPayload = toSubmissionDraftPersistencePayload(
+    const { error: agentExportInsertError } = await owner.client
+      .from("export_batches")
+      .insert({
+        format: "xlsx",
+        row_count: 1,
+        submission_ids: [submission.id],
+      });
+    expect(agentExportInsertError).toBeTruthy();
+
+    const { error: agentExportRpcError } = await owner.client.rpc(
+      "complete_export_package",
       {
-        ...submission,
-        status: "accepted",
+        payload: {
+          batch: {
+            content_fingerprint: `smoke|${submission.id}`,
+            file_name: `${submission.id}.xlsx`,
+            format: "xlsx",
+            idempotency_key: `smoke-${submission.id}-${randomUUID()}`,
+            row_count: 1,
+            submission_ids: [submission.id],
+          },
+        },
       },
-      owner.profile.id,
     );
-    const { error: agentAcceptedError } = await owner.client.rpc(
-      "save_submission_draft",
-      { payload: agentAcceptedPayload },
-    );
-    expect(agentAcceptedError).toBeTruthy();
+    expect(agentExportRpcError).toBeTruthy();
 
-    const uploadedSlots = [
-      buildMediaSlot(applicant, "photo_white", "uploaded"),
-      buildMediaSlot(applicant, "selfie", "uploaded"),
-      buildMediaSlot(applicant, "video", "uploaded"),
-    ];
-    const uploadedTargets = uploadedSlots.map((slot) => ({
-      slot,
-      target: storageTargetForSlot(submission.id, applicant.id ?? "", slot),
-      file:
-        slot.type === "video"
-          ? new Blob(["supabase-smoke-video"], { type: "video/mp4" })
-          : new Blob(["supabase-smoke-image"], { type: "image/jpeg" }),
-    }));
-    const photoTarget = uploadedTargets[0].target;
-    const photoFile = uploadedTargets[0].file;
+    const { error: wrongApplicantStorageError } = await owner.client.storage
+      .from(mediaStorageBucket)
+      .upload(
+        `${submission.id}/${submission.id}-WRONG/selfie/709002002_selfie.jpg`,
+        new Blob(["wrong-applicant"], { type: "image/jpeg" }),
+        { contentType: "image/jpeg", upsert: false },
+      );
+    expect(wrongApplicantStorageError).toBeTruthy();
+
+    const { error: wrongMediaSlotError } = await owner.client.storage
+      .from(mediaStorageBucket)
+      .upload(
+        `${submission.id}/${applicant.id}/photo_white/709002002_photo_white.jpg`,
+        new Blob(["legacy-photo"], { type: "image/jpeg" }),
+        { contentType: "image/jpeg", upsert: false },
+      );
+    expect(wrongMediaSlotError).toBeTruthy();
+
+    const { error: wrongExtensionError } = await owner.client.storage
+      .from(mediaStorageBucket)
+      .upload(
+        `${submission.id}/${applicant.id}/selfie/709002002_selfie.mp4`,
+        new Blob(["wrong-extension"], { type: "video/mp4" }),
+        { contentType: "video/mp4", upsert: false },
+      );
+    expect(wrongExtensionError).toBeTruthy();
+
+    const { error: pathTraversalError } = await owner.client.storage
+      .from(mediaStorageBucket)
+      .upload(
+        `${submission.id}/${applicant.id}/selfie/../709002002_selfie.jpg`,
+        new Blob(["path-traversal"], { type: "image/jpeg" }),
+        { contentType: "image/jpeg", upsert: false },
+      );
+    expect(pathTraversalError).toBeTruthy();
 
     for (const { target, file } of uploadedTargets) {
       const { error: ownerUploadError } = await owner.client.storage
@@ -357,93 +447,18 @@ describeLive("Legacy Supabase live archive smoke (not V-19 release proof)", () =
       expect(ownerUploadError).toBeNull();
     }
 
-    const { error: otherUploadError } = await otherAgent.client.storage
-      .from(mediaStorageBucket)
-      .upload(photoTarget.path, photoFile, {
-        contentType: "image/jpeg",
-        upsert: true,
-      });
-    expect(otherUploadError).toBeTruthy();
-
     const { data: signedUrlData, error: signedUrlError } = await owner.client.storage
       .from(mediaStorageBucket)
-      .createSignedUrl(photoTarget.path, 60);
+      .createSignedUrl(selfieTarget.path, 60);
     expect(signedUrlError).toBeNull();
-    expect(signedUrlData?.signedUrl).toContain(photoTarget.path);
-
-    const readySubmission = normalizeSubmission({
-      ...submission,
-      status: "ready_for_review",
-      media: 100,
-      updated: new Date().toISOString(),
-      applicants: [
-        {
-          ...applicant,
-          media: 100,
-          mediaSlots: uploadedSlots,
-        },
-      ],
-    });
-    await saveDraft(owner.client, readySubmission, owner.profile.id);
-
-    const waitingSubmission = normalizeSubmission({
-      ...readySubmission,
-      status: "waiting_review",
-      submittedAt: new Date().toISOString(),
-      updated: new Date().toISOString(),
-    });
-    await saveDraft(owner.client, waitingSubmission, owner.profile.id);
-
-    const adminAccepted = normalizeSubmission({
-      ...waitingSubmission,
-      status: "accepted",
-      acceptedAt: new Date().toISOString(),
-      updated: new Date().toISOString(),
-    });
-    await saveDraft(admin.client, adminAccepted, admin.profile.id);
-
-    const { data: ownerApplicantUpdateRows, error: ownerApplicantUpdateError } =
-      await owner.client
-        .from("applicants")
-        .update({ full_name: "Tampered After Handoff" })
-        .eq("id", applicant.id ?? "")
-        .select("id");
-    expect(ownerApplicantUpdateError).toBeNull();
-    expect(ownerApplicantUpdateRows).toEqual([]);
-
-    const { data: ownerMediaUpdateRows, error: ownerMediaUpdateError } =
-      await owner.client
-        .from("media_assets")
-        .update({ upload_status: "uploaded" })
-        .eq("applicant_id", applicant.id ?? "")
-        .eq("type", "photo_white")
-        .select("id");
-    expect(ownerMediaUpdateError).toBeNull();
-    expect(ownerMediaUpdateRows).toEqual([]);
-
-    const { error: ownerOverwriteAfterHandoffError } = await owner.client.storage
-      .from(mediaStorageBucket)
-      .upload(photoTarget.path, photoFile, {
-        contentType: "image/jpeg",
-        upsert: true,
-      });
-    expect(ownerOverwriteAfterHandoffError).toBeTruthy();
+    expect(signedUrlData?.signedUrl).toContain(selfieTarget.path);
 
     const { data: otherSignedUrlData, error: otherSignedUrlError } =
       await otherAgent.client.storage
         .from(mediaStorageBucket)
-        .createSignedUrl(photoTarget.path, 60);
+        .createSignedUrl(selfieTarget.path, 60);
     expect(otherSignedUrlError).toBeTruthy();
     expect(otherSignedUrlData?.signedUrl).toBeFalsy();
-
-    const { data: applicantAfterTamper, error: applicantAfterTamperError } =
-      await admin.client
-        .from("applicants")
-        .select("full_name")
-        .eq("id", applicant.id ?? "")
-        .single();
-    expect(applicantAfterTamperError).toBeNull();
-    expect(applicantAfterTamper?.full_name).toBe("Supabase Smoke Applicant");
 
     const { error: cleanupError } = await admin.client.storage
       .from(mediaStorageBucket)
@@ -451,3 +466,229 @@ describeLive("Legacy Supabase live archive smoke (not V-19 release proof)", () =
     expect(cleanupError).toBeNull();
   }, 30_000);
 });
+
+describeLegacyArchiveLive(
+  "Legacy Supabase live archive smoke (not V-19 release proof)",
+  () => {
+    beforeAll(() => {
+      assertSmokeEnvReady();
+    });
+
+    test("keeps old workflow/RPC compatibility behind sandbox-only smoke", async () => {
+      const owner = await signInAs(
+        "SUPABASE_SMOKE_AGENT_EMAIL",
+        "SUPABASE_SMOKE_AGENT_PASSWORD",
+      );
+      const otherAgent = await signInAs(
+        "SUPABASE_SMOKE_OTHER_AGENT_EMAIL",
+        "SUPABASE_SMOKE_OTHER_AGENT_PASSWORD",
+      );
+      const admin = await signInAs(
+        "SUPABASE_SMOKE_ADMIN_EMAIL",
+        "SUPABASE_SMOKE_ADMIN_PASSWORD",
+      );
+
+      expect(owner.profile.role).toBe("agent");
+      expect(otherAgent.profile.role).toBe("agent");
+      expect(admin.profile.role).toBe("admin");
+
+      const { submission, applicant } = makeSmokeSubmission(owner.profile);
+      const blockedId = `${submission.id}-BLOCKED`;
+      const blockedSubmission = normalizeSubmission({
+        ...submission,
+        id: blockedId,
+        applicants: [
+          {
+            ...applicant,
+            id: `${blockedId}-1`,
+            address: "",
+            mediaSlots: [
+              buildMediaSlot(
+                {
+                  ...applicant,
+                  id: `${blockedId}-1`,
+                  address: "",
+                },
+                "photo_white",
+                "missing",
+              ),
+            ],
+          },
+        ],
+      });
+      await saveDraft(owner.client, blockedSubmission, owner.profile.id);
+      const { error: blockedReviewError } = await trySaveDraft(
+        owner.client,
+        normalizeSubmission({
+          ...blockedSubmission,
+          status: "waiting_review",
+          submittedAt: new Date().toISOString(),
+        }),
+        owner.profile.id,
+      );
+      expect(blockedReviewError).toBeTruthy();
+      expect(blockedReviewError?.message).toContain("required fields");
+
+      // The smoke uses one deterministic submission id. Admin reset keeps repeated
+      // runs stable without adding runtime delete permissions to the app role.
+      await saveDraft(admin.client, submission, admin.profile.id);
+      await saveDraft(owner.client, submission, owner.profile.id);
+
+      const { data: ownerRows, error: ownerReadError } = await owner.client
+        .from("submissions")
+        .select("id,status,agent_id")
+        .eq("id", submission.id);
+      expect(ownerReadError).toBeNull();
+      expect(ownerRows).toHaveLength(1);
+
+      const { data: otherRows, error: otherReadError } = await otherAgent.client
+        .from("submissions")
+        .select("id")
+        .eq("id", submission.id);
+      expect(otherReadError).toBeNull();
+      expect(otherRows).toEqual([]);
+
+      const crossAgentPayload = toSubmissionDraftPersistencePayload(
+        submission,
+        otherAgent.profile.id,
+      );
+      const { error: crossAgentWriteError } = await otherAgent.client.rpc(
+        "save_submission_draft",
+        { payload: crossAgentPayload },
+      );
+      expect(crossAgentWriteError).toBeTruthy();
+
+      const agentAcceptedPayload = toSubmissionDraftPersistencePayload(
+        {
+          ...submission,
+          status: "accepted",
+        },
+        owner.profile.id,
+      );
+      const { error: agentAcceptedError } = await owner.client.rpc(
+        "save_submission_draft",
+        { payload: agentAcceptedPayload },
+      );
+      expect(agentAcceptedError).toBeTruthy();
+
+      const uploadedSlots = [
+        buildMediaSlot(applicant, "photo_white", "uploaded"),
+        buildMediaSlot(applicant, "selfie", "uploaded"),
+        buildMediaSlot(applicant, "video", "uploaded"),
+      ];
+      const uploadedTargets = uploadedSlots.map((slot) => ({
+        slot,
+        target: storageTargetForSlot(submission.id, applicant.id ?? "", slot),
+        file:
+          slot.type === "video"
+            ? new Blob(["supabase-smoke-video"], { type: "video/mp4" })
+            : new Blob(["supabase-smoke-image"], { type: "image/jpeg" }),
+      }));
+      const photoTarget = uploadedTargets[0].target;
+      const photoFile = uploadedTargets[0].file;
+
+      for (const { target, file } of uploadedTargets) {
+        const { error: ownerUploadError } = await owner.client.storage
+          .from(mediaStorageBucket)
+          .upload(target.path, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+        expect(ownerUploadError).toBeNull();
+      }
+
+      const { error: otherUploadError } = await otherAgent.client.storage
+        .from(mediaStorageBucket)
+        .upload(photoTarget.path, photoFile, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      expect(otherUploadError).toBeTruthy();
+
+      const { data: signedUrlData, error: signedUrlError } = await owner.client.storage
+        .from(mediaStorageBucket)
+        .createSignedUrl(photoTarget.path, 60);
+      expect(signedUrlError).toBeNull();
+      expect(signedUrlData?.signedUrl).toContain(photoTarget.path);
+
+      const readySubmission = normalizeSubmission({
+        ...submission,
+        status: "ready_for_review",
+        media: 100,
+        updated: new Date().toISOString(),
+        applicants: [
+          {
+            ...applicant,
+            media: 100,
+            mediaSlots: uploadedSlots,
+          },
+        ],
+      });
+      await saveDraft(owner.client, readySubmission, owner.profile.id);
+
+      const waitingSubmission = normalizeSubmission({
+        ...readySubmission,
+        status: "waiting_review",
+        submittedAt: new Date().toISOString(),
+        updated: new Date().toISOString(),
+      });
+      await saveDraft(owner.client, waitingSubmission, owner.profile.id);
+
+      const adminAccepted = normalizeSubmission({
+        ...waitingSubmission,
+        status: "accepted",
+        acceptedAt: new Date().toISOString(),
+        updated: new Date().toISOString(),
+      });
+      await saveDraft(admin.client, adminAccepted, admin.profile.id);
+
+      const { data: ownerApplicantUpdateRows, error: ownerApplicantUpdateError } =
+        await owner.client
+          .from("applicants")
+          .update({ full_name: "Tampered After Handoff" })
+          .eq("id", applicant.id ?? "")
+          .select("id");
+      expect(ownerApplicantUpdateError).toBeNull();
+      expect(ownerApplicantUpdateRows).toEqual([]);
+
+      const { data: ownerMediaUpdateRows, error: ownerMediaUpdateError } =
+        await owner.client
+          .from("media_assets")
+          .update({ upload_status: "uploaded" })
+          .eq("applicant_id", applicant.id ?? "")
+          .eq("type", "photo_white")
+          .select("id");
+      expect(ownerMediaUpdateError).toBeNull();
+      expect(ownerMediaUpdateRows).toEqual([]);
+
+      const { error: ownerOverwriteAfterHandoffError } = await owner.client.storage
+        .from(mediaStorageBucket)
+        .upload(photoTarget.path, photoFile, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      expect(ownerOverwriteAfterHandoffError).toBeTruthy();
+
+      const { data: otherSignedUrlData, error: otherSignedUrlError } =
+        await otherAgent.client.storage
+          .from(mediaStorageBucket)
+          .createSignedUrl(photoTarget.path, 60);
+      expect(otherSignedUrlError).toBeTruthy();
+      expect(otherSignedUrlData?.signedUrl).toBeFalsy();
+
+      const { data: applicantAfterTamper, error: applicantAfterTamperError } =
+        await admin.client
+          .from("applicants")
+          .select("full_name")
+          .eq("id", applicant.id ?? "")
+          .single();
+      expect(applicantAfterTamperError).toBeNull();
+      expect(applicantAfterTamper?.full_name).toBe("Supabase Smoke Applicant");
+
+      const { error: cleanupError } = await admin.client.storage
+        .from(mediaStorageBucket)
+        .remove(uploadedTargets.map(({ target }) => target.path));
+      expect(cleanupError).toBeNull();
+    }, 30_000);
+  },
+);

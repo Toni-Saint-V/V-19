@@ -165,6 +165,47 @@ describe("Supabase security contract", () => {
     expect(cockpitRepository).not.toContain('"upsert_questionnaire_answers"');
   });
 
+  test("persists trip date ranges as additive submission columns", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260628000100_trip_date_range_persistence.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const generatedTypes = readProjectFile("src/lib/supabase/database.types.ts");
+    const cockpitRepository = readProjectFile(
+      "src/modules/submissions/supabasePersistence.ts",
+    );
+
+    expect(migration).toContain("add column if not exists trip_date_from text");
+    expect(migration).toContain("add column if not exists trip_date_to text");
+    expect(migration).toContain("submissions_trip_date_from_not_blank");
+    expect(migration).toContain("submissions_trip_date_to_not_blank");
+    expect(migration).toContain(
+      "check (trip_date_from is null or btrim(trip_date_from) <> '')",
+    );
+    expect(migration).toContain(
+      "nullif(btrim(coalesce(submission_record.trip_date_from, '')), '')",
+    );
+    expect(migration).toContain(
+      "nullif(btrim(coalesce(submission_record.trip_date_to, '')), '')",
+    );
+    expect(migration).toContain("legacy_trip_date_parts");
+    expect(migration).toContain("'^\\s*(.*?)\\s+-\\s+(.*?)\\s*$'");
+    expect(migration).toContain("Trip date range is required");
+    expect(migration).toContain(
+      "app_private.save_submission_draft_without_questionnaire_rows",
+    );
+    expect(migration).toContain("travel_date = case");
+    expect(migrationContract).toContain(
+      "20260628000100_trip_date_range_persistence.sql",
+    );
+    expect(generatedTypes).toContain("trip_date_from: string | null");
+    expect(generatedTypes).toContain("trip_date_to: string | null");
+    expect(cockpitRepository).toContain("trip_date_from");
+    expect(cockpitRepository).toContain("trip_date_to");
+  });
+
   test("keeps export batch identity migration additive for legacy batches", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260616000000_export_batch_identity.sql",
@@ -251,6 +292,30 @@ describe("Supabase security contract", () => {
     expect(migration).toContain("insert into public.status_history");
     expect(migration).toContain(
       "grant execute on function public.complete_export_package(jsonb) to authenticated",
+    );
+  });
+
+  test("keeps workspace export package completion aligned with cockpit identity", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260617004000_complete_export_package_workspace_media_slots.sql",
+    );
+
+    expect(migration).toContain("cockpit.snapshot -> 'exportPackage'");
+    expect(migration).toContain(
+      "export_identity.export_package ->> 'contentFingerprint' is distinct from batch_record.content_fingerprint",
+    );
+    expect(migration).toContain(
+      "export_identity.export_package ->> 'idempotencyKey' is distinct from batch_record.idempotency_key",
+    );
+    expect(migration).toContain(
+      "jsonb_typeof(export_identity.export_package -> 'submissionIds') = 'array'",
+    );
+    expect(migration).toContain(
+      "file.value ->> 'type' in ('selfie', 'selfie_2', 'passport_scan')",
+    );
+    expect(migration).not.toContain("count(distinct type) as type_count");
+    expect(migration).not.toContain(
+      "Export package cannot mix city, travel date, or submission type",
     );
   });
 

@@ -7,8 +7,10 @@ import type {
   SubmissionAction,
 } from "./types";
 
+type SubmissionActionErrorAction = SubmissionAction | "mark_issue_fixed";
+
 export type SubmissionActionErrorState = {
-  action: SubmissionAction;
+  action: SubmissionActionErrorAction;
   code: DomainErrorCode;
   message: string;
   signature: string;
@@ -20,7 +22,7 @@ export function createSubmissionActionErrorState({
   error,
   submission,
 }: {
-  action: SubmissionAction;
+  action: SubmissionActionErrorAction;
   error: DomainError;
   submission: Submission;
 }): SubmissionActionErrorState {
@@ -41,6 +43,7 @@ export function submissionActionErrorForSubmission(
   if (!error) return "";
   if (error.submissionId !== submission.id) return "";
   if (error.signature !== submissionActionSignature(submission)) return "";
+  if (error.action === "mark_issue_fixed") return error.message;
 
   const result = applySubmissionActionResult(submission, error.action, role);
   if (result.ok || result.error.code !== error.code) return "";

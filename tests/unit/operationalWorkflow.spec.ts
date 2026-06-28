@@ -939,6 +939,8 @@ function completeInProgressSubmission(): Submission {
       ),
     ),
     status: "in_progress",
+    tripDateFrom: "2026-07-10",
+    tripDateTo: "2026-07-18",
   };
 }
 
@@ -1036,6 +1038,8 @@ function completedWithReference(input: {
       input.type === "family"
         ? `Семейная подача ${surnameFromName(input.names[0])}`
         : `Подача ${input.names[0]}`,
+    tripDateFrom: "2026-07-10",
+    tripDateTo: "2026-07-18",
   };
 }
 

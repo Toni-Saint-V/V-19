@@ -170,6 +170,8 @@ export interface SubmissionRow extends DbRecord {
   country: string;
   city: string;
   travel_date: string;
+  trip_date_from: string | null;
+  trip_date_to: string | null;
   status: SubmissionStatus;
   priority: "Высокий" | "Средний" | "Низкий";
   readiness_percent: number;

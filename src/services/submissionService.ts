@@ -37,7 +37,7 @@ import { mapSupabasePersistenceError } from "./persistenceObservability";
 import { storageTargetForSlot } from "./storagePathPolicy";
 
 const submissionSelect =
-  "id,agent_id,type,title,country,city,travel_date,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
+  "id,agent_id,type,title,country,city,travel_date,trip_date_from,trip_date_to,status,priority,readiness_percent,family_intelligence,appointment_status,created_at,submitted_at,review_started_at,accepted_at,exported_at,updated_at" as const;
 const applicantSelect =
   "id,submission_id,full_name,role,suggested_role,role_confirmed,birth_date,patronymic,citizenship,address,phone,email,passport_number,passport_issued_at,passport_expires_at,country,city,trip_dates,hotel_name,hotel_address,questionnaire_percent,media_percent,created_at,updated_at" as const;
 const mediaAssetSelect =
@@ -52,6 +52,23 @@ const statusHistorySelect =
   "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at" as const;
 const submissionListLimit = 100;
 const requiredMediaSlotsPerApplicant = 4;
+
+function legacyTravelDateFromRow(row: SubmissionRow): string {
+  const from = row.trip_date_from?.trim();
+  const to = row.trip_date_to?.trim();
+  if (from && to && from !== to) return `${from} - ${to}`;
+  return from || to || row.travel_date;
+}
+
+function splitTripDateRange(value: string): { from: string; to: string } {
+  const normalized = value.trim();
+  const rangeMatch = normalized.match(/^(.+?)\s+-\s+(.+)$/);
+  if (!rangeMatch) return { from: normalized, to: normalized };
+
+  const from = rangeMatch[1]?.trim() ?? normalized;
+  const to = rangeMatch[2]?.trim() ?? normalized;
+  return { from: from || normalized, to: to || normalized };
+}
 
 function mapSubmissionRow(
   row: SubmissionRow,
@@ -71,7 +88,7 @@ function mapSubmissionRow(
     agentName: "Agent",
     country: row.country,
     city: row.city,
-    travelDate: row.travel_date,
+    travelDate: legacyTravelDateFromRow(row),
     updated: row.updated_at,
     status: row.status,
     appointment: row.appointment_status,
@@ -285,6 +302,7 @@ function toNullableUuid(value: string | undefined): string | undefined {
 
 export function toSubmissionInsert(submission: Submission): SubmissionInsert {
   const normalized = normalizeSubmission(submission);
+  const tripDateRange = splitTripDateRange(normalized.travelDate);
 
   return {
     id: normalized.id,
@@ -294,6 +312,8 @@ export function toSubmissionInsert(submission: Submission): SubmissionInsert {
     country: normalized.country,
     city: normalized.city,
     travel_date: normalized.travelDate,
+    trip_date_from: tripDateRange.from,
+    trip_date_to: tripDateRange.to,
     status: normalized.status,
     priority: normalized.priority,
     readiness_percent: readiness(normalized),

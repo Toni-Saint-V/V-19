@@ -246,6 +246,7 @@ export const transitionMatrix: Record<
 
 const packageLevelExportActionReason =
   "Формирование Excel выполняется только через пакет выгрузки";
+const missingTripDateRangeReason = "Укажите даты поездки перед отправкой";
 
 export function openIssueCount(submission: Submission) {
   return submission.issues.filter((issue) => issue.status === "open").length;
@@ -259,7 +260,7 @@ export function blockerCount(submission: Submission) {
 
 export function unresolvedOpenIssueCount(submission: Submission) {
   return submission.issues.filter(
-    (issue) => issue.status === "open" && !isIssueResolved(submission, issue),
+    (issue) => issue.status === "open" && !isSubmissionIssueResolved(submission, issue),
   ).length;
 }
 
@@ -279,6 +280,12 @@ export function acceptanceBlockingIssueCount(submission: Submission) {
 
 export function hasRequiredBasics(submission: Submission) {
   return submission.city && submission.applicants.length > 0;
+}
+
+export function hasUsableTripDateRange(submission: Submission) {
+  const from = submission.tripDateFrom.trim();
+  const to = submission.tripDateTo.trim();
+  return Boolean(from && to && from !== "не указано" && to !== "не указано");
 }
 
 export function hasMissingRequiredWork(submission: Submission) {
@@ -381,6 +388,13 @@ export function canPerformAction(
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
+  if (
+    action === "submit_for_review" &&
+    acceptanceBlockingIssueCount(submission) > 0
+  ) {
+    return { ok: false, reason: "Есть незакрытые замечания" };
+  }
+
   if (requiresPassportGateBeforeAction(submission, action)) {
     return {
       ok: false,
@@ -395,16 +409,19 @@ export function canPerformAction(
     };
   }
 
-  if (
-    action === "submit_corrections" &&
-    openIssueCount(submission) === 0 &&
-    fixedIssueCount(submission) === 0
-  ) {
-    return { ok: false, reason: "Нет открытых замечаний для исправления" };
+  if (action === "submit_for_review" && !hasUsableTripDateRange(submission)) {
+    return { ok: false, reason: missingTripDateRangeReason };
   }
 
-  if (action === "submit_corrections" && unresolvedOpenIssueCount(submission) > 0) {
-    return { ok: false, reason: "Сначала исправьте целевые замечания" };
+  if (
+    action === "submit_corrections" &&
+    fixedIssueCount(submission) === 0
+  ) {
+    return { ok: false, reason: "Сначала отметьте замечания исправленными" };
+  }
+
+  if (action === "submit_corrections" && openIssueCount(submission) > 0) {
+    return { ok: false, reason: "Сначала отметьте замечания исправленными" };
   }
 
   if (action === "return_with_issues" && openIssueCount(submission) === 0) {
@@ -417,6 +434,13 @@ export function canPerformAction(
 
   if (action === "accept" && acceptanceBlockingIssueCount(submission) > 0) {
     return { ok: false, reason: "Есть незакрытые замечания" };
+  }
+
+  if (
+    (action === "accept" || action === "close_issues_accept") &&
+    !hasUsableTripDateRange(submission)
+  ) {
+    return { ok: false, reason: missingTripDateRangeReason };
   }
 
   if (
@@ -438,6 +462,97 @@ export function canPerformAction(
   }
 
   return { ok: true };
+}
+
+export function markSubmissionIssueFixedResult(
+  submission: Submission,
+  issueId: string,
+  role: Role,
+): CommandResult<Submission> {
+  if (role !== "agent") {
+    return {
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Only agent can mark issue fixed.",
+      },
+    };
+  }
+  if (!isCanonicalSubmissionStatus(submission.status)) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Submission status is not canonical.",
+      },
+    };
+  }
+  if (submission.status === "exported") {
+    return {
+      ok: false,
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Exported is terminal for V-19.",
+      },
+    };
+  }
+  if (submission.status !== "returned") {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Issues can be marked fixed only after admin return.",
+      },
+    };
+  }
+
+  const issue = submission.issues.find((item) => item.id === issueId);
+  if (!issue) {
+    return {
+      ok: false,
+      error: { code: "ISSUE_NOT_FOUND", message: "Issue not found." },
+    };
+  }
+  if (issue.status !== "open") {
+    return {
+      ok: false,
+      error: {
+        code: "ISSUE_NOT_FIXABLE",
+        message: "Only open issues can be marked fixed.",
+      },
+    };
+  }
+  if (!isSubmissionIssueResolved(submission, issue)) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Issue target must be corrected before it can be marked fixed.",
+      },
+    };
+  }
+
+  const clearedSubmission = clearOpenQuestionnaireIssueErrors(submission);
+  const withFixedIssue: Submission = {
+    ...clearedSubmission,
+    issues: clearedSubmission.issues.map((item) =>
+      item.id === issueId && isIssueTransitionAllowed(item.status, "fixed_by_agent")
+        ? { ...item, status: "fixed_by_agent" }
+        : item,
+    ),
+    updatedAt: "сейчас",
+    history: [
+      {
+        id: `и-${submission.id}-${issueId}-исправлено`,
+        text: "Агент отметил замечание исправленным",
+        at: "сейчас",
+        source: "agent",
+      },
+      ...submission.history,
+    ],
+  };
+
+  return { ok: true, data: withFixedIssue };
 }
 
 export function getCardActionLabel(submission: Submission, role: Role) {
@@ -556,18 +671,16 @@ export function applySubmissionActionResult(
       data: {
         ...corrected,
         status: "corrections_received",
-        issues: corrected.issues.map((issue) =>
-          isIssueTransitionAllowed(issue.status, "fixed_by_agent")
-            ? { ...issue, status: "fixed_by_agent" }
-            : issue,
-        ),
+        issues: corrected.issues,
         updatedAt: "сейчас",
         history: [
           {
             id: `и-${submission.id}-исправления`,
             text: "Агент отправил исправления",
             at: "сейчас",
+            fromStatus: submission.status,
             source: "agent",
+            toStatus: "corrections_received",
           },
           ...corrected.history,
         ],
@@ -595,7 +708,9 @@ export function applySubmissionActionResult(
             id: `и-${submission.id}-принято`,
             text: "Администратор закрыл исправления и принял подачу",
             at: "сейчас",
+            fromStatus: submission.status,
             source: "admin",
+            toStatus: "ready_for_export",
           },
           ...submission.history,
         ],
@@ -618,7 +733,9 @@ export function applySubmissionActionResult(
             id: `и-${submission.id}-принято`,
             text: "Администратор принял подачу",
             at: "сейчас",
+            fromStatus: submission.status,
             source: "admin",
+            toStatus: "ready_for_export",
           },
           ...submission.history,
         ],
@@ -641,7 +758,9 @@ export function applySubmissionActionResult(
             id: `и-${submission.id}-на-проверку`,
             text: "Агент отправил подачу на проверку",
             at: "сейчас",
+            fromStatus: submission.status,
             source: "agent",
+            toStatus: "submitted_for_review",
           },
           ...submission.history,
         ],
@@ -662,7 +781,9 @@ export function applySubmissionActionResult(
             id: `и-${submission.id}-выгружено`,
             text: "Подача отмечена выгруженной",
             at: "сейчас",
+            fromStatus: submission.status,
             source: "admin",
+            toStatus: "exported",
           },
           ...submission.history,
         ],
@@ -682,7 +803,9 @@ export function applySubmissionActionResult(
           id: `и-${submission.id}-${action}`,
           text: `Статус изменен: ${statusLabels[transition.to]}`,
           at: "сейчас",
+          fromStatus: submission.status,
           source: role,
+          toStatus: transition.to,
         },
         ...submission.history,
       ],
@@ -741,7 +864,7 @@ function markReviewFilesAccepted(
   });
 }
 
-function isIssueResolved(submission: Submission, issue: Issue) {
+export function isSubmissionIssueResolved(submission: Submission, issue: Issue) {
   if (issue.target.fileType) {
     const file = submission.files.find(
       (item) =>
