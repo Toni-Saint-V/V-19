@@ -235,7 +235,7 @@ describe("Supabase persistence failure paths", () => {
     });
   });
 
-  test("does not auto-create a missing profile after Supabase sign-in", async () => {
+  test("recovers a confirmed sandbox auth user as an agent profile", async () => {
     const signInWithPassword = vi.fn(async () => ({
       data: {
         session: {
@@ -251,7 +251,21 @@ describe("Supabase persistence failure paths", () => {
       },
       error: null,
     }));
-    const upsert = vi.fn();
+    const upsert = vi.fn(() => ({
+      select: () => ({
+        single: async () => ({
+          data: {
+            id: "00000000-0000-4000-8000-000000000321",
+            email: "confirmed-agent@example.com",
+            display_name: "Confirmed Agent",
+            organization_name: "Confirmed Agency",
+            role: "agent",
+            created_at: "2026-06-28T00:00:00.000Z",
+          },
+          error: null,
+        }),
+      }),
+    }));
     supabaseMock.client = {
       auth: { signInWithPassword },
       from: () => ({
@@ -266,10 +280,19 @@ describe("Supabase persistence failure paths", () => {
 
     await expect(
       signInSupabaseWithPassword("confirmed-agent@example.com", "secret-password"),
-    ).rejects.toThrow(
-      "Supabase profile was not found for this user. Production profile repair requires owner-approved role assignment.",
-    );
-    expect(upsert).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({
+      mode: "supabase",
+      profile: {
+        email: "confirmed-agent@example.com",
+        role: "agent",
+      },
+    });
+    expect(upsert).toHaveBeenCalledWith({
+      id: "00000000-0000-4000-8000-000000000321",
+      email: "confirmed-agent@example.com",
+      display_name: "Confirmed Agent",
+      organization_name: "Confirmed Agency",
+    });
   });
 
   test("does not auto-create a missing profile during production sign-in", async () => {

@@ -1,6 +1,7 @@
 import type { Role } from "../types/domain";
 import type { AppProfile, AppSession } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
+import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { fetchCurrentProfile, upsertProfile } from "./profileService";
 import { mapSupabasePersistenceError } from "./persistenceObservability";
 
@@ -45,7 +46,11 @@ async function profileForSupabaseUser(user: {
   const existingProfile = await fetchCurrentProfile(user.id);
   if (existingProfile) return existingProfile;
 
-  if (!options.allowMissingProfileRecovery) {
+  const canRecoverMissingProfile =
+    options.allowMissingProfileRecovery &&
+    supabaseRuntimeConfig.evidence.target !== "production";
+
+  if (!canRecoverMissingProfile) {
     throw new Error(
       "Supabase profile was not found for this user. Production profile repair requires owner-approved role assignment.",
     );
@@ -132,7 +137,7 @@ export async function signInSupabaseWithPassword(
   }
 
   const profile = await profileForSupabaseUser(data.session.user, {
-    allowMissingProfileRecovery: false,
+    allowMissingProfileRecovery: true,
   });
 
   return {

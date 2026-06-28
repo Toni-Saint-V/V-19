@@ -66,6 +66,14 @@ describe("Supabase security contract", () => {
     expect(migration).not.toContain("grant select, insert, update on public.profiles");
   });
 
+  test("keeps frontend Supabase auth on sign-in and out of self-service signup", () => {
+    const authService = readProjectFile("src/services/authService.ts");
+
+    expect(authService).toContain("client.auth.signInWithPassword");
+    expect(authService).not.toContain("client.auth.signUp");
+    expect(authService).not.toContain(".signUp(");
+  });
+
   test("blocks agent-owned writes from changing operator review and handoff state", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260611000000_visaflow_mvp_foundation.sql",
