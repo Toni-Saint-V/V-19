@@ -9991,6 +9991,796 @@ p {
   }
 }
 
+/* Figma Make transfer layer: kept at EOF to beat the legacy submissions surface rules. */
+.ops-shell.surface-agent-actions,
+.ops-shell.surface-agent-submissions,
+.ops-shell.surface-admin-review {
+  --v19-sidebar-width: 288px;
+  grid-template-columns: var(--v19-sidebar-width) minmax(0, 1fr);
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #101011;
+}
+
+.ops-shell.surface-agent-actions .ops-sidebar,
+.ops-shell.surface-agent-submissions .ops-sidebar,
+.ops-shell.surface-admin-review .ops-sidebar {
+  width: 288px !important;
+  padding: 16px 12px 12px !important;
+  border-right: 1px solid #202124 !important;
+  background: #161617 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand,
+.ops-shell.surface-agent-submissions .ops-brand,
+.ops-shell.surface-admin-review .ops-brand {
+  min-height: 54px !important;
+  padding: 0 4px 16px !important;
+  gap: 12px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-logo,
+.ops-shell.surface-agent-submissions .ops-brand-logo,
+.ops-shell.surface-admin-review .ops-brand-logo {
+  display: grid !important;
+  width: 40px !important;
+  height: 40px !important;
+  place-items: center !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #0a0a0b !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-copy strong,
+.ops-shell.surface-agent-submissions .ops-brand-copy strong,
+.ops-shell.surface-admin-review .ops-brand-copy strong {
+  color: #f3f3f5 !important;
+  font-size: 15px !important;
+  font-weight: 660 !important;
+  line-height: 1.15 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-copy em,
+.ops-shell.surface-agent-submissions .ops-brand-copy em,
+.ops-shell.surface-admin-review .ops-brand-copy em {
+  color: rgb(255 255 255 / 0.5) !important;
+  font-size: 11px !important;
+  font-weight: 450 !important;
+}
+
+.ops-shell.surface-agent-actions .workspace,
+.ops-shell.surface-agent-submissions .workspace,
+.ops-shell.surface-admin-review .workspace {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: 64px minmax(0, 1fr) !important;
+  min-width: 0;
+  min-height: 0;
+  background: #141416 !important;
+}
+
+.ops-shell.surface-agent-actions .workspace > .topbar,
+.ops-shell.surface-agent-submissions .workspace > .topbar,
+.ops-shell.surface-admin-review .workspace > .topbar {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  padding: 0 36px !important;
+  border-bottom: 1px solid #202124 !important;
+  background: #141416 !important;
+}
+
+.ops-shell.surface-agent-actions .workspace > .vf-figma-screen,
+.ops-shell.surface-agent-submissions .workspace > .vf-figma-screen,
+.ops-shell.surface-admin-review .workspace > .vf-figma-screen {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  margin: 0 !important;
+}
+
+.ops-shell.surface-agent-actions .topbar-heading p,
+.ops-shell.surface-agent-submissions .topbar-heading p,
+.ops-shell.surface-admin-review .topbar-heading p {
+  display: none !important;
+}
+
+.ops-shell.surface-agent-actions .topbar h1,
+.ops-shell.surface-agent-submissions .topbar h1,
+.ops-shell.surface-admin-review .topbar h1 {
+  color: #f3f3f5 !important;
+  font-size: 21px !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-left: auto !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 18px !important;
+  border-radius: 10px !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  font-weight: 560 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta svg,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta svg,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta svg {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.8 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta path,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta path,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta path {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta.primary-button,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta.primary-button,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta.primary-button {
+  min-width: 154px !important;
+  border-color: #4651c9 !important;
+  background: #3a45b4 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.ops-shell.surface-agent-actions .vf-figma-topbar-actions .v19-topbar-cta.is-secondary,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.ops-shell.surface-agent-submissions .vf-figma-topbar-actions .v19-topbar-cta.is-secondary,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
+.ops-shell.surface-admin-review .vf-figma-topbar-actions .v19-topbar-cta.is-secondary {
+  min-width: 128px !important;
+  border-color: #242529 !important;
+  background: #1e1e21 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav-item[id],
+.ops-shell.surface-agent-submissions .ops-nav-item[id],
+.ops-shell.surface-admin-review .ops-nav-item[id] {
+  letter-spacing: 0 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav-item:has(.ops-nav-copy strong:first-child),
+.ops-shell.surface-agent-submissions .ops-nav-item:has(.ops-nav-copy strong:first-child),
+.ops-shell.surface-admin-review .ops-nav-item:has(.ops-nav-copy strong:first-child) {
+  min-height: 38px;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-tabs button,
+.ops-shell.surface-agent-submissions .vf-figma-tabs button,
+.ops-shell.surface-admin-review .vf-figma-tabs button,
+.ops-shell.surface-agent-actions .vf-figma-view-toggle button,
+.ops-shell.surface-admin-review .vf-figma-view-toggle button {
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-row,
+.ops-shell.surface-admin-review .vf-figma-action-row {
+  grid-template-columns:
+    24px minmax(210px, 1fr) minmax(132px, 160px) minmax(118px, 136px)
+    minmax(112px, 140px) minmax(116px, 128px) !important;
+  gap: 12px !important;
+  padding: 0 12px 0 20px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-meta,
+.ops-shell.surface-admin-review .vf-figma-action-meta {
+  padding-left: 14px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-open-button,
+.ops-shell.surface-admin-review .vf-figma-open-button {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.ops-shell.surface-agent-actions,
+.ops-shell.surface-agent-submissions,
+.ops-shell.surface-admin-review {
+  --v19-sidebar-width: 240px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-sidebar,
+.ops-shell.surface-agent-submissions .ops-sidebar,
+.ops-shell.surface-admin-review .ops-sidebar {
+  width: 240px !important;
+  padding: 14px 10px 10px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand,
+.ops-shell.surface-agent-submissions .ops-brand,
+.ops-shell.surface-admin-review .ops-brand {
+  min-height: 48px !important;
+  padding: 0 2px 14px !important;
+  gap: 10px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-logo,
+.ops-shell.surface-agent-submissions .ops-brand-logo,
+.ops-shell.surface-admin-review .ops-brand-logo {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 10px !important;
+  font-size: 14px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-brand-copy strong,
+.ops-shell.surface-agent-submissions .ops-brand-copy strong,
+.ops-shell.surface-admin-review .ops-brand-copy strong {
+  font-size: 14px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-sidebar-command,
+.ops-shell.surface-agent-submissions .ops-sidebar-command,
+.ops-shell.surface-admin-review .ops-sidebar-command {
+  height: 36px !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
+  border-radius: 9px !important;
+  font-size: 13px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav,
+.ops-shell.surface-agent-submissions .ops-nav,
+.ops-shell.surface-admin-review .ops-nav {
+  margin-top: 18px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav-item,
+.ops-shell.surface-agent-submissions .ops-nav-item,
+.ops-shell.surface-admin-review .ops-nav-item {
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  border-radius: 9px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav-copy strong,
+.ops-shell.surface-agent-submissions .ops-nav-copy strong,
+.ops-shell.surface-admin-review .ops-nav-copy strong {
+  font-size: 13px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-nav-count,
+.ops-shell.surface-agent-submissions .ops-nav-count,
+.ops-shell.surface-admin-review .ops-nav-count {
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 0 7px !important;
+  font-size: 11px !important;
+}
+
+.ops-shell.surface-agent-actions .ops-sidebar-footer,
+.ops-shell.surface-agent-submissions .ops-sidebar-footer,
+.ops-shell.surface-admin-review .ops-sidebar-footer {
+  display: grid !important;
+  align-self: stretch !important;
+  gap: 10px !important;
+  margin-top: auto !important;
+  padding: 10px !important;
+  border-top: 1px solid #202124 !important;
+}
+
+.ops-shell.surface-agent-actions .ops-session,
+.ops-shell.surface-agent-submissions .ops-session,
+.ops-shell.surface-admin-review .ops-session {
+  align-self: end !important;
+}
+
+.ops-shell.surface-agent-actions .workspace > .topbar,
+.ops-shell.surface-agent-submissions .workspace > .topbar,
+.ops-shell.surface-admin-review .workspace > .topbar {
+  padding: 0 30px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-screen,
+.ops-shell.surface-agent-submissions .vf-figma-screen,
+.ops-shell.surface-admin-review .vf-figma-screen {
+  padding: 28px 30px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-tabs,
+.ops-shell.surface-agent-submissions .vf-figma-tabs,
+.ops-shell.surface-admin-review .vf-figma-tabs {
+  border-color: #202124 !important;
+  background: #141416 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-tabs button,
+.ops-shell.surface-agent-submissions .vf-figma-tabs button,
+.ops-shell.surface-admin-review .vf-figma-tabs button {
+  min-height: 34px !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: rgb(255 255 255 / 0.44) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-tabs button.is-active,
+.ops-shell.surface-agent-submissions .vf-figma-tabs button.is-active,
+.ops-shell.surface-admin-review .vf-figma-tabs button.is-active {
+  border-color: #f5f5f5 !important;
+  background: #f5f5f5 !important;
+  color: #161617 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-tabs button.is-active span,
+.ops-shell.surface-agent-submissions .vf-figma-tabs button.is-active span,
+.ops-shell.surface-admin-review .vf-figma-tabs button.is-active span {
+  background: rgb(0 0 0 / 0.1) !important;
+  color: #252529 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-view-toggle,
+.ops-shell.surface-admin-review .vf-figma-view-toggle {
+  background: #141416 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-view-toggle button,
+.ops-shell.surface-admin-review .vf-figma-view-toggle button {
+  background: transparent !important;
+  color: rgb(255 255 255 / 0.44) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-view-toggle button.is-active,
+.ops-shell.surface-admin-review .vf-figma-view-toggle button.is-active {
+  background: #27272b !important;
+  color: #fff !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-board,
+.ops-shell.surface-admin-review .vf-figma-column-board {
+  gap: 18px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column,
+.ops-shell.surface-admin-review .vf-figma-column {
+  min-width: 220px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-stack,
+.ops-shell.surface-admin-review .vf-figma-column-stack {
+  gap: 7px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-card,
+.ops-shell.surface-admin-review .vf-figma-column-card {
+  gap: 5px !important;
+  min-height: 64px !important;
+  padding: 8px 9px !important;
+  border-radius: 8px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-card-head,
+.ops-shell.surface-admin-review .vf-figma-column-card-head {
+  gap: 8px !important;
+  font-size: 9px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-card-head em,
+.ops-shell.surface-admin-review .vf-figma-column-card-head em {
+  padding: 1px 5px !important;
+  font-size: 9px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-card > strong,
+.ops-shell.surface-admin-review .vf-figma-column-card > strong {
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-subline,
+.ops-shell.surface-admin-review .vf-figma-column-subline {
+  gap: 6px !important;
+  font-size: 9.5px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-footer,
+.ops-shell.surface-admin-review .vf-figma-column-footer {
+  min-height: 16px !important;
+  margin-top: 1px !important;
+  padding-top: 5px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-footer span,
+.ops-shell.surface-admin-review .vf-figma-column-footer span {
+  gap: 4px !important;
+  font-size: 9.5px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-footer svg,
+.ops-shell.surface-admin-review .vf-figma-column-footer svg {
+  width: 11px !important;
+  height: 11px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-footer em,
+.ops-shell.surface-admin-review .vf-figma-column-footer em {
+  font-size: 8.5px !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review) {
+  --v19-sidebar-width: 272px !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar {
+  width: 272px !important;
+  padding: 14px 12px 12px !important;
+  background: rgb(16 16 17) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-brand {
+  gap: 10px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  margin-bottom: 10px !important;
+  padding: 2px 6px 13px !important;
+  border-bottom: 1px solid rgb(255 255 255 / 0.075) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-nav-item {
+  min-height: 44px !important;
+  padding: 0 11px !important;
+  border-radius: 10px !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .ops-sidebar-footer {
+  margin-top: auto !important;
+  padding-top: 8px !important;
+  border-top: 1px solid rgb(32 33 36) !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-grid,
+.ops-shell.surface-agent-submissions .vf-figma-individual-grid {
+  grid-auto-columns: clamp(292px, 28vw, 340px) !important;
+  grid-auto-flow: column !important;
+  grid-template-columns: none !important;
+  gap: 18px !important;
+  max-width: none !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-inline: contain !important;
+  padding: 2px 2px 10px !important;
+  scroll-padding-inline: 2px !important;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-individual-grid {
+  grid-auto-columns: clamp(286px, 26vw, 326px) !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-applicants-screen {
+  grid-template-rows: auto auto auto !important;
+  gap: 20px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding-top: 24px !important;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-applicants-section {
+  min-height: 0 !important;
+  overflow: visible !important;
+  gap: 14px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-card,
+.ops-shell.surface-agent-submissions .vf-figma-individual-card {
+  gap: 14px !important;
+  min-height: 232px !important;
+  padding: 20px !important;
+  border-radius: 12px !important;
+  transition:
+    border-color 160ms var(--vf-figma-motion-ease),
+    background 160ms var(--vf-figma-motion-ease),
+    transform 160ms var(--vf-figma-motion-ease) !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-card:hover,
+.ops-shell.surface-agent-submissions .vf-figma-individual-card:hover {
+  transform: translateY(-1px) !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-card:focus-visible,
+.ops-shell.surface-agent-submissions .vf-figma-individual-card:focus-visible,
+.ops-shell.surface-agent-submissions .vf-figma-member-row:focus-visible {
+  outline: 2px solid rgb(104 116 232 / 0.72) !important;
+  outline-offset: 2px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-icon {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 12px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-icon svg {
+  width: 21px !important;
+  height: 21px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-head {
+  gap: 12px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-head strong,
+.ops-shell.surface-agent-submissions .vf-figma-individual-card strong {
+  overflow-wrap: anywhere !important;
+  font-size: 15px !important;
+  line-height: 1.18 !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-head em,
+.ops-shell.surface-agent-submissions .vf-figma-individual-card > span:nth-child(2) em {
+  margin-top: 4px !important;
+  font-size: 12px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-member-row {
+  grid-template-columns: 28px minmax(0, 1fr) max-content 16px !important;
+  gap: 9px !important;
+  min-height: 32px !important;
+  padding: 1px 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+  font: inherit !important;
+  text-align: left !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-member-row em {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 10px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-member-row strong,
+.ops-shell.surface-agent-submissions .vf-figma-member-row small {
+  font-size: 12px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-member-row small {
+  color: rgb(255 255 255 / 0.42) !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-member-row svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-member-progress {
+  width: 9px !important;
+  height: 9px !important;
+  box-shadow: 0 0 0 3px #161617 !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-footer {
+  gap: 10px !important;
+  padding-top: 12px !important;
+  font-size: 11px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-footer em {
+  gap: 5px !important;
+  padding: 3px 7px !important;
+  border-radius: 7px !important;
+  font-size: 11px !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-footer svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-individual-card {
+  grid-template-columns: 48px minmax(0, 1fr) !important;
+  min-height: 156px !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  font-size: 13px !important;
+}
+
+@media (max-width: 900px) {
+  .ops-shell.surface-agent-submissions .vf-figma-family-grid,
+  .ops-shell.surface-agent-submissions .vf-figma-individual-grid {
+    grid-auto-columns: minmax(286px, 72vw) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-applicants-screen {
+    gap: 18px !important;
+    padding-top: 20px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ops-shell.surface-agent-submissions .vf-figma-family-grid,
+  .ops-shell.surface-agent-submissions .vf-figma-individual-grid {
+    grid-auto-columns: minmax(292px, calc(100vw - 64px)) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-family-card,
+  .ops-shell.surface-agent-submissions .vf-figma-individual-card {
+    min-height: 226px !important;
+    padding: 18px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-individual-card {
+    min-height: 150px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-member-row {
+    grid-template-columns: 28px minmax(0, 1fr) 16px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-member-row small {
+    display: none !important;
+  }
+}
+
+.ops-shell.surface-agent-actions .vf-figma-filter-menu,
+.ops-shell.surface-admin-review .vf-figma-filter-menu {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-filter-popover,
+.ops-shell.surface-admin-review .vf-figma-filter-popover {
+  position: absolute !important;
+  z-index: 30 !important;
+  top: calc(100% + 8px) !important;
+  right: 0 !important;
+  display: grid !important;
+  min-width: 132px !important;
+  gap: 4px !important;
+  padding: 8px !important;
+  border: 1px solid #242529 !important;
+  border-radius: 10px !important;
+  background: #161617 !important;
+  box-shadow: 0 18px 40px rgb(0 0 0 / 0.32) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-filter-popover span,
+.ops-shell.surface-admin-review .vf-figma-filter-popover span {
+  padding: 2px 8px 5px !important;
+  color: rgb(255 255 255 / 0.42) !important;
+  font-size: 10px !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-filter-popover button,
+.ops-shell.surface-admin-review .vf-figma-filter-popover button {
+  justify-content: flex-start !important;
+  min-height: 30px !important;
+  padding: 0 8px !important;
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: rgb(255 255 255 / 0.58) !important;
+  font-size: 12px !important;
+  font-weight: 560 !important;
+  text-align: left !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-filter-popover button.is-active,
+.ops-shell.surface-admin-review .vf-figma-filter-popover button.is-active {
+  border-color: #2e2f34 !important;
+  background: #27272b !important;
+  color: #fff !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-view-stage,
+.ops-shell.surface-admin-review .vf-figma-view-stage {
+  min-width: 0 !important;
+  transform-origin: 50% 0 !important;
+  animation: vf-figma-view-enter 170ms var(--vf-figma-motion-ease) both !important;
+  will-change: opacity, transform !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-view-stage.is-columns,
+.ops-shell.surface-admin-review .vf-figma-view-stage.is-columns {
+  animation-name: vf-figma-view-enter !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-filter-popover,
+.ops-shell.surface-admin-review .vf-figma-filter-popover {
+  transform-origin: 100% 0 !important;
+  animation: vf-figma-popover-enter 160ms var(--vf-figma-motion-ease) both !important;
+}
+
+@keyframes vf-figma-view-enter {
+  from {
+    opacity: 0.5;
+    transform: translateY(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vf-figma-popover-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-shell.surface-agent-actions .vf-figma-view-stage,
+  .ops-shell.surface-admin-review .vf-figma-view-stage,
+  .ops-shell.surface-agent-actions .vf-figma-filter-popover,
+  .ops-shell.surface-admin-review .vf-figma-filter-popover {
+    animation: none !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+}
+
 @media (max-width: 1179px) {
   .v19-screen-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -14214,5 +15004,401 @@ p {
   .submission-detail-drawer .drawer-footer .secondary-button,
   .submission-detail-drawer .drawer-footer .ghost-button {
     width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .ops-shell:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-admin-review
+    )
+    .v19-topbar-menu {
+    display: grid;
+  }
+
+  .ops-shell:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-admin-review
+    )
+    .ops-sidebar {
+    display: none;
+  }
+
+  .ops-shell:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-admin-review
+    ).is-mobile-nav-open
+    .ops-sidebar {
+    position: fixed;
+    inset: 8px;
+    z-index: 180;
+    display: flex;
+    width: auto;
+    height: auto;
+    border: 1px solid var(--v19-line-strong);
+    border-radius: 18px;
+    background: var(--v19-panel);
+    box-shadow: 0 18px 42px rgb(0 0 0 / 0.42);
+  }
+
+  .ops-shell:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-admin-review
+    ).is-mobile-nav-open
+    .workspace {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ops-shell.surface-agent-submissions
+    .vf-figma-topbar-actions
+    .v19-topbar-cta.is-secondary,
+  .ops-shell.surface-agent-submissions
+    .vf-figma-topbar-actions
+    .v19-topbar-cta.secondary-button {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-submissions
+    .vf-figma-topbar-actions
+    .v19-topbar-cta.primary-button {
+    min-width: 142px !important;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ops-shell.surface-agent-submissions .vf-figma-topbar-actions {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-submissions .topbar h1 {
+    font-size: 21px !important;
+    line-height: 1.08 !important;
+  }
+}
+
+.ops-shell.surface-agent-actions .vf-figma-actions-screen,
+.ops-shell.surface-admin-review .vf-figma-actions-screen {
+  gap: 24px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-actions-toolbar,
+.ops-shell.surface-admin-review .vf-figma-actions-toolbar {
+  position: relative !important;
+  z-index: 5 !important;
+  gap: 18px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-list,
+.ops-shell.surface-admin-review .vf-figma-action-list {
+  gap: 10px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-view-stage,
+.ops-shell.surface-admin-review .vf-figma-view-stage {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-row,
+.ops-shell.surface-admin-review .vf-figma-action-row {
+  min-height: 84px !important;
+  border-radius: 13px !important;
+  transition:
+    border-color 160ms var(--vf-figma-motion-ease),
+    background 160ms var(--vf-figma-motion-ease),
+    transform 160ms var(--vf-figma-motion-ease) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-row:hover,
+.ops-shell.surface-admin-review .vf-figma-action-row:hover {
+  transform: translateY(-1px) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-row:focus-visible,
+.ops-shell.surface-admin-review .vf-figma-action-row:focus-visible,
+.ops-shell.surface-agent-actions .vf-figma-column-card:focus-visible,
+.ops-shell.surface-admin-review .vf-figma-column-card:focus-visible {
+  outline: 2px solid rgb(104 116 232 / 0.72) !important;
+  outline-offset: 2px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-title strong,
+.ops-shell.surface-admin-review .vf-figma-action-title strong,
+.ops-shell.surface-agent-actions .vf-figma-action-meta strong,
+.ops-shell.surface-admin-review .vf-figma-action-meta strong,
+.ops-shell.surface-agent-actions .vf-figma-action-dates strong,
+.ops-shell.surface-admin-review .vf-figma-action-dates strong {
+  font-size: 14px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-title em,
+.ops-shell.surface-admin-review .vf-figma-action-title em,
+.ops-shell.surface-agent-actions .vf-figma-action-meta em,
+.ops-shell.surface-admin-review .vf-figma-action-meta em,
+.ops-shell.surface-agent-actions .vf-figma-action-dates em,
+.ops-shell.surface-admin-review .vf-figma-action-dates em {
+  color: rgb(255 255 255 / 0.42) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-board,
+.ops-shell.surface-admin-review .vf-figma-column-board {
+  grid-auto-columns: minmax(252px, 1fr) !important;
+  padding: 2px 2px 14px !important;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column,
+.ops-shell.surface-admin-review .vf-figma-column {
+  min-width: 252px !important;
+  max-width: 320px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-card,
+.ops-shell.surface-admin-review .vf-figma-column-card {
+  min-height: 104px !important;
+  padding: 12px 13px !important;
+  border-radius: 10px !important;
+  gap: 8px !important;
+  transition:
+    border-color 160ms var(--vf-figma-motion-ease),
+    background 160ms var(--vf-figma-motion-ease),
+    transform 160ms var(--vf-figma-motion-ease) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-card:hover,
+.ops-shell.surface-admin-review .vf-figma-column-card:hover {
+  transform: translateY(-1px) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-card > strong,
+.ops-shell.surface-admin-review .vf-figma-column-card > strong {
+  overflow-wrap: anywhere !important;
+  font-size: 13px !important;
+  line-height: 1.18 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-subline,
+.ops-shell.surface-admin-review .vf-figma-column-subline {
+  min-width: 0 !important;
+  font-size: 10.5px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-footer,
+.ops-shell.surface-admin-review .vf-figma-column-footer {
+  min-height: 24px !important;
+  margin-top: 2px !important;
+  padding-top: 8px !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-column-footer span,
+.ops-shell.surface-admin-review .vf-figma-column-footer span {
+  font-size: 10.5px !important;
+}
+
+@media (max-width: 1100px) {
+  .ops-shell.surface-agent-actions .vf-figma-topbar-actions {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .topbar h1 {
+    font-size: 21px !important;
+    line-height: 1.08 !important;
+  }
+
+  .ops-shell.surface-agent-actions
+    .vf-figma-topbar-actions
+    .v19-topbar-cta.is-secondary,
+  .ops-shell.surface-agent-actions
+    .vf-figma-topbar-actions
+    .v19-topbar-cta.secondary-button {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions
+    .vf-figma-topbar-actions
+    .v19-topbar-cta.primary-button {
+    min-width: 142px !important;
+    padding: 0 14px !important;
+    font-size: 13px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-actions-screen {
+    gap: 20px !important;
+    padding: 22px 18px 96px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-actions-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 42px !important;
+    padding: 4px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tools {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-search {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-row {
+    width: 100% !important;
+    grid-template-columns: 14px minmax(0, 1fr) minmax(104px, 118px) !important;
+    grid-auto-rows: auto !important;
+    align-items: start !important;
+    min-height: 0 !important;
+    padding: 15px !important;
+    gap: 9px 12px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-dot {
+    grid-column: 1 !important;
+    grid-row: 1 / span 3 !important;
+    margin-top: 5px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-title {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-meta {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-dates {
+    grid-column: 2 !important;
+    grid-row: 3 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-open-button {
+    grid-column: 3 !important;
+    grid-row: 2 / span 2 !important;
+    align-self: end !important;
+    width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column-board {
+    grid-auto-columns: minmax(286px, 72vw) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ops-shell.surface-agent-actions .vf-figma-topbar-actions {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .workspace > .topbar {
+    align-items: center !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 12px !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    padding: 0 18px !important;
+  }
+
+  .ops-shell.surface-agent-actions .topbar-heading {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-topbar-menu {
+    flex: 0 0 40px !important;
+  }
+
+  .ops-shell.surface-agent-actions .topbar h1 {
+    font-size: 21px !important;
+    line-height: 1.08 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-actions-screen {
+    padding: 18px 14px 92px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs {
+    min-height: 42px !important;
+    padding: 4px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs button {
+    flex: 0 0 auto !important;
+    min-height: 34px !important;
+    padding: 0 14px !important;
+    font-size: 12px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-row {
+    grid-template-columns: 14px minmax(0, 1fr) !important;
+    padding: 14px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status,
+  .ops-shell.surface-agent-actions .vf-figma-action-meta,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates,
+  .ops-shell.surface-agent-actions .vf-figma-open-button {
+    grid-column: 2 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status {
+    grid-row: 2 !important;
+    justify-self: start !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-meta {
+    grid-row: 3 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-dates {
+    grid-row: 4 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-open-button {
+    grid-row: 5 !important;
+    justify-self: stretch !important;
+    min-height: 38px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column-board {
+    grid-auto-columns: minmax(292px, calc(100vw - 64px)) !important;
   }
 }
