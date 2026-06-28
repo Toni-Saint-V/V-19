@@ -23,7 +23,6 @@ vi.mock("../../src/lib/supabase/config", () => ({
 
 import {
   signInSupabaseWithPassword,
-  signUpSupabaseAgentWithPassword,
 } from "../../src/services/authService";
 import { saveSubmissionDraft } from "../../src/services/submissionService";
 import {
@@ -236,7 +235,7 @@ describe("Supabase persistence failure paths", () => {
     });
   });
 
-  test("recovers a missing agent profile after confirmed Supabase sign-up", async () => {
+  test("does not auto-create a missing profile after Supabase sign-in", async () => {
     const signInWithPassword = vi.fn(async () => ({
       data: {
         session: {
@@ -252,7 +251,7 @@ describe("Supabase persistence failure paths", () => {
       },
       error: null,
     }));
-    const upsertPayloads: unknown[] = [];
+    const upsert = vi.fn();
     supabaseMock.client = {
       auth: { signInWithPassword },
       from: () => ({
@@ -261,41 +260,16 @@ describe("Supabase persistence failure paths", () => {
             maybeSingle: async () => ({ data: null, error: null }),
           }),
         }),
-        upsert: (payload: unknown) => {
-          upsertPayloads.push(payload);
-          return {
-            select: () => ({
-              single: async () => ({
-                data: {
-                  id: "00000000-0000-4000-8000-000000000321",
-                  email: "confirmed-agent@example.com",
-                  display_name: "Confirmed Agent",
-                  organization_name: "Confirmed Agency",
-                  role: "agent",
-                },
-                error: null,
-              }),
-            }),
-          };
-        },
+        upsert,
       }),
     };
 
     await expect(
       signInSupabaseWithPassword("confirmed-agent@example.com", "secret-password"),
-    ).resolves.toMatchObject({
-      mode: "supabase",
-      profile: {
-        email: "confirmed-agent@example.com",
-        role: "agent",
-      },
-    });
-    expect(upsertPayloads[0]).toEqual({
-      id: "00000000-0000-4000-8000-000000000321",
-      email: "confirmed-agent@example.com",
-      display_name: "Confirmed Agent",
-      organization_name: "Confirmed Agency",
-    });
+    ).rejects.toThrow(
+      "Supabase profile was not found for this user. Production profile repair requires owner-approved role assignment.",
+    );
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   test("does not auto-create a missing profile during production sign-in", async () => {
@@ -335,79 +309,4 @@ describe("Supabase persistence failure paths", () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
-  test("creates Supabase sign-up profile without writing client-owned role", async () => {
-    const signUp = vi.fn(async () => ({
-      data: {
-        session: {
-          user: {
-            id: "00000000-0000-4000-8000-000000000123",
-            email: "new-agent@example.com",
-          },
-        },
-      },
-      error: null,
-    }));
-    const upsertPayloads: unknown[] = [];
-    supabaseMock.client = {
-      auth: { signUp },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => ({ data: null, error: null }),
-          }),
-        }),
-        upsert: (payload: unknown) => {
-          upsertPayloads.push(payload);
-          return {
-            select: () => ({
-              single: async () => ({
-                data: {
-                  id: "00000000-0000-4000-8000-000000000123",
-                  email: "new-agent@example.com",
-                  display_name: "New Agent",
-                  organization_name: "New Agency",
-                  role: "agent",
-                },
-                error: null,
-              }),
-            }),
-          };
-        },
-      }),
-    };
-
-    await expect(
-      signUpSupabaseAgentWithPassword({
-        displayName: "New Agent",
-        email: "NEW-AGENT@example.com",
-        organizationName: "New Agency",
-        password: "secret-password",
-      }),
-    ).resolves.toMatchObject({
-      status: "authenticated",
-      session: {
-        mode: "supabase",
-        profile: {
-          email: "new-agent@example.com",
-          role: "agent",
-        },
-      },
-    });
-    expect(signUp).toHaveBeenCalledWith({
-      email: "new-agent@example.com",
-      password: "secret-password",
-      options: {
-        data: {
-          display_name: "New Agent",
-          organization_name: "New Agency",
-        },
-      },
-    });
-    expect(upsertPayloads[0]).toEqual({
-      id: "00000000-0000-4000-8000-000000000123",
-      email: "new-agent@example.com",
-      display_name: "New Agent",
-      organization_name: "New Agency",
-    });
-  });
 });
