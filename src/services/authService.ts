@@ -1,15 +1,10 @@
 import type { Role } from "../types/domain";
 import type { AppProfile, AppSession } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
-import { supabaseRuntimeConfig } from "../lib/supabase/config";
 import { fetchCurrentProfile, upsertProfile } from "./profileService";
 import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 export type { AppProfile, AppSession };
-
-export type SupabaseSignUpResult =
-  | { status: "authenticated"; session: AppSession }
-  | { status: "confirmation_required"; email: string };
 
 const demoProfiles: Record<Role, AppProfile> = {
   agent: {
@@ -137,76 +132,13 @@ export async function signInSupabaseWithPassword(
   }
 
   const profile = await profileForSupabaseUser(data.session.user, {
-    allowMissingProfileRecovery:
-      supabaseRuntimeConfig.evidence.target !== "production",
+    allowMissingProfileRecovery: false,
   });
 
   return {
     mode: "supabase",
     profile,
     supabaseSession: data.session,
-  };
-}
-
-export async function signUpSupabaseAgentWithPassword({
-  displayName,
-  email,
-  organizationName,
-  password,
-}: {
-  displayName: string;
-  email: string;
-  organizationName?: string;
-  password: string;
-}): Promise<SupabaseSignUpResult> {
-  const client = getSupabaseClient();
-  if (!client) {
-    throw new Error("Supabase is inactive.");
-  }
-
-  const safeEmail = email.trim().toLowerCase();
-  const safeDisplayName = displayName.trim() || safeEmail;
-  const safeOrganizationName = organizationName?.trim() || null;
-  const { data, error } = await client.auth.signUp({
-    email: safeEmail,
-    password,
-    options: {
-      data: {
-        display_name: safeDisplayName,
-        organization_name: safeOrganizationName,
-      },
-    },
-  });
-
-  if (error) {
-    throw mapSupabasePersistenceError(error, {
-      operation: "auth.sign_up_password",
-      fallbackKind: "auth",
-    });
-  }
-
-  if (!data.session?.user.id) {
-    return {
-      status: "confirmation_required",
-      email: safeEmail,
-    };
-  }
-
-  const profile = await profileForSupabaseUser(data.session.user, {
-    allowMissingProfileRecovery: true,
-    fallback: {
-      displayName: safeDisplayName,
-      organizationName: safeOrganizationName,
-    },
-  });
-
-  return {
-    status: "authenticated",
-    session: {
-      mode: "supabase",
-      profile,
-      supabaseSession: data.session,
-    },
   };
 }
 

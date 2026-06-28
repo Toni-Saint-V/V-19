@@ -141,9 +141,15 @@ import {
 import {
   getCurrentAppSession,
   signInSupabaseWithPassword,
-  signUpSupabaseAgentWithPassword,
   signOutCurrentSession,
 } from "./services/authService";
+import {
+  AuthAccessError,
+  accessRequestRepository,
+  authRepository,
+  type AccessRequest,
+  type Session as LocalAuthSession,
+} from "./services/authRegistration";
 import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
 import { invokePassportExtraction } from "./modules/submissions/passportExtractionService";
 import {
@@ -168,7 +174,6 @@ const CreateSubmissionDrawer = lazy(() =>
 const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
 const fallbackAdminEmails = ["admin@visaflow.local"];
-const fallbackAgentEmails = ["agent@visaflow.local"];
 
 type IssueComposerRequest = {
   submissionId: string;
@@ -292,10 +297,6 @@ const adminEmails = parseWorkspaceEmails(
   import.meta.env.VITE_ADMIN_EMAILS,
   fallbackAdminEmails,
 );
-const agentEmails = parseWorkspaceEmails(
-  import.meta.env.VITE_AGENT_EMAILS,
-  fallbackAgentEmails,
-);
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -304,7 +305,6 @@ function normalizeEmail(email: string) {
 function resolveWorkspaceRole(email: string): Role | null {
   const normalized = normalizeEmail(email);
   if (adminEmails.includes(normalized)) return "admin";
-  if (agentEmails.includes(normalized)) return "agent";
   return null;
 }
 
@@ -421,14 +421,16 @@ function MainApp() {
   const [role, setRole] = useState<Role>(initialWorkspaceRole);
   const [workspaceEmailDraft, setWorkspaceEmailDraft] = useState(workspaceEmail);
   const [workspacePasswordDraft, setWorkspacePasswordDraft] = useState("");
-  const [workspaceAuthMode, setWorkspaceAuthMode] = useState<"sign-in" | "sign-up">(
-    "sign-in",
-  );
-  const [workspaceNameDraft, setWorkspaceNameDraft] = useState("");
-  const [workspaceOrganizationDraft, setWorkspaceOrganizationDraft] = useState("");
   const [workspaceAccessError, setWorkspaceAccessError] = useState("");
+  const [workspaceAccessNotice, setWorkspaceAccessNotice] = useState("");
   const [authChecked, setAuthChecked] = useState(!isSupabaseMode);
   const [loginBusy, setLoginBusy] = useState(false);
+  const [localAuthSession, setLocalAuthSession] = useState<LocalAuthSession | null>(
+    null,
+  );
+  const [pendingAccessRequests, setPendingAccessRequests] = useState<
+    AccessRequest[]
+  >([]);
   const [remoteProfile, setRemoteProfile] = useState<AppProfile | null>(null);
   const [remoteSaveState, setRemoteSaveState] = useState<
     "idle" | "loading" | "saving" | "error"
@@ -577,7 +579,8 @@ function MainApp() {
   const exportPlan = exportSummary(selectedForExport);
   const showRoleSwitcher =
     !isSupabaseMode &&
-    (import.meta.env.DEV || import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true");
+    Boolean(localAuthSession) &&
+    import.meta.env.VITE_ENABLE_ROLE_SWITCH === "true";
   const isV19CollectionSurface =
     surface === "agent-actions" ||
     surface === "agent-inbox" ||
@@ -591,15 +594,16 @@ function MainApp() {
   const workspaceSurfaceDescription =
     surface === "admin-review" ? "Проверка и события" : surfaceDescription(surface);
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
-  const resolvedWorkspaceRole = resolveWorkspaceRole(workspaceEmail);
   const hasWorkspaceAccess = isSupabaseMode
     ? Boolean(remoteProfile)
-    : showRoleSwitcher || Boolean(resolvedWorkspaceRole);
+    : Boolean(localAuthSession);
   const emptyRemoteWorkspace =
     isSupabaseMode && Boolean(remoteProfile) && authChecked && submissions.length === 0;
   const sessionDisplayName =
     isSupabaseMode && remoteProfile
       ? remoteProfile.displayName || remoteProfile.email
+      : localAuthSession
+        ? localAuthSession.email
       : role === "agent"
         ? "Татьяна Новикова"
         : "Ирина Лебедева";
@@ -608,6 +612,10 @@ function MainApp() {
       ? remoteProfile.role === "admin"
         ? "АД"
         : "АГ"
+      : localAuthSession
+        ? localAuthSession.role === "admin"
+          ? "АД"
+          : "АГ"
       : role === "agent"
         ? "ТН"
         : "ИЛ";
@@ -616,6 +624,8 @@ function MainApp() {
       ? remoteProfile.role === "admin"
         ? "Admin profile"
         : "Agent profile"
+      : localAuthSession
+        ? `${localAuthSession.role === "admin" ? "Админ" : "Агент"} · local/dev auth`
       : `${role === "agent" ? "Агент" : "Админ"} · VisaFlow Operations`;
   const operationalNavItems: OperationalNavItem[] =
     role === "agent"
@@ -743,6 +753,51 @@ function MainApp() {
     if (isSupabaseMode) return;
     saveSubmissions(submissions);
   }, [isSupabaseMode, submissions]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapLocalDevSession() {
+      if (isSupabaseMode) return;
+
+      setAuthChecked(false);
+      setWorkspaceAccessError("");
+      try {
+        const restoredSession = await authRepository.restoreSession();
+        if (cancelled) return;
+
+        if (restoredSession) {
+          setLocalAuthSession(restoredSession);
+          setRole(restoredSession.role);
+          setSurface(restoredSession.role === "admin" ? "admin-review" : "agent-inbox");
+          setWorkspaceEmail(restoredSession.email);
+          setWorkspaceEmailDraft(restoredSession.email);
+          saveWorkspaceEmail(restoredSession.email);
+          if (restoredSession.role === "admin") {
+            setPendingAccessRequests(
+              await accessRequestRepository.listPendingAccessRequests(),
+            );
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceAccessError(
+            error instanceof AuthAccessError
+              ? error.message
+              : "Не удалось восстановить local/dev сессию.",
+          );
+        }
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    }
+
+    void bootstrapLocalDevSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSupabaseMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2288,35 +2343,12 @@ function MainApp() {
         setWorkspaceAccessError("Введите почту и пароль Supabase.");
         return;
       }
-      if (workspaceAuthMode === "sign-up" && !workspaceNameDraft.trim()) {
-        setWorkspaceAccessError("Введите имя для Supabase-профиля.");
-        return;
-      }
 
       setLoginBusy(true);
       setWorkspaceAccessError("");
+      setWorkspaceAccessNotice("");
       try {
-        const signUpResult =
-          workspaceAuthMode === "sign-up"
-            ? await signUpSupabaseAgentWithPassword({
-                displayName: workspaceNameDraft,
-                email,
-                organizationName: workspaceOrganizationDraft,
-                password: workspacePasswordDraft,
-              })
-            : null;
-        if (signUpResult?.status === "confirmation_required") {
-          setWorkspaceAccessError(
-            "Проверьте почту и подтвердите Supabase-регистрацию, затем войдите.",
-          );
-          setWorkspaceAuthMode("sign-in");
-          setWorkspacePasswordDraft("");
-          return;
-        }
-        const session =
-          signUpResult?.status === "authenticated"
-            ? signUpResult.session
-            : await signInSupabaseWithPassword(email, workspacePasswordDraft);
+        const session = await signInSupabaseWithPassword(email, workspacePasswordDraft);
         const loaded = await loadCockpitSubmissionsForProfile(session.profile);
         applyRemoteWorkspace(
           session.profile,
@@ -2328,9 +2360,7 @@ function MainApp() {
         setWorkspaceAccessError(
           formatPersistenceFailureForUser(
             error,
-            workspaceAuthMode === "sign-up"
-              ? "Не удалось зарегистрироваться. Проверьте почту, пароль и Supabase profile policy."
-              : "Не удалось войти. Проверьте почту, пароль и профиль Supabase.",
+            "Не удалось войти. Проверьте почту, пароль и профиль Supabase.",
           ),
         );
       } finally {
@@ -2340,17 +2370,45 @@ function MainApp() {
       return;
     }
 
-    const nextRole = resolveWorkspaceRole(email);
-
-    if (!email || !nextRole) {
-      setWorkspaceAccessError("Почта не найдена в списке доступа.");
+    if (!email) {
+      setWorkspaceAccessError("Введите рабочую почту.");
       return;
     }
 
+    setLoginBusy(true);
     setWorkspaceAccessError("");
-    setWorkspaceEmail(email);
-    saveWorkspaceEmail(email);
-    chooseRole(nextRole);
+    setWorkspaceAccessNotice("");
+    try {
+      const session = await authRepository.loginApprovedUser(email);
+      setLocalAuthSession(session);
+      setWorkspaceEmail(session.email);
+      setWorkspaceEmailDraft(session.email);
+      saveWorkspaceEmail(session.email);
+      chooseRole(session.role);
+      if (session.role === "admin") {
+        setPendingAccessRequests(
+          await accessRequestRepository.listPendingAccessRequests(),
+        );
+      }
+    } catch (error) {
+      if (error instanceof AuthAccessError && error.code === "ACCESS_NOT_FOUND") {
+        const request = await accessRequestRepository.submitAccessRequest(email);
+        if (request.status === "pending") {
+          setWorkspaceAccessNotice(
+            "Заявка отправлена. Доступ появится после одобрения администратором.",
+          );
+          return;
+        }
+      }
+      setWorkspaceAccessError(
+        error instanceof AuthAccessError
+          ? error.message
+          : "Не удалось проверить local/dev доступ.",
+      );
+    } finally {
+      setLoginBusy(false);
+      setAuthChecked(true);
+    }
   }
 
   async function resetWorkspaceEmail() {
@@ -2360,10 +2418,8 @@ function MainApp() {
       remoteSubmissionFingerprintsRef.current = new Map();
       setRemoteProfile(null);
       setWorkspacePasswordDraft("");
-      setWorkspaceNameDraft("");
-      setWorkspaceOrganizationDraft("");
-      setWorkspaceAuthMode("sign-in");
       setWorkspaceAccessError("");
+      setWorkspaceAccessNotice("");
       const localSubmissions = loadSubmissions();
       submissionsRef.current = localSubmissions;
       setSubmissions(localSubmissions);
@@ -2379,11 +2435,64 @@ function MainApp() {
       return;
     }
 
+    await authRepository.logout();
+    setLocalAuthSession(null);
+    setPendingAccessRequests([]);
     clearWorkspaceEmail();
     setWorkspaceEmail("");
     setWorkspaceEmailDraft("");
     setWorkspaceAccessError("");
+    setWorkspaceAccessNotice("");
     chooseRole("agent");
+  }
+
+  async function approvePendingAccessRequest(requestId: string) {
+    if (!localAuthSession || localAuthSession.role !== "admin") return;
+
+    setLoginBusy(true);
+    setWorkspaceAccessError("");
+    try {
+      await accessRequestRepository.approveAccessRequest(
+        requestId,
+        localAuthSession.userId,
+      );
+      setPendingAccessRequests(
+        await accessRequestRepository.listPendingAccessRequests(),
+      );
+    } catch (error) {
+      setWorkspaceAccessError(
+        error instanceof AuthAccessError
+          ? error.message
+          : "Не удалось одобрить заявку.",
+      );
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function rejectPendingAccessRequest(requestId: string) {
+    if (!localAuthSession || localAuthSession.role !== "admin") return;
+
+    setLoginBusy(true);
+    setWorkspaceAccessError("");
+    try {
+      await accessRequestRepository.rejectAccessRequest(
+        requestId,
+        localAuthSession.userId,
+        "Отклонено администратором",
+      );
+      setPendingAccessRequests(
+        await accessRequestRepository.listPendingAccessRequests(),
+      );
+    } catch (error) {
+      setWorkspaceAccessError(
+        error instanceof AuthAccessError
+          ? error.message
+          : "Не удалось отклонить заявку.",
+      );
+    } finally {
+      setLoginBusy(false);
+    }
   }
 
   const searchControl = (
@@ -2459,15 +2568,10 @@ function MainApp() {
         busy={loginBusy || !authChecked}
         email={workspaceEmailDraft}
         error={workspaceAccessError}
+        notice={workspaceAccessNotice}
         onEmail={setWorkspaceEmailDraft}
-        onMode={setWorkspaceAuthMode}
-        onName={setWorkspaceNameDraft}
-        onOrganization={setWorkspaceOrganizationDraft}
         onPassword={setWorkspacePasswordDraft}
         onSubmit={submitWorkspaceEmail}
-        mode={workspaceAuthMode}
-        name={workspaceNameDraft}
-        organization={workspaceOrganizationDraft}
         password={workspacePasswordDraft}
         requiresPassword={isSupabaseMode}
       />
@@ -2636,6 +2740,15 @@ function MainApp() {
             </div>
           ) : null}
         </header>
+
+        {!isSupabaseMode && localAuthSession?.role === "admin" ? (
+          <AdminAccessRequestQueue
+            busy={loginBusy}
+            requests={pendingAccessRequests}
+            onApprove={(requestId) => void approvePendingAccessRequest(requestId)}
+            onReject={(requestId) => void rejectPendingAccessRequest(requestId)}
+          />
+        ) : null}
 
         {emptyRemoteWorkspace ? (
           <RemoteWorkspaceEmptyState
@@ -2936,28 +3049,18 @@ function WorkspaceAccessGate({
   busy = false,
   email,
   error,
+  notice,
   onEmail,
-  onMode,
-  onName,
-  onOrganization,
   onPassword,
   onSubmit,
-  mode = "sign-in",
-  name = "",
-  organization = "",
   password = "",
   requiresPassword = false,
 }: {
   busy?: boolean;
   email: string;
   error: string;
-  mode?: "sign-in" | "sign-up";
-  name?: string;
-  organization?: string;
+  notice?: string;
   onEmail: (email: string) => void;
-  onMode?: (mode: "sign-in" | "sign-up") => void;
-  onName?: (name: string) => void;
-  onOrganization?: (organization: string) => void;
   onPassword?: (password: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   password?: string;
@@ -2978,40 +3081,10 @@ function WorkspaceAccessGate({
         </div>
         <p className="access-intro" id="workspace-access-copy">
           {requiresPassword
-            ? mode === "sign-up"
-              ? "Создайте агентский профиль через Supabase Auth."
-              : "Войдите через Supabase Auth, чтобы открыть рабочий стол по роли профиля."
-            : "Введите рабочую почту, чтобы открыть свой рабочий стол."}
+            ? "Войдите через Supabase Auth, чтобы открыть рабочий стол по роли профиля."
+            : "Введите рабочую почту. Если доступа ещё нет, будет создана заявка на одобрение администратором."}
         </p>
         <form onSubmit={onSubmit}>
-          {requiresPassword && mode === "sign-up" ? (
-            <>
-              <label>
-                <span>Имя</span>
-                <input
-                  autoComplete="name"
-                  id="workspace-name"
-                  name="name"
-                  placeholder="Имя агента"
-                  type="text"
-                  value={name}
-                  onChange={(event) => onName?.(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>Организация</span>
-                <input
-                  autoComplete="organization"
-                  id="workspace-organization"
-                  name="organization"
-                  placeholder="Название агентства"
-                  type="text"
-                  value={organization}
-                  onChange={(event) => onOrganization?.(event.target.value)}
-                />
-              </label>
-            </>
-          ) : null}
           <label>
             <span>Рабочая почта</span>
             <input
@@ -3044,34 +3117,79 @@ function WorkspaceAccessGate({
             <p className="access-error" role="alert">
               {error}
             </p>
+          ) : notice ? (
+            <p className="access-note" id="workspace-access-note" role="status">
+              {notice}
+            </p>
           ) : (
             <p className="access-note" id="workspace-access-note">
               {busy
                 ? "Проверяем текущую сессию."
                 : requiresPassword
-                  ? mode === "sign-up"
-                    ? "Роль будет agent; admin назначается только на стороне Supabase."
-                    : "Вход идёт через Supabase Auth."
-                  : "Доступ откроется после проверки почты."}
+                  ? "Вход идёт через Supabase Auth. Самостоятельная регистрация отключена."
+                  : "Pending и rejected email не открывают агентский кабинет."}
             </p>
           )}
           <Button type="submit" disabled={busy}>
-            {busy ? "Проверяем" : mode === "sign-up" ? "Создать профиль" : "Войти"}
+            {busy ? "Проверяем" : requiresPassword ? "Войти" : "Продолжить"}
           </Button>
-          {requiresPassword ? (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onMode?.(mode === "sign-up" ? "sign-in" : "sign-up")}
-            >
-              {mode === "sign-up"
-                ? "У меня уже есть доступ"
-                : "Создать агентский доступ"}
-            </Button>
-          ) : null}
         </form>
       </section>
     </main>
+  );
+}
+
+function AdminAccessRequestQueue({
+  busy,
+  requests,
+  onApprove,
+  onReject,
+}: {
+  busy: boolean;
+  requests: AccessRequest[];
+  onApprove: (requestId: string) => void;
+  onReject: (requestId: string) => void;
+}) {
+  return (
+    <section
+      className="access-queue-panel"
+      aria-labelledby="access-queue-title"
+      data-testid="admin-access-queue"
+    >
+      <div className="access-queue-head">
+        <div>
+          <p className="kicker">local/dev auth</p>
+          <h2 id="access-queue-title">Заявки на доступ</h2>
+        </div>
+        <span>{requests.length}</span>
+      </div>
+      {requests.length ? (
+        <div className="access-queue-list">
+          {requests.map((request) => (
+            <article className="access-queue-row" key={request.id}>
+              <div>
+                <strong>{request.email}</strong>
+                <small>Роль: agent · статус: pending</small>
+              </div>
+              <div className="access-queue-actions">
+                <Button
+                  disabled={busy}
+                  variant="secondary"
+                  onClick={() => onReject(request.id)}
+                >
+                  Отклонить
+                </Button>
+                <Button disabled={busy} onClick={() => onApprove(request.id)}>
+                  Одобрить
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="access-queue-empty">Новых заявок нет.</p>
+      )}
+    </section>
   );
 }
 
