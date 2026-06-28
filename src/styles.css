@@ -13216,7 +13216,7 @@ p {
     justify-content: center;
     width: var(--v19-mobile-toolbar-control-height);
     overflow: visible;
-    z-index: 110;
+    z-index: 230;
   }
 
   .v19-agent-mobile-toolbar .v19-desktop-toolbar-tools {
@@ -13240,7 +13240,7 @@ p {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 180;
+    z-index: 220;
     border: 0;
     background: rgba(0, 0, 0, 0.42);
   }
@@ -13248,9 +13248,9 @@ p {
   .v19-agent-mobile-toolbar .v19-mobile-filter-sheet {
     position: fixed;
     right: 12px;
-    bottom: 12px;
+    bottom: max(92px, calc(env(safe-area-inset-bottom) + 92px));
     left: 12px;
-    z-index: 181;
+    z-index: 221;
     display: grid;
     gap: 10px;
     padding: 12px;
