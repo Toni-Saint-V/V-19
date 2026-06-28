@@ -507,6 +507,82 @@ test.describe("V-19 operations workspace", () => {
     await expectNoRetiredNavigation(page);
   });
 
+  test("mobile status filter options stay clickable above the bottom tabbar at 390px", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 844, width: 390 });
+    await page.goto("/");
+    await page.evaluate(() => {
+      (
+        globalThis as unknown as { localStorage: { clear(): void } }
+      ).localStorage.clear();
+    });
+    await page.reload();
+
+    await clickWorkspaceButton(page, /Мои подачи/);
+    await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Фильтры подач" }).click();
+    const statusDialog = page.getByRole("dialog", { name: "Статус подач" });
+    const statusOption = statusDialog
+      .locator(".v19-mobile-filter-options")
+      .getByRole("button", { name: "Готово" });
+
+    await expect(statusDialog).toBeVisible();
+    await expect(statusOption).toBeVisible();
+    await page.screenshot({
+      fullPage: true,
+      path: "docs/qa/v19-mobile-filter-390-before-click.png",
+    });
+
+    const hitTarget = await statusOption.evaluate((element) => {
+      const probeElement = element as {
+        getBoundingClientRect: () => {
+          height: number;
+          left: number;
+          top: number;
+          width: number;
+        };
+        ownerDocument: {
+          elementFromPoint: (x: number, y: number) => {
+            closest?: (selector: string) => { textContent?: string | null } | null;
+            getAttribute?: (name: string) => string | null;
+            tagName?: string;
+            textContent?: string | null;
+          } | null;
+        };
+      };
+      const rect = probeElement.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const target = probeElement.ownerDocument.elementFromPoint(x, y);
+      const tabbar = target?.closest?.(".ops-mobile-tabbar");
+      const createDock = target?.closest?.(".mobile-create-dock");
+      const choice = target?.closest?.(".v19-mobile-filter-choice");
+
+      return {
+        choiceText: choice?.textContent?.trim() ?? null,
+        interceptedByCreateDock: Boolean(createDock),
+        interceptedByTabbar: Boolean(tabbar),
+        targetClass: target?.getAttribute?.("class") ?? null,
+        targetTag: target?.tagName ?? null,
+      };
+    });
+
+    expect(hitTarget.interceptedByTabbar, JSON.stringify(hitTarget)).toBe(false);
+    expect(hitTarget.interceptedByCreateDock, JSON.stringify(hitTarget)).toBe(false);
+    expect(hitTarget.choiceText, JSON.stringify(hitTarget)).toContain("Готово");
+
+    await statusOption.click();
+    await expect(statusDialog).toHaveCount(0);
+    await expect(submissionCard(page, "Дмитрий Орлов")).toBeVisible();
+    await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
+    await page.screenshot({
+      fullPage: true,
+      path: "docs/qa/v19-mobile-filter-390-after-click.png",
+    });
+  });
+
   test("local cockpit keeps another agent submission out of the agent workspace", async ({
     page,
   }, testInfo) => {

@@ -813,7 +813,7 @@ export function FigmaApplicantsVisual({
   return (
     <section className="vf-figma-screen vf-figma-applicants-screen" aria-label="Мои подачи">
       <div className="vf-figma-applicants-section">
-        <h2>Семьи</h2>
+        <h2>Семейные подачи</h2>
         <div className="vf-figma-family-grid">
           {visualFamilies.map((family) => (
             <article
@@ -868,7 +868,7 @@ export function FigmaApplicantsVisual({
       <div className="vf-figma-applicants-divider" />
 
       <div className="vf-figma-applicants-section">
-        <h2>Одиночные профили</h2>
+        <h2>Заявители</h2>
         <div className="vf-figma-individual-grid">
           {visualIndividuals.map((individual) => (
             <button

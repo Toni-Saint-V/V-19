@@ -2061,7 +2061,7 @@ function DrawerIssues({
                   ) : null}
                   {isFileIssue && role === "agent" ? (
                     <span className="v17-issue-note">
-                      Реальная загрузка недоступна в прототипе
+                      Загрузка доступна только для тестовых документов в пилотном режиме.
                     </span>
                   ) : null}
                 </div>
