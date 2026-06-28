@@ -41,6 +41,7 @@ import {
   toCockpitDraftPersistencePayload,
 } from "../../src/modules/submissions/supabasePersistence";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStorage";
+import { withRecomputedFileCompletion } from "../../src/modules/submissions/fileAsset";
 import {
   failPassportExtraction,
   finishPassportExtraction,
@@ -1190,6 +1191,46 @@ describe("V-19 submission actions", () => {
     expect(submitted.history[0].source).toBe("agent");
   });
 
+  it("requires a completed passport upload for every family applicant", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["IVANOV IVAN", "IVANOVA ANNA"],
+      city: "Москва",
+      familyCount: 2,
+      preliminaryIntake: datedPreliminaryIntake(),
+      submissions: initialSubmissions,
+      type: "family",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const spouse = filled.applicants[1];
+    const spousePassport = filled.files.find(
+      (file) => file.applicantId === spouse?.id && file.type === "passport_scan",
+    );
+    if (!spousePassport) throw new Error("Missing spouse passport file");
+
+    for (const uploadStatus of ["failed", "deleted"] as const) {
+      const withBrokenPassport = withRecomputedFileCompletion({
+        ...filled,
+        files: filled.files.map((file) =>
+          file.id === spousePassport.id
+            ? { ...file, status: "uploaded" as const, uploadStatus }
+            : file,
+        ),
+      });
+      const inProgress = applySubmissionAction(
+        withBrokenPassport,
+        "save_progress",
+        "agent",
+      );
+
+      expect(withBrokenPassport.completeness.files).toBeLessThan(100);
+      expect(withBrokenPassport.applicants[1]?.fileStatus).toBe("partial");
+      expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
+        ok: false,
+        reason: "Есть незаполненные поля или недостающие файлы",
+      });
+    }
+  });
+
   it("blocks review submission when extracted passport is expired", () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -1294,6 +1335,43 @@ describe("V-19 submission actions", () => {
     const failed = failPassportExtraction(inProgress, passportFile, "Не распознано");
     expect(canPerformAction(failed, "submit_for_review", "agent")).toEqual({
       ok: true,
+    });
+  });
+
+  it("does not allow failed OCR fallback when the passport upload failed", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["IVANOV IVAN"],
+      city: "Москва",
+      familyCount: 1,
+      preliminaryIntake: datedPreliminaryIntake(),
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const passportFile = filled.files.find(
+      (file) =>
+        file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
+    );
+    if (!passportFile) throw new Error("Missing passport file");
+
+    const brokenUpload = withRecomputedFileCompletion({
+      ...filled,
+      files: filled.files.map((file) =>
+        file.id === passportFile.id
+          ? { ...file, status: "uploaded" as const, uploadStatus: "failed" as const }
+          : file,
+      ),
+    });
+    const inProgress = applySubmissionAction(brokenUpload, "save_progress", "agent");
+    const failedExtraction = failPassportExtraction(
+      inProgress,
+      { ...passportFile, uploadStatus: "failed" },
+      "Не распознано",
+    );
+
+    expect(canPerformAction(failedExtraction, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Есть незаполненные поля или недостающие файлы",
     });
   });
 
