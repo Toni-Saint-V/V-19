@@ -1750,6 +1750,22 @@ function submissionPriorityLine(submission: Submission) {
 }
 
 export type AdminWorkTab = "review" | "corrections" | "events";
+type AdminReviewView = "list" | "columns";
+type AdminWorkItem = {
+  badges: Array<{
+    label: string;
+    tone: "amber" | "blue" | "danger" | "muted" | "teal";
+  }>;
+  context: ReactNode;
+  cta: string;
+  id: string;
+  readiness: number;
+  severity: "blocker" | "info" | "ready" | "warning";
+  stage: string;
+  stageTone: "amber" | "blue" | "danger" | "muted" | "teal";
+  submission: Submission;
+  title: string;
+};
 
 export function AdminReviewScreen({
   error = "",
@@ -1783,6 +1799,7 @@ export function AdminReviewScreen({
   visibleSubmission: Submission | null;
 }) {
   const [blockersOnly, setBlockersOnly] = useState(false);
+  const [reviewView, setReviewView] = useState<AdminReviewView>("list");
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [sortNewest, setSortNewest] = useState(true);
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -1828,6 +1845,10 @@ export function AdminReviewScreen({
   const groupedEventList = useMemo(
     () => groupInboxEventsByAgent(visibleEvents),
     [visibleEvents],
+  );
+  const visibleWorkItems = useMemo(
+    () => visibleReviewList.map(adminWorkItemForSubmission),
+    [visibleReviewList],
   );
   const visibleSelectedSubmission =
     visibleSubmission &&
@@ -1911,6 +1932,18 @@ export function AdminReviewScreen({
         pressed={!sortNewest}
         onClick={() => transitionUiState(() => setSortNewest((value) => !value))}
       />
+      {reviewTab !== "events" ? (
+        <ToolbarIconButton
+          label={reviewView === "list" ? "Показать колонками" : "Показать списком"}
+          icon="view"
+          pressed={reviewView === "columns"}
+          onClick={() =>
+            transitionUiState(() =>
+              setReviewView((value) => (value === "list" ? "columns" : "list")),
+            )
+          }
+        />
+      ) : null}
       <div className="v17-admin-summary-tool" ref={summaryRef}>
         <ToolbarIconButton
           label={summaryOpen ? "Скрыть сводку" : "Показать сводку"}
@@ -2075,8 +2108,17 @@ export function AdminReviewScreen({
                 onShow={() => onTab("review")}
               />
           )
-        ) : visibleReviewList.length ? (
-          <>
+        ) : visibleWorkItems.length ? (
+          reviewView === "columns" ? (
+            <AdminWorkColumns
+              items={visibleWorkItems}
+              title={adminWorkColumnTitle(reviewTab)}
+              onOpen={(submission) => {
+                onSelect(submission);
+                onOpen(submission, adminWorkDrawerTabFor(submission));
+              }}
+            />
+          ) : (
             <div
               className="v17-admin-work-list"
               aria-label={
@@ -2085,23 +2127,30 @@ export function AdminReviewScreen({
                   : "Очередь проверки"
               }
             >
-              {reviewTab === "corrections"
-                ? groupedCorrectionList.map((group) => (
-                    <section
-                      className="v17-admin-group"
-                      key={group.id}
-                      aria-label={`${group.label}: ${group.meta}`}
-                    >
-                      <div className="v17-admin-group-head">
-                        <strong>{group.label}</strong>
-                        <span>{group.meta}</span>
-                      </div>
-                      <div className="v17-admin-group-list">
-                        {group.submissions.map((submission) => (
-                          <AdminWorkRow
-                            selected={false}
-                            key={submission.id}
-                            submission={submission}
+              {reviewTab === "corrections" ? (
+                groupedCorrectionList.map((group) => (
+                  <section
+                    className="v17-admin-group"
+                    key={group.id}
+                    aria-label={`${group.label}: ${group.meta}`}
+                  >
+                    <div className="v17-admin-group-head">
+                      <strong>{group.label}</strong>
+                      <span>{group.meta}</span>
+                    </div>
+                    <div className="v17-admin-group-list">
+                      {group.submissions.map((submission) => {
+                        const item = adminWorkItemForSubmission(submission);
+
+                        return (
+                          <ActionRow
+                            badges={item.badges}
+                            context={item.context}
+                            cta={item.cta}
+                            key={item.id}
+                            selected={visibleSelectedSubmission?.id === submission.id}
+                            severity={item.severity}
+                            title={item.title}
                             onOpen={() => {
                               onSelect(submission);
                               onOpen(
@@ -2110,23 +2159,35 @@ export function AdminReviewScreen({
                               );
                             }}
                           />
-                        ))}
-                      </div>
-                    </section>
-                  ))
-                : visibleReviewList.map((submission) => (
-                    <AdminWorkRow
-                      selected={false}
-                      key={submission.id}
-                      submission={submission}
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))
+              ) : (
+                <>
+                  <CollectionGroupLabel className="v17-admin-action-group-label">
+                    {adminWorkColumnTitle(reviewTab)}
+                  </CollectionGroupLabel>
+                  {visibleWorkItems.map((item) => (
+                    <ActionRow
+                      badges={item.badges}
+                      context={item.context}
+                      cta={item.cta}
+                      key={item.id}
+                      selected={visibleSelectedSubmission?.id === item.submission.id}
+                      severity={item.severity}
+                      title={item.title}
                       onOpen={() => {
-                        onSelect(submission);
-                        onOpen(submission, adminWorkDrawerTabFor(submission));
+                        onSelect(item.submission);
+                        onOpen(item.submission, adminWorkDrawerTabFor(item.submission));
                       }}
                     />
                   ))}
+                </>
+              )}
             </div>
-          </>
+          )
         ) : (
           <AdminWorkEmptyState
             description="Новые задачи появятся после отправки подачи агентом или получения исправлений."
@@ -2170,6 +2231,69 @@ function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
   if (reviewTab === "events") return "События открывают точный контекст подачи";
   if (reviewTab === "corrections") return "Сначала исправления, затем новые проверки";
   return "Очередь отсортирована по времени ожидания";
+}
+
+function adminWorkColumnTitle(reviewTab: AdminWorkTab) {
+  if (reviewTab === "corrections") return "Исправления";
+  if (reviewTab === "events") return "События";
+  return "К проверке";
+}
+
+function adminWorkItemForSubmission(submission: Submission): AdminWorkItem {
+  const presentation = adminWorkPresentation(submission);
+  const openIssues = openIssueCount(submission);
+  const blockers = blockerCount(submission);
+  const stageTone = adminWorkStageTone(submission);
+
+  return {
+    badges: [
+      { label: presentation.stage, tone: stageTone },
+      {
+        label:
+          blockers > 0
+            ? `${blockers} блокера`
+            : openIssues > 0
+              ? `${openIssues} замечания`
+              : `${submission.completeness.total}%`,
+        tone: blockers > 0 ? "danger" : openIssues > 0 ? "amber" : "muted",
+      },
+    ],
+    context: (
+      <span className="v17-admin-action-context">
+        <span>
+          {submission.city} · {tripDates(submission)}
+        </span>
+        <span>
+          {applicantCountLabel(submission.applicants.length)} · ждет{" "}
+          {adminWorkWaitLabel(submission)}
+        </span>
+      </span>
+    ),
+    cta: adminWorkActionLabel(submission, presentation.actionLabel),
+    id: submission.id,
+    readiness: submission.completeness.total,
+    severity:
+      blockers > 0
+        ? "blocker"
+        : submission.status === "corrections_received"
+          ? "warning"
+          : submission.status === "ready_for_export"
+            ? "ready"
+            : "info",
+    stage: presentation.stage,
+    stageTone,
+    submission,
+    title: formatSubmissionListTitle(submission),
+  };
+}
+
+function adminWorkStageTone(
+  submission: Submission,
+): "amber" | "blue" | "danger" | "muted" | "teal" {
+  if (submission.status === "corrections_received") return "amber";
+  if (submission.status === "ready_for_export") return "teal";
+  if (submission.status === "submitted_for_review") return "blue";
+  return "muted";
 }
 
 function AdminWorkLoadingState() {
@@ -2224,87 +2348,52 @@ function AdminWorkEmptyState({
   );
 }
 
-function AdminWorkRow({
+function AdminWorkColumns({
+  items,
   onOpen,
-  selected,
-  submission,
+  title,
 }: {
-  onOpen: () => void;
-  selected: boolean;
-  submission: Submission;
+  items: AdminWorkItem[];
+  onOpen: (submission: Submission) => void;
+  title: string;
 }) {
-  const presentation = adminWorkPresentation(submission);
-  const family = submission.type === "family";
-
   return (
-    <button
-      aria-current={selected ? "true" : undefined}
-      className={`v17-admin-work-row ${selected ? "is-selected" : ""}`}
-      data-submission-card
-      data-submission-id={submission.id}
-      type="button"
-      onClick={onOpen}
-    >
-      <span
-        className={`v17-admin-entity-icon tone-${presentation.tone}`}
-        aria-hidden="true"
-      >
-        <SvgIcon>
-          {family ? (
-            <>
-              <circle cx="9" cy="8" r="3" />
-              <path d="M3 20a6 6 0 0 1 12 0" />
-              <circle cx="17" cy="9" r="2.5" />
-              <path d="M15 15a5 5 0 0 1 6 5" />
-            </>
-          ) : (
-            <>
-              <circle cx="12" cy="8" r="4" />
-              <path d="M5 21a7 7 0 0 1 14 0" />
-            </>
-          )}
-        </SvgIcon>
-      </span>
-      <span className="v17-admin-identity">
-        <strong>{formatSubmissionListTitle(submission)}</strong>
-        <em>
-          <span className="mono">{submission.id}</span> ·{" "}
-          {applicantCountLabel(submission.applicants.length)}
-        </em>
-        <small className="v17-admin-mobile-meta">
-          {submission.city} · {applicantCountLabel(submission.applicants.length)} ·
-          ждет с {submission.updatedAt}
-        </small>
-      </span>
-      <span className="v17-admin-route-cell">
-        <em>Подача</em>
-        <strong>{submission.city}</strong>
-        <small>{tripDates(submission)}</small>
-      </span>
-      <span className="v17-admin-wait-cell">
-        <em>Ожидает</em>
-        <strong>{adminWorkWaitLabel(submission)}</strong>
-      </span>
-      <span className="v17-admin-readiness-cell">
-        <span>
-          <em>Готовность</em>
-          <strong>{submission.completeness.total}%</strong>
-        </span>
-        <i aria-hidden="true">
-          <b style={{ width: `${submission.completeness.total}%` }} />
-        </i>
-      </span>
-      <span className={`v17-admin-stage tone-${presentation.tone}`}>
-        <i aria-hidden="true" />
-        {presentation.stage}
-      </span>
-      <span className="v17-admin-row-action">
-        <span>{adminWorkActionLabel(submission, presentation.actionLabel)}</span>
-        <SvgIcon>
-          <path d="m9 6 6 6-6 6" />
-        </SvgIcon>
-      </span>
-    </button>
+    <div className="v17-admin-column-board" aria-label="Колонки проверки">
+      <section className="v17-admin-column" aria-label={title}>
+        <header className="v17-admin-column-head">
+          <span>{title}</span>
+          <strong>{items.length}</strong>
+        </header>
+        <div className="v17-admin-column-items">
+          {items.map((item) => (
+            <button
+              className={`v17-admin-column-card severity-${item.severity}`}
+              data-submission-card
+              data-submission-id={item.submission.id}
+              key={item.id}
+              type="button"
+              onClick={() => onOpen(item.submission)}
+            >
+              <span className="v17-admin-column-card-top">
+                <span className="mono">{item.submission.id}</span>
+                <Badge tone={item.stageTone}>{item.stage}</Badge>
+              </span>
+              <strong>{item.title}</strong>
+              <em>
+                {item.submission.city} · {tripDates(item.submission)}
+              </em>
+              <span className="v17-admin-column-progress" aria-hidden="true">
+                <i style={{ width: `${item.readiness}%` }} />
+              </span>
+              <span className="v17-admin-column-card-foot">
+                <span>{applicantCountLabel(item.submission.applicants.length)}</span>
+                <b>{item.cta}</b>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
