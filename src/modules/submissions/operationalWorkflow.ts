@@ -896,6 +896,39 @@ export function buildAgentHandoffPackage(
   };
 }
 
+export function buildReturnedPdfAgentHandoffGate(
+  submission: Submission,
+  packageSubmissions: Submission[] = [submission],
+  options: { commonAppointmentPdf?: ReturnedPdfArtifact } = {},
+): AgentHandoffPackage {
+  const handoffPackage = buildAgentHandoffPackage(submission, options);
+  const exportPackageId = returnedPdfExportPackageId(submission);
+  const scopedSubmissions = exportPackageId
+    ? packageSubmissions.filter(
+        (candidate) => returnedPdfExportPackageId(candidate) === exportPackageId,
+      )
+    : [submission];
+  const ownerAgentIds = new Set(
+    (scopedSubmissions.length ? scopedSubmissions : [submission]).map(
+      (candidate) => candidate.returnedPdfPackage?.ownerAgentId ?? candidate.agentId,
+    ),
+  );
+
+  if (ownerAgentIds.size <= 1) {
+    return handoffPackage;
+  }
+
+  return {
+    ...handoffPackage,
+    blockers: uniqueMessages([
+      ...handoffPackage.blockers,
+      "Mixed-agent appointment list PDF is admin-only until the export package is split or scoped.",
+    ]),
+    mappings: [],
+    ready: false,
+  };
+}
+
 export function buildAgentReturnedPdfPackageView(
   submission: Submission,
   agentId: string,
@@ -918,6 +951,14 @@ export function buildAgentReturnedPdfPackageView(
     ...handoffPackage,
     visible: handoffPackage.ready,
   };
+}
+
+function returnedPdfExportPackageId(submission: Submission): string {
+  return (
+    submission.returnedPdfPackage?.exportPackageId ??
+    submission.exportPackage?.idempotencyKey ??
+    ""
+  );
 }
 
 export function confirmReturnedPdfMismatchIssue(

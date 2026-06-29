@@ -3,6 +3,7 @@ import {
   buildExportPackageIdentity,
   exportRowsMatchPackageIdentity,
   exportSummary,
+  isSubmissionSelectableForExport,
 } from "../../src/modules/submissions/exportRules";
 import {
   buildExportWorkbookRowFills,
@@ -290,6 +291,74 @@ describe("V-19 export workbook contract", () => {
     expect(
       blockedByIssue.blockers.map((blocker) => blocker.reason).join(" "),
     ).toContain("блокирующие замечания");
+  });
+
+  test("allows same-city mixed-agent export with warning and no external Agent column", () => {
+    const primary = readySubmission();
+    const alternateApplicantId = "з-mixed-agent-1";
+    const alternate: Submission = {
+      ...primary,
+      agentId: "local-agent-partner",
+      applicants: primary.applicants.map((applicant) => ({
+        ...applicant,
+        fullName: "OLGA MOROZOVA",
+        id: alternateApplicantId,
+      })),
+      files: primary.files.map((file) => ({
+        ...file,
+        applicantId: alternateApplicantId,
+        id: `mixed-agent-${file.id}`,
+      })),
+      id: "ПД-MIXED-AGENT",
+      title: "Ольга Морозова",
+    };
+    const plan = exportSummary([primary, alternate]);
+
+    expect(plan.ready).toBe(true);
+    expect(plan.canGenerate).toBe(true);
+    expect(plan.blockers.map((blocker) => blocker.reason)).not.toContain(
+      "Нельзя смешивать подачи разных агентов",
+    );
+    expect(plan.warnings.map((warning) => warning.reason).join(" ")).toContain(
+      "разных агентов",
+    );
+    expect(plan.preview.headers.some((header) => /agent/i.test(header))).toBe(false);
+    expect(
+      buildExportWorkbookRows(plan.rows)[0]?.some((header) => /agent/i.test(header)),
+    ).toBe(false);
+  });
+
+  test("keeps generated multi-row package members selectable while blocker rows are hidden", () => {
+    const primary = readySubmission();
+    const alternateApplicantId = "з-generated-selection-2";
+    const secondary: Submission = {
+      ...primary,
+      applicants: primary.applicants.map((applicant) => ({
+        ...applicant,
+        fullName: "IVAN PETROV",
+        id: alternateApplicantId,
+      })),
+      files: primary.files.map((file) => ({
+        ...file,
+        applicantId: alternateApplicantId,
+        id: `generated-package-${file.id}`,
+      })),
+      id: "ПД-GENERATED-2",
+      title: "Иван Петров",
+    };
+    const generated = applyExportStateToSelection(
+      [primary, secondary],
+      [primary.id, secondary.id],
+      "file_generated",
+    );
+    const missingMedia = {
+      ...primary,
+      files: primary.files.filter((file) => file.type !== "selfie_2"),
+    };
+
+    expect(generated.every(isSubmissionSelectableForExport)).toBe(true);
+    expect(exportSummary([generated[0]!]).ready).toBe(false);
+    expect(isSubmissionSelectableForExport(missingMedia)).toBe(false);
   });
 
   test("does not start browser download when artifact identity is missing or stale", () => {
