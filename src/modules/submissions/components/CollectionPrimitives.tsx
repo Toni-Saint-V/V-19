@@ -605,15 +605,16 @@ export function SubmissionCollectionRow({
 
 function ProgressCell({ value }: { value: string }) {
   const percent = Number.parseInt(value.replace("%", ""), 10);
-  const safePercent = Number.isFinite(percent)
-    ? Math.min(Math.max(percent, 0), 100)
-    : 0;
+  const isPercentLabel = value.trim().endsWith("%") && Number.isFinite(percent);
+  const safePercent = isPercentLabel ? Math.min(Math.max(percent, 0), 100) : 100;
 
   return (
     <span
       className={cn(
         "v19-progress-cell",
-        safePercent === 100
+        !isPercentLabel
+          ? "is-label"
+          : safePercent === 100
           ? "is-complete"
           : safePercent <= 5
             ? "is-empty"

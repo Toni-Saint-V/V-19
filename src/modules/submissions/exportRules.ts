@@ -17,13 +17,28 @@ import { hasUsableTripDateRange } from "./status";
 import {
   buildExportContractRows,
   buildExportPreview,
+  exportContractColumns,
   exportContractFingerprint,
+  type ExportContractColumnKey,
   type ExportContractPreview,
   type ExportContractRow,
   validateExportContractShape,
 } from "./exportContract";
 
 export type ExportSelectionState = ExportState | "mixed";
+export type ExportMappingState = "mapped" | "derived" | "unresolved";
+export type ExportMappingAuditRow = {
+  header: string;
+  index: number;
+  key: ExportContractColumnKey;
+  state: ExportMappingState;
+};
+export type ExportMappingAudit = {
+  derivedCount: number;
+  mappedCount: number;
+  rows: ExportMappingAuditRow[];
+  unresolvedCount: number;
+};
 export type ExportSummary = {
   rows: ExportContractRow[];
   blockers: ExportBlocker[];
@@ -43,6 +58,12 @@ export type ExportSummary = {
   canMarkExported: boolean;
   downloadPackageIdentity: ExportPackageIdentity | null;
 };
+
+const derivedExportColumnKeys = new Set<ExportContractColumnKey>([
+  "firstName",
+  "lastName",
+  "appointmentType",
+]);
 
 export type ExportInternalMapping = {
   applicantFullName: string;
@@ -166,6 +187,33 @@ export function canGenerateExport(submissions: Submission[]) {
 
 export function isSubmissionSelectableForExport(submission: Submission): boolean {
   return getExportBlockers([submission]).length === 0;
+}
+
+export function buildExportMappingAudit(
+  preview: ExportContractPreview,
+): ExportMappingAudit {
+  const previewHeaders = new Set(preview.headers);
+  const rows = exportContractColumns.map((column, index) => {
+    const state: ExportMappingState = !previewHeaders.has(column.header)
+      ? "unresolved"
+      : derivedExportColumnKeys.has(column.key)
+        ? "derived"
+        : "mapped";
+
+    return {
+      header: column.header,
+      index: index + 1,
+      key: column.key,
+      state,
+    };
+  });
+
+  return {
+    derivedCount: rows.filter((row) => row.state === "derived").length,
+    mappedCount: rows.filter((row) => row.state === "mapped").length,
+    rows,
+    unresolvedCount: rows.filter((row) => row.state === "unresolved").length,
+  };
 }
 
 export function buildExportRows(submissions: Submission[]): ExportContractRow[] {

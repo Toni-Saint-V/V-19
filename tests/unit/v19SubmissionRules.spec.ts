@@ -14,6 +14,7 @@ import {
   agentActionQueue,
 } from "../../src/modules/submissions/agentActions";
 import {
+  buildExportMappingAudit,
   buildExportPackageIdentity,
   buildExportRows,
   exportPackageIdentityMatches,
@@ -402,6 +403,27 @@ describe("V-19 export rules", () => {
 
   it("allows a single ready submission", () => {
     expect(getExportBlockers([readyClone({ id: "ПД-1056" })])).toEqual([]);
+  });
+
+  it("builds the export mapping audit from the actual 56-column contract", () => {
+    const summary = exportSummary([readyClone({ id: "ПД-1056" })]);
+    const audit = buildExportMappingAudit(summary.preview);
+
+    expect(audit.rows).toHaveLength(56);
+    expect(audit).toMatchObject({
+      mappedCount: 53,
+      derivedCount: 3,
+      unresolvedCount: 0,
+    });
+    expect(audit.rows.filter((row) => row.state === "unresolved")).toEqual([]);
+    expect(audit.rows.find((row) => row.header === "Visa Sub Type")).toMatchObject({
+      state: "mapped",
+    });
+    expect(
+      audit.rows.find((row) => row.header === "Nationality At Birth"),
+    ).toMatchObject({
+      state: "mapped",
+    });
   });
 
   it("blocks export when trip dates are missing", () => {

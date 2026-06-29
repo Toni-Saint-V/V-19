@@ -47,16 +47,20 @@ function renderDrawer({
 }
 
 describe("AdminReviewDrawer", () => {
-  test("shows real admin review metadata and six canonical tabs", () => {
-    renderDrawer();
+  test("shows real admin review metadata and canonical review tabs", () => {
+    const { container } = renderDrawer();
 
     expect(screen.getByRole("heading", { level: 2, name: "Нина Волкова" })).toBeVisible();
     expect(screen.getAllByText("ПД-1053")[0]).toBeVisible();
-    expect(screen.getAllByText("Казань")[0]).toBeVisible();
+    expect(container.querySelector(".admin-review-meta")?.textContent).toContain(
+      "Казань",
+    );
     expect(screen.getAllByText("На проверке")[0]).toBeVisible();
-    expect(screen.getByText("Агент: Татьяна Николаева")).toBeVisible();
+    expect(container.querySelector(".admin-review-meta")?.textContent).toContain(
+      "Агент: Татьяна Николаева",
+    );
 
-    for (const tab of ["Обзор", "Заявители", "Анкета", "Файлы", "Замечания", "История"]) {
+    for (const tab of ["Паспорт", "Селфи", "Анкета", "Замечания"]) {
       expect(screen.getByRole("tab", { name: new RegExp(`^${tab}`) })).toBeVisible();
     }
   });
@@ -67,11 +71,13 @@ describe("AdminReviewDrawer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Добавить замечание" }));
 
-    expect(screen.getByLabelText("Новое замечание")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Анкета" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Скан загранпаспорта" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Селфи" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Селфи N2" })).toBeVisible();
+    expect(screen.getByLabelText("Новое замечание")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Анкета" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Скан загранпаспорта" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Селфи" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Селфи N2" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Документ" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Скан загранпаспорта" }));

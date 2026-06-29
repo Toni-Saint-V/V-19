@@ -1791,18 +1791,18 @@ p {
 
 .access-brand-markline {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 0;
   min-width: 0;
 }
 
 .access-logo {
   display: block;
-  width: 84px;
-  height: 84px;
+  width: 58px;
+  height: 58px;
   margin: 0;
   border: 1px solid var(--vf-border-subtle);
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--vf-bg-shell);
   object-fit: cover;
 }
@@ -1810,7 +1810,7 @@ p {
 .access-brand-copy {
   display: grid;
   min-width: 0;
-  padding-top: 36px;
+  padding-top: 0;
 }
 
 .access-kicker {
@@ -1823,8 +1823,6 @@ p {
 }
 
 .access-brand-markline .access-kicker {
-  display: grid;
-  justify-items: start;
   color: var(--vf-text-primary);
   font-size: 30px;
   font-weight: 690;
@@ -1836,17 +1834,83 @@ p {
   text-transform: none;
 }
 
-.access-word-tail,
-.access-brand-version {
-  display: block;
+.vf-brand-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
 }
 
-.access-brand-version {
-  margin: 5px 0 0 1px;
+.vf-brand-wordmark--hero {
+  gap: 1px;
+}
+
+.vf-brand-capital {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.vf-brand-capital-image {
+  position: absolute;
+  top: -8px;
+  left: -20px;
+  display: block;
+  width: 76px;
+  max-width: none;
+  height: auto;
+  pointer-events: none;
+}
+
+.vf-brand-capital--hero {
+  width: 36px;
+  height: 42px;
+}
+
+.vf-brand-capital--mini {
+  width: 17px;
+  height: 20px;
+}
+
+.vf-brand-capital--mini .vf-brand-capital-image {
+  top: -4px;
+  left: -10px;
+  width: 36px;
+}
+
+.ops-brand-logo.vf-brand-capital {
+  width: 23px;
+  height: 27px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ops-brand-logo.vf-brand-capital .vf-brand-capital-image {
+  top: -5px;
+  left: -13px;
+  width: 48px;
+}
+
+.vf-brand-tail {
+  display: inline-block;
+}
+
+.vf-brand-comma-version {
+  display: inline-block;
+  margin-left: 0.06em;
   color: var(--vf-text-muted);
-  font-size: 11px;
+  font-size: 0.42em;
   font-weight: 650;
-  line-height: 1;
+  line-height: 0.7;
+  transform: translateY(0.44em);
+  transform-origin: 0 100%;
 }
 
 .access-brand-message {
@@ -2048,15 +2112,14 @@ p {
   }
 
   .access-brand-copy {
-    padding-top: 22px;
+    padding-top: 0;
   }
 
   .access-brand-markline .access-kicker {
     font-size: 22px;
   }
 
-  .access-brand-version {
-    margin-top: 4px;
+  .access-brand-markline .vf-brand-comma-version {
     font-size: 10px;
   }
 
@@ -2100,7 +2163,7 @@ p {
   }
 
   .access-brand-copy {
-    padding-top: 18px;
+    padding-top: 0;
   }
 
   .access-brand-markline .access-kicker {
@@ -3033,6 +3096,12 @@ p {
   color: var(--v19-fg-tertiary);
 }
 
+.v19-progress-cell.is-label {
+  min-width: max-content;
+  color: var(--vf-text-secondary);
+  font-variant-numeric: normal;
+}
+
 .v19-progress-track {
   --progress: 0%;
 
@@ -3060,6 +3129,10 @@ p {
 
 .v19-progress-cell.is-empty .v19-progress-track::after {
   background: var(--v19-fg-tertiary);
+}
+
+.v19-progress-cell.is-label .v19-progress-track {
+  display: none;
 }
 
 .v19-status-chip-suffix {
@@ -4242,6 +4315,11 @@ p {
   line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ops-shell .ops-brand-copy strong.vf-brand-wordmark {
+  display: inline-flex;
+  overflow: visible;
 }
 
 .ops-shell .ops-role-chip {
