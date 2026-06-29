@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -35,11 +35,7 @@ import {
   visaApplicationPdfAgentHandoffStatus,
   visaApplicationPdfReviewsForSubmission,
 } from "../visaApplicationPdfReconciliation";
-import {
-  buildAgentHandoffPackage,
-  buildAgentReturnedPdfPackageView,
-} from "../operationalWorkflow";
-import { agentOwnerDisplayName } from "../ownership";
+import { buildAgentHandoffPackage } from "../operationalWorkflow";
 import {
   activeMediaFileTypes,
   buildReadinessQueue,
@@ -54,7 +50,6 @@ import {
 } from "../workspaceModel";
 import type {
   ActionDecision,
-  AgentOwnerId,
   Applicant,
   DrawerTab,
   Issue,
@@ -62,34 +57,17 @@ import type {
   IssueInput,
   PassportExtractedFieldKey,
   QuestionnaireField,
-  QuestionnaireSection,
   QuestionnaireStatus,
   Role,
   Submission,
   SubmissionAction,
   SubmissionFileStatus,
-  SubmissionFileType,
 } from "../types";
 import { EmptyState } from "./Primitives";
-
-type ReviewRemarkContext = {
-  applicantId?: string;
-  category?: string;
-  comment: string;
-  description: string;
-  field?: string;
-  fileType?: SubmissionFileType;
-  reason: string;
-  section?: string;
-  severity?: IssueSeverity;
-  title: string;
-  type: IssueInput["type"];
-};
 
 export function SubmissionDrawer({
   actionError = "",
   activeTab,
-  agentOwnerId,
   fileUploadBusy = false,
   initialTarget = null,
   issueComposerRequest,
@@ -98,7 +76,6 @@ export function SubmissionDrawer({
   onAddIssue,
   onIssueComposerConsumed,
   onClose,
-  onMarkIssueFixed,
   onTab,
   onQuestionnaireField,
   onApplyPassportField,
@@ -116,7 +93,6 @@ export function SubmissionDrawer({
 }: {
   actionError?: string;
   activeTab: DrawerTab;
-  agentOwnerId?: AgentOwnerId;
   fileUploadBusy?: boolean;
   initialTarget?: WorkspaceTarget | null;
   issueComposerRequest: { submissionId: string; token: number } | null;
@@ -124,8 +100,10 @@ export function SubmissionDrawer({
   onAction: (action: SubmissionAction) => void;
   onAddIssue: (input: IssueInput) => void;
   onIssueComposerConsumed: () => void;
+  onAcceptAiSuggestion: (suggestionId: string) => void;
   onClose: () => void;
-  onMarkIssueFixed: (issueId: string) => void;
+  onDismissAiSuggestion: (suggestionId: string) => void;
+  onRunAiReview: () => void;
   onQuestionnaireField: (input: {
     applicantId: string;
     sectionId: string;
@@ -152,21 +130,12 @@ export function SubmissionDrawer({
 }) {
   const primaryAction = getPrimaryAction(submission, role, surface);
   const [issueComposerOpen, setIssueComposerOpen] = useState(false);
-  const [issueComposerContext, setIssueComposerContext] =
-    useState<ReviewRemarkContext | null>(null);
-  const [selectedReviewApplicantId, setSelectedReviewApplicantId] = useState(
-    submission.applicants[0]?.id ?? "",
-  );
   const [pendingTarget, setPendingTarget] = useState<WorkspaceTarget | null>(null);
   const drawerBodyRef = useRef<HTMLDivElement | null>(null);
   const tabNavigationModeRef = useRef<"manual" | "target">("manual");
   const canOpenIssueComposer =
     surface === "review" && canAddAdminIssue(submission, role);
   const contentCanBeEdited = canEditSubmissionContent(submission, role);
-  const closeIssueComposer = useCallback(() => {
-    setIssueComposerOpen(false);
-    setIssueComposerContext(null);
-  }, []);
   const footerHint =
     (primaryAction.action === "open_history" && primaryAction.disabled
       ? undefined
@@ -174,24 +143,12 @@ export function SubmissionDrawer({
     (contentCanBeEdited
       ? "Изменения сохраняются внутри подачи"
       : "Проверьте данные и выберите действие по подаче");
-  const firstReviewApplicantId = submission.applicants[0]?.id ?? "";
   useEffect(() => {
-    closeIssueComposer();
-    setSelectedReviewApplicantId(firstReviewApplicantId);
-  }, [closeIssueComposer, firstReviewApplicantId, submission.id]);
-
-  const selectedReviewApplicant =
-    submission.applicants.find(
-      (applicant) => applicant.id === selectedReviewApplicantId,
-    ) ??
-    submission.applicants[0] ??
-    null;
-  const visibleActiveTab =
-    surface === "review" ? adminReviewVisibleTab(activeTab) : activeTab;
+    setIssueComposerOpen(false);
+  }, [submission.id]);
 
   useEffect(() => {
     if (canOpenIssueComposer && issueComposerRequest?.submissionId === submission.id) {
-      setIssueComposerContext(null);
       setIssueComposerOpen(true);
       onIssueComposerConsumed();
     }
@@ -203,8 +160,8 @@ export function SubmissionDrawer({
   ]);
 
   useEffect(() => {
-    if (!canOpenIssueComposer) closeIssueComposer();
-  }, [canOpenIssueComposer, closeIssueComposer]);
+    if (!canOpenIssueComposer) setIssueComposerOpen(false);
+  }, [canOpenIssueComposer]);
 
   useLayoutEffect(() => {
     if (tabNavigationModeRef.current === "target") return;
@@ -212,11 +169,7 @@ export function SubmissionDrawer({
   }, [activeTab, submission.id]);
 
   useLayoutEffect(() => {
-    if (
-      !pendingTarget ||
-      drawerTabForWorkspaceTarget(pendingTarget, surface) !== visibleActiveTab
-    )
-      return;
+    if (!pendingTarget || tabForTarget(pendingTarget) !== activeTab) return;
 
     const targetRequest = pendingTarget;
     let cancelled = false;
@@ -254,26 +207,20 @@ export function SubmissionDrawer({
     return () => {
       cancelled = true;
     };
-  }, [pendingTarget, surface, visibleActiveTab]);
+  }, [activeTab, pendingTarget]);
 
   function openTarget(target: WorkspaceTarget) {
     tabNavigationModeRef.current = "target";
-    if (surface === "review" && "applicantId" in target) {
-      setSelectedReviewApplicantId(target.applicantId);
-    }
-    onTab(drawerTabForWorkspaceTarget(target, surface));
+    onTab(tabForTarget(target));
     setPendingTarget(target);
   }
 
   useEffect(() => {
     if (!initialTarget) return;
     tabNavigationModeRef.current = "target";
-    if (surface === "review" && "applicantId" in initialTarget) {
-      setSelectedReviewApplicantId(initialTarget.applicantId);
-    }
-    onTab(drawerTabForWorkspaceTarget(initialTarget, surface));
+    onTab(tabForTarget(initialTarget));
     setPendingTarget(initialTarget);
-  }, [initialTarget, onTab, surface]);
+  }, [initialTarget, onTab]);
 
   function handleTabChange(tab: DrawerTab) {
     tabNavigationModeRef.current = "manual";
@@ -285,164 +232,101 @@ export function SubmissionDrawer({
     if (first) openTarget(first.target);
   }
 
-  function openIssueComposer(context?: ReviewRemarkContext) {
-    if (!canOpenIssueComposer) return;
-    setIssueComposerContext(context ?? null);
-    setIssueComposerOpen(true);
-  }
-
-  const drawerTabs =
-    surface === "review"
-      ? adminReviewTabs(submission, selectedReviewApplicant)
-      : workspaceTabs.map((tab) => ({
-          ...tab,
-          label: drawerTabLabel(tab.id, tab.label),
-          meta: drawerTabValue(submission, tab.id),
-        }));
-
   return (
     <SheetFrame
       className={`submission-drawer submission-detail-drawer ${
-        surface === "review" ? "is-admin-review-drawer" : ""
-      } ${visibleActiveTab === "overview" ? "is-overview-tab" : ""} ${
-        visibleActiveTab === "applicants" ? "is-selfie-tab" : ""
+        activeTab === "overview" ? "is-overview-tab" : ""
       }`}
       labelledBy="drawer-title"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
         event.stopPropagation();
         if (issueComposerOpen) {
-          closeIssueComposer();
+          setIssueComposerOpen(false);
           return;
         }
         onClose();
       }}
     >
-      {surface === "review" ? (
-        <AdminReviewTopBar
-          applicant={selectedReviewApplicant}
-          onClose={onClose}
-          submission={submission}
-        />
-      ) : (
-        <header className="drawer-header">
-          <div className="drawer-title-block">
-            <h2 id="drawer-title">{submission.title}</h2>
-            <p className="drawer-meta-line">{drawerHeaderMeta(submission)}</p>
-            <div className="drawer-chips" aria-label="Состояние подачи">
-              <Badge className={`drawer-status-chip ${statusTone[submission.status]}`}>
-                {statusLabels[submission.status]}
-                {blockerCount(submission)
-                  ? ` · ${blockerCountLabel(blockerCount(submission))}`
-                  : ""}
-              </Badge>
-              <span className="drawer-readiness-chip">
-                {submission.completeness.total}% готово
-              </span>
-            </div>
+      <header className="drawer-header">
+        <div className="drawer-title-block">
+          <h2 id="drawer-title">{submission.title}</h2>
+          <p className="drawer-meta-line">{drawerHeaderMeta(submission)}</p>
+          <div className="drawer-chips" aria-label="Состояние подачи">
+            <Badge className={`drawer-status-chip ${statusTone[submission.status]}`}>
+              {statusLabels[submission.status]}
+              {blockerCount(submission)
+                ? ` · ${blockerCountLabel(blockerCount(submission))}`
+                : ""}
+            </Badge>
+            <span className="drawer-readiness-chip">
+              {submission.completeness.total}% готово
+            </span>
           </div>
-          <div className="drawer-header-actions" aria-label="Действия панели">
-            <button
-              className="icon-button"
-              type="button"
-              aria-label="Дополнительные действия недоступны"
-              disabled
-            >
-              ···
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              aria-label="Закрыть подачу"
-              onClick={onClose}
-            >
-              ×
-            </button>
-          </div>
-        </header>
-      )}
+        </div>
+        <div className="drawer-header-actions" aria-label="Действия панели">
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Дополнительные действия недоступны"
+            disabled
+          >
+            ···
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Закрыть подачу"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+      </header>
 
       <DrawerTabs
-        ariaLabel={surface === "review" ? "Разделы проверки" : "Разделы подачи"}
+        ariaLabel="Разделы подачи"
         autoFocusOnValueChange={tabNavigationModeRef.current !== "target"}
-        tabs={drawerTabs}
-        value={visibleActiveTab}
+        tabs={workspaceTabs.map((tab) => ({
+          ...tab,
+          label: drawerTabLabel(tab.id, tab.label),
+          meta: drawerTabValue(submission, tab.id),
+        }))}
+        value={activeTab}
         onValueChange={handleTabChange}
       />
 
       <div
         className="drawer-body workspace-drawer-body"
-        id={`drawer-panel-${visibleActiveTab}`}
+        id={`drawer-panel-${activeTab}`}
         ref={drawerBodyRef}
         role="tabpanel"
-        aria-labelledby={`drawer-tab-${visibleActiveTab}`}
+        aria-labelledby={`drawer-tab-${activeTab}`}
       >
-        {surface === "review" && submission.applicants.length > 1 ? (
-          <AdminReviewApplicantStrip
-            selectedApplicantId={selectedReviewApplicant?.id ?? ""}
-            submission={submission}
-            onSelect={setSelectedReviewApplicantId}
-          />
-        ) : null}
         <div className="workspace-main">
-          {visibleActiveTab === "overview" ? (
-            surface === "review" ? (
-              <AdminPassportReview
-                canAddIssue={canOpenIssueComposer}
-                fileUploadBusy={fileUploadBusy}
-                applicant={selectedReviewApplicant}
-                onAddRemark={openIssueComposer}
-                onClose={onClose}
-                onConfirmVisaApplicationPdfReview={onConfirmVisaApplicationPdfReview}
-                onDismissVisaApplicationPdfReview={onDismissVisaApplicationPdfReview}
-                onPublishReturnedPdfHandoff={onPublishReturnedPdfHandoff}
-                onReviewVisaApplicationPdf={onReviewVisaApplicationPdf}
-                submission={submission}
-              />
-            ) : (
-              <DrawerOverview
-                onOpenHistory={() => handleTabChange("history")}
-                onOpenTarget={openTarget}
-                primaryAction={primaryAction}
-                surface={surface}
-                submission={submission}
-              />
-            )
+          {activeTab === "overview" ? (
+            <DrawerOverview
+              onOpenHistory={() => handleTabChange("history")}
+              onOpenTarget={openTarget}
+              primaryAction={primaryAction}
+              surface={surface}
+              submission={submission}
+            />
           ) : null}
-          {visibleActiveTab === "applicants" ? (
-            surface === "review" ? (
-              <AdminSelfieReview
-                canAddIssue={canOpenIssueComposer}
-                applicant={selectedReviewApplicant}
-                onAddRemark={openIssueComposer}
-                onClose={onClose}
-                submission={submission}
-              />
-            ) : (
-              <DrawerApplicants onOpenTarget={openTarget} submission={submission} />
-            )
+          {activeTab === "applicants" ? (
+            <DrawerApplicants onOpenTarget={openTarget} submission={submission} />
           ) : null}
-          {visibleActiveTab === "questionnaire" ? (
-            surface === "review" ? (
-              <AdminQuestionnaireReview
-                canAddIssue={canOpenIssueComposer}
-                applicant={selectedReviewApplicant}
-                onAddRemark={openIssueComposer}
-                pendingTarget={pendingTarget}
-                submission={submission}
-              />
-            ) : (
-              <DrawerQuestionnaire
-                onApplyPassportField={onApplyPassportField}
-                onFieldChange={onQuestionnaireField}
-                passportExtractionEnabled={passportExtractionEnabled}
-                pendingTarget={pendingTarget}
-                role={role}
-                submission={submission}
-              />
-            )
+          {activeTab === "questionnaire" ? (
+            <DrawerQuestionnaire
+              onApplyPassportField={onApplyPassportField}
+              onFieldChange={onQuestionnaireField}
+              passportExtractionEnabled={passportExtractionEnabled}
+              pendingTarget={pendingTarget}
+              role={role}
+              submission={submission}
+            />
           ) : null}
-          {visibleActiveTab === "files" && surface !== "review" ? (
+          {activeTab === "files" ? (
             <DrawerFiles
               fileUploadBusy={fileUploadBusy}
               localPassportFileIds={localPassportFileIds}
@@ -452,47 +336,30 @@ export function SubmissionDrawer({
               onPublishReturnedPdfHandoff={onPublishReturnedPdfHandoff}
               onReviewVisaApplicationPdf={onReviewVisaApplicationPdf}
               onUploadFile={onUploadFile}
-              agentOwnerId={agentOwnerId ?? submission.agentId}
               passportExtractionEnabled={passportExtractionEnabled}
               requireSelectedFile={requireSelectedFile}
               role={role}
               submission={submission}
             />
           ) : null}
-          {visibleActiveTab === "issues" ? (
-            surface === "review" ? (
-              <AdminRemarksReview
-                canAddIssue={canOpenIssueComposer}
-                onAddRemark={openIssueComposer}
-                onOpenTarget={openTarget}
-                role={role}
-                submission={submission}
-              />
-            ) : (
-              <DrawerIssues
-                canAddIssue={canOpenIssueComposer}
-                onAddIssue={() => openIssueComposer()}
-                onMarkIssueFixed={onMarkIssueFixed}
-                onOpenTarget={openTarget}
-                role={role}
-                submission={submission}
-              />
-            )
+          {activeTab === "issues" ? (
+            <DrawerIssues
+              onOpenTarget={openTarget}
+              role={role}
+              submission={submission}
+            />
           ) : null}
-          {visibleActiveTab === "history" && surface !== "review" ? (
-            <DrawerHistory submission={submission} />
-          ) : null}
+          {activeTab === "history" ? <DrawerHistory submission={submission} /> : null}
         </div>
       </div>
 
       {canOpenIssueComposer && issueComposerOpen ? (
         <IssueComposer
-          context={issueComposerContext}
           submission={submission}
-          onCancel={closeIssueComposer}
+          onCancel={() => setIssueComposerOpen(false)}
           onSubmit={(input) => {
             onAddIssue(input);
-            closeIssueComposer();
+            setIssueComposerOpen(false);
           }}
         />
       ) : null}
@@ -513,17 +380,8 @@ export function SubmissionDrawer({
             Открыть первый блокер
           </Button>
         ) : null}
-        {surface === "review" && canOpenIssueComposer ? (
-          <Button
-            className="drawer-footer-context-action"
-            variant="secondary"
-            onClick={() => openIssueComposer(globalRemarkContext(submission))}
-          >
-            Замечание
-          </Button>
-        ) : null}
         <Button variant="ghost" onClick={onClose}>
-          {surface === "review" ? "Отложить" : "Закрыть"}
+          Закрыть
         </Button>
         <Button
           danger={primaryAction.action === "return_with_issues"}
@@ -541,1396 +399,26 @@ function submissionActionErrorRole(actionError: string): "alert" | undefined {
   return actionError ? "alert" : undefined;
 }
 
-function AdminReviewTopBar({
-  applicant,
-  onClose,
-  submission,
-}: {
-  applicant: Applicant | null;
-  onClose: () => void;
-  submission: Submission;
-}) {
-  const applicantIndex = applicant
-    ? submission.applicants.findIndex((item) => item.id === applicant.id) + 1
-    : 0;
-  const familyProgress =
-    submission.type === "family" && applicantIndex > 0
-      ? `${applicantIndex}/${submission.applicants.length}`
-      : null;
-  const ownerAgentName = agentOwnerDisplayName(
-    submission.agentId,
-    submission.returnedPdfPackage?.ownerAgentName,
-  );
-
-  return (
-    <header className="drawer-header admin-review-topbar">
-      <div className="admin-review-topbar-main">
-        <h2 id="drawer-title">{submission.title}</h2>
-        <div className="admin-review-topbar-line" aria-label="Контекст проверки">
-          <Badge className={`drawer-status-chip ${statusTone[submission.status]}`}>
-            {statusLabels[submission.status]}
-          </Badge>
-          <span className="admin-review-status-snapshot">
-            {submission.id} · {statusLabels[submission.status]}
-          </span>
-          <strong className="admin-review-owner-agent">
-            Агент: {ownerAgentName}
-          </strong>
-          <span className="mono">{submission.id}</span>
-          <span>{applicant?.fullName ?? submission.title}</span>
-          {familyProgress ? <span>Семья {familyProgress}</span> : null}
-        </div>
-      </div>
-      <button
-        className="icon-button"
-        type="button"
-        aria-label="Закрыть подачу"
-        onClick={onClose}
-      >
-        ×
-      </button>
-    </header>
-  );
-}
-
-function AdminReviewApplicantStrip({
-  onSelect,
-  selectedApplicantId,
-  submission,
-}: {
-  onSelect: (applicantId: string) => void;
-  selectedApplicantId: string;
-  submission: Submission;
-}) {
-  return (
-    <div className="admin-review-applicant-strip" aria-label="Заявители семьи">
-      {submission.applicants.map((applicant) => {
-        const issues = applicantIssues(submission, applicant.id);
-        const blockers = issues.filter((issue) => issue.severity === "blocker").length;
-        const selected = applicant.id === selectedApplicantId;
-        const visualState = applicantVisualState(submission, applicant);
-
-        return (
-          <button
-            aria-pressed={selected}
-            className={`admin-review-applicant-chip ${selected ? "is-active" : ""} tone-${visualState.tone}`}
-            key={applicant.id}
-            type="button"
-            onClick={() => onSelect(applicant.id)}
-          >
-            <span>
-              <strong>{applicant.fullName}</strong>
-              <small>{applicantRoleLabel(applicant.role)}</small>
-            </span>
-            <Badge className="visa-tag">{visualState.label}</Badge>
-            {issues.length ? (
-              <em className={blockers ? "has-blocker" : ""}>
-                {blockers ? `${blockers} блок.` : issueCountLabel(issues.length)}
-              </em>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-type AdminReviewChecklistItem = {
-  helper: string;
-  label: string;
-  status: "accepted" | "missing" | "unchecked" | "warning";
-};
-
-function AdminChecklistPanel({
-  canAddIssue,
-  items,
-  onAddRemark,
-  remarkContext,
-  title,
-}: {
-  canAddIssue: boolean;
-  items: AdminReviewChecklistItem[];
-  onAddRemark: (context: ReviewRemarkContext) => void;
-  remarkContext: (item: AdminReviewChecklistItem) => ReviewRemarkContext;
-  title: string;
-}) {
-  return (
-    <aside className="admin-checklist-panel" aria-label={`Чеклист: ${title}`}>
-      <div className="admin-checklist-head">
-        <p className="kicker">Проверка</p>
-        <h3>{title}</h3>
-      </div>
-      <div className="admin-checklist-list">
-        {items.map((item) => (
-          <div className={`admin-checklist-item state-${item.status}`} key={item.label}>
-            <span className="admin-checklist-icon" aria-hidden="true" />
-            <div>
-              <strong>{item.label}</strong>
-              <p>{item.helper}</p>
-            </div>
-            <Button
-              className="compact-button"
-              disabled={!canAddIssue}
-              variant="secondary"
-              onClick={() => onAddRemark(remarkContext(item))}
-            >
-              Замечание
-            </Button>
-          </div>
-        ))}
-      </div>
-    </aside>
-  );
-}
-
-function AdminPassportReview({
-  applicant,
-  canAddIssue,
-  fileUploadBusy = false,
-  onAddRemark,
-  onClose,
-  onConfirmVisaApplicationPdfReview,
-  onDismissVisaApplicationPdfReview,
-  onPublishReturnedPdfHandoff,
-  onReviewVisaApplicationPdf,
-  submission,
-}: {
-  applicant: Applicant | null;
-  canAddIssue: boolean;
-  fileUploadBusy?: boolean;
-  onAddRemark: (context: ReviewRemarkContext) => void;
-  onClose: () => void;
-  onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
-  onDismissVisaApplicationPdfReview: (reviewId: string) => void;
-  onPublishReturnedPdfHandoff: () => Promise<void>;
-  onReviewVisaApplicationPdf: (file: File) => Promise<void>;
-  submission: Submission;
-}) {
-  if (!applicant) return <EmptyState text="Заявитель для проверки не выбран." />;
-
-  const passportFile = reviewFileForApplicant(submission, applicant.id, "passport_scan");
-  const fileIssue = fileIssueFor(submission, applicant.id, "passport_scan");
-  const passportFields = questionnaireSectionByAlias(applicant, "passport");
-  const personalFields = questionnaireSectionByAlias(applicant, "personal");
-  const passportNumber = fieldValue(passportFields, "passport-no");
-  const expiryDate = fieldValue(passportFields, "passport-expiry-date");
-  const passportType = fieldValue(passportFields, "passport-type");
-  const birthDate = fieldValue(personalFields, "birth-date");
-  const firstName = fieldValue(personalFields, "first-name");
-  const surname = fieldValue(personalFields, "surname");
-  const fileReady = Boolean(
-    passportFile &&
-      passportFile.status !== "missing" &&
-      passportFile.status !== "needs_replacement",
-  );
-  const checklist = [
-    {
-      helper: [surname, firstName].filter(Boolean).join(" ") || "ФИО не заполнено",
-      label: "Имя и фамилия совпадают",
-      status: fileIssue ? "warning" : firstName && surname ? "accepted" : "missing",
-    },
-    {
-      helper: birthDate || "Дата рождения не заполнена",
-      label: "Дата рождения совпадает",
-      status: fileIssue ? "warning" : birthDate ? "accepted" : "missing",
-    },
-    {
-      helper: passportNumber || "Номер не заполнен",
-      label: "Номер паспорта виден",
-      status: passportNumber ? "accepted" : "missing",
-    },
-    {
-      helper: passportNumber
-        ? `Анкета: ${passportNumber}`
-        : "Нет значения для сравнения",
-      label: "Номер паспорта совпадает с анкетой",
-      status: passportNumber && !fileIssue ? "accepted" : "warning",
-    },
-    {
-      helper: expiryDate || "Срок действия не заполнен",
-      label: "Срок действия виден",
-      status: expiryDate ? "accepted" : "missing",
-    },
-    {
-      helper: expiryDate ? `До ${expiryDate}` : "Нужна ручная проверка",
-      label: "Срок действия не истёк",
-      status: expiryDate ? "accepted" : "warning",
-    },
-    {
-      helper: passportType || "Тип документа не заполнен",
-      label: "Страна и тип документа совпадают",
-      status: passportType ? "accepted" : "missing",
-    },
-    {
-      helper: fileReady ? fileStatusLabel(passportFile) : "Файл не готов",
-      label: "MRZ и страница не обрезаны",
-      status: fileIssue ? "warning" : fileReady ? "unchecked" : "missing",
-    },
-    {
-      helper: fileReady ? fileStatusLabel(passportFile) : "Файл не готов",
-      label: "Страница читаемая",
-      status: fileIssue ? "warning" : fileReady ? "unchecked" : "missing",
-    },
-  ] satisfies AdminReviewChecklistItem[];
-
-  return (
-    <section className="drawer-section admin-review-tab admin-passport-review">
-      <div className="admin-review-split">
-        <article
-          className="admin-document-preview"
-          id={targetElementId({
-            applicantId: applicant.id,
-            fileType: "passport_scan",
-            tab: "files",
-          })}
-          tabIndex={-1}
-        >
-          <div className="admin-document-preview-stage">
-            <span aria-hidden="true">PASSPORT</span>
-            <p>Превью документа недоступно в локальном окружении</p>
-          </div>
-          <dl className="admin-document-meta">
-            <div>
-              <dt>Тип</dt>
-              <dd>{passportType || "Загранпаспорт"}</dd>
-            </div>
-            <div>
-              <dt>Заявитель</dt>
-              <dd>{applicant.fullName}</dd>
-            </div>
-            <div>
-              <dt>Статус файла</dt>
-              <dd>{fileStatusLabel(passportFile)}</dd>
-            </div>
-            <div>
-              <dt>Загрузка</dt>
-              <dd>{passportFile?.uploadedAt ?? "нет даты"}</dd>
-            </div>
-          </dl>
-        </article>
-        <AdminChecklistPanel
-          canAddIssue={canAddIssue}
-          items={checklist}
-          remarkContext={(item) =>
-            fileRemarkContext({
-              applicant,
-              fileType: "passport_scan",
-              itemLabel: item.label,
-              submission,
-            })
-          }
-          title="Паспорт"
-          onAddRemark={onAddRemark}
-        />
-      </div>
-      <div className="admin-review-action-row">
-        <Button
-          className="compact-button"
-          disabled
-          title="Отдельное принятие паспорта не поддержано текущими handlers."
-        >
-          Принять паспорт
-        </Button>
-        <Button
-          className="compact-button"
-          disabled={!canAddIssue}
-          variant="secondary"
-          onClick={() =>
-            onAddRemark(
-              fileRemarkContext({
-                applicant,
-                fileType: "passport_scan",
-                itemLabel: "Паспорт",
-                submission,
-              }),
-            )
-          }
-        >
-          Замечание
-        </Button>
-        <Button className="compact-button" variant="ghost" onClick={onClose}>
-          Отложить
-        </Button>
-      </div>
-      <AdminReturnedPdfHandoff
-        fileUploadBusy={fileUploadBusy}
-        role="admin"
-        submission={submission}
-        onConfirmVisaApplicationPdfReview={onConfirmVisaApplicationPdfReview}
-        onDismissVisaApplicationPdfReview={onDismissVisaApplicationPdfReview}
-        onPublishReturnedPdfHandoff={onPublishReturnedPdfHandoff}
-        onReviewVisaApplicationPdf={onReviewVisaApplicationPdf}
-      />
-    </section>
-  );
-}
-
-function AdminReturnedPdfHandoff({
-  fileUploadBusy = false,
-  onConfirmVisaApplicationPdfReview,
-  onDismissVisaApplicationPdfReview,
-  onPublishReturnedPdfHandoff,
-  onReviewVisaApplicationPdf,
-  role,
-  submission,
-}: {
-  fileUploadBusy?: boolean;
-  onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
-  onDismissVisaApplicationPdfReview: (reviewId: string) => void;
-  onPublishReturnedPdfHandoff: () => Promise<void>;
-  onReviewVisaApplicationPdf: (file: File) => Promise<void>;
-  role: Role;
-  submission: Submission;
-}) {
-  const [pdfReviewBusy, setPdfReviewBusy] = useState(false);
-  const [pdfReviewError, setPdfReviewError] = useState("");
-  const [pdfHandoffBusy, setPdfHandoffBusy] = useState(false);
-  const [pdfHandoffMessage, setPdfHandoffMessage] = useState("");
-  const pdfReviewAvailable = submission.status === "exported";
-  const pdfReviews = visaApplicationPdfReviewsForSubmission(submission);
-  const pdfHandoffStatus = visaApplicationPdfAgentHandoffStatus(submission);
-  const agentHandoffPackage = buildAgentHandoffPackage(submission);
-  const canReviewVisaPdf =
-    pdfReviewAvailable &&
-    !fileUploadBusy &&
-    !pdfReviewBusy &&
-    !pdfHandoffBusy &&
-    role === "admin";
-  const canPublishReturnedPdfHandoff = canReviewVisaPdf && agentHandoffPackage.ready;
-
-  useEffect(() => {
-    setPdfReviewBusy(false);
-    setPdfReviewError("");
-    setPdfHandoffBusy(false);
-    setPdfHandoffMessage("");
-  }, [submission.id]);
-
-  if (!pdfReviewAvailable) return null;
-
-  async function handleVisaApplicationPdf(file: File) {
-    setPdfReviewBusy(true);
-    setPdfReviewError("");
-    setPdfHandoffMessage("");
-    try {
-      await onReviewVisaApplicationPdf(file);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "PDF анкеты не удалось прочитать. Проверьте файл и попробуйте снова.";
-      setPdfReviewError(message);
-      window.alert(message);
-    } finally {
-      setPdfReviewBusy(false);
-    }
-  }
-
-  async function handlePublishReturnedPdfHandoff() {
-    setPdfHandoffBusy(true);
-    setPdfReviewError("");
-    setPdfHandoffMessage("");
-    try {
-      await onPublishReturnedPdfHandoff();
-      setPdfHandoffMessage("Комплект PDF опубликован агенту.");
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Комплект PDF не удалось открыть агенту.";
-      setPdfReviewError(message);
-    } finally {
-      setPdfHandoffBusy(false);
-    }
-  }
-
-  return (
-    <section className="admin-review-technical" aria-label="Техническое">
-      <div className="admin-review-technical-head">
-        <span>Техническое</span>
-        <strong>Returned PDF handoff</strong>
-      </div>
-      <VisaApplicationPdfReviewPanel
-        busy={pdfReviewBusy || pdfHandoffBusy}
-        canPublish={canPublishReturnedPdfHandoff}
-        canUpload={canReviewVisaPdf}
-        error={pdfReviewError}
-        handoffBlockers={agentHandoffPackage.blockers}
-        handoffMessage={pdfHandoffMessage}
-        handoffStatus={pdfHandoffStatus}
-        applicants={submission.applicants}
-        reviews={pdfReviews}
-        submissionId={submission.id}
-        onConfirm={onConfirmVisaApplicationPdfReview}
-        onDismiss={onDismissVisaApplicationPdfReview}
-        onPublish={handlePublishReturnedPdfHandoff}
-        onReview={handleVisaApplicationPdf}
-      />
-    </section>
-  );
-}
-
-function AdminSelfieReview({
-  applicant,
-  canAddIssue,
-  onAddRemark,
-  onClose,
-  submission,
-}: {
-  applicant: Applicant | null;
-  canAddIssue: boolean;
-  onAddRemark: (context: ReviewRemarkContext) => void;
-  onClose: () => void;
-  submission: Submission;
-}) {
-  if (!applicant) return <EmptyState text="Заявитель для проверки не выбран." />;
-
-  const selfieFiles = (["selfie", "selfie_2"] as const).map((fileType) => ({
-    file: reviewFileForApplicant(submission, applicant.id, fileType),
-    issue: fileIssueFor(submission, applicant.id, fileType),
-    type: fileType,
-  }));
-  const hasCompleteSelfieSet = selfieFiles.every(
-    ({ file }) =>
-      file && file.status !== "missing" && file.status !== "needs_replacement",
-  );
-  const selfieRemarkFileType =
-    selfieFiles.find(
-      ({ file }) => !file || file.status === "missing" || file.status === "needs_replacement",
-    )?.type ??
-    selfieFiles.find(({ issue }) => issue)?.type ??
-    "selfie";
-  const hasSelfieIssue = selfieFiles.some(({ issue }) => issue);
-  const checklist = [
-    {
-      helper: hasCompleteSelfieSet ? "Оба файла есть в карточке" : "Selfie + Selfie N2 обязательны",
-      label: "Лицо видно",
-      status: hasCompleteSelfieSet ? "unchecked" : "missing",
-    },
-    {
-      helper: hasSelfieIssue ? "Есть замечание по селфи" : "Нужна ручная проверка",
-      label: "Фото не размыто",
-      status: hasSelfieIssue ? "warning" : hasCompleteSelfieSet ? "unchecked" : "missing",
-    },
-    {
-      helper: applicant.fullName,
-      label: "Заявитель соответствует",
-      status: hasCompleteSelfieSet ? "unchecked" : "missing",
-    },
-    {
-      helper: "Selfie + Selfie N2",
-      label: "Требования соблюдены",
-      status: hasSelfieIssue ? "warning" : hasCompleteSelfieSet ? "unchecked" : "missing",
-    },
-    {
-      helper: selfieFiles
-        .map(({ file, type }) => `${fileLabel(type)}: ${fileStatusLabel(file)}`)
-        .join(" · "),
-      label: "Файл доступен и читаем",
-      status: hasSelfieIssue ? "warning" : hasCompleteSelfieSet ? "unchecked" : "missing",
-    },
-  ] satisfies AdminReviewChecklistItem[];
-
-  return (
-    <section className="drawer-section admin-review-tab admin-selfie-review">
-      <div className="admin-review-split">
-        <div className="admin-selfie-previews">
-          {selfieFiles.map(({ file, issue, type }) => (
-            <article
-              className={`admin-selfie-card ${issue ? "has-issue" : ""}`}
-              id={targetElementId({
-                applicantId: applicant.id,
-                fileType: type,
-                tab: "files",
-              })}
-              key={type}
-              tabIndex={-1}
-            >
-              <div className="admin-selfie-preview-stage">
-                <span aria-hidden="true">SELFIE</span>
-                <p>
-                  {file && file.status !== "missing"
-                    ? "Превью селфи недоступно в локальном окружении"
-                    : "Селфи отсутствует"}
-                </p>
-              </div>
-              <div className="admin-selfie-card-copy">
-                <strong>{fileLabel(type)}</strong>
-                <span>{fileStatusLabel(file)}</span>
-                <small>{issue ? drawerIssueSummary(issue) : applicant.fullName}</small>
-              </div>
-            </article>
-          ))}
-        </div>
-        <AdminChecklistPanel
-          canAddIssue={canAddIssue}
-          items={checklist}
-          remarkContext={(item) =>
-            fileRemarkContext({
-              applicant,
-              fileType: selfieRemarkFileType,
-              itemLabel: item.label,
-              submission,
-            })
-          }
-          title="Селфи"
-          onAddRemark={onAddRemark}
-        />
-      </div>
-      {!hasCompleteSelfieSet ? (
-        <div className="admin-review-empty-callout">
-          <strong>Селфи не готово к проверке</strong>
-          <p>Оба файла обязательны: Selfie и Selfie N2. Создайте точное замечание к отсутствующему документу.</p>
-          <Button
-            className="compact-button"
-            disabled={!canAddIssue}
-            variant="secondary"
-            onClick={() =>
-              onAddRemark(
-                fileRemarkContext({
-                  applicant,
-                  fileType: selfieRemarkFileType,
-                  itemLabel: `${fileLabel(selfieRemarkFileType)} отсутствует`,
-                  submission,
-                }),
-              )
-            }
-          >
-            Замечание к {fileLabel(selfieRemarkFileType)}
-          </Button>
-        </div>
-      ) : null}
-      <div className="admin-review-action-row">
-        <Button
-          className="compact-button"
-          disabled
-          title="Отдельное принятие селфи не поддержано текущими handlers."
-        >
-          Принять селфи
-        </Button>
-        <Button
-          className="compact-button"
-          disabled={!canAddIssue}
-          variant="secondary"
-          onClick={() =>
-            onAddRemark(
-              fileRemarkContext({
-                applicant,
-                fileType: selfieRemarkFileType,
-                itemLabel: fileLabel(selfieRemarkFileType),
-                submission,
-              }),
-            )
-          }
-        >
-          Замечание
-        </Button>
-        <Button className="compact-button" variant="ghost" onClick={onClose}>
-          Отложить
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-function AdminQuestionnaireReview({
-  applicant,
-  canAddIssue,
-  onAddRemark,
-  pendingTarget,
-  submission,
-}: {
-  applicant: Applicant | null;
-  canAddIssue: boolean;
-  onAddRemark: (context: ReviewRemarkContext) => void;
-  pendingTarget: WorkspaceTarget | null;
-  submission: Submission;
-}) {
-  const groups = useMemo(
-    () => (applicant ? adminQuestionnaireGroups(submission, applicant) : []),
-    [applicant, submission],
-  );
-  const [activeGroupId, setActiveGroupId] = useState<string>(groups[0]?.id ?? "");
-
-  useEffect(() => {
-    if (!groups.length) {
-      setActiveGroupId("");
-      return;
-    }
-    if (!groups.some((group) => group.id === activeGroupId)) {
-      setActiveGroupId(groups[0].id);
-    }
-  }, [activeGroupId, groups]);
-
-  useEffect(() => {
-    if (!applicant || pendingTarget?.tab !== "questionnaire") return;
-    if (pendingTarget.applicantId !== applicant.id) return;
-    const targetGroup = adminQuestionnaireGroupForTarget(groups, pendingTarget);
-    if (targetGroup) setActiveGroupId(targetGroup.id);
-  }, [applicant, groups, pendingTarget]);
-
-  if (!applicant) return <EmptyState text="Заявитель для проверки не выбран." />;
-
-  const activeGroup = groups.find((group) => group.id === activeGroupId) ?? groups[0];
-  if (!activeGroup) return <EmptyState text="Разделы анкеты не найдены." />;
-
-  const activeIndex = groups.findIndex((group) => group.id === activeGroup.id);
-  const nextGroup = groups[(activeIndex + 1) % groups.length];
-  const groupIssues = issuesForQuestionnaireGroup(submission, applicant, activeGroup);
-  const fieldCount = activeGroup.sections.reduce(
-    (total, section) => total + section.fields.length,
-    0,
-  );
-  const reviewedCount = activeGroup.sections.reduce(
-    (total, section) =>
-      total + section.fields.filter((field) => field.value.trim()).length,
-    0,
-  );
-  const status = questionnaireGroupStatus(activeGroup, groupIssues);
-
-  return (
-    <section className="drawer-section admin-review-tab admin-questionnaire-review">
-      <div className="admin-questionnaire-head">
-        <div>
-          <p className="kicker">Анкета</p>
-          <h3>{applicant.fullName}</h3>
-          <p>Разделы проверяются по одному, без длинной простыни полей.</p>
-        </div>
-        <Badge className={adminReviewStatusClass(status)}>
-          {adminReviewStatusLabel(status)}
-        </Badge>
-      </div>
-
-      <div className="admin-questionnaire-section-nav" aria-label="Разделы анкеты">
-        {groups.map((group) => {
-          const issues = issuesForQuestionnaireGroup(submission, applicant, group);
-          const groupStatus = questionnaireGroupStatus(group, issues);
-
-          return (
-            <button
-              aria-pressed={group.id === activeGroup.id}
-              className={`admin-questionnaire-section-tab ${group.id === activeGroup.id ? "is-active" : ""}`}
-              key={group.id}
-              type="button"
-              onClick={() => setActiveGroupId(group.id)}
-            >
-              <span>{group.title}</span>
-              <em>{group.reviewedCount}/{group.fieldCount}</em>
-              {issues.length ? <strong>{issues.length}</strong> : null}
-              <i className={`state-${groupStatus}`} aria-hidden="true" />
-            </button>
-          );
-        })}
-      </div>
-
-      <article className={`admin-questionnaire-section-card state-${status}`}>
-        <header className="admin-questionnaire-section-header">
-          <div>
-            <h4>{activeGroup.title}</h4>
-            <p>
-              {fieldCount} полей · проверено {reviewedCount} · замечаний{" "}
-              {groupIssues.length}
-            </p>
-          </div>
-          <Badge className={adminReviewStatusClass(status)}>
-            {adminReviewStatusLabel(status)}
-          </Badge>
-        </header>
-
-        {activeGroup.id === "documents" ? (
-          <div className="admin-questionnaire-linked-note">
-            <strong>Паспортные поля проверяются во вкладке «Паспорт»</strong>
-            <p>
-              Здесь показана только связь с анкетой, чтобы не дублировать тяжёлую
-              проверку документа.
-            </p>
-          </div>
-        ) : null}
-
-        {activeGroup.id === "family" ? (
-          <div className="admin-questionnaire-linked-note">
-            <strong>Семейный контекст</strong>
-            <p>
-              Общие семейные проблемы оформляются семейным замечанием. Личные
-              замечания остаются привязанными к заявителю.
-            </p>
-          </div>
-        ) : null}
-
-        <div className="admin-questionnaire-field-list">
-          {activeGroup.sections.flatMap((section) =>
-            section.fields.map((field) => {
-              const issue = fieldIssueFor(
-                submission,
-                applicant.id,
-                section.title,
-                field.label,
-              );
-              const passportLinked = activeGroup.id === "documents";
-
-              return (
-                <div
-                  aria-label={`${applicant.fullName} · ${section.title} · ${field.label}`}
-                  className={`admin-questionnaire-field ${issue ? "has-issue" : ""} ${
-                    field.value.trim() ? "is-filled" : "is-missing"
-                  }`}
-                  id={targetElementId({
-                    applicantId: applicant.id,
-                    field: field.label,
-                    tab: "questionnaire",
-                  })}
-                  key={`${section.id}-${field.id}`}
-                  role="group"
-                  tabIndex={-1}
-                >
-                  <div>
-                    <strong>{field.label}</strong>
-                    <p>
-                      {passportLinked
-                        ? "Проверяется во вкладке «Паспорт»"
-                        : field.reviewSource ?? field.reviewOriginSource ?? "Анкета"}
-                    </p>
-                  </div>
-                  <span>{field.value || "Не заполнено"}</span>
-                  {issue ? (
-                    <Badge className="visa-tag visa-tag-danger">
-                      {drawerIssueSummary(issue)}
-                    </Badge>
-                  ) : (
-                    <Badge
-                      className={
-                        field.value.trim()
-                          ? "visa-tag visa-tag-ready"
-                          : "visa-tag visa-tag-attention"
-                      }
-                    >
-                      {field.value.trim() ? "Сверить" : "Нет данных"}
-                    </Badge>
-                  )}
-                  <Button
-                    className="compact-button"
-                    disabled={!canAddIssue}
-                    variant="secondary"
-                    onClick={() =>
-                      onAddRemark(
-                        fieldRemarkContext({
-                          applicant,
-                          field,
-                          section,
-                          submission,
-                        }),
-                      )
-                    }
-                  >
-                    Замечание
-                  </Button>
-                </div>
-              );
-            }),
-          )}
-          {!activeGroup.sections.some((section) => section.fields.length) ? (
-            <EmptyState text="В этом разделе нет отдельных полей." />
-          ) : null}
-        </div>
-
-        <div className="admin-questionnaire-section-actions">
-          <Button
-            className="compact-button"
-            disabled
-            title="Секционное принятие пока не поддержано текущими handlers."
-          >
-            Принять секцию
-          </Button>
-          <Button
-            className="compact-button"
-            disabled={!canAddIssue}
-            variant="secondary"
-            onClick={() =>
-              onAddRemark(
-                sectionRemarkContext({
-                  applicant,
-                  group: activeGroup,
-                  submission,
-                }),
-              )
-            }
-          >
-            Есть замечание
-          </Button>
-          <Button
-            className="compact-button"
-            variant="ghost"
-            onClick={() => {
-              if (nextGroup) setActiveGroupId(nextGroup.id);
-            }}
-          >
-            Проверить позже
-          </Button>
-        </div>
-      </article>
-    </section>
-  );
-}
-
-function AdminRemarksReview({
-  canAddIssue,
-  onAddRemark,
-  onOpenTarget,
-  role,
-  submission,
-}: {
-  canAddIssue: boolean;
-  onAddRemark: (context?: ReviewRemarkContext) => void;
-  onOpenTarget: (target: WorkspaceTarget) => void;
-  role: Role;
-  submission: Submission;
-}) {
-  const openIssues = submission.issues.filter(
-    (issue) => issue.status !== "closed_by_admin",
-  );
-  const resolvedIssues = submission.issues.filter(
-    (issue) => issue.status === "closed_by_admin",
-  );
-
-  return (
-    <section className="drawer-section admin-review-tab admin-remarks-review">
-      <div className="admin-remarks-head">
-        <div>
-          <p className="kicker">Замечания</p>
-          <h3>Точные замечания по проверке</h3>
-          <p>Группировка по заявителю и цели: паспорт, селфи, анкета или подача.</p>
-        </div>
-        {canAddIssue ? (
-          <Button
-            className="compact-button"
-            variant="secondary"
-            onClick={() => onAddRemark()}
-          >
-            Добавить замечание
-          </Button>
-        ) : null}
-      </div>
-
-      {openIssues.length || resolvedIssues.length ? (
-        <div className="admin-remarks-groups">
-          <AdminRemarkGroup
-            issues={openIssues}
-            title="Открытые"
-            role={role}
-            onOpenTarget={onOpenTarget}
-          />
-          <AdminRemarkGroup
-            issues={resolvedIssues}
-            title="Закрытые"
-            role={role}
-            onOpenTarget={onOpenTarget}
-          />
-        </div>
-      ) : (
-        <div className="admin-review-empty-callout">
-          <strong>Замечаний пока нет</strong>
-          <p>Если проверка выявит проблему, создайте точное замечание из нужного раздела.</p>
-          {canAddIssue ? (
-            <Button
-              className="compact-button"
-              variant="secondary"
-              onClick={() => onAddRemark()}
-            >
-              Добавить первое замечание
-            </Button>
-          ) : null}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function AdminRemarkGroup({
-  issues,
-  onOpenTarget,
-  role,
-  title,
-}: {
-  issues: Issue[];
-  onOpenTarget: (target: WorkspaceTarget) => void;
-  role: Role;
-  title: string;
-}) {
-  if (!issues.length) return null;
-
-  const applicants = new Map<string, Issue[]>();
-  for (const issue of issues) {
-    const key = issue.target.applicantName || "Подача";
-    applicants.set(key, [...(applicants.get(key) ?? []), issue]);
-  }
-
-  return (
-    <div className="admin-remark-group">
-      <h4>{title}</h4>
-      {[...applicants.entries()].map(([applicantName, applicantIssues]) => (
-        <section className="admin-remark-applicant-group" key={applicantName}>
-          <h5>{applicantName}</h5>
-          {applicantIssues.map((issue) => {
-            const target = targetForIssue(issue);
-
-            return (
-              <article
-                className={`admin-remark-card ${issue.severity} ${issue.status}`}
-                id={`admin-review-remark-${issue.id}`}
-                key={issue.id}
-                tabIndex={-1}
-              >
-                <header>
-                  <div>
-                    <strong>{drawerIssueTitle(issue)}</strong>
-                    <p>{issueTarget(issue)}</p>
-                  </div>
-                  <Badge className={issueStatusPillClass(issue.status)}>
-                    {issueStatusLabel(issue.status)}
-                  </Badge>
-                </header>
-                <dl>
-                  <div>
-                    <dt>Категория</dt>
-                    <dd>{issueCategoryLabel(issue)}</dd>
-                  </div>
-                  <div>
-                    <dt>Критичность</dt>
-                    <dd>{issueSeverityLabel(issue.severity)}</dd>
-                  </div>
-                  <div>
-                    <dt>Создано</dt>
-                    <dd>
-                      {issue.createdBy === "admin" ? "Админ" : "Система"} ·{" "}
-                      {issue.createdAt}
-                    </dd>
-                  </div>
-                </dl>
-                <p>{issue.comment}</p>
-                {issue.status !== "closed_by_admin" ? (
-                  <Button
-                    aria-label={`${role === "admin" ? "К цели проверки" : "Открыть"}: ${drawerIssueTitle(issue)}`}
-                    className="compact-button"
-                    variant="secondary"
-                    onClick={() => onOpenTarget(target)}
-                  >
-                    {role === "admin" ? "К цели проверки" : "Открыть"}
-                  </Button>
-                ) : null}
-              </article>
-            );
-          })}
-        </section>
-      ))}
-    </div>
-  );
-}
-
-type AdminQuestionnaireGroup = {
-  fieldCount: number;
-  id:
-    | "additional"
-    | "contacts"
-    | "documents"
-    | "employment"
-    | "family"
-    | "personal"
-    | "trip";
-  reviewedCount: number;
-  sections: QuestionnaireSection[];
-  title: string;
-};
-
-function adminQuestionnaireGroupForTarget(
-  groups: AdminQuestionnaireGroup[],
-  target: Extract<WorkspaceTarget, { tab: "questionnaire" }>,
-) {
-  if (target.section === "Семья") {
-    return groups.find((group) => group.id === "family") ?? groups[0] ?? null;
-  }
-
-  if (target.section === "Вся подача") {
-    return (
-      groups.find((group) => group.id === "family") ??
-      groups.find((group) => group.id === "additional") ??
-      groups[0] ??
-      null
-    );
-  }
-
-  return (
-    groups.find((group) =>
-      group.sections.some(
-        (section) =>
-          section.title === target.section ||
-          section.fields.some((field) => field.label === target.field),
-      ),
-    ) ?? null
-  );
-}
-
-function adminReviewVisibleTab(tab: DrawerTab): DrawerTab {
-  if (tab === "files") return "overview";
-  if (tab === "history") return "issues";
-  return tab;
-}
-
-function drawerTabForWorkspaceTarget(
-  target: WorkspaceTarget,
-  surface: "agent" | "review" | "export",
-): DrawerTab {
-  if (surface !== "review") return tabForTarget(target);
-  if (target.tab === "files") {
-    return target.fileType === "passport_scan" ? "overview" : "applicants";
-  }
-  return target.tab;
-}
-
-function adminReviewTabs(
-  submission: Submission,
-  applicant: Applicant | null,
-): Array<{ id: DrawerTab; label: string; meta?: string }> {
-  const applicantId = applicant?.id ?? submission.applicants[0]?.id ?? "";
-  const passportIssue = applicantId
-    ? fileIssueFor(submission, applicantId, "passport_scan")
-    : null;
-  const selfieIssueCount = applicantId
-    ? (["selfie", "selfie_2"] as const).filter((type) =>
-        fileIssueFor(submission, applicantId, type),
-      ).length
-    : 0;
-  const questionnaireIssueCount = applicantId
-    ? submission.issues.filter(
-        (issue) =>
-          issue.status !== "closed_by_admin" &&
-          issue.target.applicantId === applicantId &&
-          !issue.target.fileType,
-      ).length
-    : 0;
-  const openIssues = openIssueCount(submission);
-
-  return [
-    { id: "overview", label: "Паспорт", meta: passportIssue ? "1" : undefined },
-    {
-      id: "applicants",
-      label: "Селфи",
-      meta: selfieIssueCount ? String(selfieIssueCount) : undefined,
-    },
-    {
-      id: "questionnaire",
-      label: "Анкета",
-      meta: questionnaireIssueCount ? String(questionnaireIssueCount) : undefined,
-    },
-    { id: "issues", label: "Замечания", meta: openIssues ? String(openIssues) : undefined },
-  ];
-}
-
-function reviewFileForApplicant(
-  submission: Submission,
-  applicantId: string,
-  fileType: SubmissionFileType,
-) {
-  return submission.files.find(
-    (file) => file.applicantId === applicantId && file.type === fileType,
-  );
-}
-
-function fileIssueFor(
-  submission: Submission,
-  applicantId: string,
-  fileType: SubmissionFileType,
-) {
-  return submission.issues.find(
-    (issue) =>
-      issue.status !== "closed_by_admin" &&
-      issue.target.applicantId === applicantId &&
-      issue.target.fileType === fileType,
-  );
-}
-
-function applicantIssues(submission: Submission, applicantId: string) {
-  return submission.issues.filter(
-    (issue) =>
-      issue.status !== "closed_by_admin" && issue.target.applicantId === applicantId,
-  );
-}
-
-function fieldValue(section: QuestionnaireSection | undefined, fieldId: string) {
-  return section?.fields.find((field) => field.id === fieldId)?.value.trim() ?? "";
-}
-
-function sectionMatchesAlias(section: QuestionnaireSection, alias: string) {
-  return section.id === alias || section.id.endsWith(`-${alias}`);
-}
-
-function questionnaireSectionByAlias(applicant: Applicant, alias: string) {
-  return applicant.sections.find((section) => sectionMatchesAlias(section, alias));
-}
-
-function adminQuestionnaireGroups(
-  submission: Submission,
-  applicant: Applicant,
-): AdminQuestionnaireGroup[] {
-  const usedSectionIds = new Set<string>();
-  const makeGroup = (
-    id: AdminQuestionnaireGroup["id"],
-    title: string,
-    sectionAliases: string[],
-  ): AdminQuestionnaireGroup | null => {
-    const sections = sectionAliases
-      .map((sectionAlias) =>
-        applicant.sections.find(
-          (section) =>
-            !usedSectionIds.has(section.id) && sectionMatchesAlias(section, sectionAlias),
-        ),
-      )
-      .filter((section): section is QuestionnaireSection => Boolean(section));
-    sections.forEach((section) => usedSectionIds.add(section.id));
-    if (!sections.length) return null;
-
-    return {
-      fieldCount: sections.reduce((total, section) => total + section.fields.length, 0),
-      id,
-      reviewedCount: sections.reduce(
-        (total, section) =>
-          total + section.fields.filter((field) => field.value.trim()).length,
-        0,
-      ),
-      sections,
-      title,
-    };
-  };
-
-  const groups = [
-    makeGroup("personal", "Личные данные", ["personal"]),
-    makeGroup("contacts", "Адрес и контакты", ["contacts"]),
-    makeGroup("employment", "Работа / учёба", ["employment"]),
-    makeGroup("trip", "Поездка", ["appointment", "trip"]),
-    submission.type === "family"
-      ? {
-          fieldCount: submission.applicants.length,
-          id: "family" as const,
-          reviewedCount: submission.applicants.length,
-          sections: [] as QuestionnaireSection[],
-          title: "Семья",
-        }
-      : null,
-    makeGroup("documents", "Документы", ["passport"]),
-  ].filter((group): group is AdminQuestionnaireGroup => Boolean(group));
-
-  const additionalSections = applicant.sections.filter(
-    (section) => !usedSectionIds.has(section.id),
-  );
-  if (additionalSections.length) {
-    groups.push({
-      fieldCount: additionalSections.reduce(
-        (total, section) => total + section.fields.length,
-        0,
-      ),
-      id: "additional",
-      reviewedCount: additionalSections.reduce(
-        (total, section) =>
-          total + section.fields.filter((field) => field.value.trim()).length,
-        0,
-      ),
-      sections: additionalSections,
-      title: "Дополнительно",
-    });
-  }
-
-  return groups;
-}
-
-function issuesForQuestionnaireGroup(
-  submission: Submission,
-  applicant: Applicant,
-  group: AdminQuestionnaireGroup,
-) {
-  const sectionTitles = new Set(group.sections.map((section) => section.title));
-  const fieldLabels = new Set(
-    group.sections.flatMap((section) => section.fields.map((field) => field.label)),
-  );
-
-  return submission.issues.filter((issue) => {
-    if (
-      issue.status === "closed_by_admin" ||
-      issue.target.applicantId !== applicant.id ||
-      issue.target.fileType
-    ) {
-      return false;
-    }
-
-    if (group.id === "family") {
-      return issue.target.section === "Семья" || issue.target.section === "Вся подача";
-    }
-
-    return (
-      Boolean(issue.target.section && sectionTitles.has(issue.target.section)) ||
-      Boolean(issue.target.field && fieldLabels.has(issue.target.field))
-    );
-  });
-}
-
-function questionnaireGroupStatus(
-  group: AdminQuestionnaireGroup,
-  issues: Issue[],
-): "accepted" | "blocking" | "has-remarks" | "in-review" | "not-reviewed" {
-  if (issues.some((issue) => issue.severity === "blocker")) return "blocking";
-  if (issues.length) return "has-remarks";
-  if (group.fieldCount > 0 && group.reviewedCount >= group.fieldCount) return "accepted";
-  if (group.reviewedCount > 0) return "in-review";
-  return "not-reviewed";
-}
-
-function adminReviewStatusClass(status: ReturnType<typeof questionnaireGroupStatus>) {
-  if (status === "accepted") return "visa-tag visa-tag-ready";
-  if (status === "blocking") return "visa-tag visa-tag-blocked";
-  if (status === "has-remarks") return "visa-tag visa-tag-attention";
-  if (status === "in-review") return "visa-tag";
-  return "visa-tag visa-tag-muted";
-}
-
-function adminReviewStatusLabel(status: ReturnType<typeof questionnaireGroupStatus>) {
-  switch (status) {
-    case "accepted":
-      return "принято";
-    case "blocking":
-      return "блокер";
-    case "has-remarks":
-      return "есть замечания";
-    case "in-review":
-      return "в проверке";
-    case "not-reviewed":
-      return "не проверено";
-  }
-}
-
-function fileRemarkContext({
-  applicant,
-  fileType,
-  itemLabel,
-  submission,
-}: {
-  applicant: Applicant;
-  fileType: SubmissionFileType;
-  itemLabel: string;
-  submission: Submission;
-}): ReviewRemarkContext {
-  return {
-    applicantId: applicant.id,
-    category: "Документ",
-    comment: `${fileLabel(fileType)}: ${itemLabel}. Опишите, что агент должен исправить.`,
-    description: `${submission.id} · ${applicant.fullName} · ${fileLabel(fileType)}`,
-    fileType,
-    reason: itemLabel,
-    section: "Медиа",
-    severity: "blocker",
-    title: itemLabel,
-    type: "file",
-  };
-}
-
-function fieldRemarkContext({
-  applicant,
-  field,
-  section,
-  submission,
-}: {
-  applicant: Applicant;
-  field: QuestionnaireField;
-  section: QuestionnaireSection;
-  submission: Submission;
-}): ReviewRemarkContext {
-  return {
-    applicantId: applicant.id,
-    category: "Анкета",
-    comment: field.value
-      ? `Текущее значение: ${field.value}. Опишите точную правку для агента.`
-      : "Поле пустое. Опишите, что нужно заполнить.",
-    description: `${submission.id} · ${applicant.fullName} · ${section.title} · ${field.label}`,
-    field: field.label,
-    reason: field.value ? `Проверить поле: ${field.label}` : `Заполнить поле: ${field.label}`,
-    section: section.title,
-    severity: field.value ? "warning" : "blocker",
-    title: field.label,
-    type: "field",
-  };
-}
-
-function sectionRemarkContext({
-  applicant,
-  group,
-  submission,
-}: {
-  applicant: Applicant;
-  group: AdminQuestionnaireGroup;
-  submission: Submission;
-}): ReviewRemarkContext {
-  const targetSection = questionnaireRemarkTargetSection(group);
-  const contextTitle =
-    targetSection === group.title ? group.title : `${group.title}: ${targetSection}`;
-
-  return {
-    applicantId: applicant.id,
-    category: "Анкета",
-    comment: `${contextTitle}: опишите, какие поля агент должен исправить.`,
-    description: `${submission.id} · ${applicant.fullName} · ${contextTitle}`,
-    reason: `Проверить раздел: ${targetSection}`,
-    section: targetSection,
-    severity: "warning",
-    title: contextTitle,
-    type: "section",
-  };
-}
-
-function questionnaireRemarkTargetSection(group: AdminQuestionnaireGroup) {
-  if (group.id === "family") return "Семья";
-  return group.sections[0]?.title ?? group.title;
-}
-
-function globalRemarkContext(submission: Submission): ReviewRemarkContext {
-  const applicant = submission.applicants[0];
-
-  return {
-    applicantId: applicant?.id,
-    category: "Подача",
-    comment: "Опишите общее замечание по подаче.",
-    description: `${submission.id} · ${typeLabels[submission.type]} · ${submission.city}`,
-    reason: "Общее замечание по подаче",
-    section: "Вся подача",
-    severity: "warning",
-    title: "Вся подача",
-    type: "section",
-  };
-}
-
 function IssueComposer({
-  context,
   onCancel,
   onSubmit,
   submission,
 }: {
-  context?: ReviewRemarkContext | null;
   onCancel: () => void;
   onSubmit: (input: IssueInput) => void;
   submission: Submission;
 }) {
-  const hasContext = Boolean(context);
-  const [applicantId, setApplicantId] = useState(
-    context?.applicantId ?? submission.applicants[0]?.id ?? "",
-  );
+  const [applicantId, setApplicantId] = useState(submission.applicants[0]?.id ?? "");
   const [targetKind, setTargetKind] = useState<"questionnaire" | "files">(
-    context?.fileType ? "files" : "questionnaire",
+    "questionnaire",
   );
-  const [fieldLabel, setFieldLabel] = useState(context?.field ?? "");
+  const [fieldLabel, setFieldLabel] = useState("");
   const [fileType, setFileType] =
-    useState<NonNullable<IssueInput["fileType"]>>(context?.fileType ?? "passport_scan");
-  const [severity, setSeverity] = useState<IssueInput["severity"]>(
-    context?.severity ?? "blocker",
-  );
-  const [category, setCategory] = useState(context?.category ?? "Анкета");
-  const [reason, setReason] = useState(
-    context?.reason ?? "Нужно уточнить маршрут поездки",
-  );
+    useState<NonNullable<IssueInput["fileType"]>>("photo");
+  const [severity, setSeverity] = useState<IssueInput["severity"]>("blocker");
+  const [reason, setReason] = useState("Нужно уточнить маршрут поездки");
   const [comment, setComment] = useState(
-    context?.comment ?? "Проверьте целевое поле и отправьте исправление.",
+    "Проверьте целевое поле и отправьте исправление.",
   );
   const reasonInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -1952,24 +440,14 @@ function IssueComposer({
   function submit() {
     if (!applicant || !canSubmit) return;
 
-    const resolvedReason = category.trim()
-      ? `${category.trim()}: ${reason.trim()}`
-      : reason.trim();
-
-    const targetField = context
-      ? context.field
-      : targetKind === "files"
-        ? undefined
-        : selectedField;
-
     onSubmit({
-      type: context?.type ?? (targetKind === "files" ? "file" : "field"),
+      type: targetKind === "files" ? "file" : "field",
       applicantId: applicant.id,
-      section: context?.section ?? (targetKind === "files" ? "Медиа" : "Данные"),
-      field: targetField,
-      fileType: context?.fileType ?? (targetKind === "files" ? fileType : undefined),
-      reason: resolvedReason,
-      comment: comment.trim(),
+      section: targetKind === "files" ? "Медиа" : "Данные",
+      field: targetKind === "files" ? undefined : selectedField,
+      fileType: targetKind === "files" ? fileType : undefined,
+      reason,
+      comment,
       severity,
     });
   }
@@ -1980,73 +458,62 @@ function IssueComposer({
         <p className="kicker">Новое замечание</p>
         <h3>Точная цель возврата</h3>
       </div>
-      {context ? (
-        <div className="issue-composer-context">
-          <span>Контекст</span>
-          <strong>{context.title}</strong>
-          <p>{context.description}</p>
-        </div>
-      ) : null}
       <div className="issue-composer-grid">
-        {!hasContext ? (
-          <>
-            <Select
-              containerClassName=""
-              fieldClassName=""
-              label="Заявитель"
-              options={submission.applicants.map((item) => ({
-                label: item.fullName,
-                value: item.id,
-              }))}
-              value={applicant?.id ?? ""}
-              onChange={(event) => setApplicantId(event.target.value)}
-            />
-            <Select
-              containerClassName=""
-              fieldClassName=""
-              label="Раздел"
-              options={[
-                { label: "Данные", value: "questionnaire" },
-                { label: "Медиа", value: "files" },
-              ]}
-              value={targetKind}
-              onChange={(event) => {
-                const nextKind = event.target.value as "questionnaire" | "files";
-                setTargetKind(nextKind);
-                setReason(
-                  nextKind === "files"
-                    ? "Файл требует замены"
-                    : "Нужно уточнить маршрут поездки",
-                );
-              }}
-            />
-            {targetKind === "questionnaire" ? (
-              <Select
-                containerClassName=""
-                fieldClassName=""
-                label="Поле"
-                options={fields.map((field) => ({
-                  label: field.label,
-                  value: field.label,
-                }))}
-                value={selectedField}
-                onChange={(event) => setFieldLabel(event.target.value)}
-              />
-            ) : (
-              <Select
-                containerClassName=""
-                fieldClassName=""
-                label="Файл"
-                options={activeMediaFileTypes.map((type) => ({
-                  label: fileLabel(type),
-                  value: type,
-                }))}
-                value={fileType}
-                onChange={(event) => setFileType(event.target.value as typeof fileType)}
-              />
-            )}
-          </>
-        ) : null}
+        <Select
+          containerClassName=""
+          fieldClassName=""
+          label="Заявитель"
+          options={submission.applicants.map((item) => ({
+            label: item.fullName,
+            value: item.id,
+          }))}
+          value={applicant?.id ?? ""}
+          onChange={(event) => setApplicantId(event.target.value)}
+        />
+        <Select
+          containerClassName=""
+          fieldClassName=""
+          label="Раздел"
+          options={[
+            { label: "Данные", value: "questionnaire" },
+            { label: "Медиа", value: "files" },
+          ]}
+          value={targetKind}
+          onChange={(event) => {
+            const nextKind = event.target.value as "questionnaire" | "files";
+            setTargetKind(nextKind);
+            setReason(
+              nextKind === "files"
+                ? "Файл требует замены"
+                : "Нужно уточнить маршрут поездки",
+            );
+          }}
+        />
+        {targetKind === "questionnaire" ? (
+          <Select
+            containerClassName=""
+            fieldClassName=""
+            label="Поле"
+            options={fields.map((field) => ({
+              label: field.label,
+              value: field.label,
+            }))}
+            value={selectedField}
+            onChange={(event) => setFieldLabel(event.target.value)}
+          />
+        ) : (
+          <Select
+            containerClassName=""
+            fieldClassName=""
+            label="Файл"
+            options={activeMediaFileTypes.map((type) => ({
+              label: fileLabel(type),
+              value: type,
+            }))}
+            value={fileType}
+            onChange={(event) => setFileType(event.target.value as typeof fileType)}
+          />
+        )}
         <Select
           containerClassName=""
           fieldClassName=""
@@ -2059,19 +526,6 @@ function IssueComposer({
           value={severity}
           onChange={(event) => setSeverity(event.target.value as typeof severity)}
         />
-        <Select
-          containerClassName=""
-          fieldClassName=""
-          label="Категория"
-          options={[
-            { label: "Анкета", value: "Анкета" },
-            { label: "Документ", value: "Документ" },
-            { label: "Подача", value: "Подача" },
-            { label: "Качество файла", value: "Качество файла" },
-          ]}
-          value={category}
-          onChange={(event) => setCategory(event.target.value)}
-        />
         <TextInputField
           containerClassName=""
           label="Причина"
@@ -2079,16 +533,12 @@ function IssueComposer({
           value={reason}
           onChange={(event) => setReason(event.target.value)}
         />
-        <div className="issue-composer-textarea-field">
-          <label htmlFor="issue-composer-comment">Комментарий агенту</label>
-          <textarea
-            className="issue-composer-textarea"
-            id="issue-composer-comment"
-            rows={4}
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-          />
-        </div>
+        <TextInputField
+          containerClassName=""
+          label="Комментарий агенту"
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+        />
       </div>
       <div className="issue-composer-actions">
         <Button variant="ghost" onClick={onCancel}>
@@ -2979,7 +1429,6 @@ function defaultQuestionnaireSectionKey(submission: Submission) {
 }
 
 function DrawerFiles({
-  agentOwnerId,
   fileUploadBusy = false,
   localPassportFileIds = [],
   onConfirmVisaApplicationPdfReview,
@@ -2993,7 +1442,6 @@ function DrawerFiles({
   role,
   submission,
 }: {
-  agentOwnerId: AgentOwnerId;
   fileUploadBusy?: boolean;
   localPassportFileIds?: string[];
   onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
@@ -3016,10 +1464,6 @@ function DrawerFiles({
   const pdfReviews = visaApplicationPdfReviewsForSubmission(submission);
   const pdfHandoffStatus = visaApplicationPdfAgentHandoffStatus(submission);
   const agentHandoffPackage = buildAgentHandoffPackage(submission);
-  const agentReturnedPdfPackage =
-    role === "agent"
-      ? buildAgentReturnedPdfPackageView(submission, agentOwnerId)
-      : null;
   const canReviewVisaPdf =
     pdfReviewAvailable &&
     !fileUploadBusy &&
@@ -3073,7 +1517,7 @@ function DrawerFiles({
 
   return (
     <section className="drawer-section drawer-files-section">
-      {pdfReviewAvailable && role === "admin" ? (
+      {pdfReviewAvailable ? (
         <VisaApplicationPdfReviewPanel
           busy={pdfReviewBusy || pdfHandoffBusy}
           canPublish={canPublishReturnedPdfHandoff}
@@ -3090,9 +1534,6 @@ function DrawerFiles({
           onPublish={handlePublishReturnedPdfHandoff}
           onReview={handleVisaApplicationPdf}
         />
-      ) : null}
-      {agentReturnedPdfPackage?.visible ? (
-        <AgentReturnedPdfPackagePanel packageView={agentReturnedPdfPackage} />
       ) : null}
       <div className="file-matrix v17-file-matrix" aria-label="Файлы подачи">
         <div className="media-file-head" aria-hidden="true">
@@ -3241,16 +1682,10 @@ function DrawerFiles({
             i
           </span>
           <span>
-            <strong>
-              {canEditFiles ? "Загрузка обновляет подачу" : "Файлы только для просмотра"}
-            </strong>
+            <strong>Файлы не отправляются</strong>
             <br />
             <span className="subtle">
-              {canEditFiles
-                ? requireSelectedFile
-                  ? "Выберите файл: приватная загрузка обновит слот и состояние подачи."
-                  : "В local/dev режиме кнопка загрузки обновляет слот, историю и готовность."
-                : "Изменение файлов доступно агенту в черновике, работе или возврате."}
+              Показаны только состояния интерфейса; upload и чтение файлов отключены.
             </span>
           </span>
         </div>
@@ -3502,67 +1937,17 @@ function VisaApplicationPdfReviewPanel({
   );
 }
 
-function AgentReturnedPdfPackagePanel({
-  packageView,
-}: {
-  packageView: ReturnType<typeof buildAgentReturnedPdfPackageView>;
-}) {
-  if (!packageView.visible) return null;
-
-  return (
-    <CardComponent
-      as="article"
-      aria-label="Returned PDF комплект агента"
-      className="media-file-row"
-    >
-      <div className="media-file-main">
-        <strong>Returned PDF комплект готов</strong>
-        <p>
-          Агент видит только свой опубликованный пакет: анкета PDF по каждому
-          заявителю и общий appointment/list PDF по пакету.
-        </p>
-        {packageView.commonAppointmentPdf ? (
-          <p>
-            Пакет: {packageView.commonAppointmentPdf.fileName} · appointment_list_pdf
-          </p>
-        ) : null}
-        {packageView.applicantPdfs.map((pdf) => (
-          <p key={pdf.reviewId}>
-            {pdf.applicantName}: {pdf.fileName} · application_form_pdf
-          </p>
-        ))}
-      </div>
-      <div className="media-file-status">
-        <Badge className="visa-tag visa-tag-success">Готово агенту</Badge>
-      </div>
-    </CardComponent>
-  );
-}
-
 function DrawerIssues({
-  canAddIssue,
-  onAddIssue,
-  onMarkIssueFixed,
   onOpenTarget,
   role,
   submission,
 }: {
-  canAddIssue: boolean;
-  onAddIssue: () => void;
-  onMarkIssueFixed: (issueId: string) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
   role: Role;
   submission: Submission;
 }) {
   return (
     <section className="drawer-section drawer-issues-section">
-      {canAddIssue ? (
-        <div className="drawer-issues-actions">
-          <Button variant="secondary" onClick={onAddIssue}>
-            Добавить замечание
-          </Button>
-        </div>
-      ) : null}
       <div className="issue-list v17-issue-list" id="workspace-issues">
         {submission.issues.length ? (
           submission.issues.map((issue) => {
@@ -3617,21 +2002,9 @@ function DrawerIssues({
                       Завершено
                     </Button>
                   )}
-                  {role === "agent" &&
-                  submission.status === "returned" &&
-                  issue.status === "open" ? (
-                    <Button
-                      aria-label={`Отметить замечание исправленным: ${drawerIssueTitle(issue)}`}
-                      className="compact-button"
-                      variant="secondary"
-                      onClick={() => onMarkIssueFixed(issue.id)}
-                    >
-                      Отметить исправленным
-                    </Button>
-                  ) : null}
                   {isFileIssue && role === "agent" ? (
                     <span className="v17-issue-note">
-                      Загрузка доступна только для тестовых документов в пилотном режиме.
+                      Реальная загрузка недоступна в прототипе
                     </span>
                   ) : null}
                 </div>
@@ -3843,8 +2216,8 @@ function drawerIssueTitle(issue: Issue) {
 function fileRequirementCopy(file: Submission["files"][number], issue?: Issue) {
   if (issue) return drawerIssueSummary(issue);
   if (file.type === "passport_scan") return "Разворот с персональными данными";
-  if (file.type === "photo") return "Архивный неканонический файл";
-  if (file.type === "selfie") return "Селфи для проверки владельца документа";
+  if (file.type === "photo") return "Обязательный файл";
+  if (file.type === "selfie") return "Проверка владельца документа";
   if (file.type === "selfie_2") return "Дополнительная проверка владельца";
   return "Проверка документа в кадре";
 }
