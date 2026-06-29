@@ -32,6 +32,92 @@ test.describe("V-19 pilot agent click flow", () => {
     await loginThroughAccessGate(page, "agent@visaflow.local", "Входящие");
     await expect(page.getByRole("region", { name: "Входящие" })).toBeVisible();
 
+    await clickWorkspaceButton(page, /Мои действия/);
+    await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
+    const agentActionSurface = page.getByRole("region", { name: "Мои действия" });
+    const agentActionSearch = page.getByRole("searchbox", {
+      name: "Поиск по действиям",
+    });
+
+    await agentActionSurface.getByRole("tab", { name: /На проверке/ }).click();
+    await expect(
+      agentActionSurface.locator('[data-submission-id="ПД-1053"]').first(),
+    ).toBeVisible();
+    await agentActionSurface.getByRole("tab", { name: /Все действия/ }).click();
+
+    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
+    await page
+      .getByRole("menu", { name: "Фильтр и вид" })
+      .getByRole("menuitemradio", { name: "Колонки" })
+      .click();
+    const reviewColumn = agentActionSurface
+      .locator(".vf-figma-column")
+      .filter({ hasText: "На проверке" });
+    const readyColumn = agentActionSurface
+      .locator(".vf-figma-column")
+      .filter({ hasText: "Готово" });
+    await expect(reviewColumn.locator('[data-submission-id="ПД-1053"]').first()).toBeVisible();
+    await expect(readyColumn.locator('[data-submission-id="ПД-1053"]')).toHaveCount(0);
+    await expect(
+      agentActionSurface
+        .locator(".vf-figma-column-card")
+        .filter({ hasText: "София Иванова" })
+        .filter({ hasText: "Заполнить анкету" })
+        .first(),
+    ).toBeVisible();
+
+    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
+    await page
+      .getByRole("menu", { name: "Фильтр и вид" })
+      .getByRole("menuitemradio", { name: "Список" })
+      .click();
+
+    await agentActionSearch.fill("ПД-1048");
+    await expect(
+      agentActionSurface.locator('[data-submission-id="ПД-1048"]').first(),
+    ).toBeVisible();
+    await expect(agentActionSurface.locator('[data-submission-id="ПД-1051"]')).toHaveCount(
+      0,
+    );
+    await agentActionSearch.fill("");
+
+    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
+    await page
+      .getByRole("menu", { name: "Фильтр и вид" })
+      .getByRole("menuitemradio", { name: "Санкт-Петербург" })
+      .click();
+    await expect(
+      agentActionSurface.locator('[data-submission-id="ПД-1051"]').first(),
+    ).toBeVisible();
+    await expect(agentActionSurface.locator('[data-submission-id="ПД-1048"]')).toHaveCount(
+      0,
+    );
+
+    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
+    await page
+      .getByRole("menu", { name: "Фильтр и вид" })
+      .getByRole("menuitemradio", { name: "Создано" })
+      .click();
+    await expect(agentActionSurface.locator("[data-submission-id]").first()).toBeVisible();
+
+    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
+    await page
+      .getByRole("menu", { name: "Фильтр и вид" })
+      .getByRole("menuitemradio", { name: "Все города" })
+      .click();
+    await agentActionSurface.locator('[data-submission-id="ПД-1048"]').first().click();
+    await expect(
+      drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
+    ).toBeVisible();
+    await expect(drawer(page).locator(".drawer-meta-line")).toContainText("ПД-1048");
+    await expect(page.getByRole("tab", { name: "Файлы" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await drawer(page).getByRole("button", { name: "Закрыть подачу" }).click();
+
+    await clickWorkspaceButton(page, /Входящие/);
+    await expect(page.getByRole("region", { name: "Входящие" })).toBeVisible();
     await page.getByRole("tab", { name: /Мои действия/ }).click();
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 

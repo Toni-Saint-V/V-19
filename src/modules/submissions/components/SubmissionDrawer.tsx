@@ -35,7 +35,10 @@ import {
   visaApplicationPdfAgentHandoffStatus,
   visaApplicationPdfReviewsForSubmission,
 } from "../visaApplicationPdfReconciliation";
-import { buildAgentHandoffPackage } from "../operationalWorkflow";
+import {
+  buildAgentHandoffPackage,
+  buildAgentReturnedPdfPackageView,
+} from "../operationalWorkflow";
 import {
   activeMediaFileTypes,
   buildReadinessQueue,
@@ -50,6 +53,7 @@ import {
 } from "../workspaceModel";
 import type {
   ActionDecision,
+  AgentOwnerId,
   Applicant,
   DrawerTab,
   Issue,
@@ -69,6 +73,7 @@ import { BbAiPanel } from "./BbAiPanel";
 export function SubmissionDrawer({
   actionError = "",
   activeTab,
+  agentOwnerId,
   fileUploadBusy = false,
   initialTarget = null,
   issueComposerRequest,
@@ -98,6 +103,7 @@ export function SubmissionDrawer({
 }: {
   actionError?: string;
   activeTab: DrawerTab;
+  agentOwnerId?: AgentOwnerId;
   fileUploadBusy?: boolean;
   initialTarget?: WorkspaceTarget | null;
   issueComposerRequest: { submissionId: string; token: number } | null;
@@ -274,14 +280,6 @@ export function SubmissionDrawer({
           <button
             className="icon-button"
             type="button"
-            aria-label="Дополнительные действия недоступны"
-            disabled
-          >
-            ···
-          </button>
-          <button
-            className="icon-button"
-            type="button"
             aria-label="Закрыть подачу"
             onClick={onClose}
           >
@@ -342,6 +340,7 @@ export function SubmissionDrawer({
               onPublishReturnedPdfHandoff={onPublishReturnedPdfHandoff}
               onReviewVisaApplicationPdf={onReviewVisaApplicationPdf}
               onUploadFile={onUploadFile}
+              agentOwnerId={agentOwnerId ?? submission.agentId}
               passportExtractionEnabled={passportExtractionEnabled}
               requireSelectedFile={requireSelectedFile}
               role={role}
@@ -1442,6 +1441,7 @@ function defaultQuestionnaireSectionKey(submission: Submission) {
 }
 
 function DrawerFiles({
+  agentOwnerId,
   fileUploadBusy = false,
   localPassportFileIds = [],
   onConfirmVisaApplicationPdfReview,
@@ -1455,6 +1455,7 @@ function DrawerFiles({
   role,
   submission,
 }: {
+  agentOwnerId: AgentOwnerId;
   fileUploadBusy?: boolean;
   localPassportFileIds?: string[];
   onConfirmVisaApplicationPdfReview: (reviewId: string) => void;
@@ -1477,6 +1478,10 @@ function DrawerFiles({
   const pdfReviews = visaApplicationPdfReviewsForSubmission(submission);
   const pdfHandoffStatus = visaApplicationPdfAgentHandoffStatus(submission);
   const agentHandoffPackage = buildAgentHandoffPackage(submission);
+  const agentReturnedPdfPackage =
+    role === "agent"
+      ? buildAgentReturnedPdfPackageView(submission, agentOwnerId)
+      : null;
   const canReviewVisaPdf =
     pdfReviewAvailable &&
     !fileUploadBusy &&
@@ -1530,7 +1535,7 @@ function DrawerFiles({
 
   return (
     <section className="drawer-section drawer-files-section">
-      {pdfReviewAvailable ? (
+      {pdfReviewAvailable && role === "admin" ? (
         <VisaApplicationPdfReviewPanel
           busy={pdfReviewBusy || pdfHandoffBusy}
           canPublish={canPublishReturnedPdfHandoff}
@@ -1547,6 +1552,9 @@ function DrawerFiles({
           onPublish={handlePublishReturnedPdfHandoff}
           onReview={handleVisaApplicationPdf}
         />
+      ) : null}
+      {agentReturnedPdfPackage?.visible ? (
+        <AgentReturnedPdfPackagePanel packageView={agentReturnedPdfPackage} />
       ) : null}
       <div className="file-matrix v17-file-matrix" aria-label="Файлы подачи">
         <div className="media-file-head" aria-hidden="true">
@@ -1695,10 +1703,16 @@ function DrawerFiles({
             i
           </span>
           <span>
-            <strong>Файлы не отправляются</strong>
+            <strong>
+              {canEditFiles ? "Загрузка обновляет подачу" : "Файлы только для просмотра"}
+            </strong>
             <br />
             <span className="subtle">
-              Показаны только состояния интерфейса; upload и чтение файлов отключены.
+              {canEditFiles
+                ? requireSelectedFile
+                  ? "Выберите файл: приватная загрузка обновит слот и состояние подачи."
+                  : "В local/dev режиме кнопка загрузки обновляет слот, историю и готовность."
+                : "Изменение файлов доступно агенту в черновике, работе или возврате."}
             </span>
           </span>
         </div>
@@ -1945,6 +1959,43 @@ function VisaApplicationPdfReviewPanel({
             </label>
           </>
         ) : null}
+      </div>
+    </CardComponent>
+  );
+}
+
+function AgentReturnedPdfPackagePanel({
+  packageView,
+}: {
+  packageView: ReturnType<typeof buildAgentReturnedPdfPackageView>;
+}) {
+  if (!packageView.visible) return null;
+
+  return (
+    <CardComponent
+      as="article"
+      aria-label="Returned PDF комплект агента"
+      className="media-file-row"
+    >
+      <div className="media-file-main">
+        <strong>Returned PDF комплект готов</strong>
+        <p>
+          Агент видит только свой опубликованный пакет: анкета PDF по каждому
+          заявителю и общий appointment/list PDF по пакету.
+        </p>
+        {packageView.commonAppointmentPdf ? (
+          <p>
+            Пакет: {packageView.commonAppointmentPdf.fileName} · appointment_list_pdf
+          </p>
+        ) : null}
+        {packageView.applicantPdfs.map((pdf) => (
+          <p key={pdf.reviewId}>
+            {pdf.applicantName}: {pdf.fileName} · application_form_pdf
+          </p>
+        ))}
+      </div>
+      <div className="media-file-status">
+        <Badge className="visa-tag visa-tag-success">Готово агенту</Badge>
       </div>
     </CardComponent>
   );
