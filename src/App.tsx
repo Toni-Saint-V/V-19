@@ -499,6 +499,19 @@ function firstSubmissionForRole(
   );
 }
 
+function localAgentOwnerIdForSession(session: LocalAuthSession | null) {
+  if (
+    session?.role === "agent" &&
+    session.status === "active" &&
+    session.approvalStatus === "approved" &&
+    session.ownerAgentId
+  ) {
+    return session.ownerAgentId;
+  }
+
+  return defaultLocalAgentOwnerId;
+}
+
 function reviewTabForAdminWork(tab: AdminWorkTab): ReviewTab | null {
   if (tab === "events") return null;
   return tab;
@@ -599,7 +612,7 @@ function MainApp() {
   const currentAgentOwnerId =
     role === "agent" && remoteProfile?.role === "agent"
       ? remoteProfile.id
-      : defaultLocalAgentOwnerId;
+      : localAgentOwnerIdForSession(localAuthSession);
   const visibleSubmissionsForRole =
     role === "agent" ? ownedSubmissions(submissions, currentAgentOwnerId) : submissions;
   const activeSubmission =
@@ -2975,7 +2988,18 @@ function MainApp() {
           ) : !isV19CollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
               {!isV19CollectionSurface ? (
-                <span className="service-logo">VisaFlow V-19</span>
+                <span className="service-logo vf-brand-wordmark" aria-label="VisaFlow 19">
+                  <span
+                    className="vf-brand-capital vf-brand-capital--mini"
+                    aria-hidden="true"
+                  >
+                    <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
+                  </span>
+                  <span aria-hidden="true">VisaFlow</span>
+                  <span className="vf-brand-comma-version" aria-hidden="true">
+                    19
+                  </span>
+                </span>
               ) : null}
               {isSupabaseMode ? (
                 <p
@@ -3576,13 +3600,21 @@ function WorkspaceAccessGate({
       <div className="access-layout">
         <section className="access-brand-panel" aria-label="VisaFlow">
           <div className="access-brand-markline">
-            <img className="access-logo" src={visaOpsLogo} alt="" aria-hidden="true" />
             <div className="access-brand-copy">
-              <p className="access-kicker" aria-label="VisaFlow 19">
-                <span className="access-word-tail" aria-hidden="true">
-                  isaFlow
+              <p
+                className="access-kicker vf-brand-wordmark vf-brand-wordmark--hero"
+                aria-label="VisaFlow 19"
+              >
+                <span
+                  className="vf-brand-capital vf-brand-capital--hero"
+                  aria-hidden="true"
+                >
+                  <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
                 </span>
-                <span className="access-brand-version" aria-hidden="true">
+                <span className="vf-brand-tail" aria-hidden="true">
+                  VisaFlow
+                </span>
+                <span className="vf-brand-comma-version" aria-hidden="true">
                   19
                 </span>
               </p>

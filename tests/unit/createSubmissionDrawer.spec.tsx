@@ -22,6 +22,12 @@ function passportFile(name: string) {
   });
 }
 
+function rejectedPassportFile(name: string) {
+  return new File(["not a passport image"], name, {
+    type: "text/plain",
+  });
+}
+
 function renderCreateDrawer() {
   const onCreate = vi.fn();
   const result = render(
@@ -46,6 +52,18 @@ describe("CreateSubmissionDrawer passport readiness", () => {
     const { input } = renderCreateDrawer();
     const nextButton = screen.getByRole("button", { name: "Дальше" });
 
+    expect(nextButton).toBeDisabled();
+    expect(screen.getAllByText("Нужен файл паспорта").length).toBeGreaterThan(0);
+
+    fireEvent.change(input, {
+      target: { files: [rejectedPassportFile("notes.txt")] },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Паспорт принимается только в формате JPEG или PNG."),
+      ).toBeVisible();
+    });
     expect(nextButton).toBeDisabled();
 
     fireEvent.change(input, {

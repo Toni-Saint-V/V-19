@@ -11,6 +11,7 @@ import type {
   OperationalInboxEvent,
 } from "../agentActions";
 import {
+  buildExportMappingAudit,
   isSubmissionSelectableForExport,
   type ExportSummary,
 } from "../exportRules";
@@ -1122,6 +1123,33 @@ function inboxPassportNumber(submission: Submission) {
   return extractedPassport || questionnairePassport || "—";
 }
 
+function agentSubmissionDisplaySearchText(submission: Submission) {
+  const applicantText = submission.applicants.flatMap((applicant) => {
+    const passportFields = applicant.sections
+      .flatMap((section) => section.fields)
+      .filter(
+        (field) =>
+          field.id === "passport-no" ||
+          field.label.toLocaleLowerCase("ru-RU").includes("паспорт"),
+      )
+      .map((field) => field.value);
+
+    return [applicant.fullName, ...passportFields];
+  });
+
+  return [
+    submission.id,
+    submission.title,
+    submission.listTitle ?? "",
+    submission.city,
+    statusLabels[submission.status],
+    tripDates(submission),
+    ...applicantText,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("ru-RU");
+}
+
 export function AgentSubmissionsScreen({
   activeTab,
   agentList,
@@ -1132,6 +1160,7 @@ export function AgentSubmissionsScreen({
   onOpen,
   onSelect,
   onTab,
+  searchQuery = "",
   searchControl,
   visibleSubmission,
   summary,
@@ -1145,6 +1174,7 @@ export function AgentSubmissionsScreen({
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: AgentTab) => void;
+  searchQuery?: string;
   searchControl: ReactNode;
   visibleSubmission: Submission | null;
   summary: ReturnType<typeof counts>;
@@ -1156,18 +1186,37 @@ export function AgentSubmissionsScreen({
   );
   const [sortNewest, setSortNewest] = useState(true);
 
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
+  const searchFilteredSubmissions = useMemo(
+    () =>
+      normalizedSearchQuery
+        ? agentList.filter((submission) =>
+            agentSubmissionDisplaySearchText(submission).includes(
+              normalizedSearchQuery,
+            ),
+          )
+        : agentList,
+    [agentList, normalizedSearchQuery],
+  );
   const filteredSubmissions = useMemo(
     () =>
       blockersOnly
-        ? agentList.filter((submission) => blockerCount(submission) > 0)
-        : agentList,
-    [agentList, blockersOnly],
+        ? searchFilteredSubmissions.filter(
+            (submission) => blockerCount(submission) > 0,
+          )
+        : searchFilteredSubmissions,
+    [searchFilteredSubmissions, blockersOnly],
   );
   const orderedSubmissions = useMemo(
     () => (sortNewest ? filteredSubmissions : [...filteredSubmissions].reverse()),
     [filteredSubmissions, sortNewest],
   );
-  const prioritySubmission = visibleSubmission ?? orderedSubmissions[0] ?? null;
+  const visibleSubmissionInList =
+    visibleSubmission &&
+    orderedSubmissions.some((submission) => submission.id === visibleSubmission.id)
+      ? visibleSubmission
+      : null;
+  const prioritySubmission = visibleSubmissionInList ?? orderedSubmissions[0] ?? null;
   const priorityIssue = prioritySubmission
     ? primarySubmissionIssue(prioritySubmission)
     : null;
@@ -1371,7 +1420,7 @@ export function AgentSubmissionsScreen({
                       <SubmissionCollectionRow
                         action={submissionActionLabel(submission)}
                         compact={railCompact}
-                        completeness={`${submission.completeness.total}%`}
+                        completeness={submissionReadinessDisplay(submission)}
                         extraTagCount={
                           railCompact ? 0 : submissionExtraTagCount(submission)
                         }
@@ -1521,6 +1570,20 @@ function submissionFileStateTone(submission: Submission): "amber" | "muted" | "t
   if (ready === 0) return "muted";
   if (ready === submission.files.length) return "teal";
   return "amber";
+}
+
+function submissionReadinessDisplay(submission: Submission) {
+  if (submission.status === "ready_for_export") return "Готово к выгрузке";
+  if (submission.status === "exported") return "Выгружено";
+  if (
+    submission.completeness.questionnaire === 100 &&
+    submission.completeness.files === 100 &&
+    submission.completeness.total < 100
+  ) {
+    return "Проверить статус";
+  }
+
+  return `${submission.completeness.total}%`;
 }
 
 function submissionExtraTagCount(submission: Submission) {
@@ -2370,10 +2433,11 @@ export function ExportScreen({
   const packageFacts = exportPackageFacts(exportPlan);
   const previewColumns = exportPlan.preview.headers.slice(0, 9);
   const previewRows = exportPlan.preview.rows.slice(0, 4);
-  const mappingRows = exportMappingRows(exportPlan);
-  const mappedCount = mappingRows.filter((row) => row.state === "mapped").length;
-  const derivedCount = mappingRows.filter((row) => row.state === "derived").length;
-  const unresolvedCount = mappingRows.filter((row) => row.state === "unresolved").length;
+  const mappingAudit = buildExportMappingAudit(exportPlan.preview);
+  const mappingRows = mappingAudit.rows;
+  const mappedCount = mappingAudit.mappedCount;
+  const derivedCount = mappingAudit.derivedCount;
+  const unresolvedCount = mappingAudit.unresolvedCount;
   const [exportPanelOpen, setExportPanelOpen] = useState(true);
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("updated");
   const selectedExportIdSet = useMemo(
@@ -2744,7 +2808,7 @@ export function ExportScreen({
                 detail={`${packageFacts.city} · ${packageFacts.dates}`}
               />
               <ExportGuardItem
-                ok={exportPlan.contract.valid}
+                ok={exportPlan.contract.valid && unresolvedCount === 0}
                 label="Все 56 колонок подтверждены"
                 detail={`${exportPlan.contract.sheetName} ${exportPlan.contract.range}`}
               />
@@ -2769,7 +2833,7 @@ export function ExportScreen({
               </div>
             </div>
           </CardComponent>
-          <div className="v17-blocker-callout blocker-box">
+          <div className={`v17-blocker-callout ${exportCalloutTone(exportPlan)}`}>
             <SvgIcon>
               <path d="M10.3 4.3 2.8 17.4A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.6L13.7 4.3a2 2 0 0 0-3.4 0Z" />
               <path d="M12 9v4" />
@@ -2838,7 +2902,7 @@ export function ExportScreen({
             </div>
             <p className="sheet-caption">
               Download запускается только для текущей verified selection; stale
-              preview и row mismatch блокируются.
+              selection и row mismatch блокируются.
             </p>
           </CardComponent>
           </div>
@@ -2872,29 +2936,21 @@ function exportPackageFacts(plan: ExportSummary) {
   };
 }
 
-function exportMappingRows(plan: ExportSummary) {
-  const derivedHeaders = new Set(["FirstName", "LastName", "Appointment Type"]);
-  const unresolvedHeaders = new Set(["Visa Sub Type", "Nationality At Birth"]);
-
-  return plan.preview.headers.map((header, index) => ({
-    header,
-    index: index + 1,
-    state: unresolvedHeaders.has(header)
-      ? "unresolved"
-      : [...derivedHeaders].some((derivedHeader) => header.includes(derivedHeader))
-        ? "derived"
-        : "mapped",
-  }));
-}
-
 function exportHasBlocker(plan: ExportSummary, text: string) {
   return plan.blockers.some((blocker) => blocker.reason.includes(text));
+}
+
+function exportCalloutTone(plan: ExportSummary) {
+  if (plan.blockers.length > 0) return "blocker-box";
+  if (plan.warnings.length > 0) return "warning-box";
+  if (plan.ready) return "success-box";
+  return "neutral-box";
 }
 
 function exportCalloutTitle(plan: ExportSummary) {
   if (plan.blockers.length > 0) return "Выгрузка заблокирована fail-closed";
   if (plan.warnings.length > 0) return "Выгрузка разрешена с предупреждением";
-  if (plan.ready) return "Выгрузка проходит проверки";
+  if (plan.ready) return "Выгрузка готова";
   return "Выберите пакет для проверки";
 }
 

@@ -1,5 +1,6 @@
 import { Button, NavCount } from "../../../shared/ui/primitives";
 import type { ReactNode, SVGProps } from "react";
+import visaOpsLogo from "../../../assets/visaflow-logo.png";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
 
@@ -42,12 +43,22 @@ export function OperationalSidebar({
           <span aria-hidden="true">VF</span>
         </div>
       ) : null}
-      <div className="ops-brand" aria-label={brand}>
-        <span className="ops-brand-logo ops-brand-mark" aria-hidden="true">
-          V
+      <div className="ops-brand" aria-label={`${brand} 19`}>
+        <span
+          className="ops-brand-logo ops-brand-mark vf-brand-capital vf-brand-capital--nav"
+          aria-hidden="true"
+        >
+          <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
         </span>
         <div className="ops-brand-copy">
-          <strong>VisaFlow V-19</strong>
+          <strong className="vf-brand-wordmark">
+            <span className="vf-brand-tail" aria-hidden="true">
+              VisaFlow
+            </span>
+            <span className="vf-brand-comma-version" aria-hidden="true">
+              19
+            </span>
+          </strong>
           <em>Workspace</em>
         </div>
         {onMobileClose ? (

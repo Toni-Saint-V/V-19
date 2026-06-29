@@ -1329,7 +1329,7 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await expect(page.getByText("Sheet1 · masked preview")).toBeVisible();
     await expect(
-      page.getByText("51 mapped · 3 derived · 2 unresolved"),
+      page.getByText("53 mapped · 3 derived · 0 unresolved"),
     ).toBeVisible();
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
     await page
@@ -1545,7 +1545,7 @@ test.describe("V-19 operations workspace", () => {
       ).toBeVisible();
       await expect(page.getByText("Sheet1 · masked preview")).toBeVisible();
       await expect(
-        page.getByText("51 mapped · 3 derived · 2 unresolved"),
+        page.getByText("53 mapped · 3 derived · 0 unresolved"),
       ).toBeVisible();
       await expect(
         page.getByText(

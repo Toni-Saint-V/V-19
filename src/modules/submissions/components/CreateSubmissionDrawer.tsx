@@ -241,7 +241,17 @@ export function CreateSubmissionDrawer({
     (upload) => upload.applicantIndex === safeActiveApplicantIndex,
   );
   const passportReady = allApplicantPassportsReady(passportUploads, applicantCount);
-  const primaryActionAvailable = passportReady || Boolean(passportFileError);
+  const missingPassportLabels = missingApplicantPassportLabels(
+    passportUploads,
+    applicantCount,
+    type,
+  );
+  const primaryActionAvailable = passportReady;
+  const passportReadinessSummary = passportReady
+    ? "Все паспорта приняты. Данные проверит оператор."
+    : type === "family"
+      ? `Нужен файл паспорта: ${missingPassportLabels.join(", ")}.`
+      : "Нужен файл паспорта.";
   const firstUploadedApplicantName = passportUploadFullName(passportUploads[0]);
 
   function selectType(nextType: Submission["type"]) {
@@ -563,6 +573,7 @@ export function CreateSubmissionDrawer({
                         const upload = passportUploads.find(
                           (candidate) => candidate.applicantIndex === index,
                         );
+                        const readinessLabel = passportUploadReadinessLabel(upload);
 
                         return (
                           <button
@@ -582,6 +593,9 @@ export function CreateSubmissionDrawer({
                             <em className="block truncate text-[11px] not-italic text-white/35 mt-0.5">
                               {upload?.fileName ?? "Паспорт не загружен"}
                             </em>
+                            <span className="mt-1 block truncate text-[10px] text-white/38">
+                              {readinessLabel}
+                            </span>
                           </button>
                         );
                       })}
@@ -707,6 +721,7 @@ export function CreateSubmissionDrawer({
                         (candidate) => candidate.applicantIndex === index,
                       );
                       const visualStatus = passportUploadVisualStatus(upload);
+                      const readinessLabel = passportUploadReadinessLabel(upload);
 
                       return (
                         <button
@@ -727,6 +742,9 @@ export function CreateSubmissionDrawer({
                             <em className="block truncate text-[11px] not-italic text-white/35 mt-0.5">
                               {upload?.fileName ?? "Паспорт не загружен"}
                             </em>
+                            <small className="mt-1 block truncate text-[10px] text-white/38">
+                              {readinessLabel}
+                            </small>
                           </span>
                           <i
                             className={`h-2 w-2 rounded-full ${
@@ -966,9 +984,8 @@ export function CreateSubmissionDrawer({
       {createStep === "passport" ? (
         <footer className="shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span className="text-[12px] text-white/40">
-            {type === "family"
-              ? `${applicantCount} заявителя в семейной подаче. Дальше доступно после принятия файла паспорта для каждого заявителя; данные проверит оператор.`
-              : "Дальше доступно после принятия файла паспорта; данные проверит оператор."}
+            {type === "family" ? `${applicantCount} заявителя. ` : ""}
+            {passportReadinessSummary}
           </span>
           <div className="flex flex-col sm:flex-row gap-2">
             <button
@@ -1070,6 +1087,28 @@ function allApplicantPassportsReady(
       passportUploads.find((upload) => upload.applicantIndex === index),
     ),
   ).every(Boolean);
+}
+
+function missingApplicantPassportLabels(
+  passportUploads: PassportUploadDraft[],
+  applicantCount: number,
+  type: Submission["type"],
+) {
+  return Array.from({ length: applicantCount }, (_, index) => index)
+    .filter(
+      (index) =>
+        !isPassportUploadReady(
+          passportUploads.find((upload) => upload.applicantIndex === index),
+        ),
+    )
+    .map((index) => applicantLabel(index, type));
+}
+
+function passportUploadReadinessLabel(upload: PassportUploadDraft | undefined) {
+  if (isPassportUploadReady(upload)) return "Паспорт принят";
+  if (upload?.status === "extracting") return "Проверка файла";
+  if (upload?.file) return "Файл не принят";
+  return "Нужен файл паспорта";
 }
 
 function applicantLabel(index: number, type: Submission["type"]) {
