@@ -139,11 +139,20 @@ export type ExportContractColumn = (typeof exportContractColumns)[number];
 export type ExportContractColumnKey = ExportContractColumn["key"];
 export type ExportContractRow = Record<ExportContractColumnKey, string> & {
   applicantCount: number;
+  applicantId: string;
   applicantIndex: number;
   applicantName: string;
   city: string;
+  excelRowNumber?: number;
+  exportPackageId?: string;
+  familyGroupId?: string;
+  familySubmissionId?: string;
   groupKey: string;
   groupLabel: string;
+  ownerAgentId: string;
+  ownerAgentName?: string;
+  passportLast3: string;
+  passportNumber: string;
   submissionCode: string;
   submissionId: string;
   submissionTitle: string;
@@ -232,15 +241,79 @@ export function exportContractFingerprint(
   ].join("|");
 }
 
-export function normalizeExportContractDate(value: string): string {
+export type ExcelWorkbookDateSystem = "1900" | "1904";
+
+export function excelSerialDateToIsoDate(
+  value: number,
+  dateSystem: ExcelWorkbookDateSystem = "1900",
+): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+
+  const base =
+    dateSystem === "1904" ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+  const date = new Date(base + Math.floor(value) * 86_400_000);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+export function normalizeExportContractDateInput(
+  value: string | number,
+  dateSystem: ExcelWorkbookDateSystem = "1900",
+): string {
+  if (typeof value === "number") return excelSerialDateToIsoDate(value, dateSystem);
+
   const trimmed = value.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    return excelSerialDateToIsoDate(Number(trimmed), dateSystem);
+  }
 
   const dotted = trimmed.match(/^(\d{2})\.(\d{2})(?:\.(\d{4}))?$/);
   if (!dotted) return "";
 
   const [, day, month, year = EXPORT_DEFAULT_YEAR] = dotted;
   return `${year}-${month}-${day}`;
+}
+
+export function normalizeExportContractDate(value: string): string {
+  return normalizeExportContractDateInput(value);
+}
+
+export function isRealBlsApplicantRow(
+  row:
+    | Partial<Record<ExportContractColumnKey, string | number | null | undefined>>
+    | readonly unknown[],
+): boolean {
+  let byKey: {
+    firstName?: unknown;
+    lastName?: unknown;
+    passportNo?: unknown;
+    surnameFamilyName?: unknown;
+  };
+  if (isReadonlyUnknownArray(row)) {
+    byKey = {
+      firstName: row[9],
+      lastName: row[10],
+      passportNo: row[6],
+      surnameFamilyName: row[7],
+    };
+  } else {
+    byKey = row;
+  }
+  const passportNo = String(byKey.passportNo ?? "").trim();
+  const applicantName = [
+    byKey.surnameFamilyName,
+    byKey.firstName,
+    byKey.lastName,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .join("");
+
+  return Boolean(passportNo || applicantName);
+}
+
+function isReadonlyUnknownArray(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value);
 }
 
 export function exportDurationDays(

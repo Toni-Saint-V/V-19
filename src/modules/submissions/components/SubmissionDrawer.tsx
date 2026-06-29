@@ -39,6 +39,7 @@ import {
   buildAgentHandoffPackage,
   buildAgentReturnedPdfPackageView,
 } from "../operationalWorkflow";
+import { agentOwnerDisplayName } from "../ownership";
 import {
   activeMediaFileTypes,
   buildReadinessQueue,
@@ -570,6 +571,10 @@ function AdminReviewTopBar({
     submission.type === "family" && applicantIndex > 0
       ? `${applicantIndex}/${submission.applicants.length}`
       : null;
+  const ownerAgentName = agentOwnerDisplayName(
+    submission.agentId,
+    submission.returnedPdfPackage?.ownerAgentName,
+  );
 
   return (
     <header className="drawer-header admin-review-topbar">
@@ -582,6 +587,9 @@ function AdminReviewTopBar({
           <span className="admin-review-status-snapshot">
             {submission.id} · {statusLabels[submission.status]}
           </span>
+          <strong className="admin-review-owner-agent">
+            Агент: {ownerAgentName}
+          </strong>
           <span className="mono">{submission.id}</span>
           <span>{applicant?.fullName ?? submission.title}</span>
           {familyProgress ? <span>Семья {familyProgress}</span> : null}

@@ -55,7 +55,7 @@ function readyReturnedPdfSubmission(): Submission {
     exportPackage,
     returnedPdfPackage: {
       commonAppointmentPdf: {
-        fileName: `${passportNumber}_appointment.pdf`,
+        fileName: "STP398400350726_appointment_list_pdf.pdf",
         mimeType: "application/pdf",
         sha256: appointmentSha,
         sizeBytes: 32_000,
@@ -72,7 +72,7 @@ function readyReturnedPdfSubmission(): Submission {
         applicantId,
         applicantName: "Мария Иванова",
         artifact: {
-          fileName: `${passportNumber}_application.pdf`,
+          fileName: `${passportNumber}_application_form_pdf_иванова_мария.pdf`,
           mimeType: "application/pdf",
           sha256: applicationSha,
           sizeBytes: 48_000,
@@ -84,7 +84,7 @@ function readyReturnedPdfSubmission(): Submission {
         data: {
           passportNumber,
         },
-        fileName: `${passportNumber}_application.pdf`,
+        fileName: `${passportNumber}_application_form_pdf_иванова_мария.pdf`,
         findings: [],
         handoffStatus: "ready_for_agent",
         id: "visa-pdf-handoff-1",
@@ -331,6 +331,13 @@ describe("SubmissionDrawer returned PDF handoff", () => {
 });
 
 describe("SubmissionDrawer admin review targeting", () => {
+  test("shows owner agent in compact admin drawer header", () => {
+    renderReviewDrawer();
+
+    expect(screen.getByText("Агент: Ирина Агентова")).toBeVisible();
+    expect(screen.getAllByText(/Иван Петров/).length).toBeGreaterThan(0);
+  });
+
   test("maps an initial selfie target to the selfie tab and selected family applicant", async () => {
     const onTab = vi.fn();
 

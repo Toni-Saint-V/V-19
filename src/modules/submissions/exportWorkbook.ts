@@ -65,8 +65,6 @@ type BrowserDownloadRuntime = typeof globalThis & {
   setTimeout(callback: () => void, timeout: number): unknown;
 };
 
-const familyFillSequence: ExportWorkbookRowFill[] = ["green", "yellow", "blue"];
-
 export function buildExportWorkbookRows(rows: ExportContractRow[]): string[][] {
   return buildExportWorkbookMatrix(rows);
 }
@@ -82,12 +80,12 @@ export function buildExportWorkbookRowFills(
     ...rows.map((row) => {
       if (row.appointmentType !== "Family") return null;
 
-      const existing = familyFillsBySubmission.get(row.submissionId);
+      const familyKey = row.familyGroupId ?? row.familySubmissionId ?? row.submissionId;
+      const existing = familyFillsBySubmission.get(familyKey);
       if (existing) return existing;
 
-      const fill =
-        familyFillSequence[familyIndex % familyFillSequence.length] ?? "green";
-      familyFillsBySubmission.set(row.submissionId, fill);
+      const fill = `family-${familyIndex + 1}` as ExportWorkbookRowFill;
+      familyFillsBySubmission.set(familyKey, fill);
       familyIndex += 1;
       return fill;
     }),

@@ -16,8 +16,22 @@ function applicant(
     role,
     questionnaireStatus,
     fileStatus,
-    sections: createQuestionnaireSections(id, fullName, questionnaireStatus, missing),
+    sections: createQuestionnaireSections(id, fullName, questionnaireStatus, missing).map(
+      (section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === "passport-no" && field.value.trim()
+            ? { ...field, value: mockPassportNumber(id) }
+            : field,
+        ),
+      }),
+    ),
   };
+}
+
+function mockPassportNumber(applicantId: string): string {
+  const digits = applicantId.replace(/\D/g, "");
+  return `66${digits.padStart(7, "0").slice(-7)}`;
 }
 
 function file(
@@ -342,7 +356,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "SUB-1101",
-    agentId: defaultLocalAgentOwnerId,
+    agentId: alternateLocalAgentOwnerId,
     title: "Ольга Фролова",
     type: "single",
     country: "Испания",

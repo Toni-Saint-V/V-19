@@ -988,8 +988,9 @@ describe("V-19 submission actions", () => {
     ).map((submission) => submission.title);
 
     expect(defaultAgentTitles).toContain("Семья Ивановых");
+    expect(defaultAgentTitles).not.toContain("Ольга Фролова");
     expect(defaultAgentTitles).not.toContain("Ольга Морозова");
-    expect(alternateAgentTitles).toEqual(["Ольга Морозова"]);
+    expect(alternateAgentTitles).toEqual(["Ольга Фролова", "Ольга Морозова"]);
   });
 
   it("creates a Spain-only family draft inside the submission model", () => {

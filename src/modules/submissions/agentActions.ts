@@ -5,7 +5,7 @@ import {
   unresolvedOpenIssueCount,
 } from "./status";
 import { formatAgentActionRowText } from "./listFormatters";
-import { applicantCountLabel } from "./selectors";
+import { applicantCountLabel, submissionSearchText } from "./selectors";
 import type { DrawerTab, Submission, SubmissionFile } from "./types";
 
 export type AgentActionDue = "overdue" | "today" | "week" | "completed";
@@ -423,6 +423,7 @@ function withSearchText(action: AgentActionItem): AgentActionItem {
       action.submission.id,
       action.submission.title,
       action.submission.city,
+      submissionSearchText(action.submission),
       ...action.badges.map((badge) => badge.label),
     ]
       .join(" ")

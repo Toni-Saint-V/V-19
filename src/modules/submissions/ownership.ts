@@ -3,6 +3,13 @@ import type { AgentOwnerId, Submission } from "./types";
 export const defaultLocalAgentOwnerId: AgentOwnerId = "local-agent-tony";
 export const alternateLocalAgentOwnerId: AgentOwnerId = "local-agent-alex";
 
+const localAgentOwnerNames = new Map<AgentOwnerId, string>([
+  [defaultLocalAgentOwnerId, "Татьяна Николаева"],
+  [alternateLocalAgentOwnerId, "Алексей Морозов"],
+  ["agent-1", "Ирина Агентова"],
+  ["local-agent-partner", "Ольга Морозова"],
+]);
+
 export function ensureSubmissionOwner(
   submission: Submission,
   fallbackAgentId: AgentOwnerId,
@@ -23,4 +30,11 @@ export function submissionBelongsToAgent(
   agentId: AgentOwnerId,
 ) {
   return submission.agentId === agentId;
+}
+
+export function agentOwnerDisplayName(
+  agentId: AgentOwnerId,
+  override?: string,
+): string {
+  return override?.trim() || localAgentOwnerNames.get(agentId) || agentId;
 }

@@ -5569,6 +5569,36 @@ p {
   outline-offset: 3px;
 }
 
+.v19-admin-filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.v19-agent-filter {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.v19-agent-filter-select {
+  width: 100%;
+  min-width: 172px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--v19-line-default);
+  border-radius: var(--v19-radius-pill);
+  color: var(--v19-fg);
+  background: var(--v19-control);
+  font: inherit;
+}
+
+.v19-agent-filter-select:focus-visible {
+  outline: 2px solid rgb(var(--accent-focus) / 0.55);
+  outline-offset: 3px;
+}
+
 .v19-city-filter-pin {
   display: grid;
   place-items: center;
