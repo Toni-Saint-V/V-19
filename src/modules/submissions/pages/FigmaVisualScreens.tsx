@@ -299,11 +299,11 @@ function ListRow({
 }) {
   return (
     <div
-      aria-label={`Открыть действие ${item.id}: ${item.title}`}
       className="vf-figma-action-row"
       data-submission-id={item.id}
       role="button"
       tabIndex={0}
+      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
       onClick={() => onOpen(item.submission, item.tab)}
       onKeyDown={(event) => activateKeyboardCard(event, () => onOpen(item.submission, item.tab))}
     >
@@ -329,6 +329,7 @@ function ListRow({
       <button
         className="vf-figma-open-button"
         type="button"
+        aria-label={`${item.cta}: ${item.title}, ${item.id}`}
         onClick={(event) => {
           event.stopPropagation();
           onOpen(item.submission, item.tab);
@@ -352,6 +353,7 @@ function ColumnCard({
       className="vf-figma-column-card"
       data-submission-id={item.id}
       type="button"
+      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
       onClick={() => onOpen(item.submission, item.tab)}
     >
       {item.status === "returned" || item.status === "requires_action" ? (
@@ -569,6 +571,7 @@ export function FigmaApplicantsVisual({
                 key={submission.id}
                 role="button"
                 tabIndex={0}
+                aria-label={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submission.id}`}
                 onClick={() => onOpen?.(submission)}
                 onKeyDown={(event) =>
                   activateKeyboardCard(event, () => onOpen?.(submission))
@@ -591,6 +594,7 @@ export function FigmaApplicantsVisual({
                         className="vf-figma-member-row"
                         key={`${submission.id}-${applicant.id}`}
                         type="button"
+                        aria-label={`Открыть заявителя: ${member.name}, ${formatSubmissionListTitle(submission)}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           onOpen?.(submission, "applicants");
@@ -643,6 +647,7 @@ export function FigmaApplicantsVisual({
                   data-submission-id={submission.id}
                   key={submission.id}
                   type="button"
+                  aria-label={`Открыть заявителя: ${member?.name ?? submission.title}, ${submission.id}`}
                   onClick={() => onOpen?.(submission)}
                 >
                   <span className="vf-figma-avatar">
