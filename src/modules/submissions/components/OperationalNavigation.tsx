@@ -22,6 +22,7 @@ export function OperationalSidebar({
   footer,
   items,
   mobileTitle,
+  onMobileClose,
 }: {
   brand?: string;
   createAction?: {
@@ -31,9 +32,22 @@ export function OperationalSidebar({
   footer: ReactNode;
   items: OperationalNavItem[];
   mobileTitle?: string;
+  onMobileClose?: () => void;
 }) {
   return (
     <aside className="ops-sidebar" aria-label="Операционный центр">
+      {onMobileClose ? (
+        <button
+          className="ops-sidebar-close"
+          type="button"
+          aria-label="Закрыть меню"
+          onClick={onMobileClose}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      ) : null}
       {mobileTitle ? (
         <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
           <strong>{mobileTitle}</strong>

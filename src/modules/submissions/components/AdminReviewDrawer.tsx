@@ -227,6 +227,17 @@ export function AdminReviewDrawer({
     });
   }
 
+  function openGeneralRemark() {
+    if (!selectedApplicant) return;
+    setRemarkContext({
+      applicantId: selectedApplicant.id,
+      reason: "Требуется уточнение по проверке",
+      sectionLabel: "Анкета",
+      targetLabel: "Общая проверка",
+      targetType: "section",
+    });
+  }
+
   function submitRemark(input: IssueInput) {
     onAddIssue(input);
     setRemarkContext(null);
@@ -392,6 +403,7 @@ export function AdminReviewDrawer({
                 ) : (
                   <IssuesTab
                     submission={submission}
+                    onCreate={openGeneralRemark}
                     onJump={(issue) => {
                       if (issue.target.applicantId) setSelectedApplicantId(issue.target.applicantId);
                       if (issue.target.fileType === "passport_scan") {
@@ -409,7 +421,11 @@ export function AdminReviewDrawer({
                   />
                 )
               ) : (
-                <IssuesTab submission={submission} onJump={() => selectReviewTab("questionnaire")} />
+                <IssuesTab
+                  submission={submission}
+                  onCreate={openGeneralRemark}
+                  onJump={() => selectReviewTab("questionnaire")}
+                />
               )}
             </motion.div>
           </AnimatePresence>
@@ -1224,9 +1240,11 @@ function AdminRemarkForm({
 
 function IssuesTab({
   submission,
+  onCreate,
   onJump,
 }: {
   submission: Submission;
+  onCreate: () => void;
   onJump: (issue: Submission["issues"][number]) => void;
 }) {
   if (!submission.issues.length) {
@@ -1235,6 +1253,10 @@ function IssuesTab({
         <ShieldCheck aria-hidden="true" size={18} />
         <strong>Замечаний пока нет</strong>
         <span>Если паспорт, селфи и анкета корректны, можно принимать заявку.</span>
+        <button type="button" onClick={onCreate}>
+          <MessageSquarePlus aria-hidden="true" size={15} />
+          Добавить замечание
+        </button>
       </div>
     );
   }
