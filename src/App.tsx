@@ -103,7 +103,6 @@ import {
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
-import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
   AdminReviewScreen,
   AgentActionsScreen,
@@ -176,6 +175,11 @@ const FigmaActionQueueVisual = lazy(() =>
 const CreateSubmissionDrawer = lazy(() =>
   import("./modules/submissions/components/CreateSubmissionDrawer").then((module) => ({
     default: module.CreateSubmissionDrawer,
+  })),
+);
+const SubmissionDrawer = lazy(() =>
+  import("./modules/submissions/components/SubmissionDrawer").then((module) => ({
+    default: module.SubmissionDrawer,
   })),
 );
 
@@ -2707,6 +2711,7 @@ function MainApp() {
             : undefined
         }
         items={mobileAwareOperationalNavItems}
+        onMobileClose={() => setMobileNavOpen(false)}
         mobileTitle={
           role === "agent" &&
           (surface === "agent-actions" ||
@@ -3028,46 +3033,48 @@ function MainApp() {
       {drawerMode === "detail" &&
       activeSubmission &&
       !(role === "agent" && isFigmaVisualSurface) ? (
-        <SubmissionDrawer
-          actionError={activeSubmissionActionError}
-          activeTab={activeDrawerTab}
-          initialTarget={drawerInitialTarget}
-          issueComposerRequest={issueComposerRequest}
-          onIssueComposerConsumed={() => setIssueComposerRequest(null)}
-          onAction={updateSubmission}
-          onAddIssue={addAdminIssue}
-          onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
-          onClose={closeDrawer}
-          onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
-          onMarkIssueFixed={markActiveIssueFixed}
-          onApplyPassportField={applyPassportFieldForActiveSubmission}
-          onExtractPassport={extractPassportForActiveSubmission}
-          onConfirmVisaApplicationPdfReview={
-            confirmVisaApplicationPdfReviewForActiveSubmission
-          }
-          onDismissVisaApplicationPdfReview={
-            dismissVisaApplicationPdfReviewForActiveSubmission
-          }
-          onPublishReturnedPdfHandoff={publishReturnedPdfHandoffForActiveSubmission}
-          onRunAiReview={runAiReviewForActiveSubmission}
-          onTab={setActiveDrawerTab}
-          onQuestionnaireField={updateActiveQuestionnaireField}
-          onReviewVisaApplicationPdf={reviewVisaApplicationPdfForActiveSubmission}
-          onUploadFile={uploadActiveFile}
-          fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
-          localPassportFileIds={localPassportFileIds}
-          passportExtractionEnabled={passportExtractionEnabled}
-          requireSelectedFile={isSupabaseMode}
-          role={role}
-          surface={
-            surface === "export"
-              ? "export"
-              : surface === "admin-review"
-                ? "review"
-                : "agent"
-          }
-          submission={activeSubmission}
-        />
+        <Suspense fallback={null}>
+          <SubmissionDrawer
+            actionError={activeSubmissionActionError}
+            activeTab={activeDrawerTab}
+            initialTarget={drawerInitialTarget}
+            issueComposerRequest={issueComposerRequest}
+            onIssueComposerConsumed={() => setIssueComposerRequest(null)}
+            onAction={updateSubmission}
+            onAddIssue={addAdminIssue}
+            onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
+            onClose={closeDrawer}
+            onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
+            onMarkIssueFixed={markActiveIssueFixed}
+            onApplyPassportField={applyPassportFieldForActiveSubmission}
+            onExtractPassport={extractPassportForActiveSubmission}
+            onConfirmVisaApplicationPdfReview={
+              confirmVisaApplicationPdfReviewForActiveSubmission
+            }
+            onDismissVisaApplicationPdfReview={
+              dismissVisaApplicationPdfReviewForActiveSubmission
+            }
+            onPublishReturnedPdfHandoff={publishReturnedPdfHandoffForActiveSubmission}
+            onRunAiReview={runAiReviewForActiveSubmission}
+            onTab={setActiveDrawerTab}
+            onQuestionnaireField={updateActiveQuestionnaireField}
+            onReviewVisaApplicationPdf={reviewVisaApplicationPdfForActiveSubmission}
+            onUploadFile={uploadActiveFile}
+            fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
+            localPassportFileIds={localPassportFileIds}
+            passportExtractionEnabled={passportExtractionEnabled}
+            requireSelectedFile={isSupabaseMode}
+            role={role}
+            surface={
+              surface === "export"
+                ? "export"
+                : surface === "admin-review"
+                  ? "review"
+                  : "agent"
+            }
+            submission={activeSubmission}
+          />
+        </Suspense>
       ) : null}
 
       {drawerMode === "create" ? (
