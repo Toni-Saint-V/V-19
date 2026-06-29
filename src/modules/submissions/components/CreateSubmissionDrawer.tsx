@@ -442,7 +442,9 @@ export function CreateSubmissionDrawer({
   return (
     <motion.div
       animate={{ opacity: 1, y: 0 }}
-      className="vf-figma-surface fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden"
+      className={`vf-figma-surface create-submission-drawer ${
+        createStep === "passport" ? "is-passport-step" : "is-questionnaire-step"
+      } fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden`}
       exit={{ opacity: 0, y: 20 }}
       initial={{ opacity: 0, y: 20 }}
       role="dialog"
@@ -491,15 +493,27 @@ export function CreateSubmissionDrawer({
           {createStep === "passport" ? (
             <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
               <div className="flex flex-col gap-6">
-                <div>
-                  <h2 className="text-[20px] font-medium text-white/90 tracking-tight">
-                    Исходные файлы
-                  </h2>
-                  <p className="text-[13px] text-white/40 mt-2 leading-relaxed max-w-md font-light">
-                    Пилотный режим: используйте только тестовые файлы. Данные паспорта
-                    требуют проверки оператором. Автозаполнение является предварительным
-                    и не подтверждает корректность документа.
-                  </p>
+                <div className="create-passport-topbar">
+                  <button
+                    className="create-passport-back"
+                    type="button"
+                    aria-label="Закрыть создание"
+                    onClick={onClose}
+                  >
+                    <ArrowLeft className="w-[18px] h-[18px]" />
+                  </button>
+                  <div className="min-w-0">
+                    <h2>Паспорт</h2>
+                    <span>{type === "family" ? `${applicantCount} заявителя` : "1 заявитель"}</span>
+                  </div>
+                  <button
+                    disabled={!primaryActionAvailable}
+                    className="create-passport-next"
+                    type="button"
+                    onClick={handlePrimaryAction}
+                  >
+                    Дальше
+                  </button>
                 </div>
 
                 <section

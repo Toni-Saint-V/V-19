@@ -414,6 +414,7 @@ export function ActionRow({
   badges,
   context,
   cta,
+  dueLabel,
   submissionId,
   onOpen,
   selected = false,
@@ -426,6 +427,7 @@ export function ActionRow({
   }>;
   context: ReactNode;
   cta: string;
+  dueLabel: string;
   submissionId?: string;
   onOpen: () => void;
   selected?: boolean;
@@ -441,6 +443,7 @@ export function ActionRow({
         selected && "is-selected",
       )}
       aria-current={selected ? "true" : undefined}
+      aria-label={`${cta}: ${title}. ${dueLabel}. ${context}`}
       data-submission-card={submissionId ? "" : undefined}
       data-submission-id={submissionId}
       type="button"
@@ -448,6 +451,10 @@ export function ActionRow({
     >
       <span className="v19-action-severity" aria-hidden="true" />
       <span className="v19-event-main">
+        <span className="v19-action-row-kicker">
+          <span>{dueLabel}</span>
+          {submissionId ? <small>{submissionId}</small> : null}
+        </span>
         <strong>{title}</strong>
         <em>{context}</em>
       </span>
@@ -458,7 +465,12 @@ export function ActionRow({
           </Badge>
         ))}
       </span>
-      <span className="v19-event-action">{cta}</span>
+      <span className="v19-event-action">
+        <span className="v19-event-action-label">{cta}</span>
+        <SvgIcon>
+          <path d="M9 6l6 6-6 6" />
+        </SvgIcon>
+      </span>
     </button>
   );
 }

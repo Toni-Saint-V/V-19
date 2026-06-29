@@ -43,14 +43,17 @@ function renderCreateDrawer() {
   );
   const input = result.container.querySelector<HTMLInputElement>(".pi-file-input");
   if (!input) throw new Error("Expected passport upload input.");
+  const nextButton = result.container.querySelector<HTMLButtonElement>(
+    ".create-passport-next",
+  );
+  if (!nextButton) throw new Error("Expected passport step next button.");
 
-  return { input, onCreate, ...result };
+  return { input, nextButton, onCreate, ...result };
 }
 
 describe("CreateSubmissionDrawer passport readiness", () => {
   test("allows accepted JPEG files to move to manual operator check without fake OCR", async () => {
-    const { input } = renderCreateDrawer();
-    const nextButton = screen.getByRole("button", { name: "Дальше" });
+    const { input, nextButton } = renderCreateDrawer();
 
     expect(nextButton).toBeDisabled();
     expect(screen.getAllByText("Нужен файл паспорта").length).toBeGreaterThan(0);
