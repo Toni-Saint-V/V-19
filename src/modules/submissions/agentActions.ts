@@ -154,7 +154,7 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
   const actions: AgentActionItem[] = [];
 
   const replacementFile = submission.files.find(
-    (file) => file.status === "needs_replacement",
+    (file) => file.status === "needs_replacement" && isActiveAgentFile(file),
   );
   if (replacementFile) {
     const applicantName = applicantNameForFile(submission, replacementFile);
@@ -458,18 +458,20 @@ function questionnaireMissingLabel(missing?: string) {
 }
 
 function isMissingAgentFile(file: SubmissionFile) {
+  return file.status === "missing" && isActiveAgentFile(file);
+}
+
+function isActiveAgentFile(file: SubmissionFile) {
   return (
-    file.status === "missing" &&
-    (file.type === "selfie" ||
-      file.type === "selfie_2" ||
-      file.type === "passport_scan")
+    file.type === "selfie" ||
+    file.type === "selfie_2" ||
+    file.type === "passport_scan"
   );
 }
 
 function shortFileTypeLabel(type: SubmissionFile["type"]) {
-  if (type === "video" || type === "selfie_2") return "Селфи N2";
+  if (type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Паспорт";
   if (type === "selfie") return "Селфи";
-  if (type === "photo") return "Архив";
-  return "Файлы";
+  return "Архив";
 }

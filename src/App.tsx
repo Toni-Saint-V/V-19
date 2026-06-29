@@ -102,7 +102,6 @@ import {
 } from "./modules/submissions/components/OperationalNavigation";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
-import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
   AdminReviewScreen,
@@ -1185,33 +1184,6 @@ function MainApp() {
     setSelectedSubmissionId(submission.id);
     setActiveDrawerTab(defaultDrawerTab(submission));
     setDrawerInitialTarget(null);
-  }
-
-  function openVisualSubmission(visualId: string, intent?: "detail" | "issues") {
-    const exactSubmission = visibleSubmissionsForRole.find(
-      (submission) => submission.id === visualId,
-    );
-    const fallbackSubmission =
-      role === "admin"
-        ? firstReviewSubmissionForTab(reviewTab) ?? activeSubmission
-        : firstAgentActionSubmission() ?? activeSubmission;
-    const targetSubmission = exactSubmission ?? fallbackSubmission;
-
-    if (!targetSubmission) return;
-
-    openSubmission(
-      targetSubmission,
-      intent === "issues" ? "issues" : defaultDrawerTab(targetSubmission),
-    );
-  }
-
-  function openAgentQuestionnaireWorkspace() {
-    const targetSubmission = activeSubmission ?? firstAgentActionSubmission();
-    if (!targetSubmission) return;
-    setSelectedSubmissionId(targetSubmission.id);
-    setActiveDrawerTab("questionnaire");
-    setDrawerMode("closed");
-    setAgentQuestionnaireOpen(true);
   }
 
   function openIssueComposer(submission: Submission) {
@@ -2807,19 +2779,6 @@ function MainApp() {
           {isFigmaVisualSurface ? (
             <div className="topbar-actions vf-figma-topbar-actions">
               <Button
-                className="v19-topbar-cta is-secondary"
-                disabled
-                title="Загрузка доступна через создание подачи"
-                variant="secondary"
-              >
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="M12 16V4" />
-                  <path d="m8 8 4-4 4 4" />
-                  <path d="M20 16.5a4.5 4.5 0 0 1-4.5 4.5h-7A4.5 4.5 0 0 1 4 16.5" />
-                </svg>
-                Загрузить
-              </Button>
-              <Button
                 className="v19-topbar-cta"
                 variant="primary"
                 onClick={role === "agent" ? openCreateSubmissionDrawer : undefined}
@@ -2869,7 +2828,17 @@ function MainApp() {
           />
         ) : surface === "agent-actions" ? (
           <Suspense fallback={null}>
-            <FigmaActionQueueVisual onOpen={openVisualSubmission} />
+            <FigmaActionQueueVisual
+              cityFilter={cityFilter}
+              cityOptions={cities}
+              completedActions={searchedCompletedAgentActions}
+              onCityFilter={setCityFilter}
+              onOpen={openSubmission}
+              onSearch={setQuery}
+              openActions={searchedOpenAgentActions}
+              query={query}
+              summary={agentActions.summary}
+            />
           </Suspense>
         ) : surface === "agent-inbox" ? (
           <>
@@ -3009,28 +2978,11 @@ function MainApp() {
         />
       ) : null}
 
-      {drawerMode === "detail" &&
-      activeSubmission &&
-      role === "agent" &&
-      isFigmaVisualSurface ? (
-        <FigmaSubmissionDrawer
-          actionError={activeSubmissionActionError}
-          activeTab={activeDrawerTab}
-          onAction={updateSubmission}
-          onClose={closeDrawer}
-          onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
-          role={role}
-          surface="agent"
-          submission={activeSubmission}
-        />
-      ) : null}
-
-      {drawerMode === "detail" &&
-      activeSubmission &&
-      !(role === "agent" && isFigmaVisualSurface) ? (
+      {drawerMode === "detail" && activeSubmission ? (
         <SubmissionDrawer
           actionError={activeSubmissionActionError}
           activeTab={activeDrawerTab}
+          agentOwnerId={currentAgentOwnerId}
           initialTarget={drawerInitialTarget}
           issueComposerRequest={issueComposerRequest}
           onIssueComposerConsumed={() => setIssueComposerRequest(null)}
