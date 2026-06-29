@@ -53,9 +53,9 @@ const extractedFieldPreviewItems: Array<{
 ];
 
 const mediaRequirements = [
-  ["Фото на белом фоне", "35x45"],
-  ["Селфи", "для внутренней сверки"],
-  ["Селфи 2", "если требуется консульством"],
+  ["Загранпаспорт", "passport_scan"],
+  ["Селфи", "selfie"],
+  ["Селфи N2", "selfie_2"],
 ];
 
 const questionnaireSections = [
@@ -904,7 +904,7 @@ export function CreateSubmissionDrawer({
                 <div className="create-panel-head">
                   <div>
                     <p className="kicker">Файлы</p>
-                    <h3>Фото и селфи</h3>
+                    <h3>Обязательные файлы</h3>
                   </div>
                   <span>{applicantCount} заяв.</span>
                 </div>
@@ -986,7 +986,7 @@ export function CreateSubmissionDrawer({
       {createStep === "questionnaire" ? (
         <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/90 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span className="text-[12px] text-white/40">
-            Создайте черновик, чтобы загрузить фото и селфи в файлах.
+            Создайте черновик, чтобы загрузить обязательные файлы.
           </span>
           <div className="flex gap-3">
             <button

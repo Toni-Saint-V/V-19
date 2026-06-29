@@ -3,7 +3,11 @@ import {
   visaApplicationPdfReviewsForSubmission,
   type VisaApplicationPdfArtifactInput,
 } from "./visaApplicationPdfReconciliation";
-import { buildExportPackageIdentity, exportSummary } from "./exportRules";
+import {
+  buildExportPackageIdentity,
+  buildExportRows,
+  exportSummary,
+} from "./exportRules";
 import { createDraft, submitForReview } from "./domainEngine";
 import {
   mediaStorageBucket,
@@ -62,7 +66,15 @@ type VisaApplicationPdfReviewArtifact = NonNullable<
 
 type ReturnedPdfArtifactLike = Pick<
   ReturnedPdfArtifact,
-  "fileName" | "mimeType" | "sha256" | "sizeBytes" | "storageBucket" | "storagePath"
+  | "deletedAtIso"
+  | "failureReason"
+  | "fileName"
+  | "mimeType"
+  | "sha256"
+  | "sizeBytes"
+  | "storageBucket"
+  | "storagePath"
+  | "uploadStatus"
 >;
 
 export type OperationalWorkflowResult<T> = CommandResult<T>;
@@ -171,6 +183,7 @@ export type ReturnedPdfPackageReviewInput = {
   applicationPdfs: ReturnedApplicationPdfInput[];
   commonAppointmentPdf?: ReturnedPdfArtifact;
   nowIso?: string;
+  ownerAgentName?: string;
 };
 
 export type ReturnedPdfMismatchIssueConfirmationInput = {
@@ -197,11 +210,33 @@ export type AgentHandoffApplicantPdf = {
   status: VisaApplicationPdfReviewState["status"];
 };
 
+export type ReturnedPdfPackageMapping = {
+  applicantId?: string;
+  applicantName?: string;
+  artifactKind: "application_form_pdf" | "appointment_list_pdf";
+  city: City;
+  excelRowNumber?: number;
+  exportPackageId: string;
+  fileName: string;
+  ownerAgentId: string;
+  ownerAgentName?: string;
+  reviewId?: string;
+  sha256: string;
+  storageBucket: string;
+  storagePath: string;
+  submissionId: string;
+};
+
 export type AgentHandoffPackage = {
   applicantPdfs: AgentHandoffApplicantPdf[];
   blockers: string[];
   commonAppointmentPdf?: ReturnedPdfArtifact;
+  mappings: ReturnedPdfPackageMapping[];
   ready: boolean;
+};
+
+export type AgentReturnedPdfPackageView = AgentHandoffPackage & {
+  visible: boolean;
 };
 
 export type ReturnedPdfPackageReviewResult = {
@@ -691,11 +726,26 @@ export function buildAgentHandoffPackage(
 ): AgentHandoffPackage {
   const blockers: string[] = [];
   const applicantPdfs: AgentHandoffApplicantPdf[] = [];
+  const mappings: ReturnedPdfPackageMapping[] = [];
   const commonAppointmentPdf =
     options.commonAppointmentPdf ?? submission.returnedPdfPackage?.commonAppointmentPdf;
+  const exportPackageId =
+    submission.returnedPdfPackage?.exportPackageId ??
+    submission.exportPackage?.idempotencyKey;
+  const ownerAgentId = submission.returnedPdfPackage?.ownerAgentId ?? submission.agentId;
+  const ownerAgentName = submission.returnedPdfPackage?.ownerAgentName;
+  const excelRowsByApplicantId = exportExcelRowNumbersByApplicantId(submission);
 
   if (submission.status !== "exported") {
     blockers.push("PDF package can be handed to agent only after export.");
+  }
+
+  if (!exportPackageId) {
+    blockers.push("Returned PDF handoff requires a durable export package identity.");
+  }
+
+  if (ownerAgentId !== submission.agentId) {
+    blockers.push("Returned PDF handoff owner does not match submission owner.");
   }
 
   const commonPdfBlocker = returnedPdfArtifactBlocker(
@@ -706,6 +756,19 @@ export function buildAgentHandoffPackage(
   );
   if (commonPdfBlocker) {
     blockers.push(commonPdfBlocker);
+  } else if (commonAppointmentPdf && exportPackageId) {
+    mappings.push({
+      artifactKind: "appointment_list_pdf",
+      city: submission.city,
+      exportPackageId,
+      fileName: commonAppointmentPdf.fileName,
+      ownerAgentId,
+      ownerAgentName,
+      sha256: commonAppointmentPdf.sha256,
+      storageBucket: commonAppointmentPdf.storageBucket ?? "",
+      storagePath: commonAppointmentPdf.storagePath ?? "",
+      submissionId: submission.id,
+    });
   }
 
   for (const issue of unresolvedReturnedPdfMismatchIssues(submission)) {
@@ -804,13 +867,56 @@ export function buildAgentHandoffPackage(
       reviewId: review.id,
       status: review.status,
     });
+    if (exportPackageId) {
+      mappings.push({
+        applicantId: applicant.id,
+        applicantName: applicant.fullName,
+        artifactKind: "application_form_pdf",
+        city: submission.city,
+        excelRowNumber: excelRowsByApplicantId.get(applicant.id),
+        exportPackageId,
+        fileName: review.artifact.fileName,
+        ownerAgentId,
+        ownerAgentName,
+        reviewId: review.id,
+        sha256: review.artifact.sha256,
+        storageBucket: review.artifact.storageBucket ?? "",
+        storagePath: review.artifact.storagePath ?? "",
+        submissionId: submission.id,
+      });
+    }
   }
 
   return {
     applicantPdfs,
     blockers: uniqueMessages(blockers),
     commonAppointmentPdf,
+    mappings: blockers.length === 0 ? mappings : [],
     ready: blockers.length === 0,
+  };
+}
+
+export function buildAgentReturnedPdfPackageView(
+  submission: Submission,
+  agentId: string,
+  options: { commonAppointmentPdf?: ReturnedPdfArtifact } = {},
+): AgentReturnedPdfPackageView {
+  const ownerAgentId = submission.returnedPdfPackage?.ownerAgentId ?? submission.agentId;
+  if (submission.agentId !== agentId || ownerAgentId !== agentId) {
+    return {
+      applicantPdfs: [],
+      blockers: ["Agent can see only own returned PDF package."],
+      commonAppointmentPdf: undefined,
+      mappings: [],
+      ready: false,
+      visible: false,
+    };
+  }
+
+  const handoffPackage = buildAgentHandoffPackage(submission, options);
+  return {
+    ...handoffPackage,
+    visible: handoffPackage.ready,
   };
 }
 
@@ -917,6 +1023,11 @@ function applyReturnedPdfPackageState(
     returnedPdfPackage: {
       ...submission.returnedPdfPackage,
       commonAppointmentPdf: input.commonAppointmentPdf,
+      exportPackageId:
+        submission.exportPackage?.idempotencyKey ??
+        submission.returnedPdfPackage?.exportPackageId,
+      ownerAgentId: submission.agentId,
+      ownerAgentName: input.ownerAgentName ?? submission.returnedPdfPackage?.ownerAgentName,
       reviewedAtIso: operationalEventTimestamp(input.nowIso),
       reviewedBy: input.actorId ?? submission.returnedPdfPackage?.reviewedBy,
     },
@@ -1362,6 +1473,18 @@ function returnedPdfArtifactBlocker(
     return `${label} is missing.`;
   }
 
+  if (
+    artifact.uploadStatus === "failed" ||
+    artifact.uploadStatus === "deleted" ||
+    artifact.uploadStatus === "pending" ||
+    artifact.uploadStatus === "none"
+  ) {
+    const suffix = artifact.failureReason ? ` ${artifact.failureReason}` : "";
+    if (artifact.uploadStatus === "failed") return `${label} upload failed.${suffix}`;
+    if (artifact.uploadStatus === "deleted") return `${label} was deleted.`;
+    return `${label} is not uploaded.`;
+  }
+
   if (artifact.mimeType !== "application/pdf") {
     return `${label} must be a PDF.`;
   }
@@ -1422,6 +1545,24 @@ function returnedPdfArtifactBlocker(
   }
 
   return "";
+}
+
+function exportExcelRowNumbersByApplicantId(submission: Submission): Map<string, number> {
+  const rows = buildExportRows([submission]);
+  const rowNumbersByApplicantId = new Map<string, number>();
+
+  for (const applicant of submission.applicants) {
+    const row = rows.find(
+      (candidate) =>
+        candidate.submissionId === submission.id &&
+        candidate.applicantName === applicant.fullName,
+    );
+    if (row) {
+      rowNumbersByApplicantId.set(applicant.id, row.applicantIndex + 1);
+    }
+  }
+
+  return rowNumbersByApplicantId;
 }
 
 function unresolvedReturnedPdfMismatchIssues(submission: Submission): Issue[] {

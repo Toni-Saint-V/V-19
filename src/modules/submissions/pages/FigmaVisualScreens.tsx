@@ -60,7 +60,7 @@ const visualSubmissions: VisualSubmission[] = [
   },
   {
     applicantsCount: 1,
-    blocker: "Нет фин. гарантии",
+    blocker: "Анкета не заполнена",
     city: "Москва",
     id: "SUB-1057",
     progress: 64,
@@ -97,12 +97,12 @@ const visualSubmissions: VisualSubmission[] = [
   },
   {
     applicantsCount: 1,
-    blocker: "Ожидается бронь отеля",
+    blocker: "Не заполнены даты поездки",
     city: "Москва",
     id: "SUB-1065",
     progress: 58,
     status: "in_progress",
-    statusLabel: "Документы",
+    statusLabel: "Даты",
     title: "Олег Тиньков",
     tripDates: "10–18 авг 2026",
     type: "single",
@@ -110,12 +110,12 @@ const visualSubmissions: VisualSubmission[] = [
   },
   {
     applicantsCount: 3,
-    blocker: "Нет фин. гарантии",
+    blocker: "Не выбран город подачи",
     city: "Казань",
     id: "SUB-1070",
     progress: 52,
     status: "in_progress",
-    statusLabel: "Гарантия",
+    statusLabel: "Город",
     title: "Семья Сидоровых",
     tripDates: "05–15 сен 2026",
     type: "family",
@@ -123,7 +123,7 @@ const visualSubmissions: VisualSubmission[] = [
   },
   {
     applicantsCount: 1,
-    blocker: "Ожидает оплату сбора",
+    blocker: "Не заполнена анкета",
     city: "Москва",
     id: "SUB-1072",
     progress: 46,
@@ -162,12 +162,12 @@ const visualSubmissions: VisualSubmission[] = [
   },
   {
     applicantsCount: 1,
-    blocker: "Фото не проходит требования",
+    blocker: "Селфи не проходит требования",
     city: "Москва",
     id: "SUB-1090",
     progress: 73,
     status: "returned",
-    statusLabel: "Фото",
+    statusLabel: "Селфи",
     title: "Анна Каренина",
     tripDates: "22–30 авг 2026",
     type: "single",
@@ -551,7 +551,7 @@ function statusBadge(item: VisualSubmission) {
 function blockerLabel(item: VisualSubmission) {
   if (item.blocker) return item.blocker;
   if (item.status === "returned") return "Скан паспорта не читается";
-  if (item.status === "in_progress") return "Нет фин. гарантии";
+  if (item.status === "in_progress") return "Анкета не заполнена";
   return "";
 }
 

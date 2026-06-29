@@ -556,6 +556,14 @@ describe("Supabase security contract", () => {
       "Returned PDF mismatch issues must be closed before handoff",
     );
     expect(migration).toContain(
+      "Returned PDF handoff requires a durable export package identity",
+    );
+    expect(migration).toContain(
+      "Returned PDF handoff owner does not match submission owner",
+    );
+    expect(migration).toContain("snapshot #>> '{exportPackage,idempotencyKey}'");
+    expect(migration).toContain("snapshot #>> '{returnedPdfPackage,ownerAgentId}'");
+    expect(migration).toContain(
       "Returned PDF blocked reviews must be resolved before handoff",
     );
     expect(migration).toContain(

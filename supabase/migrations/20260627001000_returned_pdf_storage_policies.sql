@@ -254,6 +254,22 @@ begin
     raise exception 'Returned PDF handoff requires an exported cockpit snapshot';
   end if;
 
+  if coalesce(
+    snapshot #>> '{exportPackage,idempotencyKey}',
+    snapshot #>> '{returnedPdfPackage,exportPackageId}',
+    ''
+  ) = '' then
+    raise exception 'Returned PDF handoff requires a durable export package identity';
+  end if;
+
+  if coalesce(
+    snapshot #>> '{returnedPdfPackage,ownerAgentId}',
+    snapshot ->> 'agentId',
+    ''
+  ) <> submission_record.agent_id::text then
+    raise exception 'Returned PDF handoff owner does not match submission owner';
+  end if;
+
   if exists (
     select 1
     from jsonb_array_elements(coalesce(snapshot -> 'issues', '[]'::jsonb)) as issue(value)

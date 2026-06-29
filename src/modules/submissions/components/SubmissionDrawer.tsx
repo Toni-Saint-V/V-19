@@ -427,7 +427,7 @@ function IssueComposer({
   );
   const [fieldLabel, setFieldLabel] = useState("");
   const [fileType, setFileType] =
-    useState<NonNullable<IssueInput["fileType"]>>("photo");
+    useState<NonNullable<IssueInput["fileType"]>>("passport_scan");
   const [severity, setSeverity] = useState<IssueInput["severity"]>("blocker");
   const [reason, setReason] = useState("Нужно уточнить маршрут поездки");
   const [comment, setComment] = useState(
@@ -2273,8 +2273,8 @@ function drawerIssueTitle(issue: Issue) {
 function fileRequirementCopy(file: Submission["files"][number], issue?: Issue) {
   if (issue) return drawerIssueSummary(issue);
   if (file.type === "passport_scan") return "Разворот с персональными данными";
-  if (file.type === "photo") return "Обязательный файл";
-  if (file.type === "selfie") return "Проверка владельца документа";
+  if (file.type === "photo") return "Архивный неканонический файл";
+  if (file.type === "selfie") return "Селфи для проверки владельца документа";
   if (file.type === "selfie_2") return "Дополнительная проверка владельца";
   return "Проверка документа в кадре";
 }

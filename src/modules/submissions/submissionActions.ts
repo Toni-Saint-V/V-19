@@ -837,12 +837,12 @@ function applicantFileStatus(files: SubmissionFile[]) {
 }
 
 function fileTypeName(type: SubmissionFile["type"]) {
-  if (type === "photo") return "Фото";
-  if (type === "photo_white") return "Фото";
-  if (type === "selfie") return "Селфи N1";
+  if (type === "photo") return "Архивное фото";
+  if (type === "photo_white") return "Архивное фото";
+  if (type === "selfie") return "Селфи";
   if (type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Загранпаспорт";
-  return "Селфи N2";
+  return "Архивное видео";
 }
 
 function canonicalRuntimeIssues(issues: Submission["issues"]): Submission["issues"] {
@@ -866,7 +866,8 @@ function canonicalRuntimeIssues(issues: Submission["issues"]): Submission["issue
 
 function canonicalRuntimeIssueFileType(type: SubmissionFileType): SubmissionFileType {
   if (isCanonicalFrontendMediaType(type)) return type;
-  if (isRejectedLegacyMediaType(type)) return "selfie_2";
+  if (type === "photo" || type === "photo_white") return "selfie";
+  if (type === "video") return "selfie_2";
   return type;
 }
 
