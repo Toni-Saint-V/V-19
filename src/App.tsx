@@ -26,6 +26,7 @@ import {
   exportPackageIdentityMatches,
   exportSummary,
   exportSummaryForSelectedIds,
+  isSubmissionSelectableForExport,
   selectedReadySubmissionsForExport,
 } from "./modules/submissions/exportRules";
 import { loadSubmissions, saveSubmissions } from "./modules/submissions/persistence";
@@ -162,7 +163,7 @@ import {
   uploadMediaToStorage,
   type MediaStorageTarget,
 } from "./modules/submissions/mediaStorage";
-import { buildAgentHandoffPackage } from "./modules/submissions/operationalWorkflow";
+import { buildReturnedPdfAgentHandoffGate } from "./modules/submissions/operationalWorkflow";
 import { publishReturnedPdfAgentHandoff } from "./modules/submissions/returnedPdfHandoffPersistence";
 import type { AppProfile } from "./types/session";
 
@@ -591,9 +592,19 @@ function MainApp() {
     () => searchSubmissions(submissions, query, cityFilter),
     [cityFilter, query, submissions],
   );
-  const readyList = readyForExport(searchedExportSubmissions);
-  const historyList = exportedHistory(searchedExportSubmissions);
-  const selectedForExport = readyList.filter((submission) =>
+  const readyList = useMemo(
+    () => readyForExport(searchedExportSubmissions),
+    [searchedExportSubmissions],
+  );
+  const exportReadyList = useMemo(
+    () => readyList.filter(isSubmissionSelectableForExport),
+    [readyList],
+  );
+  const historyList = useMemo(
+    () => exportedHistory(searchedExportSubmissions),
+    [searchedExportSubmissions],
+  );
+  const selectedForExport = exportReadyList.filter((submission) =>
     selectedExportIds.includes(submission.id),
   );
   const selectedVisibleExportIds = selectedForExport.map((submission) => submission.id);
@@ -968,12 +979,13 @@ function MainApp() {
   }, [selectedExportIds]);
 
   useEffect(() => {
-    const readyIds = new Set(readyList.map((submission) => submission.id));
+    const readyIds = new Set(exportReadyList.map((submission) => submission.id));
     setSelectedExportIds((current) => {
       const next = current.filter((id) => readyIds.has(id));
+      if (next.length !== current.length) selectedExportIdsRef.current = next;
       return next.length === current.length ? current : next;
     });
-  }, [readyList]);
+  }, [exportReadyList]);
 
   useEffect(() => {
     if (drawerMode !== "closed" || confirmClose) return;
@@ -1142,7 +1154,7 @@ function MainApp() {
       setSurface("export");
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
-      const nextSubmission = readyList[0] ?? historyList[0];
+      const nextSubmission = exportReadyList[0] ?? historyList[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
@@ -1883,7 +1895,10 @@ function MainApp() {
       throw new Error(message);
     }
 
-    const handoffPackage = buildAgentHandoffPackage(activeSubmission);
+    const handoffPackage = buildReturnedPdfAgentHandoffGate(
+      activeSubmission,
+      submissionsRef.current,
+    );
     if (!handoffPackage.ready) {
       const message = handoffPackage.blockers[0] ?? "Комплект PDF ещё не готов.";
       setRemoteSaveState("error");
@@ -1910,7 +1925,10 @@ function MainApp() {
         throw new Error("Подача больше не найдена перед публикацией PDF комплекта.");
       }
 
-      const latestHandoffPackage = buildAgentHandoffPackage(latestSubmission);
+      const latestHandoffPackage = buildReturnedPdfAgentHandoffGate(
+        latestSubmission,
+        submissionsRef.current,
+      );
       if (!latestHandoffPackage.ready) {
         throw new Error(
           latestHandoffPackage.blockers[0] ?? "Комплект PDF больше не готов.",
@@ -2928,7 +2946,7 @@ function MainApp() {
             onOpen={openSubmission}
             onTab={setExportTab}
             onToggle={toggleExportSelection}
-            readyList={readyList}
+            readyList={exportReadyList}
             searchControl={searchControl}
             selectedExportIds={selectedVisibleExportIds}
           />
