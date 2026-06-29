@@ -414,6 +414,7 @@ export function ActionRow({
   badges,
   context,
   cta,
+  submissionId,
   onOpen,
   selected = false,
   severity,
@@ -425,6 +426,7 @@ export function ActionRow({
   }>;
   context: ReactNode;
   cta: string;
+  submissionId?: string;
   onOpen: () => void;
   selected?: boolean;
   severity: "blocker" | "info" | "ready" | "warning";
@@ -439,6 +441,8 @@ export function ActionRow({
         selected && "is-selected",
       )}
       aria-current={selected ? "true" : undefined}
+      data-submission-card={submissionId ? "" : undefined}
+      data-submission-id={submissionId}
       type="button"
       onClick={onOpen}
     >

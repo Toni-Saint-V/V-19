@@ -110,10 +110,20 @@ export function drawer(page: Page) {
 }
 
 export function submissionCard(page: Page, name: string) {
-  return page
-    .locator(".submission-card, .v17-admin-work-row, [data-submission-card]")
+  const fixtureIds: Record<string, string> = {
+    "Нина Волкова": "ПД-1053",
+    "Петровы": "ПД-1054",
+    "Семья Петровых": "ПД-1054",
+  };
+  const byText = page
+    .locator(".submission-card, .v17-admin-work-row, .v19-event-row, [data-submission-card]")
     .filter({ hasText: name })
     .first();
+  const fixtureId = fixtureIds[name];
+
+  if (!fixtureId) return byText;
+
+  return page.locator(`[data-submission-id="${fixtureId}"]`).first().or(byText).first();
 }
 
 export function submissionCardById(page: Page, id: string) {

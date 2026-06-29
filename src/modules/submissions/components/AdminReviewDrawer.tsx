@@ -1338,7 +1338,7 @@ function IssuesTab({
         <article className={`is-${issue.severity}`} key={issue.id}>
           <header>
             <span>{issue.id}</span>
-            <em>{issue.status}</em>
+            <em>{issueStatusLabel(issue.status)}</em>
           </header>
           <strong>{issue.reason}</strong>
           <p>{issue.comment}</p>
@@ -1350,6 +1350,12 @@ function IssuesTab({
       ))}
     </div>
   );
+}
+
+function issueStatusLabel(status: Submission["issues"][number]["status"]) {
+  if (status === "open") return "Открыто";
+  if (status === "fixed_by_agent") return "Исправлено агентом";
+  return "Закрыто администратором";
 }
 
 function buildReviewSections(applicant: Applicant): ReviewSection[] {

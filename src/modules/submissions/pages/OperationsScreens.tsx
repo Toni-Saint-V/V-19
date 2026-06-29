@@ -570,6 +570,7 @@ export function AgentActionsScreen({
                 key={action.id}
                 severity={action.severity}
                 selected={selectedAction?.id === action.id}
+                submissionId={action.submission.id}
                 title={action.title}
                 onOpen={() => openAction(action)}
               />
