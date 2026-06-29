@@ -5010,7 +5010,7 @@
   }
 
   .ops-shell.surface-agent-actions .vf-figma-actions-screen {
-    padding: 18px 14px 92px !important;
+    padding: 18px 16px 92px !important;
   }
 
   .ops-shell.surface-agent-actions .vf-figma-tabs {
@@ -5027,7 +5027,7 @@
 
   .ops-shell.surface-agent-actions .vf-figma-action-row {
     grid-template-columns: 14px minmax(0, 1fr) !important;
-    padding: 14px !important;
+    padding: 16px !important;
   }
 
   .ops-shell.surface-agent-actions .vf-figma-action-status,
@@ -5058,5 +5058,1385 @@
 
   .ops-shell.surface-agent-actions .vf-figma-column-board {
     grid-auto-columns: minmax(292px, calc(100vw - 64px)) !important;
+  }
+}
+
+.vf-figma-mobile-id,
+.vf-figma-mobile-route,
+.vf-figma-mobile-chevron,
+.v19-mobile-summary-head,
+.v19-mobile-summary-title,
+.v19-mobile-summary-foot {
+  display: none;
+}
+
+@media (min-width: 761px) {
+  .ops-shell.surface-agent-submissions .v19-submission-grouped-list {
+    gap: 18px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-type-section {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-type-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 24px;
+    padding: 0 2px;
+    color: var(--v19-fg-secondary);
+    font-size: 12px;
+    font-weight: 720;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-type-label span {
+    display: inline-grid;
+    min-width: 22px;
+    height: 22px;
+    place-items: center;
+    border: 1px solid var(--v19-line-default);
+    border-radius: 999px;
+    color: var(--v19-fg-muted);
+    font-size: 11px;
+    font-weight: 720;
+    background: var(--v19-control);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-type-section .v19-submission-row {
+    min-height: 64px;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-type-empty {
+    min-height: 52px;
+    padding: 14px;
+    border: 1px dashed var(--v19-line-default);
+    border-radius: 8px;
+    color: var(--v19-fg-tertiary);
+    font-size: 13px;
+    background: var(--v19-row-background);
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-shell.role-agent .ops-mobile-tabbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .ops-shell.role-agent .ops-nav-item[data-nav-id="agent-inbox"],
+  .ops-shell.role-agent .ops-mobile-tabbar-item[data-nav-id="agent-inbox"] {
+    display: none !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-mobile-menu-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 170 !important;
+    display: block !important;
+    border: 0 !important;
+    background: rgb(0 0 0 / 0.58) !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-sidebar,
+  .ops-shell.role-admin:is(.surface-admin-review, .surface-export).is-mobile-nav-open
+    .ops-sidebar {
+    position: fixed !important;
+    inset: 12px auto 12px 12px !important;
+    z-index: 180 !important;
+    display: grid !important;
+    grid-template-rows: auto auto 1fr auto !important;
+    width: min(88vw, 360px) !important;
+    max-width: calc(100vw - 24px) !important;
+    height: auto !important;
+    min-width: 0 !important;
+    padding: 16px !important;
+    border: 1px solid var(--v19-line-strong) !important;
+    border-radius: 18px !important;
+    background: var(--v19-panel) !important;
+    box-shadow: 0 22px 56px rgb(0 0 0 / 0.52) !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.role-admin:is(.surface-admin-review, .surface-export).is-mobile-nav-open
+    .workspace {
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-sidebar-command {
+    display: none !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-nav {
+    align-content: start !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-sidebar-footer {
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review, .surface-export)
+    .workspace {
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-view-stage.is-list {
+    margin-top: 48px !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-list {
+    gap: 12px !important;
+    min-width: 0 !important;
+    padding-top: 12px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-section-rule {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-row {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto auto !important;
+    min-height: 116px !important;
+    gap: 8px 12px !important;
+    padding: 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-id,
+  .ops-shell.surface-agent-actions .vf-figma-mobile-route,
+  .ops-shell.surface-agent-actions .vf-figma-mobile-chevron {
+    display: grid !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-id {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    color: rgb(255 255 255 / 0.48);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-dot,
+  .ops-shell.surface-agent-actions .vf-figma-action-title em,
+  .ops-shell.surface-agent-actions .vf-figma-action-meta,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates,
+  .ops-shell.surface-agent-actions .vf-figma-open-button {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status {
+    display: flex !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status {
+    max-width: 132px;
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-title {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-title strong {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    font-size: 16px !important;
+    line-height: 1.22 !important;
+    overflow-wrap: anywhere !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-route {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    gap: 4px;
+    align-self: end;
+    padding-right: 52px;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-route strong,
+  .ops-shell.surface-agent-actions .vf-figma-mobile-route em {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-route strong {
+    color: rgb(255 255 255 / 0.84);
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-route em {
+    color: rgb(255 255 255 / 0.44);
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-chevron {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgb(255 255 255 / 0.09);
+    border-radius: 999px;
+    color: rgb(255 255 255 / 0.72);
+    background: rgb(255 255 255 / 0.03);
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-chevron svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.9;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto auto !important;
+    min-height: 118px !important;
+    gap: 8px 12px !important;
+    padding: 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-head,
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-title,
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-foot {
+    display: grid !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-head {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-id {
+    overflow: hidden;
+    color: rgb(255 255 255 / 0.48);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-status {
+    justify-self: end;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-status .status-chip {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-title {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: -webkit-box !important;
+    overflow: hidden;
+    color: var(--v19-fg);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.24;
+    overflow-wrap: anywhere;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-foot {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-route {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-route strong,
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-route em {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-route strong {
+    color: rgb(255 255 255 / 0.84);
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-route em {
+    color: rgb(255 255 255 / 0.44);
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-tail {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgb(255 255 255 / 0.72);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-tail > svg {
+    width: 40px;
+    height: 40px;
+    padding: 11px;
+    border: 1px solid rgb(255 255 255 / 0.09);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.03);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-row > .v19-event-main,
+  .ops-shell.surface-agent-submissions .v19-submission-trip,
+  .ops-shell.surface-agent-submissions .v19-submission-status-tag,
+  .ops-shell.surface-agent-submissions .v19-submission-file-tag,
+  .ops-shell.surface-agent-submissions .v19-submission-percent-tag,
+  .ops-shell.surface-agent-submissions .v19-submission-row > .v19-event-action {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-inbox .v19-action-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    min-height: 104px !important;
+    padding: 15px 16px !important;
+  }
+
+  .ops-shell.surface-agent-inbox .v19-action-row .v19-action-severity {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-inbox .v19-action-row .v19-event-main {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+  }
+
+  .ops-shell.surface-agent-inbox .v19-action-row .v19-action-badges {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+
+  .ops-shell.surface-agent-inbox .v19-action-row .v19-event-action {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+    max-width: 132px !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-screen .v19-collection-panel,
+  .ops-shell.surface-export .magic-export-queue {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .ops-shell.role-admin:is(.surface-admin-review, .surface-export) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .ops-shell.role-admin:is(.surface-admin-review, .surface-export) .workspace {
+    grid-column: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 8px !important;
+    padding: 0 16px 18px !important;
+  }
+
+  .ops-shell.role-admin:is(.surface-admin-review, .surface-export) .workspace > .topbar,
+  .ops-shell.role-admin:is(.surface-admin-review, .surface-export)
+    .workspace
+    > .v19-screen-grid,
+  .ops-shell.role-admin.surface-export .workspace > .export-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+    min-height: 108px !important;
+    gap: 9px 12px !important;
+    padding: 15px 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row > .v17-admin-entity-icon,
+  .ops-shell.surface-admin-review .v17-admin-work-row .v17-admin-route-cell,
+  .ops-shell.surface-admin-review .v17-admin-work-row .v17-admin-wait-cell,
+  .ops-shell.surface-admin-review .v17-admin-work-row .v17-admin-readiness-cell {
+    display: none !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row > .v17-admin-identity {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row > .v17-admin-stage {
+    grid-column: 2;
+    grid-row: 1;
+    display: inline-flex !important;
+    justify-self: end;
+    max-width: 132px;
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row .v17-admin-mobile-meta {
+    display: block !important;
+    margin-top: 6px;
+    white-space: normal;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row > .v17-admin-row-action {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: end;
+    justify-self: end;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row > .v17-admin-row-action span {
+    display: none;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-event-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto !important;
+    min-height: 104px !important;
+    gap: 8px 12px !important;
+    padding: 15px 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-event-row > .v17-admin-event-dot {
+    display: none !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-event-row > .v17-admin-event-copy {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-event-row > .v17-admin-event-object {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-event-row > .v17-admin-stage {
+    grid-column: 2;
+    grid-row: 1;
+    display: inline-flex !important;
+    justify-self: end;
+    max-width: 132px;
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-event-row > .v17-admin-row-action {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: end;
+    justify-self: end;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-event-row > .v17-admin-row-action span {
+    display: none;
+  }
+
+  .ops-shell.surface-export .export-grid.magic-export-stage,
+  .ops-shell.surface-export .magic-export-list,
+  .ops-shell.surface-export .table-wrap,
+  .ops-shell.surface-export .data-table,
+  .ops-shell.surface-export .export-contract-table {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .ops-shell.surface-export .table-wrap {
+    overflow: visible !important;
+  }
+
+  .ops-shell.surface-export .data-table thead {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .data-table,
+  .ops-shell.surface-export .data-table tbody {
+    display: grid !important;
+    width: 100% !important;
+    border: 0 !important;
+  }
+
+  .ops-shell.surface-export .data-table tbody {
+    gap: 12px !important;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row {
+    display: grid !important;
+    grid-template-columns: 28px minmax(0, 1fr) auto !important;
+    grid-template-rows: auto auto auto auto !important;
+    gap: 8px 10px !important;
+    min-height: 132px !important;
+    padding: 16px !important;
+    border: 1px solid var(--v19-line-default) !important;
+    border-radius: 14px !important;
+    background: var(--v19-row-background) !important;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td {
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td:first-child {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+    align-self: start;
+    padding-top: 2px !important;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td:nth-child(2) {
+    grid-column: 2 / 4;
+    grid-row: 1;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+    color: var(--v19-fg-tertiary);
+    font-size: 12px;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td:nth-child(4) {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+    color: var(--v19-fg-tertiary);
+    font-size: 12px;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td:nth-child(5) {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td:nth-child(6) {
+    grid-column: 2 / 4;
+    grid-row: 3;
+  }
+
+  .ops-shell.surface-export .data-table tbody tr.export-contract-row td:nth-child(7) {
+    grid-column: 2 / 4;
+    grid-row: 4;
+  }
+
+  .ops-shell.surface-export .export-row-main,
+  .ops-shell.surface-export .export-table-row-action-mobile,
+  .ops-shell.surface-export .export-table-row-action {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .ops-shell.surface-export .export-table-row-action-mobile {
+    display: inline-flex !important;
+    margin-top: 8px !important;
+  }
+
+  .ops-shell.surface-export .export-table-row-action:not(.export-table-row-action-mobile) {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .v17-export-bulk-bar,
+  .ops-shell.surface-export .bulk-bar {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .vf-figma-surface {
+    inset: 48px 0 0 !important;
+    max-width: 100vw !important;
+    max-height: calc(100svh - 48px) !important;
+    overflow: hidden !important;
+  }
+
+  .vf-figma-surface > header {
+    position: sticky !important;
+    top: 0 !important;
+  }
+
+  .vf-figma-surface > div:not(:first-child) {
+    min-height: 0 !important;
+  }
+
+  .vf-figma-surface > div[class*="scrollbar-thin"] {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .vf-figma-surface > footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .vf-figma-surface > footer > div:last-child {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .vf-figma-surface > footer button {
+    min-width: 0 !important;
+    white-space: normal !important;
+  }
+
+  .vf-figma-surface:not(.vf-figma-questionnaire-screen) > header {
+    min-height: 52px !important;
+    padding: 0 !important;
+    border-bottom: 1px solid rgb(255 255 255 / 0.08) !important;
+  }
+
+  .vf-figma-surface:not(.vf-figma-questionnaire-screen) > header > div:first-child {
+    position: absolute !important;
+    top: 12px !important;
+    right: 12px !important;
+    z-index: 42 !important;
+    display: block !important;
+    height: 0 !important;
+    margin: 0 !important;
+  }
+
+  .vf-figma-surface:not(.vf-figma-questionnaire-screen)
+    > header
+    > div:first-child
+    > div:first-child {
+    display: none !important;
+  }
+
+  .vf-figma-surface:not(.vf-figma-questionnaire-screen) > header > div:first-child > button {
+    display: flex !important;
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 12px !important;
+  }
+
+  .vf-figma-surface:not(.vf-figma-questionnaire-screen) > header > div:last-child {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 6px 58px 0 14px !important;
+  }
+
+  .vf-figma-surface:not(.vf-figma-questionnaire-screen) > header > div:last-child > div {
+    margin-bottom: 0 !important;
+  }
+}
+
+/* V-19 mobile drawer composition: no bulky mobile headers, bounded sheet, sticky passport proof. */
+@media (max-width: 760px) {
+  .ops-shell.has-open-drawer .submission-detail-drawer {
+    position: fixed !important;
+    inset: 48px 0 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: auto !important;
+    max-height: calc(100svh - 48px) !important;
+    padding-top: 18px !important;
+    overflow: hidden !important;
+    border-width: 1px 1px 0 !important;
+    border-color: var(--drawer-html-line-strong) !important;
+    border-radius: 26px 26px 0 0 !important;
+    background: var(--drawer-html-surface) !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    z-index: 28;
+    width: 54px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.24);
+    transform: translateX(-50%);
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer > .drawer-header {
+    display: contents !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-title-block,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-review-topbar-main,
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer
+    .drawer-header-actions
+    .icon-button[aria-label="Дополнительные действия недоступны"] {
+    display: none !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-header-actions,
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    > .drawer-header
+    > .icon-button {
+    position: absolute !important;
+    top: 12px !important;
+    right: 12px !important;
+    z-index: 32 !important;
+    display: flex !important;
+    gap: 0 !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-header-actions .icon-button,
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    > .drawer-header
+    > .icon-button {
+    display: grid !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    place-items: center !important;
+    border: 1px solid rgb(255 255 255 / 0.12) !important;
+    border-radius: 12px !important;
+    color: var(--drawer-html-secondary) !important;
+    background: rgb(30 32 37 / 0.92) !important;
+    box-shadow: none !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs {
+    min-height: 52px !important;
+    gap: 4px !important;
+    padding: 6px 58px 0 14px !important;
+    overflow-x: auto !important;
+    border-bottom: 1px solid var(--drawer-html-divider) !important;
+    background: var(--drawer-html-surface) !important;
+    scrollbar-width: none !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs button {
+    flex: 0 0 auto !important;
+    min-width: auto !important;
+    min-height: 46px !important;
+    padding: 0 13px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--drawer-html-muted) !important;
+    font-size: 14px !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs button.is-active {
+    color: var(--drawer-html-primary) !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-body {
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom)) !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .workspace-main,
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-section,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-review-tab {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .workspace-main,
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-section,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-review-tab,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-checklist-list,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-questionnaire-field-list,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-remarks-groups,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-remark-group,
+  .ops-shell.has-open-drawer .submission-detail-drawer .admin-remark-applicant-group {
+    gap: max(8px, var(--drawer-mobile-gap, 8px)) !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer
+    :is(
+      .overview-status-card,
+      .overview-main > .surface,
+      .overview-next,
+      .drawer-recent-card,
+      .v17-applicant-matrix,
+      .v17-file-matrix,
+      .v17-issue-card,
+      .admin-document-preview,
+      .admin-checklist-panel,
+      .admin-selfie-card,
+      .admin-questionnaire-section-card,
+      .admin-review-empty-callout,
+      .admin-remark-card,
+      .issue-composer-context
+    ) {
+    margin: 0 !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer
+    :is(
+      .overview-status-card,
+      .overview-main > .surface,
+      .overview-next,
+      .drawer-recent-card,
+      .admin-checklist-panel,
+      .admin-questionnaire-section-card,
+      .admin-review-empty-callout,
+      .admin-remark-card
+    ) {
+    padding: max(12px, var(--drawer-mobile-card-padding, 12px)) !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer
+    :is(
+      .overview-status-line,
+      .drawer-section-head,
+      .overview-check,
+      .readiness-top,
+      .v17-issue-top,
+      .v17-issue-footer,
+      .admin-questionnaire-head,
+      .admin-remarks-head,
+      .admin-questionnaire-section-header,
+      .admin-questionnaire-linked-note,
+      .admin-remark-card header,
+      .issue-composer-actions
+    ) {
+    gap: max(8px, var(--drawer-mobile-gap, 8px)) !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer
+    :is(.drawer-chips, .admin-review-topbar-line, .admin-questionnaire-section-tab) {
+    gap: max(4px, var(--drawer-mobile-tight-gap, 4px)) !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 30 !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 10px 16px max(12px, env(safe-area-inset-bottom)) !important;
+    border-top: 1px solid var(--drawer-html-line) !important;
+    background: rgb(16 16 17 / 0.96) !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-footer > span {
+    display: none !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer
+    .drawer-footer
+    :is(.primary-button, .secondary-button, .ghost-button) {
+    width: 100% !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-footer .primary-button {
+    grid-column: 1 / -1 !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .drawer-footer-context-action {
+    display: inline-flex !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-review-split {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 12 !important;
+    grid-template-rows: minmax(148px, 1fr) auto !important;
+    max-height: min(38svh, 292px) !important;
+    overflow: hidden !important;
+    border-radius: 12px !important;
+    background: var(--admin-review-panel) !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview-stage {
+    min-height: 148px !important;
+    padding: 12px !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview-stage
+    span {
+    width: min(220px, 78%) !important;
+    font-size: 16px !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview-stage
+    p {
+    max-width: 26ch !important;
+    font-size: 10.5px !important;
+    line-height: 1.35 !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-meta
+    div {
+    padding: 7px 9px !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-checklist-panel {
+    min-height: 0 !important;
+    padding: 12px !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-checklist-item {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+    gap: 8px !important;
+    padding: 12px !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-checklist-icon {
+    display: none !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-checklist-item
+    .compact-button,
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-review-action-row
+    .compact-button {
+    width: 100% !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-review-action-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs {
+    padding-right: 52px !important;
+    padding-left: 10px !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs button {
+    padding: 0 10px !important;
+    font-size: 13px !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview {
+    max-height: min(36svh, 260px) !important;
+  }
+}
+
+/* V-19 mobile width pass: app-like full-width cards, smaller bottom nav, half drawer menu. */
+@media (max-width: 760px) {
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review, .surface-export) {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    background: var(--v19-canvas) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review, .surface-export)
+    .workspace {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+    border-radius: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions) .workspace > .topbar {
+    padding-right: 14px !important;
+    padding-left: 14px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-actions-screen {
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 14px !important;
+    padding: 14px 8px 72px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-actions-toolbar {
+    gap: 10px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tools {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 42px !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-search {
+    width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-icon-button {
+    width: 42px !important;
+    min-width: 42px !important;
+    height: 42px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-view-stage.is-list,
+  .ops-shell.surface-agent-actions .vf-figma-action-list,
+  .ops-shell.surface-agent-actions .vf-figma-action-row {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-view-stage.is-list {
+    margin-top: 16px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-list {
+    gap: 10px !important;
+    padding-top: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-row {
+    min-height: 108px !important;
+    padding: 14px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-screen-grid,
+  .ops-shell.surface-agent-submissions .v19-collection-panel,
+  .ops-shell.surface-agent-submissions .v19-collection-list,
+  .ops-shell.surface-agent-submissions .v19-submission-type-section,
+  .ops-shell.surface-agent-submissions .v19-submission-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-screen-grid {
+    padding-right: 8px !important;
+    padding-left: 8px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-collection-panel {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-collection-list,
+  .ops-shell.surface-agent-submissions .v19-submission-type-section {
+    display: grid !important;
+    gap: 10px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-type-section {
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-row {
+    min-height: 108px !important;
+    padding: 14px !important;
+    border: 1px solid var(--v19-line-default) !important;
+    border-radius: 14px !important;
+    background: var(--v19-row-background) !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-sidebar,
+  .ops-shell.role-admin:is(.surface-admin-review, .surface-export).is-mobile-nav-open
+    .ops-sidebar {
+    inset: 10px auto 10px 10px !important;
+    width: min(58vw, 244px) !important;
+    min-width: min(216px, calc(100vw - 20px)) !important;
+    max-width: calc(100vw - 20px) !important;
+    padding: 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-brand {
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-brand-mark {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-brand-copy strong,
+  .ops-shell.is-mobile-nav-open .ops-nav-item strong,
+  .ops-shell.is-mobile-nav-open .ops-session strong {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-nav-item {
+    gap: 8px !important;
+    min-height: 42px !important;
+    padding: 0 8px !important;
+  }
+
+  .ops-shell.role-agent .ops-mobile-tabbar {
+    right: 8px !important;
+    bottom: 6px !important;
+    left: 8px !important;
+    gap: 3px !important;
+    max-width: calc(100vw - 16px) !important;
+    min-height: 50px !important;
+    padding: 4px 4px max(4px, env(safe-area-inset-bottom)) !important;
+    border-radius: 14px !important;
+  }
+
+  .ops-mobile-tabbar-item {
+    grid-template-rows: 16px auto !important;
+    gap: 2px !important;
+    min-height: 42px !important;
+    padding: 4px 3px !important;
+    border-radius: 10px !important;
+  }
+
+  .ops-mobile-tabbar-icon {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .ops-mobile-tabbar-icon svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .ops-mobile-tabbar-label {
+    font-size: 9.5px !important;
+    line-height: 1.05 !important;
+  }
+
+  .ops-mobile-tabbar-item .ops-nav-count {
+    top: 3px !important;
+    right: 8px !important;
+    min-width: 15px !important;
+    height: 15px !important;
+    padding: 0 4px !important;
+    font-size: 8.5px !important;
+    line-height: 13px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status,
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-status .status-chip {
+    max-width: 116px !important;
+    min-height: 24px !important;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-mobile-chevron,
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-tail > svg {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-tail > svg {
+    padding: 9px !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs {
+    padding-right: 68px !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs button {
+    max-width: 132px !important;
+  }
+
+  .ops-shell.has-open-drawer .submission-detail-drawer .drawer-tabs button span {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview {
+    max-height: min(31svh, 236px) !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview-stage {
+    min-height: 116px !important;
+    padding: 10px !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-preview-stage
+    span {
+    width: min(192px, 74%) !important;
+  }
+
+  .ops-shell.has-open-drawer
+    .submission-detail-drawer.is-admin-review-drawer
+    .admin-passport-review
+    .admin-document-meta
+    div {
+    padding: 6px 9px !important;
+  }
+
+  .ops-shell.surface-export .workspace > .topbar {
+    min-height: 64px !important;
+    padding: 14px 16px !important;
+  }
+
+  .ops-shell.surface-export .topbar-heading p,
+  .ops-shell.surface-export .v17-export-intro {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .export-grid.magic-export-stage {
+    padding: 0 8px 72px !important;
+  }
+
+  .ops-shell.surface-export .magic-export-queue {
+    gap: 10px !important;
+    padding: 12px 10px !important;
   }
 }

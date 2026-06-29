@@ -63,14 +63,6 @@ export function OperationalSidebar({
           </Button>
         ) : null}
       </div>
-      <button className="ops-sidebar-command" type="button">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
-        <span>Поиск...</span>
-        <kbd>⌘K</kbd>
-      </button>
       <nav className="ops-nav" aria-label="Операционные разделы">
         {items.map((item) => (
           <Button
@@ -79,6 +71,7 @@ export function OperationalSidebar({
             className={`ops-nav-item ${item.active ? "is-active" : ""} ${
               item.tone ? `tone-${item.tone}` : ""
             }`}
+            data-nav-id={item.id}
             disabled={item.disabled}
             key={item.id}
             variant="ghost"
@@ -133,6 +126,7 @@ export function OperationalMobileTabBar({
           className={`ops-mobile-tabbar-item ${item.active ? "is-active" : ""} ${
             item.tone ? `tone-${item.tone}` : ""
           }`}
+          data-nav-id={item.id}
           disabled={item.disabled}
           key={item.id}
           type="button"

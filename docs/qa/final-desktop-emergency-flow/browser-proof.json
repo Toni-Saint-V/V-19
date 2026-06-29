@@ -1,0 +1,78 @@
+{
+  "path": "docs/qa/final-desktop-emergency-flow",
+  "runtime": {
+    "appUrl": "http://127.0.0.1:5173/",
+    "browser": "Google Chrome via Playwright fallback",
+    "inAppBrowser": "unavailable in this session",
+    "auth": "local/dev auth"
+  },
+  "viewports": {
+    "desktop1440": {
+      "width": 1440,
+      "height": 960,
+      "overflowX": false
+    },
+    "desktop1280": {
+      "width": 1280,
+      "height": 900,
+      "overflowX": false
+    }
+  },
+  "screenshots": [
+    "admin-review-desktop.png",
+    "admin-drawer-desktop.png",
+    "admin-remarks-desktop.png",
+    "admin-export-desktop.png",
+    "admin-export-desktop-1280.png",
+    "agent-actions-desktop.png",
+    "agent-submissions-desktop.png",
+    "agent-drawer-desktop.png",
+    "create-submission-desktop.png",
+    "create-submission-family-desktop.png",
+    "remark-visible-agent-desktop.png"
+  ],
+  "adminReview": {
+    "opened": true,
+    "drawerOpened": true,
+    "tabsVisible": ["Паспорт", "Селфи", "Анкета", "Замечания"],
+    "unsupportedPassportAccept": "disabled with existing handler boundary"
+  },
+  "adminRemarks": {
+    "createdInRuntime": true,
+    "reason": "Подтвердить бронь отеля",
+    "comment": "Пилотная проверка: уточните бронирование отеля перед финальной отправкой.",
+    "visibleForAdmin": true,
+    "visibleForAgentSameRuntime": true,
+    "persistence": "local/dev runtime only; not claimed as production persistence"
+  },
+  "agentSubmissions": {
+    "familySectionVisible": true,
+    "individualSectionVisible": true,
+    "familyRows": 3,
+    "singleRows": 5,
+    "primaryLabels": ["Семейные подачи", "Индивидуальные подачи", "Заявители"]
+  },
+  "createSubmission": {
+    "drawerOpened": true,
+    "singleModeVisible": true,
+    "familyModeVisible": true,
+    "passportRequired": true,
+    "saveWithoutPassport": "disabled",
+    "nextWithoutPassport": "disabled",
+    "closeConfirmationAfterDirtyTypeChange": true,
+    "ocrClaim": "not faked"
+  },
+  "export": {
+    "screenOpened": true,
+    "readyRows": 4,
+    "selectionWorks": true,
+    "generateExcelClicked": true,
+    "downloadClicked": true,
+    "downloadFilename": "visaflow-export-0mwe8ei.xlsx",
+    "historyShown": "only existing history tab"
+  },
+  "console": {
+    "errors": [],
+    "warnings": []
+  }
+}
