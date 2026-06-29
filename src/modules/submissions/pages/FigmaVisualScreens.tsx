@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -9,15 +9,24 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { agentDisplayName } from "../agentDirectory";
+import { applicantCountLabel, tripDates } from "../selectors";
+import { blockerCount, fixedIssueCount, openIssueCount } from "../status";
+import type { Submission } from "../types";
 
 type VisualStatus = "in_progress" | "ready_for_export" | "returned" | "submitted_for_review";
 
 type VisualSubmission = {
+  agentId?: string;
+  agentName?: string;
   applicantsCount: number;
   blocker?: string;
   city: string;
+  createdAt?: string;
   id: string;
+  issueCount?: number;
   progress?: number;
+  source?: Submission;
   status: VisualStatus;
   statusLabel: string;
   title: string;
@@ -27,6 +36,8 @@ type VisualSubmission = {
 };
 
 type VisualOpenIntent = "detail" | "issues";
+type VisualActionFilter = "all" | "issues" | "review";
+type VisualActionSort = "created_desc" | "created_asc" | "trip_asc" | "trip_desc";
 
 type VisualColumn = {
   id: string;
@@ -297,8 +308,6 @@ const visualSubmissions: VisualSubmission[] = [
   },
 ];
 
-const visualColumnSubmissions: VisualSubmission[] = visualSubmissions;
-
 const visualColumns: VisualColumn[] = [
   {
     id: "docs",
@@ -505,6 +514,133 @@ const visualIndividuals = [
   },
 ];
 
+const actionSortLabels: Record<VisualActionSort, string> = {
+  created_asc: "Сначала старые",
+  created_desc: "Сначала новые",
+  trip_asc: "Ближайшая поездка",
+  trip_desc: "Поздняя поездка",
+};
+
+function visualSubmissionFromSubmission(submission: Submission): VisualSubmission {
+  const issues = submission.issues.filter(
+    (issue) => issue.status === "open" || issue.status === "fixed_by_agent",
+  );
+  const openIssues = openIssueCount(submission);
+  const fixedIssues = fixedIssueCount(submission);
+  const visualStatus = visualStatusForSubmission(submission);
+
+  return {
+    agentId: submission.agentId,
+    agentName: agentDisplayName(submission.agentId),
+    applicantsCount: submission.applicants.length,
+    blocker: issues[0]?.reason,
+    city: submission.city,
+    createdAt: submission.createdAt,
+    id: submission.id,
+    issueCount: openIssues + fixedIssues,
+    progress: submission.completeness.total,
+    source: submission,
+    status: visualStatus,
+    statusLabel: visualStatusLabel(visualStatus, openIssues, fixedIssues),
+    title: submission.title,
+    tripDates: tripDates(submission).replace("-", " – "),
+    type: submission.type,
+    updated: submission.updatedAt,
+  };
+}
+
+function visualStatusForSubmission(submission: Submission): VisualStatus {
+  if (
+    submission.status === "returned" ||
+    submission.status === "requires_action" ||
+    blockerCount(submission) > 0 ||
+    openIssueCount(submission) > 0
+  ) {
+    return "returned";
+  }
+
+  if (
+    submission.status === "submitted_for_review" ||
+    submission.status === "corrections_received"
+  ) {
+    return "submitted_for_review";
+  }
+
+  if (submission.status === "ready_for_export" || submission.status === "exported") {
+    return "ready_for_export";
+  }
+
+  return "in_progress";
+}
+
+function visualStatusLabel(
+  status: VisualStatus,
+  openIssues: number,
+  fixedIssues: number,
+) {
+  if (status === "returned") return openIssues > 0 ? "Ошибки" : "Возврат";
+  if (status === "submitted_for_review") {
+    return fixedIssues > 0 ? "Исправлено" : "На проверке";
+  }
+  if (status === "ready_for_export") return "Готово";
+  return "В работе";
+}
+
+function searchText(item: VisualSubmission) {
+  return [
+    item.id,
+    item.title,
+    item.city,
+    item.agentName,
+    item.statusLabel,
+    item.blocker,
+    item.source?.applicants.map((applicant) => applicant.fullName).join(" "),
+    item.source?.issues.map((issue) => `${issue.reason} ${issue.comment}`).join(" "),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function matchesActionFilter(item: VisualSubmission, filter: VisualActionFilter) {
+  if (filter === "issues") return item.status === "returned" || Boolean(item.issueCount);
+  if (filter === "review") return item.status === "submitted_for_review";
+  return true;
+}
+
+function shortDateScore(value?: string) {
+  if (!value) return 0;
+  const [day, month] = value.split(".").map((part) => Number(part));
+  if (!day || !month) return 0;
+  return new Date(2026, month - 1, day).getTime();
+}
+
+function visualSortScore(item: VisualSubmission, sort: VisualActionSort) {
+  if (sort === "trip_asc" || sort === "trip_desc") {
+    return shortDateScore(item.source?.tripDateFrom ?? item.tripDates);
+  }
+  return shortDateScore(item.createdAt);
+}
+
+function sortVisualSubmissions(items: VisualSubmission[], sort: VisualActionSort) {
+  return [...items].sort((left, right) => {
+    const leftScore = visualSortScore(left, sort);
+    const rightScore = visualSortScore(right, sort);
+    const direction = sort === "created_asc" || sort === "trip_asc" ? 1 : -1;
+    const score = (leftScore - rightScore) * direction;
+    return score || left.title.localeCompare(right.title, "ru");
+  });
+}
+
+function uniqueFilterOptions(
+  items: VisualSubmission[],
+  key: "agentName" | "city",
+) {
+  return Array.from(new Set(items.map((item) => item[key]).filter(Boolean))).sort(
+    (left, right) => String(left).localeCompare(String(right), "ru"),
+  ) as string[];
+}
+
 function statusDot(status: VisualStatus) {
   if (status === "returned") return "vf-figma-dot-warning";
   if (status === "in_progress") return "vf-figma-dot-blue";
@@ -585,37 +721,77 @@ function activateKeyboardCard(
 }
 
 function VisualToolbar({
+  activeFilter,
+  agentFilter,
+  agentOptions,
+  categoryCounts,
+  cityFilter,
+  cityOptions,
+  onAgentFilter,
+  onCityFilter,
+  onFilter,
+  onSearch,
+  onSort,
   viewMode,
   onViewMode,
+  resultCount,
+  searchQuery,
+  sort,
 }: {
+  activeFilter: VisualActionFilter;
+  agentFilter: string;
+  agentOptions: string[];
+  categoryCounts: Record<VisualActionFilter, number>;
+  cityFilter: string;
+  cityOptions: string[];
+  onAgentFilter: (agent: string) => void;
+  onCityFilter: (city: string) => void;
+  onFilter: (filter: VisualActionFilter) => void;
+  onSearch: (value: string) => void;
+  onSort: (sort: VisualActionSort) => void;
   onViewMode: (mode: "columns" | "list") => void;
+  resultCount: number;
+  searchQuery: string;
+  sort: VisualActionSort;
   viewMode: "columns" | "list";
 }) {
   const [filterOpen, setFilterOpen] = useState(false);
+  const filterTabs: Array<{ id: VisualActionFilter; label: string }> = [
+    { id: "all", label: "Все действия" },
+    { id: "issues", label: "Ошибки" },
+    { id: "review", label: "На проверке" },
+  ];
 
   function chooseViewMode(mode: "columns" | "list") {
     onViewMode(mode);
-    setFilterOpen(false);
   }
 
   return (
     <div className="vf-figma-actions-toolbar">
       <div className="vf-figma-tabs" aria-label="Фильтры действий">
-        <button className="is-active" type="button">
-          Все действия <span>20</span>
-        </button>
-        <button type="button">
-          Ошибки <span>5</span>
-        </button>
-        <button type="button">
-          На проверке <span>4</span>
-        </button>
+        {filterTabs.map((tab) => (
+          <button
+            aria-pressed={activeFilter === tab.id}
+            className={activeFilter === tab.id ? "is-active" : ""}
+            key={tab.id}
+            type="button"
+            onClick={() => onFilter(tab.id)}
+          >
+            {tab.label} <span>{categoryCounts[tab.id]}</span>
+          </button>
+        ))}
       </div>
 
       <div className="vf-figma-tools">
         <div className="vf-figma-search">
           <Search aria-hidden="true" size={20} />
-          <input aria-label="Поиск" placeholder="Поиск..." type="text" />
+          <input
+            aria-label="Поиск"
+            placeholder="Поиск..."
+            type="search"
+            value={searchQuery}
+            onChange={(event) => onSearch(event.target.value)}
+          />
         </div>
         <div className="vf-figma-filter-menu">
           <button
@@ -629,6 +805,47 @@ function VisualToolbar({
           </button>
           {filterOpen ? (
             <div className="vf-figma-filter-popover" role="menu" aria-label="Фильтр и вид">
+              <span>Найдено</span>
+              <strong className="vf-figma-filter-result">{resultCount} пакетов</strong>
+              <span>Город</span>
+              {["Все города", ...cityOptions].map((city) => (
+                <button
+                  aria-checked={cityFilter === city}
+                  className={cityFilter === city ? "is-active" : ""}
+                  key={city}
+                  role="menuitemradio"
+                  type="button"
+                  onClick={() => onCityFilter(city)}
+                >
+                  {city}
+                </button>
+              ))}
+              <span>Агент</span>
+              {["Все агенты", ...agentOptions].map((agent) => (
+                <button
+                  aria-checked={agentFilter === agent}
+                  className={agentFilter === agent ? "is-active" : ""}
+                  key={agent}
+                  role="menuitemradio"
+                  type="button"
+                  onClick={() => onAgentFilter(agent)}
+                >
+                  {agent}
+                </button>
+              ))}
+              <span>Сортировка</span>
+              {(Object.keys(actionSortLabels) as VisualActionSort[]).map((sortKey) => (
+                <button
+                  aria-checked={sort === sortKey}
+                  className={sort === sortKey ? "is-active" : ""}
+                  key={sortKey}
+                  role="menuitemradio"
+                  type="button"
+                  onClick={() => onSort(sortKey)}
+                >
+                  {actionSortLabels[sortKey]}
+                </button>
+              ))}
               <span>Вид</span>
               <button
                 className={viewMode === "list" ? "is-active" : ""}
@@ -668,8 +885,10 @@ function ListRow({
       className="vf-figma-action-row"
       role="button"
       tabIndex={0}
-      onClick={() => onOpen?.(item.id, "detail")}
-      onKeyDown={(event) => activateKeyboardCard(event, () => onOpen?.(item.id, "detail"))}
+      onClick={() => onOpen?.(item.id, visualOpenIntent(item))}
+      onKeyDown={(event) =>
+        activateKeyboardCard(event, () => onOpen?.(item.id, visualOpenIntent(item)))
+      }
     >
       <span className={`vf-figma-dot ${statusDot(item.status)}`} aria-hidden="true" />
       <span className="vf-figma-action-title">
@@ -677,12 +896,18 @@ function ListRow({
         <em>
           ID: <span>{item.id}</span> Обновлено: {item.updated}
         </em>
+        <small className="vf-figma-action-agent">
+          Агент: {item.agentName ?? "не указан"}
+        </small>
+        {item.blocker ? (
+          <small className="vf-figma-action-problem">{item.blocker}</small>
+        ) : null}
       </span>
       <span className="vf-figma-action-meta">
         <strong>{item.city}</strong>
         <em>
           {item.type === "family" ? <Users aria-hidden="true" size={14} /> : <User aria-hidden="true" size={14} />}
-          {item.type === "family" ? `${item.applicantsCount} заявителя` : "1 заявитель"}
+          {applicantCountLabel(item.applicantsCount)}
         </em>
       </span>
       <span className="vf-figma-action-dates">
@@ -717,7 +942,7 @@ function ColumnCard({
     <button
       className="vf-figma-column-card"
       type="button"
-      onClick={() => onOpen?.(item.id, "detail")}
+      onClick={() => onOpen?.(item.id, visualOpenIntent(item))}
     >
       {item.status === "returned" ? <span className="vf-figma-card-rail is-danger" /> : null}
       {item.status === "in_progress" ? <span className="vf-figma-card-rail is-warning" /> : null}
@@ -731,6 +956,9 @@ function ColumnCard({
       <strong>{item.title}</strong>
       <span className="vf-figma-column-subline">
         {item.city} <i aria-hidden="true" /> {item.tripDates}
+      </span>
+      <span className="vf-figma-column-subline">
+        {item.agentName ?? "Агент не указан"}
       </span>
       <span className="vf-figma-column-footer">
         {blocker ? (
@@ -753,31 +981,118 @@ function ColumnCard({
 
 export function FigmaActionQueueVisual({
   onOpen,
+  submissions,
 }: {
   onOpen?: VisualOpenHandler;
+  submissions?: Submission[];
 }) {
+  const [activeFilter, setActiveFilter] = useState<VisualActionFilter>("all");
+  const [agentFilter, setAgentFilter] = useState("Все агенты");
+  const [cityFilter, setCityFilter] = useState("Все города");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sort, setSort] = useState<VisualActionSort>("created_desc");
   const [viewMode, setViewMode] = useState<"columns" | "list">("list");
+  const screenRef = useRef<HTMLElement | null>(null);
+  const visualItems = useMemo(
+    () =>
+      submissions?.length
+        ? submissions.map(visualSubmissionFromSubmission)
+        : visualSubmissions,
+    [submissions],
+  );
+  const cityOptions = useMemo(
+    () => uniqueFilterOptions(visualItems, "city"),
+    [visualItems],
+  );
+  const agentOptions = useMemo(
+    () => uniqueFilterOptions(visualItems, "agentName"),
+    [visualItems],
+  );
+  const categoryCounts = useMemo(
+    () => ({
+      all: visualItems.length,
+      issues: visualItems.filter((item) => matchesActionFilter(item, "issues")).length,
+      review: visualItems.filter((item) => matchesActionFilter(item, "review")).length,
+    }),
+    [visualItems],
+  );
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const scoped = visualItems.filter((item) => {
+      if (!matchesActionFilter(item, activeFilter)) return false;
+      if (cityFilter !== "Все города" && item.city !== cityFilter) return false;
+      if (agentFilter !== "Все агенты" && item.agentName !== agentFilter) return false;
+      if (normalizedQuery && !searchText(item).includes(normalizedQuery)) return false;
+      return true;
+    });
+
+    return sortVisualSubmissions(scoped, sort);
+  }, [activeFilter, agentFilter, cityFilter, searchQuery, sort, visualItems]);
+
+  useEffect(() => {
+    if (cityFilter !== "Все города" && !cityOptions.includes(cityFilter)) {
+      setCityFilter("Все города");
+    }
+  }, [cityFilter, cityOptions]);
+
+  useEffect(() => {
+    if (agentFilter !== "Все агенты" && !agentOptions.includes(agentFilter)) {
+      setAgentFilter("Все агенты");
+    }
+  }, [agentFilter, agentOptions]);
+
+  useEffect(() => {
+    screenRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [activeFilter, agentFilter, cityFilter, searchQuery, sort, viewMode]);
 
   return (
-    <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
-      <VisualToolbar viewMode={viewMode} onViewMode={setViewMode} />
+    <section
+      ref={screenRef}
+      className="vf-figma-screen vf-figma-actions-screen"
+      aria-label="Мои действия"
+    >
+      <VisualToolbar
+        activeFilter={activeFilter}
+        agentFilter={agentFilter}
+        agentOptions={agentOptions}
+        categoryCounts={categoryCounts}
+        cityFilter={cityFilter}
+        cityOptions={cityOptions}
+        resultCount={filteredItems.length}
+        searchQuery={searchQuery}
+        sort={sort}
+        viewMode={viewMode}
+        onAgentFilter={setAgentFilter}
+        onCityFilter={setCityFilter}
+        onFilter={setActiveFilter}
+        onSearch={setSearchQuery}
+        onSort={setSort}
+        onViewMode={setViewMode}
+      />
 
       <div className={`vf-figma-view-stage is-${viewMode}`} key={viewMode}>
         {viewMode === "list" ? (
           <div className="vf-figma-action-list">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
-              <strong>Сегодня</strong>
+              <strong>Найдено</strong>
               <span aria-hidden="true" />
             </div>
-            {visualSubmissions.map((item) => (
-              <ListRow item={item} key={item.id} onOpen={onOpen} />
-            ))}
+            {filteredItems.length ? (
+              filteredItems.map((item) => (
+                <ListRow item={item} key={item.id} onOpen={onOpen} />
+              ))
+            ) : (
+              <div className="vf-figma-empty-state" role="status">
+                <strong>Подачи не найдены</strong>
+                <span>Измените поиск, город, агента или категорию.</span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="vf-figma-column-board">
             {visualColumns.map((column) => {
-              const items = visualColumnSubmissions.filter((item) =>
+              const items = filteredItems.filter((item) =>
                 column.statuses.includes(item.status),
               );
 

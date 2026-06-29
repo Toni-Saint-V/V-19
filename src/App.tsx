@@ -34,6 +34,11 @@ import {
   ensureSubmissionOwner,
 } from "./modules/submissions/ownership";
 import {
+  agentAgencyLabel,
+  agentDisplayName,
+  agentInitials,
+} from "./modules/submissions/agentDirectory";
+import {
   changedCockpitSubmissions,
   cockpitSubmissionFingerprint,
   cockpitSubmissionFingerprintMap,
@@ -57,6 +62,7 @@ import {
   applyExportStateToSelection,
   createDraftSubmission,
   generatedCockpitMediaFileName,
+  markSubmissionFileAccepted,
   mergeUploadedFileMetadataIntoSubmissions,
   mediaSlotTypeForSubmissionFileType,
   updateQuestionnaireField,
@@ -103,12 +109,13 @@ import {
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
+import { AdminReviewDrawer } from "./modules/submissions/components/AdminReviewDrawer";
 import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
 import {
-  AdminReviewScreen,
   AgentActionsScreen,
   AgentInboxScreen,
   AgentSubmissionsScreen,
+  AdminReviewScreen,
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
@@ -480,7 +487,7 @@ function MainApp() {
   const [submissionActionError, setSubmissionActionError] =
     useState<SubmissionActionErrorState | null>(null);
   const [createType, setCreateType] = useState<Submission["type"]>("single");
-  const [createCity] = useState<City>("Москва");
+  const [createCity, setCreateCity] = useState<City>("Москва");
   const [createFamilyCount, setCreateFamilyCount] = useState(2);
   const [createApplicantNames, setCreateApplicantNames] = useState<string[]>([
     "Новый заявитель",
@@ -533,6 +540,10 @@ function MainApp() {
       searchSubmissions(agentQueue(submissions, currentAgentOwnerId), "", cityFilter),
     [cityFilter, currentAgentOwnerId, submissions],
   );
+  const visualActionSubmissions = useMemo(
+    () => agentQueue(submissions, currentAgentOwnerId),
+    [currentAgentOwnerId, submissions],
+  );
   const agentActions = useMemo(
     () => agentActionQueue(agentActionSource),
     [agentActionSource],
@@ -548,10 +559,6 @@ function MainApp() {
   const searchedReviewQueue = useMemo(
     () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
     [cityFilter, query, submissions],
-  );
-  const searchedAdminInboxEvents = useMemo(
-    () => adminInboxEvents(searchedReviewQueue),
-    [searchedReviewQueue],
   );
   const adminWorkSubmissionCount = useMemo(
     () =>
@@ -572,13 +579,17 @@ function MainApp() {
       : [],
   );
   const visibleAgentSubmission =
-    agentList.find((submission) => submission.id === selectedSubmissionId) ??
-    agentList[0] ??
-    null;
+    activeSubmission && agentList.some((submission) => submission.id === activeSubmission.id)
+      ? activeSubmission
+      : agentList[0] ?? null;
   const visibleReviewSubmission =
-    reviewList.find((submission) => submission.id === selectedSubmissionId) ??
-    reviewList[0] ??
-    null;
+    activeSubmission && reviewList.some((submission) => submission.id === activeSubmission.id)
+      ? activeSubmission
+      : reviewList[0] ?? null;
+  const searchedAdminInboxEvents = useMemo(
+    () => adminInboxEvents(searchedReviewQueue),
+    [searchedReviewQueue],
+  );
   const searchedExportSubmissions = useMemo(
     () => searchSubmissions(submissions, query, cityFilter),
     [cityFilter, query, submissions],
@@ -1148,7 +1159,7 @@ function MainApp() {
     rememberReturnFocus();
     setDrawerMode("create");
     setAgentQuestionnaireOpen(false);
-    setCreateType("single");
+    setCreateType("family");
     setCreateFamilyCount(2);
     setCreateApplicantNames(["Новый заявитель", "Супруг", "Ребёнок 1", "Ребёнок 2"]);
     setDirty(false);
@@ -1189,7 +1200,11 @@ function MainApp() {
 
     openSubmission(
       targetSubmission,
-      intent === "issues" ? "issues" : defaultDrawerTab(targetSubmission),
+      intent === "issues"
+        ? "issues"
+        : role === "admin" && surface === "admin-review"
+          ? "questionnaire"
+          : defaultDrawerTab(targetSubmission),
     );
   }
 
@@ -1419,6 +1434,18 @@ function MainApp() {
     setSubmissionActionError(null);
     setActiveDrawerTab("issues");
     setDrawerMode("detail");
+  }
+
+  function acceptAdminReviewFile(input: {
+    applicantId: string;
+    fileType: "passport_scan" | "selfie" | "selfie_2";
+  }) {
+    updateActiveSubmission((submission) =>
+      markSubmissionFileAccepted(submission, {
+        ...input,
+        reviewedBy: remoteProfile?.id,
+      }),
+    );
   }
 
   async function performSupabaseMediaUpload(
@@ -2579,14 +2606,6 @@ function MainApp() {
       onChange={setQuery}
     />
   );
-  const adminReviewSearchControl = (
-    <SearchBar
-      label="Поиск в текущем списке"
-      placeholder="Поиск по имени или ID"
-      value={query}
-      onChange={setQuery}
-    />
-  );
   const cityFilterControl = (
     <CityFilterMenu options={cities} value={cityFilter} onChange={setCityFilter} />
   );
@@ -2608,8 +2627,16 @@ function MainApp() {
   );
   const agentSubmissionsSearchControl = (
     <SearchBar
-      label="Поиск по подачам"
-      placeholder="Поиск по подачам"
+      label="Поиск по подачам агента"
+      placeholder="Подача, город или ID"
+      value={query}
+      onChange={setQuery}
+    />
+  );
+  const adminReviewSearchControl = (
+    <SearchBar
+      label="Поиск в проверке"
+      placeholder="Подача, город или ID"
       value={query}
       onChange={setQuery}
     />
@@ -2730,12 +2757,18 @@ function MainApp() {
                     setMobileNavOpen(false);
                   }}
                 >
-                  <span>{role === "agent" ? "ТН" : "АД"}</span>
+                  <span>{role === "agent" ? agentInitials(defaultLocalAgentOwnerId) : "АД"}</span>
                   <div>
                     <strong>
-                      {role === "agent" ? "Татьяна Николаева" : "Ирина Лебедева"}
+                      {role === "agent"
+                        ? agentDisplayName(defaultLocalAgentOwnerId)
+                        : "Ирина Лебедева"}
                     </strong>
-                    <small>{role === "agent" ? "Visa Center Spb" : "Админ"}</small>
+                    <small>
+                      {role === "agent"
+                        ? agentAgencyLabel(defaultLocalAgentOwnerId)
+                        : "Админ"}
+                    </small>
                   </div>
                   <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
                     <circle cx="5" cy="12" r="1" />
@@ -2853,7 +2886,10 @@ function MainApp() {
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
         ) : surface === "agent-actions" ? (
-          <FigmaActionQueueVisual onOpen={openVisualSubmission} />
+          <FigmaActionQueueVisual
+            submissions={visualActionSubmissions}
+            onOpen={openVisualSubmission}
+          />
         ) : surface === "agent-inbox" ? (
           <>
             <div className="v19-inbox-mode-tabs">
@@ -3010,7 +3046,21 @@ function MainApp() {
 
       {drawerMode === "detail" &&
       activeSubmission &&
-      !(role === "agent" && isFigmaVisualSurface) ? (
+      role !== "agent" &&
+      surface === "admin-review" ? (
+        <AdminReviewDrawer
+          actionError={activeSubmissionActionError}
+          activeTab={activeDrawerTab}
+          onAction={updateSubmission}
+          onAddIssue={addAdminIssue}
+          onClose={closeDrawer}
+          onReviewFileAccept={acceptAdminReviewFile}
+          onTab={setActiveDrawerTab}
+          submission={activeSubmission}
+        />
+      ) : drawerMode === "detail" &&
+        activeSubmission &&
+        !(role === "agent" && isFigmaVisualSurface) ? (
         <SubmissionDrawer
           actionError={activeSubmissionActionError}
           activeTab={activeDrawerTab}
@@ -3042,13 +3092,7 @@ function MainApp() {
           passportExtractionEnabled={passportExtractionEnabled}
           requireSelectedFile={isSupabaseMode}
           role={role}
-          surface={
-            surface === "export"
-              ? "export"
-              : surface === "admin-review"
-                ? "review"
-                : "agent"
-          }
+          surface={surface === "export" ? "export" : "agent"}
           submission={activeSubmission}
         />
       ) : null}
@@ -3056,8 +3100,26 @@ function MainApp() {
       {drawerMode === "create" ? (
         <Suspense fallback={null}>
           <CreateSubmissionDrawer
+            applicantNames={createApplicantNames}
+            city={createCity}
+            dirty={dirty}
             familyCount={createFamilyCount}
             focusCloseToken={createCloseFocusToken}
+            onApplicantName={(index, name) => {
+              setCreateApplicantNames((current) => {
+                const next = normalizeCreateApplicantNames(
+                  current,
+                  createFamilyCount,
+                );
+                next[index] = name;
+                return next;
+              });
+              setDirty(true);
+            }}
+            onCity={(city) => {
+              setCreateCity(city);
+              setDirty(true);
+            }}
             onClose={closeDrawer}
             onCreate={createDraft}
             onFamilyCount={(count) => {

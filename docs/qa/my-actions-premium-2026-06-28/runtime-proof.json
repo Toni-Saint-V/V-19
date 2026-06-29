@@ -1,0 +1,809 @@
+{
+  "desktopList": {
+    "overflow": {
+      "body": 0,
+      "doc": 0
+    },
+    "checks": {
+      "title": true,
+      "menu": true,
+      "tabsVisible": true,
+      "tabs": [
+        {
+          "text": "Все действия 20",
+          "top": 118,
+          "left": 346,
+          "right": 514,
+          "bottom": 152,
+          "width": 168,
+          "height": 34,
+          "visibleText": true
+        },
+        {
+          "text": "Ошибки 5",
+          "top": 118,
+          "left": 518,
+          "right": 648,
+          "bottom": 152,
+          "width": 130,
+          "height": 34,
+          "visibleText": true
+        },
+        {
+          "text": "На проверке 4",
+          "top": 118,
+          "left": 652,
+          "right": 814,
+          "bottom": 152,
+          "width": 162,
+          "height": 34,
+          "visibleText": true
+        }
+      ],
+      "search": true,
+      "filter": true,
+      "firstRow": true,
+      "status": true,
+      "dates": true,
+      "columnHeader": false,
+      "cards": 20,
+      "screenScrollTop": 0
+    }
+  },
+  "desktopColumns": {
+    "overflow": {
+      "body": 0,
+      "doc": 0
+    },
+    "checks": {
+      "title": true,
+      "menu": true,
+      "tabsVisible": true,
+      "tabs": [
+        {
+          "text": "Все действия 20",
+          "top": 108,
+          "left": 346,
+          "right": 514,
+          "bottom": 142,
+          "width": 168,
+          "height": 34,
+          "visibleText": true
+        },
+        {
+          "text": "Ошибки 5",
+          "top": 108,
+          "left": 518,
+          "right": 648,
+          "bottom": 142,
+          "width": 130,
+          "height": 34,
+          "visibleText": true
+        },
+        {
+          "text": "На проверке 4",
+          "top": 108,
+          "left": 652,
+          "right": 814,
+          "bottom": 142,
+          "width": 162,
+          "height": 34,
+          "visibleText": true
+        }
+      ],
+      "search": true,
+      "filter": true,
+      "firstRow": false,
+      "status": false,
+      "dates": false,
+      "columnHeader": true,
+      "cards": 20,
+      "screenScrollTop": 0
+    }
+  },
+  "drawerOpen": 1,
+  "mobileDrawerOpen": 1,
+  "matrix": {
+    "320": {
+      "listChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 121,
+            "bottom": 158,
+            "width": 71,
+            "height": 34,
+            "visibleText": false
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 124,
+            "right": 194,
+            "bottom": 158,
+            "width": 71,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 197,
+            "right": 268,
+            "bottom": 158,
+            "width": 71,
+            "height": 34,
+            "visibleText": false
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": true,
+        "status": true,
+        "dates": true,
+        "columnHeader": false,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "listOverflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "columnChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 121,
+            "bottom": 158,
+            "width": 71,
+            "height": 34,
+            "visibleText": false
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 124,
+            "right": 194,
+            "bottom": 158,
+            "width": 71,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 197,
+            "right": 268,
+            "bottom": 158,
+            "width": 71,
+            "height": 34,
+            "visibleText": false
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": false,
+        "status": false,
+        "dates": false,
+        "columnHeader": true,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "columnOverflow": {
+        "body": 0,
+        "doc": 0
+      }
+    },
+    "375": {
+      "listChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 139,
+            "bottom": 158,
+            "width": 89,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 142,
+            "right": 231,
+            "bottom": 158,
+            "width": 89,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 234,
+            "right": 323,
+            "bottom": 158,
+            "width": 89,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": true,
+        "status": true,
+        "dates": true,
+        "columnHeader": false,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "listOverflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "columnChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 139,
+            "bottom": 158,
+            "width": 89,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 142,
+            "right": 231,
+            "bottom": 158,
+            "width": 89,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 234,
+            "right": 323,
+            "bottom": 158,
+            "width": 89,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": false,
+        "status": false,
+        "dates": false,
+        "columnHeader": true,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "columnOverflow": {
+        "body": 0,
+        "doc": 0
+      }
+    },
+    "390": {
+      "listChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 144,
+            "bottom": 158,
+            "width": 94,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 147,
+            "right": 241,
+            "bottom": 158,
+            "width": 94,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 244,
+            "right": 338,
+            "bottom": 158,
+            "width": 94,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": true,
+        "status": true,
+        "dates": true,
+        "columnHeader": false,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "listOverflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "columnChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 144,
+            "bottom": 158,
+            "width": 94,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 147,
+            "right": 241,
+            "bottom": 158,
+            "width": 94,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 244,
+            "right": 338,
+            "bottom": 158,
+            "width": 94,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": false,
+        "status": false,
+        "dates": false,
+        "columnHeader": true,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "columnOverflow": {
+        "body": 0,
+        "doc": 0
+      }
+    },
+    "430": {
+      "listChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 157,
+            "bottom": 158,
+            "width": 107,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 160,
+            "right": 268,
+            "bottom": 158,
+            "width": 107,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 271,
+            "right": 378,
+            "bottom": 158,
+            "width": 107,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": true,
+        "status": true,
+        "dates": true,
+        "columnHeader": false,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "listOverflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "columnChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 124,
+            "left": 50,
+            "right": 157,
+            "bottom": 158,
+            "width": 107,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 124,
+            "left": 160,
+            "right": 268,
+            "bottom": 158,
+            "width": 107,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 124,
+            "left": 271,
+            "right": 378,
+            "bottom": 158,
+            "width": 107,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": false,
+        "status": false,
+        "dates": false,
+        "columnHeader": true,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "columnOverflow": {
+        "body": 0,
+        "doc": 0
+      }
+    },
+    "768": {
+      "listChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 110,
+            "left": 334,
+            "right": 455,
+            "bottom": 144,
+            "width": 121,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 110,
+            "left": 458,
+            "right": 580,
+            "bottom": 144,
+            "width": 121,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 110,
+            "left": 583,
+            "right": 704,
+            "bottom": 144,
+            "width": 121,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": true,
+        "status": true,
+        "dates": true,
+        "columnHeader": false,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "listOverflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "columnChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 100,
+            "left": 334,
+            "right": 455,
+            "bottom": 134,
+            "width": 121,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 100,
+            "left": 458,
+            "right": 580,
+            "bottom": 134,
+            "width": 121,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 100,
+            "left": 583,
+            "right": 704,
+            "bottom": 134,
+            "width": 121,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": false,
+        "status": false,
+        "dates": false,
+        "columnHeader": true,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "columnOverflow": {
+        "body": 0,
+        "doc": 0
+      }
+    },
+    "1024": {
+      "listChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 109,
+            "left": 334,
+            "right": 502,
+            "bottom": 143,
+            "width": 168,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 109,
+            "left": 506,
+            "right": 636,
+            "bottom": 143,
+            "width": 130,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 109,
+            "left": 640,
+            "right": 802,
+            "bottom": 143,
+            "width": 162,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": true,
+        "status": true,
+        "dates": true,
+        "columnHeader": false,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "listOverflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "columnChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 99,
+            "left": 334,
+            "right": 502,
+            "bottom": 133,
+            "width": 168,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 99,
+            "left": 506,
+            "right": 636,
+            "bottom": 133,
+            "width": 130,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 99,
+            "left": 640,
+            "right": 802,
+            "bottom": 133,
+            "width": 162,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": false,
+        "status": false,
+        "dates": false,
+        "columnHeader": true,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "columnOverflow": {
+        "body": 0,
+        "doc": 0
+      }
+    },
+    "1440": {
+      "listChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 118,
+            "left": 346,
+            "right": 514,
+            "bottom": 152,
+            "width": 168,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 118,
+            "left": 518,
+            "right": 648,
+            "bottom": 152,
+            "width": 130,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 118,
+            "left": 652,
+            "right": 814,
+            "bottom": 152,
+            "width": 162,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": true,
+        "status": true,
+        "dates": true,
+        "columnHeader": false,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "listOverflow": {
+        "body": 0,
+        "doc": 0
+      },
+      "columnChecks": {
+        "title": true,
+        "menu": true,
+        "tabsVisible": true,
+        "tabs": [
+          {
+            "text": "Все действия 20",
+            "top": 108,
+            "left": 346,
+            "right": 514,
+            "bottom": 142,
+            "width": 168,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "Ошибки 5",
+            "top": 108,
+            "left": 518,
+            "right": 648,
+            "bottom": 142,
+            "width": 130,
+            "height": 34,
+            "visibleText": true
+          },
+          {
+            "text": "На проверке 4",
+            "top": 108,
+            "left": 652,
+            "right": 814,
+            "bottom": 142,
+            "width": 162,
+            "height": 34,
+            "visibleText": true
+          }
+        ],
+        "search": true,
+        "filter": true,
+        "firstRow": false,
+        "status": false,
+        "dates": false,
+        "columnHeader": true,
+        "cards": 20,
+        "screenScrollTop": 0
+      },
+      "columnOverflow": {
+        "body": 0,
+        "doc": 0
+      }
+    }
+  },
+  "consoleErrors": []
+}

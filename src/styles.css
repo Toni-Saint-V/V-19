@@ -216,6 +216,8 @@
   color: #fff;
   font-size: 13px;
   font-weight: 560;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .vf-figma-admin-zone svg {
@@ -9939,6 +9941,50 @@ p {
   transform: none;
 }
 
+.surface-export .data-table tbody tr.export-city-group-row,
+.surface-export .data-table tbody tr.export-city-group-row:hover {
+  background: rgb(var(--html-builder-surface));
+  cursor: default;
+}
+
+.surface-export .data-table tbody tr.export-city-group-row td {
+  height: 38px;
+  padding: 0;
+  border-bottom: 1px solid rgb(var(--html-builder-line-default));
+  color: rgb(var(--html-builder-fg-3));
+}
+
+.surface-export .export-city-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 11px;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.surface-export .export-city-group-label strong {
+  overflow: hidden;
+  color: rgb(var(--html-builder-fg-2));
+  font-size: 11.5px;
+  font-weight: 590;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surface-export .export-city-group-label span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .surface-export .data-table tbody tr.selected,
 .surface-export .data-table tbody tr.is-selected {
   background: rgb(var(--html-builder-selected) / 0.72);
@@ -11909,9 +11955,12 @@ p {
   top: calc(100% + 8px) !important;
   right: 0 !important;
   display: grid !important;
-  min-width: 132px !important;
+  width: min(260px, calc(100vw - 28px)) !important;
+  max-height: min(540px, calc(100svh - 180px)) !important;
+  min-width: 220px !important;
   gap: 4px !important;
   padding: 8px !important;
+  overflow-y: auto !important;
   border: 1px solid #242529 !important;
   border-radius: 10px !important;
   background: #161617 !important;
@@ -11926,6 +11975,14 @@ p {
   font-weight: 650 !important;
   line-height: 1 !important;
   text-transform: uppercase !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-filter-result {
+  padding: 0 8px 6px !important;
+  color: rgb(255 255 255 / 0.82) !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  line-height: 1.2 !important;
 }
 
 .ops-shell.surface-agent-actions .vf-figma-filter-popover button,
@@ -13572,6 +13629,69 @@ p {
   grid-auto-rows: min-content;
 }
 
+.v17-admin-group {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.v17-admin-group + .v17-admin-group {
+  margin-top: 4px;
+}
+
+.v17-admin-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 2px;
+  color: var(--v19-fg-tertiary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.v17-admin-group-head strong {
+  overflow: hidden;
+  color: var(--v19-fg-secondary);
+  font-size: 11.5px;
+  font-weight: 590;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v17-admin-group-head span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v17-admin-group-list {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .v17-admin-group-head,
+  .surface-export .export-city-group-label {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .v17-admin-group-head span,
+  .surface-export .export-city-group-label span {
+    text-align: left;
+  }
+}
+
 .v17-admin-work-row,
 .v17-admin-event-row {
   position: relative;
@@ -14886,6 +15006,61 @@ p {
 .submission-detail-drawer .issue-title-copy span {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.surface-export .export-history-city-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.surface-export .export-history-city-group + .export-history-city-group {
+  margin-top: 6px;
+}
+
+.surface-export .export-history-city-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 2px;
+  color: rgb(var(--html-builder-fg-3));
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.surface-export .export-history-city-head strong {
+  overflow: hidden;
+  color: rgb(var(--html-builder-fg-2));
+  font-size: 11.5px;
+  font-weight: 590;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surface-export .export-history-city-head span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .surface-export .export-history-city-head {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .surface-export .export-history-city-head span {
+    text-align: left;
+  }
 }
 
 .submission-detail-drawer .issue-details-grid {
@@ -16374,6 +16549,52 @@ p {
   color: rgb(255 255 255 / 0.42) !important;
 }
 
+.ops-shell.surface-agent-actions .vf-figma-action-agent,
+.ops-shell.surface-agent-actions .vf-figma-action-problem {
+  display: block !important;
+  min-width: 0 !important;
+  margin-top: 6px !important;
+  overflow: hidden !important;
+  color: rgb(255 255 255 / 0.48) !important;
+  font-size: 11.5px !important;
+  font-style: normal !important;
+  font-weight: 540 !important;
+  line-height: 1.25 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-problem {
+  display: inline-flex !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-height: 24px !important;
+  align-items: center !important;
+  padding: 0 9px !important;
+  border: 1px solid rgb(255 92 103 / 0.3) !important;
+  border-radius: 999px !important;
+  background: rgb(255 92 103 / 0.08) !important;
+  color: #ff8a92 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-empty-state {
+  display: grid !important;
+  gap: 6px !important;
+  min-height: 132px !important;
+  place-items: center !important;
+  padding: 24px !important;
+  border: 1px solid #242529 !important;
+  border-radius: 14px !important;
+  background: #141416 !important;
+  color: rgb(255 255 255 / 0.56) !important;
+  text-align: center !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-empty-state strong {
+  color: rgb(255 255 255 / 0.86) !important;
+  font-size: 15px !important;
+}
+
 .ops-shell.surface-agent-actions .vf-figma-column-board,
 .ops-shell.surface-admin-review .vf-figma-column-board {
   grid-auto-columns: minmax(252px, 1fr) !important;
@@ -16547,6 +16768,20 @@ p {
     display: none !important;
   }
 
+  .ops-shell.surface-agent-actions {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-height: 100svh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .workspace {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   .ops-shell.surface-agent-actions .workspace > .topbar {
     align-items: center !important;
     flex-direction: row !important;
@@ -16574,7 +16809,13 @@ p {
   }
 
   .ops-shell.surface-agent-actions .vf-figma-actions-screen {
-    padding: 18px 14px 92px !important;
+    padding: 18px 10px 126px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-list,
+  .ops-shell.surface-agent-actions .vf-figma-view-stage {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .ops-shell.surface-agent-actions .vf-figma-tabs {
@@ -16591,6 +16832,9 @@ p {
 
   .ops-shell.surface-agent-actions .vf-figma-action-row {
     grid-template-columns: 14px minmax(0, 1fr) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
     padding: 14px !important;
   }
 
@@ -16622,5 +16866,293 @@ p {
 
   .ops-shell.surface-agent-actions .vf-figma-column-board {
     grid-auto-columns: minmax(292px, calc(100vw - 64px)) !important;
+  }
+}
+
+/* My Actions scoped mobile convergence. Keeps the Figma visual shell intact. */
+@media (max-width: 1100px) {
+  .ops-shell.surface-agent-actions .vf-figma-actions-toolbar {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 94px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-meta,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates {
+    display: grid !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status {
+    display: inline-flex !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .ops-shell.surface-agent-actions .vf-figma-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+    width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+    padding: 0 8px !important;
+    line-height: 1.05 !important;
+    white-space: normal !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ops-shell.surface-agent-actions .vf-figma-tabs {
+    overflow-x: auto !important;
+    scroll-padding-inline: 4px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs button {
+    padding: 0 4px !important;
+    font-size: 11.5px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-tabs button span {
+    min-width: 18px !important;
+    height: 18px !important;
+    margin-left: 6px !important;
+    border-radius: 6px !important;
+    font-size: 10px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-title strong,
+  .ops-shell.surface-agent-actions .vf-figma-action-meta strong,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates strong {
+    white-space: normal !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-title em,
+  .ops-shell.surface-agent-actions .vf-figma-action-meta em,
+  .ops-shell.surface-agent-actions .vf-figma-action-dates em {
+    white-space: normal !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-agent,
+  .ops-shell.surface-agent-actions .vf-figma-action-problem {
+    white-space: normal !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status {
+    max-width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status {
+    height: 26px !important;
+    padding: 0 10px !important;
+    font-size: 10px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column-board {
+    gap: 14px !important;
+    padding-top: 1px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column {
+    gap: 9px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column header {
+    min-height: 31px !important;
+    padding: 0 2px 3px !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column header span {
+    color: rgb(255 255 255 / 0.66) !important;
+    font-size: 12px !important;
+    font-weight: 620 !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-column header em {
+    width: 28px !important;
+    min-width: 28px !important;
+    height: 28px !important;
+    font-size: 11px !important;
+  }
+}
+
+@media (min-width: 761px) {
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .v19-topbar-menu {
+    display: none !important;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1179px) {
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review) {
+    --v19-sidebar-width: clamp(232px, 25vw, 272px) !important;
+    grid-template-columns: var(--v19-sidebar-width) minmax(0, 1fr) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-sidebar {
+    display: flex !important;
+    width: var(--v19-sidebar-width) !important;
+    align-items: stretch !important;
+    padding: 14px 12px 12px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-brand,
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-session {
+    justify-content: flex-start !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 44px !important;
+    padding: 0 8px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-brand-copy,
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-nav-copy,
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-session
+    div {
+    display: block !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-nav-count {
+    display: inline-flex !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-nav {
+    width: 100% !important;
+    gap: 8px !important;
+    justify-items: stretch !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-nav-item {
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 0 11px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .v19-topbar-menu {
+    display: grid !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+    .ops-sidebar {
+    display: none !important;
+  }
+
+  .ops-shell:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-admin-review
+    ).is-mobile-nav-open
+    .ops-sidebar {
+    position: fixed !important;
+    inset: 10px !important;
+    z-index: 180 !important;
+    display: flex !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: calc(100svh - 20px) !important;
+    align-items: stretch !important;
+    overflow-y: auto !important;
+    border: 1px solid var(--v19-line-strong) !important;
+    border-radius: 18px !important;
+    background: var(--v19-panel) !important;
+    box-shadow: 0 18px 42px rgb(0 0 0 / 0.42) !important;
+  }
+
+  .ops-shell:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-admin-review
+    ).is-mobile-nav-open
+    .workspace {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+/* Export screen responsive convergence. Keep export logic intact; only fix layout geometry. */
+@media (max-width: 1120px) {
+  .surface-export .export-grid.magic-export-stage {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .surface-export .magic-export-queue,
+  .surface-export .v17-export-context-rail {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .surface-export .magic-export-queue {
+    order: 1 !important;
+  }
+
+  .surface-export .v17-export-context-rail {
+    order: 2 !important;
+  }
+
+  .surface-export .export-contract-table,
+  .surface-export .table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .surface-export .export-contract-table {
+    grid-template-columns: minmax(0, 1fr) !important;
+    justify-items: stretch !important;
+  }
+
+  .surface-export .table-wrap {
+    justify-self: stretch !important;
+    overflow-x: auto !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .surface-export .magic-export-queue {
+    padding: 18px 16px 0 !important;
+  }
+
+  .surface-export .v17-export-context-rail {
+    border-radius: 14px !important;
+  }
+
+  .surface-export .data-table {
+    min-width: 620px;
+  }
+
+  .surface-export .v17-export-bulk-bar,
+  .surface-export .bulk-bar {
+    min-width: 0 !important;
   }
 }
