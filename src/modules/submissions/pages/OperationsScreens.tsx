@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { flushSync } from "react-dom";
 import {
   Badge,
@@ -29,6 +36,7 @@ import {
   type AgentTab,
   type ExportTab,
 } from "../uiTypes";
+import { agentDisplayName } from "../agentDirectory";
 import { EmptyState } from "../components/Primitives";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
@@ -139,6 +147,150 @@ type MobileFilterOption<T extends string> = {
   id: T;
   label: string;
 };
+
+type SubmissionListGroup = {
+  id: string;
+  label: string;
+  meta: string;
+  submissions: Submission[];
+};
+
+type InboxEventListGroup = {
+  events: InboxEvent[];
+  id: string;
+  label: string;
+  meta: string;
+};
+
+function groupSubmissionsByCity(submissions: Submission[]): SubmissionListGroup[] {
+  const groups = new Map<string, SubmissionListGroup>();
+
+  submissions.forEach((submission) => {
+    const city = submission.city || "Город не указан";
+    const current = groups.get(city);
+
+    if (current) {
+      current.submissions.push(submission);
+      return;
+    }
+
+    groups.set(city, {
+      id: `city-${city}`,
+      label: city,
+      meta: "",
+      submissions: [submission],
+    });
+  });
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    meta: submissionGroupMeta(group.submissions),
+  }));
+}
+
+function groupSubmissionsByAgent(submissions: Submission[]): SubmissionListGroup[] {
+  const groups = new Map<string, SubmissionListGroup>();
+
+  submissions.forEach((submission) => {
+    const agentId = submission.agentId || "agent-unknown";
+    const current = groups.get(agentId);
+
+    if (current) {
+      current.submissions.push(submission);
+      return;
+    }
+
+    groups.set(agentId, {
+      id: `agent-${agentId}`,
+      label: agentDisplayLabel(agentId),
+      meta: "",
+      submissions: [submission],
+    });
+  });
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    meta: agentSubmissionGroupMeta(group.submissions),
+  }));
+}
+
+function groupInboxEventsByAgent(events: InboxEvent[]): InboxEventListGroup[] {
+  const groups = new Map<string, InboxEventListGroup>();
+
+  events.forEach((event) => {
+    const agentId = event.submission.agentId || "agent-unknown";
+    const current = groups.get(agentId);
+
+    if (current) {
+      current.events.push(event);
+      return;
+    }
+
+    groups.set(agentId, {
+      events: [event],
+      id: `event-agent-${agentId}`,
+      label: agentDisplayLabel(agentId),
+      meta: "",
+    });
+  });
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    meta: inboxEventGroupMeta(group.events),
+  }));
+}
+
+function agentDisplayLabel(agentId: string) {
+  return agentDisplayName(agentId);
+}
+
+function submissionGroupMeta(submissions: Submission[]) {
+  const applicantTotal = submissions.reduce(
+    (total, submission) => total + submission.applicants.length,
+    0,
+  );
+
+  return `${submissions.length} ${pluralRu(
+    submissions.length,
+    "подача",
+    "подачи",
+    "подач",
+  )} · ${applicantTotal} ${pluralRu(
+    applicantTotal,
+    "заявитель",
+    "заявителя",
+    "заявителей",
+  )}`;
+}
+
+function agentSubmissionGroupMeta(submissions: Submission[]) {
+  const cityCount = new Set(submissions.map((submission) => submission.city)).size;
+
+  return `${submissionGroupMeta(submissions)} · ${cityCount} ${pluralRu(
+    cityCount,
+    "город",
+    "города",
+    "городов",
+  )}`;
+}
+
+function inboxEventGroupMeta(events: InboxEvent[]) {
+  const submissionCount = new Set(
+    events.map((event) => event.submission.id),
+  ).size;
+
+  return `${events.length} ${pluralRu(
+    events.length,
+    "событие",
+    "события",
+    "событий",
+  )} · ${submissionCount} ${pluralRu(
+    submissionCount,
+    "подача",
+    "подачи",
+    "подач",
+  )}`;
+}
 
 function MobileFilterSheet<T extends string>({
   label,
@@ -1666,6 +1818,17 @@ export function AdminReviewScreen({
     () => (sortNewest ? filteredEvents : [...filteredEvents].reverse()),
     [filteredEvents, sortNewest],
   );
+  const groupedCorrectionList = useMemo(
+    () =>
+      reviewTab === "corrections"
+        ? groupSubmissionsByAgent(visibleReviewList)
+        : [],
+    [reviewTab, visibleReviewList],
+  );
+  const groupedEventList = useMemo(
+    () => groupInboxEventsByAgent(visibleEvents),
+    [visibleEvents],
+  );
   const visibleSelectedSubmission =
     visibleSubmission &&
     visibleReviewList.some((submission) => submission.id === visibleSubmission.id)
@@ -1875,16 +2038,33 @@ export function AdminReviewScreen({
           renderBlockedState("Очередь недоступна", error, "danger")
         ) : reviewTab === "events" ? (
           visibleEvents.length ? (
-            <div className="v17-admin-event-list" aria-label="События администратора">
-              {visibleEvents.map((event) => (
-                <AdminWorkEventRow
-                  event={event}
-                  key={event.id}
-                  onOpen={() => {
-                    onSelect(event.submission);
-                    onOpen(event.submission, event.tab);
-                  }}
-                />
+            <div
+              className="v17-admin-event-list"
+              aria-label="События администратора по агентам"
+            >
+              {groupedEventList.map((group) => (
+                <section
+                  className="v17-admin-group"
+                  key={group.id}
+                  aria-label={`${group.label}: ${group.meta}`}
+                >
+                  <div className="v17-admin-group-head">
+                    <strong>{group.label}</strong>
+                    <span>{group.meta}</span>
+                  </div>
+                  <div className="v17-admin-group-list">
+                    {group.events.map((event) => (
+                      <AdminWorkEventRow
+                        event={event}
+                        key={event.id}
+                        onOpen={() => {
+                          onSelect(event.submission);
+                          onOpen(event.submission, event.tab);
+                        }}
+                      />
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
           ) : (
@@ -1897,18 +2077,54 @@ export function AdminReviewScreen({
           )
         ) : visibleReviewList.length ? (
           <>
-            <div className="v17-admin-work-list" aria-label="Очередь проверки">
-              {visibleReviewList.map((submission) => (
-                <AdminWorkRow
-                  selected={false}
-                  key={submission.id}
-                  submission={submission}
-                  onOpen={() => {
-                    onSelect(submission);
-                    onOpen(submission, adminWorkDrawerTabFor(submission));
-                  }}
-                />
-              ))}
+            <div
+              className="v17-admin-work-list"
+              aria-label={
+                reviewTab === "corrections"
+                  ? "Исправления по агентам"
+                  : "Очередь проверки"
+              }
+            >
+              {reviewTab === "corrections"
+                ? groupedCorrectionList.map((group) => (
+                    <section
+                      className="v17-admin-group"
+                      key={group.id}
+                      aria-label={`${group.label}: ${group.meta}`}
+                    >
+                      <div className="v17-admin-group-head">
+                        <strong>{group.label}</strong>
+                        <span>{group.meta}</span>
+                      </div>
+                      <div className="v17-admin-group-list">
+                        {group.submissions.map((submission) => (
+                          <AdminWorkRow
+                            selected={false}
+                            key={submission.id}
+                            submission={submission}
+                            onOpen={() => {
+                              onSelect(submission);
+                              onOpen(
+                                submission,
+                                adminWorkDrawerTabFor(submission),
+                              );
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))
+                : visibleReviewList.map((submission) => (
+                    <AdminWorkRow
+                      selected={false}
+                      key={submission.id}
+                      submission={submission}
+                      onOpen={() => {
+                        onSelect(submission);
+                        onOpen(submission, adminWorkDrawerTabFor(submission));
+                      }}
+                    />
+                  ))}
             </div>
           </>
         ) : (
@@ -2247,6 +2463,14 @@ export function ExportScreen({
     () => new Set(selectedExportIds),
     [selectedExportIds],
   );
+  const readyCityGroups = useMemo(
+    () => groupSubmissionsByCity(readyList),
+    [readyList],
+  );
+  const historyCityGroups = useMemo(
+    () => groupSubmissionsByCity(historyList),
+    [historyList],
+  );
   const allReadySelected =
     readyList.length > 0 &&
     readyList.every((submission) => selectedExportIdSet.has(submission.id));
@@ -2342,77 +2566,92 @@ export function ExportScreen({
                     </tr>
                   </thead>
                   <tbody>
-                    {readyList.map((submission) => {
-                      const selected = selectedExportIdSet.has(submission.id);
-
-                      return (
+                    {readyCityGroups.map((group) => (
+                      <Fragment key={group.id}>
                         <tr
-                          aria-label={`Пакет ${submission.title}${
-                            selected ? ", выбран" : ""
-                          }`}
-                          className={`export-row magic-export-row export-contract-row ${
-                            selected ? "selected is-selected" : ""
-                          }`}
-                          key={submission.id}
-                          onClick={() => onOpen(submission)}
+                          className="export-city-group-row"
+                          aria-label={`Город выгрузки ${group.label}`}
                         >
-                          <td onClick={(event) => event.stopPropagation()}>
-                            <input
-                              aria-label={`Выбрать ${submission.title}`}
-                              checked={selected}
-                              className="checkbox"
-                              disabled={exportBusy}
-                              type="checkbox"
-                              onChange={() => onToggle(submission.id)}
-                            />
-                          </td>
-                          <td>
-                            <button
-                              className="export-row-main"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onOpen(submission);
-                              }}
-                            >
-                              <span className="cell-title">{submission.title}</span>
-                              <span className="subtle mono">{submission.id}</span>
-                            </button>
-                            <Button
-                              className="export-table-row-action export-table-row-action-mobile"
-                              variant="secondary"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onOpen(submission);
-                              }}
-                            >
-                              Смотреть пакет
-                            </Button>
-                          </td>
-                          <td>{submission.city}</td>
-                          <td>{exportTripDates(submission)}</td>
-                          <td>{submission.applicants.length}</td>
-                          <td>
-                            <Badge className="html-builder-badge" tone="teal">
-                              Готово
-                            </Badge>
-                          </td>
-                          <td>
-                            <span>{submission.updatedAt}</span>
-                            <Button
-                              className="export-table-row-action"
-                              variant="secondary"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onOpen(submission);
-                              }}
-                            >
-                              Смотреть пакет
-                            </Button>
+                          <td colSpan={7}>
+                            <div className="export-city-group-label">
+                              <strong>{group.label}</strong>
+                              <span>{group.meta}</span>
+                            </div>
                           </td>
                         </tr>
-                      );
-                    })}
+                        {group.submissions.map((submission) => {
+                          const selected = selectedExportIdSet.has(submission.id);
+
+                          return (
+                            <tr
+                              aria-label={`Пакет ${submission.title}${
+                                selected ? ", выбран" : ""
+                              }`}
+                              className={`export-row magic-export-row export-contract-row ${
+                                selected ? "selected is-selected" : ""
+                              }`}
+                              key={submission.id}
+                              onClick={() => onOpen(submission)}
+                            >
+                              <td onClick={(event) => event.stopPropagation()}>
+                                <input
+                                  aria-label={`Выбрать ${submission.title}`}
+                                  checked={selected}
+                                  className="checkbox"
+                                  disabled={exportBusy}
+                                  type="checkbox"
+                                  onChange={() => onToggle(submission.id)}
+                                />
+                              </td>
+                              <td>
+                                <button
+                                  className="export-row-main"
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onOpen(submission);
+                                  }}
+                                >
+                                  <span className="cell-title">{submission.title}</span>
+                                  <span className="subtle mono">{submission.id}</span>
+                                </button>
+                                <Button
+                                  className="export-table-row-action export-table-row-action-mobile"
+                                  variant="secondary"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onOpen(submission);
+                                  }}
+                                >
+                                  Смотреть пакет
+                                </Button>
+                              </td>
+                              <td>{submission.city}</td>
+                              <td>{exportTripDates(submission)}</td>
+                              <td>{submission.applicants.length}</td>
+                              <td>
+                                <Badge className="html-builder-badge" tone="teal">
+                                  Готово
+                                </Badge>
+                              </td>
+                              <td>
+                                <span>{submission.updatedAt}</span>
+                                <Button
+                                  className="export-table-row-action"
+                                  variant="secondary"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onOpen(submission);
+                                  }}
+                                >
+                                  Смотреть пакет
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </Fragment>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -2428,27 +2667,42 @@ export function ExportScreen({
             </div>
           ) : (
             <div className="submission-list magic-export-list">
-              {historyList.map((submission) => (
-                <CardComponent
-                  as="article"
-                  className="export-row magic-export-row"
-                  key={submission.id}
+              {historyCityGroups.map((group) => (
+                <section
+                  className="export-history-city-group"
+                  key={group.id}
+                  aria-label={`История выгрузки: ${group.label}`}
                 >
-                  <Button
-                    className="export-row-main"
-                    variant="plain"
-                    onClick={() => onOpen(submission, "files")}
-                  >
-                    <strong>{submission.title}</strong>
-                    <span>
-                      {submission.id} · {submission.city} · {tripDates(submission)}
-                    </span>
-                  </Button>
-                  <Badge tone="teal">Выгружено</Badge>
-                  <Button variant="secondary" onClick={() => onOpen(submission, "files")}>
-                    Проверить PDF
-                  </Button>
-                </CardComponent>
+                  <div className="export-history-city-head">
+                    <strong>{group.label}</strong>
+                    <span>{group.meta}</span>
+                  </div>
+                  {group.submissions.map((submission) => (
+                    <CardComponent
+                      as="article"
+                      className="export-row magic-export-row"
+                      key={submission.id}
+                    >
+                      <Button
+                        className="export-row-main"
+                        variant="plain"
+                        onClick={() => onOpen(submission, "files")}
+                      >
+                        <strong>{submission.title}</strong>
+                        <span>
+                          {submission.id} · {submission.city} · {tripDates(submission)}
+                        </span>
+                      </Button>
+                      <Badge tone="teal">Выгружено</Badge>
+                      <Button
+                        variant="secondary"
+                        onClick={() => onOpen(submission, "files")}
+                      >
+                        Проверить PDF
+                      </Button>
+                    </CardComponent>
+                  ))}
+                </section>
               ))}
             </div>
           )}

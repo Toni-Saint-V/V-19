@@ -54,7 +54,6 @@ export const workspaceTabs: Array<{ id: DrawerTab; label: string }> = [
 
 export const activeMediaFileTypes: SubmissionFileType[] = [
   "passport_scan",
-  "photo",
   "selfie",
   "selfie_2",
 ];
