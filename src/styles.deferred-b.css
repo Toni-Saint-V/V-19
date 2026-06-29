@@ -5,6 +5,353 @@
   color: #252529 !important;
 }
 
+@media (max-width: 760px) {
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-actions-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .vf-figma-tools {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    grid-template-columns: none !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-search,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle
+    button {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important;
+    min-height: 0 !important;
+    padding: 17px !important;
+    gap: 12px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title
+    em {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    color: rgb(255 255 255 / 0.5) !important;
+    font-size: 11.5px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates {
+    display: grid !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta
+    em,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates
+    em {
+    display: flex !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status {
+    display: inline-flex !important;
+    justify-self: start !important;
+    margin-top: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    display: inline-flex !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    font-size: 13px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button::after {
+    content: none !important;
+  }
+}
+
+@media (min-width: 761px) {
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) {
+    --v19-sidebar-width: clamp(360px, 33vw, 520px) !important;
+    --vf-action-menu-width: min(472px, calc(var(--v19-sidebar-width) - 48px));
+    --vf-action-menu-icon-size: 56px;
+    grid-template-columns: var(--v19-sidebar-width) minmax(0, 1fr) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-sidebar {
+    align-items: center !important;
+    width: var(--v19-sidebar-width) !important;
+    max-width: 520px !important;
+    padding: 38px 24px 28px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-brand {
+    justify-content: center !important;
+    width: var(--vf-action-menu-width) !important;
+    min-height: 88px !important;
+    margin-bottom: 0 !important;
+    padding: 0 0 26px !important;
+    border-bottom: 1px solid rgb(255 255 255 / 0.08) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-brand-logo {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 16px !important;
+    font-size: 22px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    :is(.ops-brand-copy, .ops-mobile-close) {
+    display: none !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav {
+    justify-items: center !important;
+    width: var(--vf-action-menu-width) !important;
+    gap: 18px !important;
+    margin-top: 18px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav::before {
+    width: 100% !important;
+    padding: 0 0 2px !important;
+    text-align: center !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-item {
+    justify-content: center !important;
+    width: var(--vf-action-menu-icon-size) !important;
+    height: var(--vf-action-menu-icon-size) !important;
+    min-height: var(--vf-action-menu-icon-size) !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    border-radius: 18px !important;
+    transition:
+      width var(--v19-motion-normal) var(--v19-motion-ease),
+      background-color var(--v19-motion-fast) var(--v19-motion-ease),
+      color var(--v19-motion-fast) var(--v19-motion-ease) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-nav-item.is-active::before {
+    left: -18px !important;
+    width: 3px !important;
+    height: 28px !important;
+    background: rgb(243 243 245 / 0.86) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-icon {
+    width: 22px !important;
+    height: 22px !important;
+    flex-basis: 22px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-icon svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    :is(.ops-nav-copy, .ops-nav-count, .ops-nav-action) {
+    display: none !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-create {
+    width: var(--vf-action-menu-width) !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    margin-top: auto !important;
+    border-radius: 18px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-create
+    span {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-create
+    strong {
+    display: none !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-footer {
+    align-self: center !important;
+    width: var(--vf-action-menu-width) !important;
+    margin-top: 26px !important;
+    padding: 26px 0 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-admin-zone.secondary-button {
+    width: var(--vf-action-menu-width) !important;
+    height: 58px !important;
+    border-radius: 18px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-session {
+    justify-content: flex-start !important;
+    width: var(--vf-action-menu-width) !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    padding: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-session > span {
+    width: 44px !important;
+    height: 44px !important;
+    flex-basis: 44px !important;
+    font-size: 14px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-session
+    > div,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-user-more {
+    display: none !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-item {
+    justify-content: flex-start !important;
+    width: var(--vf-action-menu-width) !important;
+    padding: 0 18px !important;
+    gap: 12px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-item.is-active::before {
+    left: -24px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-copy {
+    display: block !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-count {
+    display: grid !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-sidebar-create {
+    gap: 10px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-sidebar-create
+    strong {
+    display: block !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-session {
+    gap: 10px !important;
+    padding: 0 6px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-session
+    > div {
+    display: block !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-user-more {
+    display: block !important;
+  }
+}
+
 .ops-shell.surface-agent-actions .vf-figma-view-toggle,
 .ops-shell.surface-admin-review .vf-figma-view-toggle {
   background: #141416 !important;
@@ -93,19 +440,17 @@
   font-size: 8.5px !important;
 }
 
-.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review) {
+.ops-shell.surface-agent-submissions {
   --v19-sidebar-width: 272px !important;
 }
 
-.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
-  .ops-sidebar {
+.ops-shell.surface-agent-submissions .ops-sidebar {
   width: 272px !important;
   padding: 14px 12px 12px !important;
   background: rgb(16 16 17) !important;
 }
 
-.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
-  .ops-brand {
+.ops-shell.surface-agent-submissions .ops-brand {
   gap: 10px !important;
   height: 62px !important;
   min-height: 62px !important;
@@ -114,21 +459,18 @@
   border-bottom: 1px solid rgb(255 255 255 / 0.075) !important;
 }
 
-.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
-  .ops-nav {
+.ops-shell.surface-agent-submissions .ops-nav {
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
 
-.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
-  .ops-nav-item {
+.ops-shell.surface-agent-submissions .ops-nav-item {
   min-height: 44px !important;
   padding: 0 11px !important;
   border-radius: 10px !important;
 }
 
-.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
-  .ops-sidebar-footer {
+.ops-shell.surface-agent-submissions .ops-sidebar-footer {
   margin-top: auto !important;
   padding-top: 8px !important;
   border-top: 1px solid rgb(32 33 36) !important;
@@ -1773,6 +2115,118 @@
     font-size: 15px;
   }
 
+}
+
+@media (max-width: 760px) {
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-actions-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .vf-figma-tools {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    grid-template-columns: none !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-search,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle
+    button {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important;
+    min-height: 0 !important;
+    padding: 17px !important;
+    gap: 12px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title
+    em {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    color: rgb(255 255 255 / 0.5) !important;
+    font-size: 11.5px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates {
+    display: grid !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta
+    em,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates
+    em {
+    display: flex !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status {
+    display: inline-flex !important;
+    justify-self: start !important;
+    margin-top: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    display: inline-flex !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    font-size: 13px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button::after {
+    content: none !important;
+  }
 }
 
 @media (max-width: 1279px) {
@@ -6669,4 +7123,116 @@
     pointer-events: auto !important;
   }
 
+}
+
+@media (max-width: 760px) {
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-actions-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .vf-figma-tools {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    grid-template-columns: none !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-search,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle
+    button {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important;
+    min-height: 0 !important;
+    padding: 17px !important;
+    gap: 12px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title
+    em {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    color: rgb(255 255 255 / 0.5) !important;
+    font-size: 11.5px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates {
+    display: grid !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta
+    em,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates
+    em {
+    display: flex !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status {
+    display: inline-flex !important;
+    justify-self: start !important;
+    margin-top: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    display: inline-flex !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    font-size: 13px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button::after {
+    content: none !important;
+  }
 }

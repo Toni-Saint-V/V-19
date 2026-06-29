@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Filter,
+  Columns3,
   Folder,
+  List,
   Search,
   User,
   Users,
@@ -22,8 +23,8 @@ import type { City, DrawerTab, Submission } from "../types";
 
 type VisualStatus = Submission["status"];
 
-type VisualActionCategory = "all" | "issues" | "review" | "completed";
-type VisualSortMode = "priority" | "updated" | "created" | "trip";
+type VisualActionCategory = "all" | "issues" | "review";
+type VisualTone = "blue" | "danger" | "green" | "indigo" | "warning";
 
 type VisualActionRow = {
   actionId: string;
@@ -53,7 +54,7 @@ type VisualColumn = {
   id: string;
   label: string;
   matches: (item: VisualActionRow) => boolean;
-  tone?: "danger" | "warning";
+  tone?: VisualTone;
 };
 
 type VisualMember = {
@@ -75,7 +76,7 @@ const emptySummary: AgentActionSummary = {
 
 function statusDot(status: VisualStatus) {
   if (status === "returned" || status === "requires_action") {
-    return "vf-figma-dot-warning";
+    return "vf-figma-dot-danger";
   }
   if (status === "draft" || status === "in_progress") return "vf-figma-dot-blue";
   if (status === "submitted_for_review" || status === "corrections_received") {
@@ -87,7 +88,7 @@ function statusDot(status: VisualStatus) {
 function statusBadge(item: VisualActionRow) {
   if (item.status === "returned" || item.status === "requires_action") {
     return (
-      <span className="vf-figma-status is-warning">
+      <span className="vf-figma-status is-danger">
         <AlertCircle aria-hidden="true" size={15} />
         {item.statusLabel}
       </span>
@@ -141,81 +142,34 @@ function activateKeyboardCard(
   action();
 }
 
-function useMobileActionListLayout() {
-  const [matches, setMatches] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)").matches : false,
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const media = window.matchMedia("(max-width: 760px)");
-    const update = () => setMatches(media.matches);
-
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return matches;
-}
-
 function VisualToolbar({
   category,
   categoryCounts,
-  cityFilter,
-  cityOptions,
-  mobileLockedView,
   onCategory,
-  onCityFilter,
   onQuery,
-  onSortMode,
   onViewMode,
   query,
-  sortMode,
   viewMode,
 }: {
   category: VisualActionCategory;
   categoryCounts: Record<VisualActionCategory, number>;
-  cityFilter: City | "Все города";
-  cityOptions: Array<City | "Все города">;
-  mobileLockedView?: boolean;
   onCategory: (category: VisualActionCategory) => void;
-  onCityFilter: (city: City | "Все города") => void;
   onQuery: (query: string) => void;
-  onSortMode: (mode: VisualSortMode) => void;
   onViewMode: (mode: "columns" | "list") => void;
   query: string;
-  sortMode: VisualSortMode;
   viewMode: "columns" | "list";
 }) {
-  const [filterOpen, setFilterOpen] = useState(false);
   const tabs: Array<{ id: VisualActionCategory; label: string }> = [
     { id: "all", label: "Все действия" },
     { id: "issues", label: "Ошибки" },
     { id: "review", label: "На проверке" },
-    { id: "completed", label: "Выполненные" },
-  ];
-  const sortOptions: Array<{ id: VisualSortMode; label: string }> = [
-    { id: "priority", label: "Приоритет" },
-    { id: "updated", label: "Обновлено" },
-    { id: "created", label: "Создано" },
-    { id: "trip", label: "Дата поездки" },
   ];
 
   function chooseViewMode(mode: "columns" | "list") {
     onViewMode(mode);
-    setFilterOpen(false);
-  }
-
-  function chooseCity(nextCity: City | "Все города") {
-    onCityFilter(nextCity);
-    setFilterOpen(false);
-  }
-
-  function chooseSort(mode: VisualSortMode) {
-    onSortMode(mode);
-    setFilterOpen(false);
+    window.requestAnimationFrame(() => {
+      document.querySelector(".vf-figma-screen")?.scrollTo({ left: 0 });
+    });
   }
 
   return (
@@ -230,7 +184,8 @@ function VisualToolbar({
             type="button"
             onClick={() => onCategory(tab.id)}
           >
-            {tab.label} <span>{categoryCounts[tab.id]}</span>
+            <span className="vf-figma-tab-label">{tab.label}</span>
+            <span className="vf-figma-tab-badge">{categoryCounts[tab.id]}</span>
           </button>
         ))}
       </div>
@@ -246,69 +201,25 @@ function VisualToolbar({
             onChange={(event) => onQuery(event.target.value)}
           />
         </div>
-        <div className="vf-figma-filter-menu">
+        <div className="vf-figma-view-toggle" aria-label="Вид списка">
           <button
-            className="vf-figma-icon-button"
-            aria-label="Фильтр и вид"
-            aria-expanded={filterOpen}
+            className={viewMode === "list" ? "is-active" : ""}
             type="button"
-            onClick={() => setFilterOpen((open) => !open)}
+            aria-pressed={viewMode === "list"}
+            onClick={() => chooseViewMode("list")}
           >
-            <Filter aria-hidden="true" size={21} />
+            <List aria-hidden="true" size={16} />
+            Список
           </button>
-          {filterOpen ? (
-            <div className="vf-figma-filter-popover" role="menu" aria-label="Фильтр и вид">
-              {!mobileLockedView ? (
-                <>
-                  <span>Вид</span>
-                  <button
-                    className={viewMode === "list" ? "is-active" : ""}
-                    role="menuitemradio"
-                    aria-checked={viewMode === "list"}
-                    type="button"
-                    onClick={() => chooseViewMode("list")}
-                  >
-                    Список
-                  </button>
-                  <button
-                    className={viewMode === "columns" ? "is-active" : ""}
-                    role="menuitemradio"
-                    aria-checked={viewMode === "columns"}
-                    type="button"
-                    onClick={() => chooseViewMode("columns")}
-                  >
-                    Колонки
-                  </button>
-                </>
-              ) : null}
-              <span>Город</span>
-              {cityOptions.map((city) => (
-                <button
-                  className={cityFilter === city ? "is-active" : ""}
-                  key={city}
-                  role="menuitemradio"
-                  aria-checked={cityFilter === city}
-                  type="button"
-                  onClick={() => chooseCity(city)}
-                >
-                  {city}
-                </button>
-              ))}
-              <span>Сортировка</span>
-              {sortOptions.map((option) => (
-                <button
-                  className={sortMode === option.id ? "is-active" : ""}
-                  key={option.id}
-                  role="menuitemradio"
-                  aria-checked={sortMode === option.id}
-                  type="button"
-                  onClick={() => chooseSort(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
+          <button
+            className={viewMode === "columns" ? "is-active" : ""}
+            type="button"
+            aria-pressed={viewMode === "columns"}
+            onClick={() => chooseViewMode("columns")}
+          >
+            <Columns3 aria-hidden="true" size={16} />
+            Колонки
+          </button>
         </div>
       </div>
     </div>
@@ -332,12 +243,12 @@ function ListRow({
       onClick={() => onOpen(item.submission, item.tab)}
       onKeyDown={(event) => activateKeyboardCard(event, () => onOpen(item.submission, item.tab))}
     >
-      <span className="vf-figma-mobile-id">{item.id}</span>
       <span className={`vf-figma-dot ${statusDot(item.status)}`} aria-hidden="true" />
       <span className="vf-figma-action-title">
         <strong>{item.title}</strong>
         <em>
-          ID: <span>{item.id}</span> Обновлено: {item.updated}
+          <span className="vf-figma-action-id">{item.id}</span>
+          <span className="vf-figma-action-updated">Обновлено: {item.updated}</span>
         </em>
       </span>
       <span className="vf-figma-action-meta">
@@ -349,18 +260,9 @@ function ListRow({
       </span>
       <span className="vf-figma-action-dates">
         <strong>{item.tripDates}</strong>
-        <em>{item.context}</em>
+        <em>Даты поездки</em>
       </span>
       <span className="vf-figma-action-status">{statusBadge(item)}</span>
-      <span className="vf-figma-mobile-route">
-        <strong>{item.city}</strong>
-        <em>{item.tripDates}</em>
-      </span>
-      <span className="vf-figma-mobile-chevron" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false">
-          <path d="m9 6 6 6-6 6" />
-        </svg>
-      </span>
       <button
         className="vf-figma-open-button"
         type="button"
@@ -383,6 +285,9 @@ function ColumnCard({
   item: VisualActionRow;
   onOpen: VisualOpenHandler;
 }) {
+  const tone = visualToneForStatus(item.status);
+  const showRail = tone !== "blue";
+
   return (
     <button
       className="vf-figma-column-card"
@@ -391,12 +296,7 @@ function ColumnCard({
       aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
       onClick={() => onOpen(item.submission, item.tab)}
     >
-      {item.status === "returned" || item.status === "requires_action" ? (
-        <span className="vf-figma-card-rail is-danger" />
-      ) : null}
-      {item.status === "draft" || item.status === "in_progress" ? (
-        <span className="vf-figma-card-rail is-warning" />
-      ) : null}
+      {showRail ? <span className={`vf-figma-card-rail is-${tone}`} /> : null}
       <span className="vf-figma-column-card-head">
         <span>{item.id}</span>
         <em>
@@ -410,8 +310,8 @@ function ColumnCard({
       </span>
       <span className="vf-figma-column-footer">
         {item.blocker ? (
-          <span className={item.severity === "blocker" ? "is-danger" : "is-warning"}>
-            <AlertCircle aria-hidden="true" size={15} />
+          <span className={`is-${tone}`}>
+            {visualToneIcon(tone)}
             {item.blocker}
           </span>
         ) : (
@@ -428,10 +328,7 @@ function ColumnCard({
 }
 
 export function FigmaActionQueueVisual({
-  cityFilter,
-  cityOptions,
   completedActions,
-  onCityFilter,
   onOpen,
   onSearch,
   openActions,
@@ -449,10 +346,7 @@ export function FigmaActionQueueVisual({
   summary?: AgentActionSummary;
 }) {
   const [viewMode, setViewMode] = useState<"columns" | "list">("list");
-  const mobileLockedView = useMobileActionListLayout();
-  const effectiveViewMode = mobileLockedView ? "list" : viewMode;
   const [category, setCategory] = useState<VisualActionCategory>("all");
-  const [sortMode, setSortMode] = useState<VisualSortMode>("priority");
   const allItems = useMemo(
     () => [...openActions, ...completedActions].map(toVisualActionRow),
     [completedActions, openActions],
@@ -460,27 +354,16 @@ export function FigmaActionQueueVisual({
   const categoryCounts = useMemo(
     () => ({
       all: allItems.length,
-      completed: completedActions.length,
       issues: allItems.filter((item) => visualCategoryMatches(item, "issues")).length,
       review: allItems.filter((item) => visualCategoryMatches(item, "review")).length,
     }),
-    [allItems, completedActions.length],
+    [allItems],
   );
   const visibleItems = useMemo(
-    () =>
-      sortVisualItems(
-        allItems.filter((item) => visualCategoryMatches(item, category)),
-        sortMode,
-      ),
-    [allItems, category, sortMode],
+    () => allItems.filter((item) => visualCategoryMatches(item, category)),
+    [allItems, category],
   );
   const columns: VisualColumn[] = [
-    {
-      id: "errors",
-      label: "Ошибки",
-      matches: (item) => visualCategoryMatches(item, "issues"),
-      tone: "danger",
-    },
     {
       id: "docs",
       label: "Сбор документов",
@@ -488,40 +371,41 @@ export function FigmaActionQueueVisual({
       tone: "warning",
     },
     {
+      id: "errors",
+      label: "Ошибки",
+      matches: (item) => visualCategoryMatches(item, "issues"),
+      tone: "danger",
+    },
+    {
       id: "review",
       label: "На проверке",
       matches: (item) => visualCategoryMatches(item, "review"),
+      tone: "indigo",
     },
     {
       id: "ready",
-      label: "Готово",
+      label: "Готово к выгрузке",
       matches: (item) => isReadyVisualStatus(item.status),
+      tone: "green",
     },
   ];
-  const groupLabel = visualGroupLabel(category, visibleItems.length, sortMode);
 
   return (
     <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
       <VisualToolbar
         category={category}
         categoryCounts={categoryCounts}
-        cityFilter={cityFilter}
-        cityOptions={cityOptions}
-        mobileLockedView={mobileLockedView}
         onCategory={setCategory}
-        onCityFilter={onCityFilter}
         onQuery={onSearch}
-        onSortMode={setSortMode}
         onViewMode={setViewMode}
         query={query}
-        sortMode={sortMode}
-        viewMode={effectiveViewMode}
+        viewMode={viewMode}
       />
 
       <div
-        className={`vf-figma-view-stage is-${effectiveViewMode}`}
+        className={`vf-figma-view-stage is-${viewMode}`}
         data-agent-action-open-count={summary.open}
-        key={effectiveViewMode}
+        key={viewMode}
       >
         {visibleItems.length === 0 ? (
           <div className="vf-figma-action-list" role="status">
@@ -533,15 +417,15 @@ export function FigmaActionQueueVisual({
             <div className="vf-figma-column-card">
               <strong>По текущим фильтрам ничего не найдено</strong>
               <span className="vf-figma-column-subline">
-                Измените поиск, город или категорию. Данные берутся из реальных подач агента.
+                Измените поиск или категорию. Данные берутся из реальных подач агента.
               </span>
             </div>
           </div>
-        ) : effectiveViewMode === "list" ? (
+        ) : viewMode === "list" ? (
           <div className="vf-figma-action-list">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
-              <strong>{groupLabel}</strong>
+              <strong>Сегодня</strong>
               <span aria-hidden="true" />
             </div>
             {visibleItems.map((item) => (
@@ -752,7 +636,6 @@ function toVisualActionRow(action: AgentActionItem): VisualActionRow {
 
 function visualCategoryMatches(item: VisualActionRow, category: VisualActionCategory) {
   if (category === "all") return true;
-  if (category === "completed") return item.completed;
   if (category === "issues") {
     return (
       !item.completed &&
@@ -777,59 +660,20 @@ function isReadyVisualStatus(status: VisualStatus) {
   return status === "ready_for_export" || status === "exported";
 }
 
-function sortVisualItems(items: VisualActionRow[], sortMode: VisualSortMode) {
-  if (sortMode === "priority") return items;
-
-  return [...items].sort((left, right) => {
-    if (sortMode === "updated") {
-      return compareOperationalDate(right.updated, left.updated);
-    }
-    if (sortMode === "created") {
-      return compareOperationalDate(right.createdAt, left.createdAt);
-    }
-    return compareOperationalDate(left.tripDateFrom, right.tripDateFrom);
-  });
+function visualToneForStatus(status: VisualStatus): VisualTone {
+  if (status === "returned" || status === "requires_action") return "danger";
+  if (status === "draft" || status === "in_progress") return "warning";
+  if (isReviewVisualStatus(status)) return "indigo";
+  if (isReadyVisualStatus(status)) return "green";
+  return "blue";
 }
 
-function compareOperationalDate(left: string, right: string) {
-  return operationalDateScore(left) - operationalDateScore(right);
-}
-
-function operationalDateScore(value: string) {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return 0;
-  if (normalized === "сейчас") return Number.MAX_SAFE_INTEGER;
-
-  const parsed = Date.parse(normalized);
-  if (!Number.isNaN(parsed)) return parsed;
-
-  const match = normalized.match(/^(\d{1,2})\.(\d{1,2})/);
-  if (match) {
-    const day = Number(match[1]);
-    const month = Number(match[2]);
-    return month * 100 + day;
+function visualToneIcon(tone: VisualTone) {
+  if (tone === "green") return <CheckCircle2 aria-hidden="true" size={15} />;
+  if (tone === "indigo" || tone === "blue") {
+    return <Clock aria-hidden="true" size={15} />;
   }
-
-  return normalized.charCodeAt(0) || 0;
-}
-
-function visualGroupLabel(
-  category: VisualActionCategory,
-  count: number,
-  sortMode: VisualSortMode,
-) {
-  const sorted =
-    sortMode === "priority"
-      ? "приоритет"
-      : sortMode === "updated"
-        ? "обновление"
-        : sortMode === "created"
-          ? "создание"
-          : "дата поездки";
-  if (category === "issues") return `Ошибки · ${count} · ${sorted}`;
-  if (category === "review") return `На проверке · ${count} · ${sorted}`;
-  if (category === "completed") return `Выполненные · ${count} · ${sorted}`;
-  return `Все действия · ${count} · ${sorted}`;
+  return <AlertCircle aria-hidden="true" size={15} />;
 }
 
 function visualMemberForApplicant(
