@@ -155,6 +155,19 @@ function MobileFilterSheet<T extends string>({
 }) {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [open]);
+
   return (
     <div className="v19-mobile-filter">
       <ToolbarIconButton
@@ -2616,12 +2629,14 @@ export function ExportScreen({
             >
               <div className="mp-action-dock-actions export-actions">
                 <Button
+                  aria-describedby={actionHint ? "export-action-hint" : undefined}
                   disabled={exportBusy || !exportPlan.canGenerate}
                   onClick={onGenerate}
                 >
                   Сформировать Эксель
                 </Button>
                 <Button
+                  aria-describedby={actionHint ? "export-action-hint" : undefined}
                   disabled={exportBusy || !exportPlan.canDownload}
                   variant="secondary"
                   onClick={onDownload}
@@ -2629,6 +2644,7 @@ export function ExportScreen({
                   Скачать Excel
                 </Button>
                 <Button
+                  aria-describedby={actionHint ? "export-action-hint" : undefined}
                   disabled={exportBusy || !exportPlan.canMarkExported}
                   loading={exportBusy}
                   variant="secondary"

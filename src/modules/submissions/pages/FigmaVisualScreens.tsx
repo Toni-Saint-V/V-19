@@ -668,6 +668,7 @@ function ListRow({
       className="vf-figma-action-row"
       role="button"
       tabIndex={0}
+      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
       onClick={() => onOpen?.(item.id, "detail")}
       onKeyDown={(event) => activateKeyboardCard(event, () => onOpen?.(item.id, "detail"))}
     >
@@ -693,6 +694,7 @@ function ListRow({
       <button
         className="vf-figma-open-button"
         type="button"
+        aria-label={`${visualActionLabel(item)}: ${item.title}, ${item.id}`}
         onClick={(event) => {
           event.stopPropagation();
           onOpen?.(item.id, visualOpenIntent(item));
@@ -717,6 +719,7 @@ function ColumnCard({
     <button
       className="vf-figma-column-card"
       type="button"
+      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
       onClick={() => onOpen?.(item.id, "detail")}
     >
       {item.status === "returned" ? <span className="vf-figma-card-rail is-danger" /> : null}
@@ -821,6 +824,7 @@ export function FigmaApplicantsVisual({
               key={family.id}
               role="button"
               tabIndex={0}
+              aria-label={`Открыть семейную подачу: ${family.title}, ${family.id}`}
               onClick={() => onOpen?.(family.id)}
               onKeyDown={(event) =>
                 activateKeyboardCard(event, () => onOpen?.(family.id))
@@ -841,6 +845,7 @@ export function FigmaApplicantsVisual({
                     className="vf-figma-member-row"
                     key={`${family.id}-${member.name}`}
                     type="button"
+                    aria-label={`Открыть заявителя: ${member.name}, ${family.title}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       onOpen?.(family.id);
@@ -875,6 +880,7 @@ export function FigmaApplicantsVisual({
               className="vf-figma-individual-card"
               key={individual.id}
               type="button"
+              aria-label={`Открыть заявителя: ${individual.name}, ${individual.id}`}
               onClick={() => onOpen?.(individual.id)}
             >
               <span className="vf-figma-avatar">{individual.initials}</span>
