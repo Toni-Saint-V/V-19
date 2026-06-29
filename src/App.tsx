@@ -103,7 +103,7 @@ import {
 } from "./modules/submissions/components/OperationalNavigation";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
-import { SubmissionDrawer } from "./modules/submissions/components/SubmissionDrawer";
+import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import {
   AdminReviewScreen,
   AgentActionsScreen,
@@ -176,6 +176,11 @@ const FigmaActionQueueVisual = lazy(() =>
 const CreateSubmissionDrawer = lazy(() =>
   import("./modules/submissions/components/CreateSubmissionDrawer").then((module) => ({
     default: module.CreateSubmissionDrawer,
+  })),
+);
+const SubmissionDrawer = lazy(() =>
+  import("./modules/submissions/components/SubmissionDrawer").then((module) => ({
+    default: module.SubmissionDrawer,
   })),
 );
 
@@ -1189,6 +1194,15 @@ function MainApp() {
     setDrawerInitialTarget(target ?? null);
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
+  }
+
+  function openAgentQuestionnaireWorkspace() {
+    const targetSubmission = activeSubmission ?? firstAgentActionSubmission();
+    if (!targetSubmission) return;
+    setSelectedSubmissionId(targetSubmission.id);
+    setActiveDrawerTab("questionnaire");
+    setDrawerMode("closed");
+    setAgentQuestionnaireOpen(true);
   }
 
   function selectSubmission(submission: Submission) {
@@ -2709,6 +2723,7 @@ function MainApp() {
             : undefined
         }
         items={mobileAwareOperationalNavItems}
+        onMobileClose={() => setMobileNavOpen(false)}
         mobileTitle={
           role === "agent" &&
           (surface === "agent-actions" ||
@@ -3017,48 +3032,68 @@ function MainApp() {
         />
       ) : null}
 
-      {drawerMode === "detail" && activeSubmission ? (
-        <SubmissionDrawer
+      {drawerMode === "detail" &&
+      activeSubmission &&
+      role === "agent" &&
+      isFigmaVisualSurface ? (
+        <FigmaSubmissionDrawer
           actionError={activeSubmissionActionError}
           activeTab={activeDrawerTab}
-          agentOwnerId={currentAgentOwnerId}
-          initialTarget={drawerInitialTarget}
-          issueComposerRequest={issueComposerRequest}
-          onIssueComposerConsumed={() => setIssueComposerRequest(null)}
           onAction={updateSubmission}
-          onAddIssue={addAdminIssue}
-          onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
           onClose={closeDrawer}
-          onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
-          onMarkIssueFixed={markActiveIssueFixed}
-          onApplyPassportField={applyPassportFieldForActiveSubmission}
-          onExtractPassport={extractPassportForActiveSubmission}
-          onConfirmVisaApplicationPdfReview={
-            confirmVisaApplicationPdfReviewForActiveSubmission
-          }
-          onDismissVisaApplicationPdfReview={
-            dismissVisaApplicationPdfReviewForActiveSubmission
-          }
-          onPublishReturnedPdfHandoff={publishReturnedPdfHandoffForActiveSubmission}
-          onRunAiReview={runAiReviewForActiveSubmission}
-          onTab={setActiveDrawerTab}
-          onQuestionnaireField={updateActiveQuestionnaireField}
-          onReviewVisaApplicationPdf={reviewVisaApplicationPdfForActiveSubmission}
-          onUploadFile={uploadActiveFile}
-          fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
-          localPassportFileIds={localPassportFileIds}
-          passportExtractionEnabled={passportExtractionEnabled}
-          requireSelectedFile={isSupabaseMode}
+          onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
           role={role}
-          surface={
-            surface === "export"
-              ? "export"
-              : surface === "admin-review"
-                ? "review"
-                : "agent"
-          }
+          surface="agent"
           submission={activeSubmission}
         />
+      ) : null}
+
+      {drawerMode === "detail" &&
+      activeSubmission &&
+      !(role === "agent" && isFigmaVisualSurface) ? (
+        <Suspense fallback={null}>
+          <SubmissionDrawer
+            actionError={activeSubmissionActionError}
+            activeTab={activeDrawerTab}
+            agentOwnerId={currentAgentOwnerId}
+            initialTarget={drawerInitialTarget}
+            issueComposerRequest={issueComposerRequest}
+            onIssueComposerConsumed={() => setIssueComposerRequest(null)}
+            onAction={updateSubmission}
+            onAddIssue={addAdminIssue}
+            onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
+            onClose={closeDrawer}
+            onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
+            onMarkIssueFixed={markActiveIssueFixed}
+            onApplyPassportField={applyPassportFieldForActiveSubmission}
+            onExtractPassport={extractPassportForActiveSubmission}
+            onConfirmVisaApplicationPdfReview={
+              confirmVisaApplicationPdfReviewForActiveSubmission
+            }
+            onDismissVisaApplicationPdfReview={
+              dismissVisaApplicationPdfReviewForActiveSubmission
+            }
+            onPublishReturnedPdfHandoff={publishReturnedPdfHandoffForActiveSubmission}
+            onRunAiReview={runAiReviewForActiveSubmission}
+            onTab={setActiveDrawerTab}
+            onQuestionnaireField={updateActiveQuestionnaireField}
+            onReviewVisaApplicationPdf={reviewVisaApplicationPdfForActiveSubmission}
+            onUploadFile={uploadActiveFile}
+            fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
+            localPassportFileIds={localPassportFileIds}
+            passportExtractionEnabled={passportExtractionEnabled}
+            requireSelectedFile={isSupabaseMode}
+            role={role}
+            surface={
+              surface === "export"
+                ? "export"
+                : surface === "admin-review"
+                  ? "review"
+                  : "agent"
+            }
+            submission={activeSubmission}
+          />
+        </Suspense>
       ) : null}
 
       {drawerMode === "create" ? (

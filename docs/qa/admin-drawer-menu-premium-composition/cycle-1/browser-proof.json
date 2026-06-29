@@ -1,0 +1,328 @@
+[
+  {
+    "label": "desktop-1440:menu-closed",
+    "innerWidth": 1440,
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "overflowX": 0,
+    "drawerOpen": false,
+    "activeDrawerTab": null,
+    "drawerRect": null
+  },
+  {
+    "label": "desktop-1440:drawer-passport",
+    "innerWidth": 1440,
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Паспорт",
+    "drawerRect": {
+      "x": 392,
+      "y": 8,
+      "width": 1040,
+      "height": 944
+    }
+  },
+  {
+    "label": "desktop-1440:drawer-selfie",
+    "innerWidth": 1440,
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Селфи",
+    "drawerRect": {
+      "x": 392,
+      "y": 8,
+      "width": 1040,
+      "height": 944
+    }
+  },
+  {
+    "label": "desktop-1440:drawer-questionnaire",
+    "innerWidth": 1440,
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Анкета",
+    "drawerRect": {
+      "x": 392,
+      "y": 8,
+      "width": 1040,
+      "height": 944
+    }
+  },
+  {
+    "label": "desktop-1440:drawer-remarks",
+    "innerWidth": 1440,
+    "docScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Замечания",
+    "drawerRect": {
+      "x": 392,
+      "y": 8,
+      "width": 1040,
+      "height": 944
+    }
+  },
+  {
+    "label": "desktop-1440:console",
+    "messages": []
+  },
+  {
+    "label": "tablet-768:menu-closed",
+    "innerWidth": 768,
+    "docScrollWidth": 768,
+    "bodyScrollWidth": 768,
+    "overflowX": 0,
+    "drawerOpen": false,
+    "activeDrawerTab": null,
+    "drawerRect": null
+  },
+  {
+    "label": "tablet-768:menu-open",
+    "innerWidth": 768,
+    "docScrollWidth": 768,
+    "bodyScrollWidth": 768,
+    "overflowX": 0,
+    "drawerOpen": false,
+    "activeDrawerTab": null,
+    "drawerRect": null
+  },
+  {
+    "label": "tablet-768:drawer-passport",
+    "innerWidth": 768,
+    "docScrollWidth": 768,
+    "bodyScrollWidth": 768,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Паспорт",
+    "drawerRect": {
+      "x": 0,
+      "y": 8,
+      "width": 768,
+      "height": 1008
+    }
+  },
+  {
+    "label": "tablet-768:drawer-selfie",
+    "innerWidth": 768,
+    "docScrollWidth": 768,
+    "bodyScrollWidth": 768,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Селфи",
+    "drawerRect": {
+      "x": 0,
+      "y": 8,
+      "width": 768,
+      "height": 1008
+    }
+  },
+  {
+    "label": "tablet-768:drawer-questionnaire",
+    "innerWidth": 768,
+    "docScrollWidth": 768,
+    "bodyScrollWidth": 768,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Анкета",
+    "drawerRect": {
+      "x": 0,
+      "y": 8,
+      "width": 768,
+      "height": 1008
+    }
+  },
+  {
+    "label": "tablet-768:drawer-remarks",
+    "innerWidth": 768,
+    "docScrollWidth": 768,
+    "bodyScrollWidth": 768,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Замечания",
+    "drawerRect": {
+      "x": 0,
+      "y": 8,
+      "width": 768,
+      "height": 1008
+    }
+  },
+  {
+    "label": "tablet-768:console",
+    "messages": []
+  },
+  {
+    "label": "mobile-390:menu-closed",
+    "innerWidth": 390,
+    "docScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "overflowX": 0,
+    "drawerOpen": false,
+    "activeDrawerTab": null,
+    "drawerRect": null
+  },
+  {
+    "label": "mobile-390:menu-open",
+    "innerWidth": 390,
+    "docScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "overflowX": 0,
+    "drawerOpen": false,
+    "activeDrawerTab": null,
+    "drawerRect": null
+  },
+  {
+    "label": "mobile-390:drawer-passport",
+    "innerWidth": 390,
+    "docScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Паспорт",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844
+    }
+  },
+  {
+    "label": "mobile-390:drawer-selfie",
+    "innerWidth": 390,
+    "docScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Селфи",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844
+    }
+  },
+  {
+    "label": "mobile-390:drawer-questionnaire",
+    "innerWidth": 390,
+    "docScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Анкета",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844
+    }
+  },
+  {
+    "label": "mobile-390:drawer-remarks",
+    "innerWidth": 390,
+    "docScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Замечания",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844
+    }
+  },
+  {
+    "label": "mobile-390:console",
+    "messages": []
+  },
+  {
+    "label": "mobile-375:menu-closed",
+    "innerWidth": 375,
+    "docScrollWidth": 375,
+    "bodyScrollWidth": 375,
+    "overflowX": 0,
+    "drawerOpen": false,
+    "activeDrawerTab": null,
+    "drawerRect": null
+  },
+  {
+    "label": "mobile-375:menu-open",
+    "innerWidth": 375,
+    "docScrollWidth": 375,
+    "bodyScrollWidth": 375,
+    "overflowX": 0,
+    "drawerOpen": false,
+    "activeDrawerTab": null,
+    "drawerRect": null
+  },
+  {
+    "label": "mobile-375:drawer-passport",
+    "innerWidth": 375,
+    "docScrollWidth": 375,
+    "bodyScrollWidth": 375,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Паспорт",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 375,
+      "height": 812
+    }
+  },
+  {
+    "label": "mobile-375:drawer-selfie",
+    "innerWidth": 375,
+    "docScrollWidth": 375,
+    "bodyScrollWidth": 375,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Селфи",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 375,
+      "height": 812
+    }
+  },
+  {
+    "label": "mobile-375:drawer-questionnaire",
+    "innerWidth": 375,
+    "docScrollWidth": 375,
+    "bodyScrollWidth": 375,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Анкета",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 375,
+      "height": 812
+    }
+  },
+  {
+    "label": "mobile-375:drawer-remarks",
+    "innerWidth": 375,
+    "docScrollWidth": 375,
+    "bodyScrollWidth": 375,
+    "overflowX": 0,
+    "drawerOpen": true,
+    "activeDrawerTab": "Замечания",
+    "drawerRect": {
+      "x": 0,
+      "y": 0,
+      "width": 375,
+      "height": 812
+    }
+  },
+  {
+    "label": "mobile-375:console",
+    "messages": []
+  }
+]
