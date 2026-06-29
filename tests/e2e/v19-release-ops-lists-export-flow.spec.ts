@@ -5,7 +5,7 @@ import {
   collectBrowserProblems,
   drawer,
   openFreshWorkspace,
-  submissionCard,
+  submissionCardById,
 } from "./v19-pilot-helpers";
 
 test.describe("V-19 release ops lists export flow", () => {
@@ -16,16 +16,18 @@ test.describe("V-19 release ops lists export flow", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Работа",
+      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
 
-    await clickWorkspaceButton(page, /Работа\. очередь проверки/);
-    await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
-    await submissionCard(page, "Нина Волкова").click();
-    await expect(drawer(page).getByText("Агент: Татьяна Николаева")).toBeVisible();
+    await clickWorkspaceButton(page, /Проверка|Работа/);
+    await expect(submissionCardById(page, "ПД-1053")).toBeVisible();
+    await submissionCardById(page, "ПД-1053").click();
+    await expect(drawer(page).locator(".admin-review-meta")).toContainText(
+      "Агент: Татьяна Николаева",
+    );
     await expect(drawer(page).getByText(/Нина Волкова/).first()).toBeVisible();
-    await page.getByRole("button", { name: "Закрыть подачу" }).click();
+    await drawer(page).getByRole("button", { name: /Закрыть (подачу|проверку)/ }).click();
 
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
@@ -85,7 +87,7 @@ test.describe("V-19 release ops lists export flow", () => {
     await expect(page.getByRole("button", { name: "Сформировать Эксель" })).toBeDisabled();
 
     await openFreshWorkspace(page, {
-      heading: "Входящие",
+      heading: "Мои действия",
       workspaceEmail: "agent@visaflow.local",
     });
     await clickWorkspaceButton(page, /Мои подачи/);

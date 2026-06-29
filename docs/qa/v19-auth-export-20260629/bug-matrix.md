@@ -14,6 +14,7 @@ Date: 2026-06-29
 | Export UI | Ready/exported completeness | Ready/exported rows could show confusing raw percent. | Fixed / verified | Non-percent readiness labels supported in collection row |
 | Admin drawer | Manual issue creation | New drawer lost visible city/agent metadata and generic add-issue entry. | Fixed / verified | `adminReviewDrawer.spec.tsx` |
 | Admin drawer | Issue target list | Remark form offered non-canonical `Документ` target. | Fixed / verified | `adminReviewDrawer.spec.tsx` |
-| E2E suite | Legacy app-smoke export selectors | Old smoke tests time out on stale `Новая подача` / `Данные` selectors after UI branch changes. | Not fixed | Playwright traces in `test-results/`; newer create/export-adjacent checks used |
-| E2E suite | Release ops heading | `v19-release-ops-lists-export-flow` expects old admin heading `Работа`. | Not fixed | Failure captured in Playwright output |
+| E2E suite | Legacy app-smoke export selectors | Old smoke tests timed out on stale `Работа`, `Исправления`, `Закрыть подачу`, issue-card, and PDF-panel selectors after UI branch changes. | Partially fixed / verified | `app-smoke` improved to 10/18 passing; focused role/admin/export subset passed |
+| E2E suite | Release ops heading | `v19-release-ops-lists-export-flow` expected old admin heading `Работа`. | Fixed / verified | `v19-release-ops-lists-export-flow.spec.ts --project=chromium` passed |
+| Create flow | Draft-to-export smoke | `app-smoke` still expects the removed editable questionnaire accordion after create draft; current runtime shows action/context flow instead. | Open | Remaining `app-smoke` failures: create-to-export and multi-family corner case |
 | Visual | Export desktop/mobile | No obvious overlap; mobile export rail stacks under list; overflow is 0. | Verified | `export-desktop.png`, `export-mobile.png` |

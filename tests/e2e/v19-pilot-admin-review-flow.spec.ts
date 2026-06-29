@@ -18,7 +18,12 @@ async function openAdminSubmission(
   const targetCard = submissionCard(page, cardText);
   await expect(targetCard).toBeVisible();
   await targetCard.click();
-  await expect(drawer(page).getByRole("heading", { name: drawerTitle })).toBeVisible();
+  await expect(
+    drawer(page)
+      .getByRole("heading", { name: drawerTitle })
+      .or(drawer(page).getByText(drawerTitle).first())
+      .first(),
+  ).toBeVisible();
 }
 
 test.describe("V-19 pilot admin review click flow", () => {
@@ -29,22 +34,20 @@ test.describe("V-19 pilot admin review click flow", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Работа",
+      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
     await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Мои подачи" })).toHaveCount(0);
 
-    await clickWorkspaceButton(page, /Работа\. очередь проверки/);
+    await clickWorkspaceButton(page, /Проверка|Работа/);
     await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
     await openAdminSubmission(page, "Нина Волкова");
 
-    await openDrawerTab(page, ["Обзор"]);
-    await openDrawerTab(page, ["Заявители"]);
+    await openDrawerTab(page, ["Паспорт"]);
+    await openDrawerTab(page, ["Селфи"]);
     await openDrawerTab(page, ["Анкета", "Данные"]);
-    await openDrawerTab(page, ["Файлы", "Документы", "Медиа"]);
     await openDrawerTab(page, ["Замечания"]);
-    await openDrawerTab(page, ["История"]);
 
     await openDrawerTab(page, ["Замечания"]);
     await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
@@ -52,7 +55,10 @@ test.describe("V-19 pilot admin review click flow", () => {
     await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
 
     const issueSummary = drawer(page)
-      .getByRole("button", { name: /Нина Волкова.*Маршрут поездки/ })
+      .locator("article")
+      .filter({ hasText: "Требуется уточнение" })
+      .filter({ hasText: "Нина Волкова" })
+      .filter({ hasText: "Анкета" })
       .first();
     await expect(issueSummary).toBeVisible();
     await drawer(page).getByRole("button", { exact: true, name: "Вернуть" }).click();
@@ -68,15 +74,14 @@ test.describe("V-19 pilot admin review click flow", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Работа",
+      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
-    await page.getByRole("tab", { name: "Исправления" }).click();
     await openAdminSubmission(page, "Петровы", "Семья Петровых");
     await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
     await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
     await expectDrawerStatus(page, "Готово к выгрузке");
-    await page.getByRole("button", { name: "Закрыть подачу" }).click();
+    await drawer(page).getByRole("button", { name: /Закрыть (подачу|проверку)/ }).click();
 
     await clickWorkspaceButton(page, /Выгрузка/);
     await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
