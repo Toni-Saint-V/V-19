@@ -514,6 +514,12 @@ export function SubmissionCollectionRow({
       type="button"
       onClick={onOpen}
     >
+      <span className="v19-mobile-summary-head" aria-hidden="true">
+        <span className="v19-mobile-summary-id">{submissionId}</span>
+        <span className="v19-mobile-summary-status">
+          <Badge tone={submissionStatusTone(status)}>{statusLabel}</Badge>
+        </span>
+      </span>
       <span className="v19-event-main">
         <span className="v19-submission-kind-icon" aria-hidden="true">
           <SvgIcon>
@@ -538,6 +544,7 @@ export function SubmissionCollectionRow({
         {searchText ? <span className="sr-only">{searchText}</span> : null}
         {meta ? <em>{meta}</em> : null}
       </span>
+      <span className="v19-mobile-summary-title">{title}</span>
       {trip ? (
         <span className="v19-submission-trip">
           <strong title={trip}>{trip}</strong>
@@ -579,6 +586,18 @@ export function SubmissionCollectionRow({
         <SvgIcon>
           <path d="M9 6l6 6-6 6" />
         </SvgIcon>
+      </span>
+      <span className="v19-mobile-summary-foot" aria-hidden="true">
+        <span className="v19-mobile-summary-route">
+          {trip ? <strong>{trip}</strong> : null}
+          {tripDetail ? <em>{tripDetail}</em> : null}
+        </span>
+        <span className="v19-mobile-summary-tail">
+          <ProgressCell value={completeness} />
+          <SvgIcon>
+            <path d="M9 6l6 6-6 6" />
+          </SvgIcon>
+        </span>
       </span>
     </button>
   );

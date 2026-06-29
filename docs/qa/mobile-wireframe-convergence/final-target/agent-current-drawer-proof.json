@@ -1,0 +1,14 @@
+{
+  "proof": {
+    "surface": "ops-shell surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer ",
+    "docW": 390,
+    "docClient": 390,
+    "bodyW": 390,
+    "bodyClient": 390,
+    "oldDrawer": true,
+    "figmaDrawer": false,
+    "drawerTitleBlockVisible": false,
+    "footerVisible": true
+  },
+  "logs": []
+}
