@@ -55,6 +55,7 @@ import {
   applyExportStateToSelection,
   createDraftSubmission,
   generatedCockpitMediaFileName,
+  markSubmissionFileAccepted,
   mergeUploadedFileMetadataIntoSubmissions,
   mediaSlotTypeForSubmissionFileType,
   updateQuestionnaireField,
@@ -71,11 +72,7 @@ import {
   type SubmissionActionErrorState,
 } from "./modules/submissions/submissionActionErrors";
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
-import {
-  canAddAdminIssue,
-  defaultDrawerTab,
-  markSubmissionIssueFixedResult,
-} from "./modules/submissions/status";
+import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
 import {
   applySafePassportExtractionFields,
   applyPassportExtractionField,
@@ -104,6 +101,7 @@ import {
 } from "./modules/submissions/components/OperationalNavigation";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
+import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import {
   AdminReviewScreen,
   AgentActionsScreen,
@@ -180,9 +178,9 @@ const CreateSubmissionDrawer = lazy(() =>
     default: module.CreateSubmissionDrawer,
   })),
 );
-const SubmissionDrawer = lazy(() =>
-  import("./modules/submissions/components/SubmissionDrawer").then((module) => ({
-    default: module.SubmissionDrawer,
+const AdminReviewDrawer = lazy(() =>
+  import("./modules/submissions/components/AdminReviewDrawer").then((module) => ({
+    default: module.AdminReviewDrawer,
   })),
 );
 
@@ -1279,6 +1277,15 @@ function MainApp() {
     setAgentQuestionnaireOpen(false);
   }
 
+  function openAgentQuestionnaireWorkspace() {
+    const targetSubmission = activeSubmission ?? firstAgentActionSubmission();
+    if (!targetSubmission) return;
+    setSelectedSubmissionId(targetSubmission.id);
+    setActiveDrawerTab("questionnaire");
+    setDrawerMode("closed");
+    setAgentQuestionnaireOpen(true);
+  }
+
   function selectSubmission(submission: Submission) {
     setSubmissionActionError(null);
     setSelectedSubmissionId(submission.id);
@@ -1487,33 +1494,17 @@ function MainApp() {
     setDrawerMode("detail");
   }
 
-  function markActiveIssueFixed(issueId: string) {
-    if (!activeSubmission) return;
-    const currentSubmission =
-      submissionsRef.current.find(
-        (submission) => submission.id === activeSubmission.id,
-      ) ?? activeSubmission;
-    const result = markSubmissionIssueFixedResult(
-      currentSubmission,
-      issueId,
-      role,
+  function acceptAdminReviewFile(input: {
+    applicantId: string;
+    fileType: "passport_scan" | "selfie" | "selfie_2";
+  }) {
+    updateActiveSubmission((submission) =>
+      markSubmissionFileAccepted(submission, {
+        ...input,
+        reviewedBy: remoteProfile?.id,
+      }),
     );
-    if (!result.ok) {
-      setSubmissionActionError(
-        createSubmissionActionErrorState({
-          action: "mark_issue_fixed",
-          error: result.error,
-          submission: currentSubmission,
-        }),
-      );
-      setActiveDrawerTab("issues");
-      setDrawerMode("detail");
-      return;
-    }
-
-    updateActiveSubmission(() => result.data);
-    setSubmissionActionError(null);
-    setActiveDrawerTab("issues");
+    setActiveDrawerTab("files");
     setDrawerMode("detail");
   }
 
@@ -3153,47 +3144,31 @@ function MainApp() {
       ) : null}
 
       {drawerMode === "detail" &&
-      activeSubmission ? (
+      activeSubmission &&
+      role === "admin" ? (
         <Suspense fallback={null}>
-          <SubmissionDrawer
+          <AdminReviewDrawer
             actionError={activeSubmissionActionError}
             activeTab={activeDrawerTab}
-            agentOwnerId={currentAgentOwnerId}
-            initialTarget={drawerInitialTarget}
-            issueComposerRequest={issueComposerRequest}
-            onIssueComposerConsumed={() => setIssueComposerRequest(null)}
             onAction={updateSubmission}
             onAddIssue={addAdminIssue}
             onClose={closeDrawer}
-            onMarkIssueFixed={markActiveIssueFixed}
-            onApplyPassportField={applyPassportFieldForActiveSubmission}
-            onExtractPassport={extractPassportForActiveSubmission}
-            onConfirmVisaApplicationPdfReview={
-              confirmVisaApplicationPdfReviewForActiveSubmission
-            }
-            onDismissVisaApplicationPdfReview={
-              dismissVisaApplicationPdfReviewForActiveSubmission
-            }
-            onPublishReturnedPdfHandoff={publishReturnedPdfHandoffForActiveSubmission}
+            onReviewFileAccept={acceptAdminReviewFile}
             onTab={setActiveDrawerTab}
-            onQuestionnaireField={updateActiveQuestionnaireField}
-            onReviewVisaApplicationPdf={reviewVisaApplicationPdfForActiveSubmission}
-            onUploadFile={uploadActiveFile}
-            fileUploadBusy={uploadingSubmissionIds.has(activeSubmission.id)}
-            localPassportFileIds={localPassportFileIds}
-            passportExtractionEnabled={passportExtractionEnabled}
-            requireSelectedFile={isSupabaseMode}
-            role={role}
-            surface={
-              surface === "export"
-                ? "export"
-                : surface === "admin-review"
-                  ? "review"
-                  : "agent"
-            }
             submission={activeSubmission}
           />
         </Suspense>
+      ) : drawerMode === "detail" && activeSubmission && role === "agent" ? (
+        <FigmaSubmissionDrawer
+          actionError={activeSubmissionActionError}
+          activeTab={activeDrawerTab}
+          onAction={updateSubmission}
+          onClose={closeDrawer}
+          onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
+          role={role}
+          surface="agent"
+          submission={activeSubmission}
+        />
       ) : null}
 
       {drawerMode === "create" ? (
