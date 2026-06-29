@@ -21,6 +21,7 @@ export function OperationalSidebar({
   createAction,
   footer,
   items,
+  onMobileClose,
   mobileTitle,
 }: {
   brand?: string;
@@ -30,6 +31,7 @@ export function OperationalSidebar({
   };
   footer: ReactNode;
   items: OperationalNavItem[];
+  onMobileClose?: () => void;
   mobileTitle?: string;
 }) {
   return (
@@ -48,6 +50,18 @@ export function OperationalSidebar({
           <strong>VisaFlow V-19</strong>
           <em>Workspace</em>
         </div>
+        {onMobileClose ? (
+          <Button
+            aria-label="Закрыть меню"
+            className="ops-mobile-close"
+            variant="ghost"
+            onClick={onMobileClose}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </Button>
+        ) : null}
       </div>
       <button className="ops-sidebar-command" type="button">
         <svg aria-hidden="true" viewBox="0 0 24 24">
