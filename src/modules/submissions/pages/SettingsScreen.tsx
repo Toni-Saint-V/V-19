@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../shared/ui/primitives";
+import type { AccessRequest } from "../../../shared/authRegistration";
 import type { Role } from "../types";
 import "./SettingsScreen.css";
 
@@ -11,6 +12,7 @@ type WorkspaceSettings = {
 
 type SettingsSectionId =
   | "profile"
+  | "access-requests"
   | "team"
   | "notifications"
   | "export-defaults"
@@ -24,6 +26,7 @@ const agentSections: SettingsSectionId[] = [
 
 const adminSections: SettingsSectionId[] = [
   "profile",
+  "access-requests",
   "team",
   "notifications",
   "export-defaults",
@@ -31,6 +34,7 @@ const adminSections: SettingsSectionId[] = [
 ];
 
 const sectionLabels: Record<SettingsSectionId, string> = {
+  "access-requests": "Входящие заявки",
   "export-defaults": "Выгрузка",
   interface: "Интерфейс",
   notifications: "Уведомления",
@@ -39,12 +43,16 @@ const sectionLabels: Record<SettingsSectionId, string> = {
 };
 
 export default function SettingsScreen({
+  accessRequests,
+  accessRequestsBusy,
   confirmLeave,
   dirty,
   email,
   isSupabaseMode,
+  onApproveAccessRequest,
   onCancelLeave,
   onConfirmLeave,
+  onRejectAccessRequest,
   onReset,
   onSave,
   onSettings,
@@ -53,12 +61,16 @@ export default function SettingsScreen({
   saveState,
   settings,
 }: {
+  accessRequests: AccessRequest[];
+  accessRequestsBusy: boolean;
   confirmLeave: boolean;
   dirty: boolean;
   email: string;
   isSupabaseMode: boolean;
+  onApproveAccessRequest: (requestId: string) => void;
   onCancelLeave: () => void;
   onConfirmLeave: () => void;
+  onRejectAccessRequest: (requestId: string) => void;
   onReset: () => void;
   onSave: () => void;
   onSettings: (patch: Partial<WorkspaceSettings>) => void;
@@ -99,9 +111,13 @@ export default function SettingsScreen({
 
         <div className="settings-form">
           <SettingsSectionContent
+            accessRequests={accessRequests}
+            accessRequestsBusy={accessRequestsBusy}
             activeSection={activeSectionSafe}
             displayEmail={displayEmail}
             isSupabaseMode={isSupabaseMode}
+            onApproveAccessRequest={onApproveAccessRequest}
+            onRejectAccessRequest={onRejectAccessRequest}
             onSettings={onSettings}
             onSignOut={onSignOut}
             role={role}
@@ -139,9 +155,13 @@ export default function SettingsScreen({
 }
 
 function SettingsSectionContent({
+  accessRequests,
+  accessRequestsBusy,
   activeSection,
   displayEmail,
   isSupabaseMode,
+  onApproveAccessRequest,
+  onRejectAccessRequest,
   onSettings,
   onSignOut,
   role,
@@ -149,9 +169,13 @@ function SettingsSectionContent({
   settings,
   userDisplayName,
 }: {
+  accessRequests: AccessRequest[];
+  accessRequestsBusy: boolean;
   activeSection: SettingsSectionId;
   displayEmail: string;
   isSupabaseMode: boolean;
+  onApproveAccessRequest: (requestId: string) => void;
+  onRejectAccessRequest: (requestId: string) => void;
   onSettings: (patch: Partial<WorkspaceSettings>) => void;
   onSignOut: () => void | Promise<void>;
   role: Role;
@@ -190,6 +214,17 @@ function SettingsSectionContent({
           </Button>
         </div>
       </section>
+    );
+  }
+
+  if (activeSection === "access-requests") {
+    return (
+      <AccessRequestsSection
+        busy={accessRequestsBusy}
+        requests={accessRequests}
+        onApprove={onApproveAccessRequest}
+        onReject={onRejectAccessRequest}
+      />
     );
   }
 
@@ -342,6 +377,82 @@ function SettingsSectionContent({
       </div>
     </section>
   );
+}
+
+function AccessRequestsSection({
+  busy,
+  requests,
+  onApprove,
+  onReject,
+}: {
+  busy: boolean;
+  requests: AccessRequest[];
+  onApprove: (requestId: string) => void;
+  onReject: (requestId: string) => void;
+}) {
+  return (
+    <section
+      className="settings-block settings-access-requests"
+      aria-labelledby="settings-title"
+      data-testid="admin-access-queue"
+    >
+      <div className="settings-access-head">
+        <div>
+          <h2 id="settings-title">Входящие заявки</h2>
+          <p>Администратор одобряет доступ агента до входа в рабочий кабинет.</p>
+        </div>
+        <span aria-label={`Новых заявок: ${requests.length}`}>{requests.length}</span>
+      </div>
+
+      {requests.length ? (
+        <div className="settings-access-list">
+          {requests.map((request) => (
+            <article className="settings-access-row" key={request.id}>
+              <div className="settings-access-main">
+                <strong>{request.displayName}</strong>
+                <span>{request.organizationName}</span>
+                <small>
+                  {request.email} · agent · pending · {formatAccessRequestDate(request.createdAt)}
+                </small>
+              </div>
+              <div className="settings-access-actions">
+                <Button
+                  disabled={busy}
+                  variant="secondary"
+                  onClick={() => onReject(request.id)}
+                >
+                  Отклонить
+                </Button>
+                <Button disabled={busy} onClick={() => onApprove(request.id)}>
+                  Одобрить
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="settings-access-empty">
+          <strong>Новых заявок нет.</strong>
+          <span>Pending и rejected email не получают доступ к кабинету.</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatAccessRequestDate(createdAt: string): string {
+  const date = new Date(createdAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return createdAt;
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  }).format(date);
 }
 
 function SwitchButton({

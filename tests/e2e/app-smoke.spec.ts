@@ -995,7 +995,8 @@ test.describe("V-19 operations workspace", () => {
       await dialog.accept();
     });
     await drawer(page).getByRole("button", { name: "Дальше" }).click();
-    expect(passportAlertMessage).toContain("Паспорт еще не подтвержден");
+    expect(passportAlertMessage).toContain("Паспорт еще не принят");
+    expect(passportAlertMessage).toContain("ручную проверку оператора");
     await expect(
       drawer(page).getByRole("heading", { name: "Загрузите паспорт" }),
     ).toBeVisible();

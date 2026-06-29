@@ -116,8 +116,18 @@ function hasRequiredPassportIdentity(upload: PassportUploadDraft | undefined) {
   return Boolean(passportUploadFullName(upload));
 }
 
+function hasAcceptedPassportFile(upload: PassportUploadDraft | undefined) {
+  return Boolean(upload?.file && passportScanUploadMimeTypes.has(upload.file.type));
+}
+
 function isPassportUploadReady(upload: PassportUploadDraft | undefined) {
-  return upload?.status === "ready" && hasRequiredPassportIdentity(upload);
+  if (!hasAcceptedPassportFile(upload)) return false;
+
+  return (
+    upload?.status === "ready" ||
+    upload?.status === "unavailable" ||
+    upload?.status === "failed"
+  );
 }
 
 function passportUploadVisualStatus(
@@ -125,10 +135,11 @@ function passportUploadVisualStatus(
 ): PassportUploadVisualStatus {
   if (!upload) return "empty";
   if (upload.status === "extracting") return "extracting";
-  if (isPassportUploadReady(upload)) return "ready";
   if (upload.status === "unavailable" || upload.status === "failed") {
     return "unavailable";
   }
+  if (upload.status === "ready" && hasRequiredPassportIdentity(upload)) return "ready";
+  if (upload.status === "ready") return "unavailable";
 
   return "selected";
 }
@@ -372,7 +383,7 @@ export function CreateSubmissionDrawer({
 
   function showPassportNotReadyAlert() {
     window.alert(
-      "Паспорт еще не подтвержден. Загрузите разворот загранпаспорта с MRZ и дождитесь зеленого статуса.",
+      "Паспорт еще не принят. Загрузите JPEG или PNG для каждого заявителя и дождитесь завершения проверки. Если OCR недоступен, файл уйдет на ручную проверку оператора.",
     );
   }
 
@@ -721,7 +732,8 @@ export function CreateSubmissionDrawer({
                             className={`h-2 w-2 rounded-full ${
                               visualStatus === "ready"
                                 ? "bg-emerald-400"
-                                : visualStatus === "extracting"
+                                : visualStatus === "extracting" ||
+                                    visualStatus === "unavailable"
                                   ? "bg-amber-400"
                                   : "bg-white/18"
                             }`}
@@ -823,6 +835,10 @@ export function CreateSubmissionDrawer({
                                     <span className="text-[11px] text-white/40 flex items-center gap-1 font-medium tracking-wide uppercase">
                                       <CheckCircle2 className="w-3 h-3 opacity-50" />
                                       Done
+                                    </span>
+                                  ) : visualStatus === "unavailable" ? (
+                                    <span className="text-[11px] text-amber-200/70 tracking-wide uppercase">
+                                      Проверка оператором
                                     </span>
                                   ) : (
                                     <span className="text-[11px] text-white/40 tracking-wide uppercase">
@@ -951,8 +967,8 @@ export function CreateSubmissionDrawer({
         <footer className="shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span className="text-[12px] text-white/40">
             {type === "family"
-              ? `${applicantCount} заявителя в семейной подаче. Дальше доступно после подтверждения паспортов.`
-              : "Дальше доступно после подтверждения паспорта."}
+              ? `${applicantCount} заявителя в семейной подаче. Дальше доступно после принятия файла паспорта для каждого заявителя; данные проверит оператор.`
+              : "Дальше доступно после принятия файла паспорта; данные проверит оператор."}
           </span>
           <div className="flex flex-col sm:flex-row gap-2">
             <button
