@@ -205,6 +205,38 @@
   border-top-color: #202124;
 }
 
+.ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-sidebar-create {
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
+  margin: auto 0 0;
+  border-color: #242529;
+  border-radius: 12px;
+  background: #1e1e21;
+  color: #f3f3f5;
+  box-shadow: none;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-admin-review)
+  .ops-sidebar-create:hover {
+  border-color: #2e2f34;
+  background: #222226;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-admin-review)
+  .ops-sidebar-create
+  span {
+  color: rgb(255 255 255 / 0.7);
+  background: rgb(255 255 255 / 0.06);
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-admin-review)
+  .ops-sidebar-create
+  strong {
+  font-size: 13px;
+  font-weight: 560;
+}
+
 .vf-figma-admin-zone.secondary-button {
   width: 100%;
   height: 40px;
@@ -304,27 +336,62 @@
 }
 
 .vf-figma-actions-toolbar {
-  gap: 24px;
+  gap: 18px;
   min-height: 48px;
+  flex-wrap: wrap;
+  justify-content: space-between;
 }
 
 .vf-figma-tabs {
-  gap: 4px;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
   padding: 4px;
   border: 1px solid #202124;
-  border-radius: 11px;
-  background: #161617;
+  border-radius: 13px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.025), rgb(255 255 255 / 0)),
+    #161617;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.vf-figma-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .vf-figma-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
   min-height: 36px;
-  padding: 0 20px;
+  padding: 0 10px 0 15px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 9px;
   color: rgb(255 255 255 / 0.5);
   font-size: 14px;
   font-weight: 560;
   line-height: 1;
+  white-space: nowrap;
+  transition:
+    border-color var(--v19-motion-fast) var(--v19-motion-ease),
+    background-color var(--v19-motion-fast) var(--v19-motion-ease),
+    color var(--v19-motion-fast) var(--v19-motion-ease);
+}
+
+.vf-figma-tabs button:focus-visible,
+.vf-figma-view-toggle button:focus-visible,
+.vf-figma-search input:focus-visible,
+.vf-figma-column-card:focus-visible {
+  outline: 2px solid rgb(124 132 255 / 0.72);
+  outline-offset: 2px;
+}
+
+.vf-figma-tabs button:hover {
+  color: rgb(255 255 255 / 0.72);
+  background: rgb(255 255 255 / 0.035);
 }
 
 .vf-figma-tabs button.is-active {
@@ -333,17 +400,27 @@
   color: #fff;
 }
 
-.vf-figma-tabs button span {
+.vf-figma-tab-label {
+  min-width: 0;
+}
+
+.vf-figma-tabs button .vf-figma-tab-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 20px;
   height: 20px;
-  margin-left: 8px;
+  padding: 0 6px;
   border-radius: 7px;
-  background: rgb(239 68 68 / 0.2);
-  color: #f87171;
+  background: rgb(255 255 255 / 0.075);
+  color: rgb(255 255 255 / 0.62);
   font-size: 11px;
+  font-weight: 660;
+}
+
+.vf-figma-tabs button.is-active .vf-figma-tab-badge {
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
 }
 
 .vf-figma-tools {
@@ -398,11 +475,22 @@
 }
 
 .vf-figma-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
   padding: 0 10px;
   border-radius: 7px;
   color: rgb(255 255 255 / 0.48);
   font-size: 12px;
   font-weight: 560;
+  white-space: nowrap;
+}
+
+.vf-figma-view-toggle button svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.8;
 }
 
 .vf-figma-view-toggle button.is-active {
@@ -464,6 +552,11 @@
   transform: scale(0.998);
 }
 
+.vf-figma-action-row:focus-visible {
+  outline: 2px solid rgb(124 132 255 / 0.72);
+  outline-offset: 2px;
+}
+
 .vf-figma-dot {
   width: 10px;
   height: 10px;
@@ -473,6 +566,10 @@
 
 .vf-figma-dot-warning {
   background: #fb8c00;
+}
+
+.vf-figma-dot-danger {
+  background: #ff5c67;
 }
 
 .vf-figma-dot-blue {
@@ -550,6 +647,12 @@
   border: 1px solid rgb(249 115 22 / 0.2);
   background: rgb(249 115 22 / 0.1);
   color: #fb923c;
+}
+
+.vf-figma-status.is-danger {
+  border: 1px solid rgb(255 92 103 / 0.34);
+  background: rgb(255 92 103 / 0.12);
+  color: #ff8a92;
 }
 
 .vf-figma-status.is-blue {
@@ -685,6 +788,18 @@
   background: rgb(255 183 77 / 0.7);
 }
 
+.vf-figma-card-rail.is-blue {
+  background: rgb(96 165 250 / 0.62);
+}
+
+.vf-figma-card-rail.is-indigo {
+  background: rgb(143 163 255 / 0.68);
+}
+
+.vf-figma-card-rail.is-green {
+  background: rgb(69 208 130 / 0.68);
+}
+
 .vf-figma-column-card-head {
   display: flex;
   align-items: flex-start;
@@ -754,6 +869,18 @@
 
 .vf-figma-column-footer .is-warning {
   color: rgb(255 183 77 / 0.9);
+}
+
+.vf-figma-column-footer .is-blue {
+  color: rgb(96 165 250 / 0.9);
+}
+
+.vf-figma-column-footer .is-indigo {
+  color: rgb(143 163 255 / 0.92);
+}
+
+.vf-figma-column-footer .is-green {
+  color: rgb(69 208 130 / 0.92);
 }
 
 .vf-figma-progress {
@@ -1018,6 +1145,11 @@
   .vf-figma-actions-toolbar {
     align-items: stretch;
     flex-direction: column;
+    gap: 12px;
+  }
+
+  .vf-figma-tabs {
+    width: 100%;
   }
 
   .vf-figma-tools {
@@ -1028,31 +1160,116 @@
   .vf-figma-search {
     flex: 1;
     width: auto;
+    min-width: 0;
   }
 
   .vf-figma-action-row {
-    grid-template-columns: 16px minmax(0, 1fr);
-    min-height: 124px;
-    padding: 16px;
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto auto;
+    align-items: start;
+    min-height: 0;
+    padding: 22px;
+    gap: 14px 16px;
+  }
+
+  .vf-figma-dot {
+    display: none;
+  }
+
+  .vf-figma-action-title {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+    gap: 9px;
+  }
+
+  .vf-figma-action-title strong {
+    font-size: 22px;
+    line-height: 1.14;
+    white-space: normal;
+  }
+
+  .vf-figma-action-title em {
+    color: rgb(255 255 255 / 0.5);
+    font-size: 13px;
+    font-weight: 650;
+    white-space: normal;
+  }
+
+  .vf-figma-action-title .vf-figma-action-updated {
+    display: none;
   }
 
   .vf-figma-action-meta,
-  .vf-figma-open-button {
-    grid-column: 2;
+  .vf-figma-action-dates {
+    grid-column: 1;
+    align-self: start;
   }
 
   .vf-figma-action-meta {
+    grid-row: 2;
     padding-left: 0;
     border-left: 0;
   }
 
+  .vf-figma-action-meta strong {
+    font-size: 18px;
+    line-height: 1.1;
+    white-space: normal;
+  }
+
+  .vf-figma-action-dates {
+    display: grid !important;
+    grid-row: 3;
+    margin-top: 0;
+  }
+
+  .vf-figma-action-dates strong {
+    color: rgb(255 255 255 / 0.5);
+    font-size: 15px;
+    font-weight: 520;
+    line-height: 1.1;
+    white-space: normal;
+  }
+
+  .vf-figma-action-status {
+    display: inline-flex !important;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+    margin-top: -3px;
+  }
+
   .vf-figma-open-button {
-    width: 100%;
-    justify-self: stretch;
+    grid-column: 2;
+    grid-row: 4;
+    align-self: end;
+    justify-self: end;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    color: transparent;
+    font-size: 0;
+  }
+
+  .vf-figma-open-button::after {
+    color: rgb(255 255 255 / 0.78);
+    content: "›";
+    font-size: 36px;
+    font-weight: 280;
+    line-height: 1;
   }
 
   .vf-figma-column-board {
-    grid-auto-columns: minmax(276px, 82vw);
+    grid-auto-columns: minmax(300px, 82vw);
+    gap: 16px;
+    scroll-padding-inline: 2px;
+  }
+
+  .vf-figma-column {
+    max-width: none;
   }
 
   .vf-figma-individual-grid {
@@ -1061,23 +1278,143 @@
 }
 
 @media (max-width: 640px) {
-  .vf-figma-topbar-actions .v19-topbar-cta.secondary-button,
-  .vf-figma-topbar-actions .v19-topbar-cta.is-secondary {
-    display: none;
+  .vf-figma-actions-screen {
+    gap: 26px;
+  }
+
+  .vf-figma-screen {
+    padding: 18px 14px 92px;
   }
 
   .vf-figma-tabs {
-    overflow-x: auto;
     max-width: 100%;
+    padding: 3px;
   }
 
   .vf-figma-tabs button {
-    padding: 0 14px;
+    flex: 1 0 auto;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 12px;
     white-space: nowrap;
   }
 
+  .vf-figma-tabs button .vf-figma-tab-badge {
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 6px;
+    font-size: 10px;
+  }
+
+  .vf-figma-tools {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .vf-figma-search,
   .vf-figma-view-toggle {
-    display: none;
+    width: 100%;
+  }
+
+  .vf-figma-view-toggle button {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .vf-figma-action-list {
+    gap: 10px;
+  }
+
+  .vf-figma-section-rule {
+    grid-template-columns: 1fr auto 1fr;
+    gap: 10px;
+    margin-bottom: 2px;
+  }
+
+  .vf-figma-action-row {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 17px;
+    border-radius: 13px;
+    gap: 13px;
+  }
+
+  .vf-figma-action-title,
+  .vf-figma-action-meta,
+  .vf-figma-action-dates,
+  .vf-figma-action-status,
+  .vf-figma-open-button {
+    grid-column: 1;
+  }
+
+  .vf-figma-action-title strong {
+    font-size: 19px;
+  }
+
+  .vf-figma-action-title em,
+  .vf-figma-action-meta em,
+  .vf-figma-action-dates em {
+    font-size: 12px;
+    line-height: 1.3;
+    white-space: normal;
+  }
+
+  .vf-figma-action-meta strong {
+    font-size: 16px;
+  }
+
+  .vf-figma-action-dates strong {
+    font-size: 14px;
+  }
+
+  .vf-figma-action-status {
+    grid-row: 4;
+    justify-self: start;
+    max-width: 100%;
+    margin-top: 0;
+  }
+
+  .vf-figma-status {
+    max-width: 100%;
+    height: auto;
+    min-height: 30px;
+    padding: 7px 11px;
+    line-height: 1.2;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .vf-figma-open-button {
+    grid-row: 5;
+    justify-self: stretch;
+    width: 100%;
+    height: 42px;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 13px;
+  }
+
+  .vf-figma-open-button::after {
+    content: none;
+  }
+
+  .vf-figma-column-board {
+    grid-auto-columns: minmax(300px, calc(100vw - 36px));
+    gap: 14px;
+    padding-bottom: 14px;
+  }
+
+  .vf-figma-column {
+    min-width: 300px;
+  }
+
+  .vf-figma-column-card {
+    min-height: 118px;
+    padding: 14px;
   }
 
   .vf-figma-family-card,
@@ -1434,6 +1771,361 @@ p {
   justify-content: center;
   border-color: var(--rose-action-line);
   box-shadow: none;
+}
+
+.access-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(360px, 440px);
+  align-items: center;
+  gap: clamp(32px, 7vw, 88px);
+  width: min(100%, 1080px);
+}
+
+.access-brand-panel {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  min-width: 0;
+  max-width: 460px;
+}
+
+.access-brand-markline {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.access-logo {
+  display: block;
+  width: 84px;
+  height: 84px;
+  margin: 0;
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 20px;
+  background: var(--vf-bg-shell);
+  object-fit: cover;
+}
+
+.access-brand-copy {
+  display: grid;
+  min-width: 0;
+  padding-top: 36px;
+}
+
+.access-kicker {
+  margin: 0;
+  color: var(--vf-text-muted);
+  font-size: 12px;
+  font-weight: 680;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+.access-brand-markline .access-kicker {
+  display: grid;
+  justify-items: start;
+  color: var(--vf-text-primary);
+  font-size: 30px;
+  font-weight: 690;
+  line-height: 0.92;
+  text-transform: none;
+}
+
+.access-card .access-kicker {
+  text-transform: none;
+}
+
+.access-word-tail,
+.access-brand-version {
+  display: block;
+}
+
+.access-brand-version {
+  margin: 5px 0 0 1px;
+  color: var(--vf-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.access-brand-message {
+  margin-top: 24px;
+}
+
+.access-brand-title {
+  margin: 10px 0 0;
+  max-width: 360px;
+  color: var(--vf-text-primary);
+  font-size: clamp(24px, 2.7vw, 34px);
+  font-weight: 640;
+  letter-spacing: 0;
+  line-height: 1.12;
+}
+
+.access-brand-text {
+  margin: 12px 0 0;
+  max-width: 390px;
+  color: var(--vf-text-secondary);
+  font-size: 15px;
+  line-height: 1.58;
+}
+
+.access-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.access-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.access-field-label {
+  color: var(--vf-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.access-card input[aria-invalid="true"] {
+  border-color: var(--vf-red-soft-border);
+}
+
+.access-password-control {
+  position: relative;
+  min-width: 0;
+}
+
+.access-password-control input {
+  padding-right: 56px;
+}
+
+.access-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: var(--vf-text-secondary);
+  background: transparent;
+}
+
+.access-password-toggle:hover {
+  color: var(--vf-text-primary);
+  background: var(--vf-bg-row-hover);
+}
+
+.access-password-toggle svg,
+.access-back-button svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+}
+
+.access-field-error {
+  color: var(--vf-red-soft-text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.access-card .access-error,
+.access-card .access-note,
+.access-card .access-success {
+  margin-top: 0;
+  padding: 12px 13px;
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 13px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.access-card .access-error {
+  border-color: var(--vf-red-soft-border);
+  color: var(--vf-red-soft-text);
+  background: var(--vf-red-soft-bg);
+}
+
+.access-card .access-note {
+  color: var(--vf-text-muted);
+  background: var(--vf-bg-row);
+}
+
+.access-card .access-success {
+  border-color: var(--vf-green-soft-border);
+  color: var(--vf-green-soft-text);
+  background: var(--vf-green-soft-bg);
+}
+
+.access-card .primary-button.access-submit {
+  width: 100%;
+  min-height: 48px;
+  justify-content: center;
+  border-radius: 13px;
+}
+
+.access-status-card {
+  max-width: 440px;
+}
+
+.access-secondary-link,
+.access-back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 0;
+  color: var(--vf-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.access-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  margin-top: 12px;
+}
+
+.access-secondary-actions .access-secondary-link {
+  width: auto;
+  margin-top: 0;
+  padding: 0 2px;
+}
+
+.access-secondary-divider {
+  color: var(--vf-text-muted);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.access-secondary-link:hover,
+.access-back-button:hover {
+  color: var(--vf-text-primary);
+}
+
+.access-back-button {
+  gap: 8px;
+  margin: -4px 0 18px;
+  padding: 0;
+}
+
+@media (max-width: 760px) {
+  .access-shell {
+    place-items: start center;
+    padding: 22px clamp(14px, 5vw, 22px);
+  }
+
+  .access-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    width: min(100%, 430px);
+  }
+
+  .access-brand-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    max-width: none;
+  }
+
+  .access-logo {
+    width: 58px;
+    height: 58px;
+    border-radius: 15px;
+  }
+
+  .access-brand-copy {
+    padding-top: 22px;
+  }
+
+  .access-brand-markline .access-kicker {
+    font-size: 22px;
+  }
+
+  .access-brand-version {
+    margin-top: 4px;
+    font-size: 10px;
+  }
+
+  .access-brand-message {
+    display: none;
+  }
+
+  .access-card {
+    padding: 22px;
+    border-radius: 18px;
+  }
+
+  .access-card-header .access-kicker {
+    display: none;
+  }
+
+  .access-card .access-intro {
+    margin-top: 8px;
+  }
+
+  .access-form {
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .access-card h1 {
+    margin-top: 0;
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 360px) {
+  .access-shell {
+    padding: 18px 12px;
+  }
+
+  .access-logo {
+    width: 50px;
+    height: 50px;
+    border-radius: 14px;
+  }
+
+  .access-brand-copy {
+    padding-top: 18px;
+  }
+
+  .access-brand-markline .access-kicker {
+    font-size: 20px;
+  }
+
+  .access-brand-title {
+    font-size: 21px;
+  }
+
+  .access-card {
+    padding: 14px 16px;
+  }
+
+  .access-card h1 {
+    font-size: 24px;
+  }
+
+  .access-card .access-error,
+  .access-card .access-note,
+  .access-card .access-success {
+    padding: 10px 11px;
+    font-size: 12px;
+    line-height: 1.35;
+  }
 }
 
 .access-queue-panel {
@@ -3917,6 +4609,239 @@ p {
   color: rgb(139 140 148);
 }
 
+@media (min-width: 761px) {
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) {
+    --v19-sidebar-width: clamp(360px, 33vw, 520px);
+    --vf-action-menu-width: min(472px, calc(var(--v19-sidebar-width) - 48px));
+    --vf-action-menu-icon-size: 56px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-sidebar {
+    align-items: center;
+    width: var(--v19-sidebar-width);
+    max-width: 520px;
+    padding: 38px 24px 28px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-brand {
+    justify-content: center;
+    width: var(--vf-action-menu-width);
+    min-height: 88px;
+    padding: 0 0 26px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-brand-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 22px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    :is(.ops-brand-copy, .ops-mobile-close) {
+    display: none;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav {
+    justify-items: center;
+    width: var(--vf-action-menu-width);
+    gap: 18px;
+    margin-top: 18px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav::before {
+    width: 100%;
+    padding: 0 0 2px;
+    text-align: center;
+    letter-spacing: 0.06em;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-item {
+    justify-content: center;
+    width: var(--vf-action-menu-icon-size);
+    height: var(--vf-action-menu-icon-size);
+    min-height: var(--vf-action-menu-icon-size);
+    padding: 0;
+    gap: 0;
+    border-radius: 18px;
+    transition:
+      width var(--v19-motion-normal) var(--v19-motion-ease),
+      background-color var(--v19-motion-fast) var(--v19-motion-ease),
+      color var(--v19-motion-fast) var(--v19-motion-ease);
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-nav-item.is-active::before {
+    left: -18px;
+    width: 3px;
+    height: 28px;
+    background: rgb(243 243 245 / 0.86);
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-icon {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    :is(.ops-nav-copy, .ops-nav-count, .ops-nav-action) {
+    display: none;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-create {
+    width: var(--vf-action-menu-width);
+    height: 58px;
+    min-height: 58px;
+    margin-top: auto;
+    border-radius: 18px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-create
+    span {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-create
+    strong {
+    display: none;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-sidebar-footer {
+    width: var(--vf-action-menu-width);
+    margin-top: 26px;
+    padding: 26px 0 0;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-admin-zone.secondary-button {
+    width: var(--vf-action-menu-width);
+    height: 58px;
+    border-radius: 18px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-session {
+    justify-content: flex-start;
+    width: var(--vf-action-menu-width);
+    height: 56px;
+    min-height: 56px;
+    padding: 0;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-session > span {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+    font-size: 14px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-session
+    > div,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-user-more {
+    display: none;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-item {
+    justify-content: flex-start;
+    width: var(--vf-action-menu-width);
+    padding: 0 18px;
+    gap: 12px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-item.is-active::before {
+    left: -24px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-copy {
+    display: block;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-nav-count {
+    display: grid;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-sidebar-create {
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-sidebar-create
+    strong {
+    display: block;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-session {
+    gap: 10px;
+    padding: 0 6px;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-session
+    > div {
+    display: block;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
+      .is-mobile-nav-open,
+      :has(.ops-sidebar:hover),
+      :has(.ops-sidebar:focus-within)
+    )
+    .ops-user-more {
+    display: block;
+  }
+}
+
 .ops-shell.surface-agent-submissions {
   --v19-sidebar-width: 272px;
   --v19-context-panel-width: clamp(324px, 25vw, 360px);
@@ -5873,6 +6798,118 @@ p {
   }
 }
 
+@media (max-width: 760px) {
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-actions-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .vf-figma-tools {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    grid-template-columns: none !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-search,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle
+    button {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important;
+    min-height: 0 !important;
+    padding: 17px !important;
+    gap: 12px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title
+    em {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    color: rgb(255 255 255 / 0.5) !important;
+    font-size: 11.5px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates {
+    display: grid !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta
+    em,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates
+    em {
+    display: flex !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status {
+    display: inline-flex !important;
+    justify-self: start !important;
+    margin-top: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    display: inline-flex !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    font-size: 13px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button::after {
+    content: none !important;
+  }
+}
+
 @media (max-width: 560px) {
   .surface-export .data-table {
     min-width: 0 !important;
@@ -6019,5 +7056,117 @@ p {
 
   .surface-export .export-table-row-action:not(.export-table-row-action-mobile) {
     display: none !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-actions-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review) .vf-figma-tools {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    grid-template-columns: none !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-search,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-view-toggle
+    button {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: none !important;
+    min-height: 0 !important;
+    padding: 17px !important;
+    gap: 12px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-title
+    em {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    color: rgb(255 255 255 / 0.5) !important;
+    font-size: 11.5px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates {
+    display: grid !important;
+    padding-left: 0 !important;
+    border-left: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-meta
+    em,
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-dates
+    em {
+    display: flex !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-action-status {
+    display: inline-flex !important;
+    justify-self: start !important;
+    margin-top: 0 !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button {
+    display: inline-flex !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    border-radius: 10px !important;
+    color: #fff !important;
+    font-size: 13px !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .vf-figma-open-button::after {
+    content: none !important;
   }
 }

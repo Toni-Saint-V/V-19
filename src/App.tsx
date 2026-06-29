@@ -8,10 +8,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchBar, StateTabs } from "./shared/ui/primitives";
 import {
-  adminInboxEvents,
+  adminActionQueue,
   agentActionQueue,
   searchAgentActions,
 } from "./modules/submissions/agentActions";
@@ -72,7 +74,10 @@ import {
   type SubmissionActionErrorState,
 } from "./modules/submissions/submissionActionErrors";
 import { completeExportPackage } from "./modules/submissions/exportWorkflow";
-import { canAddAdminIssue, defaultDrawerTab } from "./modules/submissions/status";
+import {
+  defaultDrawerTab,
+  markSubmissionIssueFixedResult,
+} from "./modules/submissions/status";
 import {
   applySafePassportExtractionFields,
   applyPassportExtractionField,
@@ -103,7 +108,6 @@ import { ConfirmationDialog } from "./modules/submissions/components/Primitives"
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import {
-  AdminReviewScreen,
   AgentActionsScreen,
   AgentInboxScreen,
   AgentSubmissionsScreen,
@@ -137,16 +141,15 @@ import {
 } from "./modules/submissions/uiTypes";
 import {
   getCurrentAppSession,
+  requestPasswordReset,
   signInSupabaseWithPassword,
   signOutCurrentSession,
+  type PasswordResetRequestResult,
 } from "./services/authService";
-import {
-  AuthAccessError,
-  accessRequestRepository,
-  authRepository,
-  type AccessRequest,
-  type AccessRequestInput,
-  type Session as LocalAuthSession,
+import type {
+  AccessRequest,
+  AccessRequestRegistrationInput,
+  Session as LocalAuthSession,
 } from "./shared/authRegistration";
 import {
   canShowLocalDemoRoleSwitch,
@@ -196,7 +199,6 @@ type WorkspaceSettings = {
 
 type AgentInboxMode = "actions" | "events";
 type AgentFilterValue = AgentOwnerId | "Все агенты";
-type AccessGateMode = "login" | "request";
 
 const defaultWorkspaceSettings: WorkspaceSettings = {
   compactLists: true,
@@ -348,6 +350,16 @@ type PassportReviewRequest = {
   submissionId: string;
 };
 
+type AccessRequestSubmitResult =
+  | {
+      message: string;
+      status: "requested";
+    }
+  | {
+      message: string;
+      status: "unavailable";
+    };
+
 function parseWorkspaceEmails(input: unknown, fallback: string[]) {
   if (typeof input !== "string" || input.trim() === "") return fallback;
   const parsed = input
@@ -364,6 +376,23 @@ const adminEmails = parseWorkspaceEmails(
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+const workspaceEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidWorkspaceEmail(email: string) {
+  return workspaceEmailPattern.test(normalizeEmail(email));
+}
+
+function isAuthAccessError(error: unknown): error is { code: string; message: string } {
+  return (
+    error instanceof Error &&
+    typeof (error as { code?: unknown }).code === "string"
+  );
+}
+
+async function loadLocalAuthRegistration() {
+  return import("./shared/authRegistration");
 }
 
 function resolveWorkspaceRole(email: string): Role | null {
@@ -486,11 +515,6 @@ function MainApp() {
   const [role, setRole] = useState<Role>(initialWorkspaceRole);
   const [workspaceEmailDraft, setWorkspaceEmailDraft] = useState(workspaceEmail);
   const [workspacePasswordDraft, setWorkspacePasswordDraft] = useState("");
-  const [workspaceAccessMode, setWorkspaceAccessMode] =
-    useState<AccessGateMode>("login");
-  const [workspaceDisplayNameDraft, setWorkspaceDisplayNameDraft] = useState("");
-  const [workspaceOrganizationNameDraft, setWorkspaceOrganizationNameDraft] =
-    useState("");
   const [workspaceAccessError, setWorkspaceAccessError] = useState("");
   const [workspaceAccessNotice, setWorkspaceAccessNotice] = useState("");
   const [authChecked, setAuthChecked] = useState(!isSupabaseMode);
@@ -632,9 +656,17 @@ function MainApp() {
     () => searchSubmissions(adminReviewSource, query, cityFilter),
     [adminReviewSource, cityFilter, query],
   );
-  const searchedAdminInboxEvents = useMemo(
-    () => adminInboxEvents(searchedReviewQueue),
+  const adminActions = useMemo(
+    () => adminActionQueue(searchedReviewQueue),
     [searchedReviewQueue],
+  );
+  const searchedOpenAdminActions = useMemo(
+    () => searchAgentActions(adminActions.open, query),
+    [adminActions.open, query],
+  );
+  const searchedCompletedAdminActions = useMemo(
+    () => searchAgentActions(adminActions.completed, query),
+    [adminActions.completed, query],
   );
   const adminWorkSubmissionCount = useMemo(
     () =>
@@ -657,10 +689,6 @@ function MainApp() {
   const visibleAgentSubmission =
     agentList.find((submission) => submission.id === selectedSubmissionId) ??
     agentList[0] ??
-    null;
-  const visibleReviewSubmission =
-    reviewList.find((submission) => submission.id === selectedSubmissionId) ??
-    reviewList[0] ??
     null;
   const searchedExportSubmissions = useMemo(
     () =>
@@ -701,15 +729,18 @@ function MainApp() {
     surface === "agent-inbox" ||
     surface === "agent-submissions" ||
     surface === "admin-review";
-  const isFigmaVisualSurface = surface === "agent-actions";
+  const isFigmaVisualSurface = surface === "agent-actions" || surface === "admin-review";
   const workspaceSurfaceTitle =
-    surface === "admin-review" ? "Работа" : surfaceTitle(surface);
+    surface === "admin-review" ? "Проверка" : surfaceTitle(surface);
   const workspaceSurfaceDescription =
     surface === "admin-review" ? "Проверка и события" : surfaceDescription(surface);
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
+  const localAuthHasWorkspaceAccess =
+    localAuthSession?.status === "active" &&
+    localAuthSession.approvalStatus === "approved";
   const hasWorkspaceAccess = isSupabaseMode
     ? Boolean(remoteProfile)
-    : Boolean(localAuthSession);
+    : localAuthHasWorkspaceAccess;
   const emptyRemoteWorkspace =
     isSupabaseMode && Boolean(remoteProfile) && authChecked && submissions.length === 0;
   const sessionDisplayName =
@@ -775,7 +806,7 @@ function MainApp() {
             count: adminWorkSubmissionCount,
             icon: "М",
             id: "admin-work",
-            label: "Работа",
+            label: "Проверка",
             meta: "очередь проверки",
             onClick: () => showReviewTab("review"),
           },
@@ -886,6 +917,8 @@ function MainApp() {
       setAuthChecked(false);
       setWorkspaceAccessError("");
       try {
+        const { accessRequestRepository, authRepository } =
+          await loadLocalAuthRegistration();
         const requestedWorkspaceEmail = loadWorkspaceEmail();
         const restoredSession = await authRepository.restoreSession();
         if (cancelled) return;
@@ -895,12 +928,23 @@ function MainApp() {
           (!requestedWorkspaceEmail || requestedWorkspaceEmail === restoredSession.email)
         ) {
           setLocalAuthSession(restoredSession);
-          setRole(restoredSession.role);
-          setSurface(restoredSession.role === "admin" ? "admin-review" : "agent-actions");
           setWorkspaceEmail(restoredSession.email);
           setWorkspaceEmailDraft(restoredSession.email);
           saveWorkspaceEmail(restoredSession.email);
-          if (restoredSession.role === "admin") {
+          if (
+            restoredSession.approvalStatus === "approved" &&
+            restoredSession.status === "active"
+          ) {
+            setRole(restoredSession.role);
+            setSurface(
+              restoredSession.role === "admin" ? "admin-review" : "agent-actions",
+            );
+          }
+          if (
+            restoredSession.role === "admin" &&
+            restoredSession.approvalStatus === "approved" &&
+            restoredSession.status === "active"
+          ) {
             setPendingAccessRequests(
               await accessRequestRepository.listPendingAccessRequests(),
             );
@@ -908,17 +952,13 @@ function MainApp() {
           return;
         }
 
-        if (!requestedWorkspaceEmail && !localDemoSeedAutoLoginEnabled) {
-          setLocalAuthSession(null);
-          setRole("agent");
-          setSurface("agent-actions");
-          setWorkspaceEmail("");
-          setWorkspaceEmailDraft("");
-          return;
-        }
+        if (!localDemoSeedAutoLoginEnabled) return;
 
         const bootstrapEmail = requestedWorkspaceEmail || fallbackAgentEmails[0];
-        const bootstrapSession = await authRepository.loginApprovedUser(bootstrapEmail);
+        const bootstrapSession = await authRepository.loginApprovedUser(
+          bootstrapEmail,
+          "local-dev-password",
+        );
         if (cancelled) return;
 
         setLocalAuthSession(bootstrapSession);
@@ -937,7 +977,7 @@ function MainApp() {
       } catch (error) {
         if (!cancelled) {
           setWorkspaceAccessError(
-            error instanceof AuthAccessError
+            isAuthAccessError(error)
               ? error.message
               : "Не удалось восстановить local/dev сессию.",
           );
@@ -1280,18 +1320,6 @@ function MainApp() {
     setActiveDrawerTab(defaultDrawerTab(submission));
   }
 
-  function openIssueComposer(submission: Submission) {
-    if (!canAddAdminIssue(submission, "admin")) {
-      openSubmission(submission, "issues");
-      return;
-    }
-
-    rememberReturnFocus();
-    setSelectedSubmissionId(submission.id);
-    setActiveDrawerTab("issues");
-    setDrawerMode("detail");
-  }
-
   const closeDrawer = useCallback(() => {
     if (dirty) {
       setConfirmClose(true);
@@ -1487,6 +1515,43 @@ function MainApp() {
       }),
     );
     setActiveDrawerTab("files");
+    setDrawerMode("detail");
+  }
+
+  function markActiveIssueFixed(issueId: string) {
+    if (!activeSubmission) return;
+    const currentSubmission =
+      submissionsRef.current.find(
+        (submission) => submission.id === activeSubmission.id,
+      ) ?? activeSubmission;
+    const result = markSubmissionIssueFixedResult(
+      currentSubmission,
+      issueId,
+      role,
+    );
+
+    if (!result.ok) {
+      setSubmissionActionError(
+        createSubmissionActionErrorState({
+          action: "mark_issue_fixed",
+          error: result.error,
+          submission: currentSubmission,
+        }),
+      );
+      setActiveDrawerTab("issues");
+      setDrawerMode("detail");
+      return;
+    }
+
+    setSubmissionActionError(null);
+    setSubmissions((current) => {
+      const next = current.map((submission) =>
+        submission.id === result.data.id ? result.data : submission,
+      );
+      submissionsRef.current = next;
+      return next;
+    });
+    setActiveDrawerTab("issues");
     setDrawerMode("detail");
   }
 
@@ -1984,6 +2049,15 @@ function MainApp() {
     setActiveDrawerTab("files");
   }
 
+  // Preserved for the next PDF/passport review UI wiring after removing the legacy drawer UI.
+  void extractPassportForActiveSubmission;
+  void applyPassportFieldForActiveSubmission;
+  void updateActiveQuestionnaireField;
+  void reviewVisaApplicationPdfForActiveSubmission;
+  void confirmVisaApplicationPdfReviewForActiveSubmission;
+  void publishReturnedPdfHandoffForActiveSubmission;
+  void dismissVisaApplicationPdfReviewForActiveSubmission;
+
   function passportSlotForUpload(submission: Submission, upload: PassportUploadDraft) {
     if (upload.applicantIndex < 0 || upload.applicantIndex >= submission.applicants.length) {
       return null;
@@ -2423,12 +2497,17 @@ function MainApp() {
     event.preventDefault();
     const email = normalizeEmail(workspaceEmailDraft);
 
-    if (isSupabaseMode) {
-      if (!email || !workspacePasswordDraft) {
-        setWorkspaceAccessError("Введите почту и пароль Supabase.");
-        return;
-      }
+    if (!isValidWorkspaceEmail(email)) {
+      setWorkspaceAccessError("Введите корректный email");
+      return;
+    }
 
+    if (!workspacePasswordDraft.trim()) {
+      setWorkspaceAccessError("Введите пароль");
+      return;
+    }
+
+    if (isSupabaseMode) {
       setLoginBusy(true);
       setWorkspaceAccessError("");
       setWorkspaceAccessNotice("");
@@ -2455,57 +2534,40 @@ function MainApp() {
       return;
     }
 
-    if (!email) {
-      setWorkspaceAccessError("Введите рабочую почту.");
-      return;
-    }
-
     setLoginBusy(true);
     setWorkspaceAccessError("");
     setWorkspaceAccessNotice("");
     try {
-      if (workspaceAccessMode === "request") {
-        const requestInput: AccessRequestInput = {
-          email,
-          displayName: workspaceDisplayNameDraft,
-          organizationName: workspaceOrganizationNameDraft,
-        };
-        const request = await accessRequestRepository.submitAccessRequest(requestInput);
-
-        if (request.status === "approved") {
-          setWorkspaceAccessNotice("Почта уже одобрена. Перейдите во «Вход».");
-          return;
-        }
-
-        if (request.status === "rejected") {
-          setWorkspaceAccessError("Заявка отклонена. Обратитесь к администратору.");
-          return;
-        }
-
-        setWorkspaceAccessNotice(
-          "Заявка отправлена. Доступ появится после одобрения администратором.",
-        );
-        return;
-      }
-
-      const session = await authRepository.loginApprovedUser(email);
+      const { accessRequestRepository, authRepository } =
+        await loadLocalAuthRegistration();
+      const session = await authRepository.loginApprovedUser(
+        email,
+        workspacePasswordDraft,
+      );
       setLocalAuthSession(session);
       setWorkspaceEmail(session.email);
       setWorkspaceEmailDraft(session.email);
       saveWorkspaceEmail(session.email);
-      chooseRole(session.role);
-      if (session.role === "admin") {
+      if (session.approvalStatus === "approved" && session.status === "active") {
+        chooseRole(session.role);
+      } else {
+        setRole("agent");
+        setSurface("agent-actions");
+      }
+      if (
+        session.role === "admin" &&
+        session.approvalStatus === "approved" &&
+        session.status === "active"
+      ) {
         setPendingAccessRequests(
           await accessRequestRepository.listPendingAccessRequests(),
         );
       }
     } catch (error) {
       setWorkspaceAccessError(
-        error instanceof AuthAccessError && error.code === "ACCESS_NOT_FOUND"
-          ? "Почта не найдена в списке доступа. Отправьте заявку на вкладке «Заявка»."
-          : error instanceof AuthAccessError && error.code === "ACCESS_REJECTED"
-            ? "Заявка отклонена. Обратитесь к администратору."
-          : error instanceof AuthAccessError
+        isAuthAccessError(error) && error.code === "ACCESS_NOT_FOUND"
+          ? "Почта не найдена в списке доступа. Если входите впервые, подайте заявку."
+          : isAuthAccessError(error)
             ? error.message
             : "Не удалось проверить local/dev доступ.",
       );
@@ -2513,6 +2575,73 @@ function MainApp() {
       setLoginBusy(false);
       setAuthChecked(true);
     }
+  }
+
+  async function requestWorkspaceAccess(
+    input: AccessRequestRegistrationInput,
+  ): Promise<AccessRequestSubmitResult> {
+    const normalizedEmail = normalizeEmail(input.email);
+
+    if (isSupabaseMode) {
+      return {
+        status: "unavailable",
+        message:
+          "Регистрация требует приглашения администратора. Публичная саморегистрация отключена.",
+      };
+    }
+
+    const { accessRequestRepository, authRepository } =
+      await loadLocalAuthRegistration();
+    const request = await accessRequestRepository.submitAccessRequest({
+      ...input,
+      email: normalizedEmail,
+    });
+    if (request.status === "pending") {
+      const pendingSession = await authRepository.loginApprovedUser(
+        normalizedEmail,
+        input.password,
+      );
+      setLocalAuthSession(pendingSession);
+      setWorkspaceEmail(pendingSession.email);
+      setWorkspaceEmailDraft(pendingSession.email);
+      saveWorkspaceEmail(pendingSession.email);
+      setRole("agent");
+      setSurface("agent-actions");
+      return {
+        status: "requested",
+        message:
+          "Заявка отправлена. Доступ появится после подтверждения администратором.",
+      };
+    }
+
+    if (request.status === "rejected") {
+      const rejectedSession = await authRepository.loginApprovedUser(
+        normalizedEmail,
+        input.password,
+      );
+      setLocalAuthSession(rejectedSession);
+      setWorkspaceEmail(rejectedSession.email);
+      setWorkspaceEmailDraft(rejectedSession.email);
+      saveWorkspaceEmail(rejectedSession.email);
+      setRole("agent");
+      setSurface("agent-actions");
+      return {
+        status: "requested",
+        message: "Заявка отклонена.",
+      };
+    }
+
+    return {
+      status: "requested",
+      message:
+        "Если доступ уже подтверждён, вернитесь ко входу. Если нет, администратор рассмотрит заявку.",
+    };
+  }
+
+  async function requestWorkspacePasswordReset(
+    email: string,
+  ): Promise<PasswordResetRequestResult> {
+    return requestPasswordReset(normalizeEmail(email));
   }
 
   async function resetWorkspaceEmail() {
@@ -2536,21 +2665,17 @@ function MainApp() {
       clearWorkspaceEmail();
       setWorkspaceEmail("");
       setWorkspaceEmailDraft("");
-      setWorkspaceAccessMode("login");
-      setWorkspaceDisplayNameDraft("");
-      setWorkspaceOrganizationNameDraft("");
       return;
     }
 
+    const { authRepository } = await loadLocalAuthRegistration();
     await authRepository.logout();
     setLocalAuthSession(null);
     setPendingAccessRequests([]);
     clearWorkspaceEmail();
     setWorkspaceEmail("");
     setWorkspaceEmailDraft("");
-    setWorkspaceAccessMode("login");
-    setWorkspaceDisplayNameDraft("");
-    setWorkspaceOrganizationNameDraft("");
+    setWorkspacePasswordDraft("");
     setWorkspaceAccessError("");
     setWorkspaceAccessNotice("");
     chooseRole("agent");
@@ -2562,6 +2687,7 @@ function MainApp() {
     setLoginBusy(true);
     setWorkspaceAccessError("");
     try {
+      const { accessRequestRepository } = await loadLocalAuthRegistration();
       await accessRequestRepository.approveAccessRequest(
         requestId,
         localAuthSession.userId,
@@ -2571,7 +2697,7 @@ function MainApp() {
       );
     } catch (error) {
       setWorkspaceAccessError(
-        error instanceof AuthAccessError
+        isAuthAccessError(error)
           ? error.message
           : "Не удалось одобрить заявку.",
       );
@@ -2580,23 +2706,24 @@ function MainApp() {
     }
   }
 
-  async function rejectPendingAccessRequest(requestId: string) {
+  async function rejectPendingAccessRequest(requestId: string, reason?: string) {
     if (!localAuthSession || localAuthSession.role !== "admin") return;
 
     setLoginBusy(true);
     setWorkspaceAccessError("");
     try {
+      const { accessRequestRepository } = await loadLocalAuthRegistration();
       await accessRequestRepository.rejectAccessRequest(
         requestId,
         localAuthSession.userId,
-        "Отклонено администратором",
+        reason,
       );
       setPendingAccessRequests(
         await accessRequestRepository.listPendingAccessRequests(),
       );
     } catch (error) {
       setWorkspaceAccessError(
-        error instanceof AuthAccessError
+        isAuthAccessError(error)
           ? error.message
           : "Не удалось отклонить заявку.",
       );
@@ -2609,14 +2736,6 @@ function MainApp() {
     <SearchBar
       label="Поиск в текущем списке"
       placeholder="Подача, город или ID"
-      value={query}
-      onChange={setQuery}
-    />
-  );
-  const adminReviewSearchControl = (
-    <SearchBar
-      label="Поиск в текущем списке"
-      placeholder="Поиск по имени или ID"
       value={query}
       onChange={setQuery}
     />
@@ -2694,28 +2813,30 @@ function MainApp() {
     },
   }));
 
+  if (!isSupabaseMode && localAuthSession && !localAuthHasWorkspaceAccess) {
+    return (
+      <WorkspaceAccessStatusGate
+        session={localAuthSession}
+        onSignOut={() => {
+          void resetWorkspaceEmail();
+        }}
+      />
+    );
+  }
+
   if (!hasWorkspaceAccess) {
     return (
       <WorkspaceAccessGate
         busy={loginBusy || !authChecked}
-        displayName={workspaceDisplayNameDraft}
         email={workspaceEmailDraft}
         error={workspaceAccessError}
-        mode={workspaceAccessMode}
         notice={workspaceAccessNotice}
-        organizationName={workspaceOrganizationNameDraft}
-        onDisplayName={setWorkspaceDisplayNameDraft}
+        onAccessRequest={requestWorkspaceAccess}
         onEmail={setWorkspaceEmailDraft}
-        onMode={(mode) => {
-          setWorkspaceAccessMode(mode);
-          setWorkspaceAccessError("");
-          setWorkspaceAccessNotice("");
-        }}
-        onOrganizationName={setWorkspaceOrganizationNameDraft}
         onPassword={setWorkspacePasswordDraft}
+        onPasswordReset={requestWorkspacePasswordReset}
         onSubmit={submitWorkspaceEmail}
         password={workspacePasswordDraft}
-        requiresPassword={isSupabaseMode}
       />
     );
   }
@@ -2731,9 +2852,9 @@ function MainApp() {
     >
       <OperationalSidebar
         createAction={
-          role === "agent" && !isFigmaVisualSurface
+          role === "agent"
             ? {
-                label: "Новая подача",
+                label: isFigmaVisualSurface ? "Создать пакет" : "Новая подача",
                 onClick: () => {
                   openCreateSubmissionDrawer();
                   setMobileNavOpen(false);
@@ -2849,20 +2970,7 @@ function MainApp() {
               <p>{workspaceSurfaceDescription}</p>
             ) : null}
           </div>
-          {isFigmaVisualSurface ? (
-            <div className="topbar-actions vf-figma-topbar-actions">
-              <Button
-                className="v19-topbar-cta"
-                variant="primary"
-                onClick={role === "agent" ? openCreateSubmissionDrawer : undefined}
-              >
-                <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Создать пакет
-              </Button>
-            </div>
-          ) : surface === "agent-inbox" ? (
+          {isFigmaVisualSurface ? null : surface === "agent-inbox" ? (
             <div className="v19-topbar-city-filter">{cityFilterControl}</div>
           ) : !isV19CollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
@@ -2890,18 +2998,28 @@ function MainApp() {
             role={role}
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
-        ) : surface === "agent-actions" ? (
+        ) : surface === "agent-actions" || surface === "admin-review" ? (
           <Suspense fallback={null}>
             <FigmaActionQueueVisual
               cityFilter={cityFilter}
               cityOptions={cities}
-              completedActions={searchedCompletedAgentActions}
+              completedActions={
+                surface === "admin-review"
+                  ? searchedCompletedAdminActions
+                  : searchedCompletedAgentActions
+              }
               onCityFilter={setCityFilter}
               onOpen={openSubmission}
               onSearch={setQuery}
-              openActions={searchedOpenAgentActions}
+              openActions={
+                surface === "admin-review"
+                  ? searchedOpenAdminActions
+                  : searchedOpenAgentActions
+              }
               query={query}
-              summary={agentActions.summary}
+              summary={
+                surface === "admin-review" ? adminActions.summary : agentActions.summary
+              }
             />
           </Suspense>
         ) : surface === "agent-inbox" ? (
@@ -2958,25 +3076,10 @@ function MainApp() {
             onOpen={openSubmission}
             onSelect={selectSubmission}
             onTab={showAgentTab}
+            searchQuery={query}
             searchControl={agentSubmissionsSearchControl}
             visibleSubmission={visibleAgentSubmission}
             summary={summary}
-          />
-        ) : null}
-
-        {surface === "admin-review" && activeSubmission ? (
-          <AdminReviewScreen
-            inboxEvents={searchedAdminInboxEvents}
-            onAddIssue={openIssueComposer}
-            onOpen={openSubmission}
-            onSelect={selectSubmission}
-            onTab={showReviewTab}
-            filterControl={adminFilterControl}
-            reviewList={reviewList}
-            reviewSource={searchedReviewQueue}
-            reviewTab={reviewTab}
-            searchControl={adminReviewSearchControl}
-            visibleSubmission={visibleReviewSubmission}
           />
         ) : null}
 
@@ -3073,6 +3176,7 @@ function MainApp() {
           activeTab={activeDrawerTab}
           onAction={updateSubmission}
           onClose={closeDrawer}
+          onMarkIssueFixed={markActiveIssueFixed}
           onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
           role={role}
           surface="agent"
@@ -3202,174 +3306,645 @@ function PassportExtractionReviewDialog({
 
 function WorkspaceAccessGate({
   busy = false,
-  displayName,
   email,
   error,
-  mode,
   notice,
-  organizationName,
-  onDisplayName,
+  onAccessRequest,
   onEmail,
-  onMode,
-  onOrganizationName,
   onPassword,
+  onPasswordReset,
   onSubmit,
   password = "",
-  requiresPassword = false,
 }: {
   busy?: boolean;
-  displayName: string;
   email: string;
   error: string;
-  mode: AccessGateMode;
   notice?: string;
-  organizationName: string;
-  onDisplayName: (displayName: string) => void;
+  onAccessRequest: (
+    input: AccessRequestRegistrationInput,
+  ) => Promise<AccessRequestSubmitResult>;
   onEmail: (email: string) => void;
-  onMode: (mode: AccessGateMode) => void;
-  onOrganizationName: (organizationName: string) => void;
   onPassword?: (password: string) => void;
+  onPasswordReset: (email: string) => Promise<PasswordResetRequestResult>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   password?: string;
-  requiresPassword?: boolean;
 }) {
-  const effectiveMode = requiresPassword ? "login" : mode;
-  const accessCopy = requiresPassword
-    ? "Войдите через Supabase Auth, чтобы открыть рабочий стол по роли профиля."
-    : effectiveMode === "request"
-      ? "Отправьте заявку на доступ агента. Администратор увидит её в настройках и примет решение."
-      : "Введите одобренную рабочую почту. Новые пользователи сначала отправляют заявку.";
-  const accessNote = requiresPassword
-    ? "Вход идёт через Supabase Auth. Самостоятельная регистрация отключена."
-    : effectiveMode === "request"
-      ? "Заявка не открывает кабинет до одобрения администратором."
-      : "Pending и rejected email не открывают агентский кабинет.";
+  const [screen, setScreen] = useState<"login" | "reset" | "register">("login");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [accessPasswordVisible, setAccessPasswordVisible] = useState(false);
+  const [loginAttempted, setLoginAttempted] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [accessDraft, setAccessDraft] = useState<AccessRequestRegistrationInput>({
+    city: "",
+    companyName: "",
+    email,
+    fullName: "",
+    password: "",
+    phone: "",
+  });
+  const [accessAttempted, setAccessAttempted] = useState(false);
+  const [accessTouched, setAccessTouched] = useState<
+    Partial<Record<keyof AccessRequestRegistrationInput, boolean>>
+  >({});
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [accessSuccess, setAccessSuccess] = useState("");
+  const [resetEmail, setResetEmail] = useState(email);
+  const [resetAttempted, setResetAttempted] = useState(false);
+  const [resetEmailTouched, setResetEmailTouched] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
+  const showEmailError =
+    (loginAttempted || emailTouched) && !isValidWorkspaceEmail(email);
+  const showPasswordError =
+    (loginAttempted || passwordTouched) && password.trim().length === 0;
+  const emailError = showEmailError ? "Введите корректный email" : "";
+  const passwordError = showPasswordError ? "Введите пароль" : "";
+  const accessErrors = {
+    city:
+      (accessAttempted || accessTouched.city) && !accessDraft.city.trim()
+        ? "Введите город"
+        : "",
+    companyName:
+      (accessAttempted || accessTouched.companyName) &&
+      !accessDraft.companyName.trim()
+        ? "Введите название агентства"
+        : "",
+    email:
+      (accessAttempted || accessTouched.email) &&
+      !isValidWorkspaceEmail(accessDraft.email)
+        ? "Введите корректный email"
+        : "",
+    fullName:
+      (accessAttempted || accessTouched.fullName) && !accessDraft.fullName.trim()
+        ? "Введите имя и фамилию"
+        : "",
+    password:
+      (accessAttempted || accessTouched.password) && !accessDraft.password.trim()
+        ? "Введите пароль"
+        : "",
+    phone:
+      (accessAttempted || accessTouched.phone) && !accessDraft.phone.trim()
+        ? "Введите телефон"
+        : "",
+  } satisfies Record<keyof AccessRequestRegistrationInput, string>;
+  const showResetEmailError =
+    (resetAttempted || resetEmailTouched) && !isValidWorkspaceEmail(resetEmail);
+  const resetEmailError = showResetEmailError ? "Введите корректный email" : "";
+  const loginNoteId = error || notice ? "workspace-access-note" : undefined;
+  const emailDescribedBy = emailError
+    ? loginNoteId
+      ? "workspace-email-error workspace-access-note"
+      : "workspace-email-error"
+    : loginNoteId;
+  const passwordDescribedBy = passwordError
+    ? loginNoteId
+      ? "workspace-password-error workspace-access-note"
+      : "workspace-password-error"
+    : loginNoteId;
+
+  function handleLoginSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoginAttempted(true);
+    if (!isValidWorkspaceEmail(email) || password.trim().length === 0) return;
+    onSubmit(event);
+  }
+
+  async function handlePasswordResetSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetAttempted(true);
+    setResetError("");
+    setResetSuccess("");
+
+    if (!isValidWorkspaceEmail(resetEmail)) return;
+
+    setResetBusy(true);
+    try {
+      const result = await onPasswordReset(resetEmail);
+      if (result.status === "requested") {
+        setResetSuccess(result.message);
+      } else {
+        setResetError(result.message);
+      }
+    } catch (resetRequestError) {
+      setResetError(
+        formatPersistenceFailureForUser(
+          resetRequestError,
+          "Не удалось подготовить восстановление доступа. Попробуйте позже.",
+        ),
+      );
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
+  async function handleAccessRequestSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccessAttempted(true);
+    setAccessError("");
+    setAccessSuccess("");
+
+    const complete =
+      accessDraft.fullName.trim() &&
+      accessDraft.companyName.trim() &&
+      accessDraft.city.trim() &&
+      accessDraft.phone.trim() &&
+      accessDraft.password.trim() &&
+      isValidWorkspaceEmail(accessDraft.email);
+    if (!complete) return;
+
+    setAccessBusy(true);
+    try {
+      const result = await onAccessRequest(accessDraft);
+      if (result.status === "requested") {
+        setAccessSuccess(result.message);
+      } else {
+        setAccessError(result.message);
+      }
+    } catch (accessRequestError) {
+      setAccessError(
+        isAuthAccessError(accessRequestError)
+          ? accessRequestError.message
+          : formatPersistenceFailureForUser(
+              accessRequestError,
+              "Не удалось отправить заявку на доступ. Попробуйте позже.",
+            ),
+      );
+    } finally {
+      setAccessBusy(false);
+    }
+  }
+
+  function openAccessRequest() {
+    setAccessDraft((current) => ({
+      ...current,
+      email,
+    }));
+    setAccessAttempted(false);
+    setAccessTouched({});
+    setAccessError("");
+    setAccessSuccess("");
+    setScreen("register");
+  }
+
+  function openPasswordReset() {
+    setResetEmail(email);
+    setResetAttempted(false);
+    setResetEmailTouched(false);
+    setResetError("");
+    setResetSuccess("");
+    setScreen("reset");
+  }
+
+  function returnToLogin() {
+    setScreen("login");
+    setAccessError("");
+    setAccessSuccess("");
+    setResetError("");
+    setResetSuccess("");
+  }
+
+  const activeTitleId =
+    screen === "login"
+      ? "workspace-access-title"
+      : screen === "reset"
+        ? "workspace-reset-title"
+        : "workspace-register-title";
+  const activeCopyId =
+    screen === "login"
+      ? "workspace-access-copy"
+      : screen === "reset"
+        ? "workspace-reset-copy"
+        : "workspace-register-copy";
+  const accessTextFields: Array<{
+    autoComplete: string;
+    id: string;
+    inputMode?: "email" | "tel";
+    key: Exclude<keyof AccessRequestRegistrationInput, "password">;
+    label: string;
+    placeholder: string;
+    type: "email" | "tel" | "text";
+  }> = [
+    {
+      autoComplete: "name",
+      id: "workspace-register-name",
+      key: "fullName",
+      label: "Имя и фамилия",
+      placeholder: "Анна Петрова",
+      type: "text",
+    },
+    {
+      autoComplete: "organization",
+      id: "workspace-register-company",
+      key: "companyName",
+      label: "Агентство / компания",
+      placeholder: "Visa Center",
+      type: "text",
+    },
+    {
+      autoComplete: "address-level2",
+      id: "workspace-register-city",
+      key: "city",
+      label: "Город",
+      placeholder: "Москва",
+      type: "text",
+    },
+    {
+      autoComplete: "tel",
+      id: "workspace-register-phone",
+      inputMode: "tel",
+      key: "phone",
+      label: "Телефон",
+      placeholder: "+7 900 000-00-00",
+      type: "tel",
+    },
+    {
+      autoComplete: "email",
+      id: "workspace-register-email",
+      inputMode: "email",
+      key: "email",
+      label: "Email",
+      placeholder: "name@example.com",
+      type: "email",
+    },
+  ];
 
   return (
     <main className="access-shell" aria-label="Вход в рабочий кабинет">
-      <section
-        className="access-card"
-        aria-labelledby="workspace-access-title"
-        aria-describedby="workspace-access-copy"
-      >
-        <div className="access-card-header">
-          <div>
-            <h1 id="workspace-access-title">Вход в рабочий кабинет</h1>
+      <div className="access-layout">
+        <section className="access-brand-panel" aria-label="VisaFlow">
+          <div className="access-brand-markline">
+            <img className="access-logo" src={visaOpsLogo} alt="" aria-hidden="true" />
+            <div className="access-brand-copy">
+              <p className="access-kicker" aria-label="VisaFlow 19">
+                <span className="access-word-tail" aria-hidden="true">
+                  isaFlow
+                </span>
+                <span className="access-brand-version" aria-hidden="true">
+                  19
+                </span>
+              </p>
+            </div>
           </div>
-          <span className="access-badge">Закрытый доступ</span>
-        </div>
-        <p className="access-intro" id="workspace-access-copy">
-          {accessCopy}
-        </p>
-
-        {!requiresPassword ? (
-          <div
-            className="access-mode-switch"
-            role="group"
-            aria-label="Режим доступа"
-          >
-            <button
-              aria-pressed={effectiveMode === "login"}
-              className={effectiveMode === "login" ? "active" : undefined}
-              type="button"
-              onClick={() => onMode("login")}
-            >
-              Вход
-            </button>
-            <button
-              aria-pressed={effectiveMode === "request"}
-              className={effectiveMode === "request" ? "active" : undefined}
-              type="button"
-              onClick={() => onMode("request")}
-            >
-              Заявка
-            </button>
+          <div className="access-brand-message">
+            <p className="access-brand-title">Операционный вход в платформу</p>
+            <p className="access-brand-text">Кабинет для испанских подач.</p>
           </div>
-        ) : null}
+        </section>
 
-        <form
-          data-testid={
-            effectiveMode === "request" ? "access-request-form" : "access-login-form"
-          }
-          onSubmit={onSubmit}
+        <section
+          className="access-card"
+          aria-labelledby={activeTitleId}
+          aria-describedby={activeCopyId}
         >
-          <label>
-            <span>Рабочая почта</span>
-            <input
-              aria-describedby="workspace-access-note"
-              autoComplete="email"
-              id="workspace-email"
-              inputMode="email"
-              name="email"
-              placeholder="name@visaflow.local"
-              type="email"
-              value={email}
-              onChange={(event) => onEmail(event.target.value)}
-            />
-          </label>
-          {!requiresPassword && effectiveMode === "request" ? (
+          {screen === "login" ? (
             <>
-              <label>
-                <span>Имя</span>
-                <input
-                  autoComplete="name"
-                  id="workspace-display-name"
-                  name="displayName"
-                  placeholder="Имя и фамилия"
-                  type="text"
-                  value={displayName}
-                  onChange={(event) => onDisplayName(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>Организация</span>
-                <input
-                  autoComplete="organization"
-                  id="workspace-organization"
-                  name="organization"
-                  placeholder="Название агентства"
-                  type="text"
-                  value={organizationName}
-                  onChange={(event) => onOrganizationName(event.target.value)}
-                />
-              </label>
+              <div className="access-card-header">
+                <div>
+                  <p className="access-kicker">VisaFlow</p>
+                  <h1 id="workspace-access-title">Вход</h1>
+                </div>
+              </div>
+              <p className="access-intro" id="workspace-access-copy">
+                Введите email и пароль для доступа к кабинету.
+              </p>
+              <form className="access-form" onSubmit={handleLoginSubmit} noValidate>
+                <div className="access-field">
+                  <label className="access-field-label" htmlFor="workspace-email">
+                    Email
+                  </label>
+                  <input
+                    aria-describedby={emailDescribedBy}
+                    aria-invalid={Boolean(emailError)}
+                    autoComplete="email"
+                    id="workspace-email"
+                    inputMode="email"
+                    name="email"
+                    placeholder="name@example.com"
+                    type="email"
+                    value={email}
+                    onBlur={() => setEmailTouched(true)}
+                    onChange={(event) => onEmail(event.target.value)}
+                  />
+                  {emailError ? (
+                    <small className="access-field-error" id="workspace-email-error">
+                      {emailError}
+                    </small>
+                  ) : null}
+                </div>
+
+                <div className="access-field">
+                  <label className="access-field-label" htmlFor="workspace-password">
+                    Пароль
+                  </label>
+                  <div className="access-password-control">
+                    <input
+                      aria-describedby={passwordDescribedBy}
+                      aria-invalid={Boolean(passwordError)}
+                      autoComplete="current-password"
+                      id="workspace-password"
+                      name="password"
+                      placeholder="Введите пароль"
+                      type={passwordVisible ? "text" : "password"}
+                      value={password}
+                      onBlur={() => setPasswordTouched(true)}
+                      onChange={(event) => onPassword?.(event.target.value)}
+                    />
+                    <button
+                      className="access-password-toggle"
+                      type="button"
+                      aria-label={passwordVisible ? "Скрыть пароль" : "Показать пароль"}
+                      aria-pressed={passwordVisible}
+                      onClick={() => setPasswordVisible((visible) => !visible)}
+                    >
+                      {passwordVisible ? (
+                        <EyeOff aria-hidden="true" />
+                      ) : (
+                        <Eye aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                  {passwordError ? (
+                    <small className="access-field-error" id="workspace-password-error">
+                      {passwordError}
+                    </small>
+                  ) : null}
+                </div>
+
+                {error ? (
+                  <p className="access-error" id="workspace-access-note" role="alert">
+                    {error}
+                  </p>
+                ) : notice ? (
+                  <p className="access-note" id="workspace-access-note" role="status">
+                    {notice}
+                  </p>
+                ) : null}
+
+                <Button className="access-submit" type="submit" disabled={busy}>
+                  {busy ? "Входим..." : "Войти"}
+                </Button>
+              </form>
+
+              <div className="access-secondary-actions">
+                <button
+                  className="access-secondary-link"
+                  type="button"
+                  onClick={openAccessRequest}
+                >
+                  Подать заявку на доступ
+                </button>
+                <span className="access-secondary-divider" aria-hidden="true">
+                  ·
+                </span>
+                <button
+                  className="access-secondary-link"
+                  type="button"
+                  onClick={openPasswordReset}
+                >
+                  Забыли пароль?
+                </button>
+              </div>
             </>
-          ) : null}
-          {requiresPassword ? (
-            <label>
-              <span>Пароль</span>
-              <input
-                autoComplete="current-password"
-                id="workspace-password"
-                name="password"
-                placeholder="Пароль Supabase"
-                type="password"
-                value={password}
-                onChange={(event) => onPassword?.(event.target.value)}
-              />
-            </label>
-          ) : null}
-          {error ? (
-            <p className="access-error" role="alert">
-              {error}
-            </p>
-          ) : notice ? (
-            <p className="access-note" id="workspace-access-note" role="status">
-              {notice}
-            </p>
+          ) : screen === "reset" ? (
+            <>
+              <button className="access-back-button" type="button" onClick={returnToLogin}>
+                <ArrowLeft aria-hidden="true" />
+                Вернуться ко входу
+              </button>
+              <div className="access-card-header">
+                <div>
+                  <p className="access-kicker">Безопасное восстановление</p>
+                  <h1 id="workspace-reset-title">Восстановление доступа</h1>
+                </div>
+              </div>
+              <p className="access-intro" id="workspace-reset-copy">
+                Укажите email, и мы отправим инструкции, если аккаунт существует.
+              </p>
+              <form className="access-form" onSubmit={handlePasswordResetSubmit} noValidate>
+                <div className="access-field">
+                  <label className="access-field-label" htmlFor="workspace-reset-email">
+                    Email
+                  </label>
+                  <input
+                    aria-describedby={
+                      resetEmailError ? "workspace-reset-email-error" : undefined
+                    }
+                    aria-invalid={Boolean(resetEmailError)}
+                    autoComplete="email"
+                    id="workspace-reset-email"
+                    inputMode="email"
+                    name="email"
+                    placeholder="name@example.com"
+                    type="email"
+                    value={resetEmail}
+                    onBlur={() => setResetEmailTouched(true)}
+                    onChange={(event) => setResetEmail(event.target.value)}
+                  />
+                  {resetEmailError ? (
+                    <small className="access-field-error" id="workspace-reset-email-error">
+                      {resetEmailError}
+                    </small>
+                  ) : null}
+                </div>
+
+                {resetError ? (
+                  <p className="access-error" role="alert">
+                    {resetError}
+                  </p>
+                ) : resetSuccess ? (
+                  <p className="access-success" role="status">
+                    {resetSuccess}
+                  </p>
+                ) : (
+                  <p className="access-note">
+                    Мы не раскрываем, существует ли аккаунт с указанным email.
+                  </p>
+                )}
+
+                <Button className="access-submit" type="submit" disabled={resetBusy}>
+                  {resetBusy ? "Отправляем..." : "Отправить инструкции"}
+                </Button>
+              </form>
+            </>
           ) : (
-            <p className="access-note" id="workspace-access-note">
-              {busy ? "Проверяем текущую сессию." : accessNote}
-            </p>
+            <>
+              <button className="access-back-button" type="button" onClick={returnToLogin}>
+                <ArrowLeft aria-hidden="true" />
+                Вернуться ко входу
+              </button>
+              <div className="access-card-header">
+                <div>
+                  <p className="access-kicker">Первый вход</p>
+                  <h1 id="workspace-register-title">Заявка на доступ</h1>
+                </div>
+              </div>
+              <p className="access-intro" id="workspace-register-copy">
+                Заполните данные агентства. Доступ появится после подтверждения
+                администратором.
+              </p>
+              <form className="access-form" onSubmit={handleAccessRequestSubmit} noValidate>
+                {accessTextFields.map((field) => {
+                  const errorId = `${field.id}-error`;
+                  const fieldError = accessErrors[field.key];
+
+                  return (
+                    <div className="access-field" key={field.key}>
+                      <label className="access-field-label" htmlFor={field.id}>
+                        {field.label}
+                      </label>
+                      <input
+                        aria-describedby={fieldError ? errorId : undefined}
+                        aria-invalid={Boolean(fieldError)}
+                        autoComplete={field.autoComplete}
+                        id={field.id}
+                        inputMode={field.inputMode}
+                        name={field.key}
+                        placeholder={field.placeholder}
+                        type={field.type}
+                        value={accessDraft[field.key]}
+                        onBlur={() =>
+                          setAccessTouched((current) => ({
+                            ...current,
+                            [field.key]: true,
+                          }))
+                        }
+                        onChange={(event) =>
+                          setAccessDraft((current) => ({
+                            ...current,
+                            [field.key]: event.target.value,
+                          }))
+                        }
+                      />
+                      {fieldError ? (
+                        <small className="access-field-error" id={errorId}>
+                          {fieldError}
+                        </small>
+                      ) : null}
+                    </div>
+                  );
+                })}
+
+                <div className="access-field">
+                  <label className="access-field-label" htmlFor="workspace-register-password">
+                    Пароль
+                  </label>
+                  <div className="access-password-control">
+                    <input
+                      aria-describedby={
+                        accessErrors.password
+                          ? "workspace-register-password-error"
+                          : undefined
+                      }
+                      aria-invalid={Boolean(accessErrors.password)}
+                      autoComplete="new-password"
+                      id="workspace-register-password"
+                      name="password"
+                      placeholder="Введите пароль"
+                      type={accessPasswordVisible ? "text" : "password"}
+                      value={accessDraft.password}
+                      onBlur={() =>
+                        setAccessTouched((current) => ({
+                          ...current,
+                          password: true,
+                        }))
+                      }
+                      onChange={(event) =>
+                        setAccessDraft((current) => ({
+                          ...current,
+                          password: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      className="access-password-toggle"
+                      type="button"
+                      aria-label={
+                        accessPasswordVisible ? "Скрыть пароль" : "Показать пароль"
+                      }
+                      aria-pressed={accessPasswordVisible}
+                      onClick={() => setAccessPasswordVisible((visible) => !visible)}
+                    >
+                      {accessPasswordVisible ? (
+                        <EyeOff aria-hidden="true" />
+                      ) : (
+                        <Eye aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                  {accessErrors.password ? (
+                    <small
+                      className="access-field-error"
+                      id="workspace-register-password-error"
+                    >
+                      {accessErrors.password}
+                    </small>
+                  ) : null}
+                </div>
+
+                {accessError ? (
+                  <p className="access-error" role="alert">
+                    {accessError}
+                  </p>
+                ) : accessSuccess ? (
+                  <p className="access-success" role="status">
+                    {accessSuccess}
+                  </p>
+                ) : (
+                  <p className="access-note">
+                    Регистрация не активирует аккаунт автоматически. Заявка ожидает
+                    подтверждения администратора.
+                  </p>
+                )}
+
+                <Button className="access-submit" type="submit" disabled={accessBusy}>
+                  {accessBusy ? "Отправляем..." : "Подать заявку на доступ"}
+                </Button>
+              </form>
+            </>
           )}
-          <Button type="submit" disabled={busy}>
-            {busy
-              ? "Проверяем"
-              : requiresPassword || effectiveMode === "login"
-                ? "Войти"
-                : "Отправить заявку"}
-          </Button>
-        </form>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function WorkspaceAccessStatusGate({
+  onSignOut,
+  session,
+}: {
+  onSignOut: () => void;
+  session: LocalAuthSession;
+}) {
+  const rejected = session.approvalStatus === "rejected";
+  const title = rejected ? "Заявка отклонена" : "Ожидает подтверждения";
+  const copy = rejected
+    ? "Доступ к кабинету не активирован."
+    : "Заявка отправлена. Доступ появится после подтверждения администратором.";
+
+  return (
+    <main className="access-shell" aria-label="Статус доступа">
+      <section className="access-card access-status-card" aria-labelledby="access-status-title">
+        <p className="access-kicker">Заявка на доступ</p>
+        <h1 id="access-status-title">{title}</h1>
+        <p className="access-intro">{copy}</p>
+        <div
+          className={rejected ? "access-error" : "access-note"}
+          role={rejected ? "alert" : "status"}
+        >
+          {rejected && session.rejectionReason ? (
+            <>Причина: {session.rejectionReason}</>
+          ) : rejected ? (
+            <>Администратор отклонил заявку.</>
+          ) : (
+            <>Доступ появится после подтверждения администратором.</>
+          )}
+        </div>
+        <Button className="access-submit" type="button" onClick={onSignOut}>
+          Выйти
+        </Button>
       </section>
     </main>
   );
