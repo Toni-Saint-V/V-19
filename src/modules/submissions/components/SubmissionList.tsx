@@ -318,7 +318,7 @@ function issueShortText(issue: Issue) {
     issue.target.fileType === "photo" &&
     normalizedReason.includes("не подходит")
   ) {
-    return "Нужно заменить фото для внутренней проверки";
+    return "Архивный файл не используется в V-19";
   }
 
   if (normalizedReason.startsWith(`${normalizedTarget} `)) {

@@ -54,7 +54,6 @@ export const workspaceTabs: Array<{ id: DrawerTab; label: string }> = [
 
 export const activeMediaFileTypes: SubmissionFileType[] = [
   "passport_scan",
-  "photo",
   "selfie",
   "selfie_2",
 ];
@@ -91,13 +90,14 @@ export function tabForTarget(target: WorkspaceTarget): DrawerTab {
 
 export function fileLabel(type: SubmissionFileType) {
   if (type === "selfie_2") return "Селфи N2";
+  if (type === "selfie") return "Селфи";
   if (type === "passport_scan") return "Загранпаспорт";
   if (type === "video") return "Селфи N2";
   return fileTypeLabels[type];
 }
 
 export function fileShortLabel(type: SubmissionFileType) {
-  if (type === "photo") return "Фото";
+  if (type === "photo") return "Архив";
   if (type === "selfie") return "Селфи";
   if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";

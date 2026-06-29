@@ -204,18 +204,18 @@ const OverviewTab = ({ data }: { data: FigmaSubmissionDetail }) => (
       <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider">
-            Чеклист документов
+            Готовность подачи
           </h3>
           <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
-            8/10
+            3/4
           </span>
         </div>
         <div className="space-y-3 flex-1 flex flex-col justify-center">
           {[
-            { label: "Паспорта (Загран, РФ)", status: "done" },
-            { label: "Финансовые гарантии", status: "done" },
-            { label: "Справки с работы", status: "pending" },
-            { label: "Бронирования (Отель, Авиа)", status: "done" },
+            { label: "Скан загранпаспорта", status: "done" },
+            { label: "Селфи", status: "done" },
+            { label: "Селфи N2", status: "pending" },
+            { label: "Анкета", status: "done" },
           ].map((doc) => (
             <div key={doc.label} className="flex items-center gap-3">
               {doc.status === "done" ? (

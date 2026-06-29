@@ -23,6 +23,14 @@ function readyReturnedPdfSubmission(): Submission {
   const passportNumber = "669308614";
   const applicationSha = "a".repeat(64);
   const appointmentSha = "b".repeat(64);
+  const exportPackage = {
+    contentFingerprint: "xlsx|returned-pdf-handoff|ПД-HANDOFF",
+    fileName: "visaflow-export-returned-pdf-handoff.xlsx",
+    format: "xlsx" as const,
+    idempotencyKey: "returned-pdf-handoff",
+    rowCount: 1,
+    submissionIds: [submissionId],
+  };
   const applicationTarget = buildVisaApplicationPdfStorageTarget({
     applicantId,
     sha256: applicationSha,
@@ -44,6 +52,7 @@ function readyReturnedPdfSubmission(): Submission {
     tripDateFrom: "22.07",
     tripDateTo: "31.07",
     status: "exported",
+    exportPackage,
     returnedPdfPackage: {
       commonAppointmentPdf: {
         fileName: `${passportNumber}_appointment.pdf`,
@@ -54,6 +63,9 @@ function readyReturnedPdfSubmission(): Submission {
         storagePath: appointmentTarget.path,
         uploadedAtIso: "2026-06-27T10:00:00.000Z",
       },
+      exportPackageId: exportPackage.idempotencyKey,
+      ownerAgentId: "agent-1",
+      ownerAgentName: "Nord Travel",
     },
     visaApplicationPdfReviews: [
       {

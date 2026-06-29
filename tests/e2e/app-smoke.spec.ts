@@ -309,7 +309,7 @@ async function markVisibleIssuesFixed(page: Page) {
 async function acceptNonPassportBbSuggestion(page: Page) {
   const nonPassportSuggestion = drawer(page)
     .locator(".bb-suggestion")
-    .filter({ hasText: /Фото|Селфи|Видео/ })
+    .filter({ hasText: /Селфи/ })
     .first();
   const targetSuggestion =
     (await nonPassportSuggestion.count()) > 0
@@ -653,12 +653,12 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await expectDrawerStatus(page, "Возвращено");
     const returnedFileIssue = drawer(page)
-      .getByRole("button", { name: /Мария Иванова.*Селфи N2/ })
+      .getByRole("button", { name: /Мария Иванова.*Селфи/ })
       .first();
     await expect(returnedFileIssue).toBeVisible();
     await returnedFileIssue.click();
     await expect(
-      drawer(page).getByRole("article", { name: /Селфи N2: Мария Иванова/ }),
+      drawer(page).getByRole("article", { name: /Селфи: Мария Иванова/ }),
     ).toBeVisible();
     await expect(
       drawer(page).getByRole("button", { name: "Отправить исправления" }),
@@ -874,12 +874,12 @@ test.describe("V-19 operations workspace", () => {
       "true",
     );
     const firstReturnedIssue = drawer(page)
-      .getByRole("button", { name: /Мария Иванова.*Селфи N2/ })
+      .getByRole("button", { name: /Мария Иванова.*Селфи/ })
       .first();
     await expect(firstReturnedIssue).toBeVisible();
     await firstReturnedIssue.click();
     await expect(
-      drawer(page).getByRole("article", { name: /Селфи N2: Мария Иванова/ }),
+      drawer(page).getByRole("article", { name: /Селфи: Мария Иванова/ }),
     ).toBeVisible();
     await openDrawerTab(page, ["Замечания"]);
     const secondReturnedIssue = drawer(page)

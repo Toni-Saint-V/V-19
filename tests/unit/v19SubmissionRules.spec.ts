@@ -535,10 +535,11 @@ describe("V-19 export rules", () => {
     });
   });
 
-  it("blocks mixed city, trip date, and already exported packages", () => {
+  it("blocks mixed city, owner agent, trip date, and already exported packages", () => {
     const blockers = getExportBlockers([
       readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-ГОРОД", city: "Казань" }),
+      readyClone({ agentId: alternateLocalAgentOwnerId, id: "ПД-ДРУГОЙ-АГЕНТ" }),
       readyClone({ id: "ПД-ДАТА", tripDateFrom: "10.10", tripDateTo: "20.10" }),
       readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
       byId("ПД-1057"),
@@ -547,6 +548,7 @@ describe("V-19 export rules", () => {
     expect(blockers).toContain("В выборке есть подачи не готовые к выгрузке");
     expect(blockers).toContain("В выборке есть уже выгруженные подачи");
     expect(blockers).toContain("Нельзя смешивать разные города");
+    expect(blockers).toContain("Нельзя смешивать подачи разных агентов");
     expect(blockers).toContain("Нельзя смешивать разные даты поездки");
     expect(blockers).not.toContain("Нельзя смешивать одинарные и семейные подачи");
   });
@@ -838,34 +840,9 @@ describe("V-19 submission actions", () => {
   });
 
   it("derives submit corrections only after all targeted file replacements are uploaded", () => {
-    const legacyReturned = byId("ПД-1048");
-    const returned = {
-      ...legacyReturned,
-      files: legacyReturned.files
-        .filter((file) => file.type !== "photo")
-        .map((file) =>
-          file.applicantId === "з-1048-1" && file.type === "selfie_2"
-            ? {
-                ...file,
-                linkedIssueId: "зм-1048-1",
-                status: "needs_replacement" as const,
-              }
-            : file,
-        ),
-      issues: legacyReturned.issues.map((issue) =>
-        issue.id === "зм-1048-1"
-          ? {
-              ...issue,
-              target: {
-                ...issue.target,
-                fileType: "selfie_2" as const,
-              },
-            }
-          : issue,
-      ),
-    } satisfies Submission;
+    const returned = byId("ПД-1048");
     const selfieFile = returned.files.find(
-      (file) => file.applicantId === "з-1048-1" && file.type === "selfie_2",
+      (file) => file.applicantId === "з-1048-1" && file.type === "selfie",
     );
     const passportFile = returned.files.find(
       (file) => file.applicantId === "з-1048-3" && file.type === "passport_scan",
@@ -878,19 +855,19 @@ describe("V-19 submission actions", () => {
     });
 
     const withSelfieReplacement = applyUploadedFileMetadata(returned, selfieFile.id, {
-      generatedFileName: "v19replacement_selfie_2.jpg",
+      generatedFileName: "v19replacement_selfie.jpg",
       mimeType: "image/jpeg",
-      originalFileName: "selfie-2-fixed.jpg",
+      originalFileName: "selfie-fixed.jpg",
       sizeBytes: 180_000,
       storageBucket: "submission-media",
-      storagePath: "ПД-1048/з-1048-1/selfie_2/v19replacement_selfie_2.jpg",
+      storagePath: "ПД-1048/з-1048-1/selfie/v19replacement_selfie.jpg",
       uploadedAtIso: "2026-06-21T10:00:00.000Z",
     });
 
     expect(
       withSelfieReplacement.files.find((file) => file.id === selfieFile.id),
     ).toMatchObject({
-      originalFileName: "selfie-2-fixed.jpg",
+      originalFileName: "selfie-fixed.jpg",
       reviewStatus: "not_reviewed",
       reviewedBy: undefined,
       status: "uploaded",
@@ -1836,7 +1813,7 @@ describe("V-19 ББ helper suggestions", () => {
         (suggestion) =>
           suggestion.target.applicantName === "Мария Иванова" &&
           suggestion.target.section === "Медиа" &&
-          suggestion.target.fileType === "photo",
+          suggestion.target.fileType === "selfie",
       ),
     ).toBe(false);
   });
@@ -1880,7 +1857,7 @@ describe("V-19 ББ helper suggestions", () => {
   it("lets admins convert a suggestion into a precise issue", () => {
     const reviewed = runAiReview(byId("ПД-1053"));
     const fileSuggestion = activeAiSuggestions(reviewed).find(
-      (suggestion) => suggestion.target.fileType === "photo",
+      (suggestion) => suggestion.target.fileType === "selfie",
     );
     if (!fileSuggestion) throw new Error("Нет файловой подсказки для проверки");
 
@@ -1894,7 +1871,7 @@ describe("V-19 ББ helper suggestions", () => {
       target: {
         applicantName: "Нина Волкова",
         section: "Медиа",
-        fileType: "photo",
+        fileType: "selfie",
       },
     });
     expect(
@@ -1904,7 +1881,7 @@ describe("V-19 ББ helper suggestions", () => {
     ).toBe(false);
     expect(next.history[0]).toMatchObject({
       text: "Подсказка ББ принята администратором",
-      detail: "Нина Волкова · Медиа · Фото на белом фоне",
+      detail: "Нина Волкова · Медиа · Селфи",
       source: "bb",
     });
   });
@@ -2025,12 +2002,45 @@ describe("V-19 persistence boundary", () => {
     ).toBe(false);
   });
 
-  it("maps legacy returned media issues to a canonical replacement slot", () => {
-    const normalized = normalizeSubmissionForCanonicalRuntime(byId("ПД-1048"));
+  it("maps legacy returned photo issues to the canonical selfie replacement slot", () => {
+    const source = byId("ПД-1048");
+    const legacyIssue = source.issues.find((item) => item.id === "зм-1048-1");
+    if (!legacyIssue) throw new Error("Missing returned issue");
+    const legacySubmission: Submission = {
+      ...source,
+      issues: source.issues.map((issue) =>
+        issue.id === legacyIssue.id
+          ? {
+              ...issue,
+              target: {
+                ...issue.target,
+                fileType: "photo",
+              },
+            }
+          : issue,
+      ),
+      files: [
+        ...source.files.filter(
+          (file) =>
+            !(
+              file.applicantId === legacyIssue.target.applicantId &&
+              file.type === "selfie"
+            ),
+        ),
+        {
+          id: "legacy-photo",
+          applicantId: legacyIssue.target.applicantId,
+          status: "needs_replacement",
+          type: "photo",
+          linkedIssueId: legacyIssue.id,
+        },
+      ],
+    };
+    const normalized = normalizeSubmissionForCanonicalRuntime(legacySubmission);
     const issue = normalized.issues.find((item) => item.id === "зм-1048-1");
     if (!issue) throw new Error("Missing returned issue");
 
-    expect(issue.target.fileType).toBe("selfie_2");
+    expect(issue.target.fileType).toBe("selfie");
     const targetFile = normalized.files.find(
       (file) =>
         file.applicantId === issue.target.applicantId &&

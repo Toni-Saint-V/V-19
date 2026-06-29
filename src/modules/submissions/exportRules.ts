@@ -72,6 +72,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     ),
   );
   const cities = new Set(submissions.map((submission) => submission.city));
+  const ownerAgentIds = new Set(submissions.map((submission) => submission.agentId));
   const tripDateRanges = new Set(submissions.map(tripDateRangeKey));
   const exportState = getExportSelectionState(submissions);
 
@@ -112,6 +113,8 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   }
 
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
+  if (ownerAgentIds.size > 1)
+    blockers.push({ reason: "Нельзя смешивать подачи разных агентов" });
   if (tripDateRanges.size > 1)
     blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (exportState === "mixed")

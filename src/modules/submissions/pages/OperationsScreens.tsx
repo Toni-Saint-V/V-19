@@ -1583,8 +1583,9 @@ function submissionRailTone(submission: Submission) {
 }
 
 function fileActionLabel(fileType: Submission["files"][number]["type"]) {
-  if (fileType === "photo") return "Заменить фото";
-  if (fileType === "selfie" || fileType === "selfie_2") return "Добавить селфи";
+  if (fileType === "photo") return "Архивный файл";
+  if (fileType === "selfie") return "Добавить селфи";
+  if (fileType === "selfie_2") return "Добавить селфи N2";
   if (fileType === "passport_scan") return "Заменить паспорт";
   return "Заменить файл";
 }

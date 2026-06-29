@@ -460,13 +460,16 @@ function questionnaireMissingLabel(missing?: string) {
 function isMissingAgentFile(file: SubmissionFile) {
   return (
     file.status === "missing" &&
-    (file.type === "selfie" || file.type === "passport_scan")
+    (file.type === "selfie" ||
+      file.type === "selfie_2" ||
+      file.type === "passport_scan")
   );
 }
 
 function shortFileTypeLabel(type: SubmissionFile["type"]) {
-  if (type === "video" || type === "selfie_2") return "Селфи 2";
+  if (type === "video" || type === "selfie_2") return "Селфи N2";
   if (type === "passport_scan") return "Паспорт";
-  if (type === "photo") return "Фото";
+  if (type === "selfie") return "Селфи";
+  if (type === "photo") return "Архив";
   return "Файлы";
 }

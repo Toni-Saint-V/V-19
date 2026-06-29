@@ -183,8 +183,10 @@ export type VisaApplicationPdfReviewState = {
   applicantName?: string;
   artifact?: {
     fileName: string;
+    deletedAtIso?: string;
     extractedPageCount?: number;
     extractionSource?: VisaApplicationPdfExtractionSource;
+    failureReason?: string;
     mimeType: string;
     ocrPageLimit?: number;
     parserVersion?: number;
@@ -192,6 +194,7 @@ export type VisaApplicationPdfReviewState = {
     sizeBytes: number;
     storageBucket?: string;
     storagePath?: string;
+    uploadStatus?: FileAssetUploadStatus;
     uploadedAtIso: string;
     uploadedBy?: string;
   };
@@ -207,17 +210,23 @@ export type VisaApplicationPdfReviewState = {
 
 export type ReturnedPdfArtifact = {
   fileName: string;
+  deletedAtIso?: string;
+  failureReason?: string;
   mimeType: string;
   sha256: string;
   sizeBytes: number;
   storageBucket?: string;
   storagePath?: string;
+  uploadStatus?: FileAssetUploadStatus;
   uploadedAtIso?: string;
   uploadedBy?: string;
 };
 
 export type ReturnedPdfPackageState = {
   commonAppointmentPdf?: ReturnedPdfArtifact;
+  exportPackageId?: string;
+  ownerAgentId?: AgentOwnerId;
+  ownerAgentName?: string;
   reviewedAtIso?: string;
   reviewedBy?: string;
 };

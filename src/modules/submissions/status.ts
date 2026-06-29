@@ -127,12 +127,12 @@ export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
 };
 
 export const fileTypeLabels = {
-  photo: "Фото на белом фоне",
-  photo_white: "Фото на белом фоне",
+  photo: "Архивное фото",
+  photo_white: "Архивное фото",
   selfie: "Селфи",
   selfie_2: "Селфи N2",
   passport_scan: "Загранпаспорт",
-  video: "Селфи N2",
+  video: "Архивное видео",
 } satisfies Record<Submission["files"][number]["type"], string>;
 
 export const typeLabels = {
