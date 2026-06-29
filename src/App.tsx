@@ -11,12 +11,6 @@ import {
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchBar, StateTabs } from "./shared/ui/primitives";
 import {
-  acceptAiSuggestionAsIssue,
-  canRunAiReview,
-  dismissAiSuggestion,
-  runAiReview,
-} from "./modules/submissions/aiSuggestions";
-import {
   adminInboxEvents,
   agentActionQueue,
   searchAgentActions,
@@ -110,7 +104,6 @@ import {
 } from "./modules/submissions/components/OperationalNavigation";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
-import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import {
   AdminReviewScreen,
   AgentActionsScreen,
@@ -523,7 +516,7 @@ function MainApp() {
   const [settingsSaveState, setSettingsSaveState] = useState<"idle" | "saved">("idle");
   const [confirmSettingsLeave, setConfirmSettingsLeave] = useState(false);
   const [surface, setSurface] = useState<Surface>(
-    initialWorkspaceRole === "admin" ? "admin-review" : "agent-inbox",
+    initialWorkspaceRole === "admin" ? "admin-review" : "agent-actions",
   );
   const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
   const [selectedSubmissionId, setSelectedSubmissionId] = useState(() => {
@@ -546,7 +539,7 @@ function MainApp() {
     useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [agentInboxMode, setAgentInboxMode] = useState<AgentInboxMode>("events");
-  const [agentTab, setAgentTab] = useState<AgentTab>("action");
+  const [agentTab, setAgentTab] = useState<AgentTab>("all");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
   const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
@@ -756,16 +749,6 @@ function MainApp() {
     role === "agent"
       ? [
           {
-            active: surface === "agent-inbox",
-            count: agentInboxUnreadCount,
-            icon: "С",
-            id: "agent-inbox",
-            label: "Входящие",
-            meta: "новые события",
-            onClick: showAgentInbox,
-            tone: agentInboxUnreadCount > 0 ? "danger" : "default",
-          },
-          {
             active: surface === "agent-actions",
             count: agentActions.summary.open,
             icon: "М",
@@ -780,7 +763,7 @@ function MainApp() {
             id: "agent-submissions",
             label: "Мои подачи",
             meta: "все рабочие подачи",
-            onClick: () => showAgentTab("action"),
+            onClick: () => showAgentTab("all"),
           },
           {
             active: surface === "settings",
@@ -908,7 +891,7 @@ function MainApp() {
         ) {
           setLocalAuthSession(restoredSession);
           setRole(restoredSession.role);
-          setSurface(restoredSession.role === "admin" ? "admin-review" : "agent-inbox");
+          setSurface(restoredSession.role === "admin" ? "admin-review" : "agent-actions");
           setWorkspaceEmail(restoredSession.email);
           setWorkspaceEmailDraft(restoredSession.email);
           saveWorkspaceEmail(restoredSession.email);
@@ -929,7 +912,7 @@ function MainApp() {
         setLocalAuthSession(bootstrapSession);
         setRole(bootstrapSession.role);
         setSurface(
-          bootstrapSession.role === "admin" ? "admin-review" : "agent-inbox",
+          bootstrapSession.role === "admin" ? "admin-review" : "agent-actions",
         );
         setWorkspaceEmail(bootstrapSession.email);
         setWorkspaceEmailDraft(bootstrapSession.email);
@@ -1157,9 +1140,9 @@ function MainApp() {
       setAgentQuestionnaireOpen(false);
       setDirty(false);
       if (nextRole === "agent") {
-        setSurface("agent-inbox");
-        setAgentInboxMode("events");
-        setAgentTab("action");
+        setSurface("agent-actions");
+        setAgentInboxMode("actions");
+        setAgentTab("all");
         setSelectedSubmissionId(
           firstSubmissionForRole(submissions, "agent", defaultLocalAgentOwnerId)?.id ??
             "",
@@ -1204,19 +1187,6 @@ function MainApp() {
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
       const nextSubmission = firstAgentActionSubmission();
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentInbox() {
-    requestSettingsLeave(() => {
-      setSurface("agent-inbox");
-      setAgentInboxMode("events");
-      setAgentTab("action");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission =
-        firstAgentSubmissionForTab("action") ?? searchedAgentQueue[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
@@ -1283,15 +1253,6 @@ function MainApp() {
     setDrawerInitialTarget(target ?? null);
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
-  }
-
-  function openAgentQuestionnaireWorkspace() {
-    const targetSubmission = activeSubmission ?? firstAgentActionSubmission();
-    if (!targetSubmission) return;
-    setSelectedSubmissionId(targetSubmission.id);
-    setActiveDrawerTab("questionnaire");
-    setDrawerMode("closed");
-    setAgentQuestionnaireOpen(true);
   }
 
   function selectSubmission(submission: Submission) {
@@ -2099,29 +2060,6 @@ function MainApp() {
     setActiveDrawerTab("files");
   }
 
-  function runAiReviewForActiveSubmission() {
-    if (!activeSubmission) return;
-    const reviewSurface =
-      surface === "export" ? "export" : surface === "admin-review" ? "review" : "agent";
-    if (!canRunAiReview(activeSubmission, role, reviewSurface)) return;
-    updateActiveSubmission(runAiReview);
-  }
-
-  function acceptAiSuggestionForActiveSubmission(suggestionId: string) {
-    if (!activeSubmission) return;
-    updateActiveSubmission((submission) =>
-      acceptAiSuggestionAsIssue(submission, suggestionId, role),
-    );
-    setActiveDrawerTab("issues");
-  }
-
-  function dismissAiSuggestionForActiveSubmission(suggestionId: string) {
-    if (!activeSubmission) return;
-    updateActiveSubmission((submission) =>
-      dismissAiSuggestion(submission, suggestionId, role),
-    );
-  }
-
   function passportSlotForUpload(submission: Submission, upload: PassportUploadDraft) {
     if (upload.applicantIndex < 0 || upload.applicantIndex >= submission.applicants.length) {
       return null;
@@ -2546,7 +2484,7 @@ function MainApp() {
     skipNextRemoteSaveRef.current = true;
     setRemoteProfile(profile);
     setRole(nextRole);
-    setSurface(nextRole === "admin" ? "admin-review" : "agent-inbox");
+    setSurface(nextRole === "admin" ? "admin-review" : "agent-actions");
     setSubmissions(nextSubmissions);
     setSelectedSubmissionId(firstSubmission?.id ?? "");
     if (firstSubmission) setActiveDrawerTab(defaultDrawerTab(firstSubmission));
@@ -2651,7 +2589,7 @@ function MainApp() {
           ?.id ?? "",
       );
       setRole("agent");
-      setSurface("agent-inbox");
+      setSurface("agent-actions");
       clearWorkspaceEmail();
       setWorkspaceEmail("");
       setWorkspaceEmailDraft("");
@@ -2783,15 +2721,11 @@ function MainApp() {
     role === "agent"
       ? operationalNavItems
           .filter((item) =>
-            ["agent-actions", "agent-submissions", "agent-inbox", "agent-settings"].includes(
+            ["agent-actions", "agent-submissions", "agent-settings"].includes(
               item.id,
             ),
           )
           .map((item) => {
-            if (item.id === "agent-inbox") {
-              return { ...item, meta: "события и задачи" };
-            }
-
             if (item.id === "agent-settings") {
               return {
                 ...item,
@@ -3161,24 +3095,7 @@ function MainApp() {
       ) : null}
 
       {drawerMode === "detail" &&
-      activeSubmission &&
-      role === "agent" &&
-      isFigmaVisualSurface ? (
-        <FigmaSubmissionDrawer
-          actionError={activeSubmissionActionError}
-          activeTab={activeDrawerTab}
-          onAction={updateSubmission}
-          onClose={closeDrawer}
-          onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
-          role={role}
-          surface="agent"
-          submission={activeSubmission}
-        />
-      ) : null}
-
-      {drawerMode === "detail" &&
-      activeSubmission &&
-      !(role === "agent" && isFigmaVisualSurface) ? (
+      activeSubmission ? (
         <Suspense fallback={null}>
           <SubmissionDrawer
             actionError={activeSubmissionActionError}
@@ -3189,9 +3106,7 @@ function MainApp() {
             onIssueComposerConsumed={() => setIssueComposerRequest(null)}
             onAction={updateSubmission}
             onAddIssue={addAdminIssue}
-            onAcceptAiSuggestion={acceptAiSuggestionForActiveSubmission}
             onClose={closeDrawer}
-            onDismissAiSuggestion={dismissAiSuggestionForActiveSubmission}
             onMarkIssueFixed={markActiveIssueFixed}
             onApplyPassportField={applyPassportFieldForActiveSubmission}
             onExtractPassport={extractPassportForActiveSubmission}
@@ -3202,7 +3117,6 @@ function MainApp() {
               dismissVisaApplicationPdfReviewForActiveSubmission
             }
             onPublishReturnedPdfHandoff={publishReturnedPdfHandoffForActiveSubmission}
-            onRunAiReview={runAiReviewForActiveSubmission}
             onTab={setActiveDrawerTab}
             onQuestionnaireField={updateActiveQuestionnaireField}
             onReviewVisaApplicationPdf={reviewVisaApplicationPdfForActiveSubmission}

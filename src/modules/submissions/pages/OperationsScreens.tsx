@@ -1173,13 +1173,20 @@ export function AgentSubmissionsScreen({
     : null;
   const railCompact = panelOpen;
   const tabCounts = {
+    all:
+      summary.requiresAction +
+      summary.draft +
+      summary.inProgress +
+      summary.inReview +
+      summary.corrections +
+      summary.ready +
+      summary.exported,
     action: summary.requiresAction,
     done: summary.ready + summary.exported,
     progress: summary.draft + summary.inProgress,
     review: summary.inReview + summary.corrections,
   };
-  const visibleTab: Exclude<AgentTab, "all"> =
-    activeTab === "all" ? "action" : activeTab;
+  const visibleTab: AgentTab = activeTab;
   const activeFilters = ([
     hasSearchQuery
       ? {
@@ -1267,9 +1274,26 @@ export function AgentSubmissionsScreen({
       {panelToggleTool}
     </>
   );
-  const mobileFilterOptions: Array<
-    MobileFilterOption<Exclude<AgentTab, "all">>
-  > = [
+  const familySubmissions = orderedSubmissions.filter(
+    (submission) => submission.type === "family",
+  );
+  const individualSubmissions = orderedSubmissions.filter(
+    (submission) => submission.type === "single",
+  );
+  const submissionGroups = [
+    {
+      empty: "Семейных подач по текущим фильтрам нет.",
+      items: familySubmissions,
+      label: "Семейные подачи",
+    },
+    {
+      empty: "Индивидуальных подач по текущим фильтрам нет.",
+      items: individualSubmissions,
+      label: "Индивидуальные подачи",
+    },
+  ];
+  const mobileFilterOptions: Array<MobileFilterOption<AgentTab>> = [
+    { count: tabCounts.all, id: "all", label: "Все" },
     { count: tabCounts.action, id: "action", label: "Действия" },
     { count: tabCounts.progress, id: "progress", label: "В работе" },
     { count: tabCounts.review, id: "review", label: "Проверка" },
@@ -1278,7 +1302,7 @@ export function AgentSubmissionsScreen({
   const toolbarTools = (
     <ToolbarTools>
       <div className="v19-desktop-toolbar-tools">{toolbarToolButtons}</div>
-      <MobileFilterSheet<Exclude<AgentTab, "all">>
+      <MobileFilterSheet<AgentTab>
         label="Фильтры подач"
         options={mobileFilterOptions}
         title="Статус подач"
@@ -1315,6 +1339,7 @@ export function AgentSubmissionsScreen({
           onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
           search={searchControl}
           tabs={[
+            { count: tabCounts.all, id: "all", label: "Все" },
             { count: tabCounts.action, id: "action", label: "Требуют действия" },
             { count: tabCounts.progress, id: "progress", label: "В работе" },
             { count: tabCounts.review, id: "review", label: "На проверке" },
@@ -1335,36 +1360,53 @@ export function AgentSubmissionsScreen({
               <span>Готовность</span>
               <span />
             </div>
-            <div className="v19-event-list v19-submission-list">
-              {orderedSubmissions.map((submission) => (
-                <SubmissionCollectionRow
-                  action={submissionActionLabel(submission)}
-                  compact={railCompact}
-                  completeness={`${submission.completeness.total}%`}
-                  extraTagCount={railCompact ? 0 : submissionExtraTagCount(submission)}
-                  extraTagLabel={railCompact ? undefined : submissionExtraTagLabel(submission)}
-                  fileDetail={submissionFileDetailLabel(submission)}
-                  fileState={submissionFileStateLabel(submission)}
-                  fileTone={submissionFileStateTone(submission)}
-                  kind={submission.applicants.length > 1 ? "family" : "single"}
-                  key={submission.id}
-                  meta={submissionIdentityMeta(submission)}
-                  status={submission.status}
-                  statusDetail={
-                    railCompact
-                      ? submissionStatusDetailLine(submission)
-                      : submissionIssueDetailLine(submission)
-                  }
-                  statusLabel={submissionStatusChipLabel(submission)}
-                  submissionId={submission.id}
-                  title={submission.title}
-                  trip={submission.city}
-                  tripDetail={tripDates(submission)}
-                  onOpen={() => {
-                    onSelect(submission);
-                    onOpen(submission, defaultDrawerTab(submission));
-                  }}
-                />
+            <div className="v19-event-list v19-submission-list v19-submission-grouped-list">
+              {submissionGroups.map((group) => (
+                <section className="v19-submission-type-section" key={group.label}>
+                  <CollectionGroupLabel className="v19-submission-type-label">
+                    {group.label} <span>{group.items.length}</span>
+                  </CollectionGroupLabel>
+                  {group.items.length ? (
+                    group.items.map((submission) => (
+                      <SubmissionCollectionRow
+                        action={submissionActionLabel(submission)}
+                        compact={railCompact}
+                        completeness={`${submission.completeness.total}%`}
+                        extraTagCount={
+                          railCompact ? 0 : submissionExtraTagCount(submission)
+                        }
+                        extraTagLabel={
+                          railCompact ? undefined : submissionExtraTagLabel(submission)
+                        }
+                        fileDetail={submissionFileDetailLabel(submission)}
+                        fileState={submissionFileStateLabel(submission)}
+                        fileTone={submissionFileStateTone(submission)}
+                        kind={submission.applicants.length > 1 ? "family" : "single"}
+                        key={submission.id}
+                        meta={submissionIdentityMeta(submission)}
+                        status={submission.status}
+                        statusDetail={
+                          railCompact
+                            ? submissionStatusDetailLine(submission)
+                            : submissionIssueDetailLine(submission)
+                        }
+                        statusLabel={submissionStatusChipLabel(submission)}
+                        submissionId={submission.id}
+                        title={submission.title}
+                        trip={submission.city}
+                        tripDetail={tripDates(submission)}
+                        onOpen={() => {
+                          onSelect(submission);
+                          onOpen(submission, defaultDrawerTab(submission));
+                        }}
+                      />
+                    ))
+                  ) : activeTab === "all" && !hasFiltering ? (
+                    <div className="v19-submission-type-empty" role="status">
+                      {group.empty}
+                    </div>
+                  ) : null}
+                </section>
               ))}
             </div>
           </>
@@ -2369,13 +2411,6 @@ export function ExportScreen({
   };
   const toolbarTools = (
     <ToolbarTools>
-      <ToolbarIconButton
-        icon="filter"
-        label="Фильтр выгрузки"
-        pressed={false}
-        type="button"
-        onClick={() => undefined}
-      />
       <ToolbarIconButton
         icon="sort"
         label={`Сортировка выгрузки: ${submissionSortModeLabel(sortMode)}`}

@@ -71,7 +71,6 @@ import type {
   SubmissionFileType,
 } from "../types";
 import { EmptyState } from "./Primitives";
-import { BbAiPanel } from "./BbAiPanel";
 
 type ReviewRemarkContext = {
   applicantId?: string;
@@ -97,13 +96,10 @@ export function SubmissionDrawer({
   localPassportFileIds = [],
   onAction,
   onAddIssue,
-  onAcceptAiSuggestion,
   onIssueComposerConsumed,
   onClose,
-  onDismissAiSuggestion,
   onMarkIssueFixed,
   onTab,
-  onRunAiReview,
   onQuestionnaireField,
   onApplyPassportField,
   onExtractPassport,
@@ -128,11 +124,8 @@ export function SubmissionDrawer({
   onAction: (action: SubmissionAction) => void;
   onAddIssue: (input: IssueInput) => void;
   onIssueComposerConsumed: () => void;
-  onAcceptAiSuggestion: (suggestionId: string) => void;
   onClose: () => void;
-  onDismissAiSuggestion: (suggestionId: string) => void;
   onMarkIssueFixed: (issueId: string) => void;
-  onRunAiReview: () => void;
   onQuestionnaireField: (input: {
     applicantId: string;
     sectionId: string;
@@ -470,10 +463,7 @@ export function SubmissionDrawer({
             surface === "review" ? (
               <AdminRemarksReview
                 canAddIssue={canOpenIssueComposer}
-                onAcceptAiSuggestion={onAcceptAiSuggestion}
                 onAddRemark={openIssueComposer}
-                onDismissAiSuggestion={onDismissAiSuggestion}
-                onRunAiReview={onRunAiReview}
                 onOpenTarget={openTarget}
                 role={role}
                 submission={submission}
@@ -481,15 +471,11 @@ export function SubmissionDrawer({
             ) : (
               <DrawerIssues
                 canAddIssue={canOpenIssueComposer}
-                onAcceptAiSuggestion={onAcceptAiSuggestion}
                 onAddIssue={() => openIssueComposer()}
-                onDismissAiSuggestion={onDismissAiSuggestion}
                 onMarkIssueFixed={onMarkIssueFixed}
                 onOpenTarget={openTarget}
-                onRunAiReview={onRunAiReview}
                 role={role}
                 submission={submission}
-                surface={surface}
               />
             )
           ) : null}
@@ -1385,19 +1371,13 @@ function AdminQuestionnaireReview({
 
 function AdminRemarksReview({
   canAddIssue,
-  onAcceptAiSuggestion,
   onAddRemark,
-  onDismissAiSuggestion,
-  onRunAiReview,
   onOpenTarget,
   role,
   submission,
 }: {
   canAddIssue: boolean;
-  onAcceptAiSuggestion: (suggestionId: string) => void;
   onAddRemark: (context?: ReviewRemarkContext) => void;
-  onDismissAiSuggestion: (suggestionId: string) => void;
-  onRunAiReview: () => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
   role: Role;
   submission: Submission;
@@ -1427,20 +1407,6 @@ function AdminRemarksReview({
           </Button>
         ) : null}
       </div>
-
-      {role === "admin" ? (
-        <div className="admin-remarks-ops">
-          <BbAiPanel
-            compact
-            onAccept={onAcceptAiSuggestion}
-            onDismiss={onDismissAiSuggestion}
-            onRun={onRunAiReview}
-            role={role}
-            submission={submission}
-            surface="review"
-          />
-        </div>
-      ) : null}
 
       {openIssues.length || resolvedIssues.length ? (
         <div className="admin-remarks-groups">
@@ -3575,26 +3541,18 @@ function AgentReturnedPdfPackagePanel({
 
 function DrawerIssues({
   canAddIssue,
-  onAcceptAiSuggestion,
   onAddIssue,
-  onDismissAiSuggestion,
   onMarkIssueFixed,
   onOpenTarget,
-  onRunAiReview,
   role,
   submission,
-  surface,
 }: {
   canAddIssue: boolean;
-  onAcceptAiSuggestion: (suggestionId: string) => void;
   onAddIssue: () => void;
-  onDismissAiSuggestion: (suggestionId: string) => void;
   onMarkIssueFixed: (issueId: string) => void;
   onOpenTarget: (target: WorkspaceTarget) => void;
-  onRunAiReview: () => void;
   role: Role;
   submission: Submission;
-  surface: "agent" | "review" | "export";
 }) {
   return (
     <section className="drawer-section drawer-issues-section">
@@ -3604,17 +3562,6 @@ function DrawerIssues({
             Добавить замечание
           </Button>
         </div>
-      ) : null}
-      {surface !== "export" ? (
-        <BbAiPanel
-          compact
-          onAccept={onAcceptAiSuggestion}
-          onDismiss={onDismissAiSuggestion}
-          onRun={onRunAiReview}
-          role={role}
-          submission={submission}
-          surface={surface}
-        />
       ) : null}
       <div className="issue-list v17-issue-list" id="workspace-issues">
         {submission.issues.length ? (
