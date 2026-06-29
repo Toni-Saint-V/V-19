@@ -383,6 +383,36 @@ export function AgentActionsScreen({
           : dueFilter === "week"
             ? "На неделе"
             : "Открытые действия";
+  const emptyState =
+    activeTab === "completed"
+      ? {
+          action: "Показать открытые",
+          body: "Завершенные шаги появятся здесь после отправки исправлений, файлов или анкет.",
+          title: "Выполненных действий пока нет",
+        }
+      : dueFilter === "overdue"
+        ? {
+            action: "Сбросить фильтр",
+            body: "В очереди нет просроченных шагов. Проверьте действия на сегодня или всю открытую очередь.",
+            title: "Просроченных действий нет",
+          }
+        : dueFilter === "today"
+          ? {
+              action: "Сбросить фильтр",
+              body: "На сегодня нет отдельных задач. Открытые действия на неделю остаются в общей очереди.",
+              title: "На сегодня чисто",
+            }
+          : dueFilter === "week"
+            ? {
+                action: "Сбросить фильтр",
+                body: "На этой неделе нет отфильтрованных действий. Можно вернуться ко всей очереди.",
+                title: "Действий на неделю нет",
+              }
+            : {
+                action: "Показать выполненные",
+                body: "Все текущие шаги выполнены. Новые действия появятся после изменений в подачах.",
+                title: "Открытых действий нет",
+              };
   const activeFilters = ([
     dueFilter !== "all"
       ? {
@@ -559,6 +589,20 @@ export function AgentActionsScreen({
 
         {visibleActions.length ? (
           <div className="v19-event-list v19-action-list" aria-label="Список действий">
+            <div className="v19-action-insights" aria-label="Сводка действий">
+              <span className="tone-danger">
+                <strong>{summary.overdue}</strong>
+                <em>просрочено</em>
+              </span>
+              <span className="tone-amber">
+                <strong>{summary.today}</strong>
+                <em>сегодня</em>
+              </span>
+              <span className="tone-teal">
+                <strong>{summary.completed}</strong>
+                <em>выполнено</em>
+              </span>
+            </div>
             <CollectionGroupLabel className="v19-action-group-label">
               {actionGroupLabel}
             </CollectionGroupLabel>
@@ -567,6 +611,7 @@ export function AgentActionsScreen({
                 badges={action.badges}
                 context={`${action.context}`}
                 cta={action.cta}
+                dueLabel={action.dueLabel}
                 key={action.id}
                 severity={action.severity}
                 selected={selectedAction?.id === action.id}
@@ -578,13 +623,27 @@ export function AgentActionsScreen({
           </div>
         ) : (
           <div className="v19-empty-state" key={`actions-empty-${activeTab}-${dueFilter}`}>
-            <h3>Открытых действий нет</h3>
-            <p>
-              Все текущие шаги выполнены. Новые действия появятся после изменений в
-              подачах.
-            </p>
-            <Button variant="secondary" onClick={() => setActiveTab("open")}>
-              Показать открытые
+            <h3>{emptyState.title}</h3>
+            <p>{emptyState.body}</p>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                transitionUiState(() => {
+                  if (activeTab === "completed") {
+                    setActiveTab("open");
+                    return;
+                  }
+
+                  if (dueFilter !== "all") {
+                    setDueFilter("all");
+                    return;
+                  }
+
+                  setActiveTab("completed");
+                })
+              }
+            >
+              {emptyState.action}
             </Button>
           </div>
         )}
@@ -2732,59 +2791,7 @@ export function ExportScreen({
               </div>
             </div>
           </CardComponent>
-          <CardComponent
-            as="section"
-            className="v17-rail-card export-preview magic-export-preview"
-            aria-label="Предпросмотр Эксель"
-            tabIndex={0}
-            >
-              <div
-                className="excel-table export-preview-sheet"
-                aria-label="Sheet1 masked preview"
-                tabIndex={0}
-              >
-              {exportPlan.rowCount === 0 ? (
-                <p className="export-preview-empty-title">Пакет не выбран</p>
-              ) : null}
-              <div className="sheet-head">
-                <span />
-                <span />
-                <span />
-                <strong>{exportPlan.contract.sheetName} · masked preview</strong>
-              </div>
-              <div
-                className="excel-head"
-                style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
-              >
-                <span>#</span>
-                {previewColumns.map((header) => (
-                  <span key={header}>{header}</span>
-                ))}
-              </div>
-              {previewRows.map((row, rowIndex) => (
-                <div
-                  className={`excel-row ${
-                    exportPlan.rows[rowIndex]?.applicantCount &&
-                    exportPlan.rows[rowIndex].applicantCount > 1
-                      ? "is-family"
-                      : ""
-                  }`}
-                  key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
-                  style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
-                >
-                  <span>{rowIndex + 1}</span>
-                  {row.slice(0, previewColumns.length).map((value, cellIndex) => (
-                    <span key={`${cellIndex}-${value}`}>{maskPreviewValue(value)}</span>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <p className="sheet-caption">
-              Показаны первые 9 из 56 колонок. Один заявитель = одна строка;
-              члены семьи идут последовательным блоком.
-            </p>
-          </CardComponent>
-          <CardComponent as="section" className="v17-rail-card">
+          <CardComponent as="section" className="v17-rail-card v17-export-checks-card">
             <p className="kicker">Pre-export checks</p>
             <div className="v17-export-checks" aria-label="Проверки перед выгрузкой">
               <ExportGuardItem
@@ -2813,25 +2820,6 @@ export function ExportScreen({
                 label="Все 56 колонок подтверждены"
                 detail={`${exportPlan.contract.sheetName} ${exportPlan.contract.range}`}
               />
-            </div>
-          </CardComponent>
-          <CardComponent as="section" className="v17-rail-card">
-            <div className="mapping-audit" aria-label="56-column export mapping audit">
-              <div className="mapping-audit-head">
-                <strong>Контракт A:BD</strong>
-                <span>
-                  {mappedCount} mapped · {derivedCount} derived · {unresolvedCount} unresolved
-                </span>
-              </div>
-              <div className="mapping-audit-scroll" tabIndex={0}>
-                {mappingRows.map((row) => (
-                  <div className="mapping-row" key={row.header}>
-                    <span className="mapping-index">{row.index}</span>
-                    <span className="mapping-name">{row.header}</span>
-                    <span className={`mapping-state ${row.state}`}>{row.state}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           </CardComponent>
           <div className={`v17-blocker-callout ${exportCalloutTone(exportPlan)}`}>
@@ -2905,6 +2893,77 @@ export function ExportScreen({
               Download запускается только для текущей verified selection; stale
               selection и row mismatch блокируются.
             </p>
+          </CardComponent>
+          <CardComponent
+            as="section"
+            className="v17-rail-card export-preview magic-export-preview"
+            aria-label="Предпросмотр Эксель"
+            tabIndex={0}
+            >
+              <div
+                className="excel-table export-preview-sheet"
+                aria-label="Sheet1 masked preview"
+                tabIndex={0}
+              >
+              {exportPlan.rowCount === 0 ? (
+                <p className="export-preview-empty-title">Пакет не выбран</p>
+              ) : null}
+              <div className="sheet-head">
+                <span />
+                <span />
+                <span />
+                <strong>{exportPlan.contract.sheetName} · masked preview</strong>
+              </div>
+              <div
+                className="excel-head"
+                style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
+              >
+                <span>#</span>
+                {previewColumns.map((header) => (
+                  <span key={header}>{header}</span>
+                ))}
+              </div>
+              {previewRows.map((row, rowIndex) => (
+                <div
+                  className={`excel-row ${
+                    exportPlan.rows[rowIndex]?.applicantCount &&
+                    exportPlan.rows[rowIndex].applicantCount > 1
+                      ? "is-family"
+                      : ""
+                  }`}
+                  key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
+                  style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
+                >
+                  <span>{rowIndex + 1}</span>
+                  {row.slice(0, previewColumns.length).map((value, cellIndex) => (
+                    <span key={`${cellIndex}-${value}`}>{maskPreviewValue(value)}</span>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <p className="sheet-caption">
+              Показаны первые 9 из 56 колонок. Один заявитель = одна строка;
+              члены семьи идут последовательным блоком.
+            </p>
+          </CardComponent>
+          <CardComponent as="section" className="v17-rail-card v17-export-mapping-card">
+            <div className="mapping-audit" aria-label="56-column export mapping audit">
+              <div className="mapping-audit-head">
+                <strong>Контракт A:BD</strong>
+                <span>
+                  {mappedCount} mapped · {derivedCount} derived · {unresolvedCount} unresolved
+                </span>
+              </div>
+              <div className="mapping-audit-scroll" tabIndex={0}>
+                {mappingRows.map((row) => (
+                  <div className="mapping-row" key={row.header}>
+                    <span className="mapping-index">{row.index}</span>
+                    <span className="mapping-name">{row.header}</span>
+                    <span className={`mapping-state ${row.state}`}>{row.state}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </CardComponent>
           </div>
         </aside>

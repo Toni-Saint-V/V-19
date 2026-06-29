@@ -52,7 +52,7 @@ async function openCreateSubmission(page: Page, mobile: boolean) {
   );
 
   const dialog = page.getByRole("dialog").first();
-  await expect(dialog.getByText("Сборка документов")).toBeVisible();
+  await expect(dialog.getByText("Новая подача")).toBeVisible();
   return dialog;
 }
 
@@ -69,7 +69,7 @@ async function uploadPassportToApplicant(
 
 async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   const dialog = await openCreateSubmission(page, mobile);
-  const nextButton = dialog.getByRole("button", { name: "Дальше" });
+  const nextButton = dialog.locator(".create-passport-next");
   const familyPanel = dialog.getByLabel(
     mobile
       ? "Заявители семьи и общие ответы"

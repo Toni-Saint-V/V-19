@@ -1209,3 +1209,137 @@
     padding: 10px 12px;
   }
 }
+
+@media (max-width: 760px) {
+  .create-submission-drawer.is-passport-step > header,
+  .create-submission-drawer.is-passport-step > footer {
+    display: none !important;
+  }
+
+  .create-submission-drawer.is-passport-step > .flex-1 {
+    padding: 10px 12px max(12px, env(safe-area-inset-bottom)) !important;
+    overflow-y: auto !important;
+  }
+
+  .create-submission-drawer.is-passport-step .max-w-\[1140px\] {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+  }
+
+  .create-submission-drawer.is-passport-step .grid.grid-cols-1 {
+    gap: 10px !important;
+    min-height: 0 !important;
+  }
+
+  .create-passport-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 50px;
+    margin: -10px -12px 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    background: rgb(14 14 16 / 0.96);
+    backdrop-filter: blur(16px);
+  }
+
+  .create-passport-topbar h2 {
+    overflow: hidden;
+    margin: 0;
+    color: var(--v19-fg);
+    font-size: 18px;
+    font-weight: 720;
+    line-height: 1.05;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .create-passport-topbar span {
+    display: block;
+    margin-top: 3px;
+    color: var(--v19-fg-tertiary);
+    font-size: 11px;
+    font-weight: 620;
+    line-height: 1;
+  }
+
+  .create-passport-back,
+  .create-passport-next {
+    border: 1px solid var(--v19-line-default);
+    border-radius: 12px;
+    color: var(--v19-fg);
+    background: var(--v19-control);
+    font: inherit;
+  }
+
+  .create-passport-back {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+  }
+
+  .create-passport-next {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 760;
+  }
+
+  .create-passport-next:disabled {
+    color: var(--v19-fg-tertiary);
+    cursor: not-allowed;
+    opacity: 0.52;
+  }
+
+  .create-submission-drawer.is-passport-step section[aria-label="Тип подачи"],
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"] {
+    padding: 10px !important;
+    border-radius: 12px !important;
+    background: #121214 !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Тип подачи"]
+    .mb-3,
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"]
+    .mb-3 {
+    margin-bottom: 8px !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"]
+    .grid.grid-cols-1 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"]
+    .mt-3 {
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] {
+    min-height: 228px !important;
+    padding: 18px !important;
+    border-radius: 14px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] .w-14 {
+    width: 46px !important;
+    height: 46px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] p {
+    margin-bottom: 16px !important;
+  }
+}

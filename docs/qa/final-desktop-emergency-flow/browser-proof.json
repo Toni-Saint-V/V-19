@@ -1,78 +1,56 @@
 {
   "path": "docs/qa/final-desktop-emergency-flow",
   "runtime": {
-    "appUrl": "http://127.0.0.1:5173/",
-    "browser": "Google Chrome via Playwright fallback",
-    "inAppBrowser": "unavailable in this session",
-    "auth": "local/dev auth"
-  },
-  "viewports": {
-    "desktop1440": {
-      "width": 1440,
-      "height": 960,
-      "overflowX": false
-    },
-    "desktop1280": {
-      "width": 1280,
-      "height": 900,
-      "overflowX": false
-    }
+    "appUrl": "http://127.0.0.1:5175/",
+    "browser": "Playwright chromium",
+    "auth": "local/dev approved seeds: agent@visaflow.local, admin@visaflow.local"
   },
   "screenshots": [
+    "agent-actions-desktop.png",
+    "agent-drawer-desktop.png",
+    "agent-submissions-desktop.png",
+    "create-submission-desktop.png",
     "admin-review-desktop.png",
     "admin-drawer-desktop.png",
     "admin-remarks-desktop.png",
     "admin-export-desktop.png",
-    "admin-export-desktop-1280.png",
-    "agent-actions-desktop.png",
-    "agent-submissions-desktop.png",
-    "agent-drawer-desktop.png",
-    "create-submission-desktop.png",
-    "create-submission-family-desktop.png",
-    "remark-visible-agent-desktop.png"
+    "admin-export-desktop-1280.png"
   ],
-  "adminReview": {
-    "opened": true,
-    "drawerOpened": true,
-    "tabsVisible": ["Паспорт", "Селфи", "Анкета", "Замечания"],
-    "unsupportedPassportAccept": "disabled with existing handler boundary"
-  },
-  "adminRemarks": {
-    "createdInRuntime": true,
-    "reason": "Подтвердить бронь отеля",
-    "comment": "Пилотная проверка: уточните бронирование отеля перед финальной отправкой.",
-    "visibleForAdmin": true,
-    "visibleForAgentSameRuntime": true,
-    "persistence": "local/dev runtime only; not claimed as production persistence"
-  },
-  "agentSubmissions": {
-    "familySectionVisible": true,
-    "individualSectionVisible": true,
-    "familyRows": 3,
-    "singleRows": 5,
-    "primaryLabels": ["Семейные подачи", "Индивидуальные подачи", "Заявители"]
-  },
-  "createSubmission": {
-    "drawerOpened": true,
-    "singleModeVisible": true,
-    "familyModeVisible": true,
-    "passportRequired": true,
-    "saveWithoutPassport": "disabled",
-    "nextWithoutPassport": "disabled",
-    "closeConfirmationAfterDirtyTypeChange": true,
-    "ocrClaim": "not faked"
-  },
-  "export": {
-    "screenOpened": true,
-    "readyRows": 4,
-    "selectionWorks": true,
-    "generateExcelClicked": true,
-    "downloadClicked": true,
-    "downloadFilename": "visaflow-export-0mwe8ei.xlsx",
-    "historyShown": "only existing history tab"
-  },
-  "console": {
-    "errors": [],
-    "warnings": []
-  }
+  "consoleEntries": [],
+  "overflow": [
+    {
+      "label": "agent-desktop-1440x960",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "horizontalOverflow": false,
+      "bodyScrollWidth": 1440,
+      "innerWidth": 1440
+    },
+    {
+      "label": "admin-desktop-1440x960",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "horizontalOverflow": false,
+      "bodyScrollWidth": 1440,
+      "innerWidth": 1440
+    },
+    {
+      "label": "admin-desktop-1280x900",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "bodyScrollWidth": 1280,
+      "innerWidth": 1280
+    }
+  ],
+  "notes": [
+    "Role switch and end-to-end remark/export flows are covered by app-smoke chromium: 18/18 passed.",
+    "Screenshots use separate local/dev approved agent/admin sessions for stable proof capture."
+  ]
 }

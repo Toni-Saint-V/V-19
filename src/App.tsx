@@ -55,6 +55,7 @@ import {
   applyUploadedFileMetadata,
   cockpitUploadExtensionForMimeType,
   applyExportStateToSelection,
+  completeQuestionnaire,
   createDraftSubmission,
   generatedCockpitMediaFileName,
   markSubmissionFileAccepted,
@@ -114,6 +115,7 @@ import {
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
+import SettingsScreen from "./modules/submissions/pages/SettingsScreen";
 import { CANONICAL_CITIES } from "./modules/submissions/types";
 import type {
   City,
@@ -151,6 +153,7 @@ import type {
   AccessRequestRegistrationInput,
   Session as LocalAuthSession,
 } from "./shared/authRegistration";
+import { supabaseAccessRequestRepository } from "./shared/supabaseAuthRegistration";
 import {
   canShowLocalDemoRoleSwitch,
   canUseLocalDemoSeedAutoLogin,
@@ -169,7 +172,6 @@ import { buildReturnedPdfAgentHandoffGate } from "./modules/submissions/operatio
 import { publishReturnedPdfAgentHandoff } from "./modules/submissions/returnedPdfHandoffPersistence";
 import type { AppProfile } from "./types/session";
 
-const SettingsScreen = lazy(() => import("./modules/submissions/pages/SettingsScreen"));
 const FigmaActionQueueVisual = lazy(() =>
   import("./modules/submissions/pages/FigmaVisualScreens").then((module) => ({
     default: module.FigmaActionQueueVisual,
@@ -1327,6 +1329,40 @@ function MainApp() {
     setAgentQuestionnaireOpen(true);
   }
 
+  function completeActiveQuestionnaire(values: {
+    travelEnd: string;
+    travelStart: string;
+  }) {
+    const submission = activeSubmission;
+    const applicant = submission?.applicants[0];
+    if (!submission || !applicant) return;
+
+    const withArrivalDate = updateQuestionnaireField(submission, {
+      applicantId: applicant.id,
+      fieldId: "arrival-date",
+      sectionId: "trip",
+      value: values.travelStart,
+    });
+    const withDepartureDate = updateQuestionnaireField(withArrivalDate, {
+      applicantId: applicant.id,
+      fieldId: "departure-date",
+      sectionId: "trip",
+      value: values.travelEnd,
+    });
+    const completed = completeQuestionnaire(withDepartureDate);
+    const nextSubmissions = submissionsRef.current.map((candidate) =>
+      candidate.id === completed.id ? completed : candidate,
+    );
+
+    submissionsRef.current = nextSubmissions;
+    setSubmissions(nextSubmissions);
+    setSubmissionActionError(null);
+    setSelectedSubmissionId(completed.id);
+    setActiveDrawerTab("questionnaire");
+    setDrawerMode("detail");
+    setAgentQuestionnaireOpen(false);
+  }
+
   function selectSubmission(submission: Submission) {
     setSubmissionActionError(null);
     setSelectedSubmissionId(submission.id);
@@ -1527,6 +1563,13 @@ function MainApp() {
         reviewedBy: remoteProfile?.id,
       }),
     );
+    setActiveDrawerTab("files");
+    setDrawerMode("detail");
+  }
+
+  function uploadActiveSubmissionFile(fileId: string) {
+    updateActiveSubmission((submission) => uploadRequiredFile(submission, fileId));
+    setSubmissionActionError(null);
     setActiveDrawerTab("files");
     setDrawerMode("detail");
   }
@@ -2004,7 +2047,7 @@ function MainApp() {
 
     if (!isSupabaseMode || !remoteProfile) {
       const message =
-        "Сначала войдите в Supabase, чтобы открыть returned PDF комплект агенту.";
+        "Сначала войдите в Supabase, чтобы открыть PDF агенту.";
       setRemoteSaveState("error");
       setRemoteSaveError(message);
       throw new Error(message);
@@ -2211,6 +2254,7 @@ function MainApp() {
   function createDraft(
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
+    options?: { openQuestionnaire?: boolean },
   ) {
     const applicantNames = applicantNamesForCreateDraft({
       currentNames: createApplicantNames,
@@ -2240,8 +2284,14 @@ function MainApp() {
       extractInitialPassportUploads(preparedSubmission, passportUploads);
     }
     setSelectedSubmissionId(preparedSubmission.id);
-    setDrawerMode("detail");
     setActiveDrawerTab(passportUploads.length ? "questionnaire" : "overview");
+    if (options?.openQuestionnaire) {
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(true);
+    } else {
+      setDrawerMode("detail");
+      setAgentQuestionnaireOpen(false);
+    }
     setDirty(false);
   }
 
@@ -2359,6 +2409,8 @@ function MainApp() {
   async function downloadExport() {
     if (!exportPlan.canDownload) return;
 
+    setExportError("");
+
     try {
       const { default: downloadExportWorkbook } =
         await import("./modules/submissions/exportWorkbook");
@@ -2454,6 +2506,7 @@ function MainApp() {
         return next;
       });
       setSelectedExportIds([]);
+      setExportTab("history");
       if (isSupabaseMode) setRemoteSaveState("idle");
     } catch (error) {
       const message = formatPersistenceFailureForUser(
@@ -2532,6 +2585,11 @@ function MainApp() {
           loaded.submissions,
           loaded.ownerIdsBySubmissionId,
         );
+        if (session.profile.role === "admin") {
+          setPendingAccessRequests(
+            await supabaseAccessRequestRepository.listPendingAccessRequests(),
+          );
+        }
         setWorkspacePasswordDraft("");
       } catch (error) {
         setWorkspaceAccessError(
@@ -2596,10 +2654,16 @@ function MainApp() {
     const normalizedEmail = normalizeEmail(input.email);
 
     if (isSupabaseMode) {
+      const request = await supabaseAccessRequestRepository.submitAccessRequest({
+        ...input,
+        email: normalizedEmail,
+      });
       return {
-        status: "unavailable",
+        status: "requested",
         message:
-          "Регистрация требует приглашения администратора. Публичная саморегистрация отключена.",
+          request.status === "approved"
+            ? "Доступ уже подтверждён. Вернитесь ко входу."
+            : "Заявка отправлена. Доступ появится после подтверждения администратором.",
       };
     }
 
@@ -2663,6 +2727,7 @@ function MainApp() {
       remoteOwnerIdsRef.current = new Map();
       remoteSubmissionFingerprintsRef.current = new Map();
       setRemoteProfile(null);
+      setPendingAccessRequests([]);
       setWorkspacePasswordDraft("");
       setWorkspaceAccessError("");
       setWorkspaceAccessNotice("");
@@ -2695,6 +2760,32 @@ function MainApp() {
   }
 
   async function approvePendingAccessRequest(requestId: string) {
+    if (isSupabaseMode) {
+      if (!remoteProfile || remoteProfile.role !== "admin") return;
+
+      setLoginBusy(true);
+      setWorkspaceAccessError("");
+      try {
+        await supabaseAccessRequestRepository.approveAccessRequest(
+          requestId,
+          remoteProfile.id,
+        );
+        setPendingAccessRequests(
+          await supabaseAccessRequestRepository.listPendingAccessRequests(),
+        );
+      } catch (error) {
+        setWorkspaceAccessError(
+          formatPersistenceFailureForUser(
+            error,
+            "Не удалось одобрить Supabase заявку.",
+          ),
+        );
+      } finally {
+        setLoginBusy(false);
+      }
+      return;
+    }
+
     if (!localAuthSession || localAuthSession.role !== "admin") return;
 
     setLoginBusy(true);
@@ -2720,6 +2811,33 @@ function MainApp() {
   }
 
   async function rejectPendingAccessRequest(requestId: string, reason?: string) {
+    if (isSupabaseMode) {
+      if (!remoteProfile || remoteProfile.role !== "admin") return;
+
+      setLoginBusy(true);
+      setWorkspaceAccessError("");
+      try {
+        await supabaseAccessRequestRepository.rejectAccessRequest(
+          requestId,
+          remoteProfile.id,
+          reason,
+        );
+        setPendingAccessRequests(
+          await supabaseAccessRequestRepository.listPendingAccessRequests(),
+        );
+      } catch (error) {
+        setWorkspaceAccessError(
+          formatPersistenceFailureForUser(
+            error,
+            "Не удалось отклонить Supabase заявку.",
+          ),
+        );
+      } finally {
+        setLoginBusy(false);
+      }
+      return;
+    }
+
     if (!localAuthSession || localAuthSession.role !== "admin") return;
 
     setLoginBusy(true);
@@ -3174,6 +3292,7 @@ function MainApp() {
 
       {agentQuestionnaireOpen && activeSubmission && role === "agent" ? (
         <FigmaQuestionnaireScreen
+          onComplete={completeActiveQuestionnaire}
           onBack={() => setAgentQuestionnaireOpen(false)}
           submission={activeSubmission}
         />
@@ -3202,6 +3321,7 @@ function MainApp() {
           onClose={closeDrawer}
           onMarkIssueFixed={markActiveIssueFixed}
           onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
+          onUploadFile={uploadActiveSubmissionFile}
           role={role}
           surface="agent"
           submission={activeSubmission}

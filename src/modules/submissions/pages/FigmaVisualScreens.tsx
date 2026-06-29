@@ -7,6 +7,7 @@ import {
   Folder,
   List,
   Search,
+  SlidersHorizontal,
   User,
   Users,
 } from "lucide-react";
@@ -24,6 +25,10 @@ import type { City, DrawerTab, Submission } from "../types";
 type VisualStatus = Submission["status"];
 
 type VisualActionCategory = "all" | "issues" | "review";
+type VisualFilterPanel = "city" | "date" | "id" | "type";
+type VisualLayoutMode = "list" | "vertical";
+type VisualSortMode = "dateAsc" | "dateDesc" | "default" | "idAsc" | "idDesc";
+type VisualTypeFilter = "all" | "family" | "single";
 type VisualTone = "blue" | "danger" | "green" | "indigo" | "warning";
 
 type VisualActionRow = {
@@ -108,7 +113,7 @@ function statusBadge(item: VisualActionRow) {
     return (
       <span className="vf-figma-status is-indigo">
         <Clock aria-hidden="true" size={15} />
-        {item.statusLabel}
+        Проверка
       </span>
     );
   }
@@ -145,28 +150,67 @@ function activateKeyboardCard(
 function VisualToolbar({
   category,
   categoryCounts,
+  cityFilter,
+  cityOptions,
+  filterPanel,
+  filterPopoverOpen,
+  layoutMode,
   onCategory,
+  onCityFilter,
+  onFilterPanel,
+  onFilterPopoverOpen,
+  onLayoutMode,
   onQuery,
-  onViewMode,
+  onSortMode,
+  onTypeFilter,
   query,
-  viewMode,
+  sortMode,
+  typeFilter,
 }: {
   category: VisualActionCategory;
   categoryCounts: Record<VisualActionCategory, number>;
+  cityFilter: City | "Все города";
+  cityOptions: Array<City | "Все города">;
+  filterPanel: VisualFilterPanel;
+  filterPopoverOpen: boolean;
+  layoutMode: VisualLayoutMode;
   onCategory: (category: VisualActionCategory) => void;
+  onCityFilter: (city: City | "Все города") => void;
+  onFilterPanel: (panel: VisualFilterPanel) => void;
+  onFilterPopoverOpen: (open: boolean) => void;
+  onLayoutMode: (mode: VisualLayoutMode) => void;
   onQuery: (query: string) => void;
-  onViewMode: (mode: "columns" | "list") => void;
+  onSortMode: (mode: VisualSortMode) => void;
+  onTypeFilter: (filter: VisualTypeFilter) => void;
   query: string;
-  viewMode: "columns" | "list";
+  sortMode: VisualSortMode;
+  typeFilter: VisualTypeFilter;
 }) {
   const tabs: Array<{ id: VisualActionCategory; label: string }> = [
     { id: "all", label: "Все действия" },
     { id: "issues", label: "Ошибки" },
     { id: "review", label: "На проверке" },
   ];
+  const layoutModes: VisualLayoutMode[] = ["list", "vertical"];
+  const layoutMeta: Record<
+    VisualLayoutMode,
+    { Icon: typeof List; label: string; nextLabel: string }
+  > = {
+    list: { Icon: List, label: "Список", nextLabel: "колонкам" },
+    vertical: { Icon: Columns3, label: "Колонки", nextLabel: "списку" },
+  };
+  const filterTabs: Array<{ id: VisualFilterPanel; label: string }> = [
+    { id: "date", label: "Даты" },
+    { id: "type", label: "Тип" },
+    { id: "id", label: "Номер" },
+    { id: "city", label: "Город" },
+  ];
+  const activeLayout = layoutMeta[layoutMode];
+  const LayoutIcon = activeLayout.Icon;
 
-  function chooseViewMode(mode: "columns" | "list") {
-    onViewMode(mode);
+  function cycleLayoutMode() {
+    const nextMode = layoutModes[(layoutModes.indexOf(layoutMode) + 1) % layoutModes.length];
+    onLayoutMode(nextMode);
     window.requestAnimationFrame(() => {
       document.querySelector(".vf-figma-screen")?.scrollTo({ left: 0 });
     });
@@ -182,10 +226,15 @@ function VisualToolbar({
             key={tab.id}
             role="tab"
             type="button"
-            onClick={() => onCategory(tab.id)}
+            onClick={() => {
+              onCategory(tab.id);
+              onFilterPopoverOpen(false);
+            }}
           >
             <span className="vf-figma-tab-label">{tab.label}</span>
-            <span className="vf-figma-tab-badge">{categoryCounts[tab.id]}</span>
+            {tab.id === "all" ? null : (
+              <span className="vf-figma-tab-badge">{categoryCounts[tab.id]}</span>
+            )}
           </button>
         ))}
       </div>
@@ -201,24 +250,164 @@ function VisualToolbar({
             onChange={(event) => onQuery(event.target.value)}
           />
         </div>
-        <div className="vf-figma-view-toggle" aria-label="Вид списка">
+        <div className="vf-figma-tool-buttons">
+          <div className="vf-figma-filter-menu">
+            <button
+              aria-expanded={filterPopoverOpen}
+              aria-label="Открыть фильтры действий"
+              className="vf-figma-icon-button vf-figma-filter-button"
+              data-testid="agent-actions-filter-toggle"
+              type="button"
+              onClick={() => onFilterPopoverOpen(!filterPopoverOpen)}
+            >
+              <SlidersHorizontal aria-hidden="true" size={18} />
+            </button>
+            {filterPopoverOpen ? (
+              <div className="vf-figma-filter-popover vf-figma-filter-popover--matrix">
+                <div className="vf-figma-filter-header">
+                  <strong>Фильтр</strong>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSortMode("default");
+                      onTypeFilter("all");
+                      onCityFilter("Все города");
+                      onFilterPopoverOpen(false);
+                    }}
+                  >
+                    Сбросить
+                  </button>
+                </div>
+                <div className="vf-figma-filter-grid" aria-label="Тип фильтра">
+                  {filterTabs.map((filterTab) => (
+                    <button
+                      className={filterPanel === filterTab.id ? "is-active" : ""}
+                      key={filterTab.id}
+                      type="button"
+                      onClick={() => onFilterPanel(filterTab.id)}
+                    >
+                      {filterTab.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="vf-figma-filter-options">
+                  {filterPanel === "date" ? (
+                    <>
+                      <span>Даты вылета</span>
+                      <button
+                        className={sortMode === "dateAsc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "dateAsc" ? "default" : "dateAsc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Сначала ранние
+                      </button>
+                      <button
+                        className={sortMode === "dateDesc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "dateDesc" ? "default" : "dateDesc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Сначала поздние
+                      </button>
+                    </>
+                  ) : null}
+                  {filterPanel === "type" ? (
+                    <>
+                      <span>Семьи и заявители</span>
+                      <button
+                        className={typeFilter === "all" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onTypeFilter("all");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Все
+                      </button>
+                      <button
+                        className={typeFilter === "family" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onTypeFilter("family");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Семьи
+                      </button>
+                      <button
+                        className={typeFilter === "single" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onTypeFilter("single");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Заявители
+                      </button>
+                    </>
+                  ) : null}
+                  {filterPanel === "id" ? (
+                    <>
+                      <span>Номер заявки</span>
+                      <button
+                        className={sortMode === "idAsc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "idAsc" ? "default" : "idAsc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        По возрастанию
+                      </button>
+                      <button
+                        className={sortMode === "idDesc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "idDesc" ? "default" : "idDesc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        По убыванию
+                      </button>
+                    </>
+                  ) : null}
+                  {filterPanel === "city" ? (
+                    <>
+                      <span>Город</span>
+                      {cityOptions.map((city) => (
+                        <button
+                          className={cityFilter === city ? "is-active" : ""}
+                          key={city}
+                          type="button"
+                          onClick={() => {
+                            onCityFilter(city);
+                            onFilterPopoverOpen(false);
+                          }}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button
-            className={viewMode === "list" ? "is-active" : ""}
+            aria-label={`${activeLayout.label}. Переключить к ${activeLayout.nextLabel}`}
+            className="vf-figma-icon-button vf-figma-layout-cycle"
+            data-layout-mode={layoutMode}
+            data-testid="agent-actions-layout-toggle"
+            title={activeLayout.label}
             type="button"
-            aria-pressed={viewMode === "list"}
-            onClick={() => chooseViewMode("list")}
+            onClick={cycleLayoutMode}
           >
-            <List aria-hidden="true" size={16} />
-            Список
-          </button>
-          <button
-            className={viewMode === "columns" ? "is-active" : ""}
-            type="button"
-            aria-pressed={viewMode === "columns"}
-            onClick={() => chooseViewMode("columns")}
-          >
-            <Columns3 aria-hidden="true" size={16} />
-            Колонки
+            <LayoutIcon aria-hidden="true" size={19} />
           </button>
         </div>
       </div>
@@ -328,7 +517,10 @@ function ColumnCard({
 }
 
 export function FigmaActionQueueVisual({
+  cityFilter,
+  cityOptions,
   completedActions,
+  onCityFilter,
   onOpen,
   onSearch,
   openActions,
@@ -345,8 +537,12 @@ export function FigmaActionQueueVisual({
   query: string;
   summary?: AgentActionSummary;
 }) {
-  const [viewMode, setViewMode] = useState<"columns" | "list">("list");
+  const [layoutMode, setLayoutMode] = useState<VisualLayoutMode>("list");
   const [category, setCategory] = useState<VisualActionCategory>("all");
+  const [filterPanel, setFilterPanel] = useState<VisualFilterPanel>("date");
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const [sortMode, setSortMode] = useState<VisualSortMode>("default");
+  const [typeFilter, setTypeFilter] = useState<VisualTypeFilter>("all");
   const allItems = useMemo(
     () => [...openActions, ...completedActions].map(toVisualActionRow),
     [completedActions, openActions],
@@ -360,8 +556,37 @@ export function FigmaActionQueueVisual({
     [allItems],
   );
   const visibleItems = useMemo(
-    () => allItems.filter((item) => visualCategoryMatches(item, category)),
-    [allItems, category],
+    () => {
+      const filteredItems = allItems.filter((item) => {
+        if (!visualCategoryMatches(item, category)) return false;
+        if (typeFilter !== "all" && item.type !== typeFilter) return false;
+        if (cityFilter !== "Все города" && item.city !== cityFilter) return false;
+        return true;
+      });
+
+      if (sortMode === "dateAsc") {
+        return [...filteredItems].sort((first, second) =>
+          first.tripDateFrom.localeCompare(second.tripDateFrom),
+        );
+      }
+      if (sortMode === "dateDesc") {
+        return [...filteredItems].sort((first, second) =>
+          second.tripDateFrom.localeCompare(first.tripDateFrom),
+        );
+      }
+      if (sortMode === "idAsc") {
+        return [...filteredItems].sort((first, second) =>
+          first.id.localeCompare(second.id, "ru", { numeric: true }),
+        );
+      }
+      if (sortMode === "idDesc") {
+        return [...filteredItems].sort((first, second) =>
+          second.id.localeCompare(first.id, "ru", { numeric: true }),
+        );
+      }
+      return filteredItems;
+    },
+    [allItems, category, cityFilter, sortMode, typeFilter],
   );
   const columns: VisualColumn[] = [
     {
@@ -395,17 +620,30 @@ export function FigmaActionQueueVisual({
       <VisualToolbar
         category={category}
         categoryCounts={categoryCounts}
-        onCategory={setCategory}
+        cityFilter={cityFilter}
+        cityOptions={cityOptions}
+        filterPanel={filterPanel}
+        filterPopoverOpen={filterPopoverOpen}
+        layoutMode={layoutMode}
+        onCategory={(nextCategory) => {
+          setCategory(nextCategory);
+          setFilterPopoverOpen(false);
+        }}
+        onCityFilter={onCityFilter}
+        onFilterPanel={setFilterPanel}
+        onFilterPopoverOpen={setFilterPopoverOpen}
+        onLayoutMode={setLayoutMode}
         onQuery={onSearch}
-        onViewMode={setViewMode}
+        onSortMode={setSortMode}
+        onTypeFilter={setTypeFilter}
         query={query}
-        viewMode={viewMode}
+        sortMode={sortMode}
+        typeFilter={typeFilter}
       />
 
       <div
-        className={`vf-figma-view-stage is-${viewMode}`}
+        className={`vf-figma-view-stage is-${layoutMode}`}
         data-agent-action-open-count={summary.open}
-        key={viewMode}
       >
         {visibleItems.length === 0 ? (
           <div className="vf-figma-action-list" role="status">
@@ -421,7 +659,7 @@ export function FigmaActionQueueVisual({
               </span>
             </div>
           </div>
-        ) : viewMode === "list" ? (
+        ) : layoutMode === "list" ? (
           <div className="vf-figma-action-list">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
