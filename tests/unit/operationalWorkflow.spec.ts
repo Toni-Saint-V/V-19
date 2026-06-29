@@ -874,23 +874,27 @@ describe("operational workflow logic spine", () => {
     expect(packageResult.applicantPdfs).toEqual([
       expect.objectContaining({
         applicantId: applicant.id,
-        fileName: `${mainReference.passportNumber}_application.pdf`,
+        fileName: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
         fileNames: {
-          application: `${mainReference.passportNumber}_application.pdf`,
-          appointment: `${mainReference.passportNumber}_appointment.pdf`,
-          passportScan: `${mainReference.passportNumber}_passport_scan.pdf`,
-          selfie: `${mainReference.passportNumber}_selfie.jpg`,
-          selfie2: `${mainReference.passportNumber}_selfie_2.jpg`,
+          application: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+          applicationFormPdf: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+          appointment: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+          passportScan: `${mainReference.passportNumber}_passport_scan_volkov_anton.pdf`,
+          questionnaire: `${mainReference.passportNumber}_questionnaire_volkov_anton.pdf`,
+          selfie: `${mainReference.passportNumber}_selfie_volkov_anton.jpg`,
+          selfie2: `${mainReference.passportNumber}_selfie_2_volkov_anton.jpg`,
         },
         status: "clear",
       }),
     ]);
     expect(buildApplicantArtifactFileNames(withCleanReview, applicant.id)).toEqual({
-      application: `${mainReference.passportNumber}_application.pdf`,
-      appointment: `${mainReference.passportNumber}_appointment.pdf`,
-      passportScan: `${mainReference.passportNumber}_passport_scan.pdf`,
-      selfie: `${mainReference.passportNumber}_selfie.jpg`,
-      selfie2: `${mainReference.passportNumber}_selfie_2.jpg`,
+      application: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+      applicationFormPdf: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+      appointment: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+      passportScan: `${mainReference.passportNumber}_passport_scan_volkov_anton.pdf`,
+      questionnaire: `${mainReference.passportNumber}_questionnaire_volkov_anton.pdf`,
+      selfie: `${mainReference.passportNumber}_selfie_volkov_anton.jpg`,
+      selfie2: `${mainReference.passportNumber}_selfie_2_volkov_anton.jpg`,
     });
   });
 

@@ -1,4 +1,5 @@
 import type { Applicant, Submission, VisaApplicationPdfReviewState } from "./types";
+import { buildApplicantDocumentFileName } from "./filenamePolicy";
 import {
   assertVisaApplicationPdfSha256,
   mediaStorageBucket,
@@ -21,6 +22,7 @@ export type {
 } from "./visaApplicationPdfReviewTypes";
 
 export type VisaApplicationPdfData = VisaApplicationPdfReviewData & {
+  passportLast3?: string;
   rawText: string;
 };
 
@@ -130,6 +132,7 @@ export function extractVisaApplicationPdfData(text: string): VisaApplicationPdfD
     passportIssueCountry: firstValueLine(pageOne.get(16) ?? ""),
     passportIssuedAt: firstDate(pageOne.get(14) ?? ""),
     passportNumber: firstPassportNumber(pageOne.get(13) ?? ""),
+    passportLast3: passportLast3(pageOne.get(13) ?? ""),
     paymentCoverage: selectedPaymentCoverage(section33),
     rawText: text,
     surname: firstValueLine(pageOne.get(1) ?? ""),
@@ -252,9 +255,11 @@ export function applyVisaApplicationPdfReview(
         referenceDataFromSubmission(submission, applicantIndex),
       )
     : unmatchedApplicantReview(data);
-  const { rawText: _rawText, ...safeData } = review.data;
+  const { passportLast3: _passportLast3, rawText: _rawText, ...safeData } =
+    review.data;
   const checkedAtIso = new Date().toISOString();
   void _rawText;
+  void _passportLast3;
   const artifact = normalizeVisaApplicationPdfArtifact(
     options.artifact,
     checkedAtIso,
@@ -265,16 +270,32 @@ export function applyVisaApplicationPdfReview(
         }
       : undefined,
   );
+  const displayArtifact =
+    artifact && applicant
+      ? {
+          ...artifact,
+          fileName: buildApplicantDocumentFileName({
+            applicant,
+            documentType: "application_form_pdf",
+          }),
+        }
+      : artifact;
+  const displayFileName = applicant
+    ? buildApplicantDocumentFileName({
+        applicant,
+        documentType: "application_form_pdf",
+      })
+    : options.fileName;
   const nextReview: VisaApplicationPdfReviewState = {
     applicantId: applicant?.id,
     applicantName: applicant?.fullName,
-    artifact,
+    artifact: displayArtifact,
     checkedAtIso,
     data: safeData,
-    fileName: artifact?.fileName ?? options.fileName,
+    fileName: displayArtifact?.fileName ?? displayFileName,
     findings: review.findings,
     handoffStatus: reviewHandoffStatus(review.status),
-    id: visaPdfReviewId(applicant, artifact, checkedAtIso),
+    id: visaPdfReviewId(applicant, displayArtifact, checkedAtIso),
     status: review.status,
   };
   const existingReviews = visaApplicationPdfReviewsForSubmission(submission);
@@ -502,14 +523,23 @@ function matchingApplicantIndexForPdfData(
     );
   });
   if (passportIndex !== undefined) return passportIndex;
+  if (data.passportNumber) return -1;
 
   const nameIndex = uniqueApplicantIndexBy(submission, (applicant) => {
-    if (!data.surname || !data.firstName) return false;
+    if (!data.surname || !data.firstName || !data.birthDate) return false;
+    const applicantPassport = normalizedComparable(
+      questionnaireValue(applicant, "passport-no"),
+    );
+    const pdfPassportLast3 = normalizedComparable(data.passportLast3 ?? "").slice(-3);
+    if (!pdfPassportLast3) return false;
     return (
       normalizedComparable(questionnaireValue(applicant, "surname")) ===
         normalizedComparable(data.surname) &&
       normalizedComparable(questionnaireValue(applicant, "first-name")) ===
-        normalizedComparable(data.firstName)
+        normalizedComparable(data.firstName) &&
+      normalizedComparable(questionnaireValue(applicant, "birth-date")) ===
+        normalizedComparable(data.birthDate) &&
+      (!pdfPassportLast3 || applicantPassport.endsWith(pdfPassportLast3))
     );
   });
   if (nameIndex !== undefined) return nameIndex;
@@ -693,6 +723,14 @@ function firstDate(section: string) {
 
 function firstPassportNumber(section: string) {
   return section.match(/\b\d{8,9}\b/)?.[0] ?? "";
+}
+
+function passportLast3(section: string) {
+  return (
+    section.match(/\*{2,}\s*(\d{3,4})\b/)?.[1]?.slice(-3) ??
+    section.match(/\b\d{3}\b/)?.[0] ??
+    ""
+  );
 }
 
 function countryValue(section: string) {

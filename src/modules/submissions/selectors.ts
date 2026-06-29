@@ -75,17 +75,42 @@ export function searchSubmissions(
     const matchesCity = city === "Все города" || submission.city === city;
     if (!matchesCity) return false;
     if (!normalized) return true;
-    return [
-      submission.id,
-      submission.title,
-      submission.city,
-      submission.status,
-      ...submission.applicants.map((applicant) => applicant.fullName),
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(normalized);
+    return submissionSearchText(submission).includes(normalized);
   });
+}
+
+export function filterSubmissionsByAgentOwner(
+  submissions: Submission[],
+  agentId: AgentOwnerId | "Все агенты",
+): Submission[] {
+  if (agentId === "Все агенты") return submissions;
+  return submissions.filter((submission) => submission.agentId === agentId);
+}
+
+export function submissionSearchText(submission: Submission): string {
+  const applicantText = submission.applicants.flatMap((applicant) => [
+    applicant.fullName,
+    applicant.id,
+    applicant.role ?? "",
+    ...applicant.sections.flatMap((section) =>
+      section.fields.flatMap((field) => [field.id, field.label, field.value]),
+    ),
+  ]);
+
+  return [
+    submission.id,
+    submission.title,
+    submission.listTitle ?? "",
+    submission.city,
+    submission.status,
+    submission.type,
+    submission.tripDateFrom,
+    submission.tripDateTo,
+    submission.updatedAt,
+    ...applicantText,
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 export function highestPriorityFirst(submissions: Submission[]) {

@@ -1,6 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
 import {
+  buildExportInternalMappings,
   buildExportPackageIdentity,
+  buildExportRows,
   exportRowsMatchPackageIdentity,
   exportSummary,
   isSubmissionSelectableForExport,
@@ -19,8 +21,12 @@ import {
   EXPORT_WORKBOOK_SHEET_NAME,
   EXPECTED_EXPORT_CONTRACT_HEADERS,
   exportContractHeaders,
+  isRealBlsApplicantRow,
+  normalizeExportContractDateInput,
 } from "../../src/modules/submissions/exportContract";
+import { buildApplicantDocumentFileName } from "../../src/modules/submissions/filenamePolicy";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { searchSubmissions } from "../../src/modules/submissions/selectors";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type {
   ExportPackageIdentity,
@@ -84,6 +90,49 @@ function withQuestionnaireFieldValues(
   };
 }
 
+function withApplicantPassports(
+  submission: Submission,
+  passportNumbers: string[],
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant, applicantIndex) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === "passport-no"
+            ? { ...field, value: passportNumbers[applicantIndex] ?? field.value }
+            : field,
+        ),
+      })),
+    })),
+  };
+}
+
+function withSubmissionIdentity(
+  submission: Submission,
+  id: string,
+  title: string,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant, index) => ({
+      ...applicant,
+      id: `${id}-applicant-${index + 1}`,
+    })),
+    files: submission.files.map((file) => ({
+      ...file,
+      applicantId: `${id}-applicant-${submission.applicants.findIndex(
+        (applicant) => applicant.id === file.applicantId,
+      ) + 1}`,
+      id: `${id}-${file.id}`,
+    })),
+    id,
+    title,
+  };
+}
+
 describe("V-19 export workbook contract", () => {
   test("generates a parseable Sheet1 workbook with exact A:BD 56-column shape", async () => {
     const selection = applyExportStateToSelection(
@@ -110,6 +159,88 @@ describe("V-19 export workbook contract", () => {
     expect(parsed.rows[0]?.at(0)).toBe("Location");
     expect(parsed.rows[0]?.at(-1)).toBe("Nationality At Birth");
     expect(await verifyExportWorkbookArtifact(artifact)).toBe(true);
+  });
+
+  test("writes Passport No into column G and keeps external BLS headers free of Agent or Family debug columns", () => {
+    const passportNumber = "669308614";
+    const plan = exportSummary([
+      withQuestionnaireFieldValues(readySubmission(), {
+        "passport-no": passportNumber,
+      }),
+    ]);
+    const passportColumn = exportContractHeaders().indexOf("Passport No");
+
+    expect(passportColumn).toBe(6);
+    expect(plan.preview.rows[0]?.[passportColumn]).toBe(passportNumber);
+    expect(exportContractHeaders()).not.toEqual(
+      expect.arrayContaining(["Agent", "Family", "Debug"]),
+    );
+  });
+
+  test("ignores blank BLS template rows without Passport No and applicant name", () => {
+    expect(
+      isRealBlsApplicantRow({
+        location: "SPB",
+        visaType: "Schengen",
+      }),
+    ).toBe(false);
+    expect(isRealBlsApplicantRow({ passportNo: "669308614" })).toBe(true);
+    expect(
+      isRealBlsApplicantRow([
+        "SPB",
+        "Schengen",
+        "Tourism",
+        "Normal",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]),
+    ).toBe(false);
+  });
+
+  test("normalizes Excel serial dates consistently for workbook date matching", () => {
+    expect(normalizeExportContractDateInput(25569)).toBe("1970-01-01");
+    expect(normalizeExportContractDateInput("25569")).toBe("1970-01-01");
+    expect(normalizeExportContractDateInput("04.09.2026")).toBe("2026-09-04");
+  });
+
+  test("stores internal export mapping with row number, passport, owner and family metadata", () => {
+    const family = withApplicantPassports(byId("SUB-1102"), [
+      "111111111",
+      "222222222",
+      "333333333",
+    ]);
+    const single = withApplicantPassports(readySubmission(), ["669308614"]);
+    const mappings = buildExportInternalMappings([single, family], "pkg-city-moscow");
+
+    expect(mappings.map((mapping) => mapping.submissionId)).toEqual([
+      "SUB-1102",
+      "SUB-1102",
+      "SUB-1102",
+      "ПД-1056",
+    ]);
+    expect(mappings[0]).toMatchObject({
+      applicantId: "з-1102-1",
+      city: "Москва",
+      excelRowNumber: 2,
+      exportPackageId: "pkg-city-moscow",
+      familyGroupId: "SUB-1102",
+      familySubmissionId: "SUB-1102",
+      ownerAgentId: family.agentId,
+      passportNumber: "111111111",
+      submissionId: "SUB-1102",
+    });
+    expect(mappings[3]).toMatchObject({
+      applicantId: "з-1056-1",
+      excelRowNumber: 5,
+      familyGroupId: undefined,
+      ownerAgentName: "Татьяна Николаева",
+      passportLast3: "614",
+    });
   });
 
   test("derives stay duration from arrival and departure dates when field is blank", () => {
@@ -233,14 +364,65 @@ describe("V-19 export workbook contract", () => {
 
     expect(buildExportWorkbookRowFills(rows)).toEqual([
       null,
-      "green",
-      "green",
-      "yellow",
+      "family-1",
+      "family-1",
+      "family-2",
       null,
     ]);
-    expect(artifact.rowFills).toEqual([null, "green", "green", "yellow", null]);
+    expect(artifact.rowFills).toEqual([
+      null,
+      "family-1",
+      "family-1",
+      "family-2",
+      null,
+    ]);
     expect(parsed.rowFills).toEqual(artifact.rowFills);
     expect(await verifyExportWorkbookArtifact(artifact)).toBe(true);
+  });
+
+  test("exports family blocks before singles, keeps each family contiguous, and leaves singles uncolored", async () => {
+    const familyOne = withApplicantPassports(byId("SUB-1102"), [
+      "111111111",
+      "222222222",
+      "333333333",
+    ]);
+    const familyTwo = withApplicantPassports(
+      withSubmissionIdentity(byId("SUB-1102"), "SUB-FAMILY-2", "Семья Ивановых"),
+      ["444444444", "555555555", "666666666"],
+    );
+    const single = withApplicantPassports(readySubmission(), ["669308614"]);
+    const rows = buildExportRows([single, familyTwo, familyOne]);
+    const identity: ExportPackageIdentity = {
+      contentFingerprint: "family-order-proof",
+      fileName: "family-order-proof.xlsx",
+      format: "xlsx",
+      idempotencyKey: "family-order-proof",
+      rowCount: rows.length,
+      submissionIds: [single.id, familyTwo.id, familyOne.id],
+    };
+    const artifact = createExportWorkbookArtifact(rows, identity);
+    const parsed = await parseExportWorkbookArtifact(artifact);
+
+    expect(rows.map((row) => row.submissionId)).toEqual([
+      "SUB-FAMILY-2",
+      "SUB-FAMILY-2",
+      "SUB-FAMILY-2",
+      "SUB-1102",
+      "SUB-1102",
+      "SUB-1102",
+      "ПД-1056",
+    ]);
+    expect(new Set(artifact.rowFills.slice(1, 4)).size).toBe(1);
+    expect(new Set(artifact.rowFills.slice(4, 7)).size).toBe(1);
+    expect(artifact.rowFills[1]).toBeTruthy();
+    expect(artifact.rowFills[4]).toBeTruthy();
+    expect(artifact.rowFills[1]).not.toBe(artifact.rowFills[4]);
+    expect(artifact.rowFills[7]).toBeNull();
+    expect(parsed.rowFills).toEqual(artifact.rowFills);
+    expect(parsed.rows[0]).toEqual(EXPECTED_EXPORT_CONTRACT_HEADERS);
+    expect(parsed.rows[0]).not.toEqual(
+      expect.arrayContaining(["Agent", "Family", "Debug"]),
+    );
   });
 
   test("ties package identity to the full 56-column serialized row model", () => {
@@ -326,6 +508,87 @@ describe("V-19 export workbook contract", () => {
     expect(
       buildExportWorkbookRows(plan.rows)[0]?.some((header) => /agent/i.test(header)),
     ).toBe(false);
+  });
+
+  test("blocks mixed-city export even when rows are individually ready", () => {
+    const primary = byId("SUB-1101");
+    const differentCity: Submission = {
+      ...primary,
+      city: "Санкт-Петербург",
+      id: "ПД-MIXED-CITY",
+      title: "Городской конфликт",
+      tripDateFrom: primary.tripDateFrom,
+      tripDateTo: primary.tripDateTo,
+    };
+    const plan = exportSummary([primary, differentCity]);
+
+    expect(plan.ready).toBe(false);
+    expect(plan.blockers.map((blocker) => blocker.reason)).toContain(
+      "Нельзя смешивать разные города",
+    );
+  });
+
+  test("search by passport number finds applicant from family and single submissions", () => {
+    const family = withApplicantPassports(byId("SUB-1102"), [
+      "111111111",
+      "222222222",
+      "333333333",
+    ]);
+    const single = withApplicantPassports(readySubmission(), ["669308614"]);
+
+    expect(
+      searchSubmissions([family, single], "222222222", "Все города").map(
+        (submission) => submission.id,
+      ),
+    ).toEqual(["SUB-1102"]);
+    expect(
+      searchSubmissions([family, single], "669308614", "Все города").map(
+        (submission) => submission.id,
+      ),
+    ).toEqual(["ПД-1056"]);
+  });
+
+  test("filename builder sanitizes and prefixes passport numbers for active applicant documents", () => {
+    const submission = withQuestionnaireFieldValues(readySubmission(), {
+      "first-name": "ANATOLII",
+      "passport-no": "669308614",
+      surname: "BOGDANOV",
+    });
+    const applicant = { ...submission.applicants[0]!, fullName: "ANATOLII BOGDANOV" };
+
+    expect(
+      buildApplicantDocumentFileName({
+        applicant,
+        documentType: "application_form_pdf",
+      }),
+    ).toBe("669308614_application_form_pdf_bogdanov_anatolii.pdf");
+    for (const documentType of [
+      "selfie",
+      "selfie_2",
+      "passport_scan",
+      "questionnaire",
+      "application_form_pdf",
+    ] as const) {
+      expect(
+        buildApplicantDocumentFileName({ applicant, documentType }).startsWith(
+          "669308614_",
+        ),
+      ).toBe(true);
+    }
+  });
+
+  test("missing passport filenames use fallback that can feed blockers", () => {
+    const applicant = withQuestionnaireFieldValues(readySubmission(), {
+      "passport-no": "",
+    }).applicants[0]!;
+
+    expect(
+      buildApplicantDocumentFileName({
+        applicant,
+        applicantId: applicant.id,
+        documentType: "passport_scan",
+      }),
+    ).toBe(`missing-passport_passport_scan_${applicant.id}.pdf`);
   });
 
   test("keeps generated multi-row package members selectable while blocker rows are hidden", () => {

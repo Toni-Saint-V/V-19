@@ -31,6 +31,7 @@ import {
 } from "./modules/submissions/exportRules";
 import { loadSubmissions, saveSubmissions } from "./modules/submissions/persistence";
 import {
+  agentOwnerDisplayName,
   defaultLocalAgentOwnerId,
   ensureSubmissionOwner,
 } from "./modules/submissions/ownership";
@@ -45,6 +46,7 @@ import {
   agentQueue,
   counts,
   exportedHistory,
+  filterSubmissionsByAgentOwner,
   highestPriorityFirst,
   ownedSubmissions,
   readyForExport,
@@ -55,6 +57,7 @@ import {
   addPreciseAdminIssue,
   applyActionToSubmissionListResult,
   applyUploadedFileMetadata,
+  cockpitUploadExtensionForMimeType,
   applyExportStateToSelection,
   createDraftSubmission,
   generatedCockpitMediaFileName,
@@ -64,6 +67,10 @@ import {
   type UploadedFileMetadata,
   uploadRequiredFile,
 } from "./modules/submissions/submissionActions";
+import {
+  buildApplicantDocumentFileName,
+  type ApplicantDocumentType,
+} from "./modules/submissions/filenamePolicy";
 import {
   createSubmissionActionErrorState,
   submissionActionErrorForSubmission,
@@ -116,6 +123,7 @@ import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import { CANONICAL_CITIES } from "./modules/submissions/types";
 import type {
   City,
+  AgentOwnerId,
   DrawerTab,
   IssueInput,
   PassportUploadDraft,
@@ -201,6 +209,7 @@ type WorkspaceSettings = {
 };
 
 type AgentInboxMode = "actions" | "events";
+type AgentFilterValue = AgentOwnerId | "Все агенты";
 
 const defaultWorkspaceSettings: WorkspaceSettings = {
   compactLists: true,
@@ -283,6 +292,60 @@ function CityFilterMenu({
       ) : null}
     </div>
   );
+}
+
+function AgentFilterMenu({
+  onChange,
+  options,
+  value,
+}: {
+  onChange: (agentId: AgentFilterValue) => void;
+  options: AgentFilterValue[];
+  value: AgentFilterValue;
+}) {
+  return (
+    <label className="topbar-filter v19-agent-filter">
+      <span className="sr-only">Фильтр по агенту</span>
+      <select
+        aria-label="Фильтр по агенту"
+        className="v19-agent-filter-select"
+        value={value}
+        onChange={(event) => onChange(event.target.value as AgentFilterValue)}
+      >
+        {options.map((agentId) => (
+          <option key={agentId} value={agentId}>
+            {agentId === "Все агенты"
+              ? "Все агенты"
+              : agentOwnerDisplayName(agentId)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function applicantFileDisplayName(input: {
+  applicant: Submission["applicants"][number];
+  fileType: SubmissionFile["type"];
+  mimeType: string;
+}): string {
+  const documentType = applicantDocumentTypeForFileType(input.fileType);
+  if (!documentType) return "";
+
+  return buildApplicantDocumentFileName({
+    applicant: input.applicant,
+    documentType,
+    extension: cockpitUploadExtensionForMimeType(input.mimeType, input.fileType),
+  });
+}
+
+function applicantDocumentTypeForFileType(
+  fileType: SubmissionFile["type"],
+): ApplicantDocumentType | null {
+  if (fileType === "passport_scan") return "passport_scan";
+  if (fileType === "selfie") return "selfie";
+  if (fileType === "selfie_2") return "selfie_2";
+  return null;
 }
 
 function sameWorkspaceSettings(left: WorkspaceSettings, right: WorkspaceSettings) {
@@ -479,6 +542,8 @@ function MainApp() {
   const [createCloseFocusToken, setCreateCloseFocusToken] = useState(0);
   const [query, setQuery] = useState("");
   const [cityFilter, setCityFilter] = useState<City | "Все города">("Все города");
+  const [agentFilter, setAgentFilter] =
+    useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [agentInboxMode, setAgentInboxMode] = useState<AgentInboxMode>("events");
   const [agentTab, setAgentTab] = useState<AgentTab>("action");
@@ -559,9 +624,25 @@ function MainApp() {
     () => searchAgentActions(agentActions.completed, query),
     [agentActions.completed, query],
   );
+  const agentFilterOptions = useMemo<AgentFilterValue[]>(() => {
+    const owners = Array.from(
+      new Set(submissions.map((submission) => submission.agentId)),
+    ).sort((left, right) =>
+      agentOwnerDisplayName(left).localeCompare(agentOwnerDisplayName(right)),
+    );
+    return ["Все агенты", ...owners];
+  }, [submissions]);
+  const adminReviewSource = useMemo(
+    () =>
+      filterSubmissionsByAgentOwner(
+        reviewQueue(submissions),
+        role === "admin" ? agentFilter : "Все агенты",
+      ),
+    [agentFilter, role, submissions],
+  );
   const searchedReviewQueue = useMemo(
-    () => searchSubmissions(reviewQueue(submissions), query, cityFilter),
-    [cityFilter, query, submissions],
+    () => searchSubmissions(adminReviewSource, query, cityFilter),
+    [adminReviewSource, cityFilter, query],
   );
   const searchedAdminInboxEvents = useMemo(
     () => adminInboxEvents(searchedReviewQueue),
@@ -594,8 +675,16 @@ function MainApp() {
     reviewList[0] ??
     null;
   const searchedExportSubmissions = useMemo(
-    () => searchSubmissions(submissions, query, cityFilter),
-    [cityFilter, query, submissions],
+    () =>
+      searchSubmissions(
+        filterSubmissionsByAgentOwner(
+          submissions,
+          role === "admin" ? agentFilter : "Все агенты",
+        ),
+        query,
+        cityFilter,
+      ),
+    [agentFilter, cityFilter, query, role, submissions],
   );
   const readyList = useMemo(
     () => readyForExport(searchedExportSubmissions),
@@ -1490,18 +1579,24 @@ function MainApp() {
 
       const uploadedAtIso = new Date().toISOString();
       const mediaSlotType = mediaSlotTypeForSubmissionFileType(targetFile.type);
-      const generatedFileName = generatedCockpitMediaFileName({
+      const storageFileName = generatedCockpitMediaFileName({
         applicantId: applicant.id,
         fileType: targetFile.type,
         mimeType: selectedFile.type,
         submissionId: latestSubmission.id,
         uploadNonce: createMediaUploadNonce(uploadedAtIso),
       });
+      const generatedFileName =
+        applicantFileDisplayName({
+          applicant,
+          fileType: targetFile.type,
+          mimeType: selectedFile.type,
+        }) || storageFileName;
       const storageTarget = buildMediaStoragePath(
         latestSubmission.id,
         applicant.id,
         mediaSlotType,
-        generatedFileName,
+        storageFileName,
       );
 
       remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
@@ -1645,13 +1740,25 @@ function MainApp() {
     if (selectedFile && targetFile?.type === "passport_scan") {
       rememberLocalPassportFile(fileId, selectedFile);
     }
+    const localApplicant = targetFile
+      ? activeSubmission.applicants.find(
+          (item) => item.id === targetFile.applicantId,
+        )
+      : undefined;
     updateActiveSubmission((submission) =>
       uploadRequiredFile(
         submission,
         fileId,
         selectedFile
           ? {
-              generatedFileName: selectedFile.name,
+              generatedFileName:
+                targetFile && localApplicant
+                  ? applicantFileDisplayName({
+                      applicant: localApplicant,
+                      fileType: targetFile.type,
+                      mimeType: selectedFile.type,
+                    }) || selectedFile.name
+                  : selectedFile.name,
               mimeType: selectedFile.type,
               originalFileName: selectedFile.name,
               sizeBytes: selectedFile.size,
@@ -2040,9 +2147,18 @@ function MainApp() {
       return uploadsWithFiles.reduce((current, upload) => {
         const slot = passportSlotForUpload(current, upload);
         if (!slot || !upload.file) return current;
+        const applicant = current.applicants.find(
+          (item) => item.id === slot.applicantId,
+        );
         rememberLocalPassportFile(slot.id, upload.file);
         const withUploadedFile = uploadRequiredFile(current, slot.id, {
-          generatedFileName: upload.file.name,
+          generatedFileName: applicant
+            ? applicantFileDisplayName({
+                applicant,
+                fileType: slot.type,
+                mimeType: upload.file.type,
+              }) || upload.file.name
+            : upload.file.name,
           mimeType: upload.file.type,
           originalFileName: upload.file.name,
           sizeBytes: upload.file.size,
@@ -2621,6 +2737,16 @@ function MainApp() {
   const cityFilterControl = (
     <CityFilterMenu options={cities} value={cityFilter} onChange={setCityFilter} />
   );
+  const adminFilterControl = (
+    <div className="v19-admin-filter-controls">
+      {cityFilterControl}
+      <AgentFilterMenu
+        options={agentFilterOptions}
+        value={agentFilter}
+        onChange={setAgentFilter}
+      />
+    </div>
+  );
   const inboxSearchControl = (
     <SearchBar
       label="Поиск по входящим"
@@ -2961,6 +3087,7 @@ function MainApp() {
             onOpen={openSubmission}
             onSelect={selectSubmission}
             onTab={showReviewTab}
+            filterControl={adminFilterControl}
             reviewList={reviewList}
             reviewSource={searchedReviewQueue}
             reviewTab={reviewTab}
@@ -2982,6 +3109,7 @@ function MainApp() {
             onOpen={openSubmission}
             onTab={setExportTab}
             onToggle={toggleExportSelection}
+            filterControl={adminFilterControl}
             readyList={exportReadyList}
             searchControl={searchControl}
             selectedExportIds={selectedVisibleExportIds}

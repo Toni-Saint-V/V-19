@@ -1,10 +1,13 @@
 import type {
+  AgentOwnerId,
+  City,
   ExportBlocker,
   ExportPackageFormat,
   ExportPackageIdentity,
   ExportState,
   Submission,
 } from "./types";
+import { agentOwnerDisplayName } from "./ownership";
 import {
   type CanonicalSubmissionStatus,
   canonicalRequiredMediaReadiness,
@@ -39,6 +42,21 @@ export type ExportSummary = {
   canDownload: boolean;
   canMarkExported: boolean;
   downloadPackageIdentity: ExportPackageIdentity | null;
+};
+
+export type ExportInternalMapping = {
+  applicantFullName: string;
+  applicantId: string;
+  city: City;
+  excelRowNumber: number;
+  exportPackageId: string;
+  familyGroupId?: string;
+  familySubmissionId?: string;
+  ownerAgentId: AgentOwnerId;
+  ownerAgentName: string;
+  passportLast3: string;
+  passportNumber: string;
+  submissionId: string;
 };
 
 export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
@@ -152,6 +170,30 @@ export function isSubmissionSelectableForExport(submission: Submission): boolean
 
 export function buildExportRows(submissions: Submission[]): ExportContractRow[] {
   return buildExportContractRows(orderSubmissionsForExportRows(submissions));
+}
+
+export function buildExportInternalMappings(
+  submissions: Submission[],
+  exportPackageId?: string,
+): ExportInternalMapping[] {
+  const rows = buildExportRows(submissions);
+  const packageId =
+    exportPackageId ?? buildExportPackageIdentity(submissions)?.idempotencyKey ?? "";
+
+  return rows.map((row, index) => ({
+    applicantFullName: row.applicantName,
+    applicantId: row.applicantId,
+    city: row.city as City,
+    excelRowNumber: row.excelRowNumber ?? index + 2,
+    exportPackageId: packageId,
+    familyGroupId: row.familyGroupId,
+    familySubmissionId: row.familySubmissionId,
+    ownerAgentId: row.ownerAgentId,
+    ownerAgentName: row.ownerAgentName ?? agentOwnerDisplayName(row.ownerAgentId),
+    passportLast3: row.passportLast3,
+    passportNumber: row.passportNumber,
+    submissionId: row.submissionId,
+  }));
 }
 
 function orderSubmissionsForExportRows(submissions: Submission[]): Submission[] {
