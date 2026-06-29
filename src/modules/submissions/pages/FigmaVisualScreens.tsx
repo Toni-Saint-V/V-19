@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -141,11 +141,31 @@ function activateKeyboardCard(
   action();
 }
 
+function useMobileActionListLayout() {
+  const [matches, setMatches] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 760px)").matches : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(max-width: 760px)");
+    const update = () => setMatches(media.matches);
+
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return matches;
+}
+
 function VisualToolbar({
   category,
   categoryCounts,
   cityFilter,
   cityOptions,
+  mobileLockedView,
   onCategory,
   onCityFilter,
   onQuery,
@@ -159,6 +179,7 @@ function VisualToolbar({
   categoryCounts: Record<VisualActionCategory, number>;
   cityFilter: City | "Все города";
   cityOptions: Array<City | "Все города">;
+  mobileLockedView?: boolean;
   onCategory: (category: VisualActionCategory) => void;
   onCityFilter: (city: City | "Все города") => void;
   onQuery: (query: string) => void;
@@ -237,25 +258,29 @@ function VisualToolbar({
           </button>
           {filterOpen ? (
             <div className="vf-figma-filter-popover" role="menu" aria-label="Фильтр и вид">
-              <span>Вид</span>
-              <button
-                className={viewMode === "list" ? "is-active" : ""}
-                role="menuitemradio"
-                aria-checked={viewMode === "list"}
-                type="button"
-                onClick={() => chooseViewMode("list")}
-              >
-                Список
-              </button>
-              <button
-                className={viewMode === "columns" ? "is-active" : ""}
-                role="menuitemradio"
-                aria-checked={viewMode === "columns"}
-                type="button"
-                onClick={() => chooseViewMode("columns")}
-              >
-                Колонки
-              </button>
+              {!mobileLockedView ? (
+                <>
+                  <span>Вид</span>
+                  <button
+                    className={viewMode === "list" ? "is-active" : ""}
+                    role="menuitemradio"
+                    aria-checked={viewMode === "list"}
+                    type="button"
+                    onClick={() => chooseViewMode("list")}
+                  >
+                    Список
+                  </button>
+                  <button
+                    className={viewMode === "columns" ? "is-active" : ""}
+                    role="menuitemradio"
+                    aria-checked={viewMode === "columns"}
+                    type="button"
+                    onClick={() => chooseViewMode("columns")}
+                  >
+                    Колонки
+                  </button>
+                </>
+              ) : null}
               <span>Город</span>
               {cityOptions.map((city) => (
                 <button
@@ -307,6 +332,7 @@ function ListRow({
       onClick={() => onOpen(item.submission, item.tab)}
       onKeyDown={(event) => activateKeyboardCard(event, () => onOpen(item.submission, item.tab))}
     >
+      <span className="vf-figma-mobile-id">{item.id}</span>
       <span className={`vf-figma-dot ${statusDot(item.status)}`} aria-hidden="true" />
       <span className="vf-figma-action-title">
         <strong>{item.title}</strong>
@@ -326,6 +352,15 @@ function ListRow({
         <em>{item.context}</em>
       </span>
       <span className="vf-figma-action-status">{statusBadge(item)}</span>
+      <span className="vf-figma-mobile-route">
+        <strong>{item.city}</strong>
+        <em>{item.tripDates}</em>
+      </span>
+      <span className="vf-figma-mobile-chevron" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="m9 6 6 6-6 6" />
+        </svg>
+      </span>
       <button
         className="vf-figma-open-button"
         type="button"
@@ -414,6 +449,8 @@ export function FigmaActionQueueVisual({
   summary?: AgentActionSummary;
 }) {
   const [viewMode, setViewMode] = useState<"columns" | "list">("list");
+  const mobileLockedView = useMobileActionListLayout();
+  const effectiveViewMode = mobileLockedView ? "list" : viewMode;
   const [category, setCategory] = useState<VisualActionCategory>("all");
   const [sortMode, setSortMode] = useState<VisualSortMode>("priority");
   const allItems = useMemo(
@@ -470,6 +507,7 @@ export function FigmaActionQueueVisual({
         categoryCounts={categoryCounts}
         cityFilter={cityFilter}
         cityOptions={cityOptions}
+        mobileLockedView={mobileLockedView}
         onCategory={setCategory}
         onCityFilter={onCityFilter}
         onQuery={onSearch}
@@ -477,13 +515,13 @@ export function FigmaActionQueueVisual({
         onViewMode={setViewMode}
         query={query}
         sortMode={sortMode}
-        viewMode={viewMode}
+        viewMode={effectiveViewMode}
       />
 
       <div
-        className={`vf-figma-view-stage is-${viewMode}`}
+        className={`vf-figma-view-stage is-${effectiveViewMode}`}
         data-agent-action-open-count={summary.open}
-        key={viewMode}
+        key={effectiveViewMode}
       >
         {visibleItems.length === 0 ? (
           <div className="vf-figma-action-list" role="status">
@@ -499,7 +537,7 @@ export function FigmaActionQueueVisual({
               </span>
             </div>
           </div>
-        ) : viewMode === "list" ? (
+        ) : effectiveViewMode === "list" ? (
           <div className="vf-figma-action-list">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
