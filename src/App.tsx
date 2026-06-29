@@ -110,7 +110,6 @@ import {
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
-import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import { CANONICAL_CITIES } from "./modules/submissions/types";
 import type {
   City,
@@ -188,11 +187,6 @@ const cities: Array<City | "Все города"> = ["Все города", ...C
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
 const fallbackAdminEmails = ["admin@visaflow.local"];
 const fallbackAgentEmails = ["agent@visaflow.local"];
-
-type IssueComposerRequest = {
-  submissionId: string;
-  token: number;
-};
 
 type WorkspaceSettings = {
   compactLists: boolean;
@@ -532,8 +526,6 @@ function MainApp() {
   const [activeDrawerTab, setActiveDrawerTab] = useState<DrawerTab>(
     defaultDrawerTab(loadSubmissions()[0]),
   );
-  const [drawerInitialTarget, setDrawerInitialTarget] =
-    useState<WorkspaceTarget | null>(null);
   const [agentQuestionnaireOpen, setAgentQuestionnaireOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -550,8 +542,6 @@ function MainApp() {
   const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState("");
-  const [issueComposerRequest, setIssueComposerRequest] =
-    useState<IssueComposerRequest | null>(null);
   const [passportReviewRequest, setPassportReviewRequest] =
     useState<PassportReviewRequest | null>(null);
   const [submissionActionError, setSubmissionActionError] =
@@ -576,8 +566,8 @@ function MainApp() {
   const selectedExportIdsRef = useRef<string[]>(selectedExportIds);
   const localPassportFilesRef = useRef<Map<string, File>>(new Map());
   const uploadQueuesRef = useRef<Map<string, Promise<void>>>(new Map());
-  const [localPassportFileIds, setLocalPassportFileIds] = useState<string[]>([]);
-  const [uploadingSubmissionIds, setUploadingSubmissionIds] = useState<Set<string>>(
+  const [, setLocalPassportFileIds] = useState<string[]>([]);
+  const [, setUploadingSubmissionIds] = useState<Set<string>>(
     () => new Set(),
   );
   const settingsDirty = !sameWorkspaceSettings(workspaceSettings, settingsDraft);
@@ -1266,13 +1256,11 @@ function MainApp() {
   function openSubmission(
     submission: Submission,
     tab = defaultDrawerTab(submission),
-    target?: WorkspaceTarget,
   ) {
     rememberReturnFocus();
     setSubmissionActionError(null);
     setSelectedSubmissionId(submission.id);
     setActiveDrawerTab(tab);
-    setDrawerInitialTarget(target ?? null);
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
   }
@@ -1290,7 +1278,6 @@ function MainApp() {
     setSubmissionActionError(null);
     setSelectedSubmissionId(submission.id);
     setActiveDrawerTab(defaultDrawerTab(submission));
-    setDrawerInitialTarget(null);
   }
 
   function openIssueComposer(submission: Submission) {
@@ -1303,10 +1290,6 @@ function MainApp() {
     setSelectedSubmissionId(submission.id);
     setActiveDrawerTab("issues");
     setDrawerMode("detail");
-    setIssueComposerRequest((current) => ({
-      submissionId: submission.id,
-      token: (current?.token ?? 0) + 1,
-    }));
   }
 
   const closeDrawer = useCallback(() => {
@@ -1315,7 +1298,6 @@ function MainApp() {
       return;
     }
     setSubmissionActionError(null);
-    setDrawerInitialTarget(null);
     setDrawerMode("closed");
   }, [dirty]);
 
@@ -1674,79 +1656,6 @@ function MainApp() {
       );
       return null;
     }
-  }
-
-  async function uploadActiveFile(fileId: string, selectedFile?: File) {
-    if (!activeSubmission) return;
-    const targetFile = activeSubmission.files.find((file) => file.id === fileId);
-    if (
-      selectedFile &&
-      targetFile?.type === "passport_scan" &&
-      !passportScanUploadMimeTypes.has(selectedFile.type)
-    ) {
-      setRemoteSaveState("error");
-      setRemoteSaveError("Загрузите паспорт в формате JPEG, PNG или PDF.");
-      return;
-    }
-
-    if (isSupabaseMode) {
-      if (!remoteProfile) {
-        setRemoteSaveState("error");
-        setRemoteSaveError("Сначала войдите в Supabase.");
-        return;
-      }
-      if (!selectedFile) {
-        setRemoteSaveState("error");
-        setRemoteSaveError("Выберите файл для приватной загрузки.");
-        return;
-      }
-
-      await enqueueSupabaseMediaUpload(activeSubmission.id, () =>
-        performSupabaseMediaUpload(
-          activeSubmission.id,
-          fileId,
-          selectedFile,
-          remoteProfile,
-        ).then(() => undefined),
-      );
-      setActiveDrawerTab("files");
-      return;
-    }
-
-    if (selectedFile && targetFile?.type === "passport_scan") {
-      rememberLocalPassportFile(fileId, selectedFile);
-    }
-    const localApplicant = targetFile
-      ? activeSubmission.applicants.find(
-          (item) => item.id === targetFile.applicantId,
-        )
-      : undefined;
-    updateActiveSubmission((submission) =>
-      uploadRequiredFile(
-        submission,
-        fileId,
-        selectedFile
-          ? {
-              generatedFileName:
-                targetFile && localApplicant
-                  ? applicantFileDisplayName({
-                      applicant: localApplicant,
-                      fileType: targetFile.type,
-                      mimeType: selectedFile.type,
-                    }) || selectedFile.name
-                  : selectedFile.name,
-              mimeType: selectedFile.type,
-              originalFileName: selectedFile.name,
-              sizeBytes: selectedFile.size,
-              storageAdapter: "local-dev" as const,
-              storageBucket: "",
-              storagePath: "",
-              uploadedAtIso: new Date().toISOString(),
-            }
-          : undefined,
-      ),
-    );
-    setActiveDrawerTab("files");
   }
 
   function updateSubmissionById(
