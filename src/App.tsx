@@ -148,6 +148,7 @@ import {
   accessRequestRepository,
   authRepository,
   type AccessRequest,
+  type AccessRequestInput,
   type Session as LocalAuthSession,
 } from "./shared/authRegistration";
 import {
@@ -203,6 +204,7 @@ type WorkspaceSettings = {
 
 type AgentInboxMode = "actions" | "events";
 type AgentFilterValue = AgentOwnerId | "Все агенты";
+type AccessGateMode = "login" | "request";
 
 const defaultWorkspaceSettings: WorkspaceSettings = {
   compactLists: true,
@@ -492,6 +494,11 @@ function MainApp() {
   const [role, setRole] = useState<Role>(initialWorkspaceRole);
   const [workspaceEmailDraft, setWorkspaceEmailDraft] = useState(workspaceEmail);
   const [workspacePasswordDraft, setWorkspacePasswordDraft] = useState("");
+  const [workspaceAccessMode, setWorkspaceAccessMode] =
+    useState<AccessGateMode>("login");
+  const [workspaceDisplayNameDraft, setWorkspaceDisplayNameDraft] = useState("");
+  const [workspaceOrganizationNameDraft, setWorkspaceOrganizationNameDraft] =
+    useState("");
   const [workspaceAccessError, setWorkspaceAccessError] = useState("");
   const [workspaceAccessNotice, setWorkspaceAccessNotice] = useState("");
   const [authChecked, setAuthChecked] = useState(!isSupabaseMode);
@@ -794,6 +801,16 @@ function MainApp() {
             onClick: showExportSurface,
             tone: summary.ready > 0 ? "success" : "default",
           },
+          {
+            active: surface === "settings",
+            count: pendingAccessRequests.length,
+            icon: "Н",
+            id: "admin-settings",
+            label: "Настройки",
+            meta: "доступ и роли",
+            onClick: showSettingsSurface,
+            tone: pendingAccessRequests.length > 0 ? "warning" : "default",
+          },
         ];
 
   async function saveRemoteWorkspaceSnapshot(
@@ -903,7 +920,14 @@ function MainApp() {
           return;
         }
 
-        if (!localDemoSeedAutoLoginEnabled) return;
+        if (!requestedWorkspaceEmail && !localDemoSeedAutoLoginEnabled) {
+          setLocalAuthSession(null);
+          setRole("agent");
+          setSurface("agent-actions");
+          setWorkspaceEmail("");
+          setWorkspaceEmailDraft("");
+          return;
+        }
 
         const bootstrapEmail = requestedWorkspaceEmail || fallbackAgentEmails[0];
         const bootstrapSession = await authRepository.loginApprovedUser(bootstrapEmail);
@@ -2540,6 +2564,30 @@ function MainApp() {
     setWorkspaceAccessError("");
     setWorkspaceAccessNotice("");
     try {
+      if (workspaceAccessMode === "request") {
+        const requestInput: AccessRequestInput = {
+          email,
+          displayName: workspaceDisplayNameDraft,
+          organizationName: workspaceOrganizationNameDraft,
+        };
+        const request = await accessRequestRepository.submitAccessRequest(requestInput);
+
+        if (request.status === "approved") {
+          setWorkspaceAccessNotice("Почта уже одобрена. Перейдите во «Вход».");
+          return;
+        }
+
+        if (request.status === "rejected") {
+          setWorkspaceAccessError("Заявка отклонена. Обратитесь к администратору.");
+          return;
+        }
+
+        setWorkspaceAccessNotice(
+          "Заявка отправлена. Доступ появится после одобрения администратором.",
+        );
+        return;
+      }
+
       const session = await authRepository.loginApprovedUser(email);
       setLocalAuthSession(session);
       setWorkspaceEmail(session.email);
@@ -2552,19 +2600,14 @@ function MainApp() {
         );
       }
     } catch (error) {
-      if (error instanceof AuthAccessError && error.code === "ACCESS_NOT_FOUND") {
-        const request = await accessRequestRepository.submitAccessRequest(email);
-        if (request.status === "pending") {
-          setWorkspaceAccessNotice(
-            "Заявка отправлена. Доступ появится после одобрения администратором.",
-          );
-          return;
-        }
-      }
       setWorkspaceAccessError(
-        error instanceof AuthAccessError
-          ? error.message
-          : "Не удалось проверить local/dev доступ.",
+        error instanceof AuthAccessError && error.code === "ACCESS_NOT_FOUND"
+          ? "Почта не найдена в списке доступа. Отправьте заявку на вкладке «Заявка»."
+          : error instanceof AuthAccessError && error.code === "ACCESS_REJECTED"
+            ? "Заявка отклонена. Обратитесь к администратору."
+          : error instanceof AuthAccessError
+            ? error.message
+            : "Не удалось проверить local/dev доступ.",
       );
     } finally {
       setLoginBusy(false);
@@ -2593,6 +2636,9 @@ function MainApp() {
       clearWorkspaceEmail();
       setWorkspaceEmail("");
       setWorkspaceEmailDraft("");
+      setWorkspaceAccessMode("login");
+      setWorkspaceDisplayNameDraft("");
+      setWorkspaceOrganizationNameDraft("");
       return;
     }
 
@@ -2602,6 +2648,9 @@ function MainApp() {
     clearWorkspaceEmail();
     setWorkspaceEmail("");
     setWorkspaceEmailDraft("");
+    setWorkspaceAccessMode("login");
+    setWorkspaceDisplayNameDraft("");
+    setWorkspaceOrganizationNameDraft("");
     setWorkspaceAccessError("");
     setWorkspaceAccessNotice("");
     chooseRole("agent");
@@ -2749,10 +2798,20 @@ function MainApp() {
     return (
       <WorkspaceAccessGate
         busy={loginBusy || !authChecked}
+        displayName={workspaceDisplayNameDraft}
         email={workspaceEmailDraft}
         error={workspaceAccessError}
+        mode={workspaceAccessMode}
         notice={workspaceAccessNotice}
+        organizationName={workspaceOrganizationNameDraft}
+        onDisplayName={setWorkspaceDisplayNameDraft}
         onEmail={setWorkspaceEmailDraft}
+        onMode={(mode) => {
+          setWorkspaceAccessMode(mode);
+          setWorkspaceAccessError("");
+          setWorkspaceAccessNotice("");
+        }}
+        onOrganizationName={setWorkspaceOrganizationNameDraft}
         onPassword={setWorkspacePasswordDraft}
         onSubmit={submitWorkspaceEmail}
         password={workspacePasswordDraft}
@@ -2926,15 +2985,6 @@ function MainApp() {
           ) : null}
         </header>
 
-        {!isSupabaseMode && localAuthSession?.role === "admin" ? (
-          <AdminAccessRequestQueue
-            busy={loginBusy}
-            requests={pendingAccessRequests}
-            onApprove={(requestId) => void approvePendingAccessRequest(requestId)}
-            onReject={(requestId) => void rejectPendingAccessRequest(requestId)}
-          />
-        ) : null}
-
         {emptyRemoteWorkspace ? (
           <RemoteWorkspaceEmptyState
             role={role}
@@ -3053,6 +3103,8 @@ function MainApp() {
         {surface === "settings" ? (
           <Suspense fallback={<SettingsLoadingState />}>
             <SettingsScreen
+              accessRequests={pendingAccessRequests}
+              accessRequestsBusy={loginBusy}
               confirmLeave={confirmSettingsLeave}
               dirty={settingsDirty}
               email={workspaceEmail}
@@ -3060,8 +3112,14 @@ function MainApp() {
               role={role}
               saveState={settingsSaveState}
               settings={settingsDraft}
+              onApproveAccessRequest={(requestId) =>
+                void approvePendingAccessRequest(requestId)
+              }
               onCancelLeave={cancelSettingsLeave}
               onConfirmLeave={confirmSettingsLeaveAndRun}
+              onRejectAccessRequest={(requestId) =>
+                void rejectPendingAccessRequest(requestId)
+              }
               onReset={resetSettingsDraft}
               onSave={saveSettingsDraft}
               onSettings={updateSettingsDraft}
@@ -3260,25 +3318,49 @@ function PassportExtractionReviewDialog({
 
 function WorkspaceAccessGate({
   busy = false,
+  displayName,
   email,
   error,
+  mode,
   notice,
+  organizationName,
+  onDisplayName,
   onEmail,
+  onMode,
+  onOrganizationName,
   onPassword,
   onSubmit,
   password = "",
   requiresPassword = false,
 }: {
   busy?: boolean;
+  displayName: string;
   email: string;
   error: string;
+  mode: AccessGateMode;
   notice?: string;
+  organizationName: string;
+  onDisplayName: (displayName: string) => void;
   onEmail: (email: string) => void;
+  onMode: (mode: AccessGateMode) => void;
+  onOrganizationName: (organizationName: string) => void;
   onPassword?: (password: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   password?: string;
   requiresPassword?: boolean;
 }) {
+  const effectiveMode = requiresPassword ? "login" : mode;
+  const accessCopy = requiresPassword
+    ? "Войдите через Supabase Auth, чтобы открыть рабочий стол по роли профиля."
+    : effectiveMode === "request"
+      ? "Отправьте заявку на доступ агента. Администратор увидит её в настройках и примет решение."
+      : "Введите одобренную рабочую почту. Новые пользователи сначала отправляют заявку.";
+  const accessNote = requiresPassword
+    ? "Вход идёт через Supabase Auth. Самостоятельная регистрация отключена."
+    : effectiveMode === "request"
+      ? "Заявка не открывает кабинет до одобрения администратором."
+      : "Pending и rejected email не открывают агентский кабинет.";
+
   return (
     <main className="access-shell" aria-label="Вход в рабочий кабинет">
       <section
@@ -3293,11 +3375,40 @@ function WorkspaceAccessGate({
           <span className="access-badge">Закрытый доступ</span>
         </div>
         <p className="access-intro" id="workspace-access-copy">
-          {requiresPassword
-            ? "Войдите через Supabase Auth, чтобы открыть рабочий стол по роли профиля."
-            : "Введите рабочую почту. Если доступа ещё нет, будет создана заявка на одобрение администратором."}
+          {accessCopy}
         </p>
-        <form onSubmit={onSubmit}>
+
+        {!requiresPassword ? (
+          <div
+            className="access-mode-switch"
+            role="group"
+            aria-label="Режим доступа"
+          >
+            <button
+              aria-pressed={effectiveMode === "login"}
+              className={effectiveMode === "login" ? "active" : undefined}
+              type="button"
+              onClick={() => onMode("login")}
+            >
+              Вход
+            </button>
+            <button
+              aria-pressed={effectiveMode === "request"}
+              className={effectiveMode === "request" ? "active" : undefined}
+              type="button"
+              onClick={() => onMode("request")}
+            >
+              Заявка
+            </button>
+          </div>
+        ) : null}
+
+        <form
+          data-testid={
+            effectiveMode === "request" ? "access-request-form" : "access-login-form"
+          }
+          onSubmit={onSubmit}
+        >
           <label>
             <span>Рабочая почта</span>
             <input
@@ -3312,6 +3423,34 @@ function WorkspaceAccessGate({
               onChange={(event) => onEmail(event.target.value)}
             />
           </label>
+          {!requiresPassword && effectiveMode === "request" ? (
+            <>
+              <label>
+                <span>Имя</span>
+                <input
+                  autoComplete="name"
+                  id="workspace-display-name"
+                  name="displayName"
+                  placeholder="Имя и фамилия"
+                  type="text"
+                  value={displayName}
+                  onChange={(event) => onDisplayName(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Организация</span>
+                <input
+                  autoComplete="organization"
+                  id="workspace-organization"
+                  name="organization"
+                  placeholder="Название агентства"
+                  type="text"
+                  value={organizationName}
+                  onChange={(event) => onOrganizationName(event.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
           {requiresPassword ? (
             <label>
               <span>Пароль</span>
@@ -3336,73 +3475,19 @@ function WorkspaceAccessGate({
             </p>
           ) : (
             <p className="access-note" id="workspace-access-note">
-              {busy
-                ? "Проверяем текущую сессию."
-                : requiresPassword
-                  ? "Вход идёт через Supabase Auth. Самостоятельная регистрация отключена."
-                  : "Pending и rejected email не открывают агентский кабинет."}
+              {busy ? "Проверяем текущую сессию." : accessNote}
             </p>
           )}
           <Button type="submit" disabled={busy}>
-            {busy ? "Проверяем" : requiresPassword ? "Войти" : "Продолжить"}
+            {busy
+              ? "Проверяем"
+              : requiresPassword || effectiveMode === "login"
+                ? "Войти"
+                : "Отправить заявку"}
           </Button>
         </form>
       </section>
     </main>
-  );
-}
-
-function AdminAccessRequestQueue({
-  busy,
-  requests,
-  onApprove,
-  onReject,
-}: {
-  busy: boolean;
-  requests: AccessRequest[];
-  onApprove: (requestId: string) => void;
-  onReject: (requestId: string) => void;
-}) {
-  return (
-    <section
-      className="access-queue-panel"
-      aria-labelledby="access-queue-title"
-      data-testid="admin-access-queue"
-    >
-      <div className="access-queue-head">
-        <div>
-          <p className="kicker">local/dev auth</p>
-          <h2 id="access-queue-title">Заявки на доступ</h2>
-        </div>
-        <span>{requests.length}</span>
-      </div>
-      {requests.length ? (
-        <div className="access-queue-list">
-          {requests.map((request) => (
-            <article className="access-queue-row" key={request.id}>
-              <div>
-                <strong>{request.email}</strong>
-                <small>Роль: agent · статус: pending</small>
-              </div>
-              <div className="access-queue-actions">
-                <Button
-                  disabled={busy}
-                  variant="secondary"
-                  onClick={() => onReject(request.id)}
-                >
-                  Отклонить
-                </Button>
-                <Button disabled={busy} onClick={() => onApprove(request.id)}>
-                  Одобрить
-                </Button>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="access-queue-empty">Новых заявок нет.</p>
-      )}
-    </section>
   );
 }
 

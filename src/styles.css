@@ -1286,9 +1286,7 @@ p {
   min-height: 100svh;
   place-items: center;
   padding: 32px 20px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.038), transparent 36%),
-    linear-gradient(135deg, rgba(111, 167, 223, 0.075), transparent 42%), var(--bg-base);
+  background: var(--vf-bg-app);
 }
 
 .access-card {
@@ -1296,20 +1294,14 @@ p {
   width: min(100%, 520px);
   padding: 28px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.012)),
-    var(--surface-1);
-  box-shadow: var(--shadow-large);
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 12px;
+  background: var(--vf-bg-panel);
+  box-shadow: none;
 }
 
 .access-card::before {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
-  background: linear-gradient(90deg, var(--rose-action-2), var(--blue-review));
-  content: "";
+  content: none;
 }
 
 .access-card-header {
@@ -1323,10 +1315,10 @@ p {
   flex: none;
   width: fit-content;
   padding: 6px 9px;
-  border: 1px solid rgba(111, 167, 223, 0.26);
+  border: 1px solid var(--vf-border-strong);
   border-radius: 999px;
-  color: #c6d6e8;
-  background: rgba(111, 167, 223, 0.09);
+  color: var(--vf-text-secondary);
+  background: var(--vf-bg-control);
   font-size: 11px;
   font-weight: 760;
   line-height: 1;
@@ -1342,7 +1334,7 @@ p {
 
 .access-card p {
   margin-top: 12px;
-  color: var(--text-secondary);
+  color: var(--vf-text-secondary);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -1357,13 +1349,47 @@ p {
   margin-top: 18px;
 }
 
+.access-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 18px;
+  padding: 4px;
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 10px;
+  background: var(--vf-bg-shell);
+}
+
+.access-mode-switch button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--vf-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.access-mode-switch button:hover {
+  color: var(--vf-text-primary);
+  background: var(--vf-bg-row-hover);
+}
+
+.access-mode-switch button.active,
+.access-mode-switch button[aria-pressed="true"] {
+  color: var(--vf-selected-text);
+  background: var(--vf-selected-bg);
+}
+
 .access-card label {
   display: grid;
   gap: 8px;
 }
 
 .access-card label span {
-  color: var(--text-muted);
+  color: var(--vf-text-muted);
   font-size: 11px;
   font-weight: 760;
   text-transform: uppercase;
@@ -1373,22 +1399,22 @@ p {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 12px;
-  color: var(--text-primary);
-  background: rgba(6, 9, 13, 0.34);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--vf-border-subtle);
+  border-radius: 10px;
+  color: var(--vf-text-primary);
+  background: var(--vf-bg-control);
+  box-shadow: none;
 }
 
 .access-card input::placeholder {
-  color: rgba(171, 179, 191, 0.5);
+  color: var(--vf-text-muted);
 }
 
 .access-card input:focus {
-  outline: 2px solid var(--focus-ring);
+  outline: 2px solid var(--vf-focus);
   outline-offset: 2px;
-  border-color: rgba(111, 167, 223, 0.55);
-  background: rgba(10, 15, 21, 0.72);
+  border-color: var(--vf-accent);
+  background: var(--vf-bg-row);
 }
 
 .access-card .access-error {
@@ -1398,7 +1424,7 @@ p {
 
 .access-card .access-note {
   margin-top: 0;
-  color: var(--text-muted);
+  color: var(--vf-text-muted);
 }
 
 .access-card .primary-button {
@@ -1407,7 +1433,7 @@ p {
   min-height: 48px;
   justify-content: center;
   border-color: var(--rose-action-line);
-  box-shadow: 0 14px 28px rgba(222, 111, 104, 0.18);
+  box-shadow: none;
 }
 
 .access-queue-panel {
