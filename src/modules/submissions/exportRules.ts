@@ -24,6 +24,7 @@ export type ExportSelectionState = ExportState | "mixed";
 export type ExportSummary = {
   rows: ExportContractRow[];
   blockers: ExportBlocker[];
+  warnings: ExportBlocker[];
   contract: {
     columnCount: number;
     range: ExportContractPreview["range"];
@@ -113,7 +114,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   }
 
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
-  if (ownerAgentIds.size > 1)
+  if (cities.size > 1 && ownerAgentIds.size > 1)
     blockers.push({ reason: "Нельзя смешивать подачи разных агентов" });
   if (tripDateRanges.size > 1)
     blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
@@ -123,8 +124,30 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   return blockers;
 }
 
+export function getExportWarnings(submissions: Submission[]): ExportBlocker[] {
+  if (submissions.length === 0) return [];
+
+  const cities = new Set(submissions.map((submission) => submission.city));
+  const ownerAgentIds = new Set(submissions.map((submission) => submission.agentId));
+
+  if (cities.size === 1 && ownerAgentIds.size > 1) {
+    return [
+      {
+        reason:
+          "Пакет содержит подачи разных агентов: Excel разрешён, returned PDF останется agent-scoped.",
+      },
+    ];
+  }
+
+  return [];
+}
+
 export function canGenerateExport(submissions: Submission[]) {
   return getExportBlockers(submissions).length === 0;
+}
+
+export function isSubmissionSelectableForExport(submission: Submission): boolean {
+  return getExportBlockers([submission]).length === 0;
 }
 
 export function buildExportRows(submissions: Submission[]): ExportContractRow[] {
@@ -157,6 +180,7 @@ export function exportSummary(
 ): ExportSummary {
   const rows = buildExportRows(submissions);
   const blockers = getExportBlockers(submissions);
+  const warnings = getExportWarnings(submissions);
   const exportState = getExportSelectionState(submissions);
   const packageIdentity = buildExportPackageIdentity(submissions, format);
   const preview = buildExportPreview(rows);
@@ -178,6 +202,7 @@ export function exportSummary(
   return {
     rows,
     blockers: effectiveBlockers,
+    warnings,
     contract: {
       columnCount: preview.columnCount,
       range: preview.range,

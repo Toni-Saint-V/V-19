@@ -10,8 +10,12 @@ import type {
   AgentActionSummary,
   OperationalInboxEvent,
 } from "../agentActions";
-import type { ExportSummary } from "../exportRules";
+import {
+  isSubmissionSelectableForExport,
+  type ExportSummary,
+} from "../exportRules";
 import { formatSubmissionListTitle } from "../listFormatters";
+import { buildAgentHandoffPackage } from "../operationalWorkflow";
 import { applicantCountLabel, counts, tripDates } from "../selectors";
 import {
   adminIssueGuard,
@@ -1599,6 +1603,72 @@ function submissionPriorityLine(submission: Submission) {
 }
 
 export type AdminWorkTab = "review" | "corrections" | "events";
+type SubmissionSortMode = "priority" | "updated" | "created" | "trip";
+
+const adminSortModes: SubmissionSortMode[] = [
+  "priority",
+  "updated",
+  "created",
+  "trip",
+];
+const exportSortModes: SubmissionSortMode[] = ["updated", "created", "trip"];
+
+function nextSubmissionSortMode(
+  current: SubmissionSortMode,
+  modes: SubmissionSortMode[],
+) {
+  const currentIndex = modes.indexOf(current);
+  return modes[(currentIndex + 1) % modes.length] ?? modes[0] ?? current;
+}
+
+function submissionSortModeLabel(mode: SubmissionSortMode) {
+  if (mode === "priority") return "приоритет";
+  if (mode === "updated") return "обновление";
+  if (mode === "created") return "создание";
+  return "дата поездки";
+}
+
+function sortSubmissionsForOperations(
+  submissions: Submission[],
+  mode: SubmissionSortMode,
+) {
+  if (mode === "priority") return submissions;
+
+  return [...submissions].sort((left, right) => {
+    if (mode === "trip") {
+      return (
+        sortableDateValue(left.tripDateFrom) - sortableDateValue(right.tripDateFrom) ||
+        sortableDateValue(left.tripDateTo) - sortableDateValue(right.tripDateTo) ||
+        left.id.localeCompare(right.id)
+      );
+    }
+
+    const leftValue =
+      mode === "created"
+        ? sortableDateValue(left.createdAt)
+        : sortableDateValue(left.updatedAt);
+    const rightValue =
+      mode === "created"
+        ? sortableDateValue(right.createdAt)
+        : sortableDateValue(right.updatedAt);
+
+    return rightValue - leftValue || left.id.localeCompare(right.id);
+  });
+}
+
+function sortableDateValue(value: string) {
+  const trimmed = value.trim();
+  const dotted = trimmed.match(/^(\d{2})\.(\d{2})(?:\.(\d{4}))?$/);
+  if (dotted) {
+    const day = Number(dotted[1]);
+    const month = Number(dotted[2]);
+    const year = Number(dotted[3] ?? "2026");
+    return year * 10_000 + month * 100 + day;
+  }
+
+  const parsed = Date.parse(trimmed);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
 
 export function AdminReviewScreen({
   error = "",
@@ -1633,7 +1703,7 @@ export function AdminReviewScreen({
 }) {
   const [blockersOnly, setBlockersOnly] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const [sortNewest, setSortNewest] = useState(true);
+  const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
   const summaryRef = useRef<HTMLDivElement>(null);
   const reviewQueue = reviewSource.filter(matchesReviewTab("review"));
   const correctionsQueue = reviewSource.filter(matchesReviewTab("corrections"));
@@ -1660,12 +1730,12 @@ export function AdminReviewScreen({
     [blockersOnly, inboxEvents],
   );
   const visibleReviewList = useMemo(
-    () => (sortNewest ? filteredReviewList : [...filteredReviewList].reverse()),
-    [filteredReviewList, sortNewest],
+    () => sortSubmissionsForOperations(filteredReviewList, sortMode),
+    [filteredReviewList, sortMode],
   );
   const visibleEvents = useMemo(
-    () => (sortNewest ? filteredEvents : [...filteredEvents].reverse()),
-    [filteredEvents, sortNewest],
+    () => filteredEvents,
+    [filteredEvents],
   );
   const visibleSelectedSubmission =
     visibleSubmission &&
@@ -1698,19 +1768,19 @@ export function AdminReviewScreen({
           onRemove: () => transitionUiState(() => setBlockersOnly(false)),
         }
       : null,
-    sortNewest
+    reviewTab === "events" || sortMode === "priority"
       ? null
       : {
           id: "sort",
-          label: "Обратный порядок",
-          onRemove: () => transitionUiState(() => setSortNewest(true)),
+          label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
+          onRemove: () => transitionUiState(() => setSortMode("priority")),
         },
   ] as Array<CollectionActiveFilter | null>
   ).filter((filter): filter is CollectionActiveFilter => filter !== null);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setBlockersOnly(false);
-      setSortNewest(true);
+      setSortMode("priority");
     });
 
   useEffect(() => {
@@ -1743,12 +1813,18 @@ export function AdminReviewScreen({
           transitionUiState(() => setBlockersOnly((value) => !value))
         }
       />
-      <ToolbarIconButton
-        label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
-        icon="sort"
-        pressed={!sortNewest}
-        onClick={() => transitionUiState(() => setSortNewest((value) => !value))}
-      />
+      {reviewTab !== "events" ? (
+        <ToolbarIconButton
+          label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
+          icon="sort"
+          pressed={sortMode !== "priority"}
+          onClick={() =>
+            transitionUiState(() =>
+              setSortMode((value) => nextSubmissionSortMode(value, adminSortModes)),
+            )
+          }
+        />
+      ) : null}
       <div className="v17-admin-summary-tool" ref={summaryRef}>
         <ToolbarIconButton
           label={summaryOpen ? "Скрыть сводку" : "Показать сводку"}
@@ -2244,15 +2320,36 @@ export function ExportScreen({
   const derivedCount = mappingRows.filter((row) => row.state === "derived").length;
   const unresolvedCount = mappingRows.filter((row) => row.state === "unresolved").length;
   const [exportPanelOpen, setExportPanelOpen] = useState(true);
+  const [sortMode, setSortMode] = useState<SubmissionSortMode>("updated");
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
   );
+  const exportReadyList = useMemo(
+    () => readyList.filter(isSubmissionSelectableForExport),
+    [readyList],
+  );
+  const exportReadyIdSet = useMemo(
+    () => new Set(exportReadyList.map((submission) => submission.id)),
+    [exportReadyList],
+  );
+  const sortedReadyList = useMemo(
+    () => sortSubmissionsForOperations(exportReadyList, sortMode),
+    [exportReadyList, sortMode],
+  );
+  const sortedHistoryList = useMemo(
+    () => sortSubmissionsForOperations(historyList, sortMode),
+    [historyList, sortMode],
+  );
+  const selectedVisibleExportIds = selectedExportIds.filter((id) =>
+    exportReadyIdSet.has(id),
+  );
+  const hiddenNotReadyCount = readyList.length - exportReadyList.length;
   const allReadySelected =
-    readyList.length > 0 &&
-    readyList.every((submission) => selectedExportIdSet.has(submission.id));
+    exportReadyList.length > 0 &&
+    exportReadyList.every((submission) => selectedExportIdSet.has(submission.id));
   const handleToggleAllReady = (checked: boolean) => {
-    readyList.forEach((submission) => {
+    exportReadyList.forEach((submission) => {
       const selected = selectedExportIdSet.has(submission.id);
       if (checked !== selected) onToggle(submission.id);
     });
@@ -2268,10 +2365,12 @@ export function ExportScreen({
       />
       <ToolbarIconButton
         icon="sort"
-        label="Сортировка выгрузки"
-        pressed={false}
+        label={`Сортировка выгрузки: ${submissionSortModeLabel(sortMode)}`}
+        pressed={sortMode !== "updated"}
         type="button"
-        onClick={() => undefined}
+        onClick={() =>
+          setSortMode((value) => nextSubmissionSortMode(value, exportSortModes))
+        }
       />
       <ToolbarIconButton
         icon="panel"
@@ -2309,8 +2408,8 @@ export function ExportScreen({
             onTabChange={onTab}
             search={searchControl}
             tabs={[
-              { count: readyList.length, id: "ready", label: "Готово" },
-              { count: historyList.length, id: "history", label: "История" },
+              { count: exportReadyList.length, id: "ready", label: "Готово" },
+              { count: sortedHistoryList.length, id: "history", label: "История" },
             ]}
             tabsAriaLabel="Состояние выгрузки"
             tools={toolbarTools}
@@ -2327,7 +2426,7 @@ export function ExportScreen({
                           aria-label="Выбрать все совместимые"
                           checked={allReadySelected}
                           className="checkbox"
-                          disabled={exportBusy || readyList.length === 0}
+                          disabled={exportBusy || exportReadyList.length === 0}
                           type="checkbox"
                           onChange={(event) =>
                             handleToggleAllReady(event.currentTarget.checked)
@@ -2343,7 +2442,7 @@ export function ExportScreen({
                     </tr>
                   </thead>
                   <tbody>
-                    {readyList.map((submission) => {
+                    {sortedReadyList.map((submission) => {
                       const selected = selectedExportIdSet.has(submission.id);
 
                       return (
@@ -2395,7 +2494,7 @@ export function ExportScreen({
                           <td>{submission.applicants.length}</td>
                           <td>
                             <Badge className="html-builder-badge" tone="teal">
-                              Готово
+                              {exportStateLabel(submission)}
                             </Badge>
                           </td>
                           <td>
@@ -2417,40 +2516,63 @@ export function ExportScreen({
                   </tbody>
                 </table>
               </div>
-              {readyList.length === 0 ? (
+              {hiddenNotReadyCount > 0 ? (
+                <div className="bulk-bar v17-export-bulk-bar">
+                  <span className="bulk-status">
+                    Скрыто из выгрузки: {hiddenNotReadyCount}{" "}
+                    {pluralRu(hiddenNotReadyCount, "подача", "подачи", "подач")} с
+                    blockers или неполным пакетом.
+                  </span>
+                </div>
+              ) : null}
+              {exportReadyList.length === 0 ? (
                 <EmptyState text="Нет подач готовых к выгрузке." />
               ) : null}
-              {selectedExportIds.length ? (
-                <div className="bulk-bar v17-export-bulk-bar">
-                  <span className="bulk-count">Выбрано: {selectedExportIds.length}</span>
+              {selectedVisibleExportIds.length ? (
+                <div
+                  className="bulk-bar v17-export-bulk-bar"
+                  style={{ pointerEvents: "none" }}
+                >
+                  <span className="bulk-count">
+                    Выбрано: {selectedVisibleExportIds.length}
+                  </span>
                   <span className="bulk-status">{actionHint}</span>
                 </div>
               ) : null}
             </div>
           ) : (
             <div className="submission-list magic-export-list">
-              {historyList.map((submission) => (
-                <CardComponent
-                  as="article"
-                  className="export-row magic-export-row"
-                  key={submission.id}
-                >
-                  <Button
-                    className="export-row-main"
-                    variant="plain"
-                    onClick={() => onOpen(submission, "files")}
+              {sortedHistoryList.map((submission) => {
+                const pdfState = returnedPdfPackageSummary(submission);
+
+                return (
+                  <CardComponent
+                    as="article"
+                    className="export-row magic-export-row"
+                    key={submission.id}
                   >
-                    <strong>{submission.title}</strong>
-                    <span>
-                      {submission.id} · {submission.city} · {tripDates(submission)}
-                    </span>
-                  </Button>
-                  <Badge tone="teal">Выгружено</Badge>
-                  <Button variant="secondary" onClick={() => onOpen(submission, "files")}>
-                    Проверить PDF
-                  </Button>
-                </CardComponent>
-              ))}
+                    <Button
+                      className="export-row-main"
+                      variant="plain"
+                      onClick={() => onOpen(submission, "files")}
+                    >
+                      <strong>{submission.title}</strong>
+                      <span>
+                        {submission.id} · {submission.city} · {tripDates(submission)}
+                      </span>
+                      <span>{pdfState.detail}</span>
+                    </Button>
+                    <Badge tone="teal">Выгружено</Badge>
+                    <Badge tone={pdfState.tone}>{pdfState.label}</Badge>
+                    <Button
+                      variant="secondary"
+                      onClick={() => onOpen(submission, "files")}
+                    >
+                      {pdfState.actionLabel}
+                    </Button>
+                  </CardComponent>
+                );
+              })}
             </div>
           )}
         </CardComponent>
@@ -2552,19 +2674,31 @@ export function ExportScreen({
           <CardComponent as="section" className="v17-rail-card">
             <p className="kicker">Pre-export checks</p>
             <div className="v17-export-checks" aria-label="Проверки перед выгрузкой">
-              <ExportGuardItem ok label="Есть выбранные подачи" />
-              <ExportGuardItem ok label="Только принятые подачи" />
-              <ExportGuardItem ok label="Нет открытых блокеров" />
-              <ExportGuardItem ok label="Обязательные файлы готовы" />
               <ExportGuardItem
-                ok
-                label="Совместимый пакет"
+                ok={exportPlan.rowCount > 0}
+                label="Есть выбранные подачи"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "не готовые к выгрузке")}
+                label="Только принятые подачи"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "блокирующие замечания")}
+                label="Нет открытых блокеров"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "канонического пакета медиа")}
+                label="Обязательные файлы готовы"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "разные города")}
+                label="Один город"
                 detail={`${packageFacts.city} · ${packageFacts.dates}`}
               />
               <ExportGuardItem
-                ok={false}
+                ok={exportPlan.contract.valid}
                 label="Все 56 колонок подтверждены"
-                detail={`${unresolvedCount} колонки требуют решения`}
+                detail={`${exportPlan.contract.sheetName} ${exportPlan.contract.range}`}
               />
             </div>
           </CardComponent>
@@ -2594,15 +2728,19 @@ export function ExportScreen({
               <path d="M12 17h.01" />
             </SvgIcon>
             <span>
-              <strong>Выгрузка заблокирована fail-closed</strong>
+              <strong>{exportCalloutTitle(exportPlan)}</strong>
               {exportPlan.blockers.length > 0 ? (
                 exportPlan.blockers.map((blocker) => (
                   <span key={blocker.reason}>{blocker.reason}</span>
                 ))
+              ) : exportPlan.warnings.length > 0 ? (
+                exportPlan.warnings.map((warning) => (
+                  <span key={warning.reason}>{warning.reason}</span>
+                ))
               ) : (
                 <span>
-                  {unresolvedCount} mapping-пункта не подтверждены. Duplicate
-                  protection требует backend evidence.
+                  Preview и workbook используют один row model; скачивание доступно
+                  только после package identity proof.
                 </span>
               )}
             </span>
@@ -2648,7 +2786,8 @@ export function ExportScreen({
               ) : null}
             </div>
             <p className="sheet-caption">
-              Standalone HTML не создаёт и не скачивает файл.
+              Download запускается только для текущей verified selection; stale
+              preview и row mismatch блокируются.
             </p>
           </CardComponent>
           </div>
@@ -2695,6 +2834,81 @@ function exportMappingRows(plan: ExportSummary) {
         ? "derived"
         : "mapped",
   }));
+}
+
+function exportHasBlocker(plan: ExportSummary, text: string) {
+  return plan.blockers.some((blocker) => blocker.reason.includes(text));
+}
+
+function exportCalloutTitle(plan: ExportSummary) {
+  if (plan.blockers.length > 0) return "Выгрузка заблокирована fail-closed";
+  if (plan.warnings.length > 0) return "Выгрузка разрешена с предупреждением";
+  if (plan.ready) return "Выгрузка проходит проверки";
+  return "Выберите пакет для проверки";
+}
+
+function exportStateLabel(submission: Submission) {
+  if (submission.exportState === "file_generated") return "Файл сформирован";
+  if (submission.exportState === "file_downloaded") return "Файл скачан";
+  if (submission.exportState === "marked_exported") return "Выгружено";
+  return "Готово";
+}
+
+function returnedPdfPackageSummary(submission: Submission): {
+  actionLabel: string;
+  detail: string;
+  label: string;
+  tone: "danger" | "amber" | "blue" | "teal" | "muted" | "default";
+} {
+  const handoffPackage = buildAgentHandoffPackage(submission);
+  const firstBlocker = handoffPackage.blockers[0] ?? "";
+
+  if (handoffPackage.ready) {
+    return {
+      actionLabel: "Открыть PDF",
+      detail: `${handoffPackage.applicantPdfs.length} application_form_pdf · appointment_list_pdf ready`,
+      label: "PDF готов",
+      tone: "teal",
+    };
+  }
+
+  if (firstBlocker.includes("Application PDF is missing")) {
+    return {
+      actionLabel: "Проверить PDF",
+      detail: firstBlocker,
+      label: "Нет application_form_pdf",
+      tone: "amber",
+    };
+  }
+
+  if (firstBlocker.includes("Common appointment/list PDF is missing")) {
+    return {
+      actionLabel: "Проверить PDF",
+      detail: firstBlocker,
+      label: "Нет appointment_list_pdf",
+      tone: "amber",
+    };
+  }
+
+  if (
+    firstBlocker.includes("upload failed") ||
+    firstBlocker.includes("was deleted") ||
+    firstBlocker.includes("is not uploaded")
+  ) {
+    return {
+      actionLabel: "Проверить PDF",
+      detail: firstBlocker,
+      label: "PDF не готов",
+      tone: "danger",
+    };
+  }
+
+  return {
+    actionLabel: "Проверить PDF",
+    detail: firstBlocker || "Returned PDF package требует проверки перед handoff.",
+    label: "PDF проверка",
+    tone: "amber",
+  };
 }
 
 function maskPreviewValue(value: string) {
