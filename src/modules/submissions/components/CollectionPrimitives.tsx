@@ -398,7 +398,12 @@ export function CollectionRow({
       <span className="v19-event-passport">{passport}</span>
       <span className="v19-event-trip">{trip}</span>
       <Badge tone={tone}>{badge}</Badge>
-      <button className="v19-event-action" type="button" onClick={onAction}>
+      <button
+        className="v19-event-action"
+        type="button"
+        aria-label={`${action}: ${title}`}
+        onClick={onAction}
+      >
         {action}
       </button>
     </div>
@@ -503,6 +508,7 @@ export function SubmissionCollectionRow({
         `status-${status}`,
         (status === "returned" || status === "requires_action") && "is-attention",
       )}
+      aria-label={`${action}: ${title}, ${submissionId}`}
       data-submission-card=""
       data-submission-id={submissionId}
       type="button"

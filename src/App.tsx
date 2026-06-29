@@ -1238,6 +1238,18 @@ function MainApp() {
     return () => document.removeEventListener("keydown", handleDrawerEscape, true);
   }, [closeDrawer, confirmClose, drawerMode, passportReviewRequest]);
 
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    function handleMobileNavEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setMobileNavOpen(false);
+    }
+
+    document.addEventListener("keydown", handleMobileNavEscape);
+    return () => document.removeEventListener("keydown", handleMobileNavEscape);
+  }, [mobileNavOpen]);
+
   function updateActiveSubmission(transform: (submission: Submission) => Submission) {
     if (!activeSubmission) return;
     setSubmissions((current) => {
@@ -2772,15 +2784,24 @@ function MainApp() {
         }
       />
 
+      {mobileNavOpen ? (
+        <button
+          className="ops-mobile-menu-backdrop"
+          type="button"
+          aria-label="Закрыть меню"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      ) : null}
+
       <section className="workspace">
         <header className="topbar">
           {isV19CollectionSurface ? (
             <button
               className="v19-topbar-menu"
               type="button"
-              aria-label="Меню"
+              aria-label={mobileNavOpen ? "Закрыть меню" : "Меню"}
               aria-expanded={mobileNavOpen}
-              onClick={() => setMobileNavOpen(true)}
+              onClick={() => setMobileNavOpen((open) => !open)}
             >
               <span aria-hidden="true" />
             </button>
