@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -9,29 +9,50 @@ import {
   User,
   Users,
 } from "lucide-react";
+import type {
+  AgentActionBadge,
+  AgentActionItem,
+  AgentActionSeverity,
+  AgentActionSummary,
+} from "../agentActions";
+import { formatSubmissionListTitle } from "../listFormatters";
+import { applicantCountLabel, tripDates } from "../selectors";
+import { statusLabelFor } from "../status";
+import type { City, DrawerTab, Submission } from "../types";
 
-type VisualStatus = "in_progress" | "ready_for_export" | "returned" | "submitted_for_review";
+type VisualStatus = Submission["status"];
 
-type VisualSubmission = {
+type VisualActionCategory = "all" | "issues" | "review" | "completed";
+type VisualSortMode = "priority" | "updated" | "created" | "trip";
+
+type VisualActionRow = {
+  actionId: string;
   applicantsCount: number;
+  badges: AgentActionBadge[];
   blocker?: string;
-  city: string;
+  city: City;
+  completed: boolean;
+  context: string;
+  createdAt: string;
+  cta: string;
   id: string;
-  progress?: number;
+  progress: number;
+  severity: AgentActionSeverity;
   status: VisualStatus;
   statusLabel: string;
+  submission: Submission;
+  tab: DrawerTab;
   title: string;
   tripDates: string;
+  tripDateFrom: string;
   type: "family" | "single";
   updated: string;
 };
 
-type VisualOpenIntent = "detail" | "issues";
-
 type VisualColumn = {
   id: string;
   label: string;
-  statuses: VisualStatus[];
+  matches: (item: VisualActionRow) => boolean;
   tone?: "danger" | "warning";
 };
 
@@ -42,478 +63,29 @@ type VisualMember = {
   status: "in_progress" | "missing_docs" | "ready";
 };
 
-type VisualOpenHandler = (id: string, intent?: VisualOpenIntent) => void;
+type VisualOpenHandler = (submission: Submission, tab?: DrawerTab) => void;
 
-const visualSubmissions: VisualSubmission[] = [
-  {
-    applicantsCount: 4,
-    blocker: "Скан паспорта не читается",
-    city: "Санкт-Петербург",
-    id: "SUB-1042",
-    progress: 92,
-    status: "returned",
-    statusLabel: "Ошибки",
-    title: "Семья Петровых",
-    tripDates: "18–23 июл 2026",
-    type: "family",
-    updated: "12 мин назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Анкета не заполнена",
-    city: "Москва",
-    id: "SUB-1057",
-    progress: 64,
-    status: "in_progress",
-    statusLabel: "В работе",
-    title: "Алина Смирнова",
-    tripDates: "02–09 авг 2026",
-    type: "single",
-    updated: "34 мин назад",
-  },
-  {
-    applicantsCount: 4,
-    city: "Москва",
-    id: "SUB-1061",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "На проверке",
-    title: "Семья Орловых",
-    tripDates: "11–21 авг 2026",
-    type: "family",
-    updated: "1 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Москва",
-    id: "SUB-1078",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Готово",
-    title: "Дмитрий Волков",
-    tripDates: "06–12 сен 2026",
-    type: "single",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Не заполнены даты поездки",
-    city: "Москва",
-    id: "SUB-1065",
-    progress: 58,
-    status: "in_progress",
-    statusLabel: "Даты",
-    title: "Олег Тиньков",
-    tripDates: "10–18 авг 2026",
-    type: "single",
-    updated: "42 мин назад",
-  },
-  {
-    applicantsCount: 3,
-    blocker: "Не выбран город подачи",
-    city: "Казань",
-    id: "SUB-1070",
-    progress: 52,
-    status: "in_progress",
-    statusLabel: "Город",
-    title: "Семья Сидоровых",
-    tripDates: "05–15 сен 2026",
-    type: "family",
-    updated: "1 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Не заполнена анкета",
-    city: "Москва",
-    id: "SUB-1072",
-    progress: 46,
-    status: "in_progress",
-    statusLabel: "Оплата",
-    title: "Игорь Николаев",
-    tripDates: "12–20 сен 2026",
-    type: "single",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 2,
-    blocker: "Не заполнен раздел работы",
-    city: "Самара",
-    id: "SUB-1076",
-    progress: 71,
-    status: "returned",
-    statusLabel: "Анкета",
-    title: "Семья Беляевых",
-    tripDates: "20–28 сен 2026",
-    type: "family",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Скан паспорта размытый",
-    city: "Екатеринбург",
-    id: "SUB-1088",
-    progress: 68,
-    status: "returned",
-    statusLabel: "Паспорт",
-    title: "Михаил Иванов",
-    tripDates: "15–20 авг 2026",
-    type: "single",
-    updated: "18 мин назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Селфи не проходит требования",
-    city: "Москва",
-    id: "SUB-1090",
-    progress: 73,
-    status: "returned",
-    statusLabel: "Селфи",
-    title: "Анна Каренина",
-    tripDates: "22–30 авг 2026",
-    type: "single",
-    updated: "26 мин назад",
-  },
-  {
-    applicantsCount: 2,
-    city: "Москва",
-    id: "SUB-1094",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "QA",
-    title: "Семья Морозовых",
-    tripDates: "28 авг – 03 сен 2026",
-    type: "family",
-    updated: "36 мин назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Санкт-Петербург",
-    id: "SUB-1062",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "Проверка",
-    title: "Виктор Цой",
-    tripDates: "14–21 авг 2026",
-    type: "single",
-    updated: "1 ч назад",
-  },
-  {
-    applicantsCount: 5,
-    city: "Москва",
-    id: "SUB-1063",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "Очередь",
-    title: "Семья Романовых",
-    tripDates: "25 авг – 05 сен 2026",
-    type: "family",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Пермь",
-    id: "SUB-1067",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "SLA",
-    title: "Кирилл Андреев",
-    tripDates: "18–24 сен 2026",
-    type: "single",
-    updated: "3 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Новосибирск",
-    id: "SUB-1080",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Выгрузка",
-    title: "Елена Летучая",
-    tripDates: "10–15 сен 2026",
-    type: "single",
-    updated: "3 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Москва",
-    id: "SUB-1081",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Архив",
-    title: "Павел Дуров",
-    tripDates: "15–25 сен 2026",
-    type: "single",
-    updated: "4 ч назад",
-  },
-  {
-    applicantsCount: 2,
-    city: "Ростов-на-Дону",
-    id: "SUB-1084",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Принято",
-    title: "Семья Абрамовых",
-    tripDates: "01–09 окт 2026",
-    type: "family",
-    updated: "4 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Черновик без паспорта",
-    city: "Москва",
-    id: "SUB-1097",
-    progress: 21,
-    status: "in_progress",
-    statusLabel: "Черновик",
-    title: "Мария Захарова",
-    tripDates: "04–12 окт 2026",
-    type: "single",
-    updated: "5 ч назад",
-  },
-  {
-    applicantsCount: 4,
-    blocker: "Нужна правка анкеты",
-    city: "Санкт-Петербург",
-    id: "SUB-1101",
-    progress: 81,
-    status: "returned",
-    statusLabel: "Возврат",
-    title: "Семья Лариных",
-    tripDates: "07–16 окт 2026",
-    type: "family",
-    updated: "5 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Москва",
-    id: "SUB-1104",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Готов",
-    title: "Никита Павлов",
-    tripDates: "11–18 окт 2026",
-    type: "single",
-    updated: "6 ч назад",
-  },
-];
-
-const visualColumnSubmissions: VisualSubmission[] = visualSubmissions;
-
-const visualColumns: VisualColumn[] = [
-  {
-    id: "docs",
-    label: "Сбор документов",
-    statuses: ["in_progress"],
-    tone: "warning",
-  },
-  {
-    id: "errors",
-    label: "Ошибки",
-    statuses: ["returned"],
-    tone: "danger",
-  },
-  {
-    id: "review",
-    label: "На проверке",
-    statuses: ["submitted_for_review"],
-  },
-  {
-    id: "ready",
-    label: "Готово к выгрузке",
-    statuses: ["ready_for_export"],
-  },
-];
-
-function familyMembers(
-  mainInitials: string,
-  mainName: string,
-  spouseInitials: string,
-  spouseName: string,
-  childInitials: string,
-  childName: string,
-  childStatus: VisualMember["status"] = "ready",
-) {
-  return [
-    { initials: mainInitials, name: mainName, role: "Основной", status: "ready" },
-    { initials: spouseInitials, name: spouseName, role: "Супруга", status: "ready" },
-    { initials: childInitials, name: childName, role: "Ребенок", status: childStatus },
-  ] satisfies VisualMember[];
-}
-
-const visualFamilies = [
-  {
-    id: "FAM-001",
-    lastActivity: "12 авг 2026",
-    members: [
-      { initials: "ИП", name: "Иван Петров", role: "Основной", status: "ready" },
-      { initials: "АП", name: "Анна Петрова", role: "Супруга", status: "ready" },
-      { initials: "МП", name: "Максим Петров", role: "Ребенок", status: "in_progress" },
-      { initials: "МП", name: "Мария Петрова", role: "Ребенок", status: "missing_docs" },
-    ] satisfies VisualMember[],
-    submissionsCount: 2,
-    title: "Семья Петровых",
-  },
-  {
-    id: "FAM-002",
-    lastActivity: "Вчера",
-    members: [
-      { initials: "СО", name: "Сергей Орлов", role: "Основной", status: "ready" },
-      { initials: "МО", name: "Марина Орлова", role: "Супруга", status: "ready" },
-      { initials: "ДО", name: "Дмитрий Орлов", role: "Ребенок", status: "ready" },
-    ] satisfies VisualMember[],
-    submissionsCount: 1,
-    title: "Семья Орловых",
-  },
-  {
-    id: "FAM-003",
-    lastActivity: "Сегодня",
-    members: familyMembers("АС", "Алексей Сидоров", "ЕС", "Елена Сидорова", "МС", "Мила Сидорова", "in_progress"),
-    submissionsCount: 1,
-    title: "Семья Сидоровых",
-  },
-  {
-    id: "FAM-004",
-    lastActivity: "20 авг 2026",
-    members: familyMembers("ДР", "Денис Романов", "НР", "Наталья Романова", "АР", "Артем Романов"),
-    submissionsCount: 3,
-    title: "Семья Романовых",
-  },
-  {
-    id: "FAM-005",
-    lastActivity: "Вчера",
-    members: familyMembers("ИМ", "Игорь Морозов", "ОМ", "Ольга Морозова", "КМ", "Кирилл Морозов", "missing_docs"),
-    submissionsCount: 2,
-    title: "Семья Морозовых",
-  },
-  {
-    id: "FAM-006",
-    lastActivity: "25 авг 2026",
-    members: familyMembers("ПБ", "Петр Беляев", "АБ", "Анна Беляева", "СБ", "София Беляева"),
-    submissionsCount: 1,
-    title: "Семья Беляевых",
-  },
-  {
-    id: "FAM-007",
-    lastActivity: "28 авг 2026",
-    members: familyMembers("ВА", "Виктор Абрамов", "МА", "Мария Абрамова", "ТА", "Тимур Абрамов"),
-    submissionsCount: 2,
-    title: "Семья Абрамовых",
-  },
-  {
-    id: "FAM-008",
-    lastActivity: "1 сен 2026",
-    members: familyMembers("НЛ", "Николай Ларин", "ЕЛ", "Екатерина Ларина", "АЛ", "Алиса Ларина", "in_progress"),
-    submissionsCount: 4,
-    title: "Семья Лариных",
-  },
-  {
-    id: "FAM-009",
-    lastActivity: "3 сен 2026",
-    members: familyMembers("АК", "Андрей Крылов", "ЮК", "Юлия Крылова", "МК", "Марк Крылов"),
-    submissionsCount: 1,
-    title: "Семья Крыловых",
-  },
-  {
-    id: "FAM-010",
-    lastActivity: "5 сен 2026",
-    members: familyMembers("СР", "Сергей Рыбаков", "ИР", "Ирина Рыбакова", "ВР", "Вера Рыбакова", "missing_docs"),
-    submissionsCount: 2,
-    title: "Семья Рыбаковых",
-  },
-];
-
-const visualIndividuals = [
-  {
-    id: "IND-001",
-    initials: "АС",
-    lastActivity: "Сегодня",
-    name: "Алина Смирнова",
-    status: "in_progress" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-002",
-    initials: "ДВ",
-    lastActivity: "5 авг 2026",
-    name: "Дмитрий Волков",
-    status: "ready" as const,
-    submissionsCount: 3,
-  },
-  {
-    id: "IND-003",
-    initials: "МИ",
-    lastActivity: "Сегодня",
-    name: "Михаил Иванов",
-    status: "missing_docs" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-004",
-    initials: "АК",
-    lastActivity: "Вчера",
-    name: "Анна Каренина",
-    status: "missing_docs" as const,
-    submissionsCount: 2,
-  },
-  {
-    id: "IND-005",
-    initials: "ВЦ",
-    lastActivity: "14 авг 2026",
-    name: "Виктор Цой",
-    status: "ready" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-006",
-    initials: "ЕЛ",
-    lastActivity: "18 авг 2026",
-    name: "Елена Летучая",
-    status: "ready" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-007",
-    initials: "ПД",
-    lastActivity: "22 авг 2026",
-    name: "Павел Дуров",
-    status: "ready" as const,
-    submissionsCount: 2,
-  },
-  {
-    id: "IND-008",
-    initials: "НП",
-    lastActivity: "26 авг 2026",
-    name: "Никита Павлов",
-    status: "ready" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-009",
-    initials: "ОТ",
-    lastActivity: "30 авг 2026",
-    name: "Олег Тиньков",
-    status: "in_progress" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-010",
-    initials: "МЗ",
-    lastActivity: "4 сен 2026",
-    name: "Мария Захарова",
-    status: "in_progress" as const,
-    submissionsCount: 1,
-  },
-];
+const emptySummary: AgentActionSummary = {
+  completed: 0,
+  open: 0,
+  overdue: 0,
+  today: 0,
+  week: 0,
+};
 
 function statusDot(status: VisualStatus) {
-  if (status === "returned") return "vf-figma-dot-warning";
-  if (status === "in_progress") return "vf-figma-dot-blue";
-  if (status === "submitted_for_review") return "vf-figma-dot-indigo";
+  if (status === "returned" || status === "requires_action") {
+    return "vf-figma-dot-warning";
+  }
+  if (status === "draft" || status === "in_progress") return "vf-figma-dot-blue";
+  if (status === "submitted_for_review" || status === "corrections_received") {
+    return "vf-figma-dot-indigo";
+  }
   return "vf-figma-dot-green";
 }
 
-function statusBadge(item: VisualSubmission) {
-  if (item.status === "returned") {
+function statusBadge(item: VisualActionRow) {
+  if (item.status === "returned" || item.status === "requires_action") {
     return (
       <span className="vf-figma-status is-warning">
         <AlertCircle aria-hidden="true" size={15} />
@@ -522,7 +94,7 @@ function statusBadge(item: VisualSubmission) {
     );
   }
 
-  if (item.status === "in_progress") {
+  if (item.status === "draft" || item.status === "in_progress") {
     return (
       <span className="vf-figma-status is-blue">
         <Clock aria-hidden="true" size={15} />
@@ -531,7 +103,7 @@ function statusBadge(item: VisualSubmission) {
     );
   }
 
-  if (item.status === "submitted_for_review") {
+  if (item.status === "submitted_for_review" || item.status === "corrections_received") {
     return (
       <span className="vf-figma-status is-indigo">
         <Clock aria-hidden="true" size={15} />
@@ -548,13 +120,6 @@ function statusBadge(item: VisualSubmission) {
   );
 }
 
-function blockerLabel(item: VisualSubmission) {
-  if (item.blocker) return item.blocker;
-  if (item.status === "returned") return "Скан паспорта не читается";
-  if (item.status === "in_progress") return "Анкета не заполнена";
-  return "";
-}
-
 function memberStatusIcon(status: VisualMember["status"]) {
   if (status === "missing_docs") {
     return <AlertCircle className="vf-figma-member-issue" aria-hidden="true" size={15} />;
@@ -567,14 +132,6 @@ function memberStatusIcon(status: VisualMember["status"]) {
   return <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />;
 }
 
-function visualOpenIntent(item: VisualSubmission): VisualOpenIntent {
-  return item.status === "returned" ? "issues" : "detail";
-}
-
-function visualActionLabel(item: VisualSubmission) {
-  return item.status === "returned" ? "Исправить" : "Открыть";
-}
-
 function activateKeyboardCard(
   event: KeyboardEvent<HTMLElement>,
   action: () => void,
@@ -585,37 +142,88 @@ function activateKeyboardCard(
 }
 
 function VisualToolbar({
-  viewMode,
+  category,
+  categoryCounts,
+  cityFilter,
+  cityOptions,
+  onCategory,
+  onCityFilter,
+  onQuery,
+  onSortMode,
   onViewMode,
+  query,
+  sortMode,
+  viewMode,
 }: {
+  category: VisualActionCategory;
+  categoryCounts: Record<VisualActionCategory, number>;
+  cityFilter: City | "Все города";
+  cityOptions: Array<City | "Все города">;
+  onCategory: (category: VisualActionCategory) => void;
+  onCityFilter: (city: City | "Все города") => void;
+  onQuery: (query: string) => void;
+  onSortMode: (mode: VisualSortMode) => void;
   onViewMode: (mode: "columns" | "list") => void;
+  query: string;
+  sortMode: VisualSortMode;
   viewMode: "columns" | "list";
 }) {
   const [filterOpen, setFilterOpen] = useState(false);
+  const tabs: Array<{ id: VisualActionCategory; label: string }> = [
+    { id: "all", label: "Все действия" },
+    { id: "issues", label: "Ошибки" },
+    { id: "review", label: "На проверке" },
+    { id: "completed", label: "Выполненные" },
+  ];
+  const sortOptions: Array<{ id: VisualSortMode; label: string }> = [
+    { id: "priority", label: "Приоритет" },
+    { id: "updated", label: "Обновлено" },
+    { id: "created", label: "Создано" },
+    { id: "trip", label: "Дата поездки" },
+  ];
 
   function chooseViewMode(mode: "columns" | "list") {
     onViewMode(mode);
     setFilterOpen(false);
   }
 
+  function chooseCity(nextCity: City | "Все города") {
+    onCityFilter(nextCity);
+    setFilterOpen(false);
+  }
+
+  function chooseSort(mode: VisualSortMode) {
+    onSortMode(mode);
+    setFilterOpen(false);
+  }
+
   return (
     <div className="vf-figma-actions-toolbar">
-      <div className="vf-figma-tabs" aria-label="Фильтры действий">
-        <button className="is-active" type="button">
-          Все действия <span>20</span>
-        </button>
-        <button type="button">
-          Ошибки <span>5</span>
-        </button>
-        <button type="button">
-          На проверке <span>4</span>
-        </button>
+      <div className="vf-figma-tabs" aria-label="Фильтры действий" role="tablist">
+        {tabs.map((tab) => (
+          <button
+            aria-selected={category === tab.id}
+            className={category === tab.id ? "is-active" : ""}
+            key={tab.id}
+            role="tab"
+            type="button"
+            onClick={() => onCategory(tab.id)}
+          >
+            {tab.label} <span>{categoryCounts[tab.id]}</span>
+          </button>
+        ))}
       </div>
 
       <div className="vf-figma-tools">
         <div className="vf-figma-search">
           <Search aria-hidden="true" size={20} />
-          <input aria-label="Поиск" placeholder="Поиск..." type="text" />
+          <input
+            aria-label="Поиск по действиям"
+            placeholder="Поиск..."
+            type="search"
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+          />
         </div>
         <div className="vf-figma-filter-menu">
           <button
@@ -648,6 +256,32 @@ function VisualToolbar({
               >
                 Колонки
               </button>
+              <span>Город</span>
+              {cityOptions.map((city) => (
+                <button
+                  className={cityFilter === city ? "is-active" : ""}
+                  key={city}
+                  role="menuitemradio"
+                  aria-checked={cityFilter === city}
+                  type="button"
+                  onClick={() => chooseCity(city)}
+                >
+                  {city}
+                </button>
+              ))}
+              <span>Сортировка</span>
+              {sortOptions.map((option) => (
+                <button
+                  className={sortMode === option.id ? "is-active" : ""}
+                  key={option.id}
+                  role="menuitemradio"
+                  aria-checked={sortMode === option.id}
+                  type="button"
+                  onClick={() => chooseSort(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           ) : null}
         </div>
@@ -660,16 +294,18 @@ function ListRow({
   item,
   onOpen,
 }: {
-  item: VisualSubmission;
-  onOpen?: VisualOpenHandler;
+  item: VisualActionRow;
+  onOpen: VisualOpenHandler;
 }) {
   return (
     <div
+      aria-label={`Открыть действие ${item.id}: ${item.title}`}
       className="vf-figma-action-row"
+      data-submission-id={item.id}
       role="button"
       tabIndex={0}
-      onClick={() => onOpen?.(item.id, "detail")}
-      onKeyDown={(event) => activateKeyboardCard(event, () => onOpen?.(item.id, "detail"))}
+      onClick={() => onOpen(item.submission, item.tab)}
+      onKeyDown={(event) => activateKeyboardCard(event, () => onOpen(item.submission, item.tab))}
     >
       <span className={`vf-figma-dot ${statusDot(item.status)}`} aria-hidden="true" />
       <span className="vf-figma-action-title">
@@ -682,12 +318,12 @@ function ListRow({
         <strong>{item.city}</strong>
         <em>
           {item.type === "family" ? <Users aria-hidden="true" size={14} /> : <User aria-hidden="true" size={14} />}
-          {item.type === "family" ? `${item.applicantsCount} заявителя` : "1 заявитель"}
+          {applicantCountLabel(item.applicantsCount)}
         </em>
       </span>
       <span className="vf-figma-action-dates">
         <strong>{item.tripDates}</strong>
-        <em>Даты поездки</em>
+        <em>{item.context}</em>
       </span>
       <span className="vf-figma-action-status">{statusBadge(item)}</span>
       <button
@@ -695,10 +331,10 @@ function ListRow({
         type="button"
         onClick={(event) => {
           event.stopPropagation();
-          onOpen?.(item.id, visualOpenIntent(item));
+          onOpen(item.submission, item.tab);
         }}
       >
-        {visualActionLabel(item)}
+        {item.cta}
       </button>
     </div>
   );
@@ -708,19 +344,22 @@ function ColumnCard({
   item,
   onOpen,
 }: {
-  item: VisualSubmission;
-  onOpen?: VisualOpenHandler;
+  item: VisualActionRow;
+  onOpen: VisualOpenHandler;
 }) {
-  const blocker = blockerLabel(item);
-
   return (
     <button
       className="vf-figma-column-card"
+      data-submission-id={item.id}
       type="button"
-      onClick={() => onOpen?.(item.id, "detail")}
+      onClick={() => onOpen(item.submission, item.tab)}
     >
-      {item.status === "returned" ? <span className="vf-figma-card-rail is-danger" /> : null}
-      {item.status === "in_progress" ? <span className="vf-figma-card-rail is-warning" /> : null}
+      {item.status === "returned" || item.status === "requires_action" ? (
+        <span className="vf-figma-card-rail is-danger" />
+      ) : null}
+      {item.status === "draft" || item.status === "in_progress" ? (
+        <span className="vf-figma-card-rail is-warning" />
+      ) : null}
       <span className="vf-figma-column-card-head">
         <span>{item.id}</span>
         <em>
@@ -733,17 +372,17 @@ function ColumnCard({
         {item.city} <i aria-hidden="true" /> {item.tripDates}
       </span>
       <span className="vf-figma-column-footer">
-        {blocker ? (
-          <span className={item.status === "returned" ? "is-danger" : "is-warning"}>
+        {item.blocker ? (
+          <span className={item.severity === "blocker" ? "is-danger" : "is-warning"}>
             <AlertCircle aria-hidden="true" size={15} />
-            {blocker}
+            {item.blocker}
           </span>
         ) : (
           <>
             <span className="vf-figma-progress">
-              <span style={{ width: `${item.progress ?? 100}%` }} />
+              <span style={{ width: `${item.progress}%` }} />
             </span>
-            <em>{item.progress ?? 100}%</em>
+            <em>{item.progress}%</em>
           </>
         )}
       </span>
@@ -752,34 +391,127 @@ function ColumnCard({
 }
 
 export function FigmaActionQueueVisual({
+  cityFilter,
+  cityOptions,
+  completedActions,
+  onCityFilter,
   onOpen,
+  onSearch,
+  openActions,
+  query,
+  summary = emptySummary,
 }: {
-  onOpen?: VisualOpenHandler;
+  cityFilter: City | "Все города";
+  cityOptions: Array<City | "Все города">;
+  completedActions: AgentActionItem[];
+  onCityFilter: (city: City | "Все города") => void;
+  onOpen: VisualOpenHandler;
+  onSearch: (query: string) => void;
+  openActions: AgentActionItem[];
+  query: string;
+  summary?: AgentActionSummary;
 }) {
   const [viewMode, setViewMode] = useState<"columns" | "list">("list");
+  const [category, setCategory] = useState<VisualActionCategory>("all");
+  const [sortMode, setSortMode] = useState<VisualSortMode>("priority");
+  const allItems = useMemo(
+    () => [...openActions, ...completedActions].map(toVisualActionRow),
+    [completedActions, openActions],
+  );
+  const categoryCounts = useMemo(
+    () => ({
+      all: allItems.length,
+      completed: completedActions.length,
+      issues: allItems.filter((item) => visualCategoryMatches(item, "issues")).length,
+      review: allItems.filter((item) => visualCategoryMatches(item, "review")).length,
+    }),
+    [allItems, completedActions.length],
+  );
+  const visibleItems = useMemo(
+    () =>
+      sortVisualItems(
+        allItems.filter((item) => visualCategoryMatches(item, category)),
+        sortMode,
+      ),
+    [allItems, category, sortMode],
+  );
+  const columns: VisualColumn[] = [
+    {
+      id: "errors",
+      label: "Ошибки",
+      matches: (item) => visualCategoryMatches(item, "issues"),
+      tone: "danger",
+    },
+    {
+      id: "docs",
+      label: "Сбор документов",
+      matches: (item) => item.status === "draft" || item.status === "in_progress",
+      tone: "warning",
+    },
+    {
+      id: "review",
+      label: "На проверке",
+      matches: (item) => visualCategoryMatches(item, "review"),
+    },
+    {
+      id: "ready",
+      label: "Готово",
+      matches: (item) => isReadyVisualStatus(item.status),
+    },
+  ];
+  const groupLabel = visualGroupLabel(category, visibleItems.length, sortMode);
 
   return (
     <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
-      <VisualToolbar viewMode={viewMode} onViewMode={setViewMode} />
+      <VisualToolbar
+        category={category}
+        categoryCounts={categoryCounts}
+        cityFilter={cityFilter}
+        cityOptions={cityOptions}
+        onCategory={setCategory}
+        onCityFilter={onCityFilter}
+        onQuery={onSearch}
+        onSortMode={setSortMode}
+        onViewMode={setViewMode}
+        query={query}
+        sortMode={sortMode}
+        viewMode={viewMode}
+      />
 
-      <div className={`vf-figma-view-stage is-${viewMode}`} key={viewMode}>
-        {viewMode === "list" ? (
+      <div
+        className={`vf-figma-view-stage is-${viewMode}`}
+        data-agent-action-open-count={summary.open}
+        key={viewMode}
+      >
+        {visibleItems.length === 0 ? (
+          <div className="vf-figma-action-list" role="status">
+            <div className="vf-figma-section-rule">
+              <span aria-hidden="true" />
+              <strong>Нет действий</strong>
+              <span aria-hidden="true" />
+            </div>
+            <div className="vf-figma-column-card">
+              <strong>По текущим фильтрам ничего не найдено</strong>
+              <span className="vf-figma-column-subline">
+                Измените поиск, город или категорию. Данные берутся из реальных подач агента.
+              </span>
+            </div>
+          </div>
+        ) : viewMode === "list" ? (
           <div className="vf-figma-action-list">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
-              <strong>Сегодня</strong>
+              <strong>{groupLabel}</strong>
               <span aria-hidden="true" />
             </div>
-            {visualSubmissions.map((item) => (
-              <ListRow item={item} key={item.id} onOpen={onOpen} />
+            {visibleItems.map((item) => (
+              <ListRow item={item} key={item.actionId} onOpen={onOpen} />
             ))}
           </div>
         ) : (
           <div className="vf-figma-column-board">
-            {visualColumns.map((column) => {
-              const items = visualColumnSubmissions.filter((item) =>
-                column.statuses.includes(item.status),
-              );
+            {columns.map((column) => {
+              const items = visibleItems.filter(column.matches);
 
               return (
                 <section className="vf-figma-column" key={column.id}>
@@ -791,9 +523,18 @@ export function FigmaActionQueueVisual({
                     <em>{items.length}</em>
                   </header>
                   <div className="vf-figma-column-stack">
-                    {items.map((item) => (
-                      <ColumnCard item={item} key={item.id} onOpen={onOpen} />
-                    ))}
+                    {items.length ? (
+                      items.map((item) => (
+                        <ColumnCard item={item} key={item.actionId} onOpen={onOpen} />
+                      ))
+                    ) : (
+                      <div className="vf-figma-column-card" role="status">
+                        <strong>Нет подач</strong>
+                        <span className="vf-figma-column-subline">
+                          Колонка пуста для текущих фильтров.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </section>
               );
@@ -807,61 +548,81 @@ export function FigmaActionQueueVisual({
 
 export function FigmaApplicantsVisual({
   onOpen,
+  submissions = [],
 }: {
   onOpen?: VisualOpenHandler;
+  submissions?: Submission[];
 }) {
+  const familySubmissions = submissions.filter((submission) => submission.type === "family");
+  const individualSubmissions = submissions.filter((submission) => submission.type === "single");
+
   return (
     <section className="vf-figma-screen vf-figma-applicants-screen" aria-label="Мои подачи">
       <div className="vf-figma-applicants-section">
         <h2>Семейные подачи</h2>
         <div className="vf-figma-family-grid">
-          {visualFamilies.map((family) => (
-            <article
-              className="vf-figma-family-card"
-              key={family.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onOpen?.(family.id)}
-              onKeyDown={(event) =>
-                activateKeyboardCard(event, () => onOpen?.(family.id))
-              }
-            >
+          {familySubmissions.length ? (
+            familySubmissions.map((submission) => (
+              <article
+                className="vf-figma-family-card"
+                data-submission-id={submission.id}
+                key={submission.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpen?.(submission)}
+                onKeyDown={(event) =>
+                  activateKeyboardCard(event, () => onOpen?.(submission))
+                }
+              >
+                <span className="vf-figma-family-head">
+                  <span className="vf-figma-family-icon">
+                    <Users aria-hidden="true" size={26} />
+                  </span>
+                  <span>
+                    <strong>{formatSubmissionListTitle(submission)}</strong>
+                    <em>{applicantCountLabel(submission.applicants.length)}</em>
+                  </span>
+                </span>
+                <span className="vf-figma-member-list">
+                  {submission.applicants.map((applicant) => {
+                    const member = visualMemberForApplicant(submission, applicant);
+                    return (
+                      <button
+                        className="vf-figma-member-row"
+                        key={`${submission.id}-${applicant.id}`}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpen?.(submission, "applicants");
+                        }}
+                      >
+                        <em>{member.initials}</em>
+                        <strong>{member.name}</strong>
+                        <small>{member.role}</small>
+                        {memberStatusIcon(member.status)}
+                      </button>
+                    );
+                  })}
+                </span>
+                <span className="vf-figma-family-footer">
+                  <span>Акт: {submission.updatedAt}</span>
+                  <em>
+                    <Folder aria-hidden="true" size={17} />
+                    {submission.files.length} файлов
+                  </em>
+                </span>
+              </article>
+            ))
+          ) : (
+            <div className="vf-figma-family-card" role="status">
               <span className="vf-figma-family-head">
-                <span className="vf-figma-family-icon">
-                  <Users aria-hidden="true" size={26} />
-                </span>
                 <span>
-                  <strong>{family.title}</strong>
-                  <em>{family.members.length} человека</em>
+                  <strong>Семейных подач нет</strong>
+                  <em>Создайте семейный пакет, чтобы он появился здесь.</em>
                 </span>
               </span>
-              <span className="vf-figma-member-list">
-                {family.members.map((member) => (
-                  <button
-                    className="vf-figma-member-row"
-                    key={`${family.id}-${member.name}`}
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpen?.(family.id);
-                    }}
-                  >
-                    <em>{member.initials}</em>
-                    <strong>{member.name}</strong>
-                    <small>{member.role}</small>
-                    {memberStatusIcon(member.status)}
-                  </button>
-                ))}
-              </span>
-              <span className="vf-figma-family-footer">
-                <span>Акт: {family.lastActivity}</span>
-                <em>
-                  <Folder aria-hidden="true" size={17} />
-                  {family.submissionsCount} пакета
-                </em>
-              </span>
-            </article>
-          ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -870,29 +631,209 @@ export function FigmaApplicantsVisual({
       <div className="vf-figma-applicants-section">
         <h2>Заявители</h2>
         <div className="vf-figma-individual-grid">
-          {visualIndividuals.map((individual) => (
-            <button
-              className="vf-figma-individual-card"
-              key={individual.id}
-              type="button"
-              onClick={() => onOpen?.(individual.id)}
-            >
-              <span className="vf-figma-avatar">{individual.initials}</span>
+          {individualSubmissions.length ? (
+            individualSubmissions.map((submission) => {
+              const applicant = submission.applicants[0];
+              const member = applicant
+                ? visualMemberForApplicant(submission, applicant)
+                : null;
+              return (
+                <button
+                  className="vf-figma-individual-card"
+                  data-submission-id={submission.id}
+                  key={submission.id}
+                  type="button"
+                  onClick={() => onOpen?.(submission)}
+                >
+                  <span className="vf-figma-avatar">
+                    {member?.initials ?? initialsForName(submission.title)}
+                  </span>
+                  <span>
+                    <strong>{member?.name ?? submission.title}</strong>
+                    <em>
+                      {member ? memberStatusIcon(member.status) : null}
+                      {statusLabelFor(submission.status, "compact")}
+                    </em>
+                  </span>
+                  <span className="vf-figma-family-footer">
+                    <span>Акт: {submission.updatedAt}</span>
+                    <em>
+                      <Folder aria-hidden="true" size={17} />
+                      {submission.files.length} файлов
+                    </em>
+                  </span>
+                </button>
+              );
+            })
+          ) : (
+            <div className="vf-figma-individual-card" role="status">
               <span>
-                <strong>{individual.name}</strong>
-                <em>{memberStatusIcon(individual.status)} Профиль готов</em>
+                <strong>Индивидуальных подач нет</strong>
+                <em>По текущему списку нет одиночных заявителей.</em>
               </span>
-              <span className="vf-figma-family-footer">
-                <span>Акт: {individual.lastActivity}</span>
-                <em>
-                  <Folder aria-hidden="true" size={17} />
-                  {individual.submissionsCount} пакета
-                </em>
-              </span>
-            </button>
-          ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
   );
+}
+
+function toVisualActionRow(action: AgentActionItem): VisualActionRow {
+  const submission = action.submission;
+
+  return {
+    actionId: action.id,
+    applicantsCount: submission.applicants.length,
+    badges: action.badges,
+    blocker: visualActionBlocker(action),
+    city: submission.city,
+    completed: action.completed,
+    context: action.context,
+    createdAt: submission.createdAt,
+    cta: action.cta,
+    id: submission.id,
+    progress: submission.completeness.total,
+    severity: action.severity,
+    status: submission.status,
+    statusLabel: statusLabelFor(submission.status, "compact"),
+    submission,
+    tab: action.tab,
+    title: action.title || formatSubmissionListTitle(submission),
+    tripDates: tripDates(submission),
+    tripDateFrom: submission.tripDateFrom,
+    type: submission.type,
+    updated: submission.updatedAt,
+  };
+}
+
+function visualCategoryMatches(item: VisualActionRow, category: VisualActionCategory) {
+  if (category === "all") return true;
+  if (category === "completed") return item.completed;
+  if (category === "issues") {
+    return (
+      !item.completed &&
+      (item.status === "returned" ||
+        item.status === "requires_action" ||
+        item.severity === "blocker")
+    );
+  }
+  return isReviewVisualStatus(item.status);
+}
+
+function visualActionBlocker(action: AgentActionItem) {
+  if (action.severity !== "blocker" && action.severity !== "warning") return undefined;
+  return action.context;
+}
+
+function isReviewVisualStatus(status: VisualStatus) {
+  return status === "submitted_for_review" || status === "corrections_received";
+}
+
+function isReadyVisualStatus(status: VisualStatus) {
+  return status === "ready_for_export" || status === "exported";
+}
+
+function sortVisualItems(items: VisualActionRow[], sortMode: VisualSortMode) {
+  if (sortMode === "priority") return items;
+
+  return [...items].sort((left, right) => {
+    if (sortMode === "updated") {
+      return compareOperationalDate(right.updated, left.updated);
+    }
+    if (sortMode === "created") {
+      return compareOperationalDate(right.createdAt, left.createdAt);
+    }
+    return compareOperationalDate(left.tripDateFrom, right.tripDateFrom);
+  });
+}
+
+function compareOperationalDate(left: string, right: string) {
+  return operationalDateScore(left) - operationalDateScore(right);
+}
+
+function operationalDateScore(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 0;
+  if (normalized === "сейчас") return Number.MAX_SAFE_INTEGER;
+
+  const parsed = Date.parse(normalized);
+  if (!Number.isNaN(parsed)) return parsed;
+
+  const match = normalized.match(/^(\d{1,2})\.(\d{1,2})/);
+  if (match) {
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    return month * 100 + day;
+  }
+
+  return normalized.charCodeAt(0) || 0;
+}
+
+function visualGroupLabel(
+  category: VisualActionCategory,
+  count: number,
+  sortMode: VisualSortMode,
+) {
+  const sorted =
+    sortMode === "priority"
+      ? "приоритет"
+      : sortMode === "updated"
+        ? "обновление"
+        : sortMode === "created"
+          ? "создание"
+          : "дата поездки";
+  if (category === "issues") return `Ошибки · ${count} · ${sorted}`;
+  if (category === "review") return `На проверке · ${count} · ${sorted}`;
+  if (category === "completed") return `Выполненные · ${count} · ${sorted}`;
+  return `Все действия · ${count} · ${sorted}`;
+}
+
+function visualMemberForApplicant(
+  submission: Submission,
+  applicant: Submission["applicants"][number],
+): VisualMember {
+  return {
+    initials: initialsForName(applicant.fullName),
+    name: applicant.fullName,
+    role: applicantRoleLabel(applicant.role ?? "main"),
+    status: memberStatus(submission, applicant.id, applicant.questionnaireStatus),
+  };
+}
+
+function memberStatus(
+  submission: Submission,
+  applicantId: string,
+  questionnaireStatus: Submission["applicants"][number]["questionnaireStatus"],
+): VisualMember["status"] {
+  const files = submission.files.filter((file) => file.applicantId === applicantId);
+  if (
+    questionnaireStatus === "needs_fix" ||
+    files.some((file) => file.status === "missing" || file.status === "needs_replacement")
+  ) {
+    return "missing_docs";
+  }
+  if (
+    questionnaireStatus === "empty" ||
+    questionnaireStatus === "partial" ||
+    files.some((file) => file.status === "uploaded" || file.status === "pending_review")
+  ) {
+    return "in_progress";
+  }
+  return "ready";
+}
+
+function applicantRoleLabel(role: string) {
+  if (role === "main") return "Основной";
+  if (role === "spouse") return "Супруга";
+  if (role === "child") return "Ребенок";
+  return role;
+}
+
+function initialsForName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 }
