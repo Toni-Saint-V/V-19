@@ -199,6 +199,27 @@ function escapeRegex(value: string) {
 }
 
 async function openDrawerTab(page: Page, labels: string[]) {
+  const drawerTabIds: Record<string, string> = {
+    Анкета: "questionnaire",
+    Данные: "questionnaire",
+    Замечания: "issues",
+    История: "history",
+    Обзор: "overview",
+    Паспорт: "files",
+    Селфи: "files",
+    Файлы: "files",
+  };
+  for (const label of labels) {
+    const tabId = drawerTabIds[label];
+    if (!tabId) continue;
+
+    const tabById = drawer(page).locator(`[data-drawer-tab="${tabId}"]`).first();
+    if (await isVisible(tabById)) {
+      await tabById.click();
+      return;
+    }
+  }
+
   const name = new RegExp(`^(${labels.map(escapeRegex).join("|")})([\\s,]|$)`);
   const roleTab = drawer(page).getByRole("tab", { name }).first();
 
@@ -347,17 +368,16 @@ async function fillQuestionnaire(page: Page) {
 
 async function uploadAllVisibleFiles(page: Page) {
   for (let pass = 0; pass < 40; pass += 1) {
-    const uploadButtons = drawer(page).getByRole("button", {
-      name: /^(Загрузить|Заменить)/,
-    });
-
-    if ((await uploadButtons.count()) === 0) {
-      return;
+    const fileInputs = drawer(page).locator(".drawer-file-input");
+    if ((await fileInputs.count()) > 0) {
+      await fileInputs.first().setInputFiles(e2ePassportFile(`drawer-${pass}`));
+      await expect(
+        drawer(page).getByRole("heading", { name: "Файлы подачи" }),
+      ).toBeVisible();
+      continue;
     }
 
-    const before = await uploadButtons.count();
-    await uploadButtons.first().click();
-    await expect(uploadButtons).toHaveCount(before - 1);
+    return;
   }
 
   throw new Error("Не удалось загрузить все видимые файлы");

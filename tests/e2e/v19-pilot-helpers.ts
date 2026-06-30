@@ -178,6 +178,26 @@ export async function selectSubmissionStatus(page: Page, label: string | RegExp)
 }
 
 export async function openDrawerTab(page: Page, labels: string[]) {
+  const drawerTabIds: Record<string, string> = {
+    Анкета: "questionnaire",
+    Замечания: "issues",
+    История: "history",
+    Обзор: "overview",
+    Паспорт: "files",
+    Селфи: "files",
+    Файлы: "files",
+  };
+  for (const label of labels) {
+    const tabId = drawerTabIds[label];
+    if (!tabId) continue;
+
+    const tabById = drawer(page).locator(`[data-drawer-tab="${tabId}"]`).first();
+    if (await isVisible(tabById)) {
+      await tabById.click();
+      return;
+    }
+  }
+
   const escapedLabels = labels.map((label) =>
     label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   );
@@ -217,22 +237,17 @@ export function e2ePassportFile(name: string) {
 export async function uploadAllVisibleFiles(page: Page) {
   await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
 
-  const uploadButtons = drawer(page).getByRole("button", {
-    name: /^(Загрузить|Заменить)/,
-  });
-  await uploadButtons.first().waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
-
   for (let pass = 0; pass < 40; pass += 1) {
-    await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
-
-    const before = await uploadButtons.count();
-    if (before === 0) {
-      return;
+    const fileInputs = drawer(page).locator(".drawer-file-input");
+    if ((await fileInputs.count()) > 0) {
+      await fileInputs.first().setInputFiles(e2ePassportFile(`drawer-${pass}`));
+      await expect(
+        drawer(page).getByRole("heading", { name: "Файлы подачи" }),
+      ).toBeVisible();
+      continue;
     }
 
-    await uploadButtons.first().click();
-    await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
-    await expect.poll(() => uploadButtons.count()).toBeLessThan(before);
+    return;
   }
 
   throw new Error("Unable to upload all visible files.");
