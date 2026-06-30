@@ -2,6 +2,7 @@ import type { Applicant } from "./types";
 
 export type ApplicantDocumentType =
   | "application_form_pdf"
+  | "appointment_pdf"
   | "passport_scan"
   | "questionnaire"
   | "selfie"
@@ -9,6 +10,7 @@ export type ApplicantDocumentType =
 
 const defaultExtensions: Record<ApplicantDocumentType, string> = {
   application_form_pdf: "pdf",
+  appointment_pdf: "pdf",
   passport_scan: "pdf",
   questionnaire: "pdf",
   selfie: "jpg",

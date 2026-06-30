@@ -6,13 +6,23 @@ import {
   resetLocalDevAuthRegistrationForTests,
   sessionRepository,
   userRepository,
+  type AccessRequestRegistrationInput,
 } from "../../src/shared/authRegistration";
 
-function accessRequestInput(email: string) {
+const localDevPassword = "local-dev-password";
+
+function registrationInput(
+  email: string,
+  patch: Partial<AccessRequestRegistrationInput> = {},
+): AccessRequestRegistrationInput {
   return {
+    city: "Москва",
+    companyName: "Visa Test",
     email,
-    displayName: "Новый агент",
-    organizationName: "Visa Center Test",
+    fullName: "Анна Петрова",
+    password: "secure-local-password",
+    phone: "+7 900 000-00-00",
+    ...patch,
   };
 }
 
@@ -22,64 +32,58 @@ describe("admin-approved local/dev auth registration", () => {
     resetLocalDevAuthRegistrationForTests();
   });
 
-  test("rejects invalid email before creating an access request", async () => {
+  test("rejects invalid registration before creating an access request", async () => {
     await expect(
-      accessRequestRepository.submitAccessRequest(accessRequestInput("bad-email")),
+      accessRequestRepository.submitAccessRequest(registrationInput("bad-email")),
     ).rejects.toMatchObject({
       code: "INVALID_EMAIL",
     });
-    await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toEqual(
-      [],
-    );
-  });
-
-  test("requires agent name and organization before creating an access request", async () => {
     await expect(
-      accessRequestRepository.submitAccessRequest({
-        email: "missing-name@example.com",
-        displayName: "",
-        organizationName: "Visa Center Test",
-      }),
+      accessRequestRepository.submitAccessRequest(
+        registrationInput("missing-name@example.com", { fullName: "" }),
+      ),
     ).rejects.toMatchObject({
-      code: "ACCESS_REQUEST_INCOMPLETE",
-      message: "Введите имя.",
-    });
-    await expect(
-      accessRequestRepository.submitAccessRequest({
-        email: "missing-org@example.com",
-        displayName: "Новый агент",
-        organizationName: "",
-      }),
-    ).rejects.toMatchObject({
-      code: "ACCESS_REQUEST_INCOMPLETE",
-      message: "Введите организацию.",
+      code: "INVALID_REGISTRATION",
     });
     await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toEqual(
       [],
     );
   });
 
-  test("seeds approved local demo agent for the default workspace", async () => {
+  test("seeds approved local demo agent and admin for e2e mode", async () => {
     await expect(
-      authRepository.loginApprovedUser("agent@visaflow.local"),
+      authRepository.loginApprovedUser("agent@visaflow.local", localDevPassword),
     ).resolves.toMatchObject({
+      approvalStatus: "approved",
       email: "agent@visaflow.local",
+      ownerAgentId: "local-agent-tony",
       role: "agent",
+      status: "active",
+    });
+    await expect(
+      authRepository.loginApprovedUser("admin@visaflow.local", localDevPassword),
+    ).resolves.toMatchObject({
+      approvalStatus: "approved",
+      email: "admin@visaflow.local",
+      role: "admin",
+      status: "active",
     });
   });
 
-  test("creates one pending access request for duplicate agent email", async () => {
+  test("public registration creates one pending request and no active agent", async () => {
     const first = await accessRequestRepository.submitAccessRequest(
-      accessRequestInput("New.Agent@Example.com"),
+      registrationInput("New.Agent@Example.com"),
     );
     const second = await accessRequestRepository.submitAccessRequest(
-      accessRequestInput("new.agent@example.com"),
+      registrationInput("new.agent@example.com"),
     );
 
     expect(first).toMatchObject({
+      city: "Москва",
+      companyName: "Visa Test",
       email: "new.agent@example.com",
-      displayName: "Новый агент",
-      organizationName: "Visa Center Test",
+      fullName: "Анна Петрова",
+      phone: "+7 900 000-00-00",
       requestedRole: "agent",
       status: "pending",
     });
@@ -87,30 +91,100 @@ describe("admin-approved local/dev auth registration", () => {
     await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toHaveLength(
       1,
     );
+    const pendingUser = await userRepository.findUserByEmail("new.agent@example.com");
+    expect(pendingUser).toMatchObject({
+      approvalStatus: "pending",
+      role: "agent",
+      status: "pending",
+    });
+    expect(pendingUser?.ownerAgentId).toBeUndefined();
   });
 
-  test("blocks pending requests from agent app access", async () => {
+  test("pending user can only restore pending state, not active workspace access", async () => {
     await accessRequestRepository.submitAccessRequest(
-      accessRequestInput("pending@example.com"),
+      registrationInput("pending@example.com"),
     );
 
-    await expect(
-      authRepository.loginApprovedUser("pending@example.com"),
-    ).rejects.toMatchObject({
-      code: "ACCESS_PENDING",
-      message:
-        "Заявка отправлена. Доступ появится после одобрения администратором.",
+    const session = await authRepository.loginApprovedUser(
+      "pending@example.com",
+      "secure-local-password",
+    );
+
+    expect(session).toMatchObject({
+      approvalStatus: "pending",
+      email: "pending@example.com",
+      ownerAgentId: undefined,
+      role: "agent",
+      status: "pending",
     });
-    await expect(authRepository.getCurrentSession()).resolves.toBeNull();
+    await expect(authRepository.restoreSession()).resolves.toMatchObject({
+      approvalStatus: "pending",
+      status: "pending",
+    });
   });
 
-  test("admin sees pending requests and can approve an active agent user", async () => {
-    const request =
-      await accessRequestRepository.submitAccessRequest(
-        accessRequestInput("agent-approved@example.com"),
-      );
+  test("repeat pending registration refreshes the password verifier", async () => {
+    const first = await accessRequestRepository.submitAccessRequest(
+      registrationInput("repeat-pending@example.com", {
+        password: "first-local-password",
+      }),
+    );
+    const second = await accessRequestRepository.submitAccessRequest(
+      registrationInput("repeat-pending@example.com", {
+        fullName: "Мария Соколова",
+        password: "second-local-password",
+      }),
+    );
+
+    expect(second).toMatchObject({
+      id: first.id,
+      fullName: "Мария Соколова",
+      status: "pending",
+    });
+    await expect(
+      authRepository.loginApprovedUser(
+        "repeat-pending@example.com",
+        "first-local-password",
+      ),
+    ).rejects.toMatchObject({
+      code: "INVALID_PASSWORD",
+    });
+    await expect(
+      authRepository.loginApprovedUser(
+        "repeat-pending@example.com",
+        "second-local-password",
+      ),
+    ).resolves.toMatchObject({
+      approvalStatus: "pending",
+      status: "pending",
+    });
+  });
+
+  test("public user cannot self-create admin", async () => {
+    const forged = {
+      ...registrationInput("forged-admin@example.com"),
+      role: "admin",
+      requestedRole: "admin",
+    };
+
+    const request = await accessRequestRepository.submitAccessRequest(forged);
+    const user = await userRepository.findUserByEmail("forged-admin@example.com");
+
+    expect(request.requestedRole).toBe("agent");
+    expect(user).toMatchObject({
+      approvalStatus: "pending",
+      role: "agent",
+      status: "pending",
+    });
+  });
+
+  test("admin sees pending requests and can approve an active agent owner", async () => {
+    const request = await accessRequestRepository.submitAccessRequest(
+      registrationInput("agent-approved@example.com"),
+    );
     const adminSession = await authRepository.loginApprovedUser(
       "admin@visaflow.local",
+      localDevPassword,
     );
 
     await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toEqual(
@@ -122,54 +196,51 @@ describe("admin-approved local/dev auth registration", () => {
       adminSession.userId,
     );
     expect(approvedUser).toMatchObject({
+      approvalStatus: "approved",
+      approvedFromRequestId: request.id,
       email: "agent-approved@example.com",
-      displayName: "Новый агент",
-      organizationName: "Visa Center Test",
       role: "agent",
       status: "active",
-      approvedFromRequestId: request.id,
     });
+    expect(approvedUser.ownerAgentId).toBe(approvedUser.id);
     await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toEqual(
       [],
     );
   });
 
-  test("approved active agent can login and restore session", async () => {
-    const request =
-      await accessRequestRepository.submitAccessRequest(
-        accessRequestInput("approved-login@example.com"),
-      );
+  test("approved active agent can login and restore approved session", async () => {
+    const request = await accessRequestRepository.submitAccessRequest(
+      registrationInput("approved-login@example.com"),
+    );
     const adminSession = await authRepository.loginApprovedUser(
       "admin@visaflow.local",
+      localDevPassword,
     );
     await accessRequestRepository.approveAccessRequest(request.id, adminSession.userId);
     await authRepository.logout();
 
     const agentSession = await authRepository.loginApprovedUser(
       "approved-login@example.com",
+      "secure-local-password",
     );
 
     expect(agentSession).toMatchObject({
+      approvalStatus: "approved",
       email: "approved-login@example.com",
-      role: "agent",
-    });
-    await expect(authRepository.restoreSession()).resolves.toEqual(agentSession);
-    await expect(authRepository.getCurrentUser()).resolves.toMatchObject({
-      email: "approved-login@example.com",
-      displayName: "Новый агент",
-      organizationName: "Visa Center Test",
       role: "agent",
       status: "active",
     });
+    expect(agentSession.ownerAgentId).toBe(agentSession.userId);
+    await expect(authRepository.restoreSession()).resolves.toEqual(agentSession);
   });
 
-  test("reject blocks access and rejected email cannot login", async () => {
-    const request =
-      await accessRequestRepository.submitAccessRequest(
-        accessRequestInput("reject-me@example.com"),
-      );
+  test("admin rejects request and rejected user stays blocked with reason", async () => {
+    const request = await accessRequestRepository.submitAccessRequest(
+      registrationInput("reject-me@example.com"),
+    );
     const adminSession = await authRepository.loginApprovedUser(
       "admin@visaflow.local",
+      localDevPassword,
     );
     const rejected = await accessRequestRepository.rejectAccessRequest(
       request.id,
@@ -178,47 +249,102 @@ describe("admin-approved local/dev auth registration", () => {
     );
 
     expect(rejected).toMatchObject({
-      status: "rejected",
       rejectionReason: "Нет договора",
       reviewedByAdminId: adminSession.userId,
+      status: "rejected",
+    });
+
+    const rejectedSession = await authRepository.loginApprovedUser(
+      "reject-me@example.com",
+      "secure-local-password",
+    );
+    expect(rejectedSession).toMatchObject({
+      approvalStatus: "rejected",
+      rejectionReason: "Нет договора",
+      status: "rejected",
+    });
+    expect(rejectedSession.ownerAgentId).toBeUndefined();
+  });
+
+  test("repeat rejected registration refreshes the password verifier and preserves rejection", async () => {
+    const request = await accessRequestRepository.submitAccessRequest(
+      registrationInput("repeat-rejected@example.com", {
+        password: "first-local-password",
+      }),
+    );
+    const adminSession = await authRepository.loginApprovedUser(
+      "admin@visaflow.local",
+      localDevPassword,
+    );
+    await accessRequestRepository.rejectAccessRequest(
+      request.id,
+      adminSession.userId,
+      "Нет договора",
+    );
+
+    const repeated = await accessRequestRepository.submitAccessRequest(
+      registrationInput("repeat-rejected@example.com", {
+        phone: "+7 999 111-22-33",
+        password: "second-local-password",
+      }),
+    );
+
+    expect(repeated).toMatchObject({
+      id: request.id,
+      phone: "+7 999 111-22-33",
+      rejectionReason: "Нет договора",
+      status: "rejected",
     });
     await expect(
-      authRepository.loginApprovedUser("reject-me@example.com"),
+      authRepository.loginApprovedUser(
+        "repeat-rejected@example.com",
+        "first-local-password",
+      ),
     ).rejects.toMatchObject({
-      code: "ACCESS_REJECTED",
+      code: "INVALID_PASSWORD",
+    });
+    await expect(
+      authRepository.loginApprovedUser(
+        "repeat-rejected@example.com",
+        "second-local-password",
+      ),
+    ).resolves.toMatchObject({
+      approvalStatus: "rejected",
+      rejectionReason: "Нет договора",
+      status: "rejected",
     });
   });
 
   test("disabled user cannot restore session or login", async () => {
-    const request =
-      await accessRequestRepository.submitAccessRequest(
-        accessRequestInput("disabled@example.com"),
-      );
+    const request = await accessRequestRepository.submitAccessRequest(
+      registrationInput("disabled@example.com"),
+    );
     const adminSession = await authRepository.loginApprovedUser(
       "admin@visaflow.local",
+      localDevPassword,
     );
     const user = await accessRequestRepository.approveAccessRequest(
       request.id,
       adminSession.userId,
     );
-    await authRepository.loginApprovedUser("disabled@example.com");
+    await authRepository.loginApprovedUser("disabled@example.com", "secure-local-password");
     await userRepository.saveUser({ ...user, status: "disabled" });
 
     await expect(authRepository.restoreSession()).resolves.toBeNull();
     await expect(
-      authRepository.loginApprovedUser("disabled@example.com"),
+      authRepository.loginApprovedUser("disabled@example.com", "secure-local-password"),
     ).rejects.toMatchObject({
       code: "USER_DISABLED",
     });
   });
 
   test("admin role works and non-admin cannot review requests", async () => {
-    const request =
-      await accessRequestRepository.submitAccessRequest(
-        accessRequestInput("needs-admin@example.com"),
-      );
+    const request = await accessRequestRepository.submitAccessRequest(
+      registrationInput("needs-admin@example.com"),
+    );
     const adminSession = await authRepository.loginApprovedUser(
       "admin@visaflow.local",
+      localDevPassword,
     );
 
     expect(adminSession.role).toBe("admin");
@@ -229,12 +355,16 @@ describe("admin-approved local/dev auth registration", () => {
     });
   });
 
-  test("session repository keeps local adapter behavior explicit", async () => {
+  test("session repository keeps pending local adapter behavior explicit", async () => {
     const session = {
-      userId: "admin-local-1",
-      email: "admin@visaflow.local",
-      role: "admin" as const,
+      approvalStatus: "pending" as const,
+      companyName: "Visa Test",
       createdAt: "2026-06-28T10:00:00.000Z",
+      email: "pending@example.com",
+      fullName: "Анна Петрова",
+      role: "agent" as const,
+      status: "pending" as const,
+      userId: "agent-user-local",
     };
 
     await expect(sessionRepository.saveSession(session)).resolves.toEqual(session);
@@ -243,37 +373,14 @@ describe("admin-approved local/dev auth registration", () => {
     await expect(sessionRepository.readSession()).resolves.toBeNull();
   });
 
-  test("rehydrates legacy email-only pending requests with safe fallback fields", async () => {
-    localStorage.setItem(
-      "visaflow.auth.localDev.v1",
-      JSON.stringify({
-        accessRequests: [
-          {
-            id: "legacy-request-1",
-            email: "legacy@example.com",
-            requestedRole: "agent",
-            status: "pending",
-            createdAt: "2026-06-28T10:00:00.000Z",
-          },
-        ],
-        users: [],
-        session: null,
-      }),
-    );
-
-    await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toEqual([
-      expect.objectContaining({
-        id: "legacy-request-1",
-        email: "legacy@example.com",
-        displayName: "legacy",
-        organizationName: "Не указана",
-      }),
-    ]);
-  });
-
   test("uses typed AuthAccessError for denied paths", async () => {
-    await expect(authRepository.loginApprovedUser("unknown@example.com")).rejects.toBeInstanceOf(
-      AuthAccessError,
-    );
+    await expect(
+      authRepository.loginApprovedUser("unknown@example.com", localDevPassword),
+    ).rejects.toBeInstanceOf(AuthAccessError);
+    await expect(
+      authRepository.loginApprovedUser("agent@visaflow.local", "bad-password"),
+    ).rejects.toMatchObject({
+      code: "INVALID_PASSWORD",
+    });
   });
 });

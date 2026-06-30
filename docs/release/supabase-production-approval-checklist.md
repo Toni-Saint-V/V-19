@@ -29,6 +29,7 @@ Backup owner:
 - `20260624001000_questionnaire_answers_persistence.sql`
 - `20260627001000_returned_pdf_storage_policies.sql`
 - `20260628000100_trip_date_range_persistence.sql`
+- `20260629193805_v19_access_requests_admin_pdfs.sql`
 
 ## Required Evidence
 

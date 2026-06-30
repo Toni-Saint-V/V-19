@@ -8,11 +8,13 @@ import { maxVisaApplicationPdfBytes } from "./visaApplicationPdfReviewTypes";
 
 export const mediaStorageBucket = "submission-media";
 export type MediaStorageObjectType =
+  | "application_pdf"
   | CanonicalFrontendMediaType
   | "appointment_pdf"
   | "visa_application_pdf";
 
 const mediaStorageObjectTypes = new Set<MediaStorageObjectType>([
+  "application_pdf",
   "appointment_pdf",
   "passport_scan",
   "selfie",
@@ -62,6 +64,7 @@ function extensionForFileName(fileName: string): string {
 }
 
 function allowedExtensions(type: MediaStorageObjectType): Set<string> {
+  if (type === "application_pdf") return new Set(["pdf"]);
   if (type === "appointment_pdf") return new Set(["pdf"]);
   if (type === "visa_application_pdf") return new Set(["pdf"]);
   if (type === "passport_scan") return new Set(["jpg", "jpeg", "png", "pdf"]);
@@ -73,6 +76,7 @@ function allowedLegacyArchiveExtensions(type: string): Set<string> {
 }
 
 function allowedMimeTypes(type: MediaStorageObjectType): Set<string> {
+  if (type === "application_pdf") return new Set(["application/pdf"]);
   if (type === "appointment_pdf") return new Set(["application/pdf"]);
   if (type === "visa_application_pdf") return new Set(["application/pdf"]);
   if (type === "passport_scan")
@@ -95,6 +99,7 @@ function mimeTypeForExtension(extension: string): string | null {
 }
 
 function maxSizeBytes(type: MediaStorageObjectType): number {
+  if (type === "application_pdf") return maxVisaApplicationPdfBytes;
   if (type === "appointment_pdf") return maxVisaApplicationPdfBytes;
   if (type === "visa_application_pdf") return maxVisaApplicationPdfBytes;
   return 50 * 1024 * 1024;
@@ -147,6 +152,8 @@ function hasExpectedGeneratedSuffix(
     return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png)$/.test(fileName);
   if (type === "passport_scan")
     return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|pdf)$/.test(fileName);
+  if (type === "application_pdf")
+    return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_application_pdf\.pdf$/.test(fileName);
   if (type === "appointment_pdf")
     return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_appointment_pdf\.pdf$/.test(fileName);
   if (type === "visa_application_pdf")
@@ -304,6 +311,21 @@ export function buildVisaApplicationPdfStorageTarget(input: {
   );
 }
 
+export function buildApplicationPdfStorageTarget(input: {
+  nonce?: string;
+  sha256: string;
+  submissionId: string;
+}): MediaStorageTarget {
+  const checksumPrefix = assertVisaApplicationPdfSha256(input.sha256).slice(0, 16);
+  const nonceSegment = safeVisaApplicationPdfStorageNonce(input.nonce);
+  return buildMediaStoragePath(
+    input.submissionId,
+    appointmentPdfApplicantId,
+    "application_pdf",
+    `${safePathSegment(checksumPrefix, "sha256")}${nonceSegment}_application_pdf.pdf`,
+  );
+}
+
 export function buildAppointmentPdfStorageTarget(input: {
   nonce?: string;
   sha256: string;
@@ -317,6 +339,33 @@ export function buildAppointmentPdfStorageTarget(input: {
     "appointment_pdf",
     `${safePathSegment(checksumPrefix, "sha256")}${nonceSegment}_appointment_pdf.pdf`,
   );
+}
+
+export function validateApplicationPdfStorageTarget({
+  file,
+  sha256,
+  submissionId,
+  target,
+}: MediaStorageValidationInput & {
+  sha256: string;
+  submissionId: string;
+}): MediaStorageTarget {
+  const validated = validateMediaStorageTarget({ file, target });
+  const parsed = parseStoragePath(validated.path);
+  const checksumPrefix = assertVisaApplicationPdfSha256(sha256).slice(0, 16);
+
+  if (
+    parsed.submissionId !== safePathSegment(submissionId, "submissionId") ||
+    parsed.applicantId !== appointmentPdfApplicantId ||
+    parsed.type !== "application_pdf" ||
+    !parsed.fileName.startsWith(checksumPrefix)
+  ) {
+    throw new MediaStorageValidationError(
+      "Application PDF storage identity must match the current submission and checksum.",
+    );
+  }
+
+  return validated;
 }
 
 export function validateAppointmentPdfStorageTarget({

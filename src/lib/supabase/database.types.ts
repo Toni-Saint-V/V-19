@@ -25,6 +25,12 @@ export type Database = {
         Update: Partial<ProfileInsert>;
         Relationships: [];
       };
+      access_requests: {
+        Row: AccessRequestRow;
+        Insert: AccessRequestInsert;
+        Update: Partial<AccessRequestInsert>;
+        Relationships: [];
+      };
       submissions: {
         Row: SubmissionRow;
         Insert: SubmissionInsert;
@@ -59,6 +65,12 @@ export type Database = {
         Row: ReturnedPdfHandoffArtifactRow;
         Insert: ReturnedPdfHandoffArtifactInsert;
         Update: Partial<ReturnedPdfHandoffArtifactInsert>;
+        Relationships: [];
+      };
+      admin_pdf_artifacts: {
+        Row: AdminPdfArtifactRow;
+        Insert: AdminPdfArtifactInsert;
+        Update: Partial<AdminPdfArtifactInsert>;
         Relationships: [];
       };
       export_batches: {
@@ -139,6 +151,7 @@ export type Database = {
         | "accepted"
         | "replace_required"
         | "poor_quality";
+      access_request_status: AccessRequestStatus;
     };
     CompositeTypes: Record<string, never>;
   };
@@ -160,6 +173,36 @@ export interface ProfileRow extends DbRecord {
 export type ProfileInsert = Omit<ProfileRow, "created_at" | "role"> & {
   role?: Role;
   created_at?: string;
+};
+
+export type AccessRequestStatus = "pending" | "approved" | "rejected";
+
+export interface AccessRequestRow extends DbRecord {
+  id: string;
+  user_id: string | null;
+  email: string;
+  full_name: string;
+  company_name: string;
+  city: string;
+  phone: string;
+  requested_role: "agent";
+  status: AccessRequestStatus;
+  created_at: string;
+  updated_at: string;
+  reviewed_at: string | null;
+  reviewed_by_admin_id: string | null;
+  rejection_reason: string | null;
+}
+
+export type AccessRequestInsert = Omit<
+  AccessRequestRow,
+  "id" | "created_at" | "updated_at" | "requested_role" | "status"
+> & {
+  id?: string;
+  created_at?: string;
+  requested_role?: "agent";
+  status?: AccessRequestStatus;
+  updated_at?: string;
 };
 
 export interface SubmissionRow extends DbRecord {
@@ -316,6 +359,28 @@ export type ReturnedPdfHandoffArtifactInsert = Omit<
 > & {
   id?: string;
   released_at?: string;
+};
+
+export type AdminPdfArtifactKind = "appointment_pdf" | "application_pdf";
+
+export interface AdminPdfArtifactRow extends DbRecord {
+  id: string;
+  submission_id: string;
+  artifact_kind: AdminPdfArtifactKind;
+  storage_bucket: "submission-media";
+  storage_path: string;
+  file_name: string;
+  sha256: string;
+  uploaded_by: string;
+  uploaded_at: string;
+}
+
+export type AdminPdfArtifactInsert = Omit<
+  AdminPdfArtifactRow,
+  "id" | "uploaded_at"
+> & {
+  id?: string;
+  uploaded_at?: string;
 };
 
 export interface ExportBatchRow extends DbRecord {

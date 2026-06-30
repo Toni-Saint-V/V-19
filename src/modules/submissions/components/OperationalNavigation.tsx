@@ -17,14 +17,7 @@ export type OperationalNavItem = {
   tone?: OperationalNavTone;
 };
 
-export function OperationalSidebar({
-  brand = "VisaFlow",
-  createAction,
-  footer,
-  items,
-  onMobileClose,
-  mobileTitle,
-}: {
+type OperationalSidebarProps = {
   brand?: string;
   createAction?: {
     label: string;
@@ -34,16 +27,100 @@ export function OperationalSidebar({
   items: OperationalNavItem[];
   onMobileClose?: () => void;
   mobileTitle?: string;
-}) {
+};
+
+type OperationalSideMenuProps = OperationalSidebarProps & {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+};
+
+export function OperationalSideMenu({
+  createAction,
+  footer,
+  items,
+  mobileOpen,
+  mobileTitle,
+  onMobileClose,
+}: OperationalSideMenuProps) {
+  const mobileItems = items.map((item) => ({
+    ...item,
+    onClick: () => {
+      item.onClick();
+      onMobileClose();
+    },
+  }));
+  const mobileCreateAction = createAction
+    ? {
+        ...createAction,
+        onClick: () => {
+          createAction.onClick();
+          onMobileClose();
+        },
+      }
+    : undefined;
+
   return (
-    <aside className="ops-sidebar" aria-label="Операционный центр">
+    <>
+      <OperationalDesktopSidebar
+        createAction={createAction}
+        items={items}
+        footer={footer}
+      />
+
+      {mobileOpen ? (
+        <OperationalMobileSidebar
+          createAction={mobileCreateAction}
+          items={mobileItems}
+          onMobileClose={onMobileClose}
+          mobileTitle={mobileTitle}
+          footer={footer}
+        />
+      ) : null}
+
+      {mobileOpen ? (
+        <button
+          className="ops-mobile-menu-backdrop"
+          type="button"
+          aria-label="Закрыть меню"
+          onClick={onMobileClose}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function OperationalDesktopSidebar(props: OperationalSidebarProps) {
+  return <OperationalSidebarFrame {...props} className="ops-sidebar--desktop" />;
+}
+
+export function OperationalMobileSidebar(props: OperationalSidebarProps) {
+  return <OperationalSidebarFrame {...props} className="ops-sidebar--mobile" />;
+}
+
+export function OperationalSidebar(props: OperationalSidebarProps) {
+  return <OperationalSidebarFrame {...props} />;
+}
+
+function OperationalSidebarFrame({
+  className,
+  createAction,
+  footer,
+  items,
+  onMobileClose,
+  mobileTitle,
+}: OperationalSidebarProps & { className?: string }) {
+  return (
+    <aside
+      className={`ops-sidebar${className ? ` ${className}` : ""}`}
+      aria-label="Операционный центр"
+    >
       {mobileTitle ? (
         <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
           <strong>{mobileTitle}</strong>
           <span aria-hidden="true">VF</span>
         </div>
       ) : null}
-      <div className="ops-brand" aria-label={`${brand} 19`}>
+      <div className="ops-brand">
         <span
           className="ops-brand-logo ops-brand-mark vf-brand-capital vf-brand-capital--nav"
           aria-hidden="true"

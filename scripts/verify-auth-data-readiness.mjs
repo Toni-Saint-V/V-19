@@ -144,6 +144,12 @@ function verifyNoFrontendSecrets() {
 function verifyAuthProfileBoundary() {
   const authService = readProjectFile("src/services/authService.ts");
   const profileService = readProjectFile("src/services/profileService.ts");
+  const supabaseAccessRegistration = readProjectFile(
+    "src/shared/supabaseAuthRegistration.ts",
+  );
+  const accessRequestFunction = readProjectFile(
+    "supabase/functions/access-request/index.ts",
+  );
 
   expectContains(
     authService,
@@ -152,43 +158,83 @@ function verifyAuthProfileBoundary() {
   );
   expectContains(
     authService,
-    "profileForSupabaseUser(data.session.user, {",
+    "profileForSupabaseUser(data.session.user)",
     "Supabase sign-in requires matching profile lookup",
   );
   expectContains(
     authService,
     "fetchCurrentProfile(user.id)",
-    "Supabase sign-in checks for an existing profile before recovery",
+    "Supabase sign-in checks for an existing profile before access request status",
   );
   expectContains(
     authService,
-    'supabaseRuntimeConfig.evidence.target !== "production"',
-    "Supabase sign-in blocks production profile auto-repair",
+    ".from(\"access_requests\")",
+    "Supabase sign-in reads owner-visible access request status",
   );
   expectContains(
     authService,
     "Production profile repair requires owner-approved role assignment",
     "Supabase sign-in explains production profile repair boundary",
   );
-  expectContains(
+  expectNotMatching(
     authService,
-    "allowMissingProfileRecovery: true",
-    "Supabase sign-up can create a confirmed agent profile",
+    /allowMissingProfileRecovery/,
+    "Supabase sign-in has no client-side profile recovery switch",
+  );
+  expectNotMatching(
+    authService,
+    /upsertProfile/,
+    "Supabase sign-in cannot upsert profiles",
   );
   expectContains(
-    authService,
+    supabaseAccessRegistration,
+    "functions.invoke<AccessRequestEdgeResult>",
+    "Supabase registration uses access request Edge Function",
+  );
+  expectNotMatching(
+    supabaseAccessRegistration,
+    /\.\.\.input/,
+    "Supabase registration does not forward the password field",
+  );
+  expectNotMatching(
+    supabaseAccessRegistration,
+    /password:/,
+    "Supabase registration payload has no password field",
+  );
+  expectContains(
+    accessRequestFunction,
+    "requireAdminProfile",
+    "Supabase access approval requires admin profile",
+  );
+  expectContains(
+    accessRequestFunction,
     "role: \"agent\"",
-    "Supabase profile recovery creates agent profiles only",
+    "Supabase access approval creates agent profiles only",
   );
   expectContains(
-    authService,
-    "upsertProfile({",
-    "Supabase sign-up can create a confirmed user profile",
+    accessRequestFunction,
+    "inviteUserByEmail",
+    "Supabase access approval invites Auth users server-side only",
   );
   expectContains(
-    authService,
-    "metadataString(user.user_metadata, \"display_name\")",
-    "Supabase sign-in recovers display name from trusted user metadata",
+    accessRequestFunction,
+    "publicAccessRequestResponse",
+    "Supabase public registration response is sanitized",
+  );
+  expectNotMatching(
+    accessRequestFunction,
+    /email_confirm:\s*true/,
+    "Supabase public registration cannot create confirmed Auth users",
+  );
+  expectNotMatching(
+    accessRequestFunction,
+    /updateUserById/,
+    "Supabase public registration cannot overwrite pending Auth passwords",
+  );
+  expectNotMatching(
+    accessRequestFunction,
+    /password:/,
+    "Supabase access request function does not accept or write passwords",
   );
   expectContains(
     profileService,

@@ -4,7 +4,7 @@ import {
   type SubmissionNextStepAction,
 } from "./submissionNextStepEngine";
 import { buildPassportExtractionBrief } from "./passportExtractionBrief";
-import { fileStatusLabels, fileTypeLabels } from "./status";
+import { fileTypeLabels } from "./status";
 import type { Role, Submission } from "./types";
 
 export type AiHelperCaseStatus =
@@ -282,7 +282,7 @@ function fileHighlight(submission: Submission): AiHelperHighlight {
 
   if (replacement.length > 0) {
     return {
-      detail: `${replacement.length} файл(а) требуют замены: ${fileList(replacement)}`,
+      detail: `Заменить: ${fileList(replacement)}`,
       kind: "files",
       label: "Файлы",
       source: "files",
@@ -290,7 +290,7 @@ function fileHighlight(submission: Submission): AiHelperHighlight {
   }
   if (missing.length > 0) {
     return {
-      detail: `${missing.length} файл(а) отсутствуют: ${fileList(missing)}`,
+      detail: `Нет файла: ${fileList(missing)}`,
       kind: "files",
       label: "Файлы",
       source: "files",
@@ -298,7 +298,7 @@ function fileHighlight(submission: Submission): AiHelperHighlight {
   }
   if (pending.length > 0) {
     return {
-      detail: `${pending.length} файл(а) ожидают ручной проверки администратора`,
+      detail: `Проверить: ${fileList(pending)}`,
       kind: "files",
       label: "Файлы",
       source: "files",
@@ -306,7 +306,7 @@ function fileHighlight(submission: Submission): AiHelperHighlight {
   }
 
   return {
-    detail: `Действий по файлам нет; всего ${submission.files.length}, статус: ${fileStatusLabels.accepted.toLowerCase()} или не требует действия`,
+    detail: `Файлы: ${submission.files.length}. Действий нет.`,
     kind: "files",
     label: "Файлы",
     source: "files",
@@ -350,7 +350,7 @@ function buildDrafts({
       {
         audience: "admin",
         title: "Текст замечания",
-        body: `Вернуть агенту: ${issueTargetLabel(firstOpenIssue)}. Укажите конкретную причину после ручной проверки.`,
+        body: `Вернуть агенту: ${issueTargetLabel(firstOpenIssue)}. Укажите причину.`,
       },
     ];
   }
@@ -359,7 +359,7 @@ function buildDrafts({
       {
         audience: "admin",
         title: "Сводка исправления",
-        body: `Проверить исправление: ${issueTargetLabel(firstFixedIssue)}. Закрывайте только после ручной проверки.`,
+        body: `Проверить: ${issueTargetLabel(firstFixedIssue)}. Закрывайте после сверки.`,
       },
     ];
   }

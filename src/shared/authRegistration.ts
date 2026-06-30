@@ -2,19 +2,25 @@ import type { Role } from "../types/domain";
 
 export type AccessRequestStatus = "pending" | "approved" | "rejected";
 export type RequestedRole = "agent";
-export type UserStatus = "active" | "disabled";
+export type UserStatus = "pending" | "active" | "rejected" | "disabled";
 
-export interface AccessRequestInput {
+export interface AccessRequestRegistrationInput {
+  fullName: string;
+  companyName: string;
+  city: string;
+  phone: string;
   email: string;
-  displayName: string;
-  organizationName: string;
+  password: string;
 }
 
 export interface AccessRequest {
   id: string;
+  userId: string;
   email: string;
-  displayName: string;
-  organizationName: string;
+  fullName: string;
+  companyName: string;
+  city: string;
+  phone: string;
   requestedRole: RequestedRole;
   status: AccessRequestStatus;
   createdAt: string;
@@ -26,25 +32,37 @@ export interface AccessRequest {
 export interface User {
   id: string;
   email: string;
-  displayName?: string;
-  organizationName?: string;
+  fullName: string;
+  companyName: string;
+  city: string;
+  phone: string;
   role: Role;
   status: UserStatus;
+  approvalStatus: AccessRequestStatus;
   createdAt: string;
+  ownerAgentId?: string;
   approvedFromRequestId?: string;
+  rejectionReason?: string;
+  localDevPasswordVerifier?: string;
 }
 
 export interface Session {
   userId: string;
   email: string;
+  fullName: string;
+  companyName: string;
   role: Role;
+  status: UserStatus;
+  approvalStatus: AccessRequestStatus;
   createdAt: string;
+  ownerAgentId?: string;
+  rejectionReason?: string;
   expiresAt?: string;
 }
 
 export interface AuthRepository {
-  submitAccessRequest(input: AccessRequestInput): Promise<AccessRequest>;
-  loginApprovedUser(email: string): Promise<Session>;
+  submitAccessRequest(input: AccessRequestRegistrationInput): Promise<AccessRequest>;
+  loginApprovedUser(email: string, password: string): Promise<Session>;
   logout(): Promise<void>;
   restoreSession(): Promise<Session | null>;
   getCurrentSession(): Promise<Session | null>;
@@ -52,7 +70,7 @@ export interface AuthRepository {
 }
 
 export interface AccessRequestRepository {
-  submitAccessRequest(input: AccessRequestInput): Promise<AccessRequest>;
+  submitAccessRequest(input: AccessRequestRegistrationInput): Promise<AccessRequest>;
   listPendingAccessRequests(): Promise<AccessRequest[]>;
   approveAccessRequest(id: string, adminId: string): Promise<User>;
   rejectAccessRequest(
@@ -80,47 +98,82 @@ interface LocalDevAuthState {
   session: Session | null;
 }
 
+type NormalizedAccessRequestInput = Omit<AccessRequestRegistrationInput, "password"> & {
+  password: string;
+};
+
 const localDevAuthStorageKey = "visaflow.auth.localDev.v1";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const localDevSeedPassword = "local-dev-password";
+const seededAgentOwnerId = "local-agent-tony";
+
+function approvedSeed(
+  id: string,
+  email: string,
+  role: Role,
+  fullName: string,
+  companyName: string,
+  city: string,
+  phone: string,
+  ownerAgentId?: string,
+): User {
+  return {
+    approvalStatus: "approved",
+    city,
+    companyName,
+    createdAt: "2026-06-28T00:00:00.000Z",
+    email,
+    fullName,
+    id,
+    localDevPasswordVerifier: createLocalDevPasswordVerifier(email, localDevSeedPassword),
+    ownerAgentId,
+    phone,
+    role,
+    status: "active",
+  };
+}
+
 const localDevApprovedUsers: User[] = [
-  {
-    id: "admin-local-1",
-    email: "admin@visaflow.local",
-    displayName: "Ирина Лебедева",
-    organizationName: "VisaFlow Ops",
-    role: "admin",
-    status: "active",
-    createdAt: "2026-06-28T00:00:00.000Z",
-  },
-  {
-    id: "admin-demo-ops",
-    email: "ops@visaflow.demo",
-    displayName: "Операции",
-    organizationName: "VisaFlow Ops",
-    role: "admin",
-    status: "active",
-    createdAt: "2026-06-28T00:00:00.000Z",
-  },
-  {
-    id: "agent-local-1",
-    email: "agent@visaflow.local",
-    displayName: "Татьяна Новикова",
-    organizationName: "Visa Center Spb",
-    role: "agent",
-    status: "active",
-    createdAt: "2026-06-28T00:00:00.000Z",
-  },
+  approvedSeed(
+    "admin-local-1",
+    "admin@visaflow.local",
+    "admin",
+    "Local Admin",
+    "VisaFlow Ops",
+    "Москва",
+    "+7 000 000-00-00",
+  ),
+  approvedSeed(
+    "admin-demo-ops",
+    "ops@visaflow.demo",
+    "admin",
+    "Операции",
+    "VisaFlow Ops",
+    "Москва",
+    "+7 000 000-00-01",
+  ),
+  approvedSeed(
+    "agent-local-1",
+    "agent@visaflow.local",
+    "agent",
+    "Татьяна Николаева",
+    "Visa Center Spb",
+    "Санкт-Петербург",
+    "+7 000 000-00-02",
+    seededAgentOwnerId,
+  ),
 ];
 
 export class AuthAccessError extends Error {
   constructor(
     readonly code:
       | "INVALID_EMAIL"
+      | "INVALID_REGISTRATION"
+      | "INVALID_PASSWORD"
       | "ACCESS_PENDING"
       | "ACCESS_REJECTED"
       | "ACCESS_NOT_FOUND"
       | "USER_DISABLED"
-      | "ACCESS_REQUEST_INCOMPLETE"
       | "ADMIN_REQUIRED"
       | "REQUEST_NOT_FOUND"
       | "REQUEST_NOT_PENDING",
@@ -143,22 +196,22 @@ function assertValidEmail(email: string): string {
   return normalized;
 }
 
-function assertRequiredRequestText(value: string, message: string): string {
+function assertRequired(value: string, message: string): string {
   const normalized = value.trim();
-  if (!normalized) {
-    throw new AuthAccessError("ACCESS_REQUEST_INCOMPLETE", message);
-  }
+  if (!normalized) throw new AuthAccessError("INVALID_REGISTRATION", message);
   return normalized;
 }
 
-function normalizeAccessRequestInput(input: AccessRequestInput): AccessRequestInput {
+function normalizeAccessRequestInput(
+  input: AccessRequestRegistrationInput,
+): NormalizedAccessRequestInput {
   return {
+    fullName: assertRequired(input.fullName, "Введите имя и фамилию."),
+    companyName: assertRequired(input.companyName, "Введите название агентства."),
+    city: assertRequired(input.city, "Введите город."),
+    phone: assertRequired(input.phone, "Введите телефон."),
     email: assertValidEmail(input.email),
-    displayName: assertRequiredRequestText(input.displayName, "Введите имя."),
-    organizationName: assertRequiredRequestText(
-      input.organizationName,
-      "Введите организацию.",
-    ),
+    password: assertRequired(input.password, "Введите пароль."),
   };
 }
 
@@ -172,6 +225,48 @@ function createId(prefix: string): string {
   return `${prefix}-${random}`;
 }
 
+function createLocalDevPasswordVerifier(email: string, password: string): string {
+  const source = `${normalizeAuthEmail(email)}\u001f${password}`;
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `local-dev-v1:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function assertPasswordMatches(user: User, password: string): void {
+  const normalizedPassword = password.trim();
+  if (!normalizedPassword) {
+    throw new AuthAccessError("INVALID_PASSWORD", "Введите пароль.");
+  }
+
+  const expectedVerifier = user.localDevPasswordVerifier;
+  if (!expectedVerifier) {
+    throw new AuthAccessError("INVALID_PASSWORD", "Пароль не настроен.");
+  }
+
+  const receivedVerifier = createLocalDevPasswordVerifier(user.email, normalizedPassword);
+  if (receivedVerifier !== expectedVerifier) {
+    throw new AuthAccessError("INVALID_PASSWORD", "Проверьте email и пароль.");
+  }
+}
+
+function sessionFromUser(user: User): Session {
+  return {
+    userId: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    companyName: user.companyName,
+    role: user.role,
+    status: user.status,
+    approvalStatus: user.approvalStatus,
+    ownerAgentId: user.ownerAgentId,
+    rejectionReason: user.rejectionReason,
+    createdAt: user.createdAt,
+  };
+}
+
 function defaultLocalDevState(): LocalDevAuthState {
   return {
     accessRequests: [],
@@ -180,129 +275,61 @@ function defaultLocalDevState(): LocalDevAuthState {
   };
 }
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function stringField(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function statusField(value: unknown): AccessRequestStatus | null {
-  return value === "pending" || value === "approved" || value === "rejected"
-    ? value
-    : null;
-}
-
-function userStatusField(value: unknown): UserStatus | null {
-  return value === "active" || value === "disabled" ? value : null;
-}
-
-function roleField(value: unknown): Role | null {
-  return value === "agent" || value === "admin" ? value : null;
-}
-
-function defaultDisplayNameForEmail(email: string): string {
-  return email.split("@")[0] || email;
-}
-
-function normalizeStoredAccessRequest(value: unknown): AccessRequest | null {
-  if (!isObjectRecord(value)) return null;
-
-  const id = stringField(value.id);
-  const emailValue = stringField(value.email);
-  const status = statusField(value.status);
-  const createdAt = stringField(value.createdAt);
-  if (!id || !emailValue || !status || !createdAt) return null;
-
-  const email = normalizeAuthEmail(emailValue);
-  if (!emailPattern.test(email)) return null;
-
-  return {
-    id,
-    email,
-    displayName: stringField(value.displayName) ?? defaultDisplayNameForEmail(email),
-    organizationName: stringField(value.organizationName) ?? "Не указана",
-    requestedRole: "agent",
-    status,
-    createdAt,
-    reviewedAt: stringField(value.reviewedAt) ?? undefined,
-    reviewedByAdminId: stringField(value.reviewedByAdminId) ?? undefined,
-    rejectionReason: stringField(value.rejectionReason) ?? undefined,
-  };
-}
-
-function normalizeStoredUser(value: unknown): User | null {
-  if (!isObjectRecord(value)) return null;
-
-  const id = stringField(value.id);
-  const emailValue = stringField(value.email);
-  const role = roleField(value.role);
-  const status = userStatusField(value.status);
-  const createdAt = stringField(value.createdAt);
-  if (!id || !emailValue || !role || !status || !createdAt) return null;
-
-  const email = normalizeAuthEmail(emailValue);
-  if (!emailPattern.test(email)) return null;
-
-  return {
-    id,
-    email,
-    displayName: stringField(value.displayName) ?? undefined,
-    organizationName: stringField(value.organizationName) ?? undefined,
-    role,
-    status,
-    createdAt,
-    approvedFromRequestId: stringField(value.approvedFromRequestId) ?? undefined,
-  };
-}
-
-function normalizeStoredSession(value: unknown): Session | null {
-  if (!isObjectRecord(value)) return null;
-
-  const userId = stringField(value.userId);
-  const emailValue = stringField(value.email);
-  const role = roleField(value.role);
-  const createdAt = stringField(value.createdAt);
-  if (!userId || !emailValue || !role || !createdAt) return null;
-
-  const email = normalizeAuthEmail(emailValue);
-  if (!emailPattern.test(email)) return null;
-
-  return {
-    userId,
-    email,
-    role,
-    createdAt,
-    expiresAt: stringField(value.expiresAt) ?? undefined,
-  };
-}
-
 function readLocalDevState(): LocalDevAuthState {
   try {
     const raw = localStorage.getItem(localDevAuthStorageKey);
     if (!raw) return defaultLocalDevState();
-    const parsed: unknown = JSON.parse(raw);
-    if (!isObjectRecord(parsed)) return defaultLocalDevState();
-    const storedUsers = Array.isArray(parsed.users)
-      ? parsed.users.map(normalizeStoredUser).filter((user) => user !== null)
+    const parsed = JSON.parse(raw) as Partial<LocalDevAuthState>;
+    const parsedUsers = Array.isArray(parsed.users)
+      ? parsed.users
+          .filter((user) => user?.id && user?.email)
+          .map((user): User => ({
+            ...user,
+            approvalStatus:
+              user.approvalStatus ??
+              (user.status === "pending"
+                ? "pending"
+                : user.status === "rejected"
+                  ? "rejected"
+                  : "approved"),
+            companyName: user.companyName ?? "VisaFlow",
+            fullName: user.fullName ?? user.email,
+            localDevPasswordVerifier:
+              user.localDevPasswordVerifier ??
+              createLocalDevPasswordVerifier(user.email, localDevSeedPassword),
+            role: user.role === "admin" ? "admin" : "agent",
+            status: user.status ?? "active",
+          }))
       : [];
     const users = [
       ...localDevApprovedUsers,
-      ...storedUsers.filter(
+      ...parsedUsers.filter(
         (user) =>
           !localDevApprovedUsers.some((approved) => approved.email === user.email),
       ),
     ];
+    const session =
+      parsed.session && typeof parsed.session.userId === "string"
+        ? (parsed.session as Session)
+        : null;
 
     return {
       accessRequests: Array.isArray(parsed.accessRequests)
         ? parsed.accessRequests
-            .map(normalizeStoredAccessRequest)
-            .filter((request) => request !== null)
+            .filter((request) => request?.id && request?.email)
+            .map((request) => ({
+              ...request,
+              city: request.city ?? "Москва",
+              companyName: request.companyName ?? "VisaFlow",
+              fullName: request.fullName ?? request.email,
+              phone: request.phone ?? "",
+              requestedRole: "agent",
+              status: request.status ?? "pending",
+              userId: request.userId ?? `pending-${request.email}`,
+            }))
         : [],
       users,
-      session: normalizeStoredSession(parsed.session),
+      session,
     };
   } catch {
     return defaultLocalDevState();
@@ -313,23 +340,74 @@ function writeLocalDevState(state: LocalDevAuthState): void {
   localStorage.setItem(localDevAuthStorageKey, JSON.stringify(state));
 }
 
+function refreshRepeatAccessRequest(
+  state: LocalDevAuthState,
+  request: AccessRequest,
+  normalized: NormalizedAccessRequestInput,
+): AccessRequest {
+  const refreshedRequest: AccessRequest = {
+    ...request,
+    city: normalized.city,
+    companyName: normalized.companyName,
+    email: normalized.email,
+    fullName: normalized.fullName,
+    phone: normalized.phone,
+    requestedRole: "agent",
+  };
+  const existingUser = state.users.find((user) => user.id === request.userId);
+  const refreshedUser: User = {
+    ...(existingUser ?? {
+      createdAt: request.createdAt,
+      id: request.userId,
+      role: "agent" as const,
+    }),
+    approvalStatus: refreshedRequest.status,
+    city: normalized.city,
+    companyName: normalized.companyName,
+    email: normalized.email,
+    fullName: normalized.fullName,
+    localDevPasswordVerifier: createLocalDevPasswordVerifier(
+      normalized.email,
+      normalized.password,
+    ),
+    ownerAgentId: undefined,
+    phone: normalized.phone,
+    role: "agent",
+    status: refreshedRequest.status === "rejected" ? "rejected" : "pending",
+    rejectionReason: refreshedRequest.rejectionReason,
+  };
+
+  state.accessRequests = state.accessRequests.map((candidate) =>
+    candidate.id === request.id ? refreshedRequest : candidate,
+  );
+  state.users = state.users.filter((candidate) => candidate.id !== refreshedUser.id);
+  state.users.push(refreshedUser);
+  state.session = sessionFromUser(refreshedUser);
+  writeLocalDevState(state);
+  return refreshedRequest;
+}
+
 export class LocalDevAuthRegistrationAdapter
   implements AuthRepository, AccessRequestRepository, UserRepository, SessionRepository
 {
   readonly adapterName = "local/dev";
 
-  async submitAccessRequest(input: AccessRequestInput): Promise<AccessRequest> {
+  async submitAccessRequest(
+    input: AccessRequestRegistrationInput,
+  ): Promise<AccessRequest> {
     const normalized = normalizeAccessRequestInput(input);
     const state = readLocalDevState();
     const existingUser = state.users.find((user) => user.email === normalized.email);
-    if (existingUser?.status === "active") {
+
+    if (existingUser?.status === "active" && existingUser.approvalStatus === "approved") {
       return {
         id: `approved-${existingUser.id}`,
+        userId: existingUser.id,
         email: normalized.email,
-        displayName:
-          existingUser.displayName ?? normalized.displayName,
-        organizationName:
-          existingUser.organizationName ?? normalized.organizationName,
+        fullName: existingUser.fullName,
+        companyName: existingUser.companyName,
+        city: existingUser.city,
+        phone: existingUser.phone,
         requestedRole: "agent",
         status: "approved",
         createdAt: existingUser.createdAt,
@@ -339,31 +417,60 @@ export class LocalDevAuthRegistrationAdapter
       };
     }
 
-    const existingRequest = state.accessRequests.find(
-      (request) => request.email === normalized.email,
-    );
-    if (existingRequest) return existingRequest;
+    const existingRequest = state.accessRequests
+      .filter((request) => request.email === normalized.email)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (existingRequest) {
+      if (
+        existingRequest.status === "pending" ||
+        existingRequest.status === "rejected"
+      ) {
+        return refreshRepeatAccessRequest(state, existingRequest, normalized);
+      }
+      return existingRequest;
+    }
 
+    const createdAt = nowIso();
+    const user: User = {
+      id: createId("agent-user"),
+      email: normalized.email,
+      fullName: normalized.fullName,
+      companyName: normalized.companyName,
+      city: normalized.city,
+      phone: normalized.phone,
+      role: "agent",
+      status: "pending",
+      approvalStatus: "pending",
+      createdAt,
+      localDevPasswordVerifier: createLocalDevPasswordVerifier(
+        normalized.email,
+        normalized.password,
+      ),
+    };
     const request: AccessRequest = {
       id: createId("access-request"),
+      userId: user.id,
       email: normalized.email,
-      displayName: normalized.displayName,
-      organizationName: normalized.organizationName,
+      fullName: normalized.fullName,
+      companyName: normalized.companyName,
+      city: normalized.city,
+      phone: normalized.phone,
       requestedRole: "agent",
       status: "pending",
-      createdAt: nowIso(),
+      createdAt,
     };
+
+    state.users.push(user);
     state.accessRequests.push(request);
+    state.session = sessionFromUser(user);
     writeLocalDevState(state);
     return request;
   }
 
   async listPendingAccessRequests(): Promise<AccessRequest[]> {
-    const pendingRequests = readLocalDevState().accessRequests.filter(
-      (request) => request.status === "pending",
-    );
-
-    return [...pendingRequests].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return readLocalDevState()
+      .accessRequests.filter((request) => request.status === "pending")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   async approveAccessRequest(id: string, adminId: string): Promise<User> {
@@ -383,26 +490,36 @@ export class LocalDevAuthRegistrationAdapter
     request.reviewedByAdminId = adminId;
     request.rejectionReason = undefined;
 
-    const existingUser = state.users.find((user) => user.email === request.email);
+    const existingUser = state.users.find((user) => user.id === request.userId);
     const user: User = existingUser
       ? {
           ...existingUser,
-          displayName: request.displayName,
-          organizationName: request.organizationName,
+          fullName: request.fullName,
+          companyName: request.companyName,
+          city: request.city,
+          phone: request.phone,
           role: "agent",
           status: "active",
+          approvalStatus: "approved",
+          ownerAgentId: existingUser.ownerAgentId ?? existingUser.id,
           approvedFromRequestId: request.id,
+          rejectionReason: undefined,
         }
       : {
-          id: createId("agent-user"),
+          id: request.userId,
           email: request.email,
-          displayName: request.displayName,
-          organizationName: request.organizationName,
+          fullName: request.fullName,
+          companyName: request.companyName,
+          city: request.city,
+          phone: request.phone,
           role: "agent",
           status: "active",
+          approvalStatus: "approved",
+          ownerAgentId: request.userId,
           createdAt: reviewedAt,
           approvedFromRequestId: request.id,
         };
+
     state.users = state.users.filter((candidate) => candidate.id !== user.id);
     state.users.push(user);
     writeLocalDevState(state);
@@ -424,10 +541,25 @@ export class LocalDevAuthRegistrationAdapter
       );
     }
 
+    const rejectionReason = reason?.trim() || undefined;
     request.status = "rejected";
     request.reviewedAt = nowIso();
     request.reviewedByAdminId = adminId;
-    request.rejectionReason = reason?.trim() || undefined;
+    request.rejectionReason = rejectionReason;
+
+    const existingUser = state.users.find((user) => user.id === request.userId);
+    if (existingUser) {
+      const rejectedUser: User = {
+        ...existingUser,
+        status: "rejected",
+        approvalStatus: "rejected",
+        ownerAgentId: undefined,
+        rejectionReason,
+      };
+      state.users = state.users.filter((candidate) => candidate.id !== rejectedUser.id);
+      state.users.push(rejectedUser);
+    }
+
     writeLocalDevState(state);
     return request;
   }
@@ -449,7 +581,7 @@ export class LocalDevAuthRegistrationAdapter
     return user;
   }
 
-  async loginApprovedUser(email: string): Promise<Session> {
+  async loginApprovedUser(email: string, password: string): Promise<Session> {
     const normalized = assertValidEmail(email);
     const state = readLocalDevState();
     const user = state.users.find((candidate) => candidate.email === normalized);
@@ -464,11 +596,16 @@ export class LocalDevAuthRegistrationAdapter
       if (latestRequest?.status === "pending") {
         throw new AuthAccessError(
           "ACCESS_PENDING",
-          "Заявка отправлена. Доступ появится после одобрения администратором.",
+          "Заявка отправлена. Доступ появится после подтверждения администратором.",
         );
       }
       if (latestRequest?.status === "rejected") {
-        throw new AuthAccessError("ACCESS_REJECTED", "Заявка отклонена.");
+        throw new AuthAccessError(
+          "ACCESS_REJECTED",
+          latestRequest.rejectionReason
+            ? `Заявка отклонена: ${latestRequest.rejectionReason}`
+            : "Заявка отклонена.",
+        );
       }
       throw new AuthAccessError(
         "ACCESS_NOT_FOUND",
@@ -476,12 +613,9 @@ export class LocalDevAuthRegistrationAdapter
       );
     }
 
-    const session: Session = {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      createdAt: nowIso(),
-    };
+    assertPasswordMatches(user, password);
+
+    const session = sessionFromUser(user);
     state.session = session;
     writeLocalDevState(state);
     return session;
@@ -513,12 +647,15 @@ export class LocalDevAuthRegistrationAdapter
     const session = state.session;
     if (!session) return null;
     const user = state.users.find((candidate) => candidate.id === session.userId);
-    if (!user || user.status !== "active") {
+    if (!user || user.status === "disabled") {
       state.session = null;
       writeLocalDevState(state);
       return null;
     }
-    return session;
+    const refreshedSession = sessionFromUser(user);
+    state.session = refreshedSession;
+    writeLocalDevState(state);
+    return refreshedSession;
   }
 
   async getCurrentSession(): Promise<Session | null> {
@@ -534,7 +671,12 @@ export class LocalDevAuthRegistrationAdapter
 
 function assertAdmin(state: LocalDevAuthState, adminId: string): void {
   const admin = state.users.find((user) => user.id === adminId);
-  if (!admin || admin.role !== "admin" || admin.status !== "active") {
+  if (
+    !admin ||
+    admin.role !== "admin" ||
+    admin.status !== "active" ||
+    admin.approvalStatus !== "approved"
+  ) {
     throw new AuthAccessError(
       "ADMIN_REQUIRED",
       "Только активный администратор может рассмотреть заявку.",

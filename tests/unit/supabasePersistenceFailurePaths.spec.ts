@@ -235,7 +235,7 @@ describe("Supabase persistence failure paths", () => {
     });
   });
 
-  test("recovers a confirmed sandbox auth user as an agent profile", async () => {
+  test("does not auto-create a missing Supabase profile during sign-in", async () => {
     const signInWithPassword = vi.fn(async () => ({
       data: {
         session: {
@@ -251,48 +251,163 @@ describe("Supabase persistence failure paths", () => {
       },
       error: null,
     }));
-    const upsert = vi.fn(() => ({
-      select: () => ({
-        single: async () => ({
-          data: {
-            id: "00000000-0000-4000-8000-000000000321",
-            email: "confirmed-agent@example.com",
-            display_name: "Confirmed Agent",
-            organization_name: "Confirmed Agency",
-            role: "agent",
-            created_at: "2026-06-28T00:00:00.000Z",
-          },
-          error: null,
-        }),
-      }),
-    }));
+    const upsert = vi.fn();
+    const signOut = vi.fn(async () => ({ error: null }));
     supabaseMock.client = {
-      auth: { signInWithPassword },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => ({ data: null, error: null }),
+      auth: { signInWithPassword, signOut },
+      from: (table: string) => {
+        if (table === "access_requests") {
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => ({ data: null, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
           }),
-        }),
-        upsert,
-      }),
+          upsert,
+        };
+      },
     };
 
     await expect(
       signInSupabaseWithPassword("confirmed-agent@example.com", "secret-password"),
-    ).resolves.toMatchObject({
-      mode: "supabase",
-      profile: {
-        email: "confirmed-agent@example.com",
-        role: "agent",
+    ).rejects.toThrow(
+      "Production profile repair requires owner-approved role assignment.",
+    );
+    expect(upsert).not.toHaveBeenCalled();
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  test("shows pending access request instead of repairing profile", async () => {
+    const signInWithPassword = vi.fn(async () => ({
+      data: {
+        session: {
+          user: {
+            id: "00000000-0000-4000-8000-000000000322",
+            email: "pending-agent@example.com",
+            user_metadata: {
+              display_name: "Pending Agent",
+              organization_name: "Pending Agency",
+            },
+          },
+        },
       },
-    });
-    expect(upsert).toHaveBeenCalledWith({
-      id: "00000000-0000-4000-8000-000000000321",
-      email: "confirmed-agent@example.com",
-      display_name: "Confirmed Agent",
-      organization_name: "Confirmed Agency",
-    });
+      error: null,
+    }));
+    const upsert = vi.fn();
+    const signOut = vi.fn(async () => ({ error: null }));
+    supabaseMock.client = {
+      auth: { signInWithPassword, signOut },
+      from: (table: string) => {
+        if (table === "access_requests") {
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => ({
+                      data: {
+                        status: "pending",
+                        rejection_reason: null,
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+          }),
+          upsert,
+        };
+      },
+    };
+
+    await expect(
+      signInSupabaseWithPassword("pending-agent@example.com", "secret-password"),
+    ).rejects.toThrow(
+      "Заявка отправлена. Доступ появится после подтверждения администратором.",
+    );
+    expect(upsert).not.toHaveBeenCalled();
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  test("clears rejected access request auth session after successful Supabase sign-in", async () => {
+    const signInWithPassword = vi.fn(async () => ({
+      data: {
+        session: {
+          user: {
+            id: "00000000-0000-4000-8000-000000000323",
+            email: "rejected-agent@example.com",
+            user_metadata: {
+              display_name: "Rejected Agent",
+              organization_name: "Rejected Agency",
+            },
+          },
+        },
+      },
+      error: null,
+    }));
+    const upsert = vi.fn();
+    const signOut = vi.fn(async () => ({ error: null }));
+    supabaseMock.client = {
+      auth: { signInWithPassword, signOut },
+      from: (table: string) => {
+        if (table === "access_requests") {
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => ({
+                      data: {
+                        status: "rejected",
+                        rejection_reason: "Нет договора",
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+          }),
+          upsert,
+        };
+      },
+    };
+
+    await expect(
+      signInSupabaseWithPassword("rejected-agent@example.com", "secret-password"),
+    ).rejects.toThrow("Заявка отклонена: Нет договора");
+    expect(upsert).not.toHaveBeenCalled();
+    expect(signOut).toHaveBeenCalledTimes(1);
   });
 
   test("does not auto-create a missing profile during production sign-in", async () => {
@@ -312,16 +427,33 @@ describe("Supabase persistence failure paths", () => {
       error: null,
     }));
     const upsert = vi.fn();
+    const signOut = vi.fn(async () => ({ error: null }));
     supabaseMock.client = {
-      auth: { signInWithPassword },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => ({ data: null, error: null }),
+      auth: { signInWithPassword, signOut },
+      from: (table: string) => {
+        if (table === "access_requests") {
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => ({ data: null, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
           }),
-        }),
-        upsert,
-      }),
+          upsert,
+        };
+      },
     };
 
     await expect(
@@ -330,6 +462,7 @@ describe("Supabase persistence failure paths", () => {
       "Production profile repair requires owner-approved role assignment.",
     );
     expect(upsert).not.toHaveBeenCalled();
+    expect(signOut).toHaveBeenCalledTimes(1);
   });
 
 });

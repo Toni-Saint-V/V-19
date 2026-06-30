@@ -203,6 +203,7 @@ describe("returned PDF operational handoff gate", () => {
     expect(ownerView.visible).toBe(true);
     expect(ownerView.applicantPdfs[0]?.fileName.startsWith("778194570_")).toBe(true);
     expect(ownerView.applicantPdfs[0]?.fileNames).toMatchObject({
+      appointment: expect.stringMatching(/^778194570_appointment_pdf_/),
       applicationFormPdf: expect.stringMatching(/^778194570_application_form_pdf_/),
       passportScan: expect.stringMatching(/^778194570_passport_scan_/),
       questionnaire: expect.stringMatching(/^778194570_questionnaire_/),
@@ -233,7 +234,7 @@ describe("returned PDF operational handoff gate", () => {
       )?.passportScan,
     ).toMatch(/^missing-passport_passport_scan_/);
     expect(buildAgentHandoffPackage(withoutPassport).blockers.join(" ")).toContain(
-      "Passport number is missing",
+      "Нет номера паспорта",
     );
   });
 });

@@ -25,7 +25,7 @@ test.describe("V-19 pilot mobile clicks", () => {
     await expectNoHorizontalOverflow(page, "mobile submissions");
 
     await page.getByRole("button", { name: "Новая подача" }).first().click();
-    await expect(drawer(page).getByText("Сборка документов")).toBeVisible();
+    await expect(drawer(page).getByText("Новая подача")).toBeVisible();
     await expect(drawer(page).getByRole("button", { name: "Сохранить черновик" })).toBeVisible();
     await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeVisible();
     await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeDisabled();
@@ -39,7 +39,7 @@ test.describe("V-19 pilot mobile clicks", () => {
     ).toBeVisible();
     await openDrawerTab(page, ["Обзор"]);
     await openDrawerTab(page, ["Анкета", "Данные"]);
-    await openDrawerTab(page, ["Файлы", "Документы", "Медиа"]);
+    await openDrawerTab(page, ["Файлы", "Селфи", "Паспорт"]);
     await openDrawerTab(page, ["Замечания"]);
     await openDrawerTab(page, ["История"]);
     await expectNoHorizontalOverflow(page, "mobile submission drawer tabs");

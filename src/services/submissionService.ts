@@ -159,10 +159,10 @@ function mediaStateFromRow(row: MediaAssetRow): MediaSlot["state"] {
 
 function mapMediaAssetRow(row: MediaAssetRow): MediaSlot {
   const labelByType: Record<MediaSlot["type"], string> = {
-    photo_white: "Фото на белом фоне",
-    selfie: "Селфи N1",
-    selfie_2: "Селфи N2",
-    passport_scan: "Загранпаспорт",
+    photo_white: "Фото",
+    selfie: "Селфи 1",
+    selfie_2: "Селфи 2",
+    passport_scan: "Скан паспорта",
     video: "Видео",
   };
 
@@ -189,7 +189,7 @@ function mapCorrectionRow(row: CorrectionRow): CorrectionNote {
     id: row.id,
     target:
       row.scope === "media"
-        ? (row.media_type ?? "Медиа")
+        ? (row.media_type ?? "Файлы")
         : row.scope === "field"
           ? (row.field_key ?? "Поле")
           : row.scope === "applicant"
