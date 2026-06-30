@@ -1,0 +1,128 @@
+{
+  "generatedAt": "2026-06-29T23:55:32.116Z",
+  "url": "http://127.0.0.1:5180/",
+  "browser": "Playwright cached chromium_headless_shell-1223",
+  "totals": {
+    "pass": 10,
+    "fail": 0,
+    "skip": 0
+  },
+  "results": [
+    {
+      "name": "admin review renders",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-review.png",
+      "h1": "Проверка",
+      "horizontalOverflow": false,
+      "frameworkOverlay": false
+    },
+    {
+      "name": "admin review drawer tabs",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-review-drawer.png",
+      "tabs": [
+        "Паспорт",
+        "Селфи",
+        "Анкета",
+        "Замечания"
+      ]
+    },
+    {
+      "name": "admin export generate download mark",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-export-marked.png",
+      "filename": "visaflow-export-0mwe8ei.xlsx"
+    },
+    {
+      "name": "admin settings renders",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-settings.png",
+      "h1": "Настройки",
+      "horizontalOverflow": false,
+      "frameworkOverlay": false
+    },
+    {
+      "name": "agent actions renders",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-actions.png",
+      "h1": "Мои действия",
+      "horizontalOverflow": false,
+      "frameworkOverlay": false
+    },
+    {
+      "name": "agent submissions drawer tabs",
+      "status": "PASS",
+      "screenshots": [
+        "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-submissions.png",
+        "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-submission-drawer.png"
+      ],
+      "tabs": [
+        "Анкета",
+        "Файлы",
+        "Замечания"
+      ]
+    },
+    {
+      "name": "agent settings and create family",
+      "status": "PASS",
+      "screenshots": [
+        "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-settings.png",
+        "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-create-family.png"
+      ]
+    },
+    {
+      "name": "mobile admin export renders",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-mobile-admin-export.png",
+      "h1": "Выгрузка",
+      "horizontalOverflow": false,
+      "frameworkOverlay": false
+    },
+    {
+      "name": "mobile agent actions renders",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-mobile-agent-actions.png",
+      "h1": "Мои действия",
+      "horizontalOverflow": false,
+      "frameworkOverlay": false
+    },
+    {
+      "name": "mobile agent submissions renders",
+      "status": "PASS",
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-mobile-agent-submissions.png",
+      "h1": "Мои подачи",
+      "horizontalOverflow": false,
+      "frameworkOverlay": false
+    }
+  ],
+  "consoleAndPageErrors": [],
+  "failedRequests": [],
+  "ignoredRequests": [
+    {
+      "url": "http://127.0.0.1:5180/src/styles.deferred-b.css?t=1782777290208",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:5180/src/styles.deferred-b.css?t=1782777290208",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:5180/src/styles.deferred-b.css?t=1782777290208",
+      "failure": "net::ERR_ABORTED"
+    }
+  ],
+  "screenshots": [
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-review.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-review-drawer.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-export-marked.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-admin-settings.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-actions.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-submissions.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-submission-drawer.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-settings.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-agent-create-family.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-mobile-admin-export.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-mobile-agent-actions.png",
+    "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/full-sections-qa-20260630/final2-mobile-agent-submissions.png"
+  ]
+}

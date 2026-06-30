@@ -1210,6 +1210,55 @@
   }
 }
 
+@media (min-width: 1024px) and (max-height: 820px) {
+  .create-submission-drawer.is-passport-step > .flex-1 {
+    padding-top: 22px !important;
+    padding-bottom: 22px !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    > .flex-1
+    .max-w-\[1140px\]
+    > .grid.grid-cols-1 {
+    gap: 32px !important;
+    min-height: 100% !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    > .flex-1
+    .max-w-\[1140px\]
+    > .grid.grid-cols-1
+    > div:first-child {
+    gap: 16px !important;
+    min-height: 0;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Тип подачи"] {
+    padding: 12px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] {
+    min-height: 300px !important;
+    padding: 24px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] .w-14 {
+    width: 52px !important;
+    height: 52px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] p {
+    margin-bottom: 22px !important;
+  }
+
+  .create-submission-drawer.is-passport-step > footer {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+}
+
 @media (max-width: 760px) {
   .create-submission-drawer.is-passport-step > header,
   .create-submission-drawer.is-passport-step > footer {

@@ -1,0 +1,160 @@
+{
+  "startedAt": "2026-06-29T14:55:38.367Z",
+  "appUrl": "http://127.0.0.1:4197/",
+  "viewports": [
+    {
+      "label": "admin-review-desktop-1440",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "offscreenControls": []
+    },
+    {
+      "label": "admin-review-drawer-desktop-1440",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "offscreenControls": []
+    },
+    {
+      "label": "admin-export-desktop-1440",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "offscreenControls": []
+    },
+    {
+      "label": "admin-review-mobile-390",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "bodyScrollWidth": 390,
+      "offscreenControls": []
+    },
+    {
+      "label": "admin-review-drawer-mobile-390",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "bodyScrollWidth": 390,
+      "offscreenControls": []
+    },
+    {
+      "label": "admin-export-mobile-390",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "bodyScrollWidth": 390,
+      "offscreenControls": []
+    },
+    {
+      "label": "admin-export-selected-mobile-390",
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "bodyScrollWidth": 390,
+      "offscreenControls": []
+    }
+  ],
+  "checks": [
+    {
+      "status": "pass",
+      "name": "Overflow admin-review-desktop-1440",
+      "detail": "document 1440/1440, body 1440"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop review navigation/tabs/search/toggles",
+      "detail": "Review nav, chips, search, list/columns ok"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop review drawer route and tabs",
+      "detail": "Проверить opens Admin Review Drawer"
+    },
+    {
+      "status": "pass",
+      "name": "Overflow admin-review-drawer-desktop-1440",
+      "detail": "document 1440/1440, body 1440"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop manual passport/selfie/questionnaire/remarks checks",
+      "detail": "Manual check controls and remark form ok"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop drawer close/Escape and package button",
+      "detail": "Escape close and package route ok"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop return with issue",
+      "detail": "Created issue and returned to agent"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop accept fixed corrections",
+      "detail": "Fixed issue accepted"
+    },
+    {
+      "status": "pass",
+      "name": "Overflow admin-export-desktop-1440",
+      "detail": "document 1440/1440, body 1440"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop export family-first/filter/search/tabs",
+      "detail": "Семья ВолковыхSUB-1102Смотреть пакетМосква09-16 сен 20263Готово15.06Смотреть пакет | Ольга ФроловаSUB-1101Смотреть пакетМосква09-16 сен 20261Готово15.06Смотреть пакет | Никита МорозовSUB-1103Смотреть пакетСанкт-Петербург09-16 сен 20261Готово15.06Смотреть пакет | Дмитрий ОрловПД-1056Смотреть пакетМосква06-12 сен 20261Готово15.06Смотреть пакет"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop export selected compatible package",
+      "detail": "Generate clicked for compatible family selection; download/mark clicked when enabled"
+    },
+    {
+      "status": "pass",
+      "name": "Desktop export empty state",
+      "detail": "Impossible search shows empty/no package state"
+    },
+    {
+      "status": "pass",
+      "name": "Overflow admin-review-mobile-390",
+      "detail": "document 390/390, body 390"
+    },
+    {
+      "status": "pass",
+      "name": "Mobile review controls and drawer",
+      "detail": "Mobile review controls and drawer tabs ok"
+    },
+    {
+      "status": "pass",
+      "name": "Overflow admin-review-drawer-mobile-390",
+      "detail": "document 390/390, body 390"
+    },
+    {
+      "status": "pass",
+      "name": "Overflow admin-export-mobile-390",
+      "detail": "document 390/390, body 390"
+    },
+    {
+      "status": "pass",
+      "name": "Overflow admin-export-selected-mobile-390",
+      "detail": "document 390/390, body 390"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "fail",
+      "name": "Desktop export row stays in export context",
+      "detail": "Missing export context text: Выбрано: 2"
+    },
+    {
+      "severity": "fail",
+      "name": "Mobile export filters and selection",
+      "detail": "Mobile selected count missing"
+    }
+  ],
+  "console": [],
+  "pageErrors": [],
+  "downloads": [
+    "docs/qa/admin-flow-deep-qa-20260629/visaflow-export-0fytdrz.xlsx"
+  ],
+  "finishedAt": "2026-06-29T14:55:52.799Z"
+}

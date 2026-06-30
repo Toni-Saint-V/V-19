@@ -596,15 +596,15 @@
 
 .admin-review-primary {
   border-color: var(--vf-accent-active, #5964d6);
-  background: var(--vf-accent, #6874e8);
+  background: var(--vf-accent-active, #5964d6);
   color: #fff;
   font-size: 13px;
 }
 
 .admin-review-primary.is-return {
-  border-color: var(--vf-red-soft-border, rgb(255 92 103 / 0.48));
-  background: var(--vf-red-soft-bg, rgb(255 92 103 / 0.13));
-  color: var(--vf-red-soft-text, #ff8a92);
+  border-color: var(--vf-red, #ff5c67);
+  background: var(--vf-red, #ff5c67);
+  color: var(--vf-red-fg, #18080a);
 }
 
 .admin-review-primary:disabled,

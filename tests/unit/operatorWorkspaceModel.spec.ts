@@ -23,9 +23,9 @@ describe("operator workspace model", () => {
 
   test("keeps passport and second selfie labels explicit", () => {
     expect(activeMediaFileTypes).toEqual(["passport_scan", "selfie", "selfie_2"]);
-    expect(fileLabel("passport_scan")).toBe("Загранпаспорт");
-    expect(fileLabel("selfie")).toBe("Селфи");
-    expect(fileLabel("selfie_2")).toBe("Селфи N2");
+    expect(fileLabel("passport_scan")).toBe("Скан паспорта");
+    expect(fileLabel("selfie")).toBe("Селфи 1");
+    expect(fileLabel("selfie_2")).toBe("Селфи 2");
   });
 
   test("opens section navigation on the applicant that actually has work", () => {

@@ -70,8 +70,92 @@ describe("Supabase security contract", () => {
     const authService = readProjectFile("src/services/authService.ts");
 
     expect(authService).toContain("client.auth.signInWithPassword");
+    expect(authService).toContain("Production profile repair requires owner-approved role assignment");
+    expect(authService).not.toContain("allowMissingProfileRecovery");
+    expect(authService).not.toContain("upsertProfile");
     expect(authService).not.toContain("client.auth.signUp");
     expect(authService).not.toContain(".signUp(");
+  });
+
+  test("keeps access requests admin-approved with requester-only status reads", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260629193805_v19_access_requests_admin_pdfs.sql",
+    );
+    const authService = readProjectFile("src/services/authService.ts");
+    const supabaseRegistration = readProjectFile(
+      "src/shared/supabaseAuthRegistration.ts",
+    );
+    const accessRequestFunction = readProjectFile(
+      "supabase/functions/access-request/index.ts",
+    );
+
+    expect(migration).toContain("create table public.access_requests");
+    expect(migration).toContain("alter table public.access_requests enable row level security");
+    expect(migration).toContain('create policy "access requests admin read"');
+    expect(migration).toContain('create policy "access requests requester read own"');
+    expect(migration).toContain("using (user_id = (select auth.uid()))");
+    expect(migration).toContain("requested_role public.profile_role not null default 'agent'");
+    expect(migration).toContain("check (requested_role = 'agent')");
+    expect(migration).toContain("where status = 'pending'");
+    expect(migration).toContain("revoke all on public.access_requests from anon, authenticated");
+    expect(migration).toContain("grant select on public.access_requests to authenticated");
+    expect(authService).toContain(".from(\"access_requests\")");
+    expect(authService).toContain("Заявка отправлена");
+    expect(authService).toContain("Заявка отклонена");
+    expect(accessRequestFunction).toContain('action === "approve"');
+    expect(accessRequestFunction).toContain("publicAccessRequestResponse");
+    expect(accessRequestFunction).toContain("resubmittedRequest");
+    expect(accessRequestFunction).toContain('.eq("status", "rejected")');
+    expect(accessRequestFunction).toContain("rejection_reason: null");
+    expect(accessRequestFunction).toContain("reviewed_at: null");
+    expect(accessRequestFunction).toContain("reviewed_by_admin_id: null");
+    expect(accessRequestFunction).toContain("inviteUserByEmail");
+    expect(accessRequestFunction).toContain("role: \"agent\"");
+    expect(accessRequestFunction).toContain("requireAdminProfile");
+    expect(accessRequestFunction).not.toContain("email_confirm: true");
+    expect(accessRequestFunction).not.toContain("updateUserById");
+    expect(accessRequestFunction).not.toContain("password:");
+    expect(accessRequestFunction).not.toContain("display_name,organization_name,role");
+    expect(supabaseRegistration).not.toContain("...input");
+    expect(supabaseRegistration).not.toContain("password:");
+  });
+
+  test("keeps admin PDFs private, slot-limited, and linked before agent reads", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260629193805_v19_access_requests_admin_pdfs.sql",
+    );
+    const storagePolicy = readProjectFile("src/modules/submissions/mediaStoragePolicy.ts");
+    const adminPdfService = readProjectFile(
+      "src/modules/submissions/adminPdfArtifacts.ts",
+    );
+
+    expect(migration).toContain("create table public.admin_pdf_artifacts");
+    expect(migration).toContain(
+      "alter table public.admin_pdf_artifacts enable row level security",
+    );
+    expect(migration).toContain(
+      "check (artifact_kind in ('appointment_pdf', 'application_pdf'))",
+    );
+    expect(migration).toContain("storage_bucket = 'submission-media'");
+    expect(migration).toContain("position('/' in file_name) = 0");
+    expect(migration).toContain("position(chr(92) in file_name) = 0");
+    expect(migration).toContain("file_name !~ '[[:cntrl:]]'");
+    expect(migration).toContain(
+      "create unique index admin_pdf_artifacts_slot_uidx",
+    );
+    expect(migration).toContain('create policy "admin pdf artifacts read owner or admin"');
+    expect(migration).toContain('create policy "admin pdf artifacts admin insert"');
+    expect(migration).toContain('create policy "admin pdf artifacts admin update"');
+    expect(migration).toContain('create policy "admin pdf artifacts admin delete"');
+    expect(migration).toContain("from public.admin_pdf_artifacts a");
+    expect(migration).toContain("and a.storage_path = name");
+    expect(migration).toContain("split_part(name, '/', 3) in ('appointment_pdf', 'application_pdf')");
+    expect(storagePolicy).toContain("\"application_pdf\"");
+    expect(storagePolicy).toContain("buildApplicationPdfStorageTarget");
+    expect(adminPdfService).toContain("uploadAdminPdfArtifact");
+    expect(adminPdfService).toContain("deleteMediaFromStorage(target)");
+    expect(adminPdfService).toContain("crypto.subtle.digest");
+    expect(adminPdfService).toContain("onConflict: \"submission_id,artifact_kind\"");
   });
 
   test("blocks agent-owned writes from changing operator review and handoff state", () => {

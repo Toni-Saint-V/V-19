@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { buildMediaSlot } from "../../src/lib/workflow";
 import {
   buildAppointmentPdfStorageTarget,
+  buildApplicationPdfStorageTarget,
   buildMediaStoragePath,
   buildVisaApplicationPdfStorageTarget,
   createMediaSignedUrl,
@@ -10,6 +11,7 @@ import {
   storageTargetForSlot,
   uploadMediaToStorage,
   validateAppointmentPdfStorageTarget,
+  validateApplicationPdfStorageTarget,
   validateMediaStorageTarget,
   validateVisaApplicationPdfStorageTarget,
 } from "../../src/services/storageService";
@@ -138,6 +140,37 @@ describe("media storage contract", () => {
     ).not.toThrow();
     expect(() =>
       validateAppointmentPdfStorageTarget({
+        sha256,
+        submissionId: "VF-9999",
+        target,
+      }),
+    ).toThrow(/current submission/);
+  });
+
+  test("scopes admin application PDFs to one submission and checksum", () => {
+    const sha256 = "d".repeat(64);
+    const target = buildApplicationPdfStorageTarget({
+      nonce: "2026-06-29T10:11:12.000Z",
+      sha256,
+      submissionId: "VF-1044",
+    });
+
+    expect(target).toEqual({
+      bucket: mediaStorageBucket,
+      path: "VF-1044/common/application_pdf/dddddddddddddddd_20260629T101112000Z_application_pdf.pdf",
+    });
+    expect(() =>
+      validateApplicationPdfStorageTarget({
+        file: new File(["%PDF"], "application.pdf", {
+          type: "application/pdf",
+        }),
+        sha256,
+        submissionId: "VF-1044",
+        target,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateApplicationPdfStorageTarget({
         sha256,
         submissionId: "VF-9999",
         target,

@@ -1,0 +1,63 @@
+{
+  "rows": [
+    {
+      "i": 0,
+      "text": "Паспорт",
+      "role": "tab",
+      "selected": "false",
+      "selectedAfterClick": "true",
+      "path": "docs/qa/all-screens-auto2-20260629/46-admin-tab-index-0-Паспорт.png"
+    },
+    {
+      "i": 1,
+      "text": "Селфи",
+      "role": "tab",
+      "selected": "false",
+      "selectedAfterClick": "true",
+      "path": "docs/qa/all-screens-auto2-20260629/46-admin-tab-index-1-Селфи.png"
+    },
+    {
+      "i": 2,
+      "text": "Анкета102",
+      "role": "tab",
+      "selected": "false",
+      "selectedAfterClick": "true",
+      "path": "docs/qa/all-screens-auto2-20260629/46-admin-tab-index-2-Анкета102.png"
+    },
+    {
+      "i": 3,
+      "text": "Замечания0",
+      "role": "tab",
+      "selected": "true",
+      "selectedAfterClick": "true",
+      "path": "docs/qa/all-screens-auto2-20260629/46-admin-tab-index-3-Замечания0.png"
+    }
+  ],
+  "blocking": [],
+  "logs": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold"
+    }
+  ]
+}

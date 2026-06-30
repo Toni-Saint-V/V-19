@@ -475,7 +475,7 @@ export function CreateSubmissionDrawer({
           >
             Сборка документов
           </h1>
-          <span className="px-2 py-0.5 rounded-[4px] bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider text-white/40 font-mono">
+          <span className="px-2 py-0.5 rounded-[4px] bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider text-white/60 font-mono">
             Шаг&nbsp; {createStep === "passport" ? "1" : "2"}/2
           </span>
         </div>
@@ -522,7 +522,7 @@ export function CreateSubmissionDrawer({
                 >
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-medium">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
                         Заявитель / Семья
                       </p>
                       <h3 className="text-[13px] text-white/80 font-medium mt-1">
@@ -565,7 +565,7 @@ export function CreateSubmissionDrawer({
                   >
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <div>
-                        <p className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-medium">
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
                           Семья
                         </p>
                         <h3 className="text-[13px] text-white/80 font-medium mt-1">
@@ -604,7 +604,7 @@ export function CreateSubmissionDrawer({
                             <strong className="block truncate text-[13px] text-white/78 font-medium">
                               {applicantLabel(index, type)}
                             </strong>
-                            <em className="block truncate text-[11px] not-italic text-white/35 mt-0.5">
+                            <em className="block truncate text-[11px] not-italic text-white/60 mt-0.5">
                               {upload?.fileName ?? "Паспорт не загружен"}
                             </em>
                             <span className="mt-1 block truncate text-[10px] text-white/38">
@@ -684,7 +684,7 @@ export function CreateSubmissionDrawer({
                   >
                     Перетащите файлы
                   </h3>
-                  <p className="text-[12px] text-white/30 max-w-[240px] mb-8 font-light relative z-10 leading-relaxed">
+                  <p className="text-[12px] text-white/60 max-w-[240px] mb-8 font-light relative z-10 leading-relaxed">
                     JPEG, PNG.
                     <br />
                     Разворот загранпаспорта с MRZ.
@@ -711,7 +711,7 @@ export function CreateSubmissionDrawer({
                 >
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-medium">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
                         {type === "family" ? "Семья" : "Заявитель"}
                       </p>
                       <h3 className="text-[13px] text-white/80 font-medium mt-1">
@@ -753,7 +753,7 @@ export function CreateSubmissionDrawer({
                             <strong className="block truncate text-[13px] text-white/78 font-medium">
                               {applicantLabel(index, type)}
                             </strong>
-                            <em className="block truncate text-[11px] not-italic text-white/35 mt-0.5">
+                            <em className="block truncate text-[11px] not-italic text-white/60 mt-0.5">
                               {upload?.fileName ?? "Паспорт не загружен"}
                             </em>
                             <small className="mt-1 block truncate text-[10px] text-white/38">
@@ -812,7 +812,7 @@ export function CreateSubmissionDrawer({
                 </section>
 
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-[13px] uppercase tracking-widest font-medium text-white/40">
+                  <h3 className="text-[13px] uppercase tracking-widest font-medium text-white/60">
                     Очередь обработки
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-white/50">
@@ -901,7 +901,7 @@ export function CreateSubmissionDrawer({
                       <div className="w-10 h-10 rounded-full bg-[#161617] border border-[#202124] flex items-center justify-center mb-3">
                         <Search className="w-4 h-4 text-white/20" />
                       </div>
-                      <p className="text-[12px] text-white/30 font-light">
+                      <p className="text-[12px] text-white/60 font-light">
                         Локальная очередь пуста.
                       </p>
                     </div>
@@ -997,7 +997,7 @@ export function CreateSubmissionDrawer({
 
       {createStep === "passport" ? (
         <footer className="shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-[12px] text-white/40">
+          <span className="text-[12px] text-white/60">
             {type === "family" ? `${applicantCount} заявителя. ` : ""}
             {passportReadinessSummary}
           </span>
@@ -1032,7 +1032,7 @@ export function CreateSubmissionDrawer({
 
       {createStep === "questionnaire" ? (
         <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/90 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-[12px] text-white/40">
+          <span className="text-[12px] text-white/60">
             Создайте черновик, чтобы загрузить обязательные файлы.
           </span>
           <div className="flex gap-3">

@@ -551,7 +551,10 @@ export function addPreciseAdminIssue(
   const comment = input.comment.trim();
   if (!reason || !comment) return submission;
 
-  const issueInput = input;
+  const hasExplicitIssueTarget = Boolean(input.fileType || input.field);
+  const issueInput = hasExplicitIssueTarget
+    ? input
+    : { ...input, field: "Маршрут поездки" };
   const applicant =
     submission.applicants.find((item) => item.id === issueInput.applicantId) ??
     firstApplicant;
@@ -572,7 +575,7 @@ export function addPreciseAdminIssue(
     status: "open",
     createdBy: "admin",
     createdAt: "сейчас",
-    snapshot: issueSnapshot(submission, issueInput),
+    snapshot: hasExplicitIssueTarget ? issueSnapshot(submission, issueInput) : undefined,
   };
 
   const withTargetFlag =
@@ -892,12 +895,12 @@ function applicantFileStatus(files: SubmissionFile[]) {
 }
 
 function fileTypeName(type: SubmissionFile["type"]) {
-  if (type === "photo") return "Архивное фото";
-  if (type === "photo_white") return "Архивное фото";
-  if (type === "selfie") return "Селфи";
-  if (type === "selfie_2") return "Селфи N2";
-  if (type === "passport_scan") return "Загранпаспорт";
-  return "Архивное видео";
+  if (type === "photo") return "Фото";
+  if (type === "photo_white") return "Фото";
+  if (type === "selfie") return "Селфи 1";
+  if (type === "selfie_2") return "Селфи 2";
+  if (type === "passport_scan") return "Скан паспорта";
+  return "Видео";
 }
 
 function canonicalRuntimeIssues(issues: Submission["issues"]): Submission["issues"] {

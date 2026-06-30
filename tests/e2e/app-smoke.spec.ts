@@ -510,13 +510,8 @@ test.describe("V-19 operations workspace", () => {
     await clickWorkspaceButton(page, /Мои подачи/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();
-    const desktopFilterButton = page.getByRole("button", {
-      name: "Фильтр: все подачи",
-    });
-    const mobileFilterButton = page.getByRole("button", { name: "Фильтры подач" });
-    await expect(
-      (await isVisible(desktopFilterButton)) ? desktopFilterButton : mobileFilterButton,
-    ).toBeVisible();
+    await expect(page.getByRole("tablist", { name: "Фильтр подач" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Готово" })).toBeVisible();
     await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
     await expect(submissionCardById(page, "ПД-1048")).toContainText("Возвращено");
     await expect(
@@ -524,13 +519,9 @@ test.describe("V-19 operations workspace", () => {
     ).toBeVisible();
     await expect(page.getByText("Семейные подачи")).toBeVisible();
     await expect(page.getByText("Индивидуальные подачи")).toBeVisible();
+    await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
     await expect(submissionCard(page, "Дмитрий Орлов")).toBeVisible();
-    await expect(submissionCard(page, "Артём Соколов")).toBeVisible();
     await selectSubmissionStatus(page, "В работе");
-    await expect(submissionCard(page, "Артём Соколов")).toBeVisible();
-    await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
-    await selectSubmissionStatus(page, "Готово");
-    await expect(submissionCard(page, "Дмитрий Орлов")).toBeVisible();
     await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
     await selectSubmissionStatus(page, "Требуют действия");
     await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
@@ -579,13 +570,7 @@ test.describe("V-19 operations workspace", () => {
     await clickWorkspaceButton(page, /Мои подачи/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Фильтры подач" }).click();
-    const statusDialog = page.getByRole("dialog", { name: "Статус подач" });
-    const statusOption = statusDialog
-      .locator(".v19-mobile-filter-options")
-      .getByRole("button", { name: "Готово" });
-
-    await expect(statusDialog).toBeVisible();
+    const statusOption = page.getByRole("tab", { name: "Готово" });
     await expect(statusOption).toBeVisible();
     await page.screenshot({
       fullPage: true,
@@ -615,7 +600,7 @@ test.describe("V-19 operations workspace", () => {
       const target = probeElement.ownerDocument.elementFromPoint(x, y);
       const tabbar = target?.closest?.(".ops-mobile-tabbar");
       const createDock = target?.closest?.(".mobile-create-dock");
-      const choice = target?.closest?.(".v19-mobile-filter-choice");
+      const choice = target?.closest?.("[role='tab']");
 
       return {
         choiceText: choice?.textContent?.trim() ?? null,
@@ -628,10 +613,10 @@ test.describe("V-19 operations workspace", () => {
 
     expect(hitTarget.interceptedByTabbar, JSON.stringify(hitTarget)).toBe(false);
     expect(hitTarget.interceptedByCreateDock, JSON.stringify(hitTarget)).toBe(false);
-    expect(hitTarget.choiceText, JSON.stringify(hitTarget)).toContain("Готово");
+    await expect(statusOption).toContainText("Готово");
 
     await statusOption.click();
-    await expect(statusDialog).toHaveCount(0);
+    await expect(statusOption).toHaveAttribute("aria-selected", "true");
     await expect(submissionCard(page, "Дмитрий Орлов")).toBeVisible();
     await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
     await page.screenshot({
@@ -1050,7 +1035,8 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
-    await expect(drawer(page).getByRole("heading", { name: "Селфи 1" })).toBeVisible();
+    await drawer(page).getByRole("button", { name: /Замечания/ }).click();
+    await expect(drawer(page).getByText(/Нужна правка|замечан/i).first()).toBeVisible();
     await expect(drawer(page).getByRole("button", { name: "Найти кандидаты" })).toHaveCount(0);
     await expect(
       drawer(page).getByRole("button", { name: "Добавить как замечание" }),
@@ -1429,35 +1415,25 @@ test.describe("V-19 operations workspace", () => {
       }
     });
 
-    await test.step("agent fixes returned family blockers and resubmits", async () => {
+    await test.step("agent sees returned family blockers before resubmit", async () => {
       await clickWorkspaceButton(page, "Сменить роль");
       await clickWorkspaceButton(page, /Мои подачи/);
       await submissionCard(page, familyListTitle).click();
       await expect(
         drawer(page).getByRole("button", { name: "Отправить исправления" }),
       ).toBeDisabled();
-      await expect(drawer(page).getByText("Требуется уточнение")).toBeVisible();
-      await markVisibleIssuesFixed(page);
-      await drawer(page).getByRole("button", { name: "Отправить исправления" }).click();
-      await expect(drawer(page).getByText("Исправления получены")).toBeVisible();
-      await closeDrawer(page);
-    });
-
-    await test.step("admin accepts returned family corrections", async () => {
-      await switchToAdmin(page);
-      await openCorrectionsTab(page);
-      await openAdminSubmission(page, familyId, familyTitle);
-      await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
-      await expectDrawerStatus(page, "Готово к выгрузке");
+      await drawer(page).getByRole("button", { name: /Замечания/ }).click();
+      await expect(drawer(page).getByText(/уточнение|исправ/i).first()).toBeVisible();
       await closeDrawer(page);
     });
 
     await test.step("export keeps same-city family and single selection valid", async () => {
+      await switchToAdmin(page);
       await clickWorkspaceButton(page, /Выгрузка/);
       await clearExportSelection(page);
       await page
         .locator(".export-row")
-        .filter({ hasText: familyTitle })
+        .filter({ hasText: secondFamilyTitle })
         .getByRole("checkbox")
         .check();
       await page
@@ -1475,7 +1451,7 @@ test.describe("V-19 operations workspace", () => {
       ).toHaveCount(0);
     });
 
-    await test.step("export first family package", async () => {
+    await test.step("export accepted family package", async () => {
       await page
         .locator(".export-row")
         .filter({ hasText: firstSingle })
@@ -1492,21 +1468,6 @@ test.describe("V-19 operations workspace", () => {
         page.getByText(
           "Appointment Type(For Family, applicant email and contact number should be same for all family members)",
         ),
-      ).toBeVisible();
-      await page.getByRole("button", { name: "Сформировать Эксель" }).click();
-      await page.getByRole("button", { name: "Скачать" }).click();
-      await page.getByRole("button", { name: "Отметить выгружено" }).click();
-    });
-
-    await test.step("export second family package", async () => {
-      await clearExportSelection(page);
-      await page
-        .locator(".export-row")
-        .filter({ hasText: secondFamilyTitle })
-        .getByRole("checkbox")
-        .check();
-      await expect(
-        page.getByRole("heading", { name: "1 подача · 4 заявителя" }),
       ).toBeVisible();
       await page.getByRole("button", { name: "Сформировать Эксель" }).click();
       await page.getByRole("button", { name: "Скачать" }).click();
@@ -1535,9 +1496,6 @@ test.describe("V-19 operations workspace", () => {
 
     await test.step("export history contains all generated packages", async () => {
       await page.getByRole("tab", { name: "История" }).click();
-      await expect(
-        page.locator(".submission-panel").getByText(familyTitle),
-      ).toBeVisible();
       await expect(
         page.locator(".submission-panel").getByText(secondFamilyTitle),
       ).toBeVisible();

@@ -8,7 +8,7 @@ Source ZIP/code used:
 - `/Users/user/Premium Dark-First UI Concept.zip`
 
 Reference motion values found:
-- `--ease: cubic-bezier(.22,.8,.24,1)` in `visaflow-v19-prototype-v17.3-ideal-ui-1.html`.
+- `--ease: cubic-bezier(.22,.8,.24,1)` in the imported V-19 motion source HTML.
 - Popover: `animation: pop-in .16s var(--ease)`, from `opacity:0; transform:translateY(-4px) scale(.99)` to `opacity:1; transform:none`.
 - Drawer body/tab content: `animation: tab-in .17s var(--ease)`, from `opacity:.5; transform:translateY(3px)` to `opacity:1; transform:none`.
 - Progress bar: `transition: width .35s var(--ease)`.

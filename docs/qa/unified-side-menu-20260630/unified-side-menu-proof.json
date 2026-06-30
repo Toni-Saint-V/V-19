@@ -1,0 +1,628 @@
+{
+  "generatedAt": "2026-06-30T05:30:13.926Z",
+  "browserFallback": "in-app Browser unavailable: Browser is not available: iab; agent.browsers.list() returned []",
+  "consoleErrors": [],
+  "requestFailures": [],
+  "results": [
+    {
+      "name": "agent-desktop-actions",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Мои действия",
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface has-unified-side-menu role-agent  ",
+        "desktopSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 8,
+            "y": 8,
+            "w": 288,
+            "h": 884,
+            "bottom": 892
+          },
+          "display": "flex",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Мои действия",
+          "Мои подачи",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "agent-desktop-submissions-after-nav",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface has-unified-side-menu role-agent  ",
+        "desktopSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 8,
+            "y": 8,
+            "w": 272,
+            "h": 884,
+            "bottom": 892
+          },
+          "display": "flex",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Мои действия",
+          "Мои подачи",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "agent-desktop-settings-after-nav",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Настройки",
+        "shellClass": "ops-shell surface-settings  has-unified-side-menu role-agent  ",
+        "desktopSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 9,
+            "y": 9,
+            "w": 272,
+            "h": 882,
+            "bottom": 891
+          },
+          "display": "flex",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Мои действия",
+          "Мои подачи",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "agent-mobile-before-menu",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Мои действия",
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface has-unified-side-menu role-agent  ",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 23,
+            "y": 35.5,
+            "w": 40,
+            "h": 40,
+            "bottom": 75.5
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Мои действия",
+          "Мои подачи",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "agent-mobile-menu-open",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Мои действия",
+        "shellClass": "ops-shell surface-agent-actions is-v19-collection-surface has-unified-side-menu role-agent  is-mobile-nav-open",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 10,
+            "y": 10,
+            "w": 210.59375,
+            "h": 824,
+            "bottom": 834
+          },
+          "display": "grid",
+          "overflowY": "hidden"
+        },
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 23,
+            "y": 35.5,
+            "w": 40,
+            "h": 40,
+            "bottom": 75.5
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": {
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 390,
+            "h": 844,
+            "bottom": 844
+          },
+          "display": "block",
+          "overflowY": "visible"
+        },
+        "desktopLabels": [
+          "Мои действия",
+          "Мои подачи",
+          "Настройки"
+        ],
+        "mobileLabels": [
+          "Мои действия",
+          "Мои подачи",
+          "Настройки"
+        ],
+        "mobileCreateVisible": true,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "agent-mobile-submissions-after-nav",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Мои подачи",
+        "shellClass": "ops-shell surface-agent-submissions is-v19-collection-surface has-unified-side-menu role-agent  ",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 27,
+            "y": 17.5,
+            "w": 40,
+            "h": 40,
+            "bottom": 57.5
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Мои действия",
+          "Мои подачи",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "admin-desktop-export",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Выгрузка",
+        "shellClass": "ops-shell surface-export  has-unified-side-menu role-admin  ",
+        "desktopSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 9,
+            "y": 9,
+            "w": 272,
+            "h": 882,
+            "bottom": 891
+          },
+          "display": "flex",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "admin-mobile-review-menu-open",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Проверка",
+        "shellClass": "ops-shell surface-admin-review is-v19-collection-surface has-unified-side-menu role-admin  is-mobile-nav-open",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "auto"
+        },
+        "mobileSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 10,
+            "y": 10,
+            "w": 210.59375,
+            "h": 824,
+            "bottom": 834
+          },
+          "display": "grid",
+          "overflowY": "hidden"
+        },
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 63,
+            "y": 17,
+            "w": 40,
+            "h": 40,
+            "bottom": 57
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": {
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 390,
+            "h": 844,
+            "bottom": 844
+          },
+          "display": "block",
+          "overflowY": "visible"
+        },
+        "desktopLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "admin-mobile-export-after-nav",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Выгрузка",
+        "shellClass": "ops-shell surface-export  has-unified-side-menu role-admin  ",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 49,
+            "y": 31,
+            "w": 40,
+            "h": 40,
+            "bottom": 71
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "admin-mobile-export-menu-open",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Выгрузка",
+        "shellClass": "ops-shell surface-export  has-unified-side-menu role-admin  is-mobile-nav-open",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "auto"
+        },
+        "mobileSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 10,
+            "y": 10,
+            "w": 210.59375,
+            "h": 824,
+            "bottom": 834
+          },
+          "display": "grid",
+          "overflowY": "hidden"
+        },
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 49,
+            "y": 31,
+            "w": 40,
+            "h": 40,
+            "bottom": 71
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": {
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 390,
+            "h": 844,
+            "bottom": 844
+          },
+          "display": "block",
+          "overflowY": "visible"
+        },
+        "desktopLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "admin-mobile-settings-after-nav",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Настройки",
+        "shellClass": "ops-shell surface-settings  has-unified-side-menu role-admin  ",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": null,
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 32,
+            "y": 38,
+            "w": 40,
+            "h": 40,
+            "bottom": 78
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": null,
+        "desktopLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileLabels": [],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    },
+    {
+      "name": "admin-mobile-settings-menu-open",
+      "metrics": {
+        "title": "Подачи",
+        "h1": "Настройки",
+        "shellClass": "ops-shell surface-settings  has-unified-side-menu role-admin  is-mobile-nav-open",
+        "desktopSidebar": {
+          "visible": false,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 0,
+            "h": 0,
+            "bottom": 0
+          },
+          "display": "none",
+          "overflowY": "visible"
+        },
+        "mobileSidebar": {
+          "visible": true,
+          "rect": {
+            "x": 10,
+            "y": 10,
+            "w": 210.59375,
+            "h": 824,
+            "bottom": 834
+          },
+          "display": "grid",
+          "overflowY": "hidden"
+        },
+        "topbarMenu": {
+          "visible": true,
+          "rect": {
+            "x": 32,
+            "y": 38,
+            "w": 40,
+            "h": 40,
+            "bottom": 78
+          },
+          "display": "grid",
+          "overflowY": "visible"
+        },
+        "backdrop": {
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 390,
+            "h": 844,
+            "bottom": 844
+          },
+          "display": "block",
+          "overflowY": "visible"
+        },
+        "desktopLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileLabels": [
+          "Проверка",
+          "Выгрузка",
+          "Настройки"
+        ],
+        "mobileCreateVisible": false,
+        "bodyOverflow": 0,
+        "htmlOverflow": 0
+      }
+    }
+  ]
+}

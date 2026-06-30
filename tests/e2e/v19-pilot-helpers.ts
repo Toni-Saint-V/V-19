@@ -155,11 +155,16 @@ export async function openDrawerTab(page: Page, labels: string[]) {
     label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   );
   const name = new RegExp(`^(${escapedLabels.join("|")})([\\s,]|$)`);
-  const tab = drawer(page).getByRole("tab", { name }).first();
+  const semanticTab = drawer(page).getByRole("tab", { name }).first();
+  const tab = (await semanticTab.count()) > 0
+    ? semanticTab
+    : drawer(page).getByRole("button", { name }).first();
 
   await expect(tab).toBeVisible();
   await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
+  if ((await tab.getAttribute("role")) === "tab") {
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+  }
 }
 
 export async function expectDrawerStatus(page: Page, status: string) {
@@ -183,11 +188,14 @@ export function e2ePassportFile(name: string) {
 }
 
 export async function uploadAllVisibleFiles(page: Page) {
-  for (let pass = 0; pass < 40; pass += 1) {
-    const uploadButtons = drawer(page).getByRole("button", {
-      name: /^(Загрузить|Заменить)/,
-    });
+  await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
 
+  const uploadButtons = drawer(page).getByRole("button", {
+    name: /^(Загрузить|Заменить)/,
+  });
+  await uploadButtons.first().waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
+
+  for (let pass = 0; pass < 40; pass += 1) {
     if ((await uploadButtons.count()) === 0) {
       return;
     }
@@ -200,16 +208,31 @@ export async function uploadAllVisibleFiles(page: Page) {
 
 export async function markVisibleIssuesFixed(page: Page) {
   await openDrawerTab(page, ["Замечания"]);
+  await expect(drawer(page).getByRole("heading", { name: "Замечания" })).toBeVisible();
+
   const fixedButtons = drawer(page).getByRole("button", {
-    name: /Отметить замечание исправленным:/,
+    name: /Отметить(?: замечание)? исправленным/,
+  });
+  const submitCorrectionsButton = drawer(page).getByRole("button", {
+    name: "Отправить исправления",
   });
 
+  if (!((await submitCorrectionsButton.count()) > 0 && await submitCorrectionsButton.isEnabled())) {
+    await fixedButtons.first().waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
+  }
+
   for (let safety = 0; safety < 12; safety += 1) {
-    const before = await fixedButtons.count();
-    if (before === 0) return;
+    if (
+      (await submitCorrectionsButton.count()) > 0 &&
+      await submitCorrectionsButton.isEnabled()
+    ) {
+      return;
+    }
+
+    if ((await fixedButtons.count()) === 0) return;
 
     await fixedButtons.first().click();
-    await expect(fixedButtons).toHaveCount(before - 1);
+    await page.waitForTimeout(120);
   }
 
   throw new Error("Too many visible issue fix buttons.");

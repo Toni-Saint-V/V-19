@@ -471,8 +471,8 @@ function isActiveAgentFile(file: SubmissionFile) {
 }
 
 function shortFileTypeLabel(type: SubmissionFile["type"]) {
-  if (type === "selfie_2") return "Селфи N2";
+  if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";
-  if (type === "selfie") return "Селфи";
-  return "Архив";
+  if (type === "selfie") return "Селфи 1";
+  return "Файл";
 }

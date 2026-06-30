@@ -1,0 +1,388 @@
+{
+  "generatedAt": "2026-06-29T11:49:12.023Z",
+  "baseURL": "http://127.0.0.1:5173/",
+  "cwd": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635",
+  "screenshots": [
+    "docs/qa/agent-click-matrix-20260629/01-agent-my-actions.png",
+    "docs/qa/agent-click-matrix-20260629/02-agent-my-submissions.png",
+    "docs/qa/agent-click-matrix-20260629/03-agent-settings.png",
+    "docs/qa/agent-click-matrix-20260629/04-my-actions-search-pd1051.png",
+    "docs/qa/agent-click-matrix-20260629/05-create-from-my-actions.png",
+    "docs/qa/agent-click-matrix-20260629/06-my-actions-row-Исправить.png",
+    "docs/qa/agent-click-matrix-20260629/07-my-actions-row-Продолжить.png",
+    "docs/qa/agent-click-matrix-20260629/08-my-actions-row-Добавить.png",
+    "docs/qa/agent-click-matrix-20260629/09-my-actions-row-Смотреть.png",
+    "docs/qa/agent-click-matrix-20260629/10-returned-drawer-send-cancel.png",
+    "docs/qa/agent-click-matrix-20260629/11-create-single-after-save.png",
+    "docs/qa/agent-click-matrix-20260629/12-my-submissions-search-reset.png",
+    "docs/qa/agent-click-matrix-20260629/13-settings-buttons.png"
+  ],
+  "results": [
+    {
+      "screen": "Мои действия",
+      "control": "screen load",
+      "type": "screen",
+      "status": "WORKS",
+      "result": "Экран открывается после agent login"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "screen load",
+      "type": "screen",
+      "status": "WORKS",
+      "result": "Обе категории видны на desktop"
+    },
+    {
+      "screen": "Настройки",
+      "control": "screen load",
+      "type": "screen",
+      "status": "WORKS",
+      "result": "Экран настроек открывается"
+    },
+    {
+      "screen": "Навигация агента",
+      "control": "Мои подачи",
+      "type": "button",
+      "status": "WORKS",
+      "result": "Переходит на список подач"
+    },
+    {
+      "screen": "Навигация агента",
+      "control": "Настройки",
+      "type": "button",
+      "status": "WORKS",
+      "result": "Переходит в настройки"
+    },
+    {
+      "screen": "Навигация агента",
+      "control": "Мои действия",
+      "type": "button",
+      "status": "WORKS",
+      "result": "Переходит в action queue"
+    },
+    {
+      "screen": "Навигация агента",
+      "control": "profile/logout",
+      "type": "button",
+      "status": "WORKS",
+      "result": "Возвращает на login gate"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "Все действия",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Фильтр меняет/показывает список или empty state"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "Ошибки",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Фильтр меняет/показывает список или empty state"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "На проверке",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Фильтр меняет/показывает список или empty state"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "Поиск по действиям",
+      "type": "search input",
+      "status": "BROKEN",
+      "result": "Поиск по ПД-1051 сужает выдачу"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "Колонки",
+      "type": "view toggle",
+      "status": "WORKS",
+      "result": "Переключатель кликается, список остается доступен"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "Список",
+      "type": "view toggle",
+      "status": "WORKS",
+      "result": "Переключатель кликается, список остается доступен"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "Создать пакет",
+      "type": "button",
+      "status": "WORKS",
+      "result": "Открывает create drawer"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "row action Исправить",
+      "type": "row button",
+      "status": "WORKS",
+      "result": "Открывает drawer/workspace context"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "row action Продолжить",
+      "type": "row button",
+      "status": "WORKS",
+      "result": "Открывает drawer/workspace context"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "row action Добавить",
+      "type": "row button",
+      "status": "WORKS",
+      "result": "Открывает drawer/workspace context"
+    },
+    {
+      "screen": "Мои действия",
+      "control": "row action Смотреть",
+      "type": "row button",
+      "status": "WORKS",
+      "result": "Открывает drawer/workspace context"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "open returned drawer",
+      "type": "drawer",
+      "status": "WORKS",
+      "result": "Returned drawer opens with issue count"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "tab Обзор",
+      "type": "tab",
+      "status": "WORKS",
+      "result": "Tab switches content"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "tab Анкета",
+      "type": "tab",
+      "status": "WORKS",
+      "result": "Tab switches content"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "tab Замечания",
+      "type": "tab",
+      "status": "WORKS",
+      "result": "Tab switches content"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "tab История",
+      "type": "tab",
+      "status": "WORKS",
+      "result": "Tab switches content"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "issue action Исправить",
+      "type": "issue button",
+      "status": "WORKS",
+      "result": "Переходит в анкету и показывает проблемный блок"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "issue action Перезагрузить",
+      "type": "issue button",
+      "status": "BROKEN",
+      "result": "Выглядит как action, но aria-disabled/disabled; нельзя исправить файловое замечание"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "Отправить исправления",
+      "type": "footer button",
+      "status": "WORKS",
+      "result": "Отправка прошла/изменила статус"
+    },
+    {
+      "screen": "Agent Drawer",
+      "control": "Отмена",
+      "type": "footer button",
+      "status": "WORKS",
+      "result": "Закрывает drawer или уводит из него"
+    },
+    {
+      "screen": "Create Submission",
+      "control": "empty save/next gates",
+      "type": "disabled state",
+      "status": "WORKS",
+      "result": "Без паспорта save/next disabled"
+    },
+    {
+      "screen": "Create Submission",
+      "control": "single passport upload",
+      "type": "file input",
+      "status": "WORKS",
+      "result": "Synthetic JPEG makes save/next available; copy stays manual-check"
+    },
+    {
+      "screen": "Create Submission",
+      "control": "Сохранить черновик",
+      "type": "button",
+      "status": "WORKS",
+      "result": "Creates draft and opens/updates submission"
+    },
+    {
+      "screen": "runtime",
+      "control": "create family",
+      "type": "script",
+      "status": "BROKEN",
+      "result": "Cannot access 'add' before initialization",
+      "note": "automation error"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "Все",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Filter changes/preserves valid list"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "Требуют действия",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Filter changes/preserves valid list"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "В работе",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Filter changes/preserves valid list"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "На проверке",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Filter changes/preserves valid list"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "Готово",
+      "type": "filter tab",
+      "status": "WORKS",
+      "result": "Filter changes/preserves valid list"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "Поиск по подачам",
+      "type": "search input",
+      "status": "BROKEN",
+      "result": "После ввода “Иван” список визуально не сужается полностью"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "Сбросить",
+      "type": "button",
+      "status": "WORKS",
+      "result": "Clears search/filter"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "card: Добавить селфи",
+      "type": "card button",
+      "status": "WORKS",
+      "result": "Opens drawer/workspace context, but no obvious close button in side detail panel"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "card: Смотреть статус",
+      "type": "card button",
+      "status": "WORKS",
+      "result": "Opens drawer/workspace context, but no obvious close button in side detail panel"
+    },
+    {
+      "screen": "Мои подачи",
+      "control": "card: Заполнить анкету",
+      "type": "card button",
+      "status": "WORKS",
+      "result": "Opens drawer/workspace context, but no obvious close button in side detail panel"
+    },
+    {
+      "screen": "Мои подачи detail rail",
+      "control": "Открыть файл",
+      "type": "quick action",
+      "status": "WORKS",
+      "result": "Quick action opens drawer/workspace target"
+    },
+    {
+      "screen": "Мои подачи detail rail",
+      "control": "Анкета",
+      "type": "quick action",
+      "status": "WORKS",
+      "result": "Quick action opens drawer/workspace target"
+    },
+    {
+      "screen": "runtime",
+      "control": "my submissions quick links",
+      "type": "script",
+      "status": "BROKEN",
+      "result": "locator.click: Timeout 30000ms exceeded.",
+      "note": "automation error"
+    },
+    {
+      "screen": "Настройки",
+      "control": "Новая подача",
+      "type": "button",
+      "status": "OBSERVED",
+      "result": "Visible button; not clicked if it may logout/change session/settings",
+      "note": "Settings side-effect audit kept non-mutating"
+    },
+    {
+      "screen": "Настройки",
+      "control": "Профиль",
+      "type": "button",
+      "status": "OBSERVED",
+      "result": "Visible button; not clicked if it may logout/change session/settings",
+      "note": "Settings side-effect audit kept non-mutating"
+    },
+    {
+      "screen": "Настройки",
+      "control": "Уведомления",
+      "type": "button",
+      "status": "OBSERVED",
+      "result": "Visible button; not clicked if it may logout/change session/settings",
+      "note": "Settings side-effect audit kept non-mutating"
+    },
+    {
+      "screen": "Настройки",
+      "control": "Интерфейс",
+      "type": "button",
+      "status": "OBSERVED",
+      "result": "Visible button; not clicked if it may logout/change session/settings",
+      "note": "Settings side-effect audit kept non-mutating"
+    },
+    {
+      "screen": "Настройки",
+      "control": "Возврат подачи",
+      "type": "button",
+      "status": "OBSERVED",
+      "result": "Visible button; not clicked if it may logout/change session/settings",
+      "note": "Settings side-effect audit kept non-mutating"
+    },
+    {
+      "screen": "Настройки",
+      "control": "Новые замечания",
+      "type": "button",
+      "status": "OBSERVED",
+      "result": "Visible button; not clicked if it may logout/change session/settings",
+      "note": "Settings side-effect audit kept non-mutating"
+    },
+    {
+      "screen": "Настройки",
+      "control": "Ошибки выгрузки",
+      "type": "button",
+      "status": "DISABLED",
+      "result": "Disabled visibly",
+      "note": "Settings side-effect audit kept non-mutating"
+    }
+  ]
+}
