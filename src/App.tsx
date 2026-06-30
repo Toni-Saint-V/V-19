@@ -102,7 +102,7 @@ import {
 } from "./modules/submissions/visaApplicationPdfReconciliation";
 import {
   OperationalMobileTabBar,
-  OperationalSidebar,
+  OperationalSideMenu,
   type OperationalNavItem,
 } from "./modules/submissions/components/OperationalNavigation";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
@@ -1318,6 +1318,39 @@ function MainApp() {
     setActiveDrawerTab(tab);
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
+  }
+
+  function openApplicantsUploadTarget() {
+    const selectedSubmission = agentList.find(
+      (submission) => submission.id === selectedSubmissionId,
+    );
+    const candidates = [selectedSubmission, ...agentList].filter(
+      (submission, index, list): submission is Submission =>
+        Boolean(submission) &&
+        list.findIndex((item) => item?.id === submission?.id) === index,
+    );
+    const target =
+      candidates.find((submission) =>
+        submission.files.some(
+          (file) =>
+            file.status === "missing" ||
+            file.status === "needs_replacement" ||
+            file.status === "uploaded" ||
+            file.status === "pending_review",
+        ) ||
+        submission.issues.some(
+          (issue) =>
+            issue.status !== "closed_by_admin" &&
+            (issue.type === "file" || issue.type === "media" || Boolean(issue.target.fileType)),
+        ),
+      ) ?? candidates[0];
+
+    if (!target) {
+      openCreateSubmissionDrawer();
+      return;
+    }
+
+    openSubmission(target, "files");
   }
 
   function openAgentQuestionnaireWorkspace() {
@@ -2909,40 +2942,91 @@ function MainApp() {
     />
   );
   const showMobileCreateDock = role === "agent" && surface === "agent-submissions";
-  const mobileAwareOperationalNavItems = operationalNavItems.map((item) => ({
-    ...item,
-    onClick: () => {
-      item.onClick();
-      setMobileNavOpen(false);
-    },
-  }));
-  const agentMobileNavItems: OperationalNavItem[] =
+  const mobileAgentNavItems: OperationalNavItem[] =
     role === "agent"
-      ? operationalNavItems
-          .filter((item) =>
-            ["agent-actions", "agent-submissions", "agent-settings"].includes(
-              item.id,
-            ),
-          )
-          .map((item) => {
-            if (item.id === "agent-settings") {
-              return {
-                ...item,
-                label: "Настройки",
-                meta: "профиль и настройки",
-              };
-            }
-
-            return item;
-          })
+      ? operationalNavItems.map((item) => ({
+          ...item,
+          onClick: () => {
+            item.onClick();
+            setMobileNavOpen(false);
+          },
+        }))
       : [];
-  const mobileAgentNavItems = agentMobileNavItems.map((item) => ({
-    ...item,
-    onClick: () => {
-      item.onClick();
-      setMobileNavOpen(false);
-    },
-  }));
+  const sidebarCreateAction =
+    role === "agent"
+      ? {
+          label: isFigmaVisualSurface ? "Создать пакет" : "Новая подача",
+          onClick: () => {
+            openCreateSubmissionDrawer();
+            setMobileNavOpen(false);
+          },
+        }
+      : undefined;
+  const operationalSidebarFooter = (
+    <>
+      {showRoleSwitcher ? (
+        <>
+          {role === "agent" && isFigmaVisualSurface ? (
+            <Button
+              className="vf-figma-admin-zone"
+              aria-label="В админскую зону"
+              variant="secondary"
+              onClick={() => {
+                chooseRole("admin");
+                setMobileNavOpen(false);
+              }}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M7 7h10M7 7l3-3M7 7l3 3" />
+                <path d="M17 17H7m10 0-3-3m3 3-3 3" />
+              </svg>
+              В админскую зону
+            </Button>
+          ) : null}
+          <Button
+            className="ops-session"
+            aria-label="Сменить роль"
+            variant="ghost"
+            onClick={() => {
+              chooseRole(role === "agent" ? "admin" : "agent");
+              setMobileNavOpen(false);
+            }}
+          >
+            <span>{role === "agent" ? "ТН" : "АД"}</span>
+            <div>
+              <strong>
+                {role === "agent" ? "Татьяна Николаева" : "Ирина Лебедева"}
+              </strong>
+              <small>{role === "agent" ? "Visa Center Spb" : "Админ"}</small>
+            </div>
+            <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
+              <circle cx="5" cy="12" r="1" />
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+            </svg>
+          </Button>
+        </>
+      ) : (
+        <Button
+          className="ops-session"
+          aria-label="Выйти из рабочей области"
+          variant="ghost"
+          onClick={resetWorkspaceEmail}
+        >
+          <span>{sessionInitials}</span>
+          <div>
+            <strong>{sessionDisplayName}</strong>
+            <small>{sessionRoleLabel}</small>
+          </div>
+          <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
+            <circle cx="5" cy="12" r="1" />
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="19" cy="12" r="1" />
+          </svg>
+        </Button>
+      )}
+    </>
+  );
 
   if (!isSupabaseMode && localAuthSession && !localAuthHasWorkspaceAccess) {
     return (
@@ -2976,122 +3060,31 @@ function MainApp() {
     <main
       className={`ops-shell surface-${surface} ${
         isV19CollectionSurface ? "is-v19-collection-surface" : ""
-      } role-${role} ${drawerMode !== "closed" ? "has-open-drawer" : ""} ${
-        mobileNavOpen ? "is-mobile-nav-open" : ""
-      }`}
+      } has-unified-side-menu role-${role} ${
+        drawerMode !== "closed" ? "has-open-drawer" : ""
+      } ${mobileNavOpen ? "is-mobile-nav-open" : ""}`}
       aria-label="Рабочая область подач"
     >
-      <OperationalSidebar
-        createAction={
-          role === "agent"
-            ? {
-                label: isFigmaVisualSurface ? "Создать пакет" : "Новая подача",
-                onClick: () => {
-                  openCreateSubmissionDrawer();
-                  setMobileNavOpen(false);
-                },
-              }
-            : undefined
-        }
-        items={mobileAwareOperationalNavItems}
+      <OperationalSideMenu
+        createAction={sidebarCreateAction}
+        items={operationalNavItems}
+        mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
-        mobileTitle={
-          role === "agent" &&
-          (surface === "agent-actions" ||
-            surface === "agent-inbox" ||
-            surface === "agent-submissions")
-            ? workspaceSurfaceTitle
-            : undefined
-        }
-        footer={
-          <>
-            {showRoleSwitcher ? (
-              <>
-                {role === "agent" && isFigmaVisualSurface ? (
-                  <Button
-                    className="vf-figma-admin-zone"
-                    aria-label="В админскую зону"
-                    variant="secondary"
-                    onClick={() => {
-                      chooseRole("admin");
-                      setMobileNavOpen(false);
-                    }}
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 24 24">
-                      <path d="M7 7h10M7 7l3-3M7 7l3 3" />
-                      <path d="M17 17H7m10 0-3-3m3 3-3 3" />
-                    </svg>
-                    В админскую зону
-                  </Button>
-                ) : null}
-                <Button
-                  className="ops-session"
-                  aria-label="Сменить роль"
-                  variant="ghost"
-                  onClick={() => {
-                    chooseRole(role === "agent" ? "admin" : "agent");
-                    setMobileNavOpen(false);
-                  }}
-                >
-                  <span>{role === "agent" ? "ТН" : "АД"}</span>
-                  <div>
-                    <strong>
-                      {role === "agent" ? "Татьяна Николаева" : "Ирина Лебедева"}
-                    </strong>
-                    <small>{role === "agent" ? "Visa Center Spb" : "Админ"}</small>
-                  </div>
-                  <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
-                    <circle cx="5" cy="12" r="1" />
-                    <circle cx="12" cy="12" r="1" />
-                    <circle cx="19" cy="12" r="1" />
-                  </svg>
-                </Button>
-              </>
-            ) : (
-              <Button
-                className="ops-session"
-                aria-label="Выйти из рабочей области"
-                variant="ghost"
-                onClick={resetWorkspaceEmail}
-              >
-                <span>{sessionInitials}</span>
-                <div>
-                  <strong>{sessionDisplayName}</strong>
-                  <small>{sessionRoleLabel}</small>
-                </div>
-                <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
-                  <circle cx="5" cy="12" r="1" />
-                  <circle cx="12" cy="12" r="1" />
-                  <circle cx="19" cy="12" r="1" />
-                </svg>
-              </Button>
-            )}
-          </>
-        }
+        mobileTitle={workspaceSurfaceTitle}
+        footer={operationalSidebarFooter}
       />
-
-      {mobileNavOpen ? (
-        <button
-          className="ops-mobile-menu-backdrop"
-          type="button"
-          aria-label="Закрыть меню"
-          onClick={() => setMobileNavOpen(false)}
-        />
-      ) : null}
 
       <section className="workspace">
         <header className="topbar">
-          {isV19CollectionSurface ? (
-            <button
-              className="v19-topbar-menu"
-              type="button"
-              aria-label={mobileNavOpen ? "Закрыть меню" : "Меню"}
-              aria-expanded={mobileNavOpen}
-              onClick={() => setMobileNavOpen((open) => !open)}
-            >
-              <span aria-hidden="true" />
-            </button>
-          ) : null}
+          <button
+            className="v19-topbar-menu"
+            type="button"
+            aria-label={mobileNavOpen ? "Закрыть меню" : "Меню"}
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen((open) => !open)}
+          >
+            <span aria-hidden="true" />
+          </button>
           <div className="topbar-heading">
             <h1>{workspaceSurfaceTitle}</h1>
             {surface !== "agent-actions" &&
@@ -3101,7 +3094,36 @@ function MainApp() {
               <p>{workspaceSurfaceDescription}</p>
             ) : null}
           </div>
-          {isFigmaVisualSurface ? null : surface === "agent-inbox" ? (
+          {isFigmaVisualSurface ? null : surface === "agent-submissions" ? (
+            <div className="vf-applicants-transfer-actions topbar-actions">
+              <Button
+                className="vf-applicants-transfer-upload"
+                type="button"
+                variant="secondary"
+                aria-label="Загрузить файлы в текущую подачу"
+                onClick={openApplicantsUploadTarget}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 16V4" />
+                  <path d="m7 9 5-5 5 5" />
+                  <path d="M5 20h14" />
+                </svg>
+                Загрузить
+              </Button>
+              <Button
+                className="vf-applicants-transfer-create"
+                type="button"
+                variant="primary"
+                onClick={openCreateSubmissionDrawer}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+                Создать пакет
+              </Button>
+            </div>
+          ) : surface === "agent-inbox" ? (
             <div className="v19-topbar-city-filter">{cityFilterControl}</div>
           ) : !isV19CollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
