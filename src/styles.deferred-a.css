@@ -713,6 +713,15 @@
   font-size: 12px;
 }
 
+.magic-export-row .export-row-note {
+  max-width: 168px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.25;
+  text-align: right;
+}
+
 .magic-export-side {
   display: grid;
   gap: 12px;

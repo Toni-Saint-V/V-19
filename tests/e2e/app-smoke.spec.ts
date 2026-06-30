@@ -1142,11 +1142,14 @@ test.describe("V-19 operations workspace", () => {
       page.locator(".submission-panel").getByText("Выгружено").first(),
     ).toBeVisible();
 
-    await page
+    const exportedFamilyRow = page
       .locator(".export-row")
-      .filter({ hasText: "Семья Петровых" })
-      .getByRole("button", { name: "Проверить PDF" })
-      .click();
+      .filter({ hasText: "Семья Петровых" });
+    await expect(
+      exportedFamilyRow.getByRole("button", { name: /^(Открыть|Проверить) PDF$/ }),
+    ).toHaveCount(0);
+    await expect(exportedFamilyRow.getByText("PDF handoff: через файлы подачи")).toBeVisible();
+    await exportedFamilyRow.getByRole("button", { name: /Семья Петровых/ }).click();
     await expect(
       drawer(page).getByText("Семья Петровых").first(),
     ).toBeVisible();

@@ -42,18 +42,19 @@ test.describe("V-19 export click and section matrix", () => {
       .getByRole("button", { name: /Семья Волковых/ })
       .first()
       .click();
-    await expect(
-      page.getByRole("heading", { name: "1 подача · 3 заявителя" }),
-    ).toBeVisible();
-    await expect(page.getByText("Строки").first()).toBeVisible();
-    await expect(page.getByText("Готов").first()).toBeVisible();
+    await expect(drawer(page)).toBeVisible();
+    await expect(drawer(page).getByText("Семья Волковых")).toBeVisible();
+    await drawer(page).getByRole("button", { name: "Закрыть проверку" }).click();
+    await expect(drawer(page)).toHaveCount(0);
 
     await page
       .locator(".export-row")
       .filter({ hasText: "Ольга Фролова" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByText(/подачи разных агентов/i)).toBeVisible();
+    await expect(page.locator("#export-action-hint")).toContainText(
+      "Сначала сформируйте Эксель",
+    );
     await expect(page.getByRole("button", { name: "Сформировать Эксель" })).toBeEnabled();
 
     await page.getByRole("button", { name: "Сформировать Эксель" }).click();
@@ -76,17 +77,20 @@ test.describe("V-19 export click and section matrix", () => {
       "aria-selected",
       "true",
     );
-    await expect(page.locator(".submission-panel").getByText("Семья Волковых")).toBeVisible();
+    await expect(page.locator(".submission-list").getByText("Ольга Фролова")).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/export-click-section-matrix-20260629/export-desktop-history.png",
     });
 
-    await page
+    const exportedHistoryRow = page
       .locator(".export-row")
-      .filter({ hasText: "Семья Волковых" })
-      .getByRole("button", { name: /^(Открыть|Проверить) PDF$/ })
-      .click();
+      .filter({ hasText: "Ольга Фролова" });
+    await expect(
+      exportedHistoryRow.getByRole("button", { name: /^(Открыть|Проверить) PDF$/ }),
+    ).toHaveCount(0);
+    await expect(exportedHistoryRow.getByText("PDF handoff: через файлы подачи")).toBeVisible();
+    await exportedHistoryRow.getByRole("button", { name: /Ольга Фролова/ }).click();
     await expect(drawer(page)).toBeVisible();
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
