@@ -1,5 +1,5 @@
 import { Button, NavCount } from "../../../shared/ui/primitives";
-import type { ReactNode, SVGProps } from "react";
+import { useEffect, useState, type ReactNode, type SVGProps } from "react";
 import visaOpsLogo from "../../../assets/visaflow-logo.png";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
@@ -34,6 +34,8 @@ type OperationalSideMenuProps = OperationalSidebarProps & {
   onMobileClose: () => void;
 };
 
+type OperationalSidebarVariant = "desktop" | "mobile" | "single";
+
 export function OperationalSideMenu({
   createAction,
   footer,
@@ -42,6 +44,7 @@ export function OperationalSideMenu({
   mobileTitle,
   onMobileClose,
 }: OperationalSideMenuProps) {
+  const isMobileViewport = useMediaQuery("(max-width: 760px)");
   const mobileItems = items.map((item) => ({
     ...item,
     onClick: () => {
@@ -59,15 +62,35 @@ export function OperationalSideMenu({
       }
     : undefined;
 
+  useEffect(() => {
+    if (!isMobileViewport && mobileOpen) {
+      onMobileClose();
+    }
+  }, [isMobileViewport, mobileOpen, onMobileClose]);
+
   return (
     <>
-      <OperationalDesktopSidebar
-        createAction={createAction}
-        items={items}
-        footer={footer}
-      />
+      {!isMobileViewport ? (
+        <OperationalSidebarFrame
+          createAction={createAction}
+          items={items}
+          footer={footer}
+          variant="desktop"
+        />
+      ) : null}
 
-      {mobileOpen ? (
+      {isMobileViewport && mobileOpen ? (
+        <OperationalSidebarFrame
+          createAction={mobileCreateAction}
+          items={mobileItems}
+          onMobileClose={onMobileClose}
+          mobileTitle={mobileTitle}
+          footer={footer}
+          variant="mobile"
+        />
+      ) : null}
+
+      {isMobileViewport && mobileOpen ? (
         <button
           className="ops-mobile-menu-backdrop"
           type="button"
@@ -75,44 +98,51 @@ export function OperationalSideMenu({
           onClick={onMobileClose}
         />
       ) : null}
-
-      {mobileOpen ? (
-        <OperationalMobileSidebar
-          createAction={mobileCreateAction}
-          items={mobileItems}
-          onMobileClose={onMobileClose}
-          mobileTitle={mobileTitle}
-          footer={footer}
-        />
-      ) : null}
     </>
   );
 }
 
-export function OperationalDesktopSidebar(props: OperationalSidebarProps) {
-  return <OperationalSidebarFrame {...props} className="ops-sidebar--desktop" />;
-}
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(query).matches;
+  });
 
-export function OperationalMobileSidebar(props: OperationalSidebarProps) {
-  return <OperationalSidebarFrame {...props} className="ops-sidebar--mobile" />;
-}
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+    const handleChange = () => setMatches(mediaQuery.matches);
 
-export function OperationalSidebar(props: OperationalSidebarProps) {
-  return <OperationalSidebarFrame {...props} />;
+    handleChange();
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [query]);
+
+  return matches;
 }
 
 function OperationalSidebarFrame({
   brand = "VisaFlow",
-  className,
   createAction,
   footer,
   items,
   onMobileClose,
   mobileTitle,
-}: OperationalSidebarProps & { className?: string }) {
+  variant = "single",
+}: OperationalSidebarProps & { variant?: OperationalSidebarVariant }) {
+  const variantClassName =
+    variant === "mobile"
+      ? "ops-sidebar--mobile opsu-sidebar--mobile"
+      : variant === "desktop"
+        ? "ops-sidebar--desktop opsu-sidebar--desktop"
+        : "opsu-sidebar--single";
+  const sidebarClassName = ["ops-sidebar", "opsu-sidebar", variantClassName]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <aside
-      className={`ops-sidebar${className ? ` ${className}` : ""}`}
+      className={sidebarClassName}
+      data-sidebar-contract="unified"
       aria-label="Операционный центр"
     >
       {mobileTitle ? (
@@ -121,15 +151,19 @@ function OperationalSidebarFrame({
           <span aria-hidden="true">VF</span>
         </div>
       ) : null}
-      <div className="ops-brand" aria-label={`${brand} 19`}>
+      <div className="ops-brand opsu-brand" aria-label={`${brand} 19`}>
         <span
-          className="ops-brand-logo ops-brand-mark vf-brand-capital vf-brand-capital--nav"
+          className="ops-brand-logo ops-brand-mark vf-brand-capital vf-brand-capital--nav opsu-brand-mark"
           aria-hidden="true"
         >
-          <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
+          <img
+            className="vf-brand-capital-image opsu-brand-image"
+            src={visaOpsLogo}
+            alt=""
+          />
         </span>
-        <div className="ops-brand-copy">
-          <strong className="vf-brand-wordmark">
+        <div className="ops-brand-copy opsu-brand-copy">
+          <strong className="vf-brand-wordmark opsu-wordmark">
             <span className="vf-brand-tail" aria-hidden="true">
               VisaFlow
             </span>
@@ -137,12 +171,11 @@ function OperationalSidebarFrame({
               19
             </span>
           </strong>
-          <em>Workspace</em>
         </div>
         {onMobileClose ? (
           <Button
             aria-label="Закрыть меню"
-            className="ops-mobile-close"
+            className="ops-mobile-close opsu-mobile-close"
             variant="ghost"
             onClick={onMobileClose}
           >
@@ -152,12 +185,12 @@ function OperationalSidebarFrame({
           </Button>
         ) : null}
       </div>
-      <nav className="ops-nav" aria-label="Операционные разделы">
+      <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
         {items.map((item) => (
           <Button
             aria-current={item.active ? "page" : undefined}
             aria-label={`${item.label}. ${item.meta}`}
-            className={`ops-nav-item ${item.active ? "is-active" : ""} ${
+            className={`ops-nav-item opsu-nav-item ${item.active ? "is-active" : ""} ${
               item.tone ? `tone-${item.tone}` : ""
             }`}
             data-nav-id={item.id}
@@ -166,24 +199,24 @@ function OperationalSidebarFrame({
             variant="ghost"
             onClick={item.onClick}
           >
-            <span className="ops-nav-icon" aria-hidden="true">
+            <span className="ops-nav-icon opsu-nav-icon" aria-hidden="true">
               <OperationalIcon id={item.id} fallback={item.icon} />
             </span>
-            <span className="ops-nav-copy">
+            <span className="ops-nav-copy opsu-nav-copy">
               <strong>{item.label}</strong>
             </span>
             {typeof item.count === "number" ? (
               <NavCount label={`${item.count}`}>{item.count}</NavCount>
             ) : null}
             {item.quickAction ? (
-              <em className="ops-nav-action">{item.quickAction}</em>
+              <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
             ) : null}
           </Button>
         ))}
       </nav>
       {createAction ? (
         <button
-          className="ops-sidebar-create"
+          className="ops-sidebar-create opsu-sidebar-create"
           type="button"
           aria-label={createAction.label}
           onClick={createAction.onClick}
@@ -196,16 +229,12 @@ function OperationalSidebarFrame({
           <strong>{createAction.label}</strong>
         </button>
       ) : null}
-      <div className="ops-sidebar-footer">{footer}</div>
+      <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
     </aside>
   );
 }
 
-export function OperationalMobileTabBar({
-  items,
-}: {
-  items: OperationalNavItem[];
-}) {
+export function OperationalMobileTabBar({ items }: { items: OperationalNavItem[] }) {
   return (
     <nav className="ops-mobile-tabbar" aria-label="Мобильная навигация агента">
       {items.map((item) => (
