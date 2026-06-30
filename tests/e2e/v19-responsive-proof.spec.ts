@@ -33,9 +33,7 @@ async function openFreshWorkspace(
 ) {
   await page.goto("/");
   await page.evaluate(() => {
-    (
-      globalThis as unknown as { localStorage: { clear(): void } }
-    ).localStorage.clear();
+    (globalThis as unknown as { localStorage: { clear(): void } }).localStorage.clear();
   });
   if (options.workspaceEmail) {
     await page.evaluate((workspaceEmail) => {
@@ -67,9 +65,7 @@ async function expectNoHorizontalDocumentOverflow(page: Page, context: string) {
     };
   });
 
-  expect(metrics.scrollWidth, context).toBeLessThanOrEqual(
-    metrics.clientWidth + 1,
-  );
+  expect(metrics.scrollWidth, context).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
 async function expectAgentNoDocumentScroll(page: Page, context: string) {
@@ -101,12 +97,14 @@ async function expectAgentNoDocumentScroll(page: Page, context: string) {
     };
   });
 
-  expect(metrics.scrollWidth, `${context}: horizontal document overflow`).toBeLessThanOrEqual(
-    metrics.clientWidth + 1,
-  );
-  expect(metrics.scrollHeight, `${context}: vertical document scroll`).toBeLessThanOrEqual(
-    metrics.clientHeight + 1,
-  );
+  expect(
+    metrics.scrollWidth,
+    `${context}: horizontal document overflow`,
+  ).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  expect(
+    metrics.scrollHeight,
+    `${context}: vertical document scroll`,
+  ).toBeLessThanOrEqual(metrics.clientHeight + 1);
 }
 
 async function expectDrawerFitsViewport(
@@ -159,7 +157,9 @@ async function clickOperationalNav(page: Page, name: RegExp) {
 }
 
 async function expectSettingsReady(page: Page) {
-  await expect(page.getByRole("heading", { level: 2, name: "Уведомления" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Уведомления" }),
+  ).toBeVisible();
   await expect(page.getByRole("switch", { name: "Возврат подачи" })).toBeVisible();
 }
 
@@ -190,7 +190,9 @@ test.describe("V-19 responsive proof", () => {
 
       await clickOperationalNav(page, /^Мои подачи/);
       await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Новая подача" }).first()).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Новая подача" }).first(),
+      ).toBeVisible();
       await expectAgentNoDocumentScroll(page, `${viewport.label}: agent submissions`);
       await screenshot(page, viewport, "agent-submissions");
 
@@ -225,7 +227,10 @@ test.describe("V-19 responsive proof", () => {
         page.getByRole("heading", { level: 1, name: "Настройки" }),
       ).toBeVisible();
       await expectSettingsReady(page);
-      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: agent settings`);
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: agent settings`,
+      );
       await screenshot(page, viewport, "agent-settings");
 
       await openFreshWorkspace(page, {
@@ -240,19 +245,27 @@ test.describe("V-19 responsive proof", () => {
       await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
       await page.getByRole("tab", { name: /На проверке/ }).click();
-      await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
-      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review filter`);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Проверка" }),
+      ).toBeVisible();
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin review filter`,
+      );
       await screenshot(page, viewport, "admin-review-filter");
 
       await page.getByRole("tab", { name: /Ошибки/ }).click();
       await expect(page.locator(".vf-figma-action-row").first()).toBeVisible();
-      await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin issues filter`);
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin issues filter`,
+      );
       await screenshot(page, viewport, "admin-issues-filter");
 
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
-      const generateButton = page.getByRole("button", { name: "Сформировать Эксель" });
+      const generateButton = page.getByRole("button", { name: "Сформировать Excel" });
       await generateButton.scrollIntoViewIfNeeded();
       await expect(generateButton).toBeVisible();
       await screenshot(page, viewport, "export");

@@ -1,7 +1,11 @@
 import {
   type ButtonHTMLAttributes,
-  type CSSProperties,
+  type Ref,
   type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
 } from "react";
 import {
   Badge,
@@ -35,6 +39,12 @@ type SummaryFilterTab<T extends string> = {
   id: T;
   label: string;
   tone?: SummaryFilterTone;
+};
+
+export type MobileFilterOption<T extends string> = {
+  count?: number;
+  id: T;
+  label: string;
 };
 
 export function CollectionToolbar<T extends string>({
@@ -78,7 +88,9 @@ export function CollectionToolbar<T extends string>({
           tabs.length > 3 && "has-many-tabs",
           (cityControl != null || filters != null) && "has-control-stack",
           cityControl != null && "has-city-control",
+          mobileCityControl != null && "has-mobile-city-control",
           filters != null && "has-filter-control",
+          filterTabs != null && "has-filter-tabs",
           tools != null && "has-toolbar-tools",
           className,
         )}
@@ -87,24 +99,30 @@ export function CollectionToolbar<T extends string>({
         {mobileTitle ? (
           <h2 className="v19-mobile-toolbar-title">{mobileTitle}</h2>
         ) : null}
-        <StateTabs
-          ariaLabel={tabsAriaLabel ?? "Состояние списка"}
-          onValueChange={onTabChange}
-          tabs={tabs}
-          value={value}
-        />
-        <ToolbarControlStack
-          cityControl={cityControl}
-          filters={filters}
-          mobileCityControl={mobileCityControl}
-          search={search}
-        />
-        {tools}
+        <div className="v19-toolbar-primary-row">
+          <ToolbarControlStack filters={filters} search={search} />
+          {tools}
+        </div>
+        {filterTabs ? (
+          <div className="v19-toolbar-filter-row">{filterTabs}</div>
+        ) : null}
+        <div className="v19-toolbar-secondary-row">
+          <StateTabs
+            ariaLabel={tabsAriaLabel ?? "Состояние списка"}
+            onValueChange={onTabChange}
+            tabs={tabs}
+            value={value}
+          />
+          {cityControl ? (
+            <div className="v19-toolbar-city-slot">{cityControl}</div>
+          ) : null}
+          {mobileCityControl ? (
+            <div className="v19-toolbar-city-slot v19-mobile-city-control">
+              {mobileCityControl}
+            </div>
+          ) : null}
+        </div>
       </div>
-
-      {filterTabs ? (
-        <div className="v19-toolbar-filter-row">{filterTabs}</div>
-      ) : null}
 
       {activeFilters.length ? (
         <ActiveFiltersRow
@@ -168,34 +186,161 @@ export function ToolbarTools({ children = null }: { children?: ReactNode }) {
   return <div className="v19-toolbar-tools">{children}</div>;
 }
 
+export function MobileFilterSheet<T extends string>({
+  label,
+  onValueChange,
+  options,
+  title,
+  value,
+}: {
+  label: string;
+  onValueChange: (value: T) => void;
+  options: Array<MobileFilterOption<T>>;
+  title: string;
+  value: T;
+}) {
+  const [open, setOpen] = useState(false);
+  const titleId = useId();
+  const sheetId = useId();
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement;
+    const triggerElement = triggerRef.current;
+
+    window.requestAnimationFrame(() => {
+      closeButtonRef.current?.focus({ preventScroll: true });
+    });
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusableElements = sheetRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      const focusable = focusableElements ? Array.from(focusableElements) : [];
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused instanceof HTMLElement) {
+        previouslyFocused.focus({ preventScroll: true });
+      } else {
+        triggerElement?.focus({ preventScroll: true });
+      }
+    };
+  }, [open]);
+
+  function handleValueChange(nextValue: T) {
+    onValueChange(nextValue);
+    setOpen(false);
+  }
+
+  return (
+    <div className="v19-mobile-filter">
+      <ToolbarIconButton
+        className="v19-mobile-filter-trigger"
+        icon="filter"
+        label={label}
+        pressed={open}
+        ref={triggerRef}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls={open ? sheetId : undefined}
+        onClick={() => setOpen((current) => !current)}
+      />
+      {open ? (
+        <>
+          <button
+            className="v19-mobile-filter-backdrop"
+            type="button"
+            onClick={() => setOpen(false)}
+          >
+            <span className="sr-only">Закрыть фильтры</span>
+          </button>
+          <div
+            className="v19-mobile-filter-sheet"
+            id={sheetId}
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+          >
+            <div className="v19-mobile-filter-head">
+              <strong id={titleId}>{title}</strong>
+              <Button
+                ref={closeButtonRef}
+                variant="ghost"
+                onClick={() => setOpen(false)}
+              >
+                Готово
+              </Button>
+            </div>
+            <div className="v19-mobile-filter-options">
+              {options.map((option) => (
+                <Button
+                  aria-pressed={value === option.id}
+                  className={cn(
+                    "v19-mobile-filter-choice",
+                    value === option.id && "is-active",
+                  )}
+                  key={option.id}
+                  variant="plain"
+                  onClick={() => handleValueChange(option.id)}
+                >
+                  <span>{option.label}</span>
+                  {typeof option.count === "number" ? <em>{option.count}</em> : null}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function ToolbarControlStack({
-  cityControl,
   className,
   filters,
-  mobileCityControl,
   search,
 }: {
-  cityControl?: ReactNode;
   className?: string;
   filters?: ReactNode;
-  mobileCityControl?: ReactNode;
   search: ReactNode;
 }) {
   return (
     <div
       className={cn(
         "v19-toolbar-control-stack",
-        cityControl != null && "has-city-control",
         filters != null && "has-filter-control",
         className,
       )}
     >
       {search}
       {filters}
-      {cityControl}
-      {mobileCityControl ? (
-        <div className="v19-mobile-city-control">{mobileCityControl}</div>
-      ) : null}
     </div>
   );
 }
@@ -259,6 +404,7 @@ export function ToolbarIconButton({
   icon: ToolbarIconName;
   label: string;
   pressed: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }) {
   return (
     <IconButton
@@ -488,6 +634,7 @@ export function SubmissionCollectionRow({
   meta,
   onOpen,
   searchText,
+  selected = false,
   status,
   statusDetail,
   statusLabel,
@@ -508,6 +655,7 @@ export function SubmissionCollectionRow({
   meta?: ReactNode;
   onOpen: () => void;
   searchText?: string;
+  selected?: boolean;
   status: SubmissionStatus;
   statusDetail?: string;
   statusLabel: string;
@@ -523,7 +671,9 @@ export function SubmissionCollectionRow({
         compact ? "is-rail-compact" : "is-rail-full",
         `status-${status}`,
         (status === "returned" || status === "requires_action") && "is-attention",
+        selected && "is-selected",
       )}
+      aria-current={selected ? "true" : undefined}
       aria-label={`${action}: ${title}, ${submissionId}`}
       data-submission-card=""
       data-submission-id={submissionId}
@@ -636,11 +786,41 @@ function ProgressCell({ value }: { value: string }) {
             ? "is-empty"
             : "is-partial",
       )}
-      style={{ "--progress": `${safePercent}%` } as CSSProperties}
     >
       <span className="v19-progress-value">{value}</span>
-      <span className="v19-progress-track" aria-hidden="true" />
+      <ProgressMeter value={safePercent} ariaHidden />
     </span>
+  );
+}
+
+export function ProgressMeter({
+  ariaHidden = false,
+  className,
+  label,
+  max = 100,
+  tone = "accent",
+  value,
+}: {
+  ariaHidden?: boolean;
+  className?: string;
+  label?: string;
+  max?: number;
+  tone?: "accent" | "danger" | "muted" | "success" | "warning";
+  value: number;
+}) {
+  const safeMax = Number.isFinite(max) && max > 0 ? max : 100;
+  const safeValue = Number.isFinite(value)
+    ? Math.min(Math.max(value, 0), safeMax)
+    : 0;
+
+  return (
+    <progress
+      aria-hidden={ariaHidden || label == null ? true : undefined}
+      aria-label={label}
+      className={cn("v19-progress-track", `tone-${tone}`, className)}
+      max={safeMax}
+      value={safeValue}
+    />
   );
 }
 

@@ -1,6 +1,7 @@
-import { Button, NavCount } from "../../../shared/ui/primitives";
-import { useEffect, useState, type ReactNode, type SVGProps } from "react";
+import type { ReactNode, SVGProps } from "react";
 import visaOpsLogo from "../../../assets/visaflow-logo.png";
+import { cn } from "../../../shared/ui/cn";
+import { Button, NavCount } from "../../../shared/ui/primitives";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
 
@@ -17,7 +18,16 @@ export type OperationalNavItem = {
   tone?: OperationalNavTone;
 };
 
-type OperationalSidebarProps = {
+export type OperationalSidebarVariant = "desktop" | "mobile" | "single";
+
+export function OperationalSidebar({
+  createAction,
+  footer,
+  items,
+  onMobileClose,
+  mobileTitle,
+  variant = "single",
+}: {
   brand?: string;
   createAction?: {
     label: string;
@@ -27,122 +37,11 @@ type OperationalSidebarProps = {
   items: OperationalNavItem[];
   onMobileClose?: () => void;
   mobileTitle?: string;
-};
-
-type OperationalSideMenuProps = OperationalSidebarProps & {
-  mobileOpen: boolean;
-  onMobileClose: () => void;
-};
-
-type OperationalSidebarVariant = "desktop" | "mobile" | "single";
-
-export function OperationalSideMenu({
-  createAction,
-  footer,
-  items,
-  mobileOpen,
-  mobileTitle,
-  onMobileClose,
-}: OperationalSideMenuProps) {
-  const isMobileViewport = useMediaQuery("(max-width: 760px)");
-  const mobileItems = items.map((item) => ({
-    ...item,
-    onClick: () => {
-      item.onClick();
-      onMobileClose();
-    },
-  }));
-  const mobileCreateAction = createAction
-    ? {
-        ...createAction,
-        onClick: () => {
-          createAction.onClick();
-          onMobileClose();
-        },
-      }
-    : undefined;
-
-  useEffect(() => {
-    if (!isMobileViewport && mobileOpen) {
-      onMobileClose();
-    }
-  }, [isMobileViewport, mobileOpen, onMobileClose]);
-
-  return (
-    <>
-      {!isMobileViewport ? (
-        <OperationalSidebarFrame
-          createAction={createAction}
-          items={items}
-          footer={footer}
-          variant="desktop"
-        />
-      ) : null}
-
-      {isMobileViewport && mobileOpen ? (
-        <OperationalSidebarFrame
-          createAction={mobileCreateAction}
-          items={mobileItems}
-          onMobileClose={onMobileClose}
-          mobileTitle={mobileTitle}
-          footer={footer}
-          variant="mobile"
-        />
-      ) : null}
-
-      {isMobileViewport && mobileOpen ? (
-        <button
-          className="ops-mobile-menu-backdrop"
-          type="button"
-          aria-label="Закрыть меню"
-          onClick={onMobileClose}
-        />
-      ) : null}
-    </>
-  );
-}
-
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia(query).matches;
-  });
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(query);
-    const handleChange = () => setMatches(mediaQuery.matches);
-
-    handleChange();
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [query]);
-
-  return matches;
-}
-
-function OperationalSidebarFrame({
-  brand = "VisaFlow",
-  createAction,
-  footer,
-  items,
-  onMobileClose,
-  mobileTitle,
-  variant = "single",
-}: OperationalSidebarProps & { variant?: OperationalSidebarVariant }) {
-  const variantClassName =
-    variant === "mobile"
-      ? "ops-sidebar--mobile opsu-sidebar--mobile"
-      : variant === "desktop"
-        ? "ops-sidebar--desktop opsu-sidebar--desktop"
-        : "opsu-sidebar--single";
-  const sidebarClassName = ["ops-sidebar", "opsu-sidebar", variantClassName]
-    .filter(Boolean)
-    .join(" ");
-
+  variant?: OperationalSidebarVariant;
+}) {
   return (
     <aside
-      className={sidebarClassName}
-      data-sidebar-contract="unified"
+      className={cn("ops-sidebar opsu-sidebar", `opsu-sidebar--${variant}`)}
       aria-label="Операционный центр"
     >
       {mobileTitle ? (
@@ -151,19 +50,19 @@ function OperationalSidebarFrame({
           <span aria-hidden="true">VF</span>
         </div>
       ) : null}
-      <div className="ops-brand opsu-brand" aria-label={`${brand} 19`}>
+      <div className="ops-brand opsu-brand">
         <span
-          className="ops-brand-logo ops-brand-mark vf-brand-capital vf-brand-capital--nav opsu-brand-mark"
+          className="ops-brand-logo ops-brand-mark opsu-brand-mark vf-brand-capital vf-brand-capital--nav"
           aria-hidden="true"
         >
           <img
-            className="vf-brand-capital-image opsu-brand-image"
+            className="opsu-brand-image vf-brand-capital-image"
             src={visaOpsLogo}
             alt=""
           />
         </span>
         <div className="ops-brand-copy opsu-brand-copy">
-          <strong className="vf-brand-wordmark opsu-wordmark">
+          <strong className="opsu-wordmark vf-brand-wordmark">
             <span className="vf-brand-tail" aria-hidden="true">
               VisaFlow
             </span>
@@ -171,6 +70,7 @@ function OperationalSidebarFrame({
               19
             </span>
           </strong>
+          <em>Workspace</em>
         </div>
         {onMobileClose ? (
           <Button
@@ -190,9 +90,11 @@ function OperationalSidebarFrame({
           <Button
             aria-current={item.active ? "page" : undefined}
             aria-label={`${item.label}. ${item.meta}`}
-            className={`ops-nav-item opsu-nav-item ${item.active ? "is-active" : ""} ${
-              item.tone ? `tone-${item.tone}` : ""
-            }`}
+            className={cn(
+              "ops-nav-item opsu-nav-item",
+              item.active && "is-active",
+              item.tone && `tone-${item.tone}`,
+            )}
             data-nav-id={item.id}
             disabled={item.disabled}
             key={item.id}
@@ -234,7 +136,11 @@ function OperationalSidebarFrame({
   );
 }
 
-export function OperationalMobileTabBar({ items }: { items: OperationalNavItem[] }) {
+export function OperationalMobileTabBar({
+  items,
+}: {
+  items: OperationalNavItem[];
+}) {
   return (
     <nav className="ops-mobile-tabbar" aria-label="Мобильная навигация агента">
       {items.map((item) => (

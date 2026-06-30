@@ -2,7 +2,6 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../shared/ui/primitives";
 import type { AccessRequest } from "../../../shared/authRegistration";
 import type { Role } from "../types";
-import "./SettingsScreen.css";
 
 type WorkspaceSettings = {
   compactLists: boolean;

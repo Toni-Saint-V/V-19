@@ -81,24 +81,30 @@ test.describe("V-19 pilot admin review click flow", () => {
     await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
     await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
     await expectDrawerStatus(page, "Готово к выгрузке");
-    await drawer(page).getByRole("button", { name: /Закрыть (подачу|проверку)/ }).click();
+    await drawer(page)
+      .getByRole("button", { name: /Закрыть (подачу|проверку)/ })
+      .click();
 
     await clickWorkspaceButton(page, /Выгрузка/);
-    await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+    ).toBeVisible();
     await clearExportSelection(page);
     await page
       .locator(".export-row")
       .filter({ hasText: "Семья Петровых" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByRole("heading", { name: "1 подача · 2 заявителя" })).toBeVisible();
-    await expect(page.getByText("Sheet1 · masked preview")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "1 подача · 2 заявителя" }),
+    ).toBeVisible();
+    await expect(page.getByText("Sheet1 · предпросмотр")).toBeVisible();
     await expect(page.getByText(/ZIP|zip/)).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Сформировать Эксель" }).click();
-    await expect(page.getByRole("button", { name: "Скачать" })).toBeEnabled();
+    await page.getByRole("button", { name: "Сформировать Excel" }).click();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Скачать" }).click();
+    await page.getByRole("button", { name: "Скачать Excel" }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
     await expect(download.failure()).resolves.toBeNull();

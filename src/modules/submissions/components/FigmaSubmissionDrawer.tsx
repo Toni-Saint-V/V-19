@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Edit3,
   FileDigit,
   FileText,
   History,
@@ -16,8 +17,11 @@ import {
   ShieldAlert,
   UploadCloud,
   User,
+  X,
 } from "lucide-react";
 import { getPrimaryAction, statusLabels } from "../status";
+import { ProgressMeter } from "./CollectionPrimitives";
+import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
 import type {
   DrawerTab,
   Role,
@@ -72,21 +76,6 @@ type FigmaSubmissionDrawerProps = {
   surface: "agent" | "review" | "export";
   [key: string]: unknown;
 };
-
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(
-    typeof window !== "undefined" ? window.matchMedia(query).matches : true,
-  );
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
-    media.addEventListener("change", listener);
-    return () => media.removeEventListener("change", listener);
-  }, [query]);
-
-  return matches;
-}
 
 function sourceStatus(submission: Submission): SourceStatus {
   if (submission.status === "draft") return "draft";
@@ -206,7 +195,7 @@ function fileApplicantSections(submission: Submission): FileApplicantSection[] {
 }
 
 const Skeleton = ({ className = "" }: { className?: string }) => (
-  <div className={`bg-white/5 animate-pulse rounded-[10px] ${className}`} />
+  <div className={`v19-figma-skeleton ${className}`} />
 );
 
 const StatusBadge = ({ status }: { status: SourceStatus }) => {
@@ -277,14 +266,15 @@ const OverviewTab = ({ data }: { data: FigmaSubmissionDetail }) => (
             Чеклист документов
           </h3>
           <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
-            3/3
+            8/10
           </span>
         </div>
         <div className="space-y-3 flex-1 flex flex-col justify-center">
           {[
-            { label: "Скан загранпаспорта", status: "done" },
-            { label: "Селфи с лицом", status: "done" },
-            { label: "Селфи с загранпаспортом", status: "done" },
+            { label: "Паспорта (Загран, РФ)", status: "done" },
+            { label: "Финансовые гарантии", status: "done" },
+            { label: "Справки с работы", status: "pending" },
+            { label: "Бронирования (Отель, Авиа)", status: "done" },
           ].map((doc) => (
             <div key={doc.label} className="flex items-center gap-3">
               {doc.status === "done" ? (
@@ -345,16 +335,19 @@ const QuestionnaireTab = ({
   onOpenQuestionnaire: () => void;
 }) => (
   <div className="space-y-6">
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-center justify-between">
       <div>
-        <h3 className="text-[16px] font-semibold text-white">Блоки анкеты</h3>
+        <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
+        <p className="text-[12px] text-white/50 mt-1">
+          Осталось заполнить 2 блока данных
+        </p>
       </div>
       <button
-        className="h-10 px-5 min-w-[142px] bg-white/[0.13] hover:bg-white/[0.18] border border-white/10 hover:border-white/15 text-white text-[13px] font-semibold rounded-xl transition-colors whitespace-nowrap"
+        className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
         onClick={onOpenQuestionnaire}
         type="button"
       >
-        Открыть анкету
+        <Edit3 className="w-4 h-4" /> Открыть анкету
       </button>
     </div>
 
@@ -373,7 +366,7 @@ const QuestionnaireTab = ({
         { title: "Детали поездки", icon: Plane, progress: 100, status: "done" },
         { title: "Визовая история", icon: History, progress: 100, status: "done" },
       ].map((section) => (
-        <div
+        <QuestionnaireSectionPreviewCard
           key={section.title}
           className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
           role="button"
@@ -385,11 +378,19 @@ const QuestionnaireTab = ({
             onOpenQuestionnaire();
           }}
         >
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border bg-white/5 border-white/10 text-white/45">
+          <div
+            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
+              section.status === "done"
+                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                : section.status === "in_progress"
+                  ? "bg-[#3a45b4]/10 border-[#3a45b4]/20 text-[#8fa3ff]"
+                  : "bg-white/5 border-white/10 text-white/40"
+            }`}
+          >
             <section.icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[13px] font-medium text-white truncate">
                 {section.title}
               </span>
@@ -397,25 +398,25 @@ const QuestionnaireTab = ({
                 {section.progress}%
               </span>
             </div>
-            <div className="w-4/5 h-[3px] bg-white/5 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full ${
-                  section.status === "done"
-                    ? "bg-emerald-500"
-                    : section.status === "in_progress"
-                      ? "bg-[#3a45b4]"
-                      : "bg-white/10"
-                }`}
-                style={{ width: `${section.progress}%` }}
-              />
-            </div>
+            <ProgressMeter
+              ariaHidden
+              className="v19-questionnaire-section-progress"
+              tone={
+                section.status === "done"
+                  ? "success"
+                  : section.status === "in_progress"
+                    ? "accent"
+                    : "muted"
+              }
+              value={section.progress}
+            />
             {section.remaining ? (
               <div className="text-[10px] text-white/40 mt-1.5">
                 Осталось: {section.remaining}
               </div>
             ) : null}
           </div>
-        </div>
+        </QuestionnaireSectionPreviewCard>
       ))}
     </div>
   </div>
@@ -547,18 +548,6 @@ const FilesTab = ({
                                 if (node) fileInputsRef.current.set(file.id, node);
                                 else fileInputsRef.current.delete(file.id);
                               }}
-                              style={{
-                                border: 0,
-                                clip: "rect(0 0 0 0)",
-                                clipPath: "inset(50%)",
-                                height: 1,
-                                margin: -1,
-                                overflow: "hidden",
-                                padding: 0,
-                                position: "absolute",
-                                whiteSpace: "nowrap",
-                                width: 1,
-                              }}
                               type="file"
                               onChange={(event) => handleFileChange(event, file.id)}
                             />
@@ -687,8 +676,9 @@ const IssuesTab = ({
   </div>
 );
 
-const HistoryTab = () => {
-  const events = [
+const HistoryTab = () => (
+  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-white/10">
+    {[
       {
         icon: <AlertCircle className="w-4 h-4 text-orange-400" />,
         time: "Сегодня, 14:30",
@@ -717,65 +707,31 @@ const HistoryTab = () => {
         type: "neutral",
         user: "Вы",
       },
-    ];
-
-  return (
-    <div
-      className="overflow-hidden rounded-2xl"
-      style={{
-        backgroundColor: "rgb(255 255 255 / 0.035)",
-        border: "1px solid rgb(255 255 255 / 0.1)",
-      }}
-    >
-      {events.map((event, index) => {
-        const isLast = index === events.length - 1;
-
-        return (
-          <div
-            key={event.title}
-            className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 px-4 py-4"
-            style={
-              isLast
-                ? undefined
-                : { borderBottom: "1px solid rgb(255 255 255 / 0.06)" }
-            }
-          >
-            <div className="relative flex justify-center">
-              {!isLast ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute left-1/2 top-9 bottom-[-17px] w-px -translate-x-1/2"
-                  style={{ backgroundColor: "rgb(255 255 255 / 0.08)" }}
-                />
-              ) : null}
-              <div
-                className={`relative z-10 w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-[#111113] ${
-                  event.type === "warning"
-                    ? "border-orange-500/30"
-                    : event.type === "info"
-                      ? "border-[#8fa3ff]/30"
-                      : "border-white/10"
-                }`}
-              >
-                {event.icon}
-              </div>
-            </div>
-            <div className="min-w-0 pt-1">
-              <div className="text-[14px] font-medium text-white/90">
-                {event.title}
-              </div>
-              <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
-                <span>{event.time}</span>
-                <span className="w-1 h-1 rounded-full bg-white/20" />
-                <span>{event.user}</span>
-              </div>
-            </div>
+    ].map((event) => (
+      <div key={event.title} className="relative flex gap-5">
+        <div
+          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10 ${
+            event.type === "warning"
+              ? "border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.2)]"
+              : event.type === "info"
+                ? "border-[#3a45b4]/50"
+                : "border-white/10"
+          }`}
+        >
+          {event.icon}
+        </div>
+        <div className="pt-1.5">
+          <div className="text-[14px] font-medium text-white/90">{event.title}</div>
+          <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
+            <span>{event.time}</span>
+            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <span>{event.user}</span>
           </div>
-        );
-      })}
-    </div>
-  );
-};
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 function initialTab(tab: DrawerTab): TabId {
   if (tab === "files") return "files";
@@ -800,7 +756,6 @@ export function FigmaSubmissionDrawer({
   const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
   const [status, setStatus] = useState<"loading" | "success">("loading");
   const drawerTabsRef = useRef<HTMLDivElement>(null);
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const data = useMemo(() => buildDetail(submission), [submission]);
   const primaryAction = getPrimaryAction(submission, role, surface);
 
@@ -856,21 +811,31 @@ export function FigmaSubmissionDrawer({
   const footerAction =
     data.status === "returned" ? (
       <button
-        className="flex-1 sm:flex-none h-11 px-6 bg-white/[0.13] hover:bg-white/[0.18] text-white/85 hover:text-white font-semibold text-[14px] rounded-xl border border-white/10 hover:border-white/15 transition-colors flex items-center justify-center whitespace-nowrap"
+        className="v19-drawer-footer-action v19-drawer-footer-action--returned"
         disabled={primaryAction.disabled}
-        onClick={() => onAction(primaryAction.action)}
+        type="button"
+        onClick={() => {
+          if (!primaryAction.disabled) onAction(primaryAction.action);
+        }}
       >
-        Отправить исправления
+        <UploadCloud className="w-4 h-4" /> Отправить исправления
       </button>
     ) : (
       <button
-        className="flex-1 sm:flex-none h-11 px-8 bg-[#3a45b4] hover:bg-[#4855d4] text-white font-medium text-[14px] rounded-xl shadow-[0_0_20px_rgba(58,69,180,0.3)] transition-colors flex items-center justify-center gap-2"
+        className="v19-drawer-footer-action v19-drawer-footer-action--primary"
         disabled={primaryAction.disabled}
+        type="button"
         onClick={() => onAction(primaryAction.action)}
       >
         <CheckCircle2 className="w-4 h-4" /> {primaryAction.label}
       </button>
     );
+  const footerStatusText =
+    actionError ||
+    primaryAction.reason ||
+    (data.status === "returned"
+      ? "Исправьте замечания перед повторной отправкой."
+      : statusLabels[submission.status]);
 
   return (
     <AnimatePresence>
@@ -886,23 +851,21 @@ export function FigmaSubmissionDrawer({
 
       <motion.div
         animate={{ opacity: 1, x: 0, y: 0 }}
-        className="vf-figma-surface fixed z-50 flex flex-col bg-[#111113] border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.6)] lg:inset-y-2 lg:right-2 lg:w-[840px] lg:rounded-2xl lg:border lg:overflow-hidden inset-x-0 bottom-0 top-12 rounded-t-[28px] border-t border-x overflow-y-auto"
-        exit={{
-          opacity: 0,
-          x: isDesktop ? "100%" : 0,
-          y: isDesktop ? 0 : "100%",
-        }}
+        className="vf-figma-surface v19-submission-drawer-frame v19-figma-drawer-shell"
+        exit={{ opacity: 0, x: 0, y: 0 }}
         initial={{
           opacity: 0.5,
-          x: isDesktop ? "100%" : 0,
-          y: isDesktop ? 0 : "100%",
+          x: 0,
+          y: 0,
         }}
         key="figma-drawer-panel"
         role="dialog"
-        transition={{ duration: 0.18, ease: "easeOut", type: "tween" }}
+        aria-label={`Подача ${data.id}`}
+        aria-modal="true"
+        transition={{ damping: 28, mass: 0.8, stiffness: 240, type: "spring" }}
       >
-        <div className="lg:hidden sticky top-0 z-30 w-full flex items-center justify-center py-3 bg-[#111113]/90 backdrop-blur-md">
-          <div className="w-12 h-1.5 rounded-full bg-white/20" />
+        <div className="v19-figma-drawer-grabber-wrap">
+          <div className="v19-figma-drawer-grabber" />
         </div>
 
         {status === "loading" ? (
@@ -916,7 +879,7 @@ export function FigmaSubmissionDrawer({
           </div>
         ) : (
           <>
-            <header className="px-5 lg:px-8 pt-4 pb-0 bg-[#111113]/95 backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-white/5">
+            <header className="v19-figma-drawer-header">
               <div className="flex items-start justify-between gap-4 mb-6">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-[11px] lg:text-xs text-white/50 mb-2">
@@ -939,6 +902,14 @@ export function FigmaSubmissionDrawer({
                   </div>
                 </div>
 
+                <button
+                  className="v19-figma-drawer-close"
+                  aria-label="Закрыть подачу"
+                  type="button"
+                  onClick={onClose}
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
               <div
@@ -986,7 +957,7 @@ export function FigmaSubmissionDrawer({
               </div>
             </header>
 
-            <div className="lg:flex-1 lg:overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10">
+            <div className="v19-submission-drawer-body flex-1 min-h-0 overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10">
               <AnimatePresence mode="wait">
                 <motion.div
                   animate={{ opacity: 1, y: 0 }}
@@ -1021,22 +992,18 @@ export function FigmaSubmissionDrawer({
               </AnimatePresence>
             </div>
 
-            <footer className="p-4 lg:px-8 lg:py-5 border-t border-white/10 bg-[#111113]/95 backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
+            <footer className="v19-figma-drawer-footer">
               <div className="text-[12px] text-white/40 hidden sm:block">
-                {actionError ||
-                  (primaryAction.disabled && primaryAction.reason) ||
-                  (data.status === "returned"
-                    ? "Исправьте замечания перед повторной отправкой."
-                    : statusLabels[submission.status])}
+                {footerStatusText}
               </div>
-              <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 w-full sm:flex sm:w-auto">
+              <div className="flex gap-3 w-full sm:w-auto">
                 <button
-                  className="w-full sm:w-auto h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
+                  className="v19-drawer-footer-action v19-drawer-footer-action--ghost"
                   aria-label="Закрыть подачу"
                   type="button"
                   onClick={onClose}
                 >
-                  Закрыть
+                  Отмена
                 </button>
                 {footerAction}
               </div>

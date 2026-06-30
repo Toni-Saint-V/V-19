@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { parse } from "postcss";
 
 const root = process.cwd();
 const visualLockPath = path.join(root, "docs", "VISAFLOW_VISUAL_LOCK.md");
@@ -30,6 +31,11 @@ verifyVisualLock();
 verifyReferenceFiles();
 verifyNoForbiddenArtifacts();
 verifyMotionContract();
+verifyCssTokenContract();
+verifySingleStyleEntrypoint();
+verifyUnifiedSidebarContract();
+verifySubmissionVisualBypassContract();
+verifyV19SemanticStyleContract();
 
 if (failures.length > 0) {
   console.error("Agent Screen System verification failed:");
@@ -77,10 +83,10 @@ function verifyVisualLock() {
 }
 
 function verifyMotionContract() {
-  const stylesPath = path.join(root, "src", "styles.css");
+  const stylesPath = path.join(root, "src", "shared", "ui", "system.css");
 
   if (!fs.existsSync(stylesPath)) {
-    failures.push("src/styles.css is missing");
+    failures.push("src/shared/ui/system.css is missing");
     return;
   }
 
@@ -114,6 +120,273 @@ function verifyMotionContract() {
 
   if (exportQueueBlocks.some((match) => /overflow:\s*hidden/.test(match[1]))) {
     failures.push("Mobile export queue must not hide enabled row actions with overflow: hidden");
+  }
+}
+
+function verifyCssTokenContract() {
+  const stylesPath = path.join(root, "src", "shared", "ui", "system.css");
+
+  if (!fs.existsSync(stylesPath)) {
+    failures.push("src/shared/ui/system.css is missing");
+    return;
+  }
+
+  const styles = fs.readFileSync(stylesPath, "utf8");
+  const parsedStyles = parse(styles, { from: stylesPath });
+  const definedTokens = new Set();
+  const rootTokenValues = new Map();
+
+  parsedStyles.walkDecls((declaration) => {
+    if (!declaration.prop.startsWith("--")) return;
+    definedTokens.add(declaration.prop);
+    if (declaration.parent?.type === "rule" && declaration.parent.selector === ":root") {
+      rootTokenValues.set(declaration.prop, declaration.value.trim());
+    }
+  });
+  const lockedTokens = new Map([
+    ["--vf-bg-app", "#070809"],
+    ["--vf-bg-shell", "#0b0c0e"],
+    ["--vf-bg-panel", "#0e1013"],
+    ["--vf-bg-row", "#15171b"],
+    ["--vf-bg-row-hover", "#191c21"],
+    ["--vf-bg-control", "#1a1c21"],
+    ["--vf-border-subtle", "rgba(255, 255, 255, 0.08)"],
+    ["--vf-border-strong", "rgba(255, 255, 255, 0.13)"],
+    ["--vf-text-primary", "#f3f4f6"],
+    ["--vf-text-secondary", "#b2b6bf"],
+    ["--vf-text-muted", "#8f949e"],
+    ["--vf-accent", "#6874e8"],
+    ["--vf-accent-hover", "#7580ee"],
+    ["--vf-accent-active", "#5964d6"],
+    ["--vf-focus", "#7c84ff"],
+    ["--vf-selected-bg", "#25272d"],
+    ["--vf-selected-bg-hover", "#2a2d34"],
+    ["--vf-selected-border", "rgba(255, 255, 255, 0.11)"],
+    ["--vf-selected-text", "#f3f4f6"],
+    ["--vf-nav-selected-bg", "#25272d"],
+    ["--vf-nav-selected-border", "rgba(255, 255, 255, 0.12)"],
+    ["--vf-row-selected-bg", "#181b21"],
+    ["--vf-row-selected-border", "rgba(104, 116, 232, 0.72)"],
+    ["--vf-red", "#ff5c67"],
+    ["--vf-red-hover", "#ff6b75"],
+    ["--vf-red-active", "#e94d59"],
+    ["--vf-red-fg", "#18080a"],
+    ["--vf-red-soft-bg", "rgba(255, 92, 103, 0.13)"],
+    ["--vf-red-soft-border", "rgba(255, 92, 103, 0.48)"],
+    ["--vf-red-soft-text", "#ff8a92"],
+    ["--vf-yellow", "#f4b840"],
+    ["--vf-yellow-hover", "#ffc653"],
+    ["--vf-yellow-active", "#d99b25"],
+    ["--vf-yellow-fg", "#171006"],
+    ["--vf-yellow-soft-bg", "rgba(244, 184, 64, 0.13)"],
+    ["--vf-yellow-soft-border", "rgba(244, 184, 64, 0.48)"],
+    ["--vf-yellow-soft-text", "#f4b840"],
+    ["--vf-green", "#45d082"],
+    ["--vf-green-hover", "#58df93"],
+    ["--vf-green-active", "#30b86a"],
+    ["--vf-green-fg", "#06150c"],
+    ["--vf-green-soft-bg", "rgba(69, 208, 130, 0.13)"],
+    ["--vf-green-soft-border", "rgba(69, 208, 130, 0.48)"],
+    ["--vf-green-soft-text", "#59df94"],
+  ]);
+
+  for (const [token, expectedValue] of lockedTokens) {
+    if (rootTokenValues.get(token)?.toLowerCase() !== expectedValue.toLowerCase()) {
+      failures.push(`src/shared/ui/system.css missing locked token ${token}: ${expectedValue}`);
+    }
+  }
+
+  const undefinedReferences = new Set();
+  for (const match of styles.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/g)) {
+    if (!definedTokens.has(match[1])) undefinedReferences.add(match[1]);
+  }
+
+  for (const token of [...undefinedReferences].sort()) {
+    failures.push(`src/shared/ui/system.css references undefined custom property ${token}`);
+  }
+
+  for (const match of styles.matchAll(
+    /var\(\s*(--[A-Za-z0-9_-]+)\s*,\s*var\(\s*\1\b/g,
+  )) {
+    failures.push(
+      `src/shared/ui/system.css has self-referential fallback for ${match[1]}`,
+    );
+  }
+}
+
+function verifySingleStyleEntrypoint() {
+  const srcRoot = path.join(root, "src");
+  const cssFiles = listFiles(srcRoot)
+    .map((file) => relative(file))
+    .filter((file) => /\.(?:css|scss|less)$/i.test(file));
+  const expectedCssFiles = ["src/shared/ui/system.css"];
+
+  assertSameSet(cssFiles, expectedCssFiles, "runtime stylesheet files");
+
+  const sourceFiles = listFiles(srcRoot).filter((file) => /\.(?:ts|tsx|js|jsx)$/i.test(file));
+  const cssImports = [];
+
+  for (const file of sourceFiles) {
+    const source = fs.readFileSync(file, "utf8");
+    const cssImportPatterns = [
+      /\bimport\s+(?:[^("'`;]*?\s+from\s+)?["']([^"']+\.(?:css|scss|less))["']/g,
+      /\bimport\s*\(\s*["']([^"']+\.(?:css|scss|less))["']\s*\)/g,
+    ];
+
+    for (const pattern of cssImportPatterns) {
+      for (const match of source.matchAll(pattern)) {
+        const specifier = match[1];
+        cssImports.push({
+          owner: relative(file),
+          resolved: specifier.startsWith(".")
+            ? relative(path.resolve(path.dirname(file), specifier))
+            : specifier,
+          specifier,
+        });
+      }
+    }
+  }
+
+  assertSameSet(
+    [...new Set(cssImports.map((cssImport) => cssImport.owner))],
+    ["src/main.tsx"],
+    "runtime stylesheet import owners",
+  );
+
+  for (const cssImport of cssImports) {
+    if (cssImport.resolved !== "src/shared/ui/system.css") {
+      failures.push(
+        `${cssImport.owner} imports stylesheet ${cssImport.specifier}; expected src/shared/ui/system.css`,
+      );
+    }
+  }
+}
+
+function verifyUnifiedSidebarContract() {
+  const stylesPath = path.join(root, "src", "shared", "ui", "system.css");
+  const styles = fs.readFileSync(stylesPath, "utf8");
+
+  if (/\.surface-agent-inbox,\s*\.surface-agent-inbox/.test(styles)) {
+    failures.push("src/shared/ui/system.css duplicates .surface-agent-inbox in an :is() selector");
+  }
+
+  if (/\.ops-shell\s+\.ops-sidebar/.test(styles)) {
+    failures.push(
+      "src/shared/ui/system.css has broad .ops-shell .ops-sidebar selectors; use .ops-shell.has-unified-side-menu or quarantine legacy rules with :not(.has-unified-side-menu)",
+    );
+  }
+
+  if (
+    /\.ops-shell(?!(?:\.has-unified-side-menu|:not\(\.has-unified-side-menu\)))(?:\.[A-Za-z0-9_-]+|:is\([^)]*\))*\.is-mobile-nav-open\s+\.ops-sidebar/.test(styles)
+  ) {
+    failures.push(
+      "src/shared/ui/system.css has mobile sidebar selectors that bypass the unified side menu contract",
+    );
+  }
+}
+
+function verifySubmissionVisualBypassContract() {
+  const checkedRoots = [
+    path.join(root, "src", "modules", "submissions"),
+    path.join(root, "src", "shared", "ui", "system.css"),
+  ];
+  const forbiddenPatterns = [
+    [/\bstyle=\{/, "React style prop"],
+    [/\bCSSProperties\b/, "React CSSProperties visual escape hatch"],
+    [/--progress\b/, "local progress custom property"],
+    [/--status-chip-dot\b/, "local status-chip custom property"],
+  ];
+
+  for (const checkedRoot of checkedRoots) {
+    const files = fs.statSync(checkedRoot).isDirectory()
+      ? listFiles(checkedRoot)
+      : [checkedRoot];
+
+    for (const file of files) {
+      if (!/\.(?:css|ts|tsx)$/i.test(file)) continue;
+      const source = fs.readFileSync(file, "utf8");
+      for (const [pattern, label] of forbiddenPatterns) {
+        if (pattern.test(source)) {
+          failures.push(`${relative(file)} contains forbidden ${label}`);
+        }
+      }
+    }
+  }
+}
+
+function verifyV19SemanticStyleContract() {
+  const stylesPath = path.join(root, "src", "shared", "ui", "system.css");
+  const checkedSourceFiles = [
+    "src/modules/submissions/components/FigmaSubmissionDrawer.tsx",
+    "src/modules/submissions/components/FigmaQuestionnaireScreen.tsx",
+    "src/modules/submissions/components/CreateSubmissionDrawer.tsx",
+    "src/modules/submissions/components/CollectionPrimitives.tsx",
+  ];
+
+  if (!fs.existsSync(stylesPath)) {
+    failures.push("src/shared/ui/system.css is missing");
+    return;
+  }
+
+  const styles = fs.readFileSync(stylesPath, "utf8");
+  const sourceByPath = new Map();
+
+  for (const relativePath of checkedSourceFiles) {
+    const absolutePath = path.join(root, relativePath);
+    if (!fs.existsSync(absolutePath)) {
+      failures.push(`${relativePath} is missing`);
+      continue;
+    }
+    sourceByPath.set(relativePath, fs.readFileSync(absolutePath, "utf8"));
+  }
+
+  const requiredSemanticClasses = [
+    "v19-drawer-footer-action--returned",
+    "v19-drawer-footer-action--primary",
+    "v19-figma-drawer-shell",
+    "v19-questionnaire-field-control",
+    "v19-questionnaire-complete-button",
+    "v19-create-drawer-shell",
+    "v19-create-footer-action--primary",
+    "v19-mobile-filter-sheet",
+  ];
+
+  const combinedSource = [...sourceByPath.values()].join("\n");
+  for (const className of requiredSemanticClasses) {
+    if (!combinedSource.includes(className)) {
+      failures.push(`V-19 semantic class ${className} is not used by the target UI surfaces`);
+    }
+    if (!styles.includes(`.${className}`)) {
+      failures.push(`V-19 semantic class ${className} is not defined in src/shared/ui/system.css`);
+    }
+  }
+
+  const forbiddenInlineVisualContracts = new Map([
+    [
+      "src/modules/submissions/components/FigmaSubmissionDrawer.tsx",
+      [
+        "bg-orange-500 hover:bg-orange-600",
+        "bg-[#3a45b4] hover:bg-[#4855d4]",
+        "shadow-[0_24px_80px_rgba(0,0,0,0.6)]",
+      ],
+    ],
+    [
+      "src/modules/submissions/components/FigmaQuestionnaireScreen.tsx",
+      ["bg-[#101011] flex flex-col overflow-hidden", "bg-orange-500 hover:bg-orange-600"],
+    ],
+    [
+      "src/modules/submissions/components/CreateSubmissionDrawer.tsx",
+      ["bg-[#0e0e10] flex flex-col overflow-hidden", "bg-white text-black hover:bg-white/90"],
+    ],
+  ]);
+
+  for (const [relativePath, forbiddenSnippets] of forbiddenInlineVisualContracts) {
+    const source = sourceByPath.get(relativePath) ?? "";
+    for (const snippet of forbiddenSnippets) {
+      if (source.includes(snippet)) {
+        failures.push(`${relativePath} still contains inline visual contract: ${snippet}`);
+      }
+    }
   }
 }
 

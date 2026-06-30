@@ -10,7 +10,6 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { invokePassportExtraction } from "../passportExtractionService";
-import "./CreateSubmissionDrawer.css";
 import {
   type PassportExtractedField,
   type PassportExtractedFieldKey,
@@ -18,6 +17,7 @@ import {
   type PreliminaryIntakeDraft,
   type Submission,
 } from "../types";
+import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
 
 const maxFamilyApplicants = 6;
 
@@ -444,9 +444,9 @@ export function CreateSubmissionDrawer({
       animate={{ opacity: 1, y: 0 }}
       className={`vf-figma-surface create-submission-drawer ${
         createStep === "passport" ? "is-passport-step" : "is-questionnaire-step"
-      } fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden`}
+      } v19-create-drawer-shell`}
       exit={{ opacity: 0, y: 20 }}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 1, y: 0 }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-title"
@@ -457,10 +457,10 @@ export function CreateSubmissionDrawer({
         onClose();
       }}
     >
-      <header className="h-[64px] shrink-0 border-b border-[#202124] flex items-center px-6 gap-4 bg-[#0e0e10]/80 backdrop-blur-xl">
+      <header className="v19-create-drawer-header">
         <button
           ref={closeButtonRef}
-          className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[10px] text-white/50 hover:text-white hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+          className="v19-create-drawer-close"
           type="button"
           aria-label="Закрыть создание"
           onClick={onClose}
@@ -695,7 +695,7 @@ export function CreateSubmissionDrawer({
                     </p>
                   ) : null}
                   <button
-                    className="h-10 px-6 bg-white text-black hover:bg-white/90 font-medium text-[13px] rounded-[8px] transition-all relative z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                    className="v19-create-upload-button"
                     type="button"
                     onClick={() => passportFileInputRef.current?.click()}
                   >
@@ -983,10 +983,12 @@ export function CreateSubmissionDrawer({
                 </div>
                 <div className="qs-preview">
                   {questionnaireSections.map((section) => (
-                    <div className="qs-item" key={section}>
-                      <strong>{section}</strong>
-                      <span>Заполнить после сохранения</span>
-                    </div>
+                    <QuestionnaireSectionPreviewCard
+                      className="qs-item"
+                      key={section}
+                      title={section}
+                      meta="Заполнить после сохранения"
+                    />
                   ))}
                 </div>
               </article>
@@ -996,7 +998,7 @@ export function CreateSubmissionDrawer({
       </div>
 
       {createStep === "passport" ? (
-        <footer className="shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <footer className="v19-create-drawer-footer">
           <span className="text-[12px] text-white/60">
             {type === "family" ? `${applicantCount} заявителя. ` : ""}
             {passportReadinessSummary}
@@ -1004,10 +1006,8 @@ export function CreateSubmissionDrawer({
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               disabled={!passportReady}
-              className={`h-11 px-5 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
-                passportReady
-                  ? "bg-white/10 text-white hover:bg-white/15 border border-white/10"
-                  : "bg-[#161617] text-white/25 cursor-not-allowed border border-[#202124]"
+              className={`v19-create-footer-action v19-create-footer-action--secondary ${
+                passportReady ? "is-enabled" : "is-disabled"
               }`}
               type="button"
               onClick={() => onCreate(passportUploads, preliminaryIntake)}
@@ -1016,10 +1016,8 @@ export function CreateSubmissionDrawer({
             </button>
             <button
               disabled={!primaryActionAvailable}
-              className={`h-11 px-6 rounded-[8px] text-[13px] font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
-                primaryActionAvailable
-                  ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                  : "bg-[#161617] text-white/25 cursor-not-allowed border border-[#202124]"
+              className={`v19-create-footer-action v19-create-footer-action--primary ${
+                primaryActionAvailable ? "is-enabled" : "is-disabled"
               }`}
               type="button"
               onClick={handlePrimaryAction}
@@ -1037,21 +1035,21 @@ export function CreateSubmissionDrawer({
           </span>
           <div className="flex gap-3">
             <button
-              className="h-10 px-4 rounded-[8px] bg-[#161617] border border-[#202124] text-white/60 hover:text-white hover:bg-[#1a1a1d] text-[13px] font-medium transition-colors"
+              className="v19-create-footer-action v19-create-footer-action--secondary is-enabled"
               type="button"
               onClick={() => setCreateStep("passport")}
             >
               Назад
             </button>
             <button
-              className="h-10 px-5 rounded-[8px] bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium transition-colors"
+              className="v19-create-footer-action v19-create-footer-action--secondary is-enabled"
               type="button"
               onClick={() => onCreate(passportUploads, preliminaryIntake)}
             >
               Сохранить черновик
             </button>
             <button
-              className="h-10 px-5 rounded-[8px] bg-white text-black hover:bg-white/90 text-[13px] font-medium transition-colors"
+              className="v19-create-footer-action v19-create-footer-action--primary is-enabled"
               type="button"
               onClick={handlePrimaryAction}
             >

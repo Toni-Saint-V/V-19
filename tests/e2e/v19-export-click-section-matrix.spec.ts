@@ -17,7 +17,9 @@ test.describe("V-19 export click and section matrix", () => {
 
     await openFreshWorkspace(page, { workspaceEmail: "admin@visaflow.local" });
     await clickWorkspaceButton(page, /Выгрузка/);
-    await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page, "desktop export initial");
     await page.screenshot({
       fullPage: true,
@@ -25,9 +27,11 @@ test.describe("V-19 export click and section matrix", () => {
     });
 
     await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Отметить выгружено" })).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Отметить выгружено" }),
+    ).toBeDisabled();
     await expect(page.locator("#export-action-hint")).toContainText(
-      "Сначала сформируйте Эксель",
+      "Сначала сформируйте Excel",
     );
 
     await page.getByRole("button", { name: "Закрыть панель" }).click();
@@ -53,11 +57,13 @@ test.describe("V-19 export click and section matrix", () => {
       .getByRole("checkbox")
       .check();
     await expect(page.locator("#export-action-hint")).toContainText(
-      "Сначала сформируйте Эксель",
+      "Сначала сформируйте Excel",
     );
-    await expect(page.getByRole("button", { name: "Сформировать Эксель" })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "Сформировать Excel" }),
+    ).toBeEnabled();
 
-    await page.getByRole("button", { name: "Сформировать Эксель" }).click();
+    await page.getByRole("button", { name: "Сформировать Excel" }).click();
     await expect(page.locator("#export-action-hint")).toContainText(
       "Файл сформирован. Теперь скачайте его.",
     );
@@ -77,7 +83,9 @@ test.describe("V-19 export click and section matrix", () => {
       "aria-selected",
       "true",
     );
-    await expect(page.locator(".submission-list").getByText("Ольга Фролова")).toBeVisible();
+    await expect(
+      page.locator(".export-history-table").getByText("Ольга Фролова"),
+    ).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/export-click-section-matrix-20260629/export-desktop-history.png",
@@ -89,7 +97,10 @@ test.describe("V-19 export click and section matrix", () => {
     await expect(
       exportedHistoryRow.getByRole("button", { name: /^(Открыть|Проверить) PDF$/ }),
     ).toHaveCount(0);
-    await expect(exportedHistoryRow.getByText("PDF handoff: через файлы подачи")).toBeVisible();
+    await expect(exportedHistoryRow.getByText("Нужна проверка PDF")).toBeVisible();
+    await expect(
+      exportedHistoryRow.getByText("PDF записи отсутствует."),
+    ).toBeVisible();
     await exportedHistoryRow.getByRole("button", { name: /Ольга Фролова/ }).click();
     await expect(drawer(page)).toBeVisible();
 
@@ -119,11 +130,12 @@ test.describe("V-19 export click and section matrix", () => {
     await expect(page.locator("#export-action-hint")).toContainText(
       "Нельзя смешивать разные города",
     );
-    await expect(page.getByRole("button", { name: "Сформировать Эксель" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Сформировать Эксель" })).toHaveAttribute(
-      "aria-describedby",
-      "export-action-hint",
-    );
+    await expect(
+      page.getByRole("button", { name: "Сформировать Excel" }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Сформировать Excel" }),
+    ).toHaveAttribute("aria-describedby", "export-action-hint");
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/export-click-section-matrix-20260629/export-desktop-blocked.png",
@@ -141,7 +153,9 @@ test.describe("V-19 export click and section matrix", () => {
     await page.setViewportSize({ height: 844, width: 390 });
     await openFreshWorkspace(page, { workspaceEmail: "admin@visaflow.local" });
     await clickWorkspaceButton(page, /Выгрузка\. готово к Excel|Выгрузка/);
-    await expect(page.getByRole("heading", { level: 1, name: "Выгрузка" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page, "mobile export");
 
     const bulkSelect = page.getByRole("checkbox", {

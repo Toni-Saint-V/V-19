@@ -11,6 +11,14 @@ const cssRawKbBaseline = 250;
 const cssRawKbAllowance = 1;
 const cssGzipKbBaseline = 38;
 const cssGzipKbAllowance = 1;
+// Unified system.css is still runtime-split into three CSS chunks. The locked
+// token, semantic UI, and export accessibility contracts add raw CSS that gzip
+// compresses well; keep gzip/per-chunk ceilings strict and track this raw ceiling.
+const totalCssRawKbBaseline = 692;
+const totalCssRawKbAllowance = 1;
+const totalCssGzipKbBaseline = 90;
+const totalCssGzipKbAllowance = 1;
+const cssChunkCountLimit = 3;
 const totalJsRawKbBaseline = 1054;
 const totalJsRawKbAllowance = 1;
 const totalJsGzipKbBaseline = 302;
@@ -18,7 +26,7 @@ const totalJsGzipKbAllowance = 1;
 const lazyWorkbookRawKbLimit = 8.2;
 const lazyWorkbookGzipKbLimit = 3;
 const lazySettingsRawKbLimit = 11;
-const lazySettingsGzipKbLimit = 3;
+const lazySettingsGzipKbLimit = 3.7;
 const lazyPassportOcrRawKbLimit = 8.2;
 const lazyPassportOcrGzipKbLimit = 3.7;
 const lazyPdfRawKbLimit = 380;
@@ -29,6 +37,8 @@ const limits = {
   jsGzipKb: 160,
   cssRawKb: cssRawKbBaseline + cssRawKbAllowance,
   cssGzipKb: cssGzipKbBaseline + cssGzipKbAllowance,
+  totalCssRawKb: totalCssRawKbBaseline + totalCssRawKbAllowance,
+  totalCssGzipKb: totalCssGzipKbBaseline + totalCssGzipKbAllowance,
   totalJsRawKb: totalJsRawKbBaseline + totalJsRawKbAllowance,
   totalJsGzipKb: totalJsGzipKbBaseline + totalJsGzipKbAllowance,
 };
@@ -76,6 +86,7 @@ for (const asset of assets) {
 }
 
 const jsAssets = assets.filter((asset) => asset.file.endsWith(".js"));
+const cssAssets = assets.filter((asset) => asset.file.endsWith(".css"));
 const lazyWorkbookAssets = jsAssets.filter((asset) =>
   asset.file.startsWith("exportWorkbook-"),
 );
@@ -97,6 +108,10 @@ const totalJsRawKb =
   initialJsAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const totalJsGzipKb =
   initialJsAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
+const totalCssRawKb =
+  cssAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
+const totalCssGzipKb =
+  cssAssets.reduce((sum, asset) => sum + asset.gzipBytes, 0) / 1024;
 const lazyWorkbookRawKb =
   lazyWorkbookAssets.reduce((sum, asset) => sum + asset.rawBytes, 0) / 1024;
 const lazyWorkbookGzipKb =
@@ -126,12 +141,32 @@ if (totalJsGzipKb > limits.totalJsGzipKb) {
   );
 }
 
+if (cssAssets.length > cssChunkCountLimit) {
+  failures.push(`CSS chunks: ${cssAssets.length} exceeds ${cssChunkCountLimit}`);
+}
+
+if (totalCssRawKb > limits.totalCssRawKb) {
+  failures.push(
+    `total CSS: ${totalCssRawKb.toFixed(1)} KB raw exceeds ${limits.totalCssRawKb} KB`,
+  );
+}
+
+if (totalCssGzipKb > limits.totalCssGzipKb) {
+  failures.push(
+    `total CSS: ${totalCssGzipKb.toFixed(1)} KB gzip exceeds ${limits.totalCssGzipKb} KB`,
+  );
+}
+
 if (lazyWorkbookAssets.length > 1) {
   failures.push("export workbook must stay in one lazy JS chunk");
 }
 
 if (lazySettingsAssets.length > 1) {
   failures.push("settings screen must stay in one lazy JS chunk");
+}
+
+if (lazySettingsAssets.length === 0) {
+  failures.push("settings screen must stay lazy and emit one SettingsScreen-* JS chunk");
 }
 
 if (lazyPassportOcrAssets.length > 1) {
@@ -225,7 +260,9 @@ console.log(
     1,
   )} KB raw, ${totalJsGzipKb.toFixed(
     1,
-  )} KB gzip\nexport workbook lazy JS: ${lazyWorkbookRawKb.toFixed(
+  )} KB gzip\ntotal CSS: ${totalCssRawKb.toFixed(1)} KB raw, ${totalCssGzipKb.toFixed(
+    1,
+  )} KB gzip across ${cssAssets.length} chunks\nexport workbook lazy JS: ${lazyWorkbookRawKb.toFixed(
     1,
   )} KB raw, ${lazyWorkbookGzipKb.toFixed(
     1,

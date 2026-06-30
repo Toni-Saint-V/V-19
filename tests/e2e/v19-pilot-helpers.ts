@@ -288,9 +288,14 @@ export async function markVisibleIssuesFixed(page: Page) {
 export async function clearExportSelection(page: Page) {
   const checked = page.locator(".export-row input:checked");
 
-  while ((await checked.count()) > 0) {
-    await checked.first().uncheck();
+  for (let safety = 0; safety < 12 && (await checked.count()) > 0; safety += 1) {
+    const checkbox = checked.first();
+    await checkbox.scrollIntoViewIfNeeded();
+    await checkbox.focus();
+    await page.keyboard.press("Space");
   }
+
+  await expect(checked).toHaveCount(0);
 }
 
 export async function expectNoHorizontalOverflow(page: Page, context: string) {

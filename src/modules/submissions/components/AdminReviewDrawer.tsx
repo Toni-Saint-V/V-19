@@ -36,7 +36,10 @@ import type {
   SubmissionAction,
   SubmissionFile,
 } from "../types";
-import "./AdminReviewDrawer.css";
+import {
+  QuestionnaireSectionTabs,
+  QuestionnaireWorkspaceShell,
+} from "./QuestionnaireWorkspacePrimitives";
 
 type AdminReviewFileTarget = "passport_scan" | "selfie" | "selfie_2";
 
@@ -830,28 +833,20 @@ function QuestionnaireReviewTab({
         </div>
       </div>
 
-      <div className="admin-review-questionnaire-workspace">
+      <QuestionnaireWorkspaceShell className="admin-review-questionnaire-workspace">
         <section className="admin-review-field-pane" aria-label="Поля анкеты">
-          <div
+          <QuestionnaireSectionTabs
             className="admin-review-section-flow"
-            role="tablist"
-            aria-label="Секции анкеты"
-          >
-            {reviewSections.map((section, index) => (
-              <button
-                aria-selected={section.id === activeSection?.id}
-                className={section.id === activeSection?.id ? "is-active" : ""}
-                key={section.id}
-                role="tab"
-                type="button"
-                onClick={() => setActiveSectionId(section.id)}
-              >
-                <span>{index + 1}</span>
-                <strong>{section.title}</strong>
-                <em>{section.rows.length}</em>
-              </button>
-            ))}
-          </div>
+            ariaLabel="Секции анкеты"
+            activeId={activeSection?.id ?? ""}
+            sections={reviewSections.map((section, index) => ({
+              count: section.rows.length,
+              id: section.id,
+              prefix: index + 1,
+              title: section.title,
+            }))}
+            onChange={setActiveSectionId}
+          />
           <div className="admin-review-field-head">
             <span />
             <small>Поле</small>
@@ -898,7 +893,7 @@ function QuestionnaireReviewTab({
             </div>
           ) : null}
         </section>
-      </div>
+      </QuestionnaireWorkspaceShell>
     </div>
   );
 }

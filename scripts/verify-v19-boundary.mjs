@@ -8,7 +8,7 @@ const allowedSourceRoots = [
   path.join(root, "src/main.tsx"),
   path.join(root, "src/modules/submissions"),
   path.join(root, "src/shared"),
-  path.join(root, "src/styles.css"),
+  path.join(root, "src/shared/ui/system.css"),
   path.join(root, "src/vite-env.d.ts"),
 ];
 const forbiddenRuntimeRoots = [
