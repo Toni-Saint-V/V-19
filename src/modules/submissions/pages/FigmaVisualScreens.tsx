@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -7,7 +7,6 @@ import {
   Folder,
   List,
   Search,
-  SlidersHorizontal,
   User,
   Users,
 } from "lucide-react";
@@ -19,16 +18,13 @@ import type {
 } from "../agentActions";
 import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
-import { blockerCount, statusLabelFor } from "../status";
+import { statusLabelFor } from "../status";
 import type { City, DrawerTab, Submission } from "../types";
+import { ProgressMeter } from "../components/CollectionPrimitives";
 
 type VisualStatus = Submission["status"];
 
 type VisualActionCategory = "all" | "issues" | "review";
-type VisualFilterPanel = "city" | "date" | "id" | "type";
-type VisualLayoutMode = "list" | "vertical";
-type VisualSortMode = "dateAsc" | "dateDesc" | "default" | "idAsc" | "idDesc";
-type VisualTypeFilter = "all" | "family" | "single";
 type VisualTone = "blue" | "danger" | "green" | "indigo" | "warning";
 
 type VisualActionRow = {
@@ -66,8 +62,7 @@ type VisualMember = {
   initials: string;
   name: string;
   role: string;
-  status: "in_progress" | "needs_fix" | "ready" | "review";
-  statusLabel: string;
+  status: "in_progress" | "missing_docs" | "ready";
 };
 
 type VisualOpenHandler = (submission: Submission, tab?: DrawerTab) => void;
@@ -114,7 +109,7 @@ function statusBadge(item: VisualActionRow) {
     return (
       <span className="vf-figma-status is-indigo">
         <Clock aria-hidden="true" size={15} />
-        Проверка
+        {item.statusLabel}
       </span>
     );
   }
@@ -127,83 +122,52 @@ function statusBadge(item: VisualActionRow) {
   );
 }
 
-function submissionCardSummary(submission: Submission) {
-  const readyFiles = submission.files.filter(
-    (file) => file.status !== "missing" && file.status !== "needs_replacement",
-  ).length;
-  const blockers = blockerCount(submission);
-
-  if (blockers > 0) {
-    return `${blockers} ${blockers === 1 ? "блокер" : "блокера"} · ${readyFiles} из ${submission.files.length}`;
+function memberStatusIcon(status: VisualMember["status"]) {
+  if (status === "missing_docs") {
+    return <AlertCircle className="vf-figma-member-issue" aria-hidden="true" size={15} />;
   }
 
-  return `${readyFiles} из ${submission.files.length} файлов`;
+  if (status === "in_progress") {
+    return <span className="vf-figma-member-progress" aria-hidden="true" />;
+  }
+
+  return <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />;
+}
+
+function activateKeyboardCard(
+  event: KeyboardEvent<HTMLElement>,
+  action: () => void,
+) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  action();
 }
 
 function VisualToolbar({
   category,
   categoryCounts,
-  cityFilter,
-  cityOptions,
-  filterPanel,
-  filterPopoverOpen,
-  layoutMode,
   onCategory,
-  onCityFilter,
-  onFilterPanel,
-  onFilterPopoverOpen,
-  onLayoutMode,
   onQuery,
-  onSortMode,
-  onTypeFilter,
+  onViewMode,
   query,
-  sortMode,
-  typeFilter,
+  viewMode,
 }: {
   category: VisualActionCategory;
   categoryCounts: Record<VisualActionCategory, number>;
-  cityFilter: City | "Все города";
-  cityOptions: Array<City | "Все города">;
-  filterPanel: VisualFilterPanel;
-  filterPopoverOpen: boolean;
-  layoutMode: VisualLayoutMode;
   onCategory: (category: VisualActionCategory) => void;
-  onCityFilter: (city: City | "Все города") => void;
-  onFilterPanel: (panel: VisualFilterPanel) => void;
-  onFilterPopoverOpen: (open: boolean) => void;
-  onLayoutMode: (mode: VisualLayoutMode) => void;
   onQuery: (query: string) => void;
-  onSortMode: (mode: VisualSortMode) => void;
-  onTypeFilter: (filter: VisualTypeFilter) => void;
+  onViewMode: (mode: "columns" | "list") => void;
   query: string;
-  sortMode: VisualSortMode;
-  typeFilter: VisualTypeFilter;
+  viewMode: "columns" | "list";
 }) {
   const tabs: Array<{ id: VisualActionCategory; label: string }> = [
     { id: "all", label: "Все действия" },
     { id: "issues", label: "Ошибки" },
     { id: "review", label: "На проверке" },
   ];
-  const layoutModes: VisualLayoutMode[] = ["list", "vertical"];
-  const layoutMeta: Record<
-    VisualLayoutMode,
-    { Icon: typeof List; label: string; nextLabel: string }
-  > = {
-    list: { Icon: List, label: "Список", nextLabel: "колонкам" },
-    vertical: { Icon: Columns3, label: "Колонки", nextLabel: "списку" },
-  };
-  const filterTabs: Array<{ id: VisualFilterPanel; label: string }> = [
-    { id: "date", label: "Даты" },
-    { id: "type", label: "Тип" },
-    { id: "id", label: "Номер" },
-    { id: "city", label: "Город" },
-  ];
-  const activeLayout = layoutMeta[layoutMode];
-  const LayoutIcon = activeLayout.Icon;
 
-  function cycleLayoutMode() {
-    const nextMode = layoutModes[(layoutModes.indexOf(layoutMode) + 1) % layoutModes.length];
-    onLayoutMode(nextMode);
+  function chooseViewMode(mode: "columns" | "list") {
+    onViewMode(mode);
     window.requestAnimationFrame(() => {
       document.querySelector(".vf-figma-screen")?.scrollTo({ left: 0 });
     });
@@ -219,15 +183,10 @@ function VisualToolbar({
             key={tab.id}
             role="tab"
             type="button"
-            onClick={() => {
-              onCategory(tab.id);
-              onFilterPopoverOpen(false);
-            }}
+            onClick={() => onCategory(tab.id)}
           >
             <span className="vf-figma-tab-label">{tab.label}</span>
-            {tab.id === "all" ? null : (
-              <span className="vf-figma-tab-badge">{categoryCounts[tab.id]}</span>
-            )}
+            <span className="vf-figma-tab-badge">{categoryCounts[tab.id]}</span>
           </button>
         ))}
       </div>
@@ -243,164 +202,28 @@ function VisualToolbar({
             onChange={(event) => onQuery(event.target.value)}
           />
         </div>
-        <div className="vf-figma-tool-buttons">
-          <div className="vf-figma-filter-menu">
-            <button
-              aria-expanded={filterPopoverOpen}
-              aria-label="Открыть фильтры действий"
-              className="vf-figma-icon-button vf-figma-filter-button"
-              data-testid="agent-actions-filter-toggle"
-              type="button"
-              onClick={() => onFilterPopoverOpen(!filterPopoverOpen)}
-            >
-              <SlidersHorizontal aria-hidden="true" size={18} />
-            </button>
-            {filterPopoverOpen ? (
-              <div className="vf-figma-filter-popover vf-figma-filter-popover--matrix">
-                <div className="vf-figma-filter-header">
-                  <strong>Фильтр</strong>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSortMode("default");
-                      onTypeFilter("all");
-                      onCityFilter("Все города");
-                      onFilterPopoverOpen(false);
-                    }}
-                  >
-                    Сбросить
-                  </button>
-                </div>
-                <div className="vf-figma-filter-grid" aria-label="Тип фильтра">
-                  {filterTabs.map((filterTab) => (
-                    <button
-                      className={filterPanel === filterTab.id ? "is-active" : ""}
-                      key={filterTab.id}
-                      type="button"
-                      onClick={() => onFilterPanel(filterTab.id)}
-                    >
-                      {filterTab.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="vf-figma-filter-options">
-                  {filterPanel === "date" ? (
-                    <>
-                      <span>Даты вылета</span>
-                      <button
-                        className={sortMode === "dateAsc" ? "is-active" : ""}
-                        type="button"
-                        onClick={() => {
-                          onSortMode(sortMode === "dateAsc" ? "default" : "dateAsc");
-                          onFilterPopoverOpen(false);
-                        }}
-                      >
-                        Сначала ранние
-                      </button>
-                      <button
-                        className={sortMode === "dateDesc" ? "is-active" : ""}
-                        type="button"
-                        onClick={() => {
-                          onSortMode(sortMode === "dateDesc" ? "default" : "dateDesc");
-                          onFilterPopoverOpen(false);
-                        }}
-                      >
-                        Сначала поздние
-                      </button>
-                    </>
-                  ) : null}
-                  {filterPanel === "type" ? (
-                    <>
-                      <span>Семейные подачи и заявители</span>
-                      <button
-                        className={typeFilter === "all" ? "is-active" : ""}
-                        type="button"
-                        onClick={() => {
-                          onTypeFilter("all");
-                          onFilterPopoverOpen(false);
-                        }}
-                      >
-                        Все
-                      </button>
-                      <button
-                        className={typeFilter === "family" ? "is-active" : ""}
-                        type="button"
-                        onClick={() => {
-                          onTypeFilter("family");
-                          onFilterPopoverOpen(false);
-                        }}
-                      >
-                        Семейные подачи
-                      </button>
-                      <button
-                        className={typeFilter === "single" ? "is-active" : ""}
-                        type="button"
-                        onClick={() => {
-                          onTypeFilter("single");
-                          onFilterPopoverOpen(false);
-                        }}
-                      >
-                        Заявители
-                      </button>
-                    </>
-                  ) : null}
-                  {filterPanel === "id" ? (
-                    <>
-                      <span>Номер заявки</span>
-                      <button
-                        className={sortMode === "idAsc" ? "is-active" : ""}
-                        type="button"
-                        onClick={() => {
-                          onSortMode(sortMode === "idAsc" ? "default" : "idAsc");
-                          onFilterPopoverOpen(false);
-                        }}
-                      >
-                        По возрастанию
-                      </button>
-                      <button
-                        className={sortMode === "idDesc" ? "is-active" : ""}
-                        type="button"
-                        onClick={() => {
-                          onSortMode(sortMode === "idDesc" ? "default" : "idDesc");
-                          onFilterPopoverOpen(false);
-                        }}
-                      >
-                        По убыванию
-                      </button>
-                    </>
-                  ) : null}
-                  {filterPanel === "city" ? (
-                    <>
-                      <span>Город</span>
-                      {cityOptions.map((city) => (
-                        <button
-                          className={cityFilter === city ? "is-active" : ""}
-                          key={city}
-                          type="button"
-                          onClick={() => {
-                            onCityFilter(city);
-                            onFilterPopoverOpen(false);
-                          }}
-                        >
-                          {city}
-                        </button>
-                      ))}
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </div>
+        <div className="vf-figma-view-toggle" aria-label="Вид списка">
           <button
-            aria-label={`${activeLayout.label}. Переключить к ${activeLayout.nextLabel}`}
-            className="vf-figma-icon-button vf-figma-layout-cycle"
-            data-layout-mode={layoutMode}
-            data-testid="agent-actions-layout-toggle"
-            title={activeLayout.label}
+            className={viewMode === "list" ? "is-active" : ""}
             type="button"
-            onClick={cycleLayoutMode}
+            aria-label="Показать списком"
+            aria-pressed={viewMode === "list"}
+            title="Список"
+            onClick={() => chooseViewMode("list")}
           >
-            <LayoutIcon aria-hidden="true" size={19} />
+            <List aria-hidden="true" size={16} />
+            <span className="vf-figma-view-toggle-label">Список</span>
+          </button>
+          <button
+            className={viewMode === "columns" ? "is-active" : ""}
+            type="button"
+            aria-label="Показать колонками"
+            aria-pressed={viewMode === "columns"}
+            title="Колонки"
+            onClick={() => chooseViewMode("columns")}
+          >
+            <Columns3 aria-hidden="true" size={16} />
+            <span className="vf-figma-view-toggle-label">Колонки</span>
           </button>
         </div>
       </div>
@@ -491,9 +314,12 @@ function ColumnCard({
           </span>
         ) : (
           <>
-            <span className="vf-figma-progress">
-              <span style={{ width: `${item.progress}%` }} />
-            </span>
+          <ProgressMeter
+            ariaHidden
+            className="vf-figma-progress"
+            tone={tone === "green" ? "success" : tone === "warning" ? "warning" : "accent"}
+            value={item.progress}
+          />
             <em>{item.progress}%</em>
           </>
         )}
@@ -503,32 +329,22 @@ function ColumnCard({
 }
 
 export function FigmaActionQueueVisual({
-  cityFilter,
-  cityOptions,
   completedActions,
-  onCityFilter,
   onOpen,
   onSearch,
   openActions,
   query,
   summary = emptySummary,
 }: {
-  cityFilter: City | "Все города";
-  cityOptions: Array<City | "Все города">;
   completedActions: AgentActionItem[];
-  onCityFilter: (city: City | "Все города") => void;
   onOpen: VisualOpenHandler;
   onSearch: (query: string) => void;
   openActions: AgentActionItem[];
   query: string;
   summary?: AgentActionSummary;
 }) {
-  const [layoutMode, setLayoutMode] = useState<VisualLayoutMode>("list");
+  const [viewMode, setViewMode] = useState<"columns" | "list">("list");
   const [category, setCategory] = useState<VisualActionCategory>("all");
-  const [filterPanel, setFilterPanel] = useState<VisualFilterPanel>("date");
-  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
-  const [sortMode, setSortMode] = useState<VisualSortMode>("default");
-  const [typeFilter, setTypeFilter] = useState<VisualTypeFilter>("all");
   const allItems = useMemo(
     () => [...openActions, ...completedActions].map(toVisualActionRow),
     [completedActions, openActions],
@@ -542,37 +358,8 @@ export function FigmaActionQueueVisual({
     [allItems],
   );
   const visibleItems = useMemo(
-    () => {
-      const filteredItems = allItems.filter((item) => {
-        if (!visualCategoryMatches(item, category)) return false;
-        if (typeFilter !== "all" && item.type !== typeFilter) return false;
-        if (cityFilter !== "Все города" && item.city !== cityFilter) return false;
-        return true;
-      });
-
-      if (sortMode === "dateAsc") {
-        return [...filteredItems].sort((first, second) =>
-          first.tripDateFrom.localeCompare(second.tripDateFrom),
-        );
-      }
-      if (sortMode === "dateDesc") {
-        return [...filteredItems].sort((first, second) =>
-          second.tripDateFrom.localeCompare(first.tripDateFrom),
-        );
-      }
-      if (sortMode === "idAsc") {
-        return [...filteredItems].sort((first, second) =>
-          first.id.localeCompare(second.id, "ru", { numeric: true }),
-        );
-      }
-      if (sortMode === "idDesc") {
-        return [...filteredItems].sort((first, second) =>
-          second.id.localeCompare(first.id, "ru", { numeric: true }),
-        );
-      }
-      return filteredItems;
-    },
-    [allItems, category, cityFilter, sortMode, typeFilter],
+    () => allItems.filter((item) => visualCategoryMatches(item, category)),
+    [allItems, category],
   );
   const columns: VisualColumn[] = [
     {
@@ -600,36 +387,29 @@ export function FigmaActionQueueVisual({
       tone: "green",
     },
   ];
+  const populatedColumns = columns
+    .map((column) => ({
+      ...column,
+      items: visibleItems.filter(column.matches),
+    }))
+    .filter((column) => column.items.length > 0);
 
   return (
     <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
       <VisualToolbar
         category={category}
         categoryCounts={categoryCounts}
-        cityFilter={cityFilter}
-        cityOptions={cityOptions}
-        filterPanel={filterPanel}
-        filterPopoverOpen={filterPopoverOpen}
-        layoutMode={layoutMode}
-        onCategory={(nextCategory) => {
-          setCategory(nextCategory);
-          setFilterPopoverOpen(false);
-        }}
-        onCityFilter={onCityFilter}
-        onFilterPanel={setFilterPanel}
-        onFilterPopoverOpen={setFilterPopoverOpen}
-        onLayoutMode={setLayoutMode}
+        onCategory={setCategory}
         onQuery={onSearch}
-        onSortMode={setSortMode}
-        onTypeFilter={setTypeFilter}
+        onViewMode={setViewMode}
         query={query}
-        sortMode={sortMode}
-        typeFilter={typeFilter}
+        viewMode={viewMode}
       />
 
       <div
-        className={`vf-figma-view-stage is-${layoutMode}`}
+        className={`vf-figma-view-stage is-${viewMode}`}
         data-agent-action-open-count={summary.open}
+        key={viewMode}
       >
         {visibleItems.length === 0 ? (
           <div className="vf-figma-action-list" role="status">
@@ -645,7 +425,7 @@ export function FigmaActionQueueVisual({
               </span>
             </div>
           </div>
-        ) : layoutMode === "list" ? (
+        ) : viewMode === "list" ? (
           <div className="vf-figma-action-list">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
@@ -658,35 +438,31 @@ export function FigmaActionQueueVisual({
           </div>
         ) : (
           <div className="vf-figma-column-board">
-            {columns.map((column) => {
-              const items = visibleItems.filter(column.matches);
-
-              return (
+            {populatedColumns.length ? (
+              populatedColumns.map((column) => (
                 <section className="vf-figma-column" key={column.id}>
                   <header>
                     <span>
                       {column.tone === "danger" ? <i aria-hidden="true" /> : null}
                       {column.label}
                     </span>
-                    <em>{items.length}</em>
+                    <em>{column.items.length}</em>
                   </header>
                   <div className="vf-figma-column-stack">
-                    {items.length ? (
-                      items.map((item) => (
-                        <ColumnCard item={item} key={item.actionId} onOpen={onOpen} />
-                      ))
-                    ) : (
-                      <div className="vf-figma-column-card" role="status">
-                        <strong>Нет подач</strong>
-                        <span className="vf-figma-column-subline">
-                          Колонка пуста для текущих фильтров.
-                        </span>
-                      </div>
-                    )}
+                    {column.items.map((item) => (
+                      <ColumnCard item={item} key={item.actionId} onOpen={onOpen} />
+                    ))}
                   </div>
                 </section>
-              );
-            })}
+              ))
+            ) : (
+              <div className="vf-figma-column-card vf-figma-board-empty" role="status">
+                <strong>По текущим фильтрам здесь нет подач</strong>
+                <span className="vf-figma-column-subline">
+                  Измените категорию или поиск, чтобы вернуться к списку действий.
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -717,13 +493,17 @@ export function FigmaApplicantsVisual({
         <div className="vf-figma-family-grid">
           {familySubmissions.length ? (
             familySubmissions.map((submission) => (
-              <button
+              <article
                 className="vf-figma-family-card"
                 data-submission-id={submission.id}
                 key={submission.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 aria-label={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submission.id}`}
                 onClick={() => onOpen?.(submission)}
+                onKeyDown={(event) =>
+                  activateKeyboardCard(event, () => onOpen?.(submission))
+                }
               >
                 <span className="vf-figma-family-head">
                   <span className="vf-figma-family-icon">
@@ -731,30 +511,28 @@ export function FigmaApplicantsVisual({
                   </span>
                   <span>
                     <strong>{formatSubmissionListTitle(submission)}</strong>
-                    <em>
-                      {statusLabelFor(submission.status, "compact")} ·{" "}
-                      {applicantCountLabel(submission.applicants.length)}
-                    </em>
+                    <em>{applicantCountLabel(submission.applicants.length)}</em>
                   </span>
-                </span>
-                <span className="vf-figma-family-summary">
-                  {submissionCardSummary(submission)}
                 </span>
                 <span className="vf-figma-member-list">
                   {submission.applicants.map((applicant) => {
                     const member = visualMemberForApplicant(submission, applicant);
                     return (
-                      <span
+                      <button
                         className="vf-figma-member-row"
                         key={`${submission.id}-${applicant.id}`}
+                        type="button"
+                        aria-label={`Открыть заявителя: ${member.name}, ${formatSubmissionListTitle(submission)}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpen?.(submission, "applicants");
+                        }}
                       >
                         <em>{member.initials}</em>
                         <strong>{member.name}</strong>
-                        <small className={`vf-figma-member-state is-${member.status}`}>
-                          {memberStatusIcon(member.status, member.statusLabel)}
-                          <span>{member.statusLabel}</span>
-                        </small>
-                      </span>
+                        <small>{member.role}</small>
+                        {memberStatusIcon(member.status)}
+                      </button>
                     );
                   })}
                 </span>
@@ -765,7 +543,7 @@ export function FigmaApplicantsVisual({
                     {submission.files.length} файлов
                   </em>
                 </span>
-              </button>
+              </article>
             ))
           ) : (
             <div className="vf-figma-family-card" role="status">
@@ -806,8 +584,8 @@ export function FigmaApplicantsVisual({
                   <span>
                     <strong>{member?.name ?? submission.title}</strong>
                     <em>
-                      {member ? memberStatusIcon(member.status, member.statusLabel) : null}
-                      {member?.statusLabel ?? statusLabelFor(submission.status, "compact")}
+                      {member ? memberStatusIcon(member.status) : null}
+                      {statusLabelFor(submission.status, "compact")}
                     </em>
                   </span>
                   <span className="vf-figma-family-footer">
@@ -824,7 +602,7 @@ export function FigmaApplicantsVisual({
             <div className="vf-figma-individual-card" role="status">
               <span>
                 <strong>Индивидуальных подач нет</strong>
-                <em>По текущему списку нет одиночных заявителей.</em>
+                <em>По текущему фильтру ничего не найдено.</em>
               </span>
             </div>
           )}
@@ -908,19 +686,11 @@ function visualMemberForApplicant(
   submission: Submission,
   applicant: Submission["applicants"][number],
 ): VisualMember {
-  const status = memberStatus(
-    submission,
-    applicant.id,
-    applicant.questionnaireStatus,
-    applicant.fileStatus,
-  );
-
   return {
     initials: initialsForName(applicant.fullName),
     name: applicant.fullName,
     role: applicantRoleLabel(applicant.role ?? "main"),
-    status,
-    statusLabel: memberStatusLabel(status),
+    status: memberStatus(submission, applicant.id, applicant.questionnaireStatus),
   };
 }
 
@@ -928,82 +698,22 @@ function memberStatus(
   submission: Submission,
   applicantId: string,
   questionnaireStatus: Submission["applicants"][number]["questionnaireStatus"],
-  fileStatus: Submission["applicants"][number]["fileStatus"],
 ): VisualMember["status"] {
   const files = submission.files.filter((file) => file.applicantId === applicantId);
-  const applicantIssues = submission.issues.filter(
-    (issue) => issue.target.applicantId === applicantId,
-  );
-  const hasOpenBlocker = applicantIssues.some(
-    (issue) => issue.status === "open" && issue.severity === "blocker",
-  );
-  const hasAgentFixedIssue = applicantIssues.some(
-    (issue) => issue.status === "fixed_by_agent",
-  );
-
   if (
-    hasOpenBlocker ||
     questionnaireStatus === "needs_fix" ||
-    files.some((file) => file.status === "needs_replacement")
+    files.some((file) => file.status === "missing" || file.status === "needs_replacement")
   ) {
-    return "needs_fix";
-  }
-  if (
-    hasAgentFixedIssue ||
-    files.some((file) => file.status === "pending_review") ||
-    (submission.status === "submitted_for_review" && files.length > 0)
-  ) {
-    return "review";
+    return "missing_docs";
   }
   if (
     questionnaireStatus === "empty" ||
     questionnaireStatus === "partial" ||
-    fileStatus === "empty" ||
-    fileStatus === "partial" ||
-    fileStatus === "needs_fix" ||
-    files.some((file) => file.status === "missing" || file.status === "uploaded")
+    files.some((file) => file.status === "uploaded" || file.status === "pending_review")
   ) {
     return "in_progress";
   }
   return "ready";
-}
-
-function memberStatusLabel(status: VisualMember["status"]) {
-  if (status === "needs_fix") return "Нужна правка";
-  if (status === "review") return "На проверке";
-  if (status === "ready") return "Готов";
-  return "В работе";
-}
-
-function memberStatusIcon(status: VisualMember["status"], label?: string) {
-  const ariaLabel = label ?? memberStatusLabel(status);
-  if (status === "ready") {
-    return (
-      <CheckCircle2
-        aria-label={ariaLabel}
-        className="vf-figma-member-status-icon vf-figma-member-ready"
-        size={15}
-      />
-    );
-  }
-  if (status === "needs_fix") {
-    return (
-      <AlertCircle
-        aria-label={ariaLabel}
-        className="vf-figma-member-status-icon vf-figma-member-issue"
-        size={15}
-      />
-    );
-  }
-  return (
-    <Clock
-      aria-label={ariaLabel}
-      className={`vf-figma-member-status-icon ${
-        status === "review" ? "vf-figma-member-review" : "vf-figma-member-progress"
-      }`}
-      size={15}
-    />
-  );
 }
 
 function applicantRoleLabel(role: string) {

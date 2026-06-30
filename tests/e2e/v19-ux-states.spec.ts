@@ -20,9 +20,7 @@ async function openFreshWorkspace(
 ) {
   await page.goto("/");
   await page.evaluate(() => {
-    (
-      globalThis as unknown as { localStorage: { clear(): void } }
-    ).localStorage.clear();
+    (globalThis as unknown as { localStorage: { clear(): void } }).localStorage.clear();
   });
   if (options.workspaceEmail) {
     await page.evaluate((workspaceEmail) => {
@@ -74,14 +72,18 @@ test.describe("V-19 UX state proof", () => {
     await clickOperationalNav(page, /^Мои подачи/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
     await page.getByLabel("Поиск по подачам").fill("нет-такой-подачи-ux-proof");
-    await expect(page.getByRole("heading", { name: "Ничего не найдено" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Ничего не найдено" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("status").getByRole("button", { name: "Сбросить фильтры" }),
     ).toBeVisible();
     await saveScreenshot(page, "agent-submissions-no-results");
 
     await clickOperationalNav(page, /^Настройки/);
-    await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Настройки" }),
+    ).toBeVisible();
     await page.getByLabel("Сводка по действиям").selectOption("daily");
     await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
     await expect(page.getByRole("button", { name: "Сохранить" })).toBeEnabled();
@@ -101,14 +103,16 @@ test.describe("V-19 UX state proof", () => {
       .getByRole("checkbox");
     await expect(selectedExport).toBeChecked();
     await selectedExport.uncheck();
-    await expect(page.locator(".export-preview").getByText("Пакет не выбран")).toBeVisible();
+    await expect(
+      page.locator(".export-preview").getByText("Пакет не выбран"),
+    ).toBeVisible();
     await expect(page.locator("#export-action-hint")).toContainText(
       "Выберите хотя бы одну подачу",
     );
     await expect(
-      page.getByRole("button", { name: "Сформировать Эксель" }),
+      page.getByRole("button", { name: "Сформировать Excel" }),
     ).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Скачать" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
     await saveScreenshot(page, "export-disabled-reason");
 
     expect(problems).toEqual([]);

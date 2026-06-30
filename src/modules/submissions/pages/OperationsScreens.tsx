@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import {
-  Badge,
-  Button,
-  CardComponent,
-} from "../../../shared/ui/primitives";
+import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import type {
   AgentActionItem,
   AgentActionSummary,
@@ -24,7 +20,11 @@ import {
   adminWorkEventTitle,
   adminWorkPresentation,
   blockerCount,
+  defaultDrawerTab,
+  fixedIssueCount,
+  nextProblem,
   openIssueCount,
+  statusLabelFor,
   statusLabels,
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
@@ -36,15 +36,22 @@ import {
 import { EmptyState } from "../components/Primitives";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
+  CollectionToolbarTools,
+  compactActiveFilters,
+} from "../components/CollectionComposition";
+import { RailCard, useRailDisclosure } from "../components/RightRailPrimitives";
+import {
   ActionRow,
   CollectionGroupLabel,
   CollectionRow,
   CollectionToolbar,
   ContextRail,
-  type CollectionActiveFilter,
+  MobileFilterSheet,
+  ProgressMeter,
+  SubmissionCollectionRow,
+  type MobileFilterOption,
   SvgIcon,
   ToolbarIconButton,
-  ToolbarTools,
 } from "../components/CollectionPrimitives";
 import {
   buildReadinessQueue,
@@ -53,7 +60,6 @@ import {
   targetForIssue,
   type WorkspaceTarget,
 } from "../workspaceModel";
-import { FigmaApplicantsVisual } from "./FigmaVisualScreens";
 
 function pluralRu(count: number, one: string, few: string, many: string) {
   const mod10 = Math.abs(count) % 10;
@@ -105,97 +111,6 @@ function transitionUiState(update: () => void) {
 }
 
 type InboxEvent = OperationalInboxEvent;
-
-type MobileFilterOption<T extends string> = {
-  count?: number;
-  id: T;
-  label: string;
-};
-
-function MobileFilterSheet<T extends string>({
-  label,
-  onValueChange,
-  options,
-  title,
-  value,
-}: {
-  label: string;
-  onValueChange: (value: T) => void;
-  options: Array<MobileFilterOption<T>>;
-  title: string;
-  value: T;
-}) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [open]);
-
-  return (
-    <div className="v19-mobile-filter">
-      <ToolbarIconButton
-        className="v19-mobile-filter-trigger"
-        icon="filter"
-        label={label}
-        pressed={open}
-        onClick={() => setOpen((current) => !current)}
-      />
-      {open ? (
-        <>
-          <button
-            className="v19-mobile-filter-backdrop"
-            type="button"
-            onClick={() => setOpen(false)}
-          >
-            <span className="sr-only">Закрыть фильтры</span>
-          </button>
-          <div
-            className="v19-mobile-filter-sheet"
-            role="dialog"
-            aria-label={title}
-          >
-            <div className="v19-mobile-filter-head">
-              <strong>{title}</strong>
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Готово
-              </Button>
-            </div>
-            <div className="v19-mobile-filter-options">
-              {options.map((option) => (
-                <Button
-                  aria-pressed={value === option.id}
-                  className={`v19-mobile-filter-choice ${
-                    value === option.id ? "is-active" : ""
-                  }`}
-                  key={option.id}
-                  variant="plain"
-                  onClick={() => {
-                    onValueChange(option.id);
-                    setOpen(false);
-                  }}
-                >
-                  <span>{option.label}</span>
-                  {typeof option.count === "number" ? (
-                    <em>{option.count}</em>
-                  ) : null}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
-}
 
 function firstFileWorkspaceTarget(submission: Submission): WorkspaceTarget | undefined {
   const file =
@@ -279,26 +194,6 @@ function defaultContextRailOpen() {
   return window.innerWidth >= 1280;
 }
 
-function useContextRailEscape(isOpen: boolean, onClose: () => void) {
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-}
-
 export function AgentActionsScreen({
   cityControl,
   completedActions,
@@ -320,9 +215,12 @@ export function AgentActionsScreen({
     "all",
   );
   const hasContextRail = cityControl != null;
-  const [panelOpen, setPanelOpen] = useState(
-    () => hasContextRail && defaultContextRailOpen(),
-  );
+  const railDisclosure = useRailDisclosure({
+    defaultOpen: defaultContextRailOpen(),
+    enabled: hasContextRail,
+    transition: transitionUiState,
+  });
+  const panelOpen = railDisclosure.open;
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [sortOldest, setSortOldest] = useState(false);
 
@@ -330,8 +228,10 @@ export function AgentActionsScreen({
   const filteredActions =
     activeTab === "open" && dueFilter !== "all"
       ? baseActions.filter((action) => {
-          if (dueFilter === "week")
+          if (dueFilter === "week") {
             return action.due === "today" || action.due === "week";
+          }
+
           return action.due === dueFilter;
         })
       : baseActions;
@@ -380,49 +280,46 @@ export function AgentActionsScreen({
                 body: "Все текущие шаги выполнены. Новые действия появятся после изменений в подачах.",
                 title: "Открытых действий нет",
               };
-  const activeFilters = ([
-    dueFilter !== "all"
-      ? {
-          id: "due",
-          label:
-            dueFilter === "overdue"
-              ? "Просрочено"
-              : dueFilter === "today"
-                ? "Сегодня"
-                : "На неделе",
-          onRemove: () => transitionUiState(() => setDueFilter("all")),
-        }
-      : null,
-    sortOldest
-      ? {
-          id: "sort",
-          label: "Старые сверху",
-          onRemove: () => transitionUiState(() => setSortOldest(false)),
-        }
-      : null,
-    comfortableView
-      ? null
-      : {
-          id: "density",
-          label: "Компактный вид",
-          onRemove: () => transitionUiState(() => setComfortableView(true)),
-        },
-  ] as Array<CollectionActiveFilter | null>
-  ).filter((filter): filter is CollectionActiveFilter => filter !== null);
+  const activeFilters = compactActiveFilters([
+      dueFilter !== "all"
+        ? {
+            id: "due",
+            label:
+              dueFilter === "overdue"
+                ? "Просрочено"
+                : dueFilter === "today"
+                  ? "Сегодня"
+                  : "На неделе",
+            onRemove: () => transitionUiState(() => setDueFilter("all")),
+          }
+        : null,
+      sortOldest
+        ? {
+            id: "sort",
+            label: "Старые сверху",
+            onRemove: () => transitionUiState(() => setSortOldest(false)),
+          }
+        : null,
+      comfortableView
+        ? null
+        : {
+            id: "density",
+            label: "Компактный вид",
+            onRemove: () => transitionUiState(() => setComfortableView(true)),
+          },
+    ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setDueFilter("all");
       setSortOldest(false);
       setComfortableView(true);
     });
-  useContextRailEscape(hasContextRail && panelOpen, closePanel);
-
   function closePanel() {
-    transitionUiState(() => setPanelOpen(false));
+    railDisclosure.close();
   }
 
   function togglePanel() {
-    transitionUiState(() => setPanelOpen((value) => !value));
+    railDisclosure.toggle();
   }
 
   const panelToggleTool = (
@@ -456,9 +353,7 @@ export function AgentActionsScreen({
         }
       />
       <ToolbarIconButton
-        label={
-          sortOldest ? "Сортировка: поздние ниже" : "Сортировка: важные сверху"
-        }
+        label={sortOldest ? "Сортировка: поздние ниже" : "Сортировка: важные сверху"}
         icon="sort"
         pressed={sortOldest}
         onClick={() => transitionUiState(() => setSortOldest((value) => !value))}
@@ -480,8 +375,10 @@ export function AgentActionsScreen({
     { count: summary.completed, id: "completed", label: "Выполненные" },
   ];
   const toolbarTools = (
-    <ToolbarTools>
-      <div className="v19-desktop-toolbar-tools">{toolbarToolButtons}</div>
+    <CollectionToolbarTools
+      desktopTools={toolbarToolButtons}
+      mobileContextTool={mobilePanelToggleTool}
+      mobileFilter={
       <MobileFilterSheet<ActionMobileFilter>
         label="Фильтры действий"
         options={mobileFilterOptions}
@@ -500,9 +397,10 @@ export function AgentActionsScreen({
           })
         }
       />
-      {mobilePanelToggleTool}
-    </ToolbarTools>
+      }
+    />
   );
+
   function openAction(action: AgentActionItem) {
     const target = targetForSubmissionTab(action.submission, action.tab);
 
@@ -517,105 +415,108 @@ export function AgentActionsScreen({
           panelOpen ? "" : "is-panel-closed"
         } ${comfortableView ? "is-comfortable" : "is-compact"}`}
       >
-      <CardComponent
-        as="section"
-        className={
-          activeFilters.length
-            ? "v19-collection-panel has-active-filters"
-            : "v19-collection-panel"
-        }
-        aria-labelledby="agent-inbox-actions-title"
-      >
-        <h2 id="agent-inbox-actions-title" className="sr-only">
-          Мои действия
-        </h2>
-
-        <CollectionToolbar
-          activeFilters={activeFilters}
-          ariaLabel="Инструменты действий"
-          className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
-          mobileCityControl={cityControl}
-          mobileTitle="Мои действия"
-          onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-          onTabChange={(nextTab) =>
-            transitionUiState(() => setActiveTab(nextTab))
+        <CardComponent
+          as="section"
+          className={
+            activeFilters.length
+              ? "v19-collection-panel has-active-filters"
+              : "v19-collection-panel"
           }
-          search={searchControl}
-          tabs={[
-            { count: summary.open, id: "open", label: "Открытые" },
-            {
-              count: summary.completed || undefined,
-              id: "completed",
-              label: "Выполненные",
-            },
-          ]}
-          tabsAriaLabel="Состояние действий"
-          tools={toolbarTools}
-          value={activeTab}
-        />
+          aria-labelledby="agent-inbox-actions-title"
+        >
+          <h2 id="agent-inbox-actions-title" className="sr-only">
+            Мои действия
+          </h2>
 
-        {visibleActions.length ? (
-          <div className="v19-event-list v19-action-list" aria-label="Список действий">
-            <div className="v19-action-insights" aria-label="Сводка действий">
-              <span className="tone-danger">
-                <strong>{summary.overdue}</strong>
-                <em>просрочено</em>
-              </span>
-              <span className="tone-amber">
-                <strong>{summary.today}</strong>
-                <em>сегодня</em>
-              </span>
-              <span className="tone-teal">
-                <strong>{summary.completed}</strong>
-                <em>выполнено</em>
-              </span>
-            </div>
-            <CollectionGroupLabel className="v19-action-group-label">
-              {actionGroupLabel}
-            </CollectionGroupLabel>
-            {visibleActions.map((action) => (
-              <ActionRow
-                badges={action.badges}
-                context={`${action.context}`}
-                cta={action.cta}
-                dueLabel={action.dueLabel}
-                key={action.id}
-                severity={action.severity}
-                selected={selectedAction?.id === action.id}
-                submissionId={action.submission.id}
-                title={action.title}
-                onOpen={() => openAction(action)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="v19-empty-state" key={`actions-empty-${activeTab}-${dueFilter}`}>
-            <h3>{emptyState.title}</h3>
-            <p>{emptyState.body}</p>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                transitionUiState(() => {
-                  if (activeTab === "completed") {
-                    setActiveTab("open");
-                    return;
-                  }
+          <CollectionToolbar
+            activeFilters={activeFilters}
+            ariaLabel="Инструменты действий"
+            className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
+            mobileCityControl={cityControl}
+            mobileTitle="Мои действия"
+            onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
+            onTabChange={(nextTab) => transitionUiState(() => setActiveTab(nextTab))}
+            search={searchControl}
+            tabs={[
+              { count: summary.open, id: "open", label: "Открытые" },
+              {
+                count: summary.completed || undefined,
+                id: "completed",
+                label: "Выполненные",
+              },
+            ]}
+            tabsAriaLabel="Состояние действий"
+            tools={toolbarTools}
+            value={activeTab}
+          />
 
-                  if (dueFilter !== "all") {
-                    setDueFilter("all");
-                    return;
-                  }
-
-                  setActiveTab("completed");
-                })
-              }
+          {visibleActions.length ? (
+            <div
+              className="v19-event-list v19-action-list"
+              aria-label="Список действий"
             >
-              {emptyState.action}
-            </Button>
-          </div>
-        )}
-      </CardComponent>
+              <div className="v19-action-insights" aria-label="Сводка действий">
+                <span className="tone-danger">
+                  <strong>{summary.overdue}</strong>
+                  <em>просрочено</em>
+                </span>
+                <span className="tone-amber">
+                  <strong>{summary.today}</strong>
+                  <em>сегодня</em>
+                </span>
+                <span className="tone-teal">
+                  <strong>{summary.completed}</strong>
+                  <em>выполнено</em>
+                </span>
+              </div>
+              <CollectionGroupLabel className="v19-action-group-label">
+                {actionGroupLabel}
+              </CollectionGroupLabel>
+              {visibleActions.map((action) => (
+                <ActionRow
+                  badges={action.badges}
+                  context={`${action.context}`}
+                  cta={action.cta}
+                  dueLabel={action.dueLabel}
+                  key={action.id}
+                  severity={action.severity}
+                  selected={selectedAction?.id === action.id}
+                  submissionId={action.submission.id}
+                  title={action.title}
+                  onOpen={() => openAction(action)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div
+              className="v19-empty-state"
+              key={`actions-empty-${activeTab}-${dueFilter}`}
+            >
+              <h3>{emptyState.title}</h3>
+              <p>{emptyState.body}</p>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  transitionUiState(() => {
+                    if (activeTab === "completed") {
+                      setActiveTab("open");
+                      return;
+                    }
 
+                    if (dueFilter !== "all") {
+                      setDueFilter("all");
+                      return;
+                    }
+
+                    setActiveTab("completed");
+                  })
+                }
+              >
+                {emptyState.action}
+              </Button>
+            </div>
+          )}
+        </CardComponent>
       </div>
 
       {hasContextRail && panelOpen ? (
@@ -626,7 +527,9 @@ export function AgentActionsScreen({
 
       {hasContextRail && panelOpen && selectedAction ? (
         <AgentSubmissionContextRail
-          applicantSummary={applicantCountLabel(selectedAction.submission.applicants.length)}
+          applicantSummary={applicantCountLabel(
+            selectedAction.submission.applicants.length,
+          )}
           fileSummary={submissionFileStateLabel(selectedAction.submission).replace(
             "Файлы ",
             "",
@@ -693,9 +596,12 @@ export function AgentInboxScreen({
   const [comfortableView, setComfortableView] = useState(true);
   const [informationalOnly, setInformationalOnly] = useState(false);
   const hasContextRail = contextRailEnabled ?? cityControl != null;
-  const [panelOpen, setPanelOpen] = useState(
-    () => hasContextRail && defaultContextRailOpen(),
-  );
+  const railDisclosure = useRailDisclosure({
+    defaultOpen: defaultContextRailOpen(),
+    enabled: hasContextRail,
+    transition: transitionUiState,
+  });
+  const panelOpen = railDisclosure.open;
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const events = useMemo(
@@ -727,8 +633,7 @@ export function AgentInboxScreen({
     : Math.min(summary.requiresAction, unreadCount);
   const informationalEventCount = Math.max(unreadCount - actionEventCount, 0);
   const selectedEvent =
-    visibleEvents.find((event) => event.id === selectedEventId) ??
-    visibleEvents[0];
+    visibleEvents.find((event) => event.id === selectedEventId) ?? visibleEvents[0];
   const railEvents = events.filter((event) => !event.read).slice(0, 3);
   const railPeerEvents = (railEvents.length ? railEvents : events)
     .filter((event) => event.id !== selectedEvent?.id)
@@ -743,37 +648,36 @@ export function AgentInboxScreen({
       label: "Ранее",
     },
   ].filter((group) => group.events.length);
-  const activeFilters = ([
-    actionOnly
-      ? {
-          id: "action",
-          label: "Требуют действия",
-          onRemove: () => transitionUiState(() => setActionOnly(false)),
-        }
-      : null,
-    informationalOnly
-      ? {
-          id: "info",
-          label: "Информационные",
-          onRemove: () => transitionUiState(() => setInformationalOnly(false)),
-        }
-      : null,
-    sortOrder === "oldest"
-      ? {
-          id: "sort",
-          label: "Старые сверху",
-          onRemove: () => transitionUiState(() => setSortOrder("newest")),
-        }
-      : null,
-    comfortableView
-      ? null
-      : {
-          id: "density",
-          label: "Компактный вид",
-          onRemove: () => transitionUiState(() => setComfortableView(true)),
-        },
-  ] as Array<CollectionActiveFilter | null>
-  ).filter((filter): filter is CollectionActiveFilter => filter !== null);
+  const activeFilters = compactActiveFilters([
+      actionOnly
+        ? {
+            id: "action",
+            label: "Требуют действия",
+            onRemove: () => transitionUiState(() => setActionOnly(false)),
+          }
+        : null,
+      informationalOnly
+        ? {
+            id: "info",
+            label: "Информационные",
+            onRemove: () => transitionUiState(() => setInformationalOnly(false)),
+          }
+        : null,
+      sortOrder === "oldest"
+        ? {
+            id: "sort",
+            label: "Старые сверху",
+            onRemove: () => transitionUiState(() => setSortOrder("newest")),
+          }
+        : null,
+      comfortableView
+        ? null
+        : {
+            id: "density",
+            label: "Компактный вид",
+            onRemove: () => transitionUiState(() => setComfortableView(true)),
+          },
+    ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setActionOnly(false);
@@ -781,14 +685,12 @@ export function AgentInboxScreen({
       setSortOrder("newest");
       setComfortableView(true);
     });
-  useContextRailEscape(hasContextRail && panelOpen, closePanel);
-
   function closePanel() {
-    transitionUiState(() => setPanelOpen(false));
+    railDisclosure.close();
   }
 
   function togglePanel() {
-    transitionUiState(() => setPanelOpen((value) => !value));
+    railDisclosure.toggle();
   }
 
   const panelToggleTool = (
@@ -812,11 +714,7 @@ export function AgentInboxScreen({
   const toolbarToolButtons = (
     <>
       <ToolbarIconButton
-        label={
-          actionOnly
-            ? "Фильтр: только требующие действия"
-            : "Фильтр: все события"
-        }
+        label={actionOnly ? "Фильтр: только требующие действия" : "Фильтр: все события"}
         icon="filter"
         pressed={actionOnly}
         onClick={() =>
@@ -844,10 +742,10 @@ export function AgentInboxScreen({
     </>
   );
   const toolbarTools = (
-    <ToolbarTools>
-      <div className="v19-desktop-toolbar-tools">{toolbarToolButtons}</div>
-      {mobilePanelToggleTool}
-    </ToolbarTools>
+    <CollectionToolbarTools
+      desktopTools={toolbarToolButtons}
+      mobileContextTool={mobilePanelToggleTool}
+    />
   );
 
   function openEventDrawer(event: InboxEvent) {
@@ -868,84 +766,92 @@ export function AgentInboxScreen({
           panelOpen ? "" : "is-panel-closed"
         } ${comfortableView ? "is-comfortable" : "is-compact"}`}
       >
-      <CardComponent
-        as="section"
-        className={
-          activeFilters.length
-            ? "v19-collection-panel has-active-filters"
-            : "v19-collection-panel"
-        }
-        aria-labelledby="agent-inbox-title"
-      >
-        <h2 id="agent-inbox-title" className="sr-only">
-          Входящие
-        </h2>
-
-        <CollectionToolbar
-          activeFilters={activeFilters}
-          ariaLabel="Инструменты входящих"
-          className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
-          mobileCityControl={cityControl}
-          mobileTitle="Входящие"
-          onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-          onTabChange={(nextTab) =>
-            transitionUiState(() => {
-              setActiveTab(nextTab);
-              setInformationalOnly(false);
-            })
+        <CardComponent
+          as="section"
+          className={
+            activeFilters.length
+              ? "v19-collection-panel has-active-filters"
+              : "v19-collection-panel"
           }
-          search={searchControl}
-          tabs={[
-            { count: unreadCount, id: "unread", label: "Непрочитанные" },
-            { id: "all", label: "Все" },
-          ]}
-          tabsAriaLabel="Состояние входящих"
-          tools={toolbarTools}
-          value={activeTab}
-        />
+          aria-labelledby="agent-inbox-title"
+        >
+          <h2 id="agent-inbox-title" className="sr-only">
+            Входящие
+          </h2>
 
-        {visibleEvents.length ? (
-          <div className="v19-event-list" aria-label="Список входящих событий">
-            {eventGroups.map((group) => (
-              <div className="v19-event-group" key={group.label}>
-                <CollectionGroupLabel>{group.label}</CollectionGroupLabel>
-                {group.events.map((event) => (
-                  <CollectionRow
-                    action={event.action}
-                    badge={event.badge}
-                    family={event.submission.type === "family"}
-                    key={event.id}
-                    meta={<InboxEventMeta event={event} />}
-                    onAction={() => openEventDrawer(event)}
-                    passport={inboxPassportNumber(event.submission)}
-                    read={event.read}
-                    title={event.title}
-                    tone={event.tone}
-                    trip={tripDates(event.submission)}
-                  />
-                ))}
-              </div>
-            ))}
-            {visibleEvents.length <= 1 ? (
-              <div className="v19-inbox-list-cue" aria-label="Состояние очереди входящих">
-                <strong>
-                  {unreadCount} непрочитанных · {actionEventCount} требуют реакции
-                </strong>
-                <span>Новые события появятся здесь после комментариев, возвратов и проверок.</span>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="v19-empty-state" key={`inbox-empty-${activeTab}-${actionOnly}`}>
-            <h3>Новых событий нет</h3>
-            <p>Здесь появятся изменения, которые требуют вашего внимания.</p>
-            <Button variant="secondary" onClick={() => setActiveTab("all")}>
-              Показать все
-            </Button>
-          </div>
-        )}
-      </CardComponent>
+          <CollectionToolbar
+            activeFilters={activeFilters}
+            ariaLabel="Инструменты входящих"
+            className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
+            mobileCityControl={cityControl}
+            mobileTitle="Входящие"
+            onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
+            onTabChange={(nextTab) =>
+              transitionUiState(() => {
+                setActiveTab(nextTab);
+                setInformationalOnly(false);
+              })
+            }
+            search={searchControl}
+            tabs={[
+              { count: unreadCount, id: "unread", label: "Непрочитанные" },
+              { id: "all", label: "Все" },
+            ]}
+            tabsAriaLabel="Состояние входящих"
+            tools={toolbarTools}
+            value={activeTab}
+          />
 
+          {visibleEvents.length ? (
+            <div className="v19-event-list" aria-label="Список входящих событий">
+              {eventGroups.map((group) => (
+                <div className="v19-event-group" key={group.label}>
+                  <CollectionGroupLabel>{group.label}</CollectionGroupLabel>
+                  {group.events.map((event) => (
+                    <CollectionRow
+                      action={event.action}
+                      badge={event.badge}
+                      family={event.submission.type === "family"}
+                      key={event.id}
+                      meta={<InboxEventMeta event={event} />}
+                      onAction={() => openEventDrawer(event)}
+                      passport={inboxPassportNumber(event.submission)}
+                      read={event.read}
+                      title={event.title}
+                      tone={event.tone}
+                      trip={tripDates(event.submission)}
+                    />
+                  ))}
+                </div>
+              ))}
+              {visibleEvents.length <= 1 ? (
+                <div
+                  className="v19-inbox-list-cue"
+                  aria-label="Состояние очереди входящих"
+                >
+                  <strong>
+                    {unreadCount} непрочитанных · {actionEventCount} требуют реакции
+                  </strong>
+                  <span>
+                    Новые события появятся здесь после комментариев, возвратов и
+                    проверок.
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div
+              className="v19-empty-state"
+              key={`inbox-empty-${activeTab}-${actionOnly}`}
+            >
+              <h3>Новых событий нет</h3>
+              <p>Здесь появятся изменения, которые требуют вашего внимания.</p>
+              <Button variant="secondary" onClick={() => setActiveTab("all")}>
+                Показать все
+              </Button>
+            </div>
+          )}
+        </CardComponent>
       </div>
 
       {hasContextRail && panelOpen ? (
@@ -961,7 +867,7 @@ export function AgentInboxScreen({
           title={selectedEvent ? selectedEvent.badge : "Входящие"}
           onClose={closePanel}
         >
-          <section className="v19-rail-card v19-inbox-overview-card">
+          <RailCard className="v19-inbox-overview-card">
             <h3>Очередь входящих</h3>
             <div className="v19-inbox-summary-line">
               <span>
@@ -977,27 +883,30 @@ export function AgentInboxScreen({
                 <em>Инфо</em>
               </span>
             </div>
-          </section>
+          </RailCard>
 
           {selectedEvent ? (
-            <section className="v19-rail-card v19-inbox-next-card">
+            <RailCard className="v19-inbox-next-card">
               <p className="v19-rail-label">Текущее событие</p>
               <h3>{selectedEvent.title}</h3>
               <p>
                 {inboxEventSourceLabel(selectedEvent)} · {selectedEvent.context} ·{" "}
                 {selectedEvent.time}
               </p>
-              <Button variant="primary" onClick={() => openPanelNextEvent(selectedEvent)}>
+              <Button
+                variant="primary"
+                onClick={() => openPanelNextEvent(selectedEvent)}
+              >
                 {selectedEvent.action}
                 <SvgIcon>
                   <path d="M9 6l6 6-6 6" />
                 </SvgIcon>
               </Button>
-            </section>
+            </RailCard>
           ) : null}
 
           {railPeerEvents.length ? (
-            <section className="v19-rail-card">
+            <RailCard>
               <h3>Ещё в очереди</h3>
               <div className="v19-rail-status-list">
                 {railPeerEvents.map((event) => (
@@ -1020,7 +929,7 @@ export function AgentInboxScreen({
                   </button>
                 ))}
               </div>
-            </section>
+            </RailCard>
           ) : null}
         </ContextRail>
       ) : null}
@@ -1153,88 +1062,511 @@ function inboxPassportNumber(submission: Submission) {
 export function AgentSubmissionsScreen({
   activeTab,
   agentList,
+  cityFilter = "Все города",
+  errorMessage = "",
   hasSearchQuery,
+  loading = false,
   onClearFilters,
+  onCreate,
   onOpen,
+  onRetryError,
   onSelect,
   onTab,
+  searchQuery = "",
   searchControl,
+  tabCounts,
+  totalSubmissionCount,
+  visibleSubmission,
 }: {
   activeTab: AgentTab;
   agentList: Submission[];
+  cityFilter?: string;
+  errorMessage?: string;
   hasSearchQuery?: boolean;
+  loading?: boolean;
   mobileTitle?: string;
   onClearFilters?: () => void;
   onCreate: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
+  onRetryError?: () => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: AgentTab) => void;
   searchQuery?: string;
   searchControl: ReactNode;
+  tabCounts: Record<AgentTab, number>;
+  totalSubmissionCount: number;
   visibleSubmission: Submission | null;
   summary: ReturnType<typeof counts>;
 }) {
+  const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
+  const hasContextRail = visibleSubmission != null && totalSubmissionCount > 0;
+  const railDisclosure = useRailDisclosure({
+    defaultOpen: defaultContextRailOpen(),
+    enabled: hasContextRail,
+    transition: transitionUiState,
+  });
+  const panelOpen = railDisclosure.open;
   const orderedApplicants = useMemo(
-    () => sortSubmissionsForOperations(agentList, "priority"),
-    [agentList],
+    () => sortSubmissionsForOperations(agentList, sortMode),
+    [agentList, sortMode],
   );
+  const familySubmissions = orderedApplicants.filter(
+    (submission) => submission.type === "family",
+  );
+  const singleSubmissions = orderedApplicants.filter(
+    (submission) => submission.type === "single",
+  );
+  const agentSortModes: SubmissionSortMode[] = ["priority", "updated", "trip"];
+  const agentTabs: Array<{ count: number; id: AgentTab; label: string }> = [
+    { count: tabCounts.all, id: "all", label: "Все подачи" },
+    { count: tabCounts.action, id: "action", label: "Требуют действия" },
+    { count: tabCounts.progress, id: "progress", label: "В работе" },
+    { count: tabCounts.review, id: "review", label: "На проверке" },
+    { count: tabCounts.done, id: "done", label: "Готово" },
+  ];
+  const activeTabLabel =
+    agentTabs.find((tab) => tab.id === activeTab)?.label ?? "Все подачи";
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const resetHorizontalScroll = () => {
+      document
+        .querySelectorAll<HTMLElement>(
+          ".ops-shell.surface-agent-submissions .workspace, .ops-shell.surface-agent-submissions .v19-collection-panel, .ops-shell.surface-agent-submissions .v19-submission-grouped-list",
+        )
+        .forEach((element) => {
+          element.scrollLeft = 0;
+        });
+    };
+
+    resetHorizontalScroll();
+    const frameId = window.requestAnimationFrame(resetHorizontalScroll);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, orderedApplicants.length, searchQuery, sortMode]);
+  const hasCityFilter = cityFilter !== "Все города";
+  const hasActiveFilters =
+    activeTab !== "all" || hasSearchQuery || hasCityFilter || sortMode !== "priority";
+  const activeFilters = compactActiveFilters([
+      activeTab !== "all"
+        ? {
+            id: "status",
+            label: activeTabLabel,
+            onRemove: () => transitionUiState(() => onTab("all")),
+          }
+        : null,
+      hasSearchQuery && searchQuery.trim()
+        ? { id: "search", label: `Поиск: ${searchQuery.trim()}` }
+        : null,
+      hasCityFilter ? { id: "city", label: `Город: ${cityFilter}` } : null,
+      sortMode !== "priority"
+        ? {
+            id: "sort",
+            label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
+            onRemove: () => transitionUiState(() => setSortMode("priority")),
+          }
+        : null,
+    ]);
+  const resetActiveFilters = () =>
+    transitionUiState(() => {
+      setSortMode("priority");
+      onClearFilters?.();
+    });
+  function closePanel() {
+    railDisclosure.close();
+  }
+
+  function togglePanel() {
+    railDisclosure.toggle();
+  }
+
+  const panelToggleTool = hasContextRail ? (
+    <ToolbarIconButton
+      label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
+      icon="panel"
+      pressed={panelOpen}
+      onClick={togglePanel}
+    />
+  ) : null;
+  const mobilePanelToggleTool = hasContextRail ? (
+    <div className="v19-mobile-context-tool">
+      <ToolbarIconButton
+        label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
+        icon="panel"
+        pressed={panelOpen}
+        onClick={togglePanel}
+      />
+    </div>
+  ) : null;
+  const toolbarTools = (
+    <CollectionToolbarTools
+      desktopTools={
+        <>
+          <ToolbarIconButton
+            label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
+            icon="sort"
+            pressed={sortMode !== "priority"}
+            onClick={() =>
+              transitionUiState(() =>
+                setSortMode((value) => nextSubmissionSortMode(value, agentSortModes)),
+              )
+            }
+          />
+          {panelToggleTool}
+        </>
+      }
+      mobileContextTool={mobilePanelToggleTool}
+      mobileFilter={
+      <MobileFilterSheet<AgentTab>
+        label="Фильтры подач"
+        title="Статус подач"
+        options={agentTabs}
+        value={activeTab}
+        onValueChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
+      />
+      }
+    />
+  );
+  const openSubmissionFromCard = (submission: Submission) => {
+    const action = agentSubmissionCardAction(submission);
+
+    onSelect(submission);
+    onOpen(submission, action.tab, action.target);
+  };
+
+  function renderSubmissionRow(submission: Submission) {
+    const action = agentSubmissionCardAction(submission);
+    const issueCount = openIssueCount(submission) + fixedIssueCount(submission);
+    const trip = tripDates(submission);
+
+    return (
+      <SubmissionCollectionRow
+        action={action.label}
+        completeness={`${submission.completeness.total}%`}
+        extraTagCount={issueCount}
+        fileDetail="Файлы"
+        fileState={submissionFileStateLabel(submission)}
+        fileTone={submissionFileTone(submission)}
+        kind={submission.type === "single" ? "single" : "family"}
+        key={submission.id}
+        meta={
+          <>
+            {applicantCountLabel(submission.applicants.length)} · {submission.city}
+          </>
+        }
+        onOpen={() => openSubmissionFromCard(submission)}
+        searchText={submission.applicants.map((applicant) => applicant.fullName).join(" ")}
+        selected={visibleSubmission?.id === submission.id}
+        status={submission.status}
+        statusDetail={agentSubmissionStatusDetail(submission)}
+        statusLabel={statusLabelFor(submission.status)}
+        submissionId={submission.id}
+        title={formatSubmissionListTitle(submission)}
+        trip={trip}
+        tripDetail={trip ? "Даты поездки" : undefined}
+      />
+    );
+  }
+
+  function renderSubmissionSection({
+    emptyText,
+    items,
+    title,
+  }: {
+    emptyText: string;
+    items: Submission[];
+    title: string;
+  }) {
+    return (
+      <section className="v19-submission-type-section" aria-label={title}>
+        <div className="v19-submission-type-label">
+          <strong>{title}</strong>
+          <span>{items.length}</span>
+        </div>
+        {items.length ? (
+          items.map(renderSubmissionRow)
+        ) : (
+          <div className="v19-submission-type-empty" role="status">
+            {emptyText}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  const railSubmission = visibleSubmission;
 
   return (
-    <section className="vf-applicants-transfer" aria-label="Мои подачи">
-      <div className="vf-applicants-transfer-toolbar">
-        {searchControl}
-        <div className="vf-applicants-transfer-tabs" role="tablist" aria-label="Фильтр подач">
-          {[
-            ["all", "Все подачи"],
-            ["action", "Требуют действия"],
-            ["progress", "В работе"],
-            ["review", "На проверке"],
-            ["done", "Готово"],
-          ].map(([id, label]) => (
-            <button
-              aria-selected={activeTab === id}
-              className={activeTab === id ? "is-active" : ""}
-              key={id}
-              role="tab"
-              type="button"
-              onClick={() => onTab(id as AgentTab)}
+    <>
+      <div
+        className={`v19-screen-grid v19-submissions-screen ${
+          panelOpen ? "" : "is-panel-closed"
+        }`}
+      >
+        <CardComponent
+          as="section"
+          className="v19-collection-panel v19-agent-submissions-panel"
+          aria-labelledby="agent-submissions-title"
+        >
+          <span className="sr-only" id="agent-submissions-title">
+            Мои подачи
+          </span>
+          <CollectionToolbar<AgentTab>
+            activeFilters={activeFilters}
+            ariaLabel="Инструменты подач"
+            className="v19-agent-mobile-toolbar"
+            mobileTitle="Мои подачи"
+            onClearActiveFilters={hasActiveFilters ? resetActiveFilters : undefined}
+            onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
+            search={searchControl}
+            tabs={agentTabs}
+            tabsAriaLabel="Фильтр подач"
+            tools={toolbarTools}
+            value={activeTab}
+          />
+
+          {loading ? (
+            <AgentSubmissionsLoadingState />
+          ) : errorMessage ? (
+            <AgentSubmissionsErrorState
+              message={errorMessage}
+              onRetry={onRetryError}
+            />
+          ) : totalSubmissionCount === 0 ? (
+            <div className="v19-submission-empty-state" role="status">
+              <h3>Подач пока нет</h3>
+              <p>Создайте первую подачу для клиента или семьи.</p>
+              <Button type="button" onClick={onCreate}>
+                Новая подача
+              </Button>
+            </div>
+          ) : orderedApplicants.length === 0 ? (
+            <div className="v19-submission-empty-state is-filtered" role="status">
+              <h3>Ничего не найдено</h3>
+              <p>
+                По текущему поиску и фильтрам подач нет. Сбросьте фильтры или
+                измените запрос.
+              </p>
+              {onClearFilters ? (
+                <Button variant="ghost" type="button" onClick={resetActiveFilters}>
+                  Сбросить фильтры
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <div
+              className="v19-collection-list v19-submission-grouped-list"
+              aria-label="Список подач"
             >
-              {label}
-            </button>
-          ))}
-        </div>
-        {onClearFilters && (hasSearchQuery || activeTab !== "all") ? (
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={onClearFilters}
-          >
-            Сбросить фильтры
-          </button>
-        ) : null}
+              {renderSubmissionSection({
+                emptyText:
+                  "Семейных подач нет. По текущему фильтру ничего не найдено.",
+                items: familySubmissions,
+                title: "Семейные подачи",
+              })}
+              {renderSubmissionSection({
+                emptyText:
+                  "Индивидуальных подач нет. По текущему фильтру ничего не найдено.",
+                items: singleSubmissions,
+                title: "Индивидуальные подачи",
+              })}
+            </div>
+          )}
+        </CardComponent>
       </div>
-      {orderedApplicants.length === 0 ? (
-        <div className="vf-applicants-transfer-empty" role="status">
-          <h2>Ничего не найдено</h2>
-          <p>Измените поиск или сбросьте фильтры.</p>
-          {onClearFilters ? (
-            <button className="secondary-button" type="button" onClick={onClearFilters}>
-              Сбросить фильтры
-            </button>
-          ) : null}
-        </div>
-      ) : (
-        <FigmaApplicantsVisual
-          maxVisiblePerGroup={2}
-          submissions={orderedApplicants}
-          onOpen={(submission, tab) => {
-            onSelect(submission);
-            onOpen(submission, tab ?? "applicants");
+
+      {hasContextRail && panelOpen ? (
+        <button className="v19-context-backdrop" type="button" onClick={closePanel}>
+          <span className="sr-only">Закрыть контекст</span>
+        </button>
+      ) : null}
+
+      {hasContextRail && panelOpen && railSubmission ? (
+        <AgentSubmissionContextRail
+          applicantSummary={applicantCountLabel(railSubmission.applicants.length)}
+          fileSummary={submissionFileStateLabel(railSubmission)}
+          history={railSubmission.history}
+          issues={railSubmission.issues
+            .filter((issue) => issue.status === "open")
+            .slice(0, 4)
+            .map((issue) => ({
+              id: issue.id,
+              reason: issue.reason,
+              targetLine: issueTargetLine(issue),
+              tone: issue.severity === "blocker" ? "danger" : "warning",
+              onOpen: () => {
+                onOpen(
+                  railSubmission,
+                  drawerTabForIssue(issue),
+                  targetForIssue(issue),
+                );
+              },
+            }))}
+          nextAction={{
+            description: agentSubmissionStatusDetail(railSubmission),
+            label: agentSubmissionCardAction(railSubmission).label,
+            title: nextProblem(railSubmission),
+            onOpen: () => openSubmissionFromCard(railSubmission),
+          }}
+          openIssueCount={openIssueCount(railSubmission)}
+          showHeader
+          status={{
+            label: submissionStatusChipLabel(railSubmission),
+            tone: submissionRailTone(railSubmission),
+          }}
+          submission={railSubmission}
+          tripSummary={tripDates(railSubmission)}
+          onClose={closePanel}
+          onOpenTab={(tab) => {
+            const target = targetForSubmissionTab(railSubmission, tab);
+
+            onOpen(railSubmission, drawerTabForScreenTarget(target, tab), target);
           }}
         />
-      )}
-    </section>
+      ) : null}
+    </>
   );
+}
+
+function AgentSubmissionsLoadingState() {
+  return (
+    <div className="v19-submission-skeleton-list" aria-label="Загрузка подач">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          aria-hidden="true"
+          className="v19-submission-skeleton-row"
+          key={index}
+        >
+          <span />
+          <span />
+          <span />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AgentSubmissionsErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="v19-submission-empty-state is-error" role="alert">
+      <h3>Не удалось сохранить изменения</h3>
+      <p>{message}</p>
+      {onRetry ? (
+        <Button type="button" onClick={onRetry}>
+          Повторить
+        </Button>
+      ) : (
+        <Button
+          disabled
+          title="Повтор доступен после подключения удалённого рабочего пространства."
+          type="button"
+        >
+          Повторить
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function agentSubmissionCardAction(submission: Submission): {
+  label: string;
+  tab: DrawerTab;
+  target?: WorkspaceTarget;
+} {
+  if (submission.status === "returned" || submission.status === "requires_action") {
+    const target = targetForSubmissionTab(submission, "issues");
+    return {
+      label: "Исправить",
+      tab: drawerTabForScreenTarget(target, "issues"),
+      target,
+    };
+  }
+
+  if (submission.status === "draft" || submission.status === "in_progress") {
+    const fallback = defaultDrawerTab(submission);
+    const target = targetForSubmissionTab(submission, fallback);
+    return {
+      label: "Продолжить",
+      tab: drawerTabForScreenTarget(target, fallback),
+      target,
+    };
+  }
+
+  if (
+    submission.status === "submitted_for_review" ||
+    submission.status === "corrections_received"
+  ) {
+    return {
+      label: "Проверить",
+      tab: "history",
+    };
+  }
+
+  if (submission.status === "ready_for_export") {
+    return {
+      label: "Пакет",
+      tab: "overview",
+    };
+  }
+
+  return {
+    label: "Открыть",
+    tab: "history",
+  };
+}
+
+function agentSubmissionStatusDetail(submission: Submission) {
+  const blockerTotal = blockerCount(submission);
+  const openTotal = openIssueCount(submission);
+  const fixedTotal = fixedIssueCount(submission);
+  const fileState = submissionFileStateLabel(submission);
+
+  if (blockerTotal > 0) {
+    return `${blockerTotal} ${pluralRu(
+      blockerTotal,
+      "блокер",
+      "блокера",
+      "блокеров",
+    )} · ${fileState}`;
+  }
+
+  if (openTotal > 0) {
+    return `${openTotal} ${pluralRu(
+      openTotal,
+      "замечание",
+      "замечания",
+      "замечаний",
+    )} · ${fileState}`;
+  }
+
+  if (fixedTotal > 0) {
+    return `${fixedTotal} ${pluralRu(
+      fixedTotal,
+      "исправление",
+      "исправления",
+      "исправлений",
+    )} ждут проверки`;
+  }
+
+  return nextProblem(submission);
+}
+
+function submissionFileTone(submission: Submission): "amber" | "muted" | "teal" {
+  if (!submission.files.length) return "muted";
+  if (
+    submission.files.some(
+      (file) => file.status === "missing" || file.status === "needs_replacement",
+    )
+  ) {
+    return "amber";
+  }
+  return "teal";
 }
 function submissionFileStateLabel(submission: Submission) {
   const ready = submission.files.filter(
@@ -1288,12 +1620,7 @@ function submissionRailTone(submission: Submission) {
 export type AdminWorkTab = "review" | "corrections" | "events";
 type SubmissionSortMode = "priority" | "updated" | "created" | "trip";
 
-const adminSortModes: SubmissionSortMode[] = [
-  "priority",
-  "updated",
-  "created",
-  "trip",
-];
+const adminSortModes: SubmissionSortMode[] = ["priority", "updated", "created", "trip"];
 const exportSortModes: SubmissionSortMode[] = ["updated", "created", "trip"];
 
 function nextSubmissionSortMode(
@@ -1416,10 +1743,7 @@ export function AdminReviewScreen({
     () => sortSubmissionsForOperations(filteredReviewList, sortMode),
     [filteredReviewList, sortMode],
   );
-  const visibleEvents = useMemo(
-    () => filteredEvents,
-    [filteredEvents],
-  );
+  const visibleEvents = useMemo(() => filteredEvents, [filteredEvents]);
   const visibleSelectedSubmission =
     visibleSubmission &&
     visibleReviewList.some((submission) => submission.id === visibleSubmission.id)
@@ -1435,31 +1759,30 @@ export function AdminReviewScreen({
   const actionSubmission =
     reviewTab === "events" || permissionDenied || loading || error
       ? null
-      : visibleSelectedSubmission ?? visibleReviewList[0] ?? null;
+      : (visibleSelectedSubmission ?? visibleReviewList[0] ?? null);
   const addIssueGuard = actionSubmission
     ? adminIssueGuard(actionSubmission, "admin")
     : null;
   const canAddIssue = addIssueGuard?.ok === true;
   const addIssueReason = canAddIssue
     ? ""
-    : addIssueGuard?.reason ?? "В этой вкладке нет видимой подачи для действия.";
-  const activeFilters = ([
-    blockersOnly
-      ? {
-          id: "blockers",
-          label: "Только блокеры",
-          onRemove: () => transitionUiState(() => setBlockersOnly(false)),
-        }
-      : null,
-    reviewTab === "events" || sortMode === "priority"
-      ? null
-      : {
-          id: "sort",
-          label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
-          onRemove: () => transitionUiState(() => setSortMode("priority")),
-        },
-  ] as Array<CollectionActiveFilter | null>
-  ).filter((filter): filter is CollectionActiveFilter => filter !== null);
+    : (addIssueGuard?.reason ?? "В этой вкладке нет видимой подачи для действия.");
+  const activeFilters = compactActiveFilters([
+      blockersOnly
+        ? {
+            id: "blockers",
+            label: "Только блокеры",
+            onRemove: () => transitionUiState(() => setBlockersOnly(false)),
+          }
+        : null,
+      reviewTab === "events" || sortMode === "priority"
+        ? null
+        : {
+            id: "sort",
+            label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
+            onRemove: () => transitionUiState(() => setSortMode("priority")),
+          },
+    ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setBlockersOnly(false);
@@ -1487,103 +1810,97 @@ export function AdminReviewScreen({
   }, [summaryOpen]);
 
   const toolbarTools = (
-    <ToolbarTools>
-      <ToolbarIconButton
-        label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
-        icon="filter"
-        pressed={blockersOnly}
-        onClick={() =>
-          transitionUiState(() => setBlockersOnly((value) => !value))
-        }
-      />
-      {reviewTab !== "events" ? (
-        <ToolbarIconButton
-          label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
-          icon="sort"
-          pressed={sortMode !== "priority"}
-          onClick={() =>
-            transitionUiState(() =>
-              setSortMode((value) => nextSubmissionSortMode(value, adminSortModes)),
-            )
-          }
-        />
-      ) : null}
-      <div className="v17-admin-summary-tool" ref={summaryRef}>
-        <ToolbarIconButton
-          label={summaryOpen ? "Скрыть сводку" : "Показать сводку"}
-          icon="panel"
-          pressed={summaryOpen}
-          onClick={() => setSummaryOpen((value) => !value)}
-        />
-        {summaryOpen ? (
-          <div
-            className="v17-admin-summary-popover"
-            role="dialog"
-            aria-label="Сводка очереди"
-          >
-            <div className="v17-admin-summary-head">
-              <strong>Сводка очереди</strong>
-            </div>
-            <div className="v17-admin-summary-grid">
-              <div>
-                <strong>{tabCounts.review}</strong>
-                <span>Новая проверка</span>
-              </div>
-              <div>
-                <strong>{tabCounts.corrections}</strong>
-                <span>Исправления</span>
-              </div>
-              <div>
-                <strong>
-                  {summaryPrioritySubmission
-                    ? `с ${summaryPrioritySubmission.updatedAt}`
-                    : "-"}
-                </strong>
-                <span>Старейшая</span>
-              </div>
-              <div>
-                <strong>{blockerSubmissions}</strong>
-                <span>Блокеры</span>
-              </div>
-            </div>
-            {summaryPrioritySubmission ? (
-              <Button
-                className="v17-admin-summary-action"
-                variant="secondary"
-                onClick={() => {
-                  setSummaryOpen(false);
-                  onSelect(summaryPrioritySubmission);
-                  onOpen(
-                    summaryPrioritySubmission,
-                    adminWorkDrawerTabFor(summaryPrioritySubmission),
-                  );
-                }}
+    <CollectionToolbarTools
+      desktopTools={
+        <>
+          <ToolbarIconButton
+            label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
+            icon="filter"
+            pressed={blockersOnly}
+            onClick={() => transitionUiState(() => setBlockersOnly((value) => !value))}
+          />
+          {reviewTab !== "events" ? (
+            <ToolbarIconButton
+              label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
+              icon="sort"
+              pressed={sortMode !== "priority"}
+              onClick={() =>
+                transitionUiState(() =>
+                  setSortMode((value) => nextSubmissionSortMode(value, adminSortModes)),
+                )
+              }
+            />
+          ) : null}
+          <div className="v17-admin-summary-tool" ref={summaryRef}>
+            <ToolbarIconButton
+              label={summaryOpen ? "Скрыть сводку" : "Показать сводку"}
+              icon="panel"
+              pressed={summaryOpen}
+              onClick={() => setSummaryOpen((value) => !value)}
+            />
+            {summaryOpen ? (
+              <div
+                className="v17-admin-summary-popover"
+                role="dialog"
+                aria-label="Сводка очереди"
               >
-                Проверить {summaryPrioritySubmission.title}
-              </Button>
+                <div className="v17-admin-summary-head">
+                  <strong>Сводка очереди</strong>
+                </div>
+                <div className="v17-admin-summary-grid">
+                  <div>
+                    <strong>{tabCounts.review}</strong>
+                    <span>Новая проверка</span>
+                  </div>
+                  <div>
+                    <strong>{tabCounts.corrections}</strong>
+                    <span>Исправления</span>
+                  </div>
+                  <div>
+                    <strong>
+                      {summaryPrioritySubmission
+                        ? `с ${summaryPrioritySubmission.updatedAt}`
+                        : "-"}
+                    </strong>
+                    <span>Старейшая</span>
+                  </div>
+                  <div>
+                    <strong>{blockerSubmissions}</strong>
+                    <span>Блокеры</span>
+                  </div>
+                </div>
+                {summaryPrioritySubmission ? (
+                  <Button
+                    className="v17-admin-summary-action"
+                    variant="secondary"
+                    onClick={() => {
+                      setSummaryOpen(false);
+                      onSelect(summaryPrioritySubmission);
+                      onOpen(
+                        summaryPrioritySubmission,
+                        adminWorkDrawerTabFor(summaryPrioritySubmission),
+                      );
+                    }}
+                  >
+                    Проверить {summaryPrioritySubmission.title}
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
-        ) : null}
-      </div>
-    </ToolbarTools>
+        </>
+      }
+    />
   );
 
   const renderBlockedState = (
     title: string,
     description: string,
     tone: "danger" | "warning" = "warning",
-  ) => (
-    <AdminWorkEmptyState
-      description={description}
-      iconTone={tone}
-      title={title}
-    />
-  );
+  ) => <AdminWorkEmptyState description={description} iconTone={tone} title={title} />;
 
   return (
-    <div
-      className="v19-screen-grid v19-admin-review-screen v17-admin-work-screen is-panel-closed"
-    >
+    <div className="v19-screen-grid v19-admin-review-screen v17-admin-work-screen is-panel-closed">
       <CardComponent
         as="section"
         className={
@@ -1648,19 +1965,19 @@ export function AdminReviewScreen({
               ))}
             </div>
           ) : (
-              <AdminWorkEmptyState
-                description="События появятся после отправки подачи, получения исправлений или подготовки пакета."
-                actionLabel="К проверке"
-                title="Событий нет"
-                onShow={() => onTab("review")}
-              />
+            <AdminWorkEmptyState
+              description="События появятся после отправки подачи, получения исправлений или подготовки пакета."
+              actionLabel="К проверке"
+              title="Событий нет"
+              onShow={() => onTab("review")}
+            />
           )
         ) : visibleReviewList.length ? (
           <>
             <div className="v17-admin-work-list" aria-label="Очередь проверки">
               {visibleReviewList.map((submission) => (
                 <AdminWorkRow
-                  selected={false}
+                  selected={visibleSelectedSubmission?.id === submission.id}
                   key={submission.id}
                   submission={submission}
                   onOpen={() => {
@@ -1718,7 +2035,11 @@ function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
 
 function AdminWorkLoadingState() {
   return (
-    <div className="v17-admin-work-list" aria-busy="true" aria-label="Очередь загружается">
+    <div
+      className="v17-admin-work-list"
+      aria-busy="true"
+      aria-label="Очередь загружается"
+    >
       {["admin-loading-1", "admin-loading-2", "admin-loading-3"].map((item) => (
         <div className="v17-admin-work-row is-loading" key={item}>
           <span className="v17-admin-entity-icon" aria-hidden="true" />
@@ -1816,8 +2137,8 @@ function AdminWorkRow({
           {applicantCountLabel(submission.applicants.length)}
         </em>
         <small className="v17-admin-mobile-meta">
-          {submission.city} · {applicantCountLabel(submission.applicants.length)} ·
-          ждет с {submission.updatedAt}
+          {submission.city} · {applicantCountLabel(submission.applicants.length)} · ждет
+          с {submission.updatedAt}
         </small>
       </span>
       <span className="v17-admin-route-cell">
@@ -1834,9 +2155,11 @@ function AdminWorkRow({
           <em>Готовность</em>
           <strong>{submission.completeness.total}%</strong>
         </span>
-        <i aria-hidden="true">
-          <b style={{ width: `${submission.completeness.total}%` }} />
-        </i>
+        <ProgressMeter
+          ariaHidden
+          className="v17-admin-readiness-progress"
+          value={submission.completeness.total}
+        />
       </span>
       <span className={`v17-admin-stage tone-${presentation.tone}`}>
         <i aria-hidden="true" />
@@ -1873,10 +2196,7 @@ function AdminWorkEventRow({
 }) {
   return (
     <button className="v17-admin-event-row" type="button" onClick={onOpen}>
-      <span
-        className={`v17-admin-event-dot tone-${event.tone}`}
-        aria-hidden="true"
-      />
+      <span className={`v17-admin-event-dot tone-${event.tone}`} aria-hidden="true" />
       <span className="v17-admin-event-copy">
         <strong>{adminWorkEventTitle(event.submission, event.title)}</strong>
         <em>{event.time}</em>
@@ -1994,7 +2314,7 @@ export function ExportScreen({
 }) {
   const actionHint =
     exportError ||
-    (exportBusy ? "Формируем и проверяем workbook..." : exportActionHint(exportPlan));
+    (exportBusy ? "Формируем и проверяем Excel-файл..." : exportActionHint(exportPlan));
   const packageFacts = exportPackageFacts(exportPlan);
   const previewColumns = exportPlan.preview.headers.slice(0, 9);
   const previewRows = exportPlan.preview.rows.slice(0, 4);
@@ -2028,6 +2348,9 @@ export function ExportScreen({
   const selectedVisibleExportIds = selectedExportIds.filter((id) =>
     exportReadyIdSet.has(id),
   );
+  const selectedSubmissionCount = new Set(
+    exportPlan.rows.map((row) => row.submissionId),
+  ).size;
   const hiddenNotReadyCount = readyList.length - exportReadyList.length;
   const allReadySelected =
     exportReadyList.length > 0 &&
@@ -2039,24 +2362,32 @@ export function ExportScreen({
     });
   };
   const toolbarTools = (
-    <ToolbarTools>
-      <ToolbarIconButton
-        icon="sort"
-        label={`Сортировка выгрузки: ${submissionSortModeLabel(sortMode)}`}
-        pressed={sortMode !== "updated"}
-        type="button"
-        onClick={() =>
-          setSortMode((value) => nextSubmissionSortMode(value, exportSortModes))
-        }
-      />
-      <ToolbarIconButton
-        icon="panel"
-        label={exportPanelOpen ? "Контракт выгрузки открыт" : "Открыть контракт выгрузки"}
-        pressed={exportPanelOpen}
-        type="button"
-        onClick={() => setExportPanelOpen((open) => !open)}
-      />
-    </ToolbarTools>
+    <CollectionToolbarTools
+      desktopTools={
+        <>
+          <ToolbarIconButton
+            icon="sort"
+            label={`Сортировка выгрузки: ${submissionSortModeLabel(sortMode)}`}
+            pressed={sortMode !== "updated"}
+            type="button"
+            onClick={() =>
+              setSortMode((value) => nextSubmissionSortMode(value, exportSortModes))
+            }
+          />
+          <ToolbarIconButton
+            icon="panel"
+            label={
+              exportPanelOpen
+                ? "Контракт выгрузки открыт"
+                : "Открыть контракт выгрузки"
+            }
+            pressed={exportPanelOpen}
+            type="button"
+            onClick={() => setExportPanelOpen((open) => !open)}
+          />
+        </>
+      }
+    />
   );
 
   return (
@@ -2073,7 +2404,8 @@ export function ExportScreen({
 
           <div className="v17-export-intro">
             <span>
-              Preview использует структуру входного Excel-шаблона, но не создаёт файл.
+              Предпросмотр показывает строки будущего Excel-файла. Файл создаётся только
+              после проверки выбранного пакета.
             </span>
             <strong>{exportPlan.contract.columnCount} колонок в шаблоне</strong>
           </div>
@@ -2098,7 +2430,7 @@ export function ExportScreen({
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 42 }}>
+                      <th className="export-select-column">
                         <input
                           aria-label="Выбрать все совместимые"
                           checked={allReadySelected}
@@ -2198,7 +2530,7 @@ export function ExportScreen({
                   <span className="bulk-status">
                     Скрыто из выгрузки: {hiddenNotReadyCount}{" "}
                     {pluralRu(hiddenNotReadyCount, "подача", "подачи", "подач")} с
-                    blockers или неполным пакетом.
+                    проблемами в статусе, файлах или датах.
                   </span>
                 </div>
               ) : null}
@@ -2206,47 +2538,76 @@ export function ExportScreen({
                 <EmptyState text="Нет подач готовых к выгрузке." />
               ) : null}
               {selectedVisibleExportIds.length ? (
-                <div
-                  className="bulk-bar v17-export-bulk-bar"
-                  style={{ pointerEvents: "none" }}
-                >
-                  <span className="bulk-count">
-                    Выбрано: {selectedVisibleExportIds.length}
-                  </span>
+                <div className="bulk-bar v17-export-bulk-bar is-passive">
+                  <span className="bulk-count">Выбрано: {selectedSubmissionCount}</span>
                   <span className="bulk-status">{actionHint}</span>
                 </div>
-              ) : null}
+              ) : (
+                <div className="bulk-bar v17-export-bulk-bar is-blocked">
+                  <span className="bulk-count">Выбрано: 0</span>
+                  <span className="bulk-status">Выберите хотя бы одну подачу</span>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="submission-list magic-export-list">
-              {sortedHistoryList.map((submission) => {
-                const pdfState = returnedPdfPackageSummary(submission);
+            <div className="magic-export-list export-contract-table export-history-table">
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Подача</th>
+                      <th>Город</th>
+                      <th>Даты</th>
+                      <th>Заявители</th>
+                      <th>PDF</th>
+                      <th>Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedHistoryList.map((submission) => {
+                      const pdfState = returnedPdfPackageSummary(submission);
 
-                return (
-                  <CardComponent
-                    as="article"
-                    className="export-row magic-export-row"
-                    key={submission.id}
-                  >
-                    <Button
-                      className="export-row-main"
-                      variant="plain"
-                      onClick={() => onOpen(submission, "files")}
-                    >
-                      <strong>{submission.title}</strong>
-                      <span>
-                        {submission.id} · {submission.city} · {tripDates(submission)}
-                      </span>
-                      <span>{pdfState.detail}</span>
-                    </Button>
-                    <Badge tone="teal">Выгружено</Badge>
-                    <Badge tone={pdfState.tone}>{pdfState.label}</Badge>
-                    <span className="export-row-note">
-                      PDF handoff: через файлы подачи
-                    </span>
-                  </CardComponent>
-                );
-              })}
+                      return (
+                        <tr
+                          aria-label={`Выгруженный пакет ${submission.title}`}
+                          className="export-row magic-export-row export-contract-row export-history-row"
+                          key={submission.id}
+                        >
+                          <td>
+                            <button
+                              className="export-row-main"
+                              type="button"
+                              onClick={() => onOpen(submission, "files")}
+                            >
+                              <span className="cell-title">{submission.title}</span>
+                              <span className="subtle mono">{submission.id}</span>
+                            </button>
+                          </td>
+                          <td>{submission.city}</td>
+                          <td>{tripDates(submission)}</td>
+                          <td>{submission.applicants.length}</td>
+                          <td>
+                            <Badge tone={pdfState.tone}>{pdfState.label}</Badge>
+                            <span className="export-row-note">{pdfState.detail}</span>
+                          </td>
+                          <td>
+                            <Button
+                              className="export-table-row-action"
+                              variant="secondary"
+                              onClick={() => onOpen(submission, "files")}
+                            >
+                              Открыть пакет
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {sortedHistoryList.length === 0 ? (
+                <EmptyState text="История выгрузки пока пуста." />
+              ) : null}
             </div>
           )}
         </CardComponent>
@@ -2256,219 +2617,235 @@ export function ExportScreen({
             className="export-side magic-export-side v17-export-context-rail"
             aria-label="Контекст выгрузки"
           >
-          <div className="v17-export-rail-head">
-            <div>
-              <p className="kicker">Контракт выгрузки</p>
-              <h2>
-                Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}
-              </h2>
-            </div>
-            <button
-              className="icon-button v17-export-close"
-              type="button"
-              aria-label="Закрыть панель"
-              onClick={() => setExportPanelOpen(false)}
-            >
-              <SvgIcon>
-                <path d="M6 6l12 12M18 6 6 18" />
-              </SvgIcon>
-            </button>
-          </div>
-          <div className="v17-export-rail-body">
-          <CardComponent as="section" className="v17-rail-card primary">
-            <div className="preview-header">
+            <div className="v17-export-rail-head">
               <div>
-                <p className="kicker">Текущий пакет</p>
-                <h2>{exportPackageTitle(exportPlan)}</h2>
+                <p className="kicker">Контракт выгрузки</p>
+                <h2>
+                  Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}
+                </h2>
               </div>
+              <button
+                className="icon-button v17-export-close"
+                type="button"
+                aria-label="Закрыть панель"
+                onClick={() => setExportPanelOpen(false)}
+              >
+                <SvgIcon>
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </SvgIcon>
+              </button>
             </div>
-            <div className="v17-export-summary">
-              <div className="v17-export-stat">
-                <strong>{mappedCount}</strong>
-                <span>mapped</span>
-              </div>
-              <div className="v17-export-stat">
-                <strong>{unresolvedCount}</strong>
-                <span>unresolved</span>
-              </div>
-            </div>
-          </CardComponent>
-          <CardComponent as="section" className="v17-rail-card v17-export-checks-card">
-            <p className="kicker">Pre-export checks</p>
-            <div className="v17-export-checks" aria-label="Проверки перед выгрузкой">
-              <ExportGuardItem
-                ok={exportPlan.rowCount > 0}
-                label="Есть выбранные подачи"
-              />
-              <ExportGuardItem
-                ok={!exportHasBlocker(exportPlan, "не готовые к выгрузке")}
-                label="Только принятые подачи"
-              />
-              <ExportGuardItem
-                ok={!exportHasBlocker(exportPlan, "блокирующие замечания")}
-                label="Нет открытых блокеров"
-              />
-              <ExportGuardItem
-                ok={!exportHasBlocker(exportPlan, "канонического пакета медиа")}
-                label="Обязательные файлы готовы"
-              />
-              <ExportGuardItem
-                ok={!exportHasBlocker(exportPlan, "разные города")}
-                label="Один город"
-                detail={`${packageFacts.city} · ${packageFacts.dates}`}
-              />
-              <ExportGuardItem
-                ok={exportPlan.contract.valid && unresolvedCount === 0}
-                label="Все 56 колонок подтверждены"
-                detail={`${exportPlan.contract.sheetName} ${exportPlan.contract.range}`}
-              />
-            </div>
-          </CardComponent>
-          <div className={`v17-blocker-callout ${exportCalloutTone(exportPlan)}`}>
-            <SvgIcon>
-              <path d="M10.3 4.3 2.8 17.4A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.6L13.7 4.3a2 2 0 0 0-3.4 0Z" />
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-            </SvgIcon>
-            <span>
-              <strong>{exportCalloutTitle(exportPlan)}</strong>
-              {exportPlan.blockers.length > 0 ? (
-                exportPlan.blockers.map((blocker) => (
-                  <span key={blocker.reason}>{blocker.reason}</span>
-                ))
-              ) : exportPlan.warnings.length > 0 ? (
-                exportPlan.warnings.map((warning) => (
-                  <span key={warning.reason}>{warning.reason}</span>
-                ))
-              ) : (
+            <div className="v17-export-rail-body">
+              <CardComponent as="section" className="v17-rail-card primary">
+                <div className="preview-header">
+                  <div>
+                    <p className="kicker">Текущий пакет</p>
+                    <h2>{exportPackageTitle(exportPlan)}</h2>
+                  </div>
+                </div>
+                <div className="v17-export-summary">
+                  <div className="v17-export-stat">
+                    <strong>{mappedCount}</strong>
+                    <span>связано</span>
+                  </div>
+                  <div className="v17-export-stat">
+                    <strong>{unresolvedCount}</strong>
+                    <span>не сопоставлено</span>
+                  </div>
+                </div>
+              </CardComponent>
+              <CardComponent
+                as="section"
+                className="v17-rail-card v17-export-checks-card"
+              >
+                <p className="kicker">Проверки перед выгрузкой</p>
+                <div
+                  className="v17-export-checks"
+                  aria-label="Проверки перед выгрузкой"
+                >
+                  <ExportGuardItem
+                    ok={exportPlan.rowCount > 0}
+                    label="Есть выбранные подачи"
+                  />
+                  <ExportGuardItem
+                    ok={!exportHasBlocker(exportPlan, "не готовые к выгрузке")}
+                    label="Только принятые подачи"
+                  />
+                  <ExportGuardItem
+                    ok={!exportHasBlocker(exportPlan, "блокирующие замечания")}
+                    label="Нет открытых блокеров"
+                  />
+                  <ExportGuardItem
+                    ok={!exportHasBlocker(exportPlan, "канонического пакета медиа")}
+                    label="Обязательные файлы готовы"
+                  />
+                  <ExportGuardItem
+                    ok={!exportHasBlocker(exportPlan, "разные города")}
+                    label="Один город"
+                    detail={`${packageFacts.city} · ${packageFacts.dates}`}
+                  />
+                  <ExportGuardItem
+                    ok={exportPlan.contract.valid && unresolvedCount === 0}
+                    label="Все 56 колонок подтверждены"
+                    detail={`${exportPlan.contract.sheetName} ${exportPlan.contract.range}`}
+                  />
+                </div>
+              </CardComponent>
+              <div className={`v17-blocker-callout ${exportCalloutTone(exportPlan)}`}>
+                <SvgIcon>
+                  <path d="M10.3 4.3 2.8 17.4A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.6L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+                  <path d="M12 9v4" />
+                  <path d="M12 17h.01" />
+                </SvgIcon>
                 <span>
-                  Preview и workbook используют один row model; скачивание доступно
-                  только после package identity proof.
+                  <strong>{exportCalloutTitle(exportPlan)}</strong>
+                  {exportPlan.blockers.length > 0 ? (
+                    exportPlan.blockers.map((blocker) => (
+                      <span key={blocker.reason}>{blocker.reason}</span>
+                    ))
+                  ) : exportPlan.warnings.length > 0 ? (
+                    exportPlan.warnings.map((warning) => (
+                      <span key={warning.reason}>{warning.reason}</span>
+                    ))
+                  ) : (
+                    <span>
+                      Предпросмотр и Excel используют одни и те же строки. Скачать файл
+                      можно только после проверки состава пакета.
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          </div>
-          <CardComponent as="section" className="v17-rail-card v17-export-actions-card">
-            <div
-              aria-busy={exportBusy || undefined}
-              aria-describedby={actionHint ? "export-action-hint" : undefined}
-              className="mp-action-dock export-action-dock"
-              data-testid="export-action-dock"
-            >
-              <div className="mp-action-dock-actions export-actions">
-                <Button
-                  aria-describedby={actionHint ? "export-action-hint" : undefined}
-                  disabled={exportBusy || !exportPlan.canGenerate}
-                  onClick={onGenerate}
-                >
-                  Сформировать Эксель
-                </Button>
-                <Button
-                  aria-describedby={actionHint ? "export-action-hint" : undefined}
-                  disabled={exportBusy || !exportPlan.canDownload}
-                  variant="secondary"
-                  onClick={onDownload}
-                >
-                  Скачать Excel
-                </Button>
-                <Button
-                  aria-describedby={actionHint ? "export-action-hint" : undefined}
-                  disabled={exportBusy || !exportPlan.canMarkExported}
-                  loading={exportBusy}
-                  variant="secondary"
-                  onClick={onMarkExported}
-                >
-                  Отметить выгружено
-                </Button>
               </div>
-              {actionHint ? (
-                <p
-                  aria-live="polite"
-                  className="mp-action-dock-hint export-action-hint"
-                  id="export-action-hint"
+              <CardComponent
+                as="section"
+                className="v17-rail-card v17-export-actions-card"
+              >
+                <div
+                  aria-busy={exportBusy || undefined}
+                  aria-describedby={actionHint ? "export-action-hint" : undefined}
+                  className="mp-action-dock export-action-dock"
+                  data-testid="export-action-dock"
                 >
-                  {actionHint}
+                  <div className="mp-action-dock-actions export-actions">
+                    <Button
+                      aria-describedby={actionHint ? "export-action-hint" : undefined}
+                      disabled={exportBusy || !exportPlan.canGenerate}
+                      onClick={onGenerate}
+                    >
+                      Сформировать Excel
+                    </Button>
+                    <Button
+                      aria-describedby={actionHint ? "export-action-hint" : undefined}
+                      disabled={exportBusy || !exportPlan.canDownload}
+                      variant="secondary"
+                      onClick={onDownload}
+                    >
+                      Скачать Excel
+                    </Button>
+                    <Button
+                      aria-describedby={actionHint ? "export-action-hint" : undefined}
+                      disabled={exportBusy || !exportPlan.canMarkExported}
+                      loading={exportBusy}
+                      variant="secondary"
+                      onClick={onMarkExported}
+                    >
+                      Отметить выгружено
+                    </Button>
+                  </div>
+                  {actionHint ? (
+                    <p
+                      aria-live="polite"
+                      className="mp-action-dock-hint export-action-hint"
+                      id="export-action-hint"
+                    >
+                      {actionHint}
+                    </p>
+                  ) : null}
+                </div>
+                <p className="sheet-caption">
+                  Скачивание доступно только для текущего выбранного пакета. Если выбор
+                  изменился, сформируйте Excel заново.
                 </p>
-              ) : null}
-            </div>
-            <p className="sheet-caption">
-              Download запускается только для текущей verified selection; stale
-              selection и row mismatch блокируются.
-            </p>
-          </CardComponent>
-          <CardComponent
-            as="section"
-            className="v17-rail-card export-preview magic-export-preview"
-            aria-label="Предпросмотр Эксель"
-            tabIndex={0}
-            >
-              <div
-                className="excel-table export-preview-sheet"
-                aria-label="Sheet1 masked preview"
+              </CardComponent>
+              <CardComponent
+                as="section"
+                className="v17-rail-card export-preview magic-export-preview"
+                aria-label="Предпросмотр Excel"
                 tabIndex={0}
               >
-              {exportPlan.rowCount === 0 ? (
-                <p className="export-preview-empty-title">Пакет не выбран</p>
-              ) : null}
-              <div className="sheet-head">
-                <span />
-                <span />
-                <span />
-                <strong>{exportPlan.contract.sheetName} · masked preview</strong>
-              </div>
-              <div
-                className="excel-head"
-                style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
-              >
-                <span>#</span>
-                {previewColumns.map((header) => (
-                  <span key={header}>{header}</span>
-                ))}
-              </div>
-              {previewRows.map((row, rowIndex) => (
                 <div
-                  className={`excel-row ${
-                    exportPlan.rows[rowIndex]?.applicantCount &&
-                    exportPlan.rows[rowIndex].applicantCount > 1
-                      ? "is-family"
-                      : ""
-                  }`}
-                  key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
-                  style={{ gridTemplateColumns: `44px repeat(${previewColumns.length}, minmax(112px, 1fr))` }}
+                  className="excel-table export-preview-sheet"
+                  aria-label="Предпросмотр Sheet1"
+                  tabIndex={0}
                 >
-                  <span>{rowIndex + 1}</span>
-                  {row.slice(0, previewColumns.length).map((value, cellIndex) => (
-                    <span key={`${cellIndex}-${value}`}>{maskPreviewValue(value)}</span>
+                  {exportPlan.rowCount === 0 ? (
+                    <p className="export-preview-empty-title">Пакет не выбран</p>
+                  ) : null}
+                  <div className="sheet-head">
+                    <span />
+                    <span />
+                    <span />
+                    <strong>{exportPlan.contract.sheetName} · предпросмотр</strong>
+                  </div>
+                  <div className="excel-head">
+                    <span>#</span>
+                    {previewColumns.map((header) => (
+                      <span key={header}>{header}</span>
+                    ))}
+                  </div>
+                  {previewRows.map((row, rowIndex) => (
+                    <div
+                      className={`excel-row ${
+                        exportPlan.rows[rowIndex]?.applicantCount &&
+                        exportPlan.rows[rowIndex].applicantCount > 1
+                          ? "is-family"
+                          : ""
+                      }`}
+                      key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
+                    >
+                      <span>{rowIndex + 1}</span>
+                      {row.slice(0, previewColumns.length).map((value, cellIndex) => (
+                        <span key={`${cellIndex}-${value}`}>
+                          {maskPreviewValue(value)}
+                        </span>
+                      ))}
+                    </div>
                   ))}
                 </div>
-              ))}
-            </div>
-            <p className="sheet-caption">
-              Показаны первые 9 из 56 колонок. Один заявитель = одна строка;
-              члены семьи идут последовательным блоком.
-            </p>
-          </CardComponent>
-          <CardComponent as="section" className="v17-rail-card v17-export-mapping-card">
-            <div className="mapping-audit" aria-label="56-column export mapping audit">
-              <div className="mapping-audit-head">
-                <strong>Контракт A:BD</strong>
-                <span>
-                  {mappedCount} mapped · {derivedCount} derived · {unresolvedCount} unresolved
-                </span>
-              </div>
-              <div className="mapping-audit-scroll" tabIndex={0}>
-                {mappingRows.map((row) => (
-                  <div className="mapping-row" key={row.header}>
-                    <span className="mapping-index">{row.index}</span>
-                    <span className="mapping-name">{row.header}</span>
-                    <span className={`mapping-state ${row.state}`}>{row.state}</span>
+                <p className="sheet-caption">
+                  Показаны первые 9 из 56 колонок. Один заявитель = одна строка; члены
+                  семьи идут последовательным блоком.
+                </p>
+              </CardComponent>
+              <CardComponent
+                as="section"
+                className="v17-rail-card v17-export-mapping-card"
+              >
+                <div
+                  className="mapping-audit"
+                  aria-label="Аудит сопоставления 56 колонок"
+                >
+                  <div className="mapping-audit-head">
+                    <strong>Контракт A:BD</strong>
+                    <span>
+                      {mappedCount} связано · {derivedCount} вычислено ·{" "}
+                      {unresolvedCount} не сопоставлено
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <div className="mapping-audit-scroll" tabIndex={0}>
+                    {mappingRows.map((row) => (
+                      <div className="mapping-row" key={row.header}>
+                        <span className="mapping-index">{row.index}</span>
+                        <span className="mapping-name">{row.header}</span>
+                        <span className={`mapping-state ${row.state}`}>
+                          {exportMappingStateLabel(row.state)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardComponent>
             </div>
-          </CardComponent>
-          </div>
-        </aside>
+          </aside>
         ) : null}
       </div>
     </>
@@ -2510,10 +2887,16 @@ function exportCalloutTone(plan: ExportSummary) {
 }
 
 function exportCalloutTitle(plan: ExportSummary) {
-  if (plan.blockers.length > 0) return "Выгрузка заблокирована fail-closed";
+  if (plan.blockers.length > 0) return "Выгрузка заблокирована";
   if (plan.warnings.length > 0) return "Выгрузка разрешена с предупреждением";
   if (plan.ready) return "Выгрузка готова";
   return "Выберите пакет для проверки";
+}
+
+function exportMappingStateLabel(state: "mapped" | "derived" | "unresolved") {
+  if (state === "mapped") return "связано";
+  if (state === "derived") return "вычислено";
+  return "не сопоставлено";
 }
 
 function exportStateLabel(submission: Submission) {
@@ -2533,7 +2916,7 @@ function returnedPdfPackageSummary(submission: Submission): {
 
   if (handoffPackage.ready) {
     return {
-      detail: `${handoffPackage.applicantPdfs.length} application_form_pdf · appointment_list_pdf ready`,
+      detail: `${handoffPackage.applicantPdfs.length} PDF анкет · общий лист записи готов`,
       label: "PDF готов",
       tone: "teal",
     };
@@ -2541,16 +2924,16 @@ function returnedPdfPackageSummary(submission: Submission): {
 
   if (firstBlocker.includes("Application PDF is missing")) {
     return {
-      detail: firstBlocker,
-      label: "Нет application_form_pdf",
+      detail: returnedPdfBlockerForUser(firstBlocker),
+      label: "Нет PDF анкеты",
       tone: "amber",
     };
   }
 
   if (firstBlocker.includes("Common appointment/list PDF is missing")) {
     return {
-      detail: firstBlocker,
-      label: "Нет appointment_list_pdf",
+      detail: returnedPdfBlockerForUser(firstBlocker),
+      label: "Нет листа записи",
       tone: "amber",
     };
   }
@@ -2561,17 +2944,33 @@ function returnedPdfPackageSummary(submission: Submission): {
     firstBlocker.includes("is not uploaded")
   ) {
     return {
-      detail: firstBlocker,
+      detail: returnedPdfBlockerForUser(firstBlocker),
       label: "PDF не готов",
       tone: "danger",
     };
   }
 
   return {
-    detail: firstBlocker || "Returned PDF package требует проверки перед handoff.",
-    label: "PDF проверка",
+    detail: firstBlocker
+      ? returnedPdfBlockerForUser(firstBlocker)
+      : "Пакет PDF нужно проверить перед передачей агенту",
+    label: "Нужна проверка PDF",
     tone: "amber",
   };
+}
+
+function returnedPdfBlockerForUser(blocker: string) {
+  if (blocker.includes("Application PDF is missing")) return "Нет PDF анкеты";
+  if (blocker.includes("Common appointment/list PDF is missing")) {
+    return "Нет общего листа записи";
+  }
+  if (blocker.includes("upload failed")) return "PDF не загрузился";
+  if (blocker.includes("was deleted")) return "PDF удалён";
+  if (blocker.includes("is not uploaded")) return "PDF ещё не загружен";
+  if (blocker.includes("PDF можно передать агенту после выгрузки")) {
+    return "PDF можно передать агенту после выгрузки";
+  }
+  return blocker;
 }
 
 function maskPreviewValue(value: string) {
@@ -2601,7 +3000,7 @@ function exportActionHint(plan: ExportSummary) {
   if (plan.blockers.length > 0)
     return plan.blockers[0]?.reason ?? "Выгрузка заблокирована";
   if (plan.exportState === "ready")
-    return "Сначала сформируйте Эксель, затем скачайте файл.";
+    return "Сначала сформируйте Excel, затем скачайте файл.";
   if (plan.exportState === "file_generated")
     return "Файл сформирован. Теперь скачайте его.";
   if (plan.exportState === "file_downloaded")

@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import "./styles.css";
+import "./shared/ui/system.css";
 
 const root = document.getElementById("root");
 
@@ -19,7 +19,4 @@ function renderApp() {
   );
 }
 
-void import("./styles.deferred-a.css")
-  .then(() => import("./styles.deferred-b.css"))
-  .then(() => import("./styles.sidebar-contract.css"))
-  .then(renderApp, renderApp);
+renderApp();

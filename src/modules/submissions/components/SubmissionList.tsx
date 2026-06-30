@@ -11,6 +11,7 @@ import {
 import { applicantCountLabel, tripDates } from "../selectors";
 import type { DrawerTab, Issue, Role, Submission } from "../types";
 import { EmptyState, StatusChip } from "./Primitives";
+import { ProgressMeter } from "./CollectionPrimitives";
 
 export function SubmissionList({
   activeSubmission,
@@ -198,26 +199,17 @@ function SubmissionCard({
         </div>
         <div className="progress-strip">
           <div className="row-progress-metrics">
-            <div
+            <ProgressMeter
               className="progress-line"
-              role="progressbar"
-              aria-label="Готовность анкеты"
-              aria-valuemax={100}
-              aria-valuemin={0}
-              aria-valuenow={submission.completeness.questionnaire}
-            >
-              <span style={{ width: `${submission.completeness.questionnaire}%` }} />
-            </div>
-            <div
+              label="Готовность анкеты"
+              value={submission.completeness.questionnaire}
+            />
+            <ProgressMeter
               className="progress-line is-files"
-              role="progressbar"
-              aria-label="Готовность файлов"
-              aria-valuemax={100}
-              aria-valuemin={0}
-              aria-valuenow={submission.completeness.files}
-            >
-              <span style={{ width: `${submission.completeness.files}%` }} />
-            </div>
+              label="Готовность файлов"
+              tone="warning"
+              value={submission.completeness.files}
+            />
           </div>
           <span className="progress-value">
             <em>Анкета</em>

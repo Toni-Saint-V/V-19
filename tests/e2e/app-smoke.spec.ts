@@ -20,9 +20,7 @@ async function expectNoRetiredNavigation(page: Page) {
 }
 
 async function isVisible(locator: Locator) {
-  return locator
-    .isVisible({ timeout: 750 })
-    .catch(() => false);
+  return locator.isVisible({ timeout: 750 }).catch(() => false);
 }
 
 async function openMobileMenu(page: Page) {
@@ -99,7 +97,9 @@ async function clickExportTab(page: Page, label: string | RegExp) {
 
   if (await isVisible(closePanelButton)) {
     await closePanelButton.click();
-    await expect(page.getByRole("complementary", { name: "Контекст выгрузки" })).toHaveCount(0);
+    await expect(
+      page.getByRole("complementary", { name: "Контекст выгрузки" }),
+    ).toHaveCount(0);
   }
 
   const tab = page.getByRole("tab", { name: label });
@@ -136,11 +136,13 @@ async function expectAdminWorkNavigation(page: Page) {
 function submissionCard(page: Page, name: string) {
   const fixtureIds: Record<string, string> = {
     "Нина Волкова": "ПД-1053",
-    "Петровы": "ПД-1054",
+    Петровы: "ПД-1054",
     "Семья Петровых": "ПД-1054",
   };
   const byText = page
-    .locator(".submission-card, .v17-admin-work-row, .v19-event-row, [data-submission-card]")
+    .locator(
+      ".submission-card, .v17-admin-work-row, .v19-event-row, [data-submission-card]",
+    )
     .filter({ hasText: name })
     .first();
   const byRoleButton = page
@@ -167,7 +169,9 @@ function drawer(page: Page) {
 }
 
 async function closeDrawer(page: Page) {
-  const namedClose = drawer(page).getByRole("button", { name: /Закрыть (подачу|проверку)/ });
+  const namedClose = drawer(page).getByRole("button", {
+    name: /Закрыть (подачу|проверку)/,
+  });
 
   if (await isVisible(namedClose.first())) {
     await namedClose.first().click();
@@ -187,7 +191,11 @@ async function expectDrawerStatus(page: Page, status: string) {
   }
 
   await expect(drawer(page).getByText(status).first()).toBeVisible();
-  await expect(drawer(page).getByText(/ПД-\d+|SUB-\d+/).first()).toBeVisible();
+  await expect(
+    drawer(page)
+      .getByText(/ПД-\d+|SUB-\d+/)
+      .first(),
+  ).toBeVisible();
 }
 
 function returnedIvanovsAction(page: Page) {
@@ -243,10 +251,16 @@ function questionnaireScreen(page: Page) {
 
 async function openMediaTab(page: Page) {
   await openDrawerTab(page, ["Файлы", "Селфи", "Паспорт"]);
-  await expect(drawer(page).getByRole("heading", { name: /Файлы подачи|Файлы/ })).toBeVisible();
+  await expect(
+    drawer(page).getByRole("heading", { name: /Файлы подачи|Файлы/ }),
+  ).toBeVisible();
 }
 
-async function openAdminSubmission(page: Page, cardText: string, drawerTitle = cardText) {
+async function openAdminSubmission(
+  page: Page,
+  cardText: string,
+  drawerTitle = cardText,
+) {
   const targetCard = submissionCard(page, cardText);
   await expect(targetCard).toBeVisible();
   await targetCard.click();
@@ -514,14 +528,14 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Мои действия" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Мои действия/ }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Мои действия/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Мои подачи" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Настройки" })).toBeVisible();
     await expect(page.getByText("Входящие", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
-    await expect(page.locator(".v19-action-row, .vf-figma-action-row").first()).toBeVisible();
+    await expect(
+      page.locator(".v19-action-row, .vf-figma-action-row").first(),
+    ).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/v19-agent-actions-restored-desktop.png",
@@ -549,8 +563,12 @@ test.describe("V-19 operations workspace", () => {
     await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
 
     await clickWorkspaceButton(page, /Настройки/);
-    await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 2, name: "Уведомления" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Настройки" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Уведомления" }),
+    ).toBeVisible();
     await page.getByLabel("Сводка по действиям").selectOption("daily");
     await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
     if (testInfo.project.name === "chromium") {
@@ -560,9 +578,13 @@ test.describe("V-19 operations workspace", () => {
       });
     }
     await clickWorkspaceButton(page, /Мои подачи/);
-    await expect(page.getByRole("dialog", { name: "Уйти без сохранения?" })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Уйти без сохранения?" }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Остаться" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Настройки" }),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Сохранить" }).click();
     await expect(page.getByText("Настройки сохранены")).toBeVisible();
     if (testInfo.project.name === "chromium") {
@@ -606,7 +628,10 @@ test.describe("V-19 operations workspace", () => {
           width: number;
         };
         ownerDocument: {
-          elementFromPoint: (x: number, y: number) => {
+          elementFromPoint: (
+            x: number,
+            y: number,
+          ) => {
             closest?: (selector: string) => { textContent?: string | null } | null;
             getAttribute?: (name: string) => string | null;
             tagName?: string;
@@ -745,16 +770,18 @@ test.describe("V-19 operations workspace", () => {
         .filter({ hasText: "Дмитрий Орлов" })
         .getByText("Готово"),
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "1 подача · 1 заявитель" })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Сформировать Эксель" }),
+      page.getByRole("heading", { name: "1 подача · 1 заявитель" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Сформировать Excel" }),
     ).toBeVisible();
     await expect(page.locator("#export-action-hint")).toContainText(
-      "Сначала сформируйте Эксель",
+      "Сначала сформируйте Excel",
     );
-    await page.getByRole("button", { name: "Сформировать Эксель" }).click();
+    await page.getByRole("button", { name: "Сформировать Excel" }).click();
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Скачать" }).click();
+    await page.getByRole("button", { name: "Скачать Excel" }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
     await expect(download.failure()).resolves.toBeNull();
@@ -834,7 +861,7 @@ test.describe("V-19 operations workspace", () => {
         .getByText("Готово"),
     ).toBeVisible();
     await expect(page.locator("#export-action-hint")).toContainText(
-      "Сначала сформируйте Эксель",
+      "Сначала сформируйте Excel",
     );
 
     if (projectName === "chromium") {
@@ -1030,7 +1057,9 @@ test.describe("V-19 operations workspace", () => {
     await clickWorkspaceButton(page, /Мои подачи/);
     await selectSubmissionStatus(page, /В работе/);
     await expect(submissionCard(page, "Новая семейная подача")).toBeVisible();
-    await expect(submissionCard(page, "Новая семейная подача")).toContainText("Черновик");
+    await expect(submissionCard(page, "Новая семейная подача")).toContainText(
+      "Черновик",
+    );
   });
 
   test("header actions stay locked when the current list is filtered empty", async ({
@@ -1040,9 +1069,9 @@ test.describe("V-19 operations workspace", () => {
     await page.getByLabel("Поиск по действиям").fill("нет такой подачи");
 
     await expect(page.getByText("Нет действий")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Открыть выбранную" }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Открыть выбранную" })).toHaveCount(
+      0,
+    );
     await expect(
       page.getByRole("button", { name: "Вернуть", exact: true }),
     ).toHaveCount(0);
@@ -1055,15 +1084,25 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
-    await drawer(page).getByRole("button", { name: /Замечания/ }).click();
-    await expect(drawer(page).getByText(/Нужна правка|замечан/i).first()).toBeVisible();
-    await expect(drawer(page).getByRole("button", { name: "Найти кандидаты" })).toHaveCount(0);
+    await drawer(page)
+      .getByRole("button", { name: /Замечания/ })
+      .click();
+    await expect(
+      drawer(page)
+        .getByText(/Нужна правка|замечан/i)
+        .first(),
+    ).toBeVisible();
+    await expect(
+      drawer(page).getByRole("button", { name: "Найти кандидаты" }),
+    ).toHaveCount(0);
     await expect(
       drawer(page).getByRole("button", { name: "Добавить как замечание" }),
     ).toHaveCount(0);
   });
 
-  test("admin creates a precise issue without suggestion shortcuts", async ({ page }) => {
+  test("admin creates a precise issue without suggestion shortcuts", async ({
+    page,
+  }) => {
     await switchToAdmin(page);
     await openAdminSubmission(page, "Нина Волкова");
     await expect(
@@ -1073,11 +1112,15 @@ test.describe("V-19 operations workspace", () => {
     await drawer(page)
       .getByRole("tab", { name: /Замечания/ })
       .click();
-    await expect(drawer(page).getByRole("button", { name: "Найти кандидаты" })).toHaveCount(0);
+    await expect(
+      drawer(page).getByRole("button", { name: "Найти кандидаты" }),
+    ).toHaveCount(0);
     await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
     await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
 
-    await expect(issueArticle(page, "Нина Волкова", "Требуется уточнение")).toBeVisible();
+    await expect(
+      issueArticle(page, "Нина Волкова", "Требуется уточнение"),
+    ).toBeVisible();
     await expect(drawer(page).getByText("ББ-проверка запущена")).toHaveCount(0);
     await expect(
       drawer(page).getByText("Подсказка ББ принята администратором"),
@@ -1119,9 +1162,7 @@ test.describe("V-19 operations workspace", () => {
     await expect(submissionCard(page, "Петровы")).toBeVisible();
 
     await openAdminSubmission(page, "Петровы", "Семья Петровых");
-    await expect(
-      drawer(page).getByText("Семья Петровых").first(),
-    ).toBeVisible();
+    await expect(drawer(page).getByText("Семья Петровых").first()).toBeVisible();
     const fixedIssueSummary = issueArticle(page, "Ирина Петрова", "Данные");
     await expect(fixedIssueSummary).toBeVisible();
     await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
@@ -1140,12 +1181,12 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { name: "1 подача · 2 заявителя" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Сформировать Эксель" }).click();
+    await page.getByRole("button", { name: "Сформировать Excel" }).click();
     await expect(page.locator("#export-action-hint")).toContainText(
       "Файл сформирован. Теперь скачайте его.",
     );
-    await expect(page.getByRole("button", { name: "Скачать" })).toBeEnabled();
-    await page.getByRole("button", { name: "Скачать" }).click();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
+    await page.getByRole("button", { name: "Скачать Excel" }).click();
     await expect(page.locator("#export-action-hint")).toContainText(
       "Файл скачан. Можно отметить подачу выгруженной.",
     );
@@ -1156,10 +1197,9 @@ test.describe("V-19 operations workspace", () => {
 
     await page.getByRole("tab", { name: "История" }).click();
     await expect(
-      page.locator(".submission-panel").getByText("Семья Петровых"),
-    ).toBeVisible();
-    await expect(
-      page.locator(".submission-panel").getByText("Выгружено").first(),
+      page
+        .locator(".export-history-table .export-row")
+        .filter({ hasText: "Семья Петровых" }),
     ).toBeVisible();
 
     const exportedFamilyRow = page
@@ -1168,11 +1208,12 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       exportedFamilyRow.getByRole("button", { name: /^(Открыть|Проверить) PDF$/ }),
     ).toHaveCount(0);
-    await expect(exportedFamilyRow.getByText("PDF handoff: через файлы подачи")).toBeVisible();
-    await exportedFamilyRow.getByRole("button", { name: /Семья Петровых/ }).click();
+    await expect(exportedFamilyRow.getByText("Нужна проверка PDF")).toBeVisible();
     await expect(
-      drawer(page).getByText("Семья Петровых").first(),
+      exportedFamilyRow.getByText("PDF записи отсутствует."),
     ).toBeVisible();
+    await exportedFamilyRow.getByRole("button", { name: /Семья Петровых/ }).click();
+    await expect(drawer(page).getByText("Семья Петровых").first()).toBeVisible();
     await expect(
       drawer(page).getByRole("button", {
         name: /Передача агентам недоступна:/,
@@ -1213,7 +1254,9 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.locator("#export-action-hint")).toContainText(
       "Нельзя смешивать разные даты поездки",
     );
-    await expect(page.getByRole("button", { name: "Сформировать Эксель" })).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Сформировать Excel" }),
+    ).toBeDisabled();
   });
 
   test("one submission moves from creation to Excel export", async ({ page }) => {
@@ -1291,11 +1334,11 @@ test.describe("V-19 operations workspace", () => {
     await expect(
       page.getByRole("heading", { name: "1 подача · 1 заявитель" }),
     ).toBeVisible();
-    await expect(page.getByText("Sheet1 · masked preview")).toBeVisible();
+    await expect(page.getByText("Sheet1 · предпросмотр")).toBeVisible();
     await expect(
-      page.getByText("53 mapped · 3 derived · 0 unresolved"),
+      page.getByText("53 связано · 3 вычислено · 0 не сопоставлено"),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Сформировать Эксель" }).click();
+    await page.getByRole("button", { name: "Сформировать Excel" }).click();
     await page
       .locator(".export-row")
       .filter({ hasText: "Новая подача" })
@@ -1306,7 +1349,7 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: "Дмитрий Орлов" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByRole("button", { name: "Скачать" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeDisabled();
     await page
       .locator(".export-row")
       .filter({ hasText: "Дмитрий Орлов" })
@@ -1317,8 +1360,8 @@ test.describe("V-19 operations workspace", () => {
       .filter({ hasText: "Новая подача" })
       .getByRole("checkbox")
       .check();
-    await expect(page.getByRole("button", { name: "Скачать" })).toBeEnabled();
-    await page.getByRole("button", { name: "Скачать" }).click();
+    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
+    await page.getByRole("button", { name: "Скачать Excel" }).click();
     await page.getByRole("button", { name: "Отметить выгружено" }).click();
 
     await page.getByRole("tab", { name: "История" }).click();
@@ -1356,7 +1399,10 @@ test.describe("V-19 operations workspace", () => {
       ).toBeVisible();
       await openQuestionnaireTab(page);
       await fillQuestionnaire(page);
-      familyId = await fillFilesAndSubmit(page, "docs/qa/v19-flow-media-drawer-no-overlap.png");
+      familyId = await fillFilesAndSubmit(
+        page,
+        "docs/qa/v19-flow-media-drawer-no-overlap.png",
+      );
     });
 
     await test.step("agent creates and submits second four-person family", async () => {
@@ -1408,7 +1454,9 @@ test.describe("V-19 operations workspace", () => {
       await page.getByRole("tab", { name: /На проверке/ }).click();
       await openAdminSubmission(page, familyId, familyTitle);
       await openDrawerTab(page, ["Замечания"]);
-      await expect(drawer(page).getByRole("button", { name: "Найти кандидаты" })).toHaveCount(0);
+      await expect(
+        drawer(page).getByRole("button", { name: "Найти кандидаты" }),
+      ).toHaveCount(0);
       await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
       await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
       await expect(
@@ -1445,8 +1493,14 @@ test.describe("V-19 operations workspace", () => {
       await expect(
         drawer(page).getByRole("button", { name: "Отправить исправления" }),
       ).toBeDisabled();
-      await drawer(page).getByRole("button", { name: /Замечания/ }).click();
-      await expect(drawer(page).getByText(/уточнение|исправ/i).first()).toBeVisible();
+      await drawer(page)
+        .getByRole("button", { name: /Замечания/ })
+        .click();
+      await expect(
+        drawer(page)
+          .getByText(/уточнение|исправ/i)
+          .first(),
+      ).toBeVisible();
       await closeDrawer(page);
     });
 
@@ -1483,17 +1537,17 @@ test.describe("V-19 operations workspace", () => {
       await expect(
         page.getByRole("heading", { name: "1 подача · 4 заявителя" }),
       ).toBeVisible();
-      await expect(page.getByText("Sheet1 · masked preview")).toBeVisible();
+      await expect(page.getByText("Sheet1 · предпросмотр")).toBeVisible();
       await expect(
-        page.getByText("53 mapped · 3 derived · 0 unresolved"),
+        page.getByText("53 связано · 3 вычислено · 0 не сопоставлено"),
       ).toBeVisible();
       await expect(
         page.getByText(
           "Appointment Type(For Family, applicant email and contact number should be same for all family members)",
         ),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Сформировать Эксель" }).click();
-      await page.getByRole("button", { name: "Скачать" }).click();
+      await page.getByRole("button", { name: "Сформировать Excel" }).click();
+      await page.getByRole("button", { name: "Скачать Excel" }).click();
       await page.getByRole("button", { name: "Отметить выгружено" }).click();
     });
 
@@ -1512,8 +1566,8 @@ test.describe("V-19 operations workspace", () => {
       await expect(
         page.getByRole("heading", { name: "2 подачи · 2 заявителя" }),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Сформировать Эксель" }).click();
-      await page.getByRole("button", { name: "Скачать" }).click();
+      await page.getByRole("button", { name: "Сформировать Excel" }).click();
+      await page.getByRole("button", { name: "Скачать Excel" }).click();
       await page.getByRole("button", { name: "Отметить выгружено" }).click();
     });
 

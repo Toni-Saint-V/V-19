@@ -770,7 +770,7 @@ describe("V-19 export rules", () => {
     });
     expect(
       exportSummary(staleGenerated).blockers.map((blocker) => blocker.reason),
-    ).toContain("Состав выгрузки изменился после формирования файла");
+    ).toContain("Выбор изменился. Сформируйте Excel заново");
     expect(
       applyExportStateToSelection(staleGenerated, ["ПД-1056"], "file_downloaded"),
     ).toBe(staleGenerated);

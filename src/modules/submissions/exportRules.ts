@@ -275,16 +275,19 @@ export function exportSummary(
   const packageIdentity = buildExportPackageIdentity(submissions, format);
   const preview = buildExportPreview(rows);
   const contractValid = validateExportContractShape();
+  const hasRecordedPackage = submissions.some((submission) => submission.exportPackage);
   const packageStale =
     Boolean(packageIdentity) &&
-    (exportState === "file_generated" || exportState === "file_downloaded") &&
+    (hasRecordedPackage ||
+      exportState === "file_generated" ||
+      exportState === "file_downloaded") &&
     !submissions.every(
       (submission) =>
         submission.exportPackage &&
         exportPackageIdentityMatches(submission.exportPackage, packageIdentity),
     );
   const effectiveBlockers = packageStale
-    ? [...blockers, { reason: "Состав выгрузки изменился после формирования файла" }]
+    ? [{ reason: "Выбор изменился. Сформируйте Excel заново" }, ...blockers]
     : blockers;
   const ready = blockers.length === 0 && contractValid;
   const canDownload = ready && !packageStale && exportState === "file_generated";

@@ -9,6 +9,10 @@ import {
   Users,
 } from "lucide-react";
 import type { Submission } from "../types";
+import {
+  QuestionnaireProgressBadge,
+  QuestionnaireWorkspaceShell,
+} from "./QuestionnaireWorkspacePrimitives";
 
 type FieldState = "normal" | "needs_review" | "invalid";
 type ApplicantTab = { hasIssue?: boolean; id: string; index: number; name: string };
@@ -74,14 +78,13 @@ function FormField({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  const baseClasses =
-    "w-full h-[46px] rounded-[10px] px-3.5 text-[13px] text-white outline-none transition-colors";
+  const baseClasses = "v19-questionnaire-field-control";
   const stateClasses =
     state === "needs_review"
-      ? "bg-orange-500/5 border border-orange-500/50 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
+      ? "is-review"
       : state === "invalid"
-        ? "bg-[#1e1e21] border border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/30"
-        : "bg-[#1e1e21] border border-[#242529] focus:border-[#3a45b4] focus:ring-1 focus:ring-[#3a45b4]/30 hover:border-[#2e2f34]";
+        ? "is-invalid"
+        : "is-normal";
 
   return (
     <div
@@ -91,7 +94,7 @@ function FormField({
     >
       <label className="flex items-start gap-2 text-[12px] text-white/70 leading-snug">
         {number ? (
-          <span className="shrink-0 flex items-center justify-center min-w-[25px] h-5 rounded-md bg-[#1e1e21] border border-[#242529] text-[9.5px] font-mono text-white/50">
+          <span className="v19-questionnaire-field-number">
             {number}
           </span>
         ) : null}
@@ -111,28 +114,22 @@ function FormField({
             <span className="truncate">
               {value || <span className="text-white/30">Выберите...</span>}
             </span>
-            <ChevronDown
-              className={`w-4 h-4 shrink-0 ml-2 transition-transform ${
-                isOpen ? "rotate-180 text-white/70" : "text-white/40"
-              }`}
-            />
+            <ChevronDown className="w-4 h-4 text-white/40 shrink-0 ml-2" />
           </button>
 
           <AnimatePresence>
             {isOpen ? (
               <motion.div
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="absolute z-50 top-[calc(100%+6px)] left-0 w-full bg-[#1a1a1d] border border-[#242529] rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.4)] overflow-hidden py-1.5 max-h-[220px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10"
+                className="v19-questionnaire-dropdown"
                 exit={{ opacity: 0, scale: 0.98, y: -4 }}
                 initial={{ opacity: 0, scale: 0.98, y: -4 }}
                 transition={{ duration: 0.15 }}
               >
                 {options.map((option) => (
                   <button
-                    className={`w-full text-left px-3.5 py-2.5 text-[13px] transition-colors ${
-                      value === option
-                        ? "bg-[#3a45b4]/10 text-[#4855d4] font-medium"
-                        : "text-white/80 hover:text-white hover:bg-white/[0.04]"
+                    className={`v19-questionnaire-dropdown-option ${
+                      value === option ? "is-selected" : ""
                     }`}
                     key={option}
                     type="button"
@@ -150,7 +147,7 @@ function FormField({
         </div>
       ) : type === "textarea" ? (
         <textarea
-          className={`${baseClasses.replace("h-[46px]", "h-24 py-3 resize-none")} ${stateClasses}`}
+          className={`${baseClasses} is-textarea ${stateClasses}`}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
         />
@@ -176,7 +173,7 @@ function FormField({
           </span>
         ) : null}
         {excelMap ? (
-          <span className="ml-auto inline-flex items-center px-2 h-[22px] rounded-full border border-[#242529] bg-[#161617] whitespace-nowrap overflow-hidden text-ellipsis max-w-[50%]">
+          <span className="v19-questionnaire-excel-map">
             <span className="font-medium text-white/60 tracking-wide text-[10px]">
               {excelMap}
             </span>
@@ -254,7 +251,8 @@ export function FigmaQuestionnaireScreen({
     hotel: "Сверьте размещение, приглашение и адрес принимающей стороны.",
     passport: "Сверьте номер паспорта, тип документа, даты выдачи и срок действия.",
     payment: "Проверьте, кто оплачивает поездку и какие подтверждения приложены.",
-    personal: "Сверьте данные с паспортом.",
+    personal:
+      "Убедитесь, что все данные в точности совпадают с паспортом. Особое внимание обратите на транслитерацию.",
     trip: "Проверьте маршрут, даты, цель поездки и страну первого въезда.",
   };
 
@@ -267,11 +265,6 @@ export function FigmaQuestionnaireScreen({
     const nextSection = sections[(currentIndex + 1) % sections.length];
     setActiveSection(nextSection.id);
   }
-
-  useEffect(() => {
-    document.body.classList.add("vf-questionnaire-open");
-    return () => document.body.classList.remove("vf-questionnaire-open");
-  }, []);
 
   const cities = [
     "MOSCOW",
@@ -594,15 +587,15 @@ export function FigmaQuestionnaireScreen({
   return (
     <motion.div
       animate={{ opacity: 1, x: 0 }}
-      className="vf-figma-surface vf-figma-questionnaire-screen fixed inset-0 z-[60] bg-[#101011] flex flex-col overflow-hidden"
+      className="vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell"
       exit={{ opacity: 0, x: -20 }}
       initial={{ opacity: 0, x: 20 }}
       transition={{ damping: 25, stiffness: 250, type: "spring" }}
     >
-      <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-3 lg:px-6 gap-3 lg:gap-4 bg-[#141416]">
+      <header className="v19-questionnaire-screen-header">
         <button
           aria-label="Назад"
-          className="w-10 h-10 shrink-0 flex items-center justify-center rounded-[10px] hover:bg-white/5 text-white/70 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          className="v19-questionnaire-back-button"
           type="button"
           onClick={onBack}
         >
@@ -610,7 +603,7 @@ export function FigmaQuestionnaireScreen({
         </button>
 
         <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-[6px] bg-[#27272b] text-white/70 text-xs font-mono">
+          <div className="v19-questionnaire-submission-id">
             {submission.id}
           </div>
           <h1 className="text-[15px] lg:text-[18px] font-semibold tracking-tight text-white m-0 truncate">
@@ -624,7 +617,7 @@ export function FigmaQuestionnaireScreen({
             Сохранено только что
           </span>
           <button
-            className="h-[36px] lg:h-10 px-3 lg:px-4 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="v19-questionnaire-complete-button"
             type="button"
             onClick={() =>
               onComplete({
@@ -639,10 +632,10 @@ export function FigmaQuestionnaireScreen({
         </div>
       </header>
 
-      <div className="h-[3px] w-full bg-[#161617] shrink-0">
+      <div className="v19-questionnaire-progress-track">
         <motion.div
           animate={{ width: "68%" }}
-          className="h-full bg-[#3a45b4] relative overflow-hidden"
+          className="v19-questionnaire-progress-fill"
           initial={{ width: 0 }}
           transition={{ delay: 0.1, duration: 1.2, ease: "easeOut" }}
         >
@@ -654,28 +647,26 @@ export function FigmaQuestionnaireScreen({
         </motion.div>
       </div>
 
-      <div className="flex-1 overflow-auto p-3 lg:p-6 bg-[#101011]">
+      <div className="v19-questionnaire-scroll">
         <div className="max-w-[1240px] mx-auto flex flex-col min-h-full gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
-          <div className="min-h-[56px] lg:min-h-[62px] p-2 lg:p-2.5 rounded-xl lg:rounded-2xl bg-[#161617] border border-[#242529] shadow-[0_8px_22px_rgba(0,0,0,0.16)] flex flex-col md:flex-row md:items-center gap-3 shrink-0">
+          <div className="v19-questionnaire-applicant-bar">
             <div className="flex overflow-x-auto scrollbar-hide gap-1.5 lg:gap-2 flex-1 w-full snap-x pb-1 md:pb-0">
               {applicants.map((applicant) => (
                 <button
                   aria-selected={activeApplicant === applicant.id}
-                  className={`relative h-10 px-3 rounded-[10px] flex shrink-0 items-center gap-2 text-[12px] font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] snap-start ${
-                    activeApplicant === applicant.id
-                      ? "bg-[#27272b] text-white border border-[#2e2f34] shadow-sm"
-                      : "bg-[#1e1e21] text-white/60 border border-[#242529] hover:bg-[#232326] hover:text-white/90"
+                  className={`v19-questionnaire-applicant-tab ${
+                    activeApplicant === applicant.id ? "is-active" : ""
                   }`}
                   key={applicant.id}
                   type="button"
                   onClick={() => setActiveApplicant(applicant.id)}
                 >
-                  <span className="w-5 h-5 rounded-[6px] bg-[#161617] border border-[#242529] flex items-center justify-center text-[10px] text-white/50 shadow-inner">
+                  <span className="v19-questionnaire-applicant-index">
                     {applicant.index}
                   </span>
                   {applicant.name}
                   {applicant.hasIssue ? (
-                    <span className="ml-0.5 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.55)]" />
+                    <span className="v19-questionnaire-applicant-issue" />
                   ) : null}
                 </button>
               ))}
@@ -691,14 +682,12 @@ export function FigmaQuestionnaireScreen({
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
-            <aside className="shrink-0 flex lg:flex-col gap-1.5 lg:w-[188px] bg-[#161617] border border-[#242529] rounded-xl lg:rounded-2xl p-2 overflow-x-auto lg:overflow-y-auto scrollbar-hide snap-x">
+          <QuestionnaireWorkspaceShell className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
+            <aside className="v19-questionnaire-section-nav">
               {sections.map((section) => (
                 <button
-                  className={`w-[160px] shrink-0 lg:w-full min-h-[50px] p-2.5 flex items-center gap-3 rounded-[10px] transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] snap-start ${
-                    activeSection === section.id
-                      ? "bg-[#27272b] border border-[#2e2f34] text-white shadow-sm"
-                      : "border border-transparent text-white/60 hover:bg-[#202024] hover:text-white"
+                  className={`v19-questionnaire-section-tab ${
+                    activeSection === section.id ? "is-active" : ""
                   }`}
                   key={section.id}
                   type="button"
@@ -713,14 +702,8 @@ export function FigmaQuestionnaireScreen({
                     </div>
                   </div>
 
-                  <div
-                    className={`min-w-[24px] h-[22px] rounded-[6px] border flex items-center justify-center text-[10px] shrink-0 ${
-                      section.status === "complete"
-                        ? "border-emerald-500/25 text-emerald-400 bg-emerald-500/5"
-                        : section.status === "issue"
-                          ? "border-red-500/30 text-red-400 bg-red-500/10"
-                          : "border-[#242529] text-white/30 bg-black/20"
-                    }`}
+                  <QuestionnaireProgressBadge
+                    className={`v19-questionnaire-progress-badge status-${section.status}`}
                   >
                     {section.status === "complete" ? (
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -729,13 +712,13 @@ export function FigmaQuestionnaireScreen({
                     ) : (
                       "-"
                     )}
-                  </div>
+                  </QuestionnaireProgressBadge>
                 </button>
               ))}
             </aside>
 
-            <div className="flex-1 min-w-0 bg-[#161617] border border-[#242529] rounded-xl lg:rounded-2xl overflow-y-auto overflow-x-hidden flex flex-col relative shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
-              <div className="min-h-[66px] px-4 md:px-6 py-4 md:py-5 border-b border-[#242529] sticky top-0 bg-[#161617]/90 backdrop-blur-md z-10 flex flex-col justify-center">
+            <div className="v19-questionnaire-work-panel">
+              <div className="v19-questionnaire-work-head">
                 <h3 className="text-[15px] lg:text-[16px] font-semibold text-white leading-snug">
                   {sections.find((section) => section.id === activeSection)?.title}
                 </h3>
@@ -745,9 +728,9 @@ export function FigmaQuestionnaireScreen({
               </div>
 
               {activeSection === "personal" && activeApplicant === applicants[0]?.id ? (
-                <div className="mx-4 md:mx-6 mt-4 p-4 bg-red-500/5 border border-red-500/20 rounded-xl flex items-start gap-3.5 relative overflow-hidden shadow-sm">
-                  <div className="absolute left-0 top-0 w-1 h-full bg-red-500" />
-                  <div className="w-8 h-8 shrink-0 rounded-[8px] bg-red-500/10 text-red-500 flex items-center justify-center">
+                <div className="v19-questionnaire-review-alert">
+                  <div className="v19-questionnaire-review-strip" />
+                  <div className="v19-questionnaire-review-icon">
                     <AlertCircle className="w-[18px] h-[18px]" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -755,10 +738,11 @@ export function FigmaQuestionnaireScreen({
                       Несоответствие даты рождения
                     </div>
                     <p className="text-[12px] text-white/60 mt-1.5 leading-relaxed">
-                      PDF:{" "}
-                      <strong className="text-white/90 font-medium">15.05.1985</strong>.
-                      Анкета:{" "}
+                      В загруженном приложении PDF дата рождения{" "}
+                      <strong className="text-white/90 font-medium">15.05.1985</strong>,
+                      а в анкете указано{" "}
                       <strong className="text-white/90 font-medium">12.05.1985</strong>.
+                      Подтвердите правильное значение.
                     </p>
                   </div>
                 </div>
@@ -768,19 +752,19 @@ export function FigmaQuestionnaireScreen({
                 {renderSectionFields()}
               </div>
 
-              <div className="mt-auto p-4 md:p-5 border-t border-[#242529] bg-[#1a1a1d]/90 backdrop-blur-md sticky bottom-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="v19-questionnaire-panel-footer">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 text-[11px] text-white/40 font-medium">
                     <Info className="w-4 h-4" />
                     <span>Автосохранение включено</span>
                   </div>
-                  <div className="hidden sm:flex items-center gap-2 text-[11px] font-medium px-2 py-1 rounded-md bg-white/5 text-white/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#3a45b4]" />
+                  <div className="v19-questionnaire-completion-pill">
+                    <span className="v19-questionnaire-completion-dot" />
                     Заполнено 8 из 12 (68%)
                   </div>
                 </div>
                 <button
-                  className="w-full sm:w-auto px-6 h-11 bg-white/10 hover:bg-white/15 text-white rounded-xl text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  className="v19-questionnaire-next-button"
                   type="button"
                   onClick={goToNextSection}
                 >
@@ -788,7 +772,7 @@ export function FigmaQuestionnaireScreen({
                 </button>
               </div>
             </div>
-          </div>
+          </QuestionnaireWorkspaceShell>
         </div>
       </div>
     </motion.div>
