@@ -14,6 +14,7 @@ import {
   agentActionQueue,
 } from "../../src/modules/submissions/agentActions";
 import {
+  buildExportMappingAudit,
   buildExportPackageIdentity,
   buildExportRows,
   exportPackageIdentityMatches,
@@ -41,6 +42,7 @@ import {
   toCockpitDraftPersistencePayload,
 } from "../../src/modules/submissions/supabasePersistence";
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStorage";
+import { withRecomputedFileCompletion } from "../../src/modules/submissions/fileAsset";
 import {
   failPassportExtraction,
   finishPassportExtraction,
@@ -403,6 +405,27 @@ describe("V-19 export rules", () => {
     expect(getExportBlockers([readyClone({ id: "ПД-1056" })])).toEqual([]);
   });
 
+  it("builds the export mapping audit from the actual 56-column contract", () => {
+    const summary = exportSummary([readyClone({ id: "ПД-1056" })]);
+    const audit = buildExportMappingAudit(summary.preview);
+
+    expect(audit.rows).toHaveLength(56);
+    expect(audit).toMatchObject({
+      mappedCount: 53,
+      derivedCount: 3,
+      unresolvedCount: 0,
+    });
+    expect(audit.rows.filter((row) => row.state === "unresolved")).toEqual([]);
+    expect(audit.rows.find((row) => row.header === "Visa Sub Type")).toMatchObject({
+      state: "mapped",
+    });
+    expect(
+      audit.rows.find((row) => row.header === "Nationality At Birth"),
+    ).toMatchObject({
+      state: "mapped",
+    });
+  });
+
   it("blocks export when trip dates are missing", () => {
     const blockers = getExportBlockers([
       readyClone({
@@ -534,10 +557,11 @@ describe("V-19 export rules", () => {
     });
   });
 
-  it("blocks mixed city, trip date, and already exported packages", () => {
+  it("blocks mixed city, owner agent, trip date, and already exported packages", () => {
     const blockers = getExportBlockers([
       readyClone({ id: "ПД-1056" }),
       readyClone({ id: "ПД-ГОРОД", city: "Казань" }),
+      readyClone({ agentId: alternateLocalAgentOwnerId, id: "ПД-ДРУГОЙ-АГЕНТ" }),
       readyClone({ id: "ПД-ДАТА", tripDateFrom: "10.10", tripDateTo: "20.10" }),
       readyClone({ id: "ПД-СЕМЬЯ", type: "family" }),
       byId("ПД-1057"),
@@ -546,6 +570,7 @@ describe("V-19 export rules", () => {
     expect(blockers).toContain("В выборке есть подачи не готовые к выгрузке");
     expect(blockers).toContain("В выборке есть уже выгруженные подачи");
     expect(blockers).toContain("Нельзя смешивать разные города");
+    expect(blockers).toContain("Нельзя смешивать подачи разных агентов");
     expect(blockers).toContain("Нельзя смешивать разные даты поездки");
     expect(blockers).not.toContain("Нельзя смешивать одинарные и семейные подачи");
   });
@@ -837,34 +862,9 @@ describe("V-19 submission actions", () => {
   });
 
   it("derives submit corrections only after all targeted file replacements are uploaded", () => {
-    const legacyReturned = byId("ПД-1048");
-    const returned = {
-      ...legacyReturned,
-      files: legacyReturned.files
-        .filter((file) => file.type !== "photo")
-        .map((file) =>
-          file.applicantId === "з-1048-1" && file.type === "selfie_2"
-            ? {
-                ...file,
-                linkedIssueId: "зм-1048-1",
-                status: "needs_replacement" as const,
-              }
-            : file,
-        ),
-      issues: legacyReturned.issues.map((issue) =>
-        issue.id === "зм-1048-1"
-          ? {
-              ...issue,
-              target: {
-                ...issue.target,
-                fileType: "selfie_2" as const,
-              },
-            }
-          : issue,
-      ),
-    } satisfies Submission;
+    const returned = byId("ПД-1048");
     const selfieFile = returned.files.find(
-      (file) => file.applicantId === "з-1048-1" && file.type === "selfie_2",
+      (file) => file.applicantId === "з-1048-1" && file.type === "selfie",
     );
     const passportFile = returned.files.find(
       (file) => file.applicantId === "з-1048-3" && file.type === "passport_scan",
@@ -877,19 +877,19 @@ describe("V-19 submission actions", () => {
     });
 
     const withSelfieReplacement = applyUploadedFileMetadata(returned, selfieFile.id, {
-      generatedFileName: "v19replacement_selfie_2.jpg",
+      generatedFileName: "v19replacement_selfie.jpg",
       mimeType: "image/jpeg",
-      originalFileName: "selfie-2-fixed.jpg",
+      originalFileName: "selfie-fixed.jpg",
       sizeBytes: 180_000,
       storageBucket: "submission-media",
-      storagePath: "ПД-1048/з-1048-1/selfie_2/v19replacement_selfie_2.jpg",
+      storagePath: "ПД-1048/з-1048-1/selfie/v19replacement_selfie.jpg",
       uploadedAtIso: "2026-06-21T10:00:00.000Z",
     });
 
     expect(
       withSelfieReplacement.files.find((file) => file.id === selfieFile.id),
     ).toMatchObject({
-      originalFileName: "selfie-2-fixed.jpg",
+      originalFileName: "selfie-fixed.jpg",
       reviewStatus: "not_reviewed",
       reviewedBy: undefined,
       status: "uploaded",
@@ -1010,8 +1010,9 @@ describe("V-19 submission actions", () => {
     ).map((submission) => submission.title);
 
     expect(defaultAgentTitles).toContain("Семья Ивановых");
+    expect(defaultAgentTitles).not.toContain("Ольга Фролова");
     expect(defaultAgentTitles).not.toContain("Ольга Морозова");
-    expect(alternateAgentTitles).toEqual(["Ольга Морозова"]);
+    expect(alternateAgentTitles).toEqual(["Ольга Фролова", "Ольга Морозова"]);
   });
 
   it("creates a Spain-only family draft inside the submission model", () => {
@@ -1190,6 +1191,46 @@ describe("V-19 submission actions", () => {
     expect(submitted.history[0].source).toBe("agent");
   });
 
+  it("requires a completed passport upload for every family applicant", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["IVANOV IVAN", "IVANOVA ANNA"],
+      city: "Москва",
+      familyCount: 2,
+      preliminaryIntake: datedPreliminaryIntake(),
+      submissions: initialSubmissions,
+      type: "family",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const spouse = filled.applicants[1];
+    const spousePassport = filled.files.find(
+      (file) => file.applicantId === spouse?.id && file.type === "passport_scan",
+    );
+    if (!spousePassport) throw new Error("Missing spouse passport file");
+
+    for (const uploadStatus of ["failed", "deleted"] as const) {
+      const withBrokenPassport = withRecomputedFileCompletion({
+        ...filled,
+        files: filled.files.map((file) =>
+          file.id === spousePassport.id
+            ? { ...file, status: "uploaded" as const, uploadStatus }
+            : file,
+        ),
+      });
+      const inProgress = applySubmissionAction(
+        withBrokenPassport,
+        "save_progress",
+        "agent",
+      );
+
+      expect(withBrokenPassport.completeness.files).toBeLessThan(100);
+      expect(withBrokenPassport.applicants[1]?.fileStatus).toBe("partial");
+      expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
+        ok: false,
+        reason: "Есть незаполненные поля или недостающие файлы",
+      });
+    }
+  });
+
   it("blocks review submission when extracted passport is expired", () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
@@ -1294,6 +1335,43 @@ describe("V-19 submission actions", () => {
     const failed = failPassportExtraction(inProgress, passportFile, "Не распознано");
     expect(canPerformAction(failed, "submit_for_review", "agent")).toEqual({
       ok: true,
+    });
+  });
+
+  it("does not allow failed OCR fallback when the passport upload failed", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["IVANOV IVAN"],
+      city: "Москва",
+      familyCount: 1,
+      preliminaryIntake: datedPreliminaryIntake(),
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const passportFile = filled.files.find(
+      (file) =>
+        file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
+    );
+    if (!passportFile) throw new Error("Missing passport file");
+
+    const brokenUpload = withRecomputedFileCompletion({
+      ...filled,
+      files: filled.files.map((file) =>
+        file.id === passportFile.id
+          ? { ...file, status: "uploaded" as const, uploadStatus: "failed" as const }
+          : file,
+      ),
+    });
+    const inProgress = applySubmissionAction(brokenUpload, "save_progress", "agent");
+    const failedExtraction = failPassportExtraction(
+      inProgress,
+      { ...passportFile, uploadStatus: "failed" },
+      "Не распознано",
+    );
+
+    expect(canPerformAction(failedExtraction, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Есть незаполненные поля или недостающие файлы",
     });
   });
 
@@ -1758,7 +1836,7 @@ describe("V-19 ББ helper suggestions", () => {
         (suggestion) =>
           suggestion.target.applicantName === "Мария Иванова" &&
           suggestion.target.section === "Медиа" &&
-          suggestion.target.fileType === "photo",
+          suggestion.target.fileType === "selfie",
       ),
     ).toBe(false);
   });
@@ -1802,7 +1880,7 @@ describe("V-19 ББ helper suggestions", () => {
   it("lets admins convert a suggestion into a precise issue", () => {
     const reviewed = runAiReview(byId("ПД-1053"));
     const fileSuggestion = activeAiSuggestions(reviewed).find(
-      (suggestion) => suggestion.target.fileType === "photo",
+      (suggestion) => suggestion.target.fileType === "selfie",
     );
     if (!fileSuggestion) throw new Error("Нет файловой подсказки для проверки");
 
@@ -1816,7 +1894,7 @@ describe("V-19 ББ helper suggestions", () => {
       target: {
         applicantName: "Нина Волкова",
         section: "Медиа",
-        fileType: "photo",
+        fileType: "selfie",
       },
     });
     expect(
@@ -1826,7 +1904,7 @@ describe("V-19 ББ helper suggestions", () => {
     ).toBe(false);
     expect(next.history[0]).toMatchObject({
       text: "Подсказка ББ принята администратором",
-      detail: "Нина Волкова · Медиа · Фото на белом фоне",
+      detail: "Нина Волкова · Медиа · Селфи",
       source: "bb",
     });
   });
@@ -1947,12 +2025,45 @@ describe("V-19 persistence boundary", () => {
     ).toBe(false);
   });
 
-  it("maps legacy returned media issues to a canonical replacement slot", () => {
-    const normalized = normalizeSubmissionForCanonicalRuntime(byId("ПД-1048"));
+  it("maps legacy returned photo issues to the canonical selfie replacement slot", () => {
+    const source = byId("ПД-1048");
+    const legacyIssue = source.issues.find((item) => item.id === "зм-1048-1");
+    if (!legacyIssue) throw new Error("Missing returned issue");
+    const legacySubmission: Submission = {
+      ...source,
+      issues: source.issues.map((issue) =>
+        issue.id === legacyIssue.id
+          ? {
+              ...issue,
+              target: {
+                ...issue.target,
+                fileType: "photo",
+              },
+            }
+          : issue,
+      ),
+      files: [
+        ...source.files.filter(
+          (file) =>
+            !(
+              file.applicantId === legacyIssue.target.applicantId &&
+              file.type === "selfie"
+            ),
+        ),
+        {
+          id: "legacy-photo",
+          applicantId: legacyIssue.target.applicantId,
+          status: "needs_replacement",
+          type: "photo",
+          linkedIssueId: legacyIssue.id,
+        },
+      ],
+    };
+    const normalized = normalizeSubmissionForCanonicalRuntime(legacySubmission);
     const issue = normalized.issues.find((item) => item.id === "зм-1048-1");
     if (!issue) throw new Error("Missing returned issue");
 
-    expect(issue.target.fileType).toBe("selfie_2");
+    expect(issue.target.fileType).toBe("selfie");
     const targetFile = normalized.files.find(
       (file) =>
         file.applicantId === issue.target.applicantId &&

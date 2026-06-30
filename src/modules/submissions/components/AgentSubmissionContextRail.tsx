@@ -80,7 +80,10 @@ export function AgentSubmissionContextRail({
       </section>
 
       <section className="v19-rail-card v19-rail-next-card">
-        <p className="v19-rail-label">Следующее действие</p>
+        <div className="v19-rail-next-head">
+          <p className="v19-rail-label">Следующее действие</p>
+          <Badge tone={status.tone}>{status.label}</Badge>
+        </div>
         <h3>{nextAction.title}</h3>
         <p className="v19-rail-action-detail">{nextAction.description}</p>
         <Button variant="primary" onClick={nextAction.onOpen}>

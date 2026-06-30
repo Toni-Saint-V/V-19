@@ -5,6 +5,7 @@ import type {
   SubmissionAction,
   SubmissionFile,
 } from "./types";
+import { isCompletedFileAsset } from "./fileAsset";
 
 export type PassportGateIssue = {
   applicantId: string;
@@ -140,8 +141,8 @@ function applicantPassportGateIssues(
 
   const canUseQuestionnaireFallback =
     state.status === "ready" ||
-    state.status === "failed" ||
-    state.status === "unavailable";
+    ((state.status === "failed" || state.status === "unavailable") &&
+      hasRealPassportUpload(file));
 
   if (state.status === "ready" && !state.extractedFields.length) {
     return [
@@ -262,13 +263,12 @@ function passportFileForApplicant(submission: Submission, applicantId: string) {
 function hasRealPassportUpload(file: SubmissionFile | undefined) {
   return Boolean(
     file &&
-    file.status !== "missing" &&
-    file.status !== "needs_replacement" &&
-    (file.mimeType ||
-      file.originalFileName ||
-      file.generatedFileName ||
-      file.storagePath ||
-      file.storageBucket),
+      isCompletedFileAsset(file) &&
+      (file.mimeType ||
+        file.originalFileName ||
+        file.generatedFileName ||
+        file.storagePath ||
+        file.storageBucket),
   );
 }
 

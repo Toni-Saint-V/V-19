@@ -1,5 +1,6 @@
 import { Button, NavCount } from "../../../shared/ui/primitives";
 import type { ReactNode, SVGProps } from "react";
+import visaOpsLogo from "../../../assets/visaflow-logo.png";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
 
@@ -21,8 +22,8 @@ export function OperationalSidebar({
   createAction,
   footer,
   items,
-  mobileTitle,
   onMobileClose,
+  mobileTitle,
 }: {
   brand?: string;
   createAction?: {
@@ -31,46 +32,48 @@ export function OperationalSidebar({
   };
   footer: ReactNode;
   items: OperationalNavItem[];
-  mobileTitle?: string;
   onMobileClose?: () => void;
+  mobileTitle?: string;
 }) {
   return (
     <aside className="ops-sidebar" aria-label="Операционный центр">
-      {onMobileClose ? (
-        <button
-          className="ops-sidebar-close"
-          type="button"
-          aria-label="Закрыть меню"
-          onClick={onMobileClose}
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
-        </button>
-      ) : null}
       {mobileTitle ? (
         <div className="ops-mobile-screen-title" aria-label={mobileTitle}>
           <strong>{mobileTitle}</strong>
           <span aria-hidden="true">VF</span>
         </div>
       ) : null}
-      <div className="ops-brand" aria-label={brand}>
-        <span className="ops-brand-logo ops-brand-mark" aria-hidden="true">
-          V
+      <div className="ops-brand" aria-label={`${brand} 19`}>
+        <span
+          className="ops-brand-logo ops-brand-mark vf-brand-capital vf-brand-capital--nav"
+          aria-hidden="true"
+        >
+          <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
         </span>
         <div className="ops-brand-copy">
-          <strong>VisaFlow V-19</strong>
+          <strong className="vf-brand-wordmark">
+            <span className="vf-brand-tail" aria-hidden="true">
+              VisaFlow
+            </span>
+            <span className="vf-brand-comma-version" aria-hidden="true">
+              19
+            </span>
+          </strong>
           <em>Workspace</em>
         </div>
+        {onMobileClose ? (
+          <Button
+            aria-label="Закрыть меню"
+            className="ops-mobile-close"
+            variant="ghost"
+            onClick={onMobileClose}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </Button>
+        ) : null}
       </div>
-      <button className="ops-sidebar-command" type="button">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
-        <span>Поиск...</span>
-        <kbd>⌘K</kbd>
-      </button>
       <nav className="ops-nav" aria-label="Операционные разделы">
         {items.map((item) => (
           <Button
@@ -79,6 +82,7 @@ export function OperationalSidebar({
             className={`ops-nav-item ${item.active ? "is-active" : ""} ${
               item.tone ? `tone-${item.tone}` : ""
             }`}
+            data-nav-id={item.id}
             disabled={item.disabled}
             key={item.id}
             variant="ghost"
@@ -133,6 +137,7 @@ export function OperationalMobileTabBar({
           className={`ops-mobile-tabbar-item ${item.active ? "is-active" : ""} ${
             item.tone ? `tone-${item.tone}` : ""
           }`}
+          data-nav-id={item.id}
           disabled={item.disabled}
           key={item.id}
           type="button"

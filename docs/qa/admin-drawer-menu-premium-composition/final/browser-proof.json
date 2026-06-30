@@ -1,0 +1,193 @@
+{
+  "baseURL": "http://127.0.0.1:5297/",
+  "generatedAt": "2026-06-29T03:20:32.755Z",
+  "viewports": [
+    {
+      "name": "desktop-1440",
+      "width": 1440,
+      "height": 960,
+      "menuOpened": true,
+      "closeReachable": true,
+      "overflow": {
+        "clientWidth": 1440,
+        "scrollWidth": 1440,
+        "overflowX": 0
+      },
+      "tabs": [
+        {
+          "label": "Паспорт",
+          "selected": "true"
+        },
+        {
+          "label": "Селфи",
+          "selected": "true"
+        },
+        {
+          "label": "Анкета",
+          "selected": "true"
+        },
+        {
+          "label": "Замечания",
+          "selected": "true"
+        }
+      ],
+      "consoleErrors": []
+    },
+    {
+      "name": "tablet-768",
+      "width": 768,
+      "height": 1024,
+      "menuOpened": true,
+      "closeReachable": true,
+      "overflow": {
+        "clientWidth": 768,
+        "scrollWidth": 768,
+        "overflowX": 0
+      },
+      "tabs": [
+        {
+          "label": "Паспорт",
+          "selected": "true"
+        },
+        {
+          "label": "Селфи",
+          "selected": "true"
+        },
+        {
+          "label": "Анкета",
+          "selected": "true"
+        },
+        {
+          "label": "Замечания",
+          "selected": "true"
+        }
+      ],
+      "consoleErrors": []
+    },
+    {
+      "name": "mobile-430",
+      "width": 430,
+      "height": 932,
+      "menuOpened": true,
+      "closeReachable": true,
+      "overflow": {
+        "clientWidth": 430,
+        "scrollWidth": 430,
+        "overflowX": 0
+      },
+      "tabs": [
+        {
+          "label": "Паспорт",
+          "selected": "true"
+        },
+        {
+          "label": "Селфи",
+          "selected": "true"
+        },
+        {
+          "label": "Анкета",
+          "selected": "true"
+        },
+        {
+          "label": "Замечания",
+          "selected": "true"
+        }
+      ],
+      "consoleErrors": []
+    },
+    {
+      "name": "mobile-390",
+      "width": 390,
+      "height": 844,
+      "menuOpened": true,
+      "closeReachable": true,
+      "overflow": {
+        "clientWidth": 390,
+        "scrollWidth": 390,
+        "overflowX": 0
+      },
+      "tabs": [
+        {
+          "label": "Паспорт",
+          "selected": "true"
+        },
+        {
+          "label": "Селфи",
+          "selected": "true"
+        },
+        {
+          "label": "Анкета",
+          "selected": "true"
+        },
+        {
+          "label": "Замечания",
+          "selected": "true"
+        }
+      ],
+      "consoleErrors": []
+    },
+    {
+      "name": "mobile-375",
+      "width": 375,
+      "height": 812,
+      "menuOpened": true,
+      "closeReachable": true,
+      "overflow": {
+        "clientWidth": 375,
+        "scrollWidth": 375,
+        "overflowX": 0
+      },
+      "tabs": [
+        {
+          "label": "Паспорт",
+          "selected": "true"
+        },
+        {
+          "label": "Селфи",
+          "selected": "true"
+        },
+        {
+          "label": "Анкета",
+          "selected": "true"
+        },
+        {
+          "label": "Замечания",
+          "selected": "true"
+        }
+      ],
+      "consoleErrors": []
+    },
+    {
+      "name": "mobile-320",
+      "width": 320,
+      "height": 740,
+      "menuOpened": true,
+      "closeReachable": true,
+      "overflow": {
+        "clientWidth": 320,
+        "scrollWidth": 320,
+        "overflowX": 0
+      },
+      "tabs": [
+        {
+          "label": "Паспорт",
+          "selected": "true"
+        },
+        {
+          "label": "Селфи",
+          "selected": "true"
+        },
+        {
+          "label": "Анкета",
+          "selected": "true"
+        },
+        {
+          "label": "Замечания",
+          "selected": "true"
+        }
+      ],
+      "consoleErrors": []
+    }
+  ],
+  "console": []
+}

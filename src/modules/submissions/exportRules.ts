@@ -1,10 +1,13 @@
 import type {
+  AgentOwnerId,
+  City,
   ExportBlocker,
   ExportPackageFormat,
   ExportPackageIdentity,
   ExportState,
   Submission,
 } from "./types";
+import { agentOwnerDisplayName } from "./ownership";
 import {
   type CanonicalSubmissionStatus,
   canonicalRequiredMediaReadiness,
@@ -14,16 +17,32 @@ import { hasUsableTripDateRange } from "./status";
 import {
   buildExportContractRows,
   buildExportPreview,
+  exportContractColumns,
   exportContractFingerprint,
+  type ExportContractColumnKey,
   type ExportContractPreview,
   type ExportContractRow,
   validateExportContractShape,
 } from "./exportContract";
 
 export type ExportSelectionState = ExportState | "mixed";
+export type ExportMappingState = "mapped" | "derived" | "unresolved";
+export type ExportMappingAuditRow = {
+  header: string;
+  index: number;
+  key: ExportContractColumnKey;
+  state: ExportMappingState;
+};
+export type ExportMappingAudit = {
+  derivedCount: number;
+  mappedCount: number;
+  rows: ExportMappingAuditRow[];
+  unresolvedCount: number;
+};
 export type ExportSummary = {
   rows: ExportContractRow[];
   blockers: ExportBlocker[];
+  warnings: ExportBlocker[];
   contract: {
     columnCount: number;
     range: ExportContractPreview["range"];
@@ -38,6 +57,27 @@ export type ExportSummary = {
   canDownload: boolean;
   canMarkExported: boolean;
   downloadPackageIdentity: ExportPackageIdentity | null;
+};
+
+const derivedExportColumnKeys = new Set<ExportContractColumnKey>([
+  "firstName",
+  "lastName",
+  "appointmentType",
+]);
+
+export type ExportInternalMapping = {
+  applicantFullName: string;
+  applicantId: string;
+  city: City;
+  excelRowNumber: number;
+  exportPackageId: string;
+  familyGroupId?: string;
+  familySubmissionId?: string;
+  ownerAgentId: AgentOwnerId;
+  ownerAgentName: string;
+  passportLast3: string;
+  passportNumber: string;
+  submissionId: string;
 };
 
 export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
@@ -72,6 +112,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     ),
   );
   const cities = new Set(submissions.map((submission) => submission.city));
+  const ownerAgentIds = new Set(submissions.map((submission) => submission.agentId));
   const tripDateRanges = new Set(submissions.map(tripDateRangeKey));
   const exportState = getExportSelectionState(submissions);
 
@@ -112,6 +153,8 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   }
 
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
+  if (cities.size > 1 && ownerAgentIds.size > 1)
+    blockers.push({ reason: "Нельзя смешивать подачи разных агентов" });
   if (tripDateRanges.size > 1)
     blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (exportState === "mixed")
@@ -120,12 +163,85 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   return blockers;
 }
 
+export function getExportWarnings(submissions: Submission[]): ExportBlocker[] {
+  if (submissions.length === 0) return [];
+
+  const cities = new Set(submissions.map((submission) => submission.city));
+  const ownerAgentIds = new Set(submissions.map((submission) => submission.agentId));
+
+  if (cities.size === 1 && ownerAgentIds.size > 1) {
+    return [
+      {
+        reason:
+          "Пакет содержит подачи разных агентов: Excel разрешён, returned PDF останется agent-scoped.",
+      },
+    ];
+  }
+
+  return [];
+}
+
 export function canGenerateExport(submissions: Submission[]) {
   return getExportBlockers(submissions).length === 0;
 }
 
+export function isSubmissionSelectableForExport(submission: Submission): boolean {
+  return getExportBlockers([submission]).length === 0;
+}
+
+export function buildExportMappingAudit(
+  preview: ExportContractPreview,
+): ExportMappingAudit {
+  const previewHeaders = new Set(preview.headers);
+  const rows = exportContractColumns.map((column, index) => {
+    const state: ExportMappingState = !previewHeaders.has(column.header)
+      ? "unresolved"
+      : derivedExportColumnKeys.has(column.key)
+        ? "derived"
+        : "mapped";
+
+    return {
+      header: column.header,
+      index: index + 1,
+      key: column.key,
+      state,
+    };
+  });
+
+  return {
+    derivedCount: rows.filter((row) => row.state === "derived").length,
+    mappedCount: rows.filter((row) => row.state === "mapped").length,
+    rows,
+    unresolvedCount: rows.filter((row) => row.state === "unresolved").length,
+  };
+}
+
 export function buildExportRows(submissions: Submission[]): ExportContractRow[] {
   return buildExportContractRows(orderSubmissionsForExportRows(submissions));
+}
+
+export function buildExportInternalMappings(
+  submissions: Submission[],
+  exportPackageId?: string,
+): ExportInternalMapping[] {
+  const rows = buildExportRows(submissions);
+  const packageId =
+    exportPackageId ?? buildExportPackageIdentity(submissions)?.idempotencyKey ?? "";
+
+  return rows.map((row, index) => ({
+    applicantFullName: row.applicantName,
+    applicantId: row.applicantId,
+    city: row.city as City,
+    excelRowNumber: row.excelRowNumber ?? index + 2,
+    exportPackageId: packageId,
+    familyGroupId: row.familyGroupId,
+    familySubmissionId: row.familySubmissionId,
+    ownerAgentId: row.ownerAgentId,
+    ownerAgentName: row.ownerAgentName ?? agentOwnerDisplayName(row.ownerAgentId),
+    passportLast3: row.passportLast3,
+    passportNumber: row.passportNumber,
+    submissionId: row.submissionId,
+  }));
 }
 
 function orderSubmissionsForExportRows(submissions: Submission[]): Submission[] {
@@ -154,6 +270,7 @@ export function exportSummary(
 ): ExportSummary {
   const rows = buildExportRows(submissions);
   const blockers = getExportBlockers(submissions);
+  const warnings = getExportWarnings(submissions);
   const exportState = getExportSelectionState(submissions);
   const packageIdentity = buildExportPackageIdentity(submissions, format);
   const preview = buildExportPreview(rows);
@@ -175,6 +292,7 @@ export function exportSummary(
   return {
     rows,
     blockers: effectiveBlockers,
+    warnings,
     contract: {
       columnCount: preview.columnCount,
       range: preview.range,

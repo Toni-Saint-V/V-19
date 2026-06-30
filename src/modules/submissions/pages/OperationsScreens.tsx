@@ -1,11 +1,4 @@
-import {
-  Fragment,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import {
   Badge,
@@ -17,8 +10,13 @@ import type {
   AgentActionSummary,
   OperationalInboxEvent,
 } from "../agentActions";
-import type { ExportSummary } from "../exportRules";
+import {
+  buildExportMappingAudit,
+  isSubmissionSelectableForExport,
+  type ExportSummary,
+} from "../exportRules";
 import { formatSubmissionListTitle } from "../listFormatters";
+import { buildAgentHandoffPackage } from "../operationalWorkflow";
 import { applicantCountLabel, counts, tripDates } from "../selectors";
 import {
   adminIssueGuard,
@@ -36,7 +34,6 @@ import {
   type AgentTab,
   type ExportTab,
 } from "../uiTypes";
-import { agentDisplayName } from "../agentDirectory";
 import { EmptyState } from "../components/Primitives";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
@@ -148,150 +145,6 @@ type MobileFilterOption<T extends string> = {
   label: string;
 };
 
-type SubmissionListGroup = {
-  id: string;
-  label: string;
-  meta: string;
-  submissions: Submission[];
-};
-
-type InboxEventListGroup = {
-  events: InboxEvent[];
-  id: string;
-  label: string;
-  meta: string;
-};
-
-function groupSubmissionsByCity(submissions: Submission[]): SubmissionListGroup[] {
-  const groups = new Map<string, SubmissionListGroup>();
-
-  submissions.forEach((submission) => {
-    const city = submission.city || "Город не указан";
-    const current = groups.get(city);
-
-    if (current) {
-      current.submissions.push(submission);
-      return;
-    }
-
-    groups.set(city, {
-      id: `city-${city}`,
-      label: city,
-      meta: "",
-      submissions: [submission],
-    });
-  });
-
-  return Array.from(groups.values()).map((group) => ({
-    ...group,
-    meta: submissionGroupMeta(group.submissions),
-  }));
-}
-
-function groupSubmissionsByAgent(submissions: Submission[]): SubmissionListGroup[] {
-  const groups = new Map<string, SubmissionListGroup>();
-
-  submissions.forEach((submission) => {
-    const agentId = submission.agentId || "agent-unknown";
-    const current = groups.get(agentId);
-
-    if (current) {
-      current.submissions.push(submission);
-      return;
-    }
-
-    groups.set(agentId, {
-      id: `agent-${agentId}`,
-      label: agentDisplayLabel(agentId),
-      meta: "",
-      submissions: [submission],
-    });
-  });
-
-  return Array.from(groups.values()).map((group) => ({
-    ...group,
-    meta: agentSubmissionGroupMeta(group.submissions),
-  }));
-}
-
-function groupInboxEventsByAgent(events: InboxEvent[]): InboxEventListGroup[] {
-  const groups = new Map<string, InboxEventListGroup>();
-
-  events.forEach((event) => {
-    const agentId = event.submission.agentId || "agent-unknown";
-    const current = groups.get(agentId);
-
-    if (current) {
-      current.events.push(event);
-      return;
-    }
-
-    groups.set(agentId, {
-      events: [event],
-      id: `event-agent-${agentId}`,
-      label: agentDisplayLabel(agentId),
-      meta: "",
-    });
-  });
-
-  return Array.from(groups.values()).map((group) => ({
-    ...group,
-    meta: inboxEventGroupMeta(group.events),
-  }));
-}
-
-function agentDisplayLabel(agentId: string) {
-  return agentDisplayName(agentId);
-}
-
-function submissionGroupMeta(submissions: Submission[]) {
-  const applicantTotal = submissions.reduce(
-    (total, submission) => total + submission.applicants.length,
-    0,
-  );
-
-  return `${submissions.length} ${pluralRu(
-    submissions.length,
-    "подача",
-    "подачи",
-    "подач",
-  )} · ${applicantTotal} ${pluralRu(
-    applicantTotal,
-    "заявитель",
-    "заявителя",
-    "заявителей",
-  )}`;
-}
-
-function agentSubmissionGroupMeta(submissions: Submission[]) {
-  const cityCount = new Set(submissions.map((submission) => submission.city)).size;
-
-  return `${submissionGroupMeta(submissions)} · ${cityCount} ${pluralRu(
-    cityCount,
-    "город",
-    "города",
-    "городов",
-  )}`;
-}
-
-function inboxEventGroupMeta(events: InboxEvent[]) {
-  const submissionCount = new Set(
-    events.map((event) => event.submission.id),
-  ).size;
-
-  return `${events.length} ${pluralRu(
-    events.length,
-    "событие",
-    "события",
-    "событий",
-  )} · ${submissionCount} ${pluralRu(
-    submissionCount,
-    "подача",
-    "подачи",
-    "подач",
-  )}`;
-}
-
 function MobileFilterSheet<T extends string>({
   label,
   onValueChange,
@@ -306,6 +159,19 @@ function MobileFilterSheet<T extends string>({
   value: T;
 }) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [open]);
 
   return (
     <div className="v19-mobile-filter">
@@ -517,6 +383,36 @@ export function AgentActionsScreen({
           : dueFilter === "week"
             ? "На неделе"
             : "Открытые действия";
+  const emptyState =
+    activeTab === "completed"
+      ? {
+          action: "Показать открытые",
+          body: "Завершенные шаги появятся здесь после отправки исправлений, файлов или анкет.",
+          title: "Выполненных действий пока нет",
+        }
+      : dueFilter === "overdue"
+        ? {
+            action: "Сбросить фильтр",
+            body: "В очереди нет просроченных шагов. Проверьте действия на сегодня или всю открытую очередь.",
+            title: "Просроченных действий нет",
+          }
+        : dueFilter === "today"
+          ? {
+              action: "Сбросить фильтр",
+              body: "На сегодня нет отдельных задач. Открытые действия на неделю остаются в общей очереди.",
+              title: "На сегодня чисто",
+            }
+          : dueFilter === "week"
+            ? {
+                action: "Сбросить фильтр",
+                body: "На этой неделе нет отфильтрованных действий. Можно вернуться ко всей очереди.",
+                title: "Действий на неделю нет",
+              }
+            : {
+                action: "Показать выполненные",
+                body: "Все текущие шаги выполнены. Новые действия появятся после изменений в подачах.",
+                title: "Открытых действий нет",
+              };
   const activeFilters = ([
     dueFilter !== "all"
       ? {
@@ -693,6 +589,20 @@ export function AgentActionsScreen({
 
         {visibleActions.length ? (
           <div className="v19-event-list v19-action-list" aria-label="Список действий">
+            <div className="v19-action-insights" aria-label="Сводка действий">
+              <span className="tone-danger">
+                <strong>{summary.overdue}</strong>
+                <em>просрочено</em>
+              </span>
+              <span className="tone-amber">
+                <strong>{summary.today}</strong>
+                <em>сегодня</em>
+              </span>
+              <span className="tone-teal">
+                <strong>{summary.completed}</strong>
+                <em>выполнено</em>
+              </span>
+            </div>
             <CollectionGroupLabel className="v19-action-group-label">
               {actionGroupLabel}
             </CollectionGroupLabel>
@@ -701,9 +611,11 @@ export function AgentActionsScreen({
                 badges={action.badges}
                 context={`${action.context}`}
                 cta={action.cta}
+                dueLabel={action.dueLabel}
                 key={action.id}
                 severity={action.severity}
                 selected={selectedAction?.id === action.id}
+                submissionId={action.submission.id}
                 title={action.title}
                 onOpen={() => openAction(action)}
               />
@@ -711,13 +623,27 @@ export function AgentActionsScreen({
           </div>
         ) : (
           <div className="v19-empty-state" key={`actions-empty-${activeTab}-${dueFilter}`}>
-            <h3>Открытых действий нет</h3>
-            <p>
-              Все текущие шаги выполнены. Новые действия появятся после изменений в
-              подачах.
-            </p>
-            <Button variant="secondary" onClick={() => setActiveTab("open")}>
-              Показать открытые
+            <h3>{emptyState.title}</h3>
+            <p>{emptyState.body}</p>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                transitionUiState(() => {
+                  if (activeTab === "completed") {
+                    setActiveTab("open");
+                    return;
+                  }
+
+                  if (dueFilter !== "all") {
+                    setDueFilter("all");
+                    return;
+                  }
+
+                  setActiveTab("completed");
+                })
+              }
+            >
+              {emptyState.action}
             </Button>
           </div>
         )}
@@ -1257,6 +1183,33 @@ function inboxPassportNumber(submission: Submission) {
   return extractedPassport || questionnairePassport || "—";
 }
 
+function agentSubmissionDisplaySearchText(submission: Submission) {
+  const applicantText = submission.applicants.flatMap((applicant) => {
+    const passportFields = applicant.sections
+      .flatMap((section) => section.fields)
+      .filter(
+        (field) =>
+          field.id === "passport-no" ||
+          field.label.toLocaleLowerCase("ru-RU").includes("паспорт"),
+      )
+      .map((field) => field.value);
+
+    return [applicant.fullName, ...passportFields];
+  });
+
+  return [
+    submission.id,
+    submission.title,
+    submission.listTitle ?? "",
+    submission.city,
+    statusLabels[submission.status],
+    tripDates(submission),
+    ...applicantText,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("ru-RU");
+}
+
 export function AgentSubmissionsScreen({
   activeTab,
   agentList,
@@ -1267,6 +1220,7 @@ export function AgentSubmissionsScreen({
   onOpen,
   onSelect,
   onTab,
+  searchQuery = "",
   searchControl,
   visibleSubmission,
   summary,
@@ -1280,6 +1234,7 @@ export function AgentSubmissionsScreen({
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: AgentTab) => void;
+  searchQuery?: string;
   searchControl: ReactNode;
   visibleSubmission: Submission | null;
   summary: ReturnType<typeof counts>;
@@ -1291,30 +1246,56 @@ export function AgentSubmissionsScreen({
   );
   const [sortNewest, setSortNewest] = useState(true);
 
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
+  const searchFilteredSubmissions = useMemo(
+    () =>
+      normalizedSearchQuery
+        ? agentList.filter((submission) =>
+            agentSubmissionDisplaySearchText(submission).includes(
+              normalizedSearchQuery,
+            ),
+          )
+        : agentList,
+    [agentList, normalizedSearchQuery],
+  );
   const filteredSubmissions = useMemo(
     () =>
       blockersOnly
-        ? agentList.filter((submission) => blockerCount(submission) > 0)
-        : agentList,
-    [agentList, blockersOnly],
+        ? searchFilteredSubmissions.filter(
+            (submission) => blockerCount(submission) > 0,
+          )
+        : searchFilteredSubmissions,
+    [searchFilteredSubmissions, blockersOnly],
   );
   const orderedSubmissions = useMemo(
     () => (sortNewest ? filteredSubmissions : [...filteredSubmissions].reverse()),
     [filteredSubmissions, sortNewest],
   );
-  const prioritySubmission = visibleSubmission ?? orderedSubmissions[0] ?? null;
+  const visibleSubmissionInList =
+    visibleSubmission &&
+    orderedSubmissions.some((submission) => submission.id === visibleSubmission.id)
+      ? visibleSubmission
+      : null;
+  const prioritySubmission = visibleSubmissionInList ?? orderedSubmissions[0] ?? null;
   const priorityIssue = prioritySubmission
     ? primarySubmissionIssue(prioritySubmission)
     : null;
   const railCompact = panelOpen;
   const tabCounts = {
+    all:
+      summary.requiresAction +
+      summary.draft +
+      summary.inProgress +
+      summary.inReview +
+      summary.corrections +
+      summary.ready +
+      summary.exported,
     action: summary.requiresAction,
     done: summary.ready + summary.exported,
     progress: summary.draft + summary.inProgress,
     review: summary.inReview + summary.corrections,
   };
-  const visibleTab: Exclude<AgentTab, "all"> =
-    activeTab === "all" ? "action" : activeTab;
+  const visibleTab: AgentTab = activeTab;
   const activeFilters = ([
     hasSearchQuery
       ? {
@@ -1402,9 +1383,26 @@ export function AgentSubmissionsScreen({
       {panelToggleTool}
     </>
   );
-  const mobileFilterOptions: Array<
-    MobileFilterOption<Exclude<AgentTab, "all">>
-  > = [
+  const familySubmissions = orderedSubmissions.filter(
+    (submission) => submission.type === "family",
+  );
+  const individualSubmissions = orderedSubmissions.filter(
+    (submission) => submission.type === "single",
+  );
+  const submissionGroups = [
+    {
+      empty: "Семейных подач по текущим фильтрам нет.",
+      items: familySubmissions,
+      label: "Семейные подачи",
+    },
+    {
+      empty: "Индивидуальных подач по текущим фильтрам нет.",
+      items: individualSubmissions,
+      label: "Индивидуальные подачи",
+    },
+  ];
+  const mobileFilterOptions: Array<MobileFilterOption<AgentTab>> = [
+    { count: tabCounts.all, id: "all", label: "Все" },
     { count: tabCounts.action, id: "action", label: "Действия" },
     { count: tabCounts.progress, id: "progress", label: "В работе" },
     { count: tabCounts.review, id: "review", label: "Проверка" },
@@ -1413,7 +1411,7 @@ export function AgentSubmissionsScreen({
   const toolbarTools = (
     <ToolbarTools>
       <div className="v19-desktop-toolbar-tools">{toolbarToolButtons}</div>
-      <MobileFilterSheet<Exclude<AgentTab, "all">>
+      <MobileFilterSheet<AgentTab>
         label="Фильтры подач"
         options={mobileFilterOptions}
         title="Статус подач"
@@ -1450,6 +1448,7 @@ export function AgentSubmissionsScreen({
           onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
           search={searchControl}
           tabs={[
+            { count: tabCounts.all, id: "all", label: "Все" },
             { count: tabCounts.action, id: "action", label: "Требуют действия" },
             { count: tabCounts.progress, id: "progress", label: "В работе" },
             { count: tabCounts.review, id: "review", label: "На проверке" },
@@ -1470,36 +1469,53 @@ export function AgentSubmissionsScreen({
               <span>Готовность</span>
               <span />
             </div>
-            <div className="v19-event-list v19-submission-list">
-              {orderedSubmissions.map((submission) => (
-                <SubmissionCollectionRow
-                  action={submissionActionLabel(submission)}
-                  compact={railCompact}
-                  completeness={`${submission.completeness.total}%`}
-                  extraTagCount={railCompact ? 0 : submissionExtraTagCount(submission)}
-                  extraTagLabel={railCompact ? undefined : submissionExtraTagLabel(submission)}
-                  fileDetail={submissionFileDetailLabel(submission)}
-                  fileState={submissionFileStateLabel(submission)}
-                  fileTone={submissionFileStateTone(submission)}
-                  kind={submission.applicants.length > 1 ? "family" : "single"}
-                  key={submission.id}
-                  meta={submissionIdentityMeta(submission)}
-                  status={submission.status}
-                  statusDetail={
-                    railCompact
-                      ? submissionStatusDetailLine(submission)
-                      : submissionIssueDetailLine(submission)
-                  }
-                  statusLabel={submissionStatusChipLabel(submission)}
-                  submissionId={submission.id}
-                  title={submission.title}
-                  trip={submission.city}
-                  tripDetail={tripDates(submission)}
-                  onOpen={() => {
-                    onSelect(submission);
-                    onOpen(submission, defaultDrawerTab(submission));
-                  }}
-                />
+            <div className="v19-event-list v19-submission-list v19-submission-grouped-list">
+              {submissionGroups.map((group) => (
+                <section className="v19-submission-type-section" key={group.label}>
+                  <CollectionGroupLabel className="v19-submission-type-label">
+                    {group.label} <span>{group.items.length}</span>
+                  </CollectionGroupLabel>
+                  {group.items.length ? (
+                    group.items.map((submission) => (
+                      <SubmissionCollectionRow
+                        action={submissionActionLabel(submission)}
+                        compact={railCompact}
+                        completeness={submissionReadinessDisplay(submission)}
+                        extraTagCount={
+                          railCompact ? 0 : submissionExtraTagCount(submission)
+                        }
+                        extraTagLabel={
+                          railCompact ? undefined : submissionExtraTagLabel(submission)
+                        }
+                        fileDetail={submissionFileDetailLabel(submission)}
+                        fileState={submissionFileStateLabel(submission)}
+                        fileTone={submissionFileStateTone(submission)}
+                        kind={submission.applicants.length > 1 ? "family" : "single"}
+                        key={submission.id}
+                        meta={submissionIdentityMeta(submission)}
+                        status={submission.status}
+                        statusDetail={
+                          railCompact
+                            ? submissionStatusDetailLine(submission)
+                            : submissionIssueDetailLine(submission)
+                        }
+                        statusLabel={submissionStatusChipLabel(submission)}
+                        submissionId={submission.id}
+                        title={submission.title}
+                        trip={submission.city}
+                        tripDetail={tripDates(submission)}
+                        onOpen={() => {
+                          onSelect(submission);
+                          onOpen(submission, defaultDrawerTab(submission));
+                        }}
+                      />
+                    ))
+                  ) : activeTab === "all" && !hasFiltering ? (
+                    <div className="v19-submission-type-empty" role="status">
+                      {group.empty}
+                    </div>
+                  ) : null}
+                </section>
               ))}
             </div>
           </>
@@ -1614,6 +1630,20 @@ function submissionFileStateTone(submission: Submission): "amber" | "muted" | "t
   if (ready === 0) return "muted";
   if (ready === submission.files.length) return "teal";
   return "amber";
+}
+
+function submissionReadinessDisplay(submission: Submission) {
+  if (submission.status === "ready_for_export") return "Готово к выгрузке";
+  if (submission.status === "exported") return "Выгружено";
+  if (
+    submission.completeness.questionnaire === 100 &&
+    submission.completeness.files === 100 &&
+    submission.completeness.total < 100
+  ) {
+    return "Проверить статус";
+  }
+
+  return `${submission.completeness.total}%`;
 }
 
 function submissionExtraTagCount(submission: Submission) {
@@ -1735,8 +1765,9 @@ function submissionRailTone(submission: Submission) {
 }
 
 function fileActionLabel(fileType: Submission["files"][number]["type"]) {
-  if (fileType === "photo") return "Заменить фото";
-  if (fileType === "selfie" || fileType === "selfie_2") return "Добавить селфи";
+  if (fileType === "photo") return "Архивный файл";
+  if (fileType === "selfie") return "Добавить селфи";
+  if (fileType === "selfie_2") return "Добавить селфи N2";
   if (fileType === "passport_scan") return "Заменить паспорт";
   return "Заменить файл";
 }
@@ -1750,22 +1781,72 @@ function submissionPriorityLine(submission: Submission) {
 }
 
 export type AdminWorkTab = "review" | "corrections" | "events";
-type AdminReviewView = "list" | "columns";
-type AdminWorkItem = {
-  badges: Array<{
-    label: string;
-    tone: "amber" | "blue" | "danger" | "muted" | "teal";
-  }>;
-  context: ReactNode;
-  cta: string;
-  id: string;
-  readiness: number;
-  severity: "blocker" | "info" | "ready" | "warning";
-  stage: string;
-  stageTone: "amber" | "blue" | "danger" | "muted" | "teal";
-  submission: Submission;
-  title: string;
-};
+type SubmissionSortMode = "priority" | "updated" | "created" | "trip";
+
+const adminSortModes: SubmissionSortMode[] = [
+  "priority",
+  "updated",
+  "created",
+  "trip",
+];
+const exportSortModes: SubmissionSortMode[] = ["updated", "created", "trip"];
+
+function nextSubmissionSortMode(
+  current: SubmissionSortMode,
+  modes: SubmissionSortMode[],
+) {
+  const currentIndex = modes.indexOf(current);
+  return modes[(currentIndex + 1) % modes.length] ?? modes[0] ?? current;
+}
+
+function submissionSortModeLabel(mode: SubmissionSortMode) {
+  if (mode === "priority") return "приоритет";
+  if (mode === "updated") return "обновление";
+  if (mode === "created") return "создание";
+  return "дата поездки";
+}
+
+function sortSubmissionsForOperations(
+  submissions: Submission[],
+  mode: SubmissionSortMode,
+) {
+  if (mode === "priority") return submissions;
+
+  return [...submissions].sort((left, right) => {
+    if (mode === "trip") {
+      return (
+        sortableDateValue(left.tripDateFrom) - sortableDateValue(right.tripDateFrom) ||
+        sortableDateValue(left.tripDateTo) - sortableDateValue(right.tripDateTo) ||
+        left.id.localeCompare(right.id)
+      );
+    }
+
+    const leftValue =
+      mode === "created"
+        ? sortableDateValue(left.createdAt)
+        : sortableDateValue(left.updatedAt);
+    const rightValue =
+      mode === "created"
+        ? sortableDateValue(right.createdAt)
+        : sortableDateValue(right.updatedAt);
+
+    return rightValue - leftValue || left.id.localeCompare(right.id);
+  });
+}
+
+function sortableDateValue(value: string) {
+  const trimmed = value.trim();
+  const dotted = trimmed.match(/^(\d{2})\.(\d{2})(?:\.(\d{4}))?$/);
+  if (dotted) {
+    const day = Number(dotted[1]);
+    const month = Number(dotted[2]);
+    const year = Number(dotted[3] ?? "2026");
+    return year * 10_000 + month * 100 + day;
+  }
+
+  const parsed = Date.parse(trimmed);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
 
 export function AdminReviewScreen({
   error = "",
@@ -1799,9 +1880,8 @@ export function AdminReviewScreen({
   visibleSubmission: Submission | null;
 }) {
   const [blockersOnly, setBlockersOnly] = useState(false);
-  const [reviewView, setReviewView] = useState<AdminReviewView>("list");
   const [summaryOpen, setSummaryOpen] = useState(false);
-  const [sortNewest, setSortNewest] = useState(true);
+  const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
   const summaryRef = useRef<HTMLDivElement>(null);
   const reviewQueue = reviewSource.filter(matchesReviewTab("review"));
   const correctionsQueue = reviewSource.filter(matchesReviewTab("corrections"));
@@ -1828,27 +1908,12 @@ export function AdminReviewScreen({
     [blockersOnly, inboxEvents],
   );
   const visibleReviewList = useMemo(
-    () => (sortNewest ? filteredReviewList : [...filteredReviewList].reverse()),
-    [filteredReviewList, sortNewest],
+    () => sortSubmissionsForOperations(filteredReviewList, sortMode),
+    [filteredReviewList, sortMode],
   );
   const visibleEvents = useMemo(
-    () => (sortNewest ? filteredEvents : [...filteredEvents].reverse()),
-    [filteredEvents, sortNewest],
-  );
-  const groupedCorrectionList = useMemo(
-    () =>
-      reviewTab === "corrections"
-        ? groupSubmissionsByAgent(visibleReviewList)
-        : [],
-    [reviewTab, visibleReviewList],
-  );
-  const groupedEventList = useMemo(
-    () => groupInboxEventsByAgent(visibleEvents),
-    [visibleEvents],
-  );
-  const visibleWorkItems = useMemo(
-    () => visibleReviewList.map(adminWorkItemForSubmission),
-    [visibleReviewList],
+    () => filteredEvents,
+    [filteredEvents],
   );
   const visibleSelectedSubmission =
     visibleSubmission &&
@@ -1881,19 +1946,19 @@ export function AdminReviewScreen({
           onRemove: () => transitionUiState(() => setBlockersOnly(false)),
         }
       : null,
-    sortNewest
+    reviewTab === "events" || sortMode === "priority"
       ? null
       : {
           id: "sort",
-          label: "Обратный порядок",
-          onRemove: () => transitionUiState(() => setSortNewest(true)),
+          label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
+          onRemove: () => transitionUiState(() => setSortMode("priority")),
         },
   ] as Array<CollectionActiveFilter | null>
   ).filter((filter): filter is CollectionActiveFilter => filter !== null);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setBlockersOnly(false);
-      setSortNewest(true);
+      setSortMode("priority");
     });
 
   useEffect(() => {
@@ -1926,20 +1991,14 @@ export function AdminReviewScreen({
           transitionUiState(() => setBlockersOnly((value) => !value))
         }
       />
-      <ToolbarIconButton
-        label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
-        icon="sort"
-        pressed={!sortNewest}
-        onClick={() => transitionUiState(() => setSortNewest((value) => !value))}
-      />
       {reviewTab !== "events" ? (
         <ToolbarIconButton
-          label={reviewView === "list" ? "Показать колонками" : "Показать списком"}
-          icon="view"
-          pressed={reviewView === "columns"}
+          label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
+          icon="sort"
+          pressed={sortMode !== "priority"}
           onClick={() =>
             transitionUiState(() =>
-              setReviewView((value) => (value === "list" ? "columns" : "list")),
+              setSortMode((value) => nextSubmissionSortMode(value, adminSortModes)),
             )
           }
         />
@@ -2071,33 +2130,16 @@ export function AdminReviewScreen({
           renderBlockedState("Очередь недоступна", error, "danger")
         ) : reviewTab === "events" ? (
           visibleEvents.length ? (
-            <div
-              className="v17-admin-event-list"
-              aria-label="События администратора по агентам"
-            >
-              {groupedEventList.map((group) => (
-                <section
-                  className="v17-admin-group"
-                  key={group.id}
-                  aria-label={`${group.label}: ${group.meta}`}
-                >
-                  <div className="v17-admin-group-head">
-                    <strong>{group.label}</strong>
-                    <span>{group.meta}</span>
-                  </div>
-                  <div className="v17-admin-group-list">
-                    {group.events.map((event) => (
-                      <AdminWorkEventRow
-                        event={event}
-                        key={event.id}
-                        onOpen={() => {
-                          onSelect(event.submission);
-                          onOpen(event.submission, event.tab);
-                        }}
-                      />
-                    ))}
-                  </div>
-                </section>
+            <div className="v17-admin-event-list" aria-label="События администратора">
+              {visibleEvents.map((event) => (
+                <AdminWorkEventRow
+                  event={event}
+                  key={event.id}
+                  onOpen={() => {
+                    onSelect(event.submission);
+                    onOpen(event.submission, event.tab);
+                  }}
+                />
               ))}
             </div>
           ) : (
@@ -2108,86 +2150,22 @@ export function AdminReviewScreen({
                 onShow={() => onTab("review")}
               />
           )
-        ) : visibleWorkItems.length ? (
-          reviewView === "columns" ? (
-            <AdminWorkColumns
-              items={visibleWorkItems}
-              title={adminWorkColumnTitle(reviewTab)}
-              onOpen={(submission) => {
-                onSelect(submission);
-                onOpen(submission, adminWorkDrawerTabFor(submission));
-              }}
-            />
-          ) : (
-            <div
-              className="v17-admin-work-list"
-              aria-label={
-                reviewTab === "corrections"
-                  ? "Исправления по агентам"
-                  : "Очередь проверки"
-              }
-            >
-              {reviewTab === "corrections" ? (
-                groupedCorrectionList.map((group) => (
-                  <section
-                    className="v17-admin-group"
-                    key={group.id}
-                    aria-label={`${group.label}: ${group.meta}`}
-                  >
-                    <div className="v17-admin-group-head">
-                      <strong>{group.label}</strong>
-                      <span>{group.meta}</span>
-                    </div>
-                    <div className="v17-admin-group-list">
-                      {group.submissions.map((submission) => {
-                        const item = adminWorkItemForSubmission(submission);
-
-                        return (
-                          <ActionRow
-                            badges={item.badges}
-                            context={item.context}
-                            cta={item.cta}
-                            key={item.id}
-                            selected={visibleSelectedSubmission?.id === submission.id}
-                            severity={item.severity}
-                            title={item.title}
-                            onOpen={() => {
-                              onSelect(submission);
-                              onOpen(
-                                submission,
-                                adminWorkDrawerTabFor(submission),
-                              );
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))
-              ) : (
-                <>
-                  <CollectionGroupLabel className="v17-admin-action-group-label">
-                    {adminWorkColumnTitle(reviewTab)}
-                  </CollectionGroupLabel>
-                  {visibleWorkItems.map((item) => (
-                    <ActionRow
-                      badges={item.badges}
-                      context={item.context}
-                      cta={item.cta}
-                      key={item.id}
-                      selected={visibleSelectedSubmission?.id === item.submission.id}
-                      severity={item.severity}
-                      title={item.title}
-                      onOpen={() => {
-                        onSelect(item.submission);
-                        onOpen(item.submission, adminWorkDrawerTabFor(item.submission));
-                      }}
-                    />
-                  ))}
-                </>
-              )}
+        ) : visibleReviewList.length ? (
+          <>
+            <div className="v17-admin-work-list" aria-label="Очередь проверки">
+              {visibleReviewList.map((submission) => (
+                <AdminWorkRow
+                  selected={false}
+                  key={submission.id}
+                  submission={submission}
+                  onOpen={() => {
+                    onSelect(submission);
+                    onOpen(submission, adminWorkDrawerTabFor(submission));
+                  }}
+                />
+              ))}
             </div>
-          )
+          </>
         ) : (
           <AdminWorkEmptyState
             description="Новые задачи появятся после отправки подачи агентом или получения исправлений."
@@ -2231,69 +2209,6 @@ function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
   if (reviewTab === "events") return "События открывают точный контекст подачи";
   if (reviewTab === "corrections") return "Сначала исправления, затем новые проверки";
   return "Очередь отсортирована по времени ожидания";
-}
-
-function adminWorkColumnTitle(reviewTab: AdminWorkTab) {
-  if (reviewTab === "corrections") return "Исправления";
-  if (reviewTab === "events") return "События";
-  return "К проверке";
-}
-
-function adminWorkItemForSubmission(submission: Submission): AdminWorkItem {
-  const presentation = adminWorkPresentation(submission);
-  const openIssues = openIssueCount(submission);
-  const blockers = blockerCount(submission);
-  const stageTone = adminWorkStageTone(submission);
-
-  return {
-    badges: [
-      { label: presentation.stage, tone: stageTone },
-      {
-        label:
-          blockers > 0
-            ? `${blockers} блокера`
-            : openIssues > 0
-              ? `${openIssues} замечания`
-              : `${submission.completeness.total}%`,
-        tone: blockers > 0 ? "danger" : openIssues > 0 ? "amber" : "muted",
-      },
-    ],
-    context: (
-      <span className="v17-admin-action-context">
-        <span>
-          {submission.city} · {tripDates(submission)}
-        </span>
-        <span>
-          {applicantCountLabel(submission.applicants.length)} · ждет{" "}
-          {adminWorkWaitLabel(submission)}
-        </span>
-      </span>
-    ),
-    cta: adminWorkActionLabel(submission, presentation.actionLabel),
-    id: submission.id,
-    readiness: submission.completeness.total,
-    severity:
-      blockers > 0
-        ? "blocker"
-        : submission.status === "corrections_received"
-          ? "warning"
-          : submission.status === "ready_for_export"
-            ? "ready"
-            : "info",
-    stage: presentation.stage,
-    stageTone,
-    submission,
-    title: formatSubmissionListTitle(submission),
-  };
-}
-
-function adminWorkStageTone(
-  submission: Submission,
-): "amber" | "blue" | "danger" | "muted" | "teal" {
-  if (submission.status === "corrections_received") return "amber";
-  if (submission.status === "ready_for_export") return "teal";
-  if (submission.status === "submitted_for_review") return "blue";
-  return "muted";
 }
 
 function AdminWorkLoadingState() {
@@ -2348,52 +2263,87 @@ function AdminWorkEmptyState({
   );
 }
 
-function AdminWorkColumns({
-  items,
+function AdminWorkRow({
   onOpen,
-  title,
+  selected,
+  submission,
 }: {
-  items: AdminWorkItem[];
-  onOpen: (submission: Submission) => void;
-  title: string;
+  onOpen: () => void;
+  selected: boolean;
+  submission: Submission;
 }) {
+  const presentation = adminWorkPresentation(submission);
+  const family = submission.type === "family";
+
   return (
-    <div className="v17-admin-column-board" aria-label="Колонки проверки">
-      <section className="v17-admin-column" aria-label={title}>
-        <header className="v17-admin-column-head">
-          <span>{title}</span>
-          <strong>{items.length}</strong>
-        </header>
-        <div className="v17-admin-column-items">
-          {items.map((item) => (
-            <button
-              className={`v17-admin-column-card severity-${item.severity}`}
-              data-submission-card
-              data-submission-id={item.submission.id}
-              key={item.id}
-              type="button"
-              onClick={() => onOpen(item.submission)}
-            >
-              <span className="v17-admin-column-card-top">
-                <span className="mono">{item.submission.id}</span>
-                <Badge tone={item.stageTone}>{item.stage}</Badge>
-              </span>
-              <strong>{item.title}</strong>
-              <em>
-                {item.submission.city} · {tripDates(item.submission)}
-              </em>
-              <span className="v17-admin-column-progress" aria-hidden="true">
-                <i style={{ width: `${item.readiness}%` }} />
-              </span>
-              <span className="v17-admin-column-card-foot">
-                <span>{applicantCountLabel(item.submission.applicants.length)}</span>
-                <b>{item.cta}</b>
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-    </div>
+    <button
+      aria-current={selected ? "true" : undefined}
+      className={`v17-admin-work-row ${selected ? "is-selected" : ""}`}
+      data-submission-card
+      data-submission-id={submission.id}
+      type="button"
+      onClick={onOpen}
+    >
+      <span
+        className={`v17-admin-entity-icon tone-${presentation.tone}`}
+        aria-hidden="true"
+      >
+        <SvgIcon>
+          {family ? (
+            <>
+              <circle cx="9" cy="8" r="3" />
+              <path d="M3 20a6 6 0 0 1 12 0" />
+              <circle cx="17" cy="9" r="2.5" />
+              <path d="M15 15a5 5 0 0 1 6 5" />
+            </>
+          ) : (
+            <>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M5 21a7 7 0 0 1 14 0" />
+            </>
+          )}
+        </SvgIcon>
+      </span>
+      <span className="v17-admin-identity">
+        <strong>{formatSubmissionListTitle(submission)}</strong>
+        <em>
+          <span className="mono">{submission.id}</span> ·{" "}
+          {applicantCountLabel(submission.applicants.length)}
+        </em>
+        <small className="v17-admin-mobile-meta">
+          {submission.city} · {applicantCountLabel(submission.applicants.length)} ·
+          ждет с {submission.updatedAt}
+        </small>
+      </span>
+      <span className="v17-admin-route-cell">
+        <em>Подача</em>
+        <strong>{submission.city}</strong>
+        <small>{tripDates(submission)}</small>
+      </span>
+      <span className="v17-admin-wait-cell">
+        <em>Ожидает</em>
+        <strong>{adminWorkWaitLabel(submission)}</strong>
+      </span>
+      <span className="v17-admin-readiness-cell">
+        <span>
+          <em>Готовность</em>
+          <strong>{submission.completeness.total}%</strong>
+        </span>
+        <i aria-hidden="true">
+          <b style={{ width: `${submission.completeness.total}%` }} />
+        </i>
+      </span>
+      <span className={`v17-admin-stage tone-${presentation.tone}`}>
+        <i aria-hidden="true" />
+        {presentation.stage}
+      </span>
+      <span className="v17-admin-row-action">
+        <span>{adminWorkActionLabel(submission, presentation.actionLabel)}</span>
+        <SvgIcon>
+          <path d="m9 6 6 6-6 6" />
+        </SvgIcon>
+      </span>
+    </button>
   );
 }
 
@@ -2543,28 +2493,42 @@ export function ExportScreen({
   const packageFacts = exportPackageFacts(exportPlan);
   const previewColumns = exportPlan.preview.headers.slice(0, 9);
   const previewRows = exportPlan.preview.rows.slice(0, 4);
-  const mappingRows = exportMappingRows(exportPlan);
-  const mappedCount = mappingRows.filter((row) => row.state === "mapped").length;
-  const derivedCount = mappingRows.filter((row) => row.state === "derived").length;
-  const unresolvedCount = mappingRows.filter((row) => row.state === "unresolved").length;
+  const mappingAudit = buildExportMappingAudit(exportPlan.preview);
+  const mappingRows = mappingAudit.rows;
+  const mappedCount = mappingAudit.mappedCount;
+  const derivedCount = mappingAudit.derivedCount;
+  const unresolvedCount = mappingAudit.unresolvedCount;
   const [exportPanelOpen, setExportPanelOpen] = useState(true);
+  const [sortMode, setSortMode] = useState<SubmissionSortMode>("updated");
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
   );
-  const readyCityGroups = useMemo(
-    () => groupSubmissionsByCity(readyList),
+  const exportReadyList = useMemo(
+    () => readyList.filter(isSubmissionSelectableForExport),
     [readyList],
   );
-  const historyCityGroups = useMemo(
-    () => groupSubmissionsByCity(historyList),
-    [historyList],
+  const exportReadyIdSet = useMemo(
+    () => new Set(exportReadyList.map((submission) => submission.id)),
+    [exportReadyList],
   );
+  const sortedReadyList = useMemo(
+    () => sortSubmissionsForOperations(exportReadyList, sortMode),
+    [exportReadyList, sortMode],
+  );
+  const sortedHistoryList = useMemo(
+    () => sortSubmissionsForOperations(historyList, sortMode),
+    [historyList, sortMode],
+  );
+  const selectedVisibleExportIds = selectedExportIds.filter((id) =>
+    exportReadyIdSet.has(id),
+  );
+  const hiddenNotReadyCount = readyList.length - exportReadyList.length;
   const allReadySelected =
-    readyList.length > 0 &&
-    readyList.every((submission) => selectedExportIdSet.has(submission.id));
+    exportReadyList.length > 0 &&
+    exportReadyList.every((submission) => selectedExportIdSet.has(submission.id));
   const handleToggleAllReady = (checked: boolean) => {
-    readyList.forEach((submission) => {
+    exportReadyList.forEach((submission) => {
       const selected = selectedExportIdSet.has(submission.id);
       if (checked !== selected) onToggle(submission.id);
     });
@@ -2572,18 +2536,13 @@ export function ExportScreen({
   const toolbarTools = (
     <ToolbarTools>
       <ToolbarIconButton
-        icon="filter"
-        label="Фильтр выгрузки"
-        pressed={false}
-        type="button"
-        onClick={() => undefined}
-      />
-      <ToolbarIconButton
         icon="sort"
-        label="Сортировка выгрузки"
-        pressed={false}
+        label={`Сортировка выгрузки: ${submissionSortModeLabel(sortMode)}`}
+        pressed={sortMode !== "updated"}
         type="button"
-        onClick={() => undefined}
+        onClick={() =>
+          setSortMode((value) => nextSubmissionSortMode(value, exportSortModes))
+        }
       />
       <ToolbarIconButton
         icon="panel"
@@ -2621,8 +2580,8 @@ export function ExportScreen({
             onTabChange={onTab}
             search={searchControl}
             tabs={[
-              { count: readyList.length, id: "ready", label: "Готово" },
-              { count: historyList.length, id: "history", label: "История" },
+              { count: exportReadyList.length, id: "ready", label: "Готово" },
+              { count: sortedHistoryList.length, id: "history", label: "История" },
             ]}
             tabsAriaLabel="Состояние выгрузки"
             tools={toolbarTools}
@@ -2639,7 +2598,7 @@ export function ExportScreen({
                           aria-label="Выбрать все совместимые"
                           checked={allReadySelected}
                           className="checkbox"
-                          disabled={exportBusy || readyList.length === 0}
+                          disabled={exportBusy || exportReadyList.length === 0}
                           type="checkbox"
                           onChange={(event) =>
                             handleToggleAllReady(event.currentTarget.checked)
@@ -2655,144 +2614,137 @@ export function ExportScreen({
                     </tr>
                   </thead>
                   <tbody>
-                    {readyCityGroups.map((group) => (
-                      <Fragment key={group.id}>
+                    {sortedReadyList.map((submission) => {
+                      const selected = selectedExportIdSet.has(submission.id);
+
+                      return (
                         <tr
-                          className="export-city-group-row"
-                          aria-label={`Город выгрузки ${group.label}`}
+                          aria-label={`Пакет ${submission.title}${
+                            selected ? ", выбран" : ""
+                          }`}
+                          className={`export-row magic-export-row export-contract-row ${
+                            selected ? "selected is-selected" : ""
+                          }`}
+                          key={submission.id}
+                          onClick={() => onOpen(submission)}
                         >
-                          <td colSpan={7}>
-                            <div className="export-city-group-label">
-                              <strong>{group.label}</strong>
-                              <span>{group.meta}</span>
-                            </div>
+                          <td onClick={(event) => event.stopPropagation()}>
+                            <input
+                              aria-label={`Выбрать ${submission.title}`}
+                              checked={selected}
+                              className="checkbox"
+                              disabled={exportBusy}
+                              type="checkbox"
+                              onChange={() => onToggle(submission.id)}
+                            />
+                          </td>
+                          <td>
+                            <button
+                              className="export-row-main"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpen(submission);
+                              }}
+                            >
+                              <span className="cell-title">{submission.title}</span>
+                              <span className="subtle mono">{submission.id}</span>
+                            </button>
+                            <Button
+                              className="export-table-row-action export-table-row-action-mobile"
+                              variant="secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpen(submission);
+                              }}
+                            >
+                              Смотреть пакет
+                            </Button>
+                          </td>
+                          <td>{submission.city}</td>
+                          <td>{exportTripDates(submission)}</td>
+                          <td>{submission.applicants.length}</td>
+                          <td>
+                            <Badge className="html-builder-badge" tone="teal">
+                              {exportStateLabel(submission)}
+                            </Badge>
+                          </td>
+                          <td>
+                            <span>{submission.updatedAt}</span>
+                            <Button
+                              className="export-table-row-action"
+                              variant="secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpen(submission);
+                              }}
+                            >
+                              Смотреть пакет
+                            </Button>
                           </td>
                         </tr>
-                        {group.submissions.map((submission) => {
-                          const selected = selectedExportIdSet.has(submission.id);
-
-                          return (
-                            <tr
-                              aria-label={`Пакет ${submission.title}${
-                                selected ? ", выбран" : ""
-                              }`}
-                              className={`export-row magic-export-row export-contract-row ${
-                                selected ? "selected is-selected" : ""
-                              }`}
-                              key={submission.id}
-                              onClick={() => onOpen(submission)}
-                            >
-                              <td onClick={(event) => event.stopPropagation()}>
-                                <input
-                                  aria-label={`Выбрать ${submission.title}`}
-                                  checked={selected}
-                                  className="checkbox"
-                                  disabled={exportBusy}
-                                  type="checkbox"
-                                  onChange={() => onToggle(submission.id)}
-                                />
-                              </td>
-                              <td>
-                                <button
-                                  className="export-row-main"
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    onOpen(submission);
-                                  }}
-                                >
-                                  <span className="cell-title">{submission.title}</span>
-                                  <span className="subtle mono">{submission.id}</span>
-                                </button>
-                                <Button
-                                  className="export-table-row-action export-table-row-action-mobile"
-                                  variant="secondary"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    onOpen(submission);
-                                  }}
-                                >
-                                  Смотреть пакет
-                                </Button>
-                              </td>
-                              <td>{submission.city}</td>
-                              <td>{exportTripDates(submission)}</td>
-                              <td>{submission.applicants.length}</td>
-                              <td>
-                                <Badge className="html-builder-badge" tone="teal">
-                                  Готово
-                                </Badge>
-                              </td>
-                              <td>
-                                <span>{submission.updatedAt}</span>
-                                <Button
-                                  className="export-table-row-action"
-                                  variant="secondary"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    onOpen(submission);
-                                  }}
-                                >
-                                  Смотреть пакет
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </Fragment>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-              {readyList.length === 0 ? (
+              {hiddenNotReadyCount > 0 ? (
+                <div className="bulk-bar v17-export-bulk-bar">
+                  <span className="bulk-status">
+                    Скрыто из выгрузки: {hiddenNotReadyCount}{" "}
+                    {pluralRu(hiddenNotReadyCount, "подача", "подачи", "подач")} с
+                    blockers или неполным пакетом.
+                  </span>
+                </div>
+              ) : null}
+              {exportReadyList.length === 0 ? (
                 <EmptyState text="Нет подач готовых к выгрузке." />
               ) : null}
-              {selectedExportIds.length ? (
-                <div className="bulk-bar v17-export-bulk-bar">
-                  <span className="bulk-count">Выбрано: {selectedExportIds.length}</span>
+              {selectedVisibleExportIds.length ? (
+                <div
+                  className="bulk-bar v17-export-bulk-bar"
+                  style={{ pointerEvents: "none" }}
+                >
+                  <span className="bulk-count">
+                    Выбрано: {selectedVisibleExportIds.length}
+                  </span>
                   <span className="bulk-status">{actionHint}</span>
                 </div>
               ) : null}
             </div>
           ) : (
             <div className="submission-list magic-export-list">
-              {historyCityGroups.map((group) => (
-                <section
-                  className="export-history-city-group"
-                  key={group.id}
-                  aria-label={`История выгрузки: ${group.label}`}
-                >
-                  <div className="export-history-city-head">
-                    <strong>{group.label}</strong>
-                    <span>{group.meta}</span>
-                  </div>
-                  {group.submissions.map((submission) => (
-                    <CardComponent
-                      as="article"
-                      className="export-row magic-export-row"
-                      key={submission.id}
+              {sortedHistoryList.map((submission) => {
+                const pdfState = returnedPdfPackageSummary(submission);
+
+                return (
+                  <CardComponent
+                    as="article"
+                    className="export-row magic-export-row"
+                    key={submission.id}
+                  >
+                    <Button
+                      className="export-row-main"
+                      variant="plain"
+                      onClick={() => onOpen(submission, "files")}
                     >
-                      <Button
-                        className="export-row-main"
-                        variant="plain"
-                        onClick={() => onOpen(submission, "files")}
-                      >
-                        <strong>{submission.title}</strong>
-                        <span>
-                          {submission.id} · {submission.city} · {tripDates(submission)}
-                        </span>
-                      </Button>
-                      <Badge tone="teal">Выгружено</Badge>
-                      <Button
-                        variant="secondary"
-                        onClick={() => onOpen(submission, "files")}
-                      >
-                        Проверить PDF
-                      </Button>
-                    </CardComponent>
-                  ))}
-                </section>
-              ))}
+                      <strong>{submission.title}</strong>
+                      <span>
+                        {submission.id} · {submission.city} · {tripDates(submission)}
+                      </span>
+                      <span>{pdfState.detail}</span>
+                    </Button>
+                    <Badge tone="teal">Выгружено</Badge>
+                    <Badge tone={pdfState.tone}>{pdfState.label}</Badge>
+                    <Button
+                      variant="secondary"
+                      onClick={() => onOpen(submission, "files")}
+                    >
+                      {pdfState.actionLabel}
+                    </Button>
+                  </CardComponent>
+                );
+              })}
             </div>
           )}
         </CardComponent>
@@ -2838,6 +2790,109 @@ export function ExportScreen({
                 <span>unresolved</span>
               </div>
             </div>
+          </CardComponent>
+          <CardComponent as="section" className="v17-rail-card v17-export-checks-card">
+            <p className="kicker">Pre-export checks</p>
+            <div className="v17-export-checks" aria-label="Проверки перед выгрузкой">
+              <ExportGuardItem
+                ok={exportPlan.rowCount > 0}
+                label="Есть выбранные подачи"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "не готовые к выгрузке")}
+                label="Только принятые подачи"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "блокирующие замечания")}
+                label="Нет открытых блокеров"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "канонического пакета медиа")}
+                label="Обязательные файлы готовы"
+              />
+              <ExportGuardItem
+                ok={!exportHasBlocker(exportPlan, "разные города")}
+                label="Один город"
+                detail={`${packageFacts.city} · ${packageFacts.dates}`}
+              />
+              <ExportGuardItem
+                ok={exportPlan.contract.valid && unresolvedCount === 0}
+                label="Все 56 колонок подтверждены"
+                detail={`${exportPlan.contract.sheetName} ${exportPlan.contract.range}`}
+              />
+            </div>
+          </CardComponent>
+          <div className={`v17-blocker-callout ${exportCalloutTone(exportPlan)}`}>
+            <SvgIcon>
+              <path d="M10.3 4.3 2.8 17.4A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.6L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </SvgIcon>
+            <span>
+              <strong>{exportCalloutTitle(exportPlan)}</strong>
+              {exportPlan.blockers.length > 0 ? (
+                exportPlan.blockers.map((blocker) => (
+                  <span key={blocker.reason}>{blocker.reason}</span>
+                ))
+              ) : exportPlan.warnings.length > 0 ? (
+                exportPlan.warnings.map((warning) => (
+                  <span key={warning.reason}>{warning.reason}</span>
+                ))
+              ) : (
+                <span>
+                  Preview и workbook используют один row model; скачивание доступно
+                  только после package identity proof.
+                </span>
+              )}
+            </span>
+          </div>
+          <CardComponent as="section" className="v17-rail-card v17-export-actions-card">
+            <div
+              aria-busy={exportBusy || undefined}
+              aria-describedby={actionHint ? "export-action-hint" : undefined}
+              className="mp-action-dock export-action-dock"
+              data-testid="export-action-dock"
+            >
+              <div className="mp-action-dock-actions export-actions">
+                <Button
+                  aria-describedby={actionHint ? "export-action-hint" : undefined}
+                  disabled={exportBusy || !exportPlan.canGenerate}
+                  onClick={onGenerate}
+                >
+                  Сформировать Эксель
+                </Button>
+                <Button
+                  aria-describedby={actionHint ? "export-action-hint" : undefined}
+                  disabled={exportBusy || !exportPlan.canDownload}
+                  variant="secondary"
+                  onClick={onDownload}
+                >
+                  Скачать Excel
+                </Button>
+                <Button
+                  aria-describedby={actionHint ? "export-action-hint" : undefined}
+                  disabled={exportBusy || !exportPlan.canMarkExported}
+                  loading={exportBusy}
+                  variant="secondary"
+                  onClick={onMarkExported}
+                >
+                  Отметить выгружено
+                </Button>
+              </div>
+              {actionHint ? (
+                <p
+                  aria-live="polite"
+                  className="mp-action-dock-hint export-action-hint"
+                  id="export-action-hint"
+                >
+                  {actionHint}
+                </p>
+              ) : null}
+            </div>
+            <p className="sheet-caption">
+              Download запускается только для текущей verified selection; stale
+              selection и row mismatch блокируются.
+            </p>
           </CardComponent>
           <CardComponent
             as="section"
@@ -2891,26 +2946,7 @@ export function ExportScreen({
               члены семьи идут последовательным блоком.
             </p>
           </CardComponent>
-          <CardComponent as="section" className="v17-rail-card">
-            <p className="kicker">Pre-export checks</p>
-            <div className="v17-export-checks" aria-label="Проверки перед выгрузкой">
-              <ExportGuardItem ok label="Есть выбранные подачи" />
-              <ExportGuardItem ok label="Только принятые подачи" />
-              <ExportGuardItem ok label="Нет открытых блокеров" />
-              <ExportGuardItem ok label="Обязательные файлы готовы" />
-              <ExportGuardItem
-                ok
-                label="Совместимый пакет"
-                detail={`${packageFacts.city} · ${packageFacts.dates}`}
-              />
-              <ExportGuardItem
-                ok={false}
-                label="Все 56 колонок подтверждены"
-                detail={`${unresolvedCount} колонки требуют решения`}
-              />
-            </div>
-          </CardComponent>
-          <CardComponent as="section" className="v17-rail-card">
+          <CardComponent as="section" className="v17-rail-card v17-export-mapping-card">
             <div className="mapping-audit" aria-label="56-column export mapping audit">
               <div className="mapping-audit-head">
                 <strong>Контракт A:BD</strong>
@@ -2928,70 +2964,6 @@ export function ExportScreen({
                 ))}
               </div>
             </div>
-          </CardComponent>
-          <div className="v17-blocker-callout blocker-box">
-            <SvgIcon>
-              <path d="M10.3 4.3 2.8 17.4A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.6L13.7 4.3a2 2 0 0 0-3.4 0Z" />
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-            </SvgIcon>
-            <span>
-              <strong>Выгрузка заблокирована fail-closed</strong>
-              {exportPlan.blockers.length > 0 ? (
-                exportPlan.blockers.map((blocker) => (
-                  <span key={blocker.reason}>{blocker.reason}</span>
-                ))
-              ) : (
-                <span>
-                  {unresolvedCount} mapping-пункта не подтверждены. Duplicate
-                  protection требует backend evidence.
-                </span>
-              )}
-            </span>
-          </div>
-          <CardComponent as="section" className="v17-rail-card v17-export-actions-card">
-            <div
-              aria-busy={exportBusy || undefined}
-              aria-describedby={actionHint ? "export-action-hint" : undefined}
-              className="mp-action-dock export-action-dock"
-              data-testid="export-action-dock"
-            >
-              <div className="mp-action-dock-actions export-actions">
-                <Button
-                  disabled={exportBusy || !exportPlan.canGenerate}
-                  onClick={onGenerate}
-                >
-                  Сформировать Эксель
-                </Button>
-                <Button
-                  disabled={exportBusy || !exportPlan.canDownload}
-                  variant="secondary"
-                  onClick={onDownload}
-                >
-                  Скачать Excel
-                </Button>
-                <Button
-                  disabled={exportBusy || !exportPlan.canMarkExported}
-                  loading={exportBusy}
-                  variant="secondary"
-                  onClick={onMarkExported}
-                >
-                  Отметить выгружено
-                </Button>
-              </div>
-              {actionHint ? (
-                <p
-                  aria-live="polite"
-                  className="mp-action-dock-hint export-action-hint"
-                  id="export-action-hint"
-                >
-                  {actionHint}
-                </p>
-              ) : null}
-            </div>
-            <p className="sheet-caption">
-              Standalone HTML не создаёт и не скачивает файл.
-            </p>
           </CardComponent>
           </div>
         </aside>
@@ -3024,19 +2996,86 @@ function exportPackageFacts(plan: ExportSummary) {
   };
 }
 
-function exportMappingRows(plan: ExportSummary) {
-  const derivedHeaders = new Set(["FirstName", "LastName", "Appointment Type"]);
-  const unresolvedHeaders = new Set(["Visa Sub Type", "Nationality At Birth"]);
+function exportHasBlocker(plan: ExportSummary, text: string) {
+  return plan.blockers.some((blocker) => blocker.reason.includes(text));
+}
 
-  return plan.preview.headers.map((header, index) => ({
-    header,
-    index: index + 1,
-    state: unresolvedHeaders.has(header)
-      ? "unresolved"
-      : [...derivedHeaders].some((derivedHeader) => header.includes(derivedHeader))
-        ? "derived"
-        : "mapped",
-  }));
+function exportCalloutTone(plan: ExportSummary) {
+  if (plan.blockers.length > 0) return "blocker-box";
+  if (plan.warnings.length > 0) return "warning-box";
+  if (plan.ready) return "success-box";
+  return "neutral-box";
+}
+
+function exportCalloutTitle(plan: ExportSummary) {
+  if (plan.blockers.length > 0) return "Выгрузка заблокирована fail-closed";
+  if (plan.warnings.length > 0) return "Выгрузка разрешена с предупреждением";
+  if (plan.ready) return "Выгрузка готова";
+  return "Выберите пакет для проверки";
+}
+
+function exportStateLabel(submission: Submission) {
+  if (submission.exportState === "file_generated") return "Файл сформирован";
+  if (submission.exportState === "file_downloaded") return "Файл скачан";
+  if (submission.exportState === "marked_exported") return "Выгружено";
+  return "Готово";
+}
+
+function returnedPdfPackageSummary(submission: Submission): {
+  actionLabel: string;
+  detail: string;
+  label: string;
+  tone: "danger" | "amber" | "blue" | "teal" | "muted" | "default";
+} {
+  const handoffPackage = buildAgentHandoffPackage(submission);
+  const firstBlocker = handoffPackage.blockers[0] ?? "";
+
+  if (handoffPackage.ready) {
+    return {
+      actionLabel: "Открыть PDF",
+      detail: `${handoffPackage.applicantPdfs.length} application_form_pdf · appointment_list_pdf ready`,
+      label: "PDF готов",
+      tone: "teal",
+    };
+  }
+
+  if (firstBlocker.includes("Application PDF is missing")) {
+    return {
+      actionLabel: "Проверить PDF",
+      detail: firstBlocker,
+      label: "Нет application_form_pdf",
+      tone: "amber",
+    };
+  }
+
+  if (firstBlocker.includes("Common appointment/list PDF is missing")) {
+    return {
+      actionLabel: "Проверить PDF",
+      detail: firstBlocker,
+      label: "Нет appointment_list_pdf",
+      tone: "amber",
+    };
+  }
+
+  if (
+    firstBlocker.includes("upload failed") ||
+    firstBlocker.includes("was deleted") ||
+    firstBlocker.includes("is not uploaded")
+  ) {
+    return {
+      actionLabel: "Проверить PDF",
+      detail: firstBlocker,
+      label: "PDF не готов",
+      tone: "danger",
+    };
+  }
+
+  return {
+    actionLabel: "Проверить PDF",
+    detail: firstBlocker || "Returned PDF package требует проверки перед handoff.",
+    label: "PDF проверка",
+    tone: "amber",
+  };
 }
 
 function maskPreviewValue(value: string) {

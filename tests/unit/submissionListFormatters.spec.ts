@@ -65,11 +65,11 @@ describe("submission list formatters", () => {
     expect(
       formatAgentActionRowText({
         applicantName: "Мария Иванова",
-        fileType: "photo",
+        fileType: "selfie",
         kind: "replace_file",
       }),
     ).toEqual({
-      subtitle: "Заменить фото",
+      subtitle: "Заменить селфи",
       title: "Мария Иванова",
     });
   });

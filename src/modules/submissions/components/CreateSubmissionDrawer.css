@@ -1210,626 +1210,136 @@
   }
 }
 
-/* Create submission Figma transfer: passport/family first step. */
-.create-flow-shell {
-  background: var(--v19-canvas);
-}
-
-.create-flow-header {
-  display: grid;
-  gap: 14px;
-  flex: 0 0 auto;
-  padding: 18px 24px 16px;
-  border-bottom: 1px solid var(--v19-line-default);
-  background: color-mix(in srgb, var(--v19-canvas) 92%, transparent);
-  backdrop-filter: blur(18px);
-}
-
-.create-flow-title-row {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-}
-
-.create-flow-close {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  color: var(--v19-fg-tertiary);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    border-color var(--v19-motion-fast) var(--v19-motion-ease),
-    background-color var(--v19-motion-fast) var(--v19-motion-ease),
-    color var(--v19-motion-fast) var(--v19-motion-ease),
-    transform var(--v19-motion-fast) var(--v19-motion-ease-out);
-}
-
-.create-flow-close svg {
-  width: 18px;
-  height: 18px;
-}
-
-.create-flow-close:hover {
-  border-color: var(--v19-line-default);
-  color: var(--v19-fg);
-  background: var(--v19-control);
-}
-
-.create-flow-close:active {
-  transform: translateY(1px);
-}
-
-.create-flow-title {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.create-flow-title h1 {
-  margin: 0;
-  color: var(--v19-fg);
-  font-size: clamp(22px, 2.1vw, 30px);
-  font-weight: 720;
-  line-height: 1.1;
-  letter-spacing: 0;
-}
-
-.create-flow-title p {
-  margin: 0;
-  color: var(--v19-fg-secondary);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.create-flow-steps {
-  width: min(100%, 780px);
-  margin-left: 58px;
-}
-
-.create-flow-steps button {
-  min-height: 44px;
-  border-radius: 12px;
-}
-
-.create-flow-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 26px 24px 28px;
-  background: var(--v19-canvas);
-}
-
-.create-flow-container {
-  width: min(1180px, 100%);
-  min-height: 100%;
-  margin: 0 auto;
-}
-
-.create-passport-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.42fr) minmax(320px, 0.78fr);
-  gap: 18px;
-  align-items: stretch;
-  min-height: min(620px, calc(100svh - 210px));
-}
-
-.create-upload-panel,
-.create-family-panel {
-  min-width: 0;
-  border: 1px solid var(--v19-line-default);
-  border-radius: 18px;
-  background: var(--v19-surface);
-}
-
-.create-upload-panel {
-  position: relative;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 14px;
-  padding: 36px;
-  overflow: hidden;
-  text-align: center;
-  transition:
-    border-color var(--v19-motion-normal) var(--v19-motion-ease),
-    background-color var(--v19-motion-normal) var(--v19-motion-ease),
-    transform var(--v19-motion-normal) var(--v19-motion-ease-out);
-}
-
-.create-upload-panel::before {
-  content: "";
-  position: absolute;
-  inset: 18px;
-  border: 1px dashed rgb(255 255 255 / 0.06);
-  border-radius: 14px;
-  pointer-events: none;
-}
-
-.create-upload-panel:hover,
-.create-upload-panel.is-dragging {
-  border-color: var(--v19-line-strong);
-  background: var(--v19-panel);
-}
-
-.create-upload-panel.is-dragging {
-  transform: scale(1.006);
-}
-
-.create-upload-visual {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  border: 1px solid var(--v19-line-default);
-  border-radius: 999px;
-  color: var(--v19-fg-secondary);
-  background: var(--v19-control);
-}
-
-.create-upload-visual svg {
-  width: 30px;
-  height: 30px;
-}
-
-.create-upload-visual span {
-  position: absolute;
-  right: 15px;
-  bottom: 15px;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--v19-fg-tertiary);
-}
-
-.create-upload-panel.has-passport .create-upload-visual span {
-  background: var(--v19-success);
-}
-
-.create-upload-panel h2 {
-  margin: 0;
-  color: var(--v19-fg);
-  font-size: clamp(24px, 2.8vw, 34px);
-  font-weight: 720;
-  line-height: 1.08;
-  letter-spacing: 0;
-}
-
-.create-upload-panel > p:not(.kicker):not(.create-upload-error) {
-  max-width: 520px;
-  margin: 0;
-  color: var(--v19-fg-secondary);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.create-upload-error {
-  margin: 0;
-  color: var(--vf-red-soft-text);
-  font-size: 12px;
-  font-weight: 620;
-}
-
-.create-upload-actions {
-  display: grid;
-  justify-items: center;
-  gap: 12px;
-  width: min(100%, 620px);
-  margin-top: 4px;
-}
-
-.create-upload-button,
-.create-primary-action,
-.create-secondary-action,
-.create-add-applicant,
-.create-mode-tabs button {
-  min-height: 42px;
-  border: 1px solid var(--v19-line-default);
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 680;
-  transition:
-    border-color var(--v19-motion-fast) var(--v19-motion-ease),
-    background-color var(--v19-motion-fast) var(--v19-motion-ease),
-    color var(--v19-motion-fast) var(--v19-motion-ease),
-    opacity var(--v19-motion-fast) var(--v19-motion-ease-out),
-    transform var(--v19-motion-fast) var(--v19-motion-ease-out);
-}
-
-.create-upload-button {
-  padding: 0 22px;
-  border-color: transparent;
-  color: var(--v19-canvas);
-  background: var(--v19-fg);
-}
-
-.create-upload-button:hover {
-  background: color-mix(in srgb, var(--v19-fg) 92%, transparent);
-}
-
-.create-upload-button:active,
-.create-primary-action:active,
-.create-secondary-action:active,
-.create-add-applicant:active,
-.create-mode-tabs button:active {
-  transform: translateY(1px);
-}
-
-.create-upload-panel .pi-extraction-status {
-  width: fit-content;
-  max-width: 100%;
-}
-
-.create-upload-list {
-  display: grid;
-  gap: 8px;
-  width: min(100%, 560px);
-  margin-top: 4px;
-}
-
-.create-upload-file {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 18px;
-  gap: 10px;
-  align-items: center;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--v19-line-default);
-  border-radius: 12px;
-  color: var(--v19-fg-secondary);
-  background: var(--v19-control);
-  text-align: left;
-}
-
-.create-upload-file > svg {
-  width: 17px;
-  height: 17px;
-  justify-self: center;
-}
-
-.create-upload-file div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.create-upload-file strong,
-.create-upload-file span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.create-upload-file strong {
-  color: var(--v19-fg);
-  font-size: 12.5px;
-}
-
-.create-upload-file span {
-  color: var(--v19-fg-tertiary);
-  font-size: 11.5px;
-}
-
-.create-family-panel {
-  display: grid;
-  align-content: start;
-  gap: 14px;
-  padding: 18px;
-  background: var(--v19-control);
-}
-
-.create-mode-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 4px;
-  border: 1px solid var(--v19-line-default);
-  border-radius: 14px;
-  background: var(--v19-surface);
-}
-
-.create-mode-tabs button {
-  min-width: 0;
-  min-height: 38px;
-  color: var(--v19-fg-secondary);
-  background: transparent;
-}
-
-.create-mode-tabs button.is-active {
-  border-color: var(--v19-line-strong);
-  color: var(--v19-fg);
-  background: var(--v19-selected);
-}
-
-.create-panel-mode {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.create-family-panel .pi-passport-targets {
-  padding: 0;
-  border-bottom: 0;
-}
-
-.create-family-panel .pi-passport-target {
-  min-height: 68px;
-  background: var(--v19-row-background);
-}
-
-.create-add-applicant {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  color: var(--v19-fg);
-  background: var(--v19-surface);
-}
-
-.create-add-applicant svg {
-  width: 16px;
-  height: 16px;
-}
-
-.create-add-applicant:hover {
-  border-color: var(--v19-line-strong);
-  background: var(--v19-selected);
-}
-
-.create-add-applicant:disabled,
-.create-primary-action:disabled,
-.create-secondary-action:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-  transform: none;
-}
-
-.create-family-panel .pi-family-yes-no {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.create-family-panel .fyn-question {
-  background: var(--v19-row-background);
-}
-
-.create-flow-footer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  flex: 0 0 auto;
-  padding: 14px 24px;
-  border-top: 1px solid var(--v19-line-default);
-  background: color-mix(in srgb, var(--v19-canvas) 92%, transparent);
-  backdrop-filter: blur(18px);
-}
-
-.create-flow-footer > span {
-  min-width: 0;
-  color: var(--v19-fg-secondary);
-  font-size: 12.5px;
-  line-height: 1.35;
-}
-
-.create-flow-footer > div {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.create-secondary-action,
-.create-primary-action {
-  padding: 0 16px;
-}
-
-.create-secondary-action {
-  color: var(--v19-fg-secondary);
-  background: var(--v19-control);
-}
-
-.create-secondary-action:hover {
-  border-color: var(--v19-line-strong);
-  color: var(--v19-fg);
-  background: var(--v19-selected);
-}
-
-.create-primary-action {
-  border-color: transparent;
-  color: var(--v19-canvas);
-  background: var(--v19-fg);
-}
-
-.create-primary-action:not(:disabled):hover {
-  background: color-mix(in srgb, var(--v19-fg) 92%, transparent);
-}
-
-.create-primary-action:disabled {
-  border-color: var(--v19-line-default);
-  color: var(--v19-fg-tertiary);
-  background: var(--v19-control);
-}
-
-@media (max-width: 1024px) {
-  .create-passport-layout {
-    grid-template-columns: minmax(0, 1fr);
-    min-height: 0;
+@media (max-width: 760px) {
+  .create-submission-drawer.is-passport-step > header,
+  .create-submission-drawer.is-passport-step > footer {
+    display: none !important;
   }
 
-  .create-family-panel {
-    min-height: auto;
-  }
-}
-
-@media (max-width: 720px) {
-  .create-flow-header {
-    gap: 12px;
-    padding: 12px 12px 10px;
+  .create-submission-drawer.is-passport-step > .flex-1 {
+    padding: 10px 12px max(12px, env(safe-area-inset-bottom)) !important;
+    overflow-y: auto !important;
   }
 
-  .create-flow-title-row {
-    grid-template-columns: 40px minmax(0, 1fr);
-    gap: 10px;
+  .create-submission-drawer.is-passport-step .max-w-\[1140px\] {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
   }
 
-  .create-flow-close {
-    width: 38px;
-    height: 38px;
+  .create-submission-drawer.is-passport-step .grid.grid-cols-1 {
+    gap: 10px !important;
+    min-height: 0 !important;
   }
 
-  .create-flow-title h1 {
-    font-size: 21px;
-  }
-
-  .create-flow-title p {
-    font-size: 12px;
-  }
-
-  .create-flow-steps {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .create-flow-steps button {
-    min-height: 40px;
-    padding-inline: 9px;
-  }
-
-  .create-flow-steps strong {
-    font-size: 11.5px;
-  }
-
-  .create-flow-body {
-    padding: 12px 12px 16px;
-  }
-
-  .create-upload-panel,
-  .create-family-panel {
-    border-radius: 16px;
-  }
-
-  .create-upload-panel {
-    min-height: 330px;
-    padding: 24px 16px;
-  }
-
-  .create-upload-panel::before {
-    inset: 12px;
-  }
-
-  .create-upload-visual {
-    width: 62px;
-    height: 62px;
-  }
-
-  .create-upload-panel h2 {
-    font-size: 25px;
-  }
-
-  .create-upload-panel > p:not(.kicker):not(.create-upload-error) {
-    font-size: 13px;
-  }
-
-  .create-family-panel {
-    padding: 14px;
-  }
-
-  .create-passport-layout.is-family-mode .create-upload-panel {
-    min-height: 210px;
-    gap: 9px;
-    padding-block: 16px;
-  }
-
-  .create-passport-layout.is-family-mode .create-upload-visual {
-    width: 52px;
-    height: 52px;
-  }
-
-  .create-passport-layout.is-family-mode .create-upload-visual svg {
-    width: 24px;
-    height: 24px;
-  }
-
-  .create-passport-layout.is-family-mode .create-upload-panel h2 {
-    font-size: 23px;
-  }
-
-  .create-passport-layout.is-family-mode
-    .create-upload-panel
-    > p:not(.kicker):not(.create-upload-error) {
-    display: none;
-  }
-
-  .create-passport-layout.is-family-mode .create-upload-actions {
-    gap: 8px;
-  }
-
-  .create-flow-footer {
+  .create-passport-topbar {
     position: sticky;
-    bottom: 0;
-    grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-  }
-
-  .create-flow-footer > div {
+    top: 0;
+    z-index: 8;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 50px;
+    margin: -10px -12px 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    background: rgb(14 14 16 / 0.96);
+    backdrop-filter: blur(16px);
   }
 
-  .create-flow-footer .create-secondary-action,
-  .create-flow-footer .create-primary-action {
-    width: 100%;
-    min-width: 0;
-    padding-inline: 8px;
+  .create-passport-topbar h2 {
+    overflow: hidden;
+    margin: 0;
+    color: var(--v19-fg);
+    font-size: 18px;
+    font-weight: 720;
+    line-height: 1.05;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .create-flow-footer .create-secondary-action:first-child:nth-last-child(3) {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 360px) {
-  .create-flow-header {
-    padding-inline: 10px;
-  }
-
-  .create-flow-body {
-    padding-inline: 10px;
+  .create-passport-topbar span {
+    display: block;
+    margin-top: 3px;
+    color: var(--v19-fg-tertiary);
+    font-size: 11px;
+    font-weight: 620;
+    line-height: 1;
   }
 
-  .create-flow-steps button {
-    gap: 6px;
-    padding-inline: 7px;
+  .create-passport-back,
+  .create-passport-next {
+    border: 1px solid var(--v19-line-default);
+    border-radius: 12px;
+    color: var(--v19-fg);
+    background: var(--v19-control);
+    font: inherit;
   }
 
-  .create-flow-steps span {
-    width: 18px;
-    height: 18px;
-    font-size: 10px;
+  .create-passport-back {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
   }
 
-  .create-upload-panel {
-    padding-inline: 14px;
-    min-height: 318px;
+  .create-passport-next {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 760;
   }
 
-  .create-passport-layout.is-family-mode .create-upload-panel {
-    min-height: 204px;
+  .create-passport-next:disabled {
+    color: var(--v19-fg-tertiary);
+    cursor: not-allowed;
+    opacity: 0.52;
   }
 
-  .create-family-panel {
-    padding: 12px;
+  .create-submission-drawer.is-passport-step section[aria-label="Тип подачи"],
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"] {
+    padding: 10px !important;
+    border-radius: 12px !important;
+    background: #121214 !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Тип подачи"]
+    .mb-3,
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"]
+    .mb-3 {
+    margin-bottom: 8px !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"]
+    .grid.grid-cols-1 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"]
+    .mt-3 {
+    margin-top: 8px !important;
+    padding-top: 8px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] {
+    min-height: 228px !important;
+    padding: 18px !important;
+    border-radius: 14px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] .w-14 {
+    width: 46px !important;
+    height: 46px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .create-submission-drawer.is-passport-step .flex-1.min-h-\[360px\] p {
+    margin-bottom: 16px !important;
   }
 }

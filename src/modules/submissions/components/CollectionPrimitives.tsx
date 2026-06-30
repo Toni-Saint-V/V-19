@@ -398,7 +398,12 @@ export function CollectionRow({
       <span className="v19-event-passport">{passport}</span>
       <span className="v19-event-trip">{trip}</span>
       <Badge tone={tone}>{badge}</Badge>
-      <button className="v19-event-action" type="button" onClick={onAction}>
+      <button
+        className="v19-event-action"
+        type="button"
+        aria-label={`${action}: ${title}`}
+        onClick={onAction}
+      >
         {action}
       </button>
     </div>
@@ -409,6 +414,8 @@ export function ActionRow({
   badges,
   context,
   cta,
+  dueLabel,
+  submissionId,
   onOpen,
   selected = false,
   severity,
@@ -420,6 +427,8 @@ export function ActionRow({
   }>;
   context: ReactNode;
   cta: string;
+  dueLabel: string;
+  submissionId?: string;
   onOpen: () => void;
   selected?: boolean;
   severity: "blocker" | "info" | "ready" | "warning";
@@ -434,11 +443,18 @@ export function ActionRow({
         selected && "is-selected",
       )}
       aria-current={selected ? "true" : undefined}
+      aria-label={`${cta}: ${title}. ${dueLabel}. ${context}`}
+      data-submission-card={submissionId ? "" : undefined}
+      data-submission-id={submissionId}
       type="button"
       onClick={onOpen}
     >
       <span className="v19-action-severity" aria-hidden="true" />
       <span className="v19-event-main">
+        <span className="v19-action-row-kicker">
+          <span>{dueLabel}</span>
+          {submissionId ? <small>{submissionId}</small> : null}
+        </span>
         <strong>{title}</strong>
         <em>{context}</em>
       </span>
@@ -449,7 +465,12 @@ export function ActionRow({
           </Badge>
         ))}
       </span>
-      <span className="v19-event-action">{cta}</span>
+      <span className="v19-event-action">
+        <span className="v19-event-action-label">{cta}</span>
+        <SvgIcon>
+          <path d="M9 6l6 6-6 6" />
+        </SvgIcon>
+      </span>
     </button>
   );
 }
@@ -503,11 +524,18 @@ export function SubmissionCollectionRow({
         `status-${status}`,
         (status === "returned" || status === "requires_action") && "is-attention",
       )}
+      aria-label={`${action}: ${title}, ${submissionId}`}
       data-submission-card=""
       data-submission-id={submissionId}
       type="button"
       onClick={onOpen}
     >
+      <span className="v19-mobile-summary-head" aria-hidden="true">
+        <span className="v19-mobile-summary-id">{submissionId}</span>
+        <span className="v19-mobile-summary-status">
+          <Badge tone={submissionStatusTone(status)}>{statusLabel}</Badge>
+        </span>
+      </span>
       <span className="v19-event-main">
         <span className="v19-submission-kind-icon" aria-hidden="true">
           <SvgIcon>
@@ -532,6 +560,7 @@ export function SubmissionCollectionRow({
         {searchText ? <span className="sr-only">{searchText}</span> : null}
         {meta ? <em>{meta}</em> : null}
       </span>
+      <span className="v19-mobile-summary-title">{title}</span>
       {trip ? (
         <span className="v19-submission-trip">
           <strong title={trip}>{trip}</strong>
@@ -574,21 +603,34 @@ export function SubmissionCollectionRow({
           <path d="M9 6l6 6-6 6" />
         </SvgIcon>
       </span>
+      <span className="v19-mobile-summary-foot" aria-hidden="true">
+        <span className="v19-mobile-summary-route">
+          {trip ? <strong>{trip}</strong> : null}
+          {tripDetail ? <em>{tripDetail}</em> : null}
+        </span>
+        <span className="v19-mobile-summary-tail">
+          <ProgressCell value={completeness} />
+          <SvgIcon>
+            <path d="M9 6l6 6-6 6" />
+          </SvgIcon>
+        </span>
+      </span>
     </button>
   );
 }
 
 function ProgressCell({ value }: { value: string }) {
   const percent = Number.parseInt(value.replace("%", ""), 10);
-  const safePercent = Number.isFinite(percent)
-    ? Math.min(Math.max(percent, 0), 100)
-    : 0;
+  const isPercentLabel = value.trim().endsWith("%") && Number.isFinite(percent);
+  const safePercent = isPercentLabel ? Math.min(Math.max(percent, 0), 100) : 100;
 
   return (
     <span
       className={cn(
         "v19-progress-cell",
-        safePercent === 100
+        !isPercentLabel
+          ? "is-label"
+          : safePercent === 100
           ? "is-complete"
           : safePercent <= 5
             ? "is-empty"
