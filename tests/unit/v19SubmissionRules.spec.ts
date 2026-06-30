@@ -918,7 +918,7 @@ describe("V-19 submission actions", () => {
       canPerformAction(withAllReplacements, "submit_corrections", "agent"),
     ).toEqual({
       ok: false,
-      reason: "Скан паспорта не проверен.",
+      reason: "Сначала отметьте замечания исправленными",
     });
 
     const withExtractedPassport = finishPassportExtraction(
