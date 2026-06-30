@@ -21,4 +21,5 @@ function renderApp() {
 
 void import("./styles.deferred-a.css")
   .then(() => import("./styles.deferred-b.css"))
+  .then(() => import("./styles.sidebar-contract.css"))
   .then(renderApp, renderApp);

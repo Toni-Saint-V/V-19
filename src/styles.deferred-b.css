@@ -575,15 +575,6 @@
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .ops-sidebar--desktop
-    .ops-nav::before {
-    width: 100% !important;
-    padding: 0 10px 8px !important;
-    text-align: left !important;
-    letter-spacing: 0.04em !important;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
-    .ops-sidebar--desktop
     .ops-nav-item {
     justify-content: flex-start !important;
     width: 100% !important;
