@@ -121,18 +121,18 @@ export function adminWorkEventTitle(submission: Submission, fallback: string) {
 export const fileStatusLabels: Record<SubmissionFileStatus, string> = {
   missing: "Нет файла",
   uploaded: "Загружено",
-  needs_replacement: "Нужна замена",
-  pending_review: "Ожидает проверки",
+  needs_replacement: "Заменить",
+  pending_review: "Проверить",
   accepted: "Принято",
 };
 
 export const fileTypeLabels = {
-  photo: "Архивное фото",
-  photo_white: "Архивное фото",
-  selfie: "Селфи",
-  selfie_2: "Селфи N2",
-  passport_scan: "Загранпаспорт",
-  video: "Архивное видео",
+  photo: "Фото",
+  photo_white: "Фото",
+  selfie: "Селфи 1",
+  selfie_2: "Селфи 2",
+  passport_scan: "Скан паспорта",
+  video: "Видео",
 } satisfies Record<Submission["files"][number]["type"], string>;
 
 export const typeLabels = {

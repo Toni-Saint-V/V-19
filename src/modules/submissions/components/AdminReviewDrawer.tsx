@@ -316,7 +316,11 @@ export function AdminReviewDrawer({
             onApplicant={setSelectedApplicantId}
           />
 
-          <nav className="admin-review-tabs" aria-label="Рабочие вкладки проверки">
+          <nav
+            className="admin-review-tabs"
+            aria-label="Рабочие вкладки проверки"
+            role="tablist"
+          >
             {adminReviewTabs.map((tab) => {
               const TabIcon = tab.icon;
               const count = tab.count?.(submission);

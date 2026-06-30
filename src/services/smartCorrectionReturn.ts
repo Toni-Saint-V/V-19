@@ -46,8 +46,19 @@ function openCorrectionKey(note: CorrectionNote): string {
     note.fieldKey ?? "",
     note.mediaType ?? "",
     note.target.trim(),
-    note.text.trim(),
+    correctionTextKey(note.text),
   ].join("|");
+}
+
+function correctionTextKey(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/^(исправьте перед повторной передачей:\s*)+/g, "")
+    .replace(/селфи\s*(?:n|№)\s*1/g, "селфи 1")
+    .replace(/селфи\s*(?:n|№)\s*2/g, "селфи 2")
+    .replace(/\s+/g, " ");
 }
 
 function isOpenCorrection(note: CorrectionNote): boolean {
@@ -89,6 +100,16 @@ function fallbackCorrection(text: string, options: ReturnMetadata): CorrectionNo
 
 function fallbackNoteText(blocker: string): string {
   return `Исправьте перед повторной передачей: ${blocker}`;
+}
+
+function uniqueCorrectionTexts(texts: string[]): string[] {
+  const seen = new Set<string>();
+  return texts.filter((text) => {
+    const key = correctionTextKey(text);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function textReviewSummary({
@@ -151,7 +172,7 @@ function existingCorrectionIndex(notes: CorrectionNote[]): ExistingCorrectionInd
   const openNotes = notes.filter(isOpenCorrection);
   return {
     keys: new Set(openNotes.map(openCorrectionKey)),
-    texts: new Set(openNotes.map((note) => note.text.trim()).filter(Boolean)),
+    texts: new Set(openNotes.map((note) => correctionTextKey(note.text)).filter(Boolean)),
   };
 }
 
@@ -170,7 +191,8 @@ function isNewCorrection(
   existing: ExistingCorrectionIndex,
 ): boolean {
   return (
-    !existing.keys.has(openCorrectionKey(note)) && !existing.texts.has(note.text.trim())
+    !existing.keys.has(openCorrectionKey(note)) &&
+    !existing.texts.has(correctionTextKey(note.text))
   );
 }
 
@@ -257,7 +279,6 @@ function buildAgentPreflightFallbackPackage(
   const blockerTexts = submissionPreflight(normalized)
     .blockers.map((blocker) => blocker.trim())
     .filter(Boolean)
-    .filter((blocker) => !existing.texts.has(blocker))
     .map(fallbackNoteText);
   const candidateTexts = blockerTexts.length
     ? blockerTexts
@@ -266,14 +287,17 @@ function buildAgentPreflightFallbackPackage(
           "Оператор вернул заявку на ручное уточнение перед повторной передачей.",
         ),
       ];
-  const noteTextsToAdd = candidateTexts.filter((text) => !existing.texts.has(text));
-  const skippedExistingCount = candidateTexts.length - noteTextsToAdd.length;
+  const uniqueCandidateTexts = uniqueCorrectionTexts(candidateTexts);
+  const noteTextsToAdd = uniqueCandidateTexts.filter(
+    (text) => !existing.texts.has(correctionTextKey(text)),
+  );
+  const skippedExistingCount = uniqueCandidateTexts.length - noteTextsToAdd.length;
 
   if (!noteTextsToAdd.length) {
     return packageResult({
       notes: [],
       source: "agent_preflight_fallback",
-      candidateCount: candidateTexts.length,
+      candidateCount: uniqueCandidateTexts.length,
       skippedExistingCount,
       truncatedCount: 0,
       summary: emptyPreflightSummary(skippedExistingCount),
@@ -288,7 +312,7 @@ function buildAgentPreflightFallbackPackage(
   return packageResult({
     notes,
     source: "agent_preflight_fallback",
-    candidateCount: candidateTexts.length,
+    candidateCount: uniqueCandidateTexts.length,
     skippedExistingCount,
     truncatedCount,
     summary: preflightSummary(notes.length, truncatedCount),

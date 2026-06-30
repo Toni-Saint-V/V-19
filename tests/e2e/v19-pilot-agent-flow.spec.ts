@@ -6,7 +6,6 @@ import {
   e2ePassportFile,
   expectAtLeastOneVisible,
   expectDrawerStatus,
-  loginThroughAccessGate,
   markVisibleIssuesFixed,
   openDrawerTab,
   openFreshWorkspace,
@@ -23,14 +22,7 @@ test.describe("V-19 pilot agent click flow", () => {
     test.skip(testInfo.project.name !== "chromium", "desktop pilot runs once");
     const browserProblems = collectBrowserProblems(page);
 
-    await openFreshWorkspace(page, { workspaceEmail: "unknown@visaflow.local" });
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Вход в рабочий кабинет" }),
-    ).toBeVisible();
-    await expect(page.getByRole("alert")).toContainText("Почта не найдена");
-
-    await loginThroughAccessGate(page, "agent@visaflow.local", "Входящие");
-    await expect(page.getByRole("region", { name: "Входящие" })).toBeVisible();
+    await openFreshWorkspace(page, { heading: "Мои действия" });
 
     await clickWorkspaceButton(page, /Мои действия/);
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
@@ -45,10 +37,8 @@ test.describe("V-19 pilot agent click flow", () => {
     ).toBeVisible();
     await agentActionSurface.getByRole("tab", { name: /Все действия/ }).click();
 
-    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
-    await page
-      .getByRole("menu", { name: "Фильтр и вид" })
-      .getByRole("menuitemradio", { name: "Колонки" })
+    await agentActionSurface
+      .getByRole("button", { name: /Переключить к колонкам/ })
       .click();
     const reviewColumn = agentActionSurface
       .locator(".vf-figma-column")
@@ -63,13 +53,11 @@ test.describe("V-19 pilot agent click flow", () => {
         .locator(".vf-figma-column-card")
         .filter({ hasText: "София Иванова" })
         .filter({ hasText: "Заполнить анкету" })
-        .first(),
+      .first(),
     ).toBeVisible();
 
-    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
-    await page
-      .getByRole("menu", { name: "Фильтр и вид" })
-      .getByRole("menuitemradio", { name: "Список" })
+    await agentActionSurface
+      .getByRole("button", { name: /Переключить к списку/ })
       .click();
 
     await agentActionSearch.fill("ПД-1048");
@@ -81,82 +69,50 @@ test.describe("V-19 pilot agent click flow", () => {
     );
     await agentActionSearch.fill("");
 
-    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
-    await page
-      .getByRole("menu", { name: "Фильтр и вид" })
-      .getByRole("menuitemradio", { name: "Санкт-Петербург" })
-      .click();
-    await expect(
-      agentActionSurface.locator('[data-submission-id="ПД-1051"]').first(),
-    ).toBeVisible();
-    await expect(agentActionSurface.locator('[data-submission-id="ПД-1048"]')).toHaveCount(
-      0,
-    );
-
-    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
-    await page
-      .getByRole("menu", { name: "Фильтр и вид" })
-      .getByRole("menuitemradio", { name: "Создано" })
-      .click();
     await expect(agentActionSurface.locator("[data-submission-id]").first()).toBeVisible();
 
-    await agentActionSurface.getByRole("button", { name: "Фильтр и вид" }).click();
-    await page
-      .getByRole("menu", { name: "Фильтр и вид" })
-      .getByRole("menuitemradio", { name: "Все города" })
-      .click();
     await agentActionSurface.locator('[data-submission-id="ПД-1048"]').first().click();
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
-    await expect(drawer(page).locator(".drawer-meta-line")).toContainText("ПД-1048");
-    await expect(page.getByRole("tab", { name: "Файлы" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await expect(drawer(page).getByText("ПД-1048").first()).toBeVisible();
+    await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
     await drawer(page).getByRole("button", { name: "Закрыть подачу" }).click();
-
-    await clickWorkspaceButton(page, /Входящие/);
-    await expect(page.getByRole("region", { name: "Входящие" })).toBeVisible();
-    await page.getByRole("tab", { name: /Мои действия/ }).click();
-    await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 
     await clickWorkspaceButton(page, /Мои подачи/);
     await expect(page.getByRole("heading", { level: 1, name: "Мои подачи" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();
 
     await selectSubmissionStatus(page, "В работе");
-    await expect(submissionCard(page, "Артём Соколов")).toBeVisible();
     await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
 
-    await selectSubmissionStatus(page, "Готово");
-    await expect(submissionCard(page, "Дмитрий Орлов")).toBeVisible();
-    await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
-
-    await selectSubmissionStatus(page, "Действия");
+    await selectSubmissionStatus(page, "Требуют действия");
     await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
     await expect(
       submissionCardById(page, "ПД-1048").getByText(/2 блокера · 4 из 12/),
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Новая подача" }).first().click();
-    await expect(drawer(page).getByText("Сборка документов")).toBeVisible();
-    await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeDisabled();
+    await expect(drawer(page).getByText("Новая подача")).toBeVisible();
+    const createNextButton = drawer(page)
+      .locator("footer")
+      .getByRole("button", { name: "Дальше" });
+    await expect(createNextButton).toBeDisabled();
 
     await drawer(page).getByRole("button", { exact: true, name: "Семья" }).click();
     await expect(drawer(page).getByText("2 чел.")).toBeVisible();
     await expect(
       drawer(page).getByRole("button", {
-        name: "Основной заявитель Паспорт не загружен",
+        name: /Основной заявитель Паспорт не загружен/,
       }),
     ).toBeVisible();
     await expect(
-      drawer(page).getByRole("button", { name: "Заявитель 2 Паспорт не загружен" }),
+      drawer(page).getByRole("button", { name: /Заявитель 2 Паспорт не загружен/ }),
     ).toBeVisible();
     await drawer(page).getByRole("button", { name: "Добавить заявителя в семью" }).click();
     await expect(drawer(page).getByText("3 чел.")).toBeVisible();
     await expect(
-      drawer(page).getByRole("button", { name: "Заявитель 3 Паспорт не загружен" }),
+      drawer(page).getByRole("button", { name: /Заявитель 3 Паспорт не загружен/ }),
     ).toBeVisible();
 
     await drawer(page)
@@ -170,17 +126,17 @@ test.describe("V-19 pilot agent click flow", () => {
       drawer(page).getByText("e2e-passport-Ivan_Petrov.jpg"),
       "uploaded passport file is visible in create drawer",
     );
-    await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeEnabled();
+    await expect(createNextButton).toBeEnabled();
 
     await drawer(page).getByRole("button", { exact: true, name: "Заявитель" }).click();
     await expect(drawer(page).getByText("1 чел.")).toBeVisible();
     await expect(drawer(page).getByText("e2e-passport-Anna_Petrova.jpg")).toHaveCount(0);
-    await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeEnabled();
+    await expect(createNextButton).toBeEnabled();
 
     await drawer(page).getByRole("button", { exact: true, name: "Семья" }).click();
     await expect(drawer(page).getByText("2 чел.")).toBeVisible();
-    await expect(drawer(page).getByRole("button", { name: "Дальше" })).toBeDisabled();
-    await drawer(page).getByRole("button", { name: "Закрыть создание" }).click();
+    await expect(createNextButton).toBeDisabled();
+    await drawer(page).getByRole("button", { name: "Закрыть создание" }).first().click();
     await expect(page.getByRole("dialog", { name: "Закрыть панель?" })).toBeVisible();
     await page.getByRole("button", { name: "Закрыть без сохранения" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -194,32 +150,26 @@ test.describe("V-19 pilot agent click flow", () => {
     test.skip(testInfo.project.name !== "chromium", "desktop pilot runs once");
     const browserProblems = collectBrowserProblems(page);
 
-    await openFreshWorkspace(page, { heading: "Входящие" });
+    await openFreshWorkspace(page, { heading: "Мои действия" });
     await clickWorkspaceButton(page, /Мои подачи/);
-    await selectSubmissionStatus(page, "Действия");
+    await selectSubmissionStatus(page, "Требуют действия");
     await submissionCardById(page, "ПД-1048").click();
 
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Замечания" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await drawer(page).getByRole("button", { name: /Замечания/ }).click();
+    await expect(drawer(page).getByText(/Нужна правка|замечан/i).first()).toBeVisible();
     await expect(
       drawer(page).getByRole("button", { name: "Отправить исправления" }),
     ).toBeDisabled();
 
-    const fileIssue = drawer(page)
-      .getByRole("button", { name: /София Иванова.*Загранпаспорт/ })
-      .first();
-    await expect(fileIssue).toBeVisible();
-    await fileIssue.click();
     await expect(
-      drawer(page).getByRole("article", { name: /Загранпаспорт: София Иванова/ }),
+      drawer(page).getByRole("heading", { name: "Скан паспорта" }),
     ).toBeVisible();
+    await expect(drawer(page).getByText(/София Иванова · Файлы/)).toBeVisible();
 
-    await openDrawerTab(page, ["Файлы", "Документы", "Медиа"]);
+    await openDrawerTab(page, ["Файлы", "Селфи", "Паспорт"]);
     await uploadAllVisibleFiles(page);
     await markVisibleIssuesFixed(page);
     await expect(

@@ -29,7 +29,6 @@ import { isQuestionnaireReviewSource, isQuestionnaireReviewState } from "./types
 import {
   canonicalRequiredMediaReadiness,
   isCanonicalFrontendMediaType,
-  isRejectedLegacyMediaType,
   normalizeLegacySubmissionStatus,
   toCanonicalStorageMediaType,
 } from "./domainContract";
@@ -276,7 +275,7 @@ function fileStatusFromMediaAssetRow(
 function submissionFileTypeFromMediaAssetRow(
   row: CockpitMediaAssetRow,
 ): SubmissionFileType | null {
-  if (isCanonicalFrontendMediaType(row.type) || isRejectedLegacyMediaType(row.type)) {
+  if (isCanonicalFrontendMediaType(row.type)) {
     return row.type;
   }
   return null;

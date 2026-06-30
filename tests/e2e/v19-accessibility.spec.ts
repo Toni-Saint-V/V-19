@@ -22,7 +22,7 @@ async function openFreshWorkspace(
   }
   await page.reload();
   await expect(
-    page.getByRole("heading", { level: 1, name: options.heading ?? "Входящие" }),
+    page.getByRole("heading", { level: 1, name: options.heading ?? "Мои действия" }),
   ).toBeVisible();
 }
 
@@ -42,9 +42,10 @@ async function expectNoAxeViolations(page: Page, context: string) {
 }
 
 async function openAgentActionsTab(page: Page) {
-  const actionsTab = page.getByRole("tab", { name: /Мои действия/ });
-  await actionsTab.click();
-  await expect(actionsTab).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Мои действия" }),
+  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 }
 
 test.describe("V-19 accessibility contract", () => {
@@ -56,7 +57,7 @@ test.describe("V-19 accessibility contract", () => {
 
     await openAgentActionsTab(page);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Входящие" }),
+      page.getByRole("heading", { level: 1, name: "Мои действия" }),
     ).toBeVisible();
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
     await expectNoAxeViolations(page, "agent actions");
@@ -68,30 +69,34 @@ test.describe("V-19 accessibility contract", () => {
     await expectNoAxeViolations(page, "agent submissions");
 
     await page.getByRole("button", { name: "Новая подача" }).first().click();
-    await expect(page.getByRole("dialog", { name: "Новая подача" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Закрыть создание" })).toBeVisible();
+    const createDialog = page.getByRole("dialog").first();
+    await expect(createDialog).toBeVisible();
+    await expect(
+      createDialog.getByRole("button", { name: "Закрыть создание" }).first(),
+    ).toBeVisible();
     await expectNoAxeViolations(page, "create submission drawer");
-    await page.getByRole("button", { name: "Закрыть создание" }).click();
+    await createDialog.getByRole("button", { name: "Закрыть создание" }).first().click();
   });
 
   test("admin primary surfaces, export, and submission drawer have no automated WCAG A/AA violations", async ({
     page,
   }) => {
     await openFreshWorkspace(page, {
-      heading: "Работа",
+      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
     await expectNoAxeViolations(page, "admin review");
 
     await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
-    await page.getByRole("button", { name: /Работа\. очередь проверки/ }).click();
-    await expect(page.getByRole("heading", { name: "Работа" })).toBeVisible();
+    await page.getByRole("button", { name: /^Проверка/ }).click();
+    await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
 
-    await page.locator(".submission-card, [data-submission-card]").first().click();
-    await expect(page.getByRole("dialog").first()).toBeVisible();
+    await page.locator(".submission-card, [data-submission-card], .vf-figma-action-row").first().click();
+    const drawer = page.getByRole("dialog").first();
+    await expect(drawer).toBeVisible();
     await expectNoAxeViolations(page, "submission drawer");
-    await page.getByRole("button", { name: "Закрыть подачу" }).click();
+    await drawer.getByRole("button", { name: /Закрыть (подачу|проверку)/ }).first().click();
 
     await page.getByRole("button", { name: "Выгрузка" }).click();
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();

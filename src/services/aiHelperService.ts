@@ -84,7 +84,7 @@ export function buildAdminReviewSummary(submission: Submission): AiHelperResult 
   const openBlockers = blockers(submission);
   const suggestions = [
     `Сначала проверьте ${typeLabel(submission.type).toLowerCase()} и ${submission.applicants.length} заявителя(ей).`,
-    `Медиа: ${media.uploaded}/${media.required} загружено, ${media.accepted}/${media.required} принято оператором.`,
+    `Файлы: ${media.uploaded}/${media.required} загружено, ${media.accepted}/${media.required} принято.`,
   ];
 
   if (openBlockers.length) {

@@ -35,7 +35,7 @@ async function openFreshWorkspace(
   }
   await page.reload();
   await expect(
-    page.getByRole("heading", { level: 1, name: options.heading ?? "Входящие" }),
+    page.getByRole("heading", { level: 1, name: options.heading ?? "Мои действия" }),
   ).toBeVisible();
 }
 
@@ -44,6 +44,22 @@ async function saveScreenshot(page: Page, name: string) {
     fullPage: true,
     path: `docs/qa/2026-06-21-v19-ux-states-${name}.png`,
   });
+}
+
+async function clickOperationalNav(page: Page, name: RegExp) {
+  const buttons = page.getByRole("button", { name });
+  const buttonCount = await buttons.count();
+
+  for (let index = 0; index < buttonCount; index += 1) {
+    const candidate = buttons.nth(index);
+    if (await candidate.isVisible()) {
+      await candidate.click();
+      return;
+    }
+  }
+
+  await page.getByRole("button", { name: "Меню" }).click();
+  await page.getByRole("button", { name }).first().click();
 }
 
 test.describe("V-19 UX state proof", () => {
@@ -55,14 +71,16 @@ test.describe("V-19 UX state proof", () => {
     const problems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page);
-    await page.getByRole("button", { name: "Мои подачи" }).click();
+    await clickOperationalNav(page, /^Мои подачи/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
     await page.getByLabel("Поиск по подачам").fill("нет-такой-подачи-ux-proof");
     await expect(page.getByRole("heading", { name: "Ничего не найдено" })).toBeVisible();
-    await expect(page.getByText("Сбросить фильтры")).toBeVisible();
+    await expect(
+      page.getByRole("status").getByRole("button", { name: "Сбросить фильтры" }),
+    ).toBeVisible();
     await saveScreenshot(page, "agent-submissions-no-results");
 
-    await page.getByRole("button", { name: "Настройки" }).click();
+    await clickOperationalNav(page, /^Настройки/);
     await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
     await page.getByLabel("Сводка по действиям").selectOption("daily");
     await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
@@ -72,10 +90,10 @@ test.describe("V-19 UX state proof", () => {
     await expect(page.getByText("Настройки сохранены")).toBeVisible();
 
     await openFreshWorkspace(page, {
-      heading: "Работа",
+      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
-    await page.getByRole("button", { name: "Выгрузка" }).click();
+    await clickOperationalNav(page, /^Выгрузка/);
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
     const selectedExport = page
       .locator(".export-row")

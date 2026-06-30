@@ -55,7 +55,7 @@ function fileSuggestions(submission: Submission): AiSuggestion[] {
         target: {
           applicantId: applicant.id,
           applicantName: applicant.fullName,
-          section: "Медиа",
+          section: "Файлы",
           fileType: file.type,
         },
       },
@@ -72,8 +72,8 @@ function suggestionForFile(
     return {
       id: suggestionId(submissionId, file.applicantId, "file", `${file.type}-missing`),
       type: "file",
-      title: `Запросить файл: ${fileTypeLabels[file.type]}`,
-      reason: `${applicantName}: обязательный файл отсутствует. Без него подачу нельзя безопасно отправить дальше.`,
+      title: `Нет файла: ${fileTypeLabels[file.type]}`,
+      reason: `${applicantName}: загрузите файл.`,
       confidence: "high",
       severity: "blocker",
       status: "suggested",
@@ -85,8 +85,8 @@ function suggestionForFile(
     return {
       id: suggestionId(submissionId, file.applicantId, "file", `${file.type}-replace`),
       type: "file",
-      title: `Вернуть файл на замену: ${fileTypeLabels[file.type]}`,
-      reason: `${applicantName}: файл уже отмечен проблемным. Нужно подтвердить причину и запросить замену.`,
+      title: `Заменить: ${fileTypeLabels[file.type]}`,
+      reason: `${applicantName}: нужен новый файл.`,
       confidence: "high",
       severity: "blocker",
       status: "suggested",
@@ -98,8 +98,8 @@ function suggestionForFile(
     return {
       id: suggestionId(submissionId, file.applicantId, "file", `${file.type}-review`),
       type: "file",
-      title: `Проверить файл перед приемкой: ${fileTypeLabels[file.type]}`,
-      reason: `${applicantName}: файл ожидает ручной проверки администратора перед приемкой подачи.`,
+      title: `Проверить: ${fileTypeLabels[file.type]}`,
+      reason: `${applicantName}: файл ждёт проверки.`,
       confidence: "medium",
       severity: "warning",
       status: "suggested",
@@ -123,7 +123,7 @@ function hasMatchingIssue(submission: Submission, suggestion: AiSuggestion) {
 }
 
 function normalizedIssueSection(section: string | undefined) {
-  if (section === "Файлы") return "Медиа";
+  if (section === "Медиа") return "Файлы";
   if (section === "Анкета") return "Данные";
   return section ?? "";
 }

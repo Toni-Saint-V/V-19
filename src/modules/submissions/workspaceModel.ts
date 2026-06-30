@@ -89,19 +89,19 @@ export function tabForTarget(target: WorkspaceTarget): DrawerTab {
 }
 
 export function fileLabel(type: SubmissionFileType) {
-  if (type === "selfie_2") return "Селфи N2";
-  if (type === "selfie") return "Селфи";
-  if (type === "passport_scan") return "Загранпаспорт";
-  if (type === "video") return "Селфи N2";
+  if (type === "selfie_2") return "Селфи 2";
+  if (type === "selfie") return "Селфи 1";
+  if (type === "passport_scan") return "Скан паспорта";
+  if (type === "video") return "Видео";
   return fileTypeLabels[type];
 }
 
 export function fileShortLabel(type: SubmissionFileType) {
-  if (type === "photo") return "Архив";
-  if (type === "selfie") return "Селфи";
+  if (type === "photo") return "Фото";
+  if (type === "selfie") return "Селфи 1";
   if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";
-  return "Селфи 2";
+  return "Видео";
 }
 
 export function fileStatusLabel(file: SubmissionFile | undefined) {
@@ -207,7 +207,7 @@ function systemMissingQueueItems(submission: Submission): ReadinessQueueItem[] {
           section: section.title,
           tab: "questionnaire",
         },
-        title: `${applicant.fullName} · Данные · ${section.title}`,
+        title: `${applicant.fullName} · Анкета · ${section.title}`,
         tone: "warning",
         type: "system_missing",
       });
@@ -253,12 +253,12 @@ function targetForSuggestion(suggestion: AiSuggestion): WorkspaceTarget {
 
 function issueTargetLabel(issue: Issue) {
   if (issue.target.fileType) {
-    return `${issue.target.applicantName} · Медиа · ${fileLabel(issue.target.fileType)}`;
+    return `${issue.target.applicantName} · Файлы · ${fileLabel(issue.target.fileType)}`;
   }
 
   const parts = [
     issue.target.applicantName,
-    "Данные",
+    "Анкета",
     issue.target.field ?? issue.target.section,
   ];
   return parts.filter(Boolean).join(" · ");
@@ -266,12 +266,12 @@ function issueTargetLabel(issue: Issue) {
 
 function suggestionTargetLabel(suggestion: AiSuggestion) {
   if (suggestion.target.fileType) {
-    return `${suggestion.target.applicantName} · Медиа · ${fileLabel(suggestion.target.fileType)}`;
+    return `${suggestion.target.applicantName} · Файлы · ${fileLabel(suggestion.target.fileType)}`;
   }
 
   const parts = [
     suggestion.target.applicantName,
-    "Данные",
+    "Анкета",
     suggestion.target.field ?? suggestion.target.section,
   ];
   return parts.filter(Boolean).join(" · ");

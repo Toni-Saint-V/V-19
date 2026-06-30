@@ -501,7 +501,7 @@ describe("operational workflow logic spine", () => {
     });
     expect(result.submission.history[0]).toMatchObject({
       source: "system",
-      text: "PDF mismatch issue created from returned PDF",
+      text: "Создано PDF замечание",
     });
     expect(result.handoffPackage.ready).toBe(false);
     expect(result.handoffPackage.blockers).toEqual(
@@ -526,7 +526,7 @@ describe("operational workflow logic spine", () => {
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Returned PDF package can be reviewed only after export.",
+        message: "PDF можно проверить после выгрузки.",
       },
     });
   });
@@ -554,7 +554,7 @@ describe("operational workflow logic spine", () => {
       }),
     );
     const blockedIssueId = mismatched.submission.issues.find(
-      (issue) => issue.reason === "Returned PDF mismatch",
+      (issue) => issue.reason === "PDF не совпадает",
     )?.id;
     if (!blockedIssueId) throw new Error("Missing blocked PDF mismatch issue.");
 
@@ -566,7 +566,7 @@ describe("operational workflow logic spine", () => {
       ok: false,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Returned PDF mismatch is still present in the latest PDF review.",
+        message: "В PDF всё ещё есть расхождение.",
       },
     });
 
@@ -592,7 +592,7 @@ describe("operational workflow logic spine", () => {
     expect(blockedPackage).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("returned PDF mismatch issue is open"),
+        expect.stringContaining("PDF замечание открыто"),
       ]),
     });
 
@@ -604,7 +604,7 @@ describe("operational workflow logic spine", () => {
       "admin-1",
     );
     const issueId = confirmedPdfSubmission.issues.find(
-      (issue) => issue.reason === "Returned PDF mismatch",
+      (issue) => issue.reason === "PDF не совпадает",
     )?.id;
     if (!issueId) throw new Error("Missing returned PDF mismatch issue.");
     const confirmedIssueSubmission = unwrap(
@@ -673,7 +673,7 @@ describe("operational workflow logic spine", () => {
       status: "open",
     });
     expect(result.submission.history[0]).toMatchObject({
-      text: "PDF mismatch issue reopened from returned PDF",
+      text: "PDF замечание открыто повторно",
     });
   });
 
@@ -733,7 +733,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("artifact is missing"),
+        expect.stringContaining("Нет файла PDF анкеты"),
       ]),
     });
   });
@@ -765,7 +765,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("private storage identity"),
+        expect.stringContaining("нет private storage"),
       ]),
     });
 
@@ -788,7 +788,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("appointment PDF storage identity"),
+        expect.stringContaining("PDF записи: неверный storage path"),
       ]),
     });
 
@@ -819,7 +819,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("application PDF storage identity"),
+        expect.stringContaining("PDF анкеты: ANTON VOLKOV: неверный storage path"),
       ]),
     });
 
@@ -841,7 +841,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("exactly one ready review"),
+        expect.stringContaining("Нужен один готовый PDF анкеты"),
       ]),
     });
 
@@ -878,7 +878,7 @@ describe("operational workflow logic spine", () => {
         fileNames: {
           application: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
           applicationFormPdf: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
-          appointment: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+          appointment: `${mainReference.passportNumber}_appointment_pdf_volkov_anton.pdf`,
           passportScan: `${mainReference.passportNumber}_passport_scan_volkov_anton.pdf`,
           questionnaire: `${mainReference.passportNumber}_questionnaire_volkov_anton.pdf`,
           selfie: `${mainReference.passportNumber}_selfie_volkov_anton.jpg`,
@@ -890,7 +890,7 @@ describe("operational workflow logic spine", () => {
     expect(buildApplicantArtifactFileNames(withCleanReview, applicant.id)).toEqual({
       application: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
       applicationFormPdf: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
-      appointment: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+      appointment: `${mainReference.passportNumber}_appointment_pdf_volkov_anton.pdf`,
       passportScan: `${mainReference.passportNumber}_passport_scan_volkov_anton.pdf`,
       questionnaire: `${mainReference.passportNumber}_questionnaire_volkov_anton.pdf`,
       selfie: `${mainReference.passportNumber}_selfie_volkov_anton.jpg`,
@@ -916,7 +916,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        "Returned PDF handoff requires a durable export package identity.",
+        "Нет номера выгрузки.",
       ]),
       mappings: [],
     });
@@ -939,7 +939,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("Application PDF for ANTON VOLKOV was deleted"),
+        expect.stringContaining("PDF анкеты: ANTON VOLKOV удалён"),
       ]),
       mappings: [],
     });
@@ -961,7 +961,7 @@ describe("operational workflow logic spine", () => {
     ).toMatchObject({
       ready: false,
       blockers: expect.arrayContaining([
-        expect.stringContaining("Common appointment/list PDF upload failed"),
+        expect.stringContaining("PDF записи: ошибка загрузки"),
       ]),
       mappings: [],
     });
@@ -996,7 +996,7 @@ describe("operational workflow logic spine", () => {
       buildAgentReturnedPdfPackageView(withCleanReview, "different-agent"),
     ).toMatchObject({
       applicantPdfs: [],
-      blockers: ["Agent can see only own returned PDF package."],
+      blockers: ["Агент видит только свой PDF пакет."],
       commonAppointmentPdf: undefined,
       mappings: [],
       ready: false,
@@ -1049,7 +1049,7 @@ describe("operational workflow logic spine", () => {
       reviewedBy: "admin-1",
     });
     expect(buildAgentHandoffPackage(reviewed.submission).blockers).not.toContain(
-      "Common appointment/list PDF is missing.",
+      "PDF записи отсутствует.",
     );
   });
 });
