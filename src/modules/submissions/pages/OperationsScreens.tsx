@@ -2241,12 +2241,9 @@ export function ExportScreen({
                     </Button>
                     <Badge tone="teal">Выгружено</Badge>
                     <Badge tone={pdfState.tone}>{pdfState.label}</Badge>
-                    <Button
-                      variant="secondary"
-                      onClick={() => onOpen(submission, "files")}
-                    >
-                      {pdfState.actionLabel}
-                    </Button>
+                    <span className="export-row-note">
+                      PDF handoff: через файлы подачи
+                    </span>
                   </CardComponent>
                 );
               })}
@@ -2527,7 +2524,6 @@ function exportStateLabel(submission: Submission) {
 }
 
 function returnedPdfPackageSummary(submission: Submission): {
-  actionLabel: string;
   detail: string;
   label: string;
   tone: "danger" | "amber" | "blue" | "teal" | "muted" | "default";
@@ -2537,7 +2533,6 @@ function returnedPdfPackageSummary(submission: Submission): {
 
   if (handoffPackage.ready) {
     return {
-      actionLabel: "Открыть PDF",
       detail: `${handoffPackage.applicantPdfs.length} application_form_pdf · appointment_list_pdf ready`,
       label: "PDF готов",
       tone: "teal",
@@ -2546,7 +2541,6 @@ function returnedPdfPackageSummary(submission: Submission): {
 
   if (firstBlocker.includes("Application PDF is missing")) {
     return {
-      actionLabel: "Проверить PDF",
       detail: firstBlocker,
       label: "Нет application_form_pdf",
       tone: "amber",
@@ -2555,7 +2549,6 @@ function returnedPdfPackageSummary(submission: Submission): {
 
   if (firstBlocker.includes("Common appointment/list PDF is missing")) {
     return {
-      actionLabel: "Проверить PDF",
       detail: firstBlocker,
       label: "Нет appointment_list_pdf",
       tone: "amber",
@@ -2568,7 +2561,6 @@ function returnedPdfPackageSummary(submission: Submission): {
     firstBlocker.includes("is not uploaded")
   ) {
     return {
-      actionLabel: "Проверить PDF",
       detail: firstBlocker,
       label: "PDF не готов",
       tone: "danger",
@@ -2576,7 +2568,6 @@ function returnedPdfPackageSummary(submission: Submission): {
   }
 
   return {
-    actionLabel: "Проверить PDF",
     detail: firstBlocker || "Returned PDF package требует проверки перед handoff.",
     label: "PDF проверка",
     tone: "amber",

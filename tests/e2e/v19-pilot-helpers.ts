@@ -36,6 +36,26 @@ export async function openFreshWorkspace(
   }, options.workspaceEmail ?? "");
   await page.reload();
 
+  const emailField = page.locator("#workspace-email");
+  if (await isVisible(emailField)) {
+    try {
+      await emailField.fill(options.workspaceEmail ?? "agent@visaflow.local", {
+        timeout: 2_000,
+      });
+      await page.locator("#workspace-password").fill("local-dev-password", {
+        timeout: 2_000,
+      });
+      await page.getByRole("button", { name: "Войти" }).click();
+    } catch (error) {
+      const workspaceNav = page
+        .getByRole("button", { name: /^(Мои действия|Проверка|Выгрузка)/ })
+        .first();
+      if (!(await isVisible(workspaceNav))) {
+        throw error;
+      }
+    }
+  }
+
   if (options.heading) {
     await expect(
       page.getByRole("heading", { level: 1, name: options.heading }),
@@ -101,6 +121,13 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
   if (!(await isVisible(button.first()))) {
     await openMobileMenu(page);
   }
+
+  await button
+    .first()
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .catch(async () => {
+      await openMobileMenu(page);
+    });
 
   await clickFirstVisible(button);
 }
