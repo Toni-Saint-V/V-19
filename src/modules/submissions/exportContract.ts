@@ -1,4 +1,5 @@
 import type { Applicant, Submission } from "./types";
+import { agentOwnerDisplayName } from "./ownership";
 import {
   digitsOnly,
   exportDurationDays,
@@ -17,10 +18,14 @@ export {
   exportContractFingerprint,
   exportContractHeaders,
   exportContractRecordFromRow,
+  excelSerialDateToIsoDate,
+  isRealBlsApplicantRow,
   normalizeExportContractDate,
+  normalizeExportContractDateInput,
   safeSpreadsheetValue,
   serializeExportContractRow,
   validateExportContractShape,
+  type ExcelWorkbookDateSystem,
   type ExportContractColumn,
   type ExportContractColumnKey,
   type ExportContractPreview,
@@ -31,11 +36,13 @@ export {
 export function buildExportContractRows(
   submissions: Submission[],
 ): ExportContractRow[] {
-  return submissions.flatMap((submission) =>
-    submission.applicants.map((applicant, index) =>
-      buildExportContractRow(submission, applicant, index),
-    ),
-  );
+  return submissions
+    .flatMap((submission) =>
+      submission.applicants.map((applicant, index) =>
+        buildExportContractRow(submission, applicant, index),
+      ),
+    )
+    .map((row, index) => ({ ...row, excelRowNumber: index + 2 }));
 }
 
 function buildExportContractRow(
@@ -62,6 +69,8 @@ function buildExportContractRow(
   const intendedDateOfDeparture = normalizeExportContractDate(
     field("departure-date", submission.tripDateTo),
   );
+  const passportNumber = digitsOnly(field("passport-no"));
+  const familyGroupId = submission.type === "family" ? submission.id : undefined;
 
   return {
     addressCity: field("home-city"),
@@ -71,6 +80,7 @@ function buildExportContractRow(
     addressPostalCode: field("postal-code"),
     applicantCount: submission.applicants.length,
     applicantEmail: field("email"),
+    applicantId: applicant.id,
     applicantIndex: index + 1,
     applicantMobile: mobile,
     applicantName: applicant.fullName,
@@ -95,6 +105,8 @@ function buildExportContractRow(
     employerOccupation: field("occupation-specify", field("occupation")),
     entriesRequested: normalizeEntryCount(field("entry-count")),
     firstName,
+    familyGroupId,
+    familySubmissionId: familyGroupId,
     gender: normalizeGender(field("gender")),
     groupKey: submission.id,
     groupLabel,
@@ -112,11 +124,15 @@ function buildExportContractRow(
     maritalStatus: normalizeMaritalStatus(field("marital-status")),
     meansOfSupport: normalizeMeans(field("means-of-support")),
     nationalityAtBirth: normalizeCountry(field("birth-country")),
+    ownerAgentId: submission.agentId,
+    ownerAgentName: agentOwnerDisplayName(submission.agentId),
+    passportLast3: passportNumber.slice(-3),
+    passportNumber,
     passportExpiryDate: normalizeExportContractDate(field("passport-expiry-date")),
     passportIssueCountry: normalizeCountry(field("passport-issue-country")),
     passportIssueDate: normalizeExportContractDate(field("passport-issue-date")),
     passportIssuePlace: field("passport-issue-place"),
-    passportNo: digitsOnly(field("passport-no")),
+    passportNo: passportNumber,
     passportType: field("passport-type", "Ordinary Passport"),
     placeOfBirth: field("birth-place"),
     purposeOfJourney: field("purpose", "TOURISM"),

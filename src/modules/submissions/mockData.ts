@@ -16,8 +16,22 @@ function applicant(
     role,
     questionnaireStatus,
     fileStatus,
-    sections: createQuestionnaireSections(id, fullName, questionnaireStatus, missing),
+    sections: createQuestionnaireSections(id, fullName, questionnaireStatus, missing).map(
+      (section) => ({
+        ...section,
+        fields: section.fields.map((field) =>
+          field.id === "passport-no" && field.value.trim()
+            ? { ...field, value: mockPassportNumber(id) }
+            : field,
+        ),
+      }),
+    ),
   };
+}
+
+function mockPassportNumber(applicantId: string): string {
+  const digits = applicantId.replace(/\D/g, "");
+  return `66${digits.padStart(7, "0").slice(-7)}`;
 }
 
 function file(
@@ -97,12 +111,12 @@ export const initialSubmissions: Submission[] = [
         "зм-1048-1",
         "з-1048-1",
         "Мария Иванова",
-        "Фото не подходит для внутренней проверки",
-        "Лицо обрезано, нужен новый файл.",
+        "Селфи требует замены",
+        "Лицо обрезано, нужен новый файл selfie.",
         "blocker",
         "open",
         "Медиа",
-        "photo",
+        "selfie",
       ),
       issue(
         "зм-1048-2",
@@ -117,11 +131,9 @@ export const initialSubmissions: Submission[] = [
       ),
     ],
     files: [
-      file("ф-1048-1", "з-1048-1", "photo", "needs_replacement", "зм-1048-1"),
-      file("ф-1048-2", "з-1048-1", "selfie", "accepted"),
+      file("ф-1048-2", "з-1048-1", "selfie", "needs_replacement", "зм-1048-1"),
       file("ф-1048-3", "з-1048-1", "selfie_2", "accepted"),
       file("ф-1048-4", "з-1048-1", "passport_scan", "accepted"),
-      file("ф-1048-5", "з-1048-3", "photo", "accepted"),
       file("ф-1048-6", "з-1048-3", "selfie", "accepted"),
       file("ф-1048-7", "з-1048-3", "selfie_2", "accepted"),
       file("ф-1048-8", "з-1048-3", "passport_scan", "needs_replacement", "зм-1048-2"),
@@ -167,10 +179,9 @@ export const initialSubmissions: Submission[] = [
     ],
     issues: [],
     files: [
-      file("ф-1051-1", "з-1051-1", "photo", "uploaded"),
       file("ф-1051-2", "з-1051-1", "selfie", "missing"),
       file("ф-1051-3", "з-1051-1", "selfie_2", "missing"),
-      file("ф-1051-4", "з-1051-1", "passport_scan", "missing"),
+      file("ф-1051-4", "з-1051-1", "passport_scan", "uploaded"),
     ],
     completeness: { questionnaire: 67, files: 33, total: 50 },
     exportState: "not_ready",
@@ -208,7 +219,6 @@ export const initialSubmissions: Submission[] = [
     ],
     issues: [],
     files: [
-      file("ф-1052-1", "з-1052-1", "photo", "missing"),
       file("ф-1052-2", "з-1052-1", "selfie", "missing"),
       file("ф-1052-3", "з-1052-1", "selfie_2", "missing"),
       file("ф-1052-4", "з-1052-1", "passport_scan", "missing"),
@@ -234,7 +244,6 @@ export const initialSubmissions: Submission[] = [
     applicants: [applicant("з-1053-1", "Нина Волкова", "main", "complete", "complete")],
     issues: [],
     files: [
-      file("ф-1053-1", "з-1053-1", "photo", "pending_review"),
       file("ф-1053-2", "з-1053-1", "selfie", "pending_review"),
       file("ф-1053-3", "з-1053-1", "selfie_2", "pending_review"),
       file("ф-1053-4", "з-1053-1", "passport_scan", "pending_review"),
@@ -286,11 +295,9 @@ export const initialSubmissions: Submission[] = [
       ),
     ],
     files: [
-      file("ф-1054-1", "з-1054-1", "photo", "accepted"),
       file("ф-1054-2", "з-1054-1", "selfie", "accepted"),
       file("ф-1054-3", "з-1054-1", "selfie_2", "accepted"),
       file("ф-1054-4", "з-1054-1", "passport_scan", "accepted"),
-      file("ф-1054-5", "з-1054-2", "photo", "accepted"),
       file("ф-1054-6", "з-1054-2", "selfie", "accepted"),
       file("ф-1054-7", "з-1054-2", "selfie_2", "accepted"),
       file("ф-1054-8", "з-1054-2", "passport_scan", "accepted"),
@@ -329,7 +336,6 @@ export const initialSubmissions: Submission[] = [
     ],
     issues: [],
     files: [
-      file("ф-1056-1", "з-1056-1", "photo", "accepted"),
       file("ф-1056-2", "з-1056-1", "selfie", "accepted"),
       file("ф-1056-3", "з-1056-1", "selfie_2", "accepted"),
       file("ф-1056-4", "з-1056-1", "passport_scan", "accepted"),
@@ -350,7 +356,7 @@ export const initialSubmissions: Submission[] = [
   },
   {
     id: "SUB-1101",
-    agentId: defaultLocalAgentOwnerId,
+    agentId: alternateLocalAgentOwnerId,
     title: "Ольга Фролова",
     type: "single",
     country: "Испания",
@@ -363,7 +369,6 @@ export const initialSubmissions: Submission[] = [
     ],
     issues: [],
     files: [
-      file("ф-1101-1", "з-1101-1", "photo", "accepted"),
       file("ф-1101-2", "з-1101-1", "selfie", "accepted"),
       file("ф-1101-3", "з-1101-1", "selfie_2", "accepted"),
       file("ф-1101-4", "з-1101-1", "passport_scan", "accepted"),
@@ -395,16 +400,15 @@ export const initialSubmissions: Submission[] = [
     ],
     issues: [],
     files: [
-      file("ф-1102-1", "з-1102-1", "photo", "accepted"),
       file("ф-1102-2", "з-1102-1", "selfie", "accepted"),
       file("ф-1102-3", "з-1102-1", "selfie_2", "accepted"),
       file("ф-1102-4", "з-1102-1", "passport_scan", "accepted"),
-      file("ф-1102-5", "з-1102-2", "photo", "accepted"),
       file("ф-1102-6", "з-1102-2", "selfie", "accepted"),
-      file("ф-1102-7", "з-1102-2", "passport_scan", "accepted"),
-      file("ф-1102-8", "з-1102-3", "photo", "accepted"),
+      file("ф-1102-7", "з-1102-2", "selfie_2", "accepted"),
+      file("ф-1102-8", "з-1102-2", "passport_scan", "accepted"),
       file("ф-1102-9", "з-1102-3", "selfie", "accepted"),
-      file("ф-1102-10", "з-1102-3", "passport_scan", "accepted"),
+      file("ф-1102-10", "з-1102-3", "selfie_2", "accepted"),
+      file("ф-1102-11", "з-1102-3", "passport_scan", "accepted"),
     ],
     completeness: { questionnaire: 100, files: 100, total: 100 },
     exportState: "ready",
@@ -430,7 +434,6 @@ export const initialSubmissions: Submission[] = [
     ],
     issues: [],
     files: [
-      file("ф-1103-1", "з-1103-1", "photo", "accepted"),
       file("ф-1103-2", "з-1103-1", "selfie", "accepted"),
       file("ф-1103-3", "з-1103-1", "selfie_2", "accepted"),
       file("ф-1103-4", "з-1103-1", "passport_scan", "accepted"),
@@ -459,7 +462,6 @@ export const initialSubmissions: Submission[] = [
     ],
     issues: [],
     files: [
-      file("ф-1057-1", "з-1057-1", "photo", "accepted"),
       file("ф-1057-2", "з-1057-1", "selfie", "accepted"),
       file("ф-1057-3", "з-1057-1", "selfie_2", "accepted"),
       file("ф-1057-4", "з-1057-1", "passport_scan", "accepted"),

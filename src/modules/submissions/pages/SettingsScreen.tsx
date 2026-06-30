@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../shared/ui/primitives";
+import type { AccessRequest } from "../../../shared/authRegistration";
 import type { Role } from "../types";
 import "./SettingsScreen.css";
 
@@ -11,6 +12,7 @@ type WorkspaceSettings = {
 
 type SettingsSectionId =
   | "profile"
+  | "access-requests"
   | "team"
   | "notifications"
   | "export-defaults"
@@ -24,6 +26,7 @@ const agentSections: SettingsSectionId[] = [
 
 const adminSections: SettingsSectionId[] = [
   "profile",
+  "access-requests",
   "team",
   "notifications",
   "export-defaults",
@@ -31,6 +34,7 @@ const adminSections: SettingsSectionId[] = [
 ];
 
 const sectionLabels: Record<SettingsSectionId, string> = {
+  "access-requests": "Входящие заявки",
   "export-defaults": "Выгрузка",
   interface: "Интерфейс",
   notifications: "Уведомления",
@@ -39,12 +43,16 @@ const sectionLabels: Record<SettingsSectionId, string> = {
 };
 
 export default function SettingsScreen({
+  accessRequests,
+  accessRequestsBusy,
   confirmLeave,
   dirty,
   email,
   isSupabaseMode,
+  onApproveAccessRequest,
   onCancelLeave,
   onConfirmLeave,
+  onRejectAccessRequest,
   onReset,
   onSave,
   onSettings,
@@ -53,12 +61,16 @@ export default function SettingsScreen({
   saveState,
   settings,
 }: {
+  accessRequests: AccessRequest[];
+  accessRequestsBusy: boolean;
   confirmLeave: boolean;
   dirty: boolean;
   email: string;
   isSupabaseMode: boolean;
+  onApproveAccessRequest: (requestId: string) => void;
   onCancelLeave: () => void;
   onConfirmLeave: () => void;
+  onRejectAccessRequest: (requestId: string) => void;
   onReset: () => void;
   onSave: () => void;
   onSettings: (patch: Partial<WorkspaceSettings>) => void;
@@ -99,9 +111,13 @@ export default function SettingsScreen({
 
         <div className="settings-form">
           <SettingsSectionContent
+            accessRequests={accessRequests}
+            accessRequestsBusy={accessRequestsBusy}
             activeSection={activeSectionSafe}
             displayEmail={displayEmail}
             isSupabaseMode={isSupabaseMode}
+            onApproveAccessRequest={onApproveAccessRequest}
+            onRejectAccessRequest={onRejectAccessRequest}
             onSettings={onSettings}
             onSignOut={onSignOut}
             role={role}
@@ -139,9 +155,13 @@ export default function SettingsScreen({
 }
 
 function SettingsSectionContent({
+  accessRequests,
+  accessRequestsBusy,
   activeSection,
   displayEmail,
   isSupabaseMode,
+  onApproveAccessRequest,
+  onRejectAccessRequest,
   onSettings,
   onSignOut,
   role,
@@ -149,9 +169,13 @@ function SettingsSectionContent({
   settings,
   userDisplayName,
 }: {
+  accessRequests: AccessRequest[];
+  accessRequestsBusy: boolean;
   activeSection: SettingsSectionId;
   displayEmail: string;
   isSupabaseMode: boolean;
+  onApproveAccessRequest: (requestId: string) => void;
+  onRejectAccessRequest: (requestId: string) => void;
   onSettings: (patch: Partial<WorkspaceSettings>) => void;
   onSignOut: () => void | Promise<void>;
   role: Role;
@@ -161,111 +185,94 @@ function SettingsSectionContent({
 }) {
   if (activeSection === "profile") {
     return (
-      <section className="settings-block" aria-labelledby="settings-title">
-        <h2 id="settings-title">Профиль</h2>
-        <p>Имя и рабочие контакты пользователя.</p>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Имя</div>
-            <div className="settings-form-help">Отображается в истории действий.</div>
-          </div>
+      <SettingsBlock title="Профиль" description="Имя и рабочие контакты пользователя.">
+        <SettingsRow label="Имя" help="Отображается в истории действий.">
           <input className="settings-field-control" readOnly value={userDisplayName} />
-        </div>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Рабочая почта</div>
-            <div className="settings-form-help">Тестовый адрес в прототипе.</div>
-          </div>
+        </SettingsRow>
+        <SettingsRow label="Рабочая почта" help="Тестовый адрес в демо-среде.">
           <input className="settings-field-control" readOnly value={displayEmail} />
-        </div>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Сессия</div>
-            <div className="settings-form-help">
-              {isSupabaseMode ? "Supabase workspace." : "Локальный демо-режим."}
-            </div>
-          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Сессия"
+          help={isSupabaseMode ? "Supabase workspace." : "Локальный демо-режим."}
+        >
           <Button variant="secondary" onClick={() => void onSignOut()}>
             {isSupabaseMode ? "Выйти" : "Сбросить почту"}
           </Button>
-        </div>
-      </section>
+        </SettingsRow>
+      </SettingsBlock>
+    );
+  }
+
+  if (activeSection === "access-requests") {
+    return (
+      <AccessRequestsSection
+        busy={accessRequestsBusy}
+        requests={accessRequests}
+        onApprove={onApproveAccessRequest}
+        onReject={onRejectAccessRequest}
+      />
     );
   }
 
   if (activeSection === "team") {
     return (
-      <section className="settings-block" aria-labelledby="settings-title">
-        <h2 id="settings-title">Команда и роли</h2>
-        <p>Управление доступом остаётся подразделом настроек, а не отдельным продуктом.</p>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Строгое разделение ролей</div>
-            <div className="settings-form-help">Агент не видит Проверку и Выгрузку.</div>
-          </div>
+      <SettingsBlock
+        title="Команда и роли"
+        description="Управление доступом остаётся подразделом настроек, а не отдельным продуктом."
+      >
+        <SettingsRow
+          label="Строгое разделение ролей"
+          help="Агент не видит Проверку и Выгрузку."
+        >
           <SwitchButton checked ariaLabel="Строгое разделение ролей" />
-        </div>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Текущая роль</div>
-            <div className="settings-form-help">Назначается в рабочей среде.</div>
-          </div>
+        </SettingsRow>
+        <SettingsRow label="Текущая роль" help="Назначается в рабочей среде.">
           <button className="settings-small-button" disabled type="button">
             {roleLabel}
           </button>
-        </div>
-      </section>
+        </SettingsRow>
+      </SettingsBlock>
     );
   }
 
   if (activeSection === "export-defaults") {
     return (
-      <section className="settings-block" aria-labelledby="settings-title">
-        <h2 id="settings-title">Выгрузка</h2>
-        <p>Только defaults и naming. Сам workflow находится в разделе «Выгрузка».</p>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Шаблон имени</div>
-            <div className="settings-form-help">Не генерирует файл в прототипе.</div>
-          </div>
+      <SettingsBlock
+        title="Выгрузка"
+        description="Только defaults и naming. Сам workflow находится в разделе «Выгрузка»."
+      >
+        <SettingsRow label="Шаблон имени" help="Не генерирует файл в демо-среде.">
           <input
             className="settings-field-control is-mono"
             readOnly
             value="VF_{city}_{date}_{batch}"
           />
-        </div>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Fail closed</div>
-            <div className="settings-form-help">
-              Блокировать несовместимые и повторные пакеты.
-            </div>
-          </div>
+        </SettingsRow>
+        <SettingsRow
+          label="Fail closed"
+          help="Блокировать несовместимые и повторные пакеты."
+        >
           <SwitchButton checked ariaLabel="Fail closed" />
-        </div>
-      </section>
+        </SettingsRow>
+      </SettingsBlock>
     );
   }
 
   if (activeSection === "interface") {
     return (
-      <section className="settings-block" aria-labelledby="settings-title">
-        <h2 id="settings-title">Интерфейс</h2>
-        <p>Тёмная тема — фиксированный baseline текущего scope.</p>
-        <div className="settings-form-row">
-          <div>
-            <div className="settings-form-label">Тема</div>
-            <div className="settings-form-help">Светлая тема не реализована.</div>
-          </div>
+      <SettingsBlock title="Интерфейс" description="Тёмная тема — фиксированный baseline текущего scope.">
+        <SettingsRow label="Тема" help="Светлая тема не реализована.">
           <button className="settings-small-button" disabled type="button">
             Тёмная
           </button>
-        </div>
-        <label className="settings-form-row" htmlFor="settings-density">
-          <div>
-            <div className="settings-form-label">Плотность списков</div>
-            <div className="settings-form-help">Локально может меняться в меню «Вид».</div>
-          </div>
+        </SettingsRow>
+        <SettingsRow
+          as="label"
+          htmlFor="settings-density"
+          label="Плотность списков"
+          help="Локально может меняться в меню «Вид»."
+        >
           <select
             aria-label="Плотность списков"
             className="settings-field-control"
@@ -278,31 +285,29 @@ function SettingsSectionContent({
             <option value="compact">Компактно</option>
             <option value="comfortable">Комфортно</option>
           </select>
-        </label>
-      </section>
+        </SettingsRow>
+      </SettingsBlock>
     );
   }
 
   return (
-    <section className="settings-block" aria-labelledby="settings-title">
-      <h2 id="settings-title">Уведомления</h2>
-      <p>События попадают во «Входящие»; здесь настраиваются только каналы.</p>
-      <div className="settings-form-row">
-        <div>
-          <div className="settings-form-label">Возврат подачи</div>
-          <div className="settings-form-help">Показывать событие и точное действие.</div>
-        </div>
+    <SettingsBlock
+      title="Уведомления"
+      description="События попадают во «Входящие»; здесь настраиваются только каналы."
+    >
+      <SettingsRow label="Возврат подачи" help="Показывать событие и точное действие.">
         <SwitchButton
           ariaLabel="Возврат подачи"
           checked={settings.digest === "instant"}
           onChange={(checked) => onSettings({ digest: checked ? "instant" : "daily" })}
         />
-      </div>
-      <label className="settings-form-row" htmlFor="settings-action-digest">
-        <div>
-          <div className="settings-form-label">Сводка по действиям</div>
-          <div className="settings-form-help">Как часто показывать сводку задач агента.</div>
-        </div>
+      </SettingsRow>
+      <SettingsRow
+        as="label"
+        htmlFor="settings-action-digest"
+        label="Сводка по действиям"
+        help="Как часто показывать сводку задач агента."
+      >
         <select
           aria-label="Сводка по действиям"
           className="settings-field-control"
@@ -315,33 +320,145 @@ function SettingsSectionContent({
           <option value="instant">Сразу</option>
           <option value="daily">Ежедневно</option>
         </select>
-      </label>
-      <div className="settings-form-row">
-        <div>
-          <div className="settings-form-label">Новые замечания</div>
-          <div className="settings-form-help">
-            Открывать drawer на вкладке «Замечания».
-          </div>
-        </div>
+      </SettingsRow>
+      <SettingsRow label="Новые замечания" help="Открывать drawer на вкладке «Замечания».">
         <SwitchButton
           ariaLabel="Новые замечания"
           checked={settings.drawerHints}
           onChange={(checked) => onSettings({ drawerHints: checked })}
         />
-      </div>
-      <div className="settings-form-row">
-        <div>
-          <div className="settings-form-label">Ошибки выгрузки</div>
-          <div className="settings-form-help">Только для роли администратора.</div>
-        </div>
+      </SettingsRow>
+      <SettingsRow label="Ошибки выгрузки" help="Только для роли администратора.">
         <SwitchButton
           ariaLabel="Ошибки выгрузки"
           checked={role === "admin"}
           disabled={role !== "admin"}
         />
-      </div>
+      </SettingsRow>
+    </SettingsBlock>
+  );
+}
+
+function SettingsBlock({
+  children,
+  description,
+  title,
+}: {
+  children: ReactNode;
+  description: string;
+  title: string;
+}) {
+  return (
+    <section className="settings-block" aria-labelledby="settings-title">
+      <h2 id="settings-title">{title}</h2>
+      <p>{description}</p>
+      {children}
     </section>
   );
+}
+
+function SettingsRow({
+  as = "div",
+  children,
+  help,
+  htmlFor,
+  label,
+}: {
+  as?: "div" | "label";
+  children: ReactNode;
+  help: ReactNode;
+  htmlFor?: string;
+  label: string;
+}) {
+  const Component = as;
+
+  return (
+    <Component className="settings-form-row" htmlFor={htmlFor}>
+      <div>
+        <div className="settings-form-label">{label}</div>
+        <div className="settings-form-help">{help}</div>
+      </div>
+      {children}
+    </Component>
+  );
+}
+
+function AccessRequestsSection({
+  busy,
+  requests,
+  onApprove,
+  onReject,
+}: {
+  busy: boolean;
+  requests: AccessRequest[];
+  onApprove: (requestId: string) => void;
+  onReject: (requestId: string) => void;
+}) {
+  return (
+    <section
+      className="settings-block settings-access-requests"
+      aria-labelledby="settings-title"
+      data-testid="admin-access-queue"
+    >
+      <div className="settings-access-head">
+        <div>
+          <h2 id="settings-title">Входящие заявки</h2>
+          <p>Администратор одобряет доступ агента до входа в рабочий кабинет.</p>
+        </div>
+        <span aria-label={`Новых заявок: ${requests.length}`}>{requests.length}</span>
+      </div>
+
+      {requests.length ? (
+        <div className="settings-access-list">
+          {requests.map((request) => (
+            <article className="settings-access-row" key={request.id}>
+              <div className="settings-access-main">
+                <strong>{request.fullName}</strong>
+                <span>
+                  {request.companyName} · {request.city} · {request.phone}
+                </span>
+                <small>
+                  {request.email} · agent · pending · {formatAccessRequestDate(request.createdAt)}
+                </small>
+              </div>
+              <div className="settings-access-actions">
+                <Button
+                  disabled={busy}
+                  variant="secondary"
+                  onClick={() => onReject(request.id)}
+                >
+                  Отклонить
+                </Button>
+                <Button disabled={busy} onClick={() => onApprove(request.id)}>
+                  Одобрить
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="settings-access-empty">
+          <strong>Новых заявок нет.</strong>
+          <span>Pending и rejected email не получают доступ к кабинету.</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatAccessRequestDate(createdAt: string): string {
+  const date = new Date(createdAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return createdAt;
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  }).format(date);
 }
 
 function SwitchButton({

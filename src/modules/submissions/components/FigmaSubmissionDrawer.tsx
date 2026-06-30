@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
-  Edit3,
   FileDigit,
   FileText,
   History,
@@ -17,10 +16,15 @@ import {
   ShieldAlert,
   UploadCloud,
   User,
-  X,
 } from "lucide-react";
 import { getPrimaryAction, statusLabels } from "../status";
-import type { DrawerTab, Role, Submission, SubmissionAction } from "../types";
+import type {
+  DrawerTab,
+  Role,
+  Submission,
+  SubmissionAction,
+  SubmissionFile,
+} from "../types";
 
 type SourceStatus =
   | "draft"
@@ -31,7 +35,7 @@ type SourceStatus =
   | "ready_for_export"
   | "exported";
 
-type TabId = "overview" | "questionnaire" | "issues" | "history";
+type TabId = "overview" | "questionnaire" | "files" | "issues" | "history";
 
 type FigmaApplicant = {
   completeness: number;
@@ -60,6 +64,8 @@ type FigmaSubmissionDrawerProps = {
   actionError?: string;
   onAction: (action: SubmissionAction) => void;
   onClose: () => void;
+  onMarkIssueFixed?: (issueId: string) => void;
+  onUploadFile?: (fileId: string) => void;
   onOpenQuestionnaireWorkspace: () => void;
   role: Role;
   submission: Submission;
@@ -135,6 +141,23 @@ function buildDetail(submission: Submission): FigmaSubmissionDetail {
   };
 }
 
+function fileTypeLabel(type: SubmissionFile["type"]) {
+  if (type === "passport_scan") return "Скан паспорта";
+  if (type === "selfie") return "Селфи 1";
+  if (type === "selfie_2") return "Селфи 2";
+  return "Документ";
+}
+
+function fileStatusLabel(file: SubmissionFile) {
+  if (file.status === "needs_replacement") return "Нужна замена";
+  if (file.status === "uploaded" || file.status === "accepted") return "Загружено";
+  return "Не загружено";
+}
+
+function fileActionLabel(file: SubmissionFile) {
+  return file.status === "needs_replacement" ? "Заменить" : "Загрузить";
+}
+
 const Skeleton = ({ className = "" }: { className?: string }) => (
   <div className={`bg-white/5 animate-pulse rounded-[10px] ${className}`} />
 );
@@ -207,15 +230,14 @@ const OverviewTab = ({ data }: { data: FigmaSubmissionDetail }) => (
             Чеклист документов
           </h3>
           <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
-            8/10
+            3/3
           </span>
         </div>
         <div className="space-y-3 flex-1 flex flex-col justify-center">
           {[
-            { label: "Паспорта (Загран, РФ)", status: "done" },
-            { label: "Финансовые гарантии", status: "done" },
-            { label: "Справки с работы", status: "pending" },
-            { label: "Бронирования (Отель, Авиа)", status: "done" },
+            { label: "Скан загранпаспорта", status: "done" },
+            { label: "Селфи с лицом", status: "done" },
+            { label: "Селфи с загранпаспортом", status: "done" },
           ].map((doc) => (
             <div key={doc.label} className="flex items-center gap-3">
               {doc.status === "done" ? (
@@ -276,19 +298,16 @@ const QuestionnaireTab = ({
   onOpenQuestionnaire: () => void;
 }) => (
   <div className="space-y-6">
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-3">
       <div>
-        <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
-        <p className="text-[12px] text-white/50 mt-1">
-          Осталось заполнить 2 блока данных
-        </p>
+        <h3 className="text-[16px] font-semibold text-white">Блоки анкеты</h3>
       </div>
       <button
-        className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
+        className="h-10 px-5 min-w-[142px] bg-white/[0.13] hover:bg-white/[0.18] border border-white/10 hover:border-white/15 text-white text-[13px] font-semibold rounded-xl transition-colors whitespace-nowrap"
         onClick={onOpenQuestionnaire}
         type="button"
       >
-        <Edit3 className="w-4 h-4" /> Открыть анкету
+        Открыть анкету
       </button>
     </div>
 
@@ -319,19 +338,11 @@ const QuestionnaireTab = ({
             onOpenQuestionnaire();
           }}
         >
-          <div
-            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
-              section.status === "done"
-                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                : section.status === "in_progress"
-                  ? "bg-[#3a45b4]/10 border-[#3a45b4]/20 text-[#8fa3ff]"
-                  : "bg-white/5 border-white/10 text-white/40"
-            }`}
-          >
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border bg-white/5 border-white/10 text-white/45">
             <section.icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-[13px] font-medium text-white truncate">
                 {section.title}
               </span>
@@ -339,7 +350,7 @@ const QuestionnaireTab = ({
                 {section.progress}%
               </span>
             </div>
-            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div className="w-4/5 h-[3px] bg-white/5 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full ${
                   section.status === "done"
@@ -363,89 +374,152 @@ const QuestionnaireTab = ({
   </div>
 );
 
-const IssuesTab = ({
-  data,
-  onOpenQuestionnaire,
+const FilesTab = ({
+  onUploadFile,
+  submission,
 }: {
-  data: FigmaSubmissionDetail;
-  onOpenQuestionnaire: () => void;
+  onUploadFile?: (fileId: string) => void;
+  submission: Submission;
 }) => (
-  <div className="space-y-6">
-    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+  <div className="space-y-5">
+    <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
       <div>
-        <h3 className="text-[15px] font-semibold text-white">
-          Список задач по замечаниям
-        </h3>
+        <h3 className="text-[15px] font-semibold text-white">Файлы подачи</h3>
         <p className="text-[12px] text-white/40 mt-0.5">
-          Ошибки, выявленные администратором при проверке
+          Загрузите недостающие файлы. OCR и хранение остаются в текущем pilot-режиме.
         </p>
       </div>
-      <span className="px-2.5 py-1 bg-orange-500/10 text-orange-400 rounded-lg text-[12px] font-medium border border-orange-500/20 shrink-0">
-        Требуют исправления: {data.issuesCount}
+      <span className="min-w-8 px-2.5 py-1 bg-white/5 text-white/60 rounded-lg text-[12px] font-semibold border border-white/10 shrink-0 text-center">
+        {submission.files.filter((file) => file.status !== "missing").length}/
+        {submission.files.length}
+      </span>
+    </div>
+
+    <div className="space-y-3">
+      {submission.files.map((file) => {
+        const applicant = submission.applicants.find(
+          (item) => item.id === file.applicantId,
+        );
+        const canUpload = file.status === "missing" || file.status === "needs_replacement";
+
+        return (
+          <div
+            className="grid grid-cols-[40px_minmax(0,1fr)] sm:grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center rounded-xl border border-white/5 bg-white/[0.02] p-4"
+            key={file.id}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50">
+              <UploadCloud className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[14px] font-semibold text-white">
+                {fileTypeLabel(file.type)}
+              </div>
+              <div className="mt-1 text-[12px] text-white/45">
+                {applicant?.fullName ?? "Заявитель"} · {fileStatusLabel(file)}
+              </div>
+            </div>
+            {canUpload ? (
+              <button
+                className="col-start-2 sm:col-start-auto h-9 rounded-lg border border-white/10 bg-white/[0.08] px-4 text-[13px] font-medium text-white/85 transition-colors hover:border-white/20 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!onUploadFile}
+                type="button"
+                onClick={() => onUploadFile?.(file.id)}
+              >
+                {fileActionLabel(file)}
+              </button>
+            ) : (
+              <span className="col-start-2 sm:col-start-auto inline-flex h-9 items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[12px] font-medium text-emerald-400">
+                Готово
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+const IssuesTab = ({
+  data,
+  onMarkIssueFixed,
+  onOpenQuestionnaire,
+  role,
+  submission,
+}: {
+  data: FigmaSubmissionDetail;
+  onMarkIssueFixed?: (issueId: string) => void;
+  onOpenQuestionnaire: () => void;
+  role: Role;
+  submission: Submission;
+}) => (
+  <div className="space-y-6">
+    <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
+      <div>
+        <h3 className="text-[15px] font-semibold text-white">
+          Замечания
+        </h3>
+        <p className="text-[12px] text-white/40 mt-0.5">
+          Исправьте пункты ниже
+        </p>
+      </div>
+      <span className="min-w-8 px-2.5 py-1 bg-orange-500/10 text-orange-400 rounded-lg text-[12px] font-semibold border border-orange-500/20 shrink-0 text-center">
+        {data.issuesCount}
       </span>
     </div>
 
     {data.issuesCount > 0 ? (
       <div className="space-y-3">
-        {[
-          {
-            actionText: "Исправить",
-            desc: "В анкете указано 12.05.1985, а в загруженном скане паспорта — 15.05.1985.",
-            icon: FileText,
-            id: 1,
-            opensQuestionnaire: true,
-            target: "Иван Петров • Паспортные данные",
-            title: "Несоответствие даты рождения",
-          },
-          {
-            actionText: "Перезагрузить",
-            desc: "Размытый скан, не читается MRZ-зона. Загрузите файл в более высоком разрешении.",
-            icon: ImageIcon,
-            id: 2,
-            opensQuestionnaire: false,
-            target: "Анна Петрова • Скан загранпаспорта",
-            title: "Плохое качество скана",
-          },
-        ]
-          .slice(0, data.issuesCount)
-          .map((issue) => (
+        {submission.issues
+          .filter((issue) => issue.status !== "closed_by_admin")
+          .map((issue) => {
+            const Icon = issue.type === "file" ? ImageIcon : FileText;
+            const canMarkFixed =
+              role === "agent" && issue.status === "open" && Boolean(onMarkIssueFixed);
+
+            return (
             <div
               key={issue.id}
-              className="p-4 bg-white/[0.02] border border-orange-500/15 rounded-xl flex flex-col sm:flex-row gap-4 hover:bg-orange-500/[0.03] transition-colors"
+              className="relative p-4 bg-white/[0.02] border border-orange-500/15 rounded-xl hover:bg-orange-500/[0.03] transition-colors"
             >
-              <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
-                <issue.icon className="w-5 h-5 text-orange-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="absolute right-4 top-4 px-1.5 py-0.5 rounded-md text-[10px] bg-orange-500/10 text-orange-400 font-medium border border-orange-500/20">
+                {issue.status === "fixed_by_agent" ? "Исправлено" : "Blocker"}
+              </span>
+              <div className="grid grid-cols-[40px_minmax(0,1fr)] gap-x-3 gap-y-3 pr-20">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20 row-span-2">
+                  <Icon className="w-5 h-5 text-orange-400" />
+                </div>
+                <div className="min-w-0">
                   <h4 className="text-[14px] font-semibold text-white">
-                    {issue.title}
+                    {issue.reason}
                   </h4>
-                  <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-orange-500/10 text-orange-400 font-medium border border-orange-500/20">
-                    Blocker
-                  </span>
+                  <div className="text-[11px] font-medium text-orange-400/70 mt-1.5">
+                    {issue.target.applicantName} · {issue.target.section ?? "Подача"}
+                  </div>
                 </div>
-                <div className="text-[11px] font-medium text-orange-400/70 mb-2">
-                  {issue.target}
-                </div>
-                <p className="text-[13px] text-white/50 leading-relaxed">
-                  {issue.desc}
+                <p className="col-start-2 text-[13px] text-white/50 leading-relaxed">
+                  {issue.comment}
                 </p>
               </div>
-              <div className="sm:w-[160px] shrink-0 flex sm:items-center">
+              {canMarkFixed ? (
                 <button
-                  aria-disabled={issue.opensQuestionnaire ? undefined : "true"}
-                  className="w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
-                  onClick={
-                    issue.opensQuestionnaire ? onOpenQuestionnaire : undefined
-                  }
+                  className="mt-4 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
                   type="button"
+                  onClick={() => onMarkIssueFixed?.(issue.id)}
                 >
-                  {issue.actionText}
+                  Отметить исправленным
                 </button>
-              </div>
+              ) : issue.type === "field" && issue.status === "open" ? (
+                <button
+                  className="mt-4 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
+                  type="button"
+                  onClick={onOpenQuestionnaire}
+                >
+                  Исправить
+                </button>
+              ) : null}
             </div>
-          ))}
+          );
+        })}
       </div>
     ) : (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -463,9 +537,8 @@ const IssuesTab = ({
   </div>
 );
 
-const HistoryTab = () => (
-  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-white/10">
-    {[
+const HistoryTab = () => {
+  const events = [
       {
         icon: <AlertCircle className="w-4 h-4 text-orange-400" />,
         time: "Сегодня, 14:30",
@@ -494,33 +567,68 @@ const HistoryTab = () => (
         type: "neutral",
         user: "Вы",
       },
-    ].map((event) => (
-      <div key={event.title} className="relative flex gap-5">
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10 ${
-            event.type === "warning"
-              ? "border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.2)]"
-              : event.type === "info"
-                ? "border-[#3a45b4]/50"
-                : "border-white/10"
-          }`}
-        >
-          {event.icon}
-        </div>
-        <div className="pt-1.5">
-          <div className="text-[14px] font-medium text-white/90">{event.title}</div>
-          <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
-            <span>{event.time}</span>
-            <span className="w-1 h-1 rounded-full bg-white/20" />
-            <span>{event.user}</span>
+    ];
+
+  return (
+    <div
+      className="overflow-hidden rounded-2xl"
+      style={{
+        backgroundColor: "rgb(255 255 255 / 0.035)",
+        border: "1px solid rgb(255 255 255 / 0.1)",
+      }}
+    >
+      {events.map((event, index) => {
+        const isLast = index === events.length - 1;
+
+        return (
+          <div
+            key={event.title}
+            className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 px-4 py-4"
+            style={
+              isLast
+                ? undefined
+                : { borderBottom: "1px solid rgb(255 255 255 / 0.06)" }
+            }
+          >
+            <div className="relative flex justify-center">
+              {!isLast ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute left-1/2 top-9 bottom-[-17px] w-px -translate-x-1/2"
+                  style={{ backgroundColor: "rgb(255 255 255 / 0.08)" }}
+                />
+              ) : null}
+              <div
+                className={`relative z-10 w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border bg-[#111113] ${
+                  event.type === "warning"
+                    ? "border-orange-500/30"
+                    : event.type === "info"
+                      ? "border-[#8fa3ff]/30"
+                      : "border-white/10"
+                }`}
+              >
+                {event.icon}
+              </div>
+            </div>
+            <div className="min-w-0 pt-1">
+              <div className="text-[14px] font-medium text-white/90">
+                {event.title}
+              </div>
+              <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
+                <span>{event.time}</span>
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+                <span>{event.user}</span>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    ))}
-  </div>
-);
+        );
+      })}
+    </div>
+  );
+};
 
 function initialTab(tab: DrawerTab): TabId {
+  if (tab === "files") return "files";
   if (tab === "issues") return "issues";
   if (tab === "history") return "history";
   if (tab === "questionnaire") return "questionnaire";
@@ -532,13 +640,16 @@ export function FigmaSubmissionDrawer({
   actionError = "",
   onAction,
   onClose,
+  onMarkIssueFixed,
   onOpenQuestionnaireWorkspace,
+  onUploadFile,
   role,
   submission,
   surface,
 }: FigmaSubmissionDrawerProps) {
   const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
   const [status, setStatus] = useState<"loading" | "success">("loading");
+  const drawerTabsRef = useRef<HTMLDivElement>(null);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const data = useMemo(() => buildDetail(submission), [submission]);
   const primaryAction = getPrimaryAction(submission, role, surface);
@@ -562,6 +673,18 @@ export function FigmaSubmissionDrawer({
     };
   }, [onClose]);
 
+  useEffect(() => {
+    if (status !== "success") return;
+    const activeButton = drawerTabsRef.current?.querySelector<HTMLButtonElement>(
+      `[data-drawer-tab="${tab}"]`,
+    );
+    activeButton?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [status, tab]);
+
   const tabs: Array<{
     getCount?: (detail: FigmaSubmissionDetail) => number;
     id: TabId;
@@ -570,6 +693,7 @@ export function FigmaSubmissionDrawer({
   }> = [
     { id: "overview", label: "Обзор" },
     { id: "questionnaire", label: "Анкета" },
+    { id: "files", label: "Файлы" },
     {
       getCount: (detail) => detail.issuesCount,
       id: "issues",
@@ -582,10 +706,11 @@ export function FigmaSubmissionDrawer({
   const footerAction =
     data.status === "returned" ? (
       <button
-        className="flex-1 sm:flex-none h-11 px-8 bg-orange-500 hover:bg-orange-600 text-white font-medium text-[14px] rounded-xl shadow-[0_0_20px_rgba(249,115,22,0.2)] transition-colors flex items-center justify-center gap-2"
+        className="flex-1 sm:flex-none h-11 px-6 bg-white/[0.13] hover:bg-white/[0.18] text-white/85 hover:text-white font-semibold text-[14px] rounded-xl border border-white/10 hover:border-white/15 transition-colors flex items-center justify-center whitespace-nowrap"
+        disabled={primaryAction.disabled}
         onClick={() => onAction(primaryAction.action)}
       >
-        <UploadCloud className="w-4 h-4" /> Отправить исправления
+        Отправить исправления
       </button>
     ) : (
       <button
@@ -664,15 +789,12 @@ export function FigmaSubmissionDrawer({
                   </div>
                 </div>
 
-                <button
-                  className="hidden lg:flex w-10 h-10 items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10"
-                  onClick={onClose}
-                >
-                  <X className="w-5 h-5" />
-                </button>
               </div>
 
-              <div className="w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0">
+              <div
+                className="w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0"
+                ref={drawerTabsRef}
+              >
                 <div className="flex items-center gap-1.5 w-max mb-[-1px]">
                   {tabs.map((item) => {
                     const count = item.getCount ? item.getCount(data) : 0;
@@ -682,6 +804,7 @@ export function FigmaSubmissionDrawer({
                         className={`relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap ${
                           isActive ? "text-white" : "text-white/50 hover:text-white/80"
                         }`}
+                        data-drawer-tab={item.id}
                         key={item.id}
                         onClick={() => setTab(item.id)}
                         type="button"
@@ -728,10 +851,19 @@ export function FigmaSubmissionDrawer({
                       onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
                     />
                   ) : null}
+                  {tab === "files" ? (
+                    <FilesTab
+                      onUploadFile={onUploadFile}
+                      submission={submission}
+                    />
+                  ) : null}
                   {tab === "issues" ? (
                     <IssuesTab
                       data={data}
+                      onMarkIssueFixed={onMarkIssueFixed}
                       onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
+                      role={role}
+                      submission={submission}
                     />
                   ) : null}
                   {tab === "history" ? <HistoryTab /> : null}
@@ -746,12 +878,12 @@ export function FigmaSubmissionDrawer({
                     ? "Исправьте замечания перед повторной отправкой."
                     : statusLabels[submission.status])}
               </div>
-              <div className="flex gap-3 w-full sm:w-auto">
+              <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 w-full sm:flex sm:w-auto">
                 <button
-                  className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
+                  className="w-full sm:w-auto h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
                   onClick={onClose}
                 >
-                  Отмена
+                  Закрыть
                 </button>
                 {footerAction}
               </div>

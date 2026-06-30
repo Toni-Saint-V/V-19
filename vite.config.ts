@@ -16,6 +16,9 @@ export default defineConfig({
           if (id.includes("node_modules/@supabase/supabase-js")) {
             return "supabase";
           }
+          if (id.includes("node_modules/lucide-react")) {
+            return "lucide";
+          }
           return undefined;
         },
       },

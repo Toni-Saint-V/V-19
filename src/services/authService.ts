@@ -1,10 +1,20 @@
 import type { Role } from "../types/domain";
 import type { AppProfile, AppSession } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
-import { fetchCurrentProfile, upsertProfile } from "./profileService";
+import { fetchCurrentProfile } from "./profileService";
 import { mapSupabasePersistenceError } from "./persistenceObservability";
 
 export type { AppProfile, AppSession };
+
+export type PasswordResetRequestResult =
+  | {
+      message: string;
+      status: "requested";
+    }
+  | {
+      message: string;
+      status: "unavailable";
+    };
 
 const demoProfiles: Record<Role, AppProfile> = {
   agent: {
@@ -23,57 +33,42 @@ const demoProfiles: Record<Role, AppProfile> = {
   },
 };
 
-function metadataString(
-  metadata: Record<string, unknown> | null | undefined,
-  key: string,
-): string | null {
-  const value = metadata?.[key];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
 async function profileForSupabaseUser(user: {
   email?: string;
   id: string;
-  user_metadata?: Record<string, unknown>;
-}, options: {
-  allowMissingProfileRecovery: boolean;
-  fallback?: {
-    displayName?: string;
-    organizationName?: string | null;
-  };
 }): Promise<AppProfile> {
   const existingProfile = await fetchCurrentProfile(user.id);
   if (existingProfile) return existingProfile;
 
-  if (!options.allowMissingProfileRecovery) {
-    throw new Error(
-      "Supabase profile was not found for this user. Production profile repair requires owner-approved role assignment.",
-    );
-  }
-
   const email = user.email?.trim().toLowerCase() ?? "";
-  const displayName =
-    metadataString(user.user_metadata, "display_name") ??
-    metadataString(user.user_metadata, "name") ??
-    options.fallback?.displayName?.trim() ??
-    email;
-  const organizationName =
-    metadataString(user.user_metadata, "organization_name") ??
-    options.fallback?.organizationName ??
-    null;
-  const profile = await upsertProfile({
-    id: user.id,
-    email,
-    displayName,
-    organizationName,
-    role: "agent",
-  });
+  const client = getSupabaseClient();
+  if (client && email) {
+    const { data: accessRequest } = await client
+      .from("access_requests")
+      .select("status,rejection_reason")
+      .eq("email", email)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (!profile) {
-    throw new Error("Supabase profile was not created for this user.");
+    if (accessRequest?.status === "pending") {
+      throw new Error(
+        "Заявка отправлена. Доступ появится после подтверждения администратором.",
+      );
+    }
+
+    if (accessRequest?.status === "rejected") {
+      throw new Error(
+        accessRequest.rejection_reason
+          ? `Заявка отклонена: ${accessRequest.rejection_reason}`
+          : "Заявка отклонена.",
+      );
+    }
   }
 
-  return profile;
+  throw new Error(
+    "Supabase profile was not found for this user. Production profile repair requires owner-approved role assignment.",
+  );
 }
 
 export async function getCurrentAppSession(): Promise<AppSession | null> {
@@ -131,14 +126,48 @@ export async function signInSupabaseWithPassword(
     throw new Error("Supabase session was not returned.");
   }
 
-  const profile = await profileForSupabaseUser(data.session.user, {
-    allowMissingProfileRecovery: false,
-  });
+  let profile: AppProfile;
+  try {
+    profile = await profileForSupabaseUser(data.session.user);
+  } catch (profileError) {
+    try {
+      await client.auth.signOut();
+    } catch {
+      // Keep the original access-gate error visible to the login flow.
+    }
+    throw profileError;
+  }
 
   return {
     mode: "supabase",
     profile,
     supabaseSession: data.session,
+  };
+}
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<PasswordResetRequestResult> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      status: "unavailable",
+      message:
+        "В local/dev режиме восстановление не отправляет email. Нужен Supabase Auth или email provider.",
+    };
+  }
+
+  const { error } = await client.auth.resetPasswordForEmail(email);
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "auth.reset_password",
+      fallbackKind: "auth",
+    });
+  }
+
+  return {
+    status: "requested",
+    message: "Если аккаунт существует, мы отправим инструкции на почту.",
   };
 }
 

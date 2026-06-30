@@ -70,6 +70,15 @@ export type SubmissionFileStatus =
   | "pending_review"
   | "accepted";
 
+export type FileAssetUploadStatus =
+  | "none"
+  | "pending"
+  | "uploaded"
+  | "failed"
+  | "deleted";
+
+export type FileAssetStorageAdapter = "local-dev" | "supabase-private";
+
 export type SubmissionFileType = CanonicalFrontendMediaType | RejectedLegacyMediaType;
 
 export type IssueSeverity = "blocker" | "warning" | "info";
@@ -174,8 +183,10 @@ export type VisaApplicationPdfReviewState = {
   applicantName?: string;
   artifact?: {
     fileName: string;
+    deletedAtIso?: string;
     extractedPageCount?: number;
     extractionSource?: VisaApplicationPdfExtractionSource;
+    failureReason?: string;
     mimeType: string;
     ocrPageLimit?: number;
     parserVersion?: number;
@@ -183,6 +194,7 @@ export type VisaApplicationPdfReviewState = {
     sizeBytes: number;
     storageBucket?: string;
     storagePath?: string;
+    uploadStatus?: FileAssetUploadStatus;
     uploadedAtIso: string;
     uploadedBy?: string;
   };
@@ -198,17 +210,23 @@ export type VisaApplicationPdfReviewState = {
 
 export type ReturnedPdfArtifact = {
   fileName: string;
+  deletedAtIso?: string;
+  failureReason?: string;
   mimeType: string;
   sha256: string;
   sizeBytes: number;
   storageBucket?: string;
   storagePath?: string;
+  uploadStatus?: FileAssetUploadStatus;
   uploadedAtIso?: string;
   uploadedBy?: string;
 };
 
 export type ReturnedPdfPackageState = {
   commonAppointmentPdf?: ReturnedPdfArtifact;
+  exportPackageId?: string;
+  ownerAgentId?: AgentOwnerId;
+  ownerAgentName?: string;
   reviewedAtIso?: string;
   reviewedBy?: string;
 };
@@ -358,10 +376,11 @@ export type SubmissionFile = {
   reviewedBy?: string;
   reviewStatus?: "not_reviewed" | "accepted" | "replace_required" | "poor_quality";
   sizeBytes?: number;
+  storageAdapter?: FileAssetStorageAdapter;
   storageBucket?: string;
   storagePath?: string;
   uploadedAtIso?: string;
-  uploadStatus?: "none" | "uploaded";
+  uploadStatus?: FileAssetUploadStatus;
   uploadedBy?: string;
   uploadedAt?: string;
   linkedIssueId?: string;

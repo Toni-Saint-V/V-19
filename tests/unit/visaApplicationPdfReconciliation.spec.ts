@@ -474,7 +474,8 @@ destino, si procede)/
 
     expect(visaApplicationPdfAgentHandoffStatus(withPdfReview)).toEqual({
       ok: false,
-      reason: "PDF не совпадает с заявкой: фамилия.",
+      reason:
+        "PDF анкеты не удалось однозначно сопоставить с заявителем по паспорту или ФИО.",
       status: "blocked",
     });
   });

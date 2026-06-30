@@ -8,6 +8,7 @@ const mockState = vi.hoisted(() => ({
   applicantRows: [] as unknown[],
   exportBatchRows: [] as unknown[],
   fromCalls: [] as string[],
+  mediaAssetRows: [] as unknown[],
   questionnaireRows: [] as unknown[],
   rpcCalls: [] as Array<{
     args: { answers?: unknown; payload?: unknown };
@@ -73,7 +74,9 @@ vi.mock("../../src/lib/supabase/client", () => {
                   ? mockState.applicantRows
                   : table === "questionnaire_answers"
                     ? mockState.questionnaireRows
-                    : mockState.exportBatchRows,
+                    : table === "media_assets"
+                      ? mockState.mediaAssetRows
+                      : mockState.exportBatchRows,
             ),
         };
       },
@@ -147,6 +150,7 @@ beforeEach(() => {
   mockState.applicantRows = [];
   mockState.exportBatchRows = [];
   mockState.fromCalls = [];
+  mockState.mediaAssetRows = [];
   mockState.questionnaireRows = [];
   mockState.rpcCalls = [];
   mockState.submissionRows = [];
@@ -626,6 +630,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       "submissions",
       "applicants",
       "questionnaire_answers",
+      "media_assets",
     ]);
     expect(field).toMatchObject({
       id: sourceAnswer.field_id,
@@ -1073,6 +1078,7 @@ describe("V-19 Supabase cockpit persistence", () => {
           reviewStatus: "accepted",
           sizeBytes: 2048,
           status: "accepted",
+          storageAdapter: "supabase-private",
           storageBucket: "submission-media",
           storagePath: "ПД-1052/з-1052-1/passport_scan/v1900abcde_passport_scan.jpg",
           uploadedAtIso: "2026-06-16T10:00:00.000Z",
@@ -1092,6 +1098,184 @@ describe("V-19 Supabase cockpit persistence", () => {
       submission_id: "ПД-1052",
       type: "passport_scan",
       upload_status: "uploaded",
+    });
+  });
+
+  it("restores durable private file metadata from media_assets after reload", async () => {
+    const submission = initialSubmissions[2] as Submission;
+    const passportFile = submission.files.find((file) => file.type === "passport_scan");
+    if (!passportFile) throw new Error("Missing passport file");
+    const staleSnapshot: Submission = {
+      ...submission,
+      files: submission.files.map((file) => ({
+        ...file,
+        generatedFileName: undefined,
+        mimeType: undefined,
+        originalFileName: undefined,
+        sizeBytes: undefined,
+        status: "missing",
+        storageAdapter: undefined,
+        storageBucket: undefined,
+        storagePath: undefined,
+        uploadStatus: "none",
+        uploadedAtIso: undefined,
+      })),
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      staleSnapshot,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.mediaAssetRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000777",
+        applicant_id: passportFile.applicantId,
+        submission_id: submission.id,
+        type: "passport_scan",
+        original_file_name: "passport-scan.jpg",
+        generated_file_name: "v1900abcde_passport_scan.jpg",
+        storage_bucket: "submission-media",
+        storage_path: `${submission.id}/${passportFile.applicantId}/passport_scan/v1900abcde_passport_scan.jpg`,
+        mime_type: "image/jpeg",
+        size_bytes: 2048,
+        upload_status: "uploaded",
+        review_status: "not_reviewed",
+        uploaded_at: "2026-06-16T10:00:00.000Z",
+        reviewed_at: null,
+        reviewed_by: null,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const restoredPassport = loaded.submissions[0]?.files.find(
+      (file) => file.type === "passport_scan",
+    );
+
+    expect(restoredPassport).toMatchObject({
+      generatedFileName: "v1900abcde_passport_scan.jpg",
+      originalFileName: "passport-scan.jpg",
+      status: "uploaded",
+      storageAdapter: "supabase-private",
+      storageBucket: "submission-media",
+      storagePath: `${submission.id}/${passportFile.applicantId}/passport_scan/v1900abcde_passport_scan.jpg`,
+      uploadStatus: "uploaded",
+    });
+    expect(loaded.submissions[0]?.completeness.files).toBeGreaterThan(0);
+  });
+
+  it("does not restore another agent's media rows through the agent load path", async () => {
+    const submission = initialSubmissions[2] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+      {
+        ...payload.submission,
+        id: "OTHER-AGENT-SUBMISSION",
+        agent_id: otherAgentProfile.id,
+        title: "Other agent submission",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.mediaAssetRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000778",
+        applicant_id: "other-agent-applicant",
+        submission_id: "OTHER-AGENT-SUBMISSION",
+        type: "passport_scan",
+        original_file_name: "other-passport.jpg",
+        generated_file_name: "other_passport_scan.jpg",
+        storage_bucket: "submission-media",
+        storage_path: "OTHER-AGENT-SUBMISSION/other-agent-applicant/passport_scan/other_passport_scan.jpg",
+        mime_type: "image/jpeg",
+        size_bytes: 2048,
+        upload_status: "uploaded",
+        review_status: "not_reviewed",
+        uploaded_at: "2026-06-16T10:00:00.000Z",
+        reviewed_at: null,
+        reviewed_by: null,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions).toHaveLength(1);
+    expect(loaded.submissions[0]?.id).toBe(submission.id);
+    expect(
+      loaded.submissions[0]?.files.some(
+        (file) => file.generatedFileName === "other_passport_scan.jpg",
+      ),
+    ).toBe(false);
+  });
+
+  it("allows admin reload to restore media rows for selected submissions", async () => {
+    const submission = {
+      ...(initialSubmissions[2] as Submission),
+      agentId: otherAgentProfile.id,
+    };
+    const passportFile = submission.files.find((file) => file.type === "passport_scan");
+    if (!passportFile) throw new Error("Missing passport file");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      adminProfile.id,
+      otherAgentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.mediaAssetRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000779",
+        applicant_id: passportFile.applicantId,
+        submission_id: submission.id,
+        type: "passport_scan",
+        original_file_name: "admin-visible-passport.jpg",
+        generated_file_name: "admin_visible_passport_scan.jpg",
+        storage_bucket: "submission-media",
+        storage_path: `${submission.id}/${passportFile.applicantId}/passport_scan/admin_visible_passport_scan.jpg`,
+        mime_type: "image/jpeg",
+        size_bytes: 2048,
+        upload_status: "uploaded",
+        review_status: "not_reviewed",
+        uploaded_at: "2026-06-16T10:00:00.000Z",
+        reviewed_at: null,
+        reviewed_by: null,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.ownerIdsBySubmissionId.get(submission.id)).toBe(
+      otherAgentProfile.id,
+    );
+    expect(
+      loaded.submissions[0]?.files.find((file) => file.type === "passport_scan"),
+    ).toMatchObject({
+      generatedFileName: "admin_visible_passport_scan.jpg",
+      storageAdapter: "supabase-private",
+      uploadStatus: "uploaded",
     });
   });
 
@@ -1135,6 +1319,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       "submissions",
       "applicants",
       "questionnaire_answers",
+      "media_assets",
       "export_batches",
     ]);
     expect(loaded.submissions[0]).toMatchObject({
@@ -1190,6 +1375,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       "submissions",
       "applicants",
       "questionnaire_answers",
+      "media_assets",
     ]);
     expect(loaded.submissions[0]).toMatchObject({
       exportPackage: undefined,

@@ -43,6 +43,7 @@ type FormFieldProps = {
 
 type FigmaQuestionnaireScreenProps = {
   onBack: () => void;
+  onComplete: (values: { travelEnd: string; travelStart: string }) => void;
   submission: Submission;
 };
 
@@ -79,7 +80,7 @@ function FormField({
     state === "needs_review"
       ? "bg-orange-500/5 border border-orange-500/50 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
       : state === "invalid"
-        ? "bg-red-500/5 border border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/30"
+        ? "bg-[#1e1e21] border border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/30"
         : "bg-[#1e1e21] border border-[#242529] focus:border-[#3a45b4] focus:ring-1 focus:ring-[#3a45b4]/30 hover:border-[#2e2f34]";
 
   return (
@@ -110,7 +111,11 @@ function FormField({
             <span className="truncate">
               {value || <span className="text-white/30">Выберите...</span>}
             </span>
-            <ChevronDown className="w-4 h-4 text-white/40 shrink-0 ml-2" />
+            <ChevronDown
+              className={`w-4 h-4 shrink-0 ml-2 transition-transform ${
+                isOpen ? "rotate-180 text-white/70" : "text-white/40"
+              }`}
+            />
           </button>
 
           <AnimatePresence>
@@ -197,6 +202,7 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
 
 export function FigmaQuestionnaireScreen({
   onBack,
+  onComplete,
   submission,
 }: FigmaQuestionnaireScreenProps) {
   const applicants = applicantTabs(submission);
@@ -248,8 +254,7 @@ export function FigmaQuestionnaireScreen({
     hotel: "Сверьте размещение, приглашение и адрес принимающей стороны.",
     passport: "Сверьте номер паспорта, тип документа, даты выдачи и срок действия.",
     payment: "Проверьте, кто оплачивает поездку и какие подтверждения приложены.",
-    personal:
-      "Убедитесь, что все данные в точности совпадают с паспортом. Особое внимание обратите на транслитерацию.",
+    personal: "Сверьте данные с паспортом.",
     trip: "Проверьте маршрут, даты, цель поездки и страну первого въезда.",
   };
 
@@ -262,6 +267,11 @@ export function FigmaQuestionnaireScreen({
     const nextSection = sections[(currentIndex + 1) % sections.length];
     setActiveSection(nextSection.id);
   }
+
+  useEffect(() => {
+    document.body.classList.add("vf-questionnaire-open");
+    return () => document.body.classList.remove("vf-questionnaire-open");
+  }, []);
 
   const cities = [
     "MOSCOW",
@@ -613,7 +623,16 @@ export function FigmaQuestionnaireScreen({
             <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
             Сохранено только что
           </span>
-          <button className="h-[36px] lg:h-10 px-3 lg:px-4 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+          <button
+            className="h-[36px] lg:h-10 px-3 lg:px-4 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            type="button"
+            onClick={() =>
+              onComplete({
+                travelEnd: formData.travelEnd,
+                travelStart: formData.travelStart,
+              })
+            }
+          >
             <span className="hidden sm:inline">Готово к проверке</span>
             <span className="sm:hidden">Готово</span>
           </button>
@@ -656,7 +675,7 @@ export function FigmaQuestionnaireScreen({
                   </span>
                   {applicant.name}
                   {applicant.hasIssue ? (
-                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-[#161617]" />
+                    <span className="ml-0.5 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.55)]" />
                   ) : null}
                 </button>
               ))}
@@ -736,11 +755,10 @@ export function FigmaQuestionnaireScreen({
                       Несоответствие даты рождения
                     </div>
                     <p className="text-[12px] text-white/60 mt-1.5 leading-relaxed">
-                      В загруженном приложении PDF дата рождения{" "}
-                      <strong className="text-white/90 font-medium">15.05.1985</strong>,
-                      а в анкете указано{" "}
+                      PDF:{" "}
+                      <strong className="text-white/90 font-medium">15.05.1985</strong>.
+                      Анкета:{" "}
                       <strong className="text-white/90 font-medium">12.05.1985</strong>.
-                      Подтвердите правильное значение.
                     </p>
                   </div>
                 </div>

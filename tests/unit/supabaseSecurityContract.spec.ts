@@ -66,6 +66,14 @@ describe("Supabase security contract", () => {
     expect(migration).not.toContain("grant select, insert, update on public.profiles");
   });
 
+  test("keeps frontend Supabase auth on sign-in and out of self-service signup", () => {
+    const authService = readProjectFile("src/services/authService.ts");
+
+    expect(authService).toContain("client.auth.signInWithPassword");
+    expect(authService).not.toContain("client.auth.signUp");
+    expect(authService).not.toContain(".signUp(");
+  });
+
   test("blocks agent-owned writes from changing operator review and handoff state", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260611000000_visaflow_mvp_foundation.sql",
@@ -437,6 +445,15 @@ describe("Supabase security contract", () => {
     expect(rpcBoundary).toContain("insert into public.status_history");
   });
 
+  test("keeps media access private with signed URLs instead of public URLs", () => {
+    const mediaStorage = readProjectFile("src/modules/submissions/mediaStorage.ts");
+    const appSource = readProjectFile("src/App.tsx");
+
+    expect(mediaStorage).toContain(".createSignedUrl(");
+    expect(mediaStorage).not.toContain(".getPublicUrl(");
+    expect(appSource).not.toContain("/storage/v1/object/public/");
+  });
+
   test("keeps correction handoff server-authoritative and atomic", () => {
     const handoffMigration = readProjectFile(
       "supabase/migrations/20260617001000_submit_corrections_handoff_rpc.sql",
@@ -538,6 +555,14 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(
       "Returned PDF mismatch issues must be closed before handoff",
     );
+    expect(migration).toContain(
+      "Returned PDF handoff requires a durable export package identity",
+    );
+    expect(migration).toContain(
+      "Returned PDF handoff owner does not match submission owner",
+    );
+    expect(migration).toContain("snapshot #>> '{exportPackage,idempotencyKey}'");
+    expect(migration).toContain("snapshot #>> '{returnedPdfPackage,ownerAgentId}'");
     expect(migration).toContain(
       "Returned PDF blocked reviews must be resolved before handoff",
     );

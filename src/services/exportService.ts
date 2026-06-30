@@ -450,6 +450,9 @@ function buildServiceExportContractRow(
   const hotelAddress = applicant.hotelAddress ?? "";
   const groupLabel = submission.type === "family" ? "Семья" : "Один заявитель";
   const contactNumber = cleanPassport(applicant.phone ?? "");
+  const passportNumber = cleanPassport(applicant.passport);
+  const familyGroupId =
+    submission.type === "family" ? (submission.familyGroupId ?? submission.id) : undefined;
 
   return {
     addressCity: applicant.city ?? submission.city,
@@ -459,6 +462,7 @@ function buildServiceExportContractRow(
     addressPostalCode: "",
     applicantCount: submission.applicants.length,
     applicantEmail: applicant.email ?? "",
+    applicantId: applicant.id ?? `${submission.id}-${index + 1}`,
     applicantIndex: index + 1,
     applicantMobile: contactNumber,
     applicantName: applicant.name,
@@ -483,6 +487,8 @@ function buildServiceExportContractRow(
     employerOccupation: applicant.employment ?? "",
     entriesRequested: "Multiple Entry",
     firstName: nameParts.first,
+    familyGroupId,
+    familySubmissionId: familyGroupId,
     gender: "",
     groupKey: submission.id,
     groupLabel,
@@ -500,11 +506,15 @@ function buildServiceExportContractRow(
     maritalStatus: "",
     meansOfSupport: "Cash",
     nationalityAtBirth: applicant.citizenship ?? "Russian Federation",
+    ownerAgentId: submission.agentId,
+    ownerAgentName: submission.agentName,
+    passportLast3: passportNumber.slice(-3),
+    passportNumber,
     passportExpiryDate: applicant.passportExpiresAt ?? "",
     passportIssueCountry: applicant.country ?? submission.country,
     passportIssueDate: applicant.passportIssuedAt ?? "",
     passportIssuePlace: "",
-    passportNo: cleanPassport(applicant.passport),
+    passportNo: passportNumber,
     passportType: "Ordinary Passport",
     placeOfBirth: "",
     purposeOfJourney: applicant.tripPurpose ?? "TOURISM",

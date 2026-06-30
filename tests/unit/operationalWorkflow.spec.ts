@@ -4,6 +4,7 @@ import {
   applyPassportAutofillResult,
   applyReturnedPdfPackageReview,
   buildAgentHandoffPackage,
+  buildAgentReturnedPdfPackageView,
   buildApplicantArtifactFileNames,
   buildCityExportBatchPlan,
   confirmReturnedPdfMismatchIssue,
@@ -13,6 +14,7 @@ import {
   submitOperationalForReview,
   type ReturnedPdfArtifact,
 } from "../../src/modules/submissions/operationalWorkflow";
+import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
 import { finishPassportExtraction } from "../../src/modules/submissions/passportExtraction";
 import {
@@ -848,26 +850,169 @@ describe("operational workflow logic spine", () => {
     });
 
     expect(packageResult.ready).toBe(true);
+    expect(packageResult.mappings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactKind: "appointment_list_pdf",
+          city: exported.city,
+          exportPackageId: exported.exportPackage?.idempotencyKey,
+          ownerAgentId: exported.agentId,
+          submissionId: exported.id,
+        }),
+        expect.objectContaining({
+          applicantId: applicant.id,
+          artifactKind: "application_form_pdf",
+          city: exported.city,
+          excelRowNumber: 2,
+          exportPackageId: exported.exportPackage?.idempotencyKey,
+          ownerAgentId: exported.agentId,
+          reviewId: cleanReview.id,
+          submissionId: exported.id,
+        }),
+      ]),
+    );
     expect(packageResult.applicantPdfs).toEqual([
       expect.objectContaining({
         applicantId: applicant.id,
-        fileName: `${mainReference.passportNumber}_application.pdf`,
+        fileName: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
         fileNames: {
-          application: `${mainReference.passportNumber}_application.pdf`,
-          appointment: `${mainReference.passportNumber}_appointment.pdf`,
-          passportScan: `${mainReference.passportNumber}_passport_scan.pdf`,
-          selfie: `${mainReference.passportNumber}_selfie.jpg`,
-          selfie2: `${mainReference.passportNumber}_selfie_2.jpg`,
+          application: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+          applicationFormPdf: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+          appointment: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+          passportScan: `${mainReference.passportNumber}_passport_scan_volkov_anton.pdf`,
+          questionnaire: `${mainReference.passportNumber}_questionnaire_volkov_anton.pdf`,
+          selfie: `${mainReference.passportNumber}_selfie_volkov_anton.jpg`,
+          selfie2: `${mainReference.passportNumber}_selfie_2_volkov_anton.jpg`,
         },
         status: "clear",
       }),
     ]);
     expect(buildApplicantArtifactFileNames(withCleanReview, applicant.id)).toEqual({
-      application: `${mainReference.passportNumber}_application.pdf`,
-      appointment: `${mainReference.passportNumber}_appointment.pdf`,
-      passportScan: `${mainReference.passportNumber}_passport_scan.pdf`,
-      selfie: `${mainReference.passportNumber}_selfie.jpg`,
-      selfie2: `${mainReference.passportNumber}_selfie_2.jpg`,
+      application: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+      applicationFormPdf: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+      appointment: `${mainReference.passportNumber}_application_form_pdf_volkov_anton.pdf`,
+      passportScan: `${mainReference.passportNumber}_passport_scan_volkov_anton.pdf`,
+      questionnaire: `${mainReference.passportNumber}_questionnaire_volkov_anton.pdf`,
+      selfie: `${mainReference.passportNumber}_selfie_volkov_anton.jpg`,
+      selfie2: `${mainReference.passportNumber}_selfie_2_volkov_anton.jpg`,
+    });
+  });
+
+  test("blocks returned PDF handoff without export identity and for failed or deleted PDFs", () => {
+    const exported = exportedSubmission();
+    const applicant = exported.applicants[0];
+    if (!applicant) throw new Error("Missing applicant.");
+    const cleanReview = cleanPdfReview(applicant);
+    const withoutExportIdentity: Submission = {
+      ...exported,
+      exportPackage: undefined,
+      visaApplicationPdfReviews: [cleanReview],
+    };
+
+    expect(
+      buildAgentHandoffPackage(withoutExportIdentity, {
+        commonAppointmentPdf: appointmentPdf,
+      }),
+    ).toMatchObject({
+      ready: false,
+      blockers: expect.arrayContaining([
+        "Returned PDF handoff requires a durable export package identity.",
+      ]),
+      mappings: [],
+    });
+
+    expect(
+      buildAgentHandoffPackage(
+        {
+          ...exported,
+          visaApplicationPdfReviews: [
+            {
+              ...cleanReview,
+              artifact: cleanReview.artifact
+                ? { ...cleanReview.artifact, uploadStatus: "deleted" }
+                : undefined,
+            },
+          ],
+        },
+        { commonAppointmentPdf: appointmentPdf },
+      ),
+    ).toMatchObject({
+      ready: false,
+      blockers: expect.arrayContaining([
+        expect.stringContaining("Application PDF for ANTON VOLKOV was deleted"),
+      ]),
+      mappings: [],
+    });
+
+    expect(
+      buildAgentHandoffPackage(
+        {
+          ...exported,
+          visaApplicationPdfReviews: [cleanReview],
+        },
+        {
+          commonAppointmentPdf: {
+            ...appointmentPdf,
+            failureReason: "Storage upload returned 503.",
+            uploadStatus: "failed",
+          },
+        },
+      ),
+    ).toMatchObject({
+      ready: false,
+      blockers: expect.arrayContaining([
+        expect.stringContaining("Common appointment/list PDF upload failed"),
+      ]),
+      mappings: [],
+    });
+
+    expect(
+      buildAgentHandoffPackage(
+        {
+          ...exported,
+          visaApplicationPdfReviews: [cleanReview],
+        },
+        { commonAppointmentPdf: appointmentPdf },
+      ).ready,
+    ).toBe(true);
+  });
+
+  test("shows returned PDFs only to the owning agent", () => {
+    const exported = exportedSubmission();
+    const applicant = exported.applicants[0];
+    if (!applicant) throw new Error("Missing applicant.");
+    const withCleanReview: Submission = {
+      ...exported,
+      returnedPdfPackage: {
+        commonAppointmentPdf: appointmentPdf,
+        exportPackageId: exported.exportPackage?.idempotencyKey,
+        ownerAgentId: exported.agentId,
+        ownerAgentName: "Nord Travel",
+      },
+      visaApplicationPdfReviews: [cleanPdfReview(applicant)],
+    };
+
+    expect(
+      buildAgentReturnedPdfPackageView(withCleanReview, "different-agent"),
+    ).toMatchObject({
+      applicantPdfs: [],
+      blockers: ["Agent can see only own returned PDF package."],
+      commonAppointmentPdf: undefined,
+      mappings: [],
+      ready: false,
+      visible: false,
+    });
+
+    expect(
+      buildAgentReturnedPdfPackageView(withCleanReview, exported.agentId),
+    ).toMatchObject({
+      ready: true,
+      visible: true,
+      mappings: expect.arrayContaining([
+        expect.objectContaining({
+          ownerAgentName: "Nord Travel",
+        }),
+      ]),
     });
   });
 
@@ -891,11 +1036,15 @@ describe("operational workflow logic spine", () => {
         ],
         commonAppointmentPdf: appointmentPdf,
         nowIso: "2026-06-27T10:00:00.000Z",
+        ownerAgentName: "Nord Travel",
       }),
     );
 
     expect(reviewed.submission.returnedPdfPackage).toMatchObject({
       commonAppointmentPdf: appointmentPdf,
+      exportPackageId: exported.exportPackage?.idempotencyKey,
+      ownerAgentId: exported.agentId,
+      ownerAgentName: "Nord Travel",
       reviewedAtIso: "2026-06-27T10:00:00.000Z",
       reviewedBy: "admin-1",
     });
@@ -912,7 +1061,7 @@ function unwrap<T>(result: CommandResult<T>): T {
 
 function completeInProgressSubmission(): Submission {
   return {
-    ...uploadRequiredFiles(
+    ...uploadRequiredFilesWithRealPassportScan(
       setApplicantFieldValues(
         completeQuestionnaire(
           createDraftSubmission({
@@ -942,6 +1091,21 @@ function completeInProgressSubmission(): Submission {
     tripDateFrom: "2026-07-10",
     tripDateTo: "2026-07-18",
   };
+}
+
+function uploadRequiredFilesWithRealPassportScan(submission: Submission): Submission {
+  const passportScan = submission.files.find((file) => file.type === "passport_scan");
+  const withPassportScan = passportScan
+    ? uploadRequiredFile(submission, passportScan.id, {
+        generatedFileName: "passport-scan.pdf",
+        mimeType: "application/pdf",
+        originalFileName: "passport-scan.pdf",
+        sizeBytes: 150_000,
+        uploadedAtIso: "2026-06-27T08:00:00.000Z",
+      })
+    : submission;
+
+  return uploadRequiredFiles(withPassportScan);
 }
 
 function draftWithUploadedPassportScan(): Submission {
@@ -988,17 +1152,18 @@ function readySubmission(input: {
 }
 
 function exportedSubmission(): Submission {
-  const submission = completedWithReference({
+  const ready = readySubmission({
     city: "Москва",
     id: "exported-main",
     names: ["ANTON VOLKOV"],
     type: "single",
   });
+  const exportPackage = buildExportPackageIdentity([ready], "xlsx");
 
   return {
-    ...submission,
+    ...ready,
+    exportPackage: exportPackage ?? undefined,
     exportState: "marked_exported",
-    files: submission.files.map((file) => ({ ...file, status: "accepted" })),
     id: "exported-main",
     status: "exported",
   };

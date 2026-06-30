@@ -22,6 +22,16 @@ Reason:
 - Production activation flag must remain disabled until the approval checklist
   is complete.
 
+## Closed Pilot Update
+
+Recorded: 2026-06-28
+
+- Pilot auth/access evidence: `docs/qa/pilot-auth-gate-evidence-20260628.md`
+- Pilot verdict: `GO_DUMMY_ONLY`
+- Production verdict remains: `NO_GO`
+- Closed pilot only; dummy/test documents only; no real passports; no public
+  launch; no production OCR, Storage, RLS, or production profile-repair claim.
+
 ## Required Local Evidence
 
 Before any activation discussion, record fresh output for:

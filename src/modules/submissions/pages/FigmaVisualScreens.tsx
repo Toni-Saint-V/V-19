@@ -1,49 +1,65 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Filter,
+  Columns3,
   Folder,
+  List,
   Search,
+  SlidersHorizontal,
   User,
   Users,
 } from "lucide-react";
-import { agentDisplayName } from "../agentDirectory";
+import type {
+  AgentActionBadge,
+  AgentActionItem,
+  AgentActionSeverity,
+  AgentActionSummary,
+} from "../agentActions";
+import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
-import { blockerCount, fixedIssueCount, openIssueCount } from "../status";
-import type { Submission } from "../types";
+import { statusLabelFor } from "../status";
+import type { City, DrawerTab, Submission } from "../types";
 
-type VisualStatus = "in_progress" | "ready_for_export" | "returned" | "submitted_for_review";
+type VisualStatus = Submission["status"];
 
-type VisualSubmission = {
-  agentId?: string;
-  agentName?: string;
+type VisualActionCategory = "all" | "issues" | "review";
+type VisualFilterPanel = "city" | "date" | "id" | "type";
+type VisualLayoutMode = "list" | "vertical";
+type VisualSortMode = "dateAsc" | "dateDesc" | "default" | "idAsc" | "idDesc";
+type VisualTypeFilter = "all" | "family" | "single";
+type VisualTone = "blue" | "danger" | "green" | "indigo" | "warning";
+
+type VisualActionRow = {
+  actionId: string;
   applicantsCount: number;
+  badges: AgentActionBadge[];
   blocker?: string;
-  city: string;
-  createdAt?: string;
+  city: City;
+  completed: boolean;
+  context: string;
+  createdAt: string;
+  cta: string;
   id: string;
-  issueCount?: number;
-  progress?: number;
-  source?: Submission;
+  progress: number;
+  severity: AgentActionSeverity;
   status: VisualStatus;
   statusLabel: string;
+  submission: Submission;
+  tab: DrawerTab;
   title: string;
   tripDates: string;
+  tripDateFrom: string;
   type: "family" | "single";
   updated: string;
 };
 
-type VisualOpenIntent = "detail" | "issues";
-type VisualActionFilter = "all" | "issues" | "review";
-type VisualActionSort = "created_desc" | "created_asc" | "trip_asc" | "trip_desc";
-
 type VisualColumn = {
   id: string;
   label: string;
-  statuses: VisualStatus[];
-  tone?: "danger" | "warning";
+  matches: (item: VisualActionRow) => boolean;
+  tone?: VisualTone;
 };
 
 type VisualMember = {
@@ -53,612 +69,38 @@ type VisualMember = {
   status: "in_progress" | "missing_docs" | "ready";
 };
 
-type VisualOpenHandler = (id: string, intent?: VisualOpenIntent) => void;
+type VisualOpenHandler = (submission: Submission, tab?: DrawerTab) => void;
 
-const visualSubmissions: VisualSubmission[] = [
-  {
-    applicantsCount: 4,
-    blocker: "Скан паспорта не читается",
-    city: "Санкт-Петербург",
-    id: "SUB-1042",
-    progress: 92,
-    status: "returned",
-    statusLabel: "Ошибки",
-    title: "Семья Петровых",
-    tripDates: "18–23 июл 2026",
-    type: "family",
-    updated: "12 мин назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Нет фин. гарантии",
-    city: "Москва",
-    id: "SUB-1057",
-    progress: 64,
-    status: "in_progress",
-    statusLabel: "В работе",
-    title: "Алина Смирнова",
-    tripDates: "02–09 авг 2026",
-    type: "single",
-    updated: "34 мин назад",
-  },
-  {
-    applicantsCount: 4,
-    city: "Москва",
-    id: "SUB-1061",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "На проверке",
-    title: "Семья Орловых",
-    tripDates: "11–21 авг 2026",
-    type: "family",
-    updated: "1 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Москва",
-    id: "SUB-1078",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Готово",
-    title: "Дмитрий Волков",
-    tripDates: "06–12 сен 2026",
-    type: "single",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Ожидается бронь отеля",
-    city: "Москва",
-    id: "SUB-1065",
-    progress: 58,
-    status: "in_progress",
-    statusLabel: "Документы",
-    title: "Олег Тиньков",
-    tripDates: "10–18 авг 2026",
-    type: "single",
-    updated: "42 мин назад",
-  },
-  {
-    applicantsCount: 3,
-    blocker: "Нет фин. гарантии",
-    city: "Казань",
-    id: "SUB-1070",
-    progress: 52,
-    status: "in_progress",
-    statusLabel: "Гарантия",
-    title: "Семья Сидоровых",
-    tripDates: "05–15 сен 2026",
-    type: "family",
-    updated: "1 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Ожидает оплату сбора",
-    city: "Москва",
-    id: "SUB-1072",
-    progress: 46,
-    status: "in_progress",
-    statusLabel: "Оплата",
-    title: "Игорь Николаев",
-    tripDates: "12–20 сен 2026",
-    type: "single",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 2,
-    blocker: "Не заполнен раздел работы",
-    city: "Самара",
-    id: "SUB-1076",
-    progress: 71,
-    status: "returned",
-    statusLabel: "Анкета",
-    title: "Семья Беляевых",
-    tripDates: "20–28 сен 2026",
-    type: "family",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Скан паспорта размытый",
-    city: "Екатеринбург",
-    id: "SUB-1088",
-    progress: 68,
-    status: "returned",
-    statusLabel: "Паспорт",
-    title: "Михаил Иванов",
-    tripDates: "15–20 авг 2026",
-    type: "single",
-    updated: "18 мин назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Фото не проходит требования",
-    city: "Москва",
-    id: "SUB-1090",
-    progress: 73,
-    status: "returned",
-    statusLabel: "Фото",
-    title: "Анна Каренина",
-    tripDates: "22–30 авг 2026",
-    type: "single",
-    updated: "26 мин назад",
-  },
-  {
-    applicantsCount: 2,
-    city: "Москва",
-    id: "SUB-1094",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "QA",
-    title: "Семья Морозовых",
-    tripDates: "28 авг – 03 сен 2026",
-    type: "family",
-    updated: "36 мин назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Санкт-Петербург",
-    id: "SUB-1062",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "Проверка",
-    title: "Виктор Цой",
-    tripDates: "14–21 авг 2026",
-    type: "single",
-    updated: "1 ч назад",
-  },
-  {
-    applicantsCount: 5,
-    city: "Москва",
-    id: "SUB-1063",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "Очередь",
-    title: "Семья Романовых",
-    tripDates: "25 авг – 05 сен 2026",
-    type: "family",
-    updated: "2 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Пермь",
-    id: "SUB-1067",
-    progress: 100,
-    status: "submitted_for_review",
-    statusLabel: "SLA",
-    title: "Кирилл Андреев",
-    tripDates: "18–24 сен 2026",
-    type: "single",
-    updated: "3 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Новосибирск",
-    id: "SUB-1080",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Выгрузка",
-    title: "Елена Летучая",
-    tripDates: "10–15 сен 2026",
-    type: "single",
-    updated: "3 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Москва",
-    id: "SUB-1081",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Архив",
-    title: "Павел Дуров",
-    tripDates: "15–25 сен 2026",
-    type: "single",
-    updated: "4 ч назад",
-  },
-  {
-    applicantsCount: 2,
-    city: "Ростов-на-Дону",
-    id: "SUB-1084",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Принято",
-    title: "Семья Абрамовых",
-    tripDates: "01–09 окт 2026",
-    type: "family",
-    updated: "4 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    blocker: "Черновик без паспорта",
-    city: "Москва",
-    id: "SUB-1097",
-    progress: 21,
-    status: "in_progress",
-    statusLabel: "Черновик",
-    title: "Мария Захарова",
-    tripDates: "04–12 окт 2026",
-    type: "single",
-    updated: "5 ч назад",
-  },
-  {
-    applicantsCount: 4,
-    blocker: "Нужна правка анкеты",
-    city: "Санкт-Петербург",
-    id: "SUB-1101",
-    progress: 81,
-    status: "returned",
-    statusLabel: "Возврат",
-    title: "Семья Лариных",
-    tripDates: "07–16 окт 2026",
-    type: "family",
-    updated: "5 ч назад",
-  },
-  {
-    applicantsCount: 1,
-    city: "Москва",
-    id: "SUB-1104",
-    progress: 100,
-    status: "ready_for_export",
-    statusLabel: "Готов",
-    title: "Никита Павлов",
-    tripDates: "11–18 окт 2026",
-    type: "single",
-    updated: "6 ч назад",
-  },
-];
-
-const visualColumns: VisualColumn[] = [
-  {
-    id: "docs",
-    label: "Сбор документов",
-    statuses: ["in_progress"],
-    tone: "warning",
-  },
-  {
-    id: "errors",
-    label: "Ошибки",
-    statuses: ["returned"],
-    tone: "danger",
-  },
-  {
-    id: "review",
-    label: "На проверке",
-    statuses: ["submitted_for_review"],
-  },
-  {
-    id: "ready",
-    label: "Готово к выгрузке",
-    statuses: ["ready_for_export"],
-  },
-];
-
-function familyMembers(
-  mainInitials: string,
-  mainName: string,
-  spouseInitials: string,
-  spouseName: string,
-  childInitials: string,
-  childName: string,
-  childStatus: VisualMember["status"] = "ready",
-) {
-  return [
-    { initials: mainInitials, name: mainName, role: "Основной", status: "ready" },
-    { initials: spouseInitials, name: spouseName, role: "Супруга", status: "ready" },
-    { initials: childInitials, name: childName, role: "Ребенок", status: childStatus },
-  ] satisfies VisualMember[];
-}
-
-const visualFamilies = [
-  {
-    id: "FAM-001",
-    lastActivity: "12 авг 2026",
-    members: [
-      { initials: "ИП", name: "Иван Петров", role: "Основной", status: "ready" },
-      { initials: "АП", name: "Анна Петрова", role: "Супруга", status: "ready" },
-      { initials: "МП", name: "Максим Петров", role: "Ребенок", status: "in_progress" },
-      { initials: "МП", name: "Мария Петрова", role: "Ребенок", status: "missing_docs" },
-    ] satisfies VisualMember[],
-    submissionsCount: 2,
-    title: "Семья Петровых",
-  },
-  {
-    id: "FAM-002",
-    lastActivity: "Вчера",
-    members: [
-      { initials: "СО", name: "Сергей Орлов", role: "Основной", status: "ready" },
-      { initials: "МО", name: "Марина Орлова", role: "Супруга", status: "ready" },
-      { initials: "ДО", name: "Дмитрий Орлов", role: "Ребенок", status: "ready" },
-    ] satisfies VisualMember[],
-    submissionsCount: 1,
-    title: "Семья Орловых",
-  },
-  {
-    id: "FAM-003",
-    lastActivity: "Сегодня",
-    members: familyMembers("АС", "Алексей Сидоров", "ЕС", "Елена Сидорова", "МС", "Мила Сидорова", "in_progress"),
-    submissionsCount: 1,
-    title: "Семья Сидоровых",
-  },
-  {
-    id: "FAM-004",
-    lastActivity: "20 авг 2026",
-    members: familyMembers("ДР", "Денис Романов", "НР", "Наталья Романова", "АР", "Артем Романов"),
-    submissionsCount: 3,
-    title: "Семья Романовых",
-  },
-  {
-    id: "FAM-005",
-    lastActivity: "Вчера",
-    members: familyMembers("ИМ", "Игорь Морозов", "ОМ", "Ольга Морозова", "КМ", "Кирилл Морозов", "missing_docs"),
-    submissionsCount: 2,
-    title: "Семья Морозовых",
-  },
-  {
-    id: "FAM-006",
-    lastActivity: "25 авг 2026",
-    members: familyMembers("ПБ", "Петр Беляев", "АБ", "Анна Беляева", "СБ", "София Беляева"),
-    submissionsCount: 1,
-    title: "Семья Беляевых",
-  },
-  {
-    id: "FAM-007",
-    lastActivity: "28 авг 2026",
-    members: familyMembers("ВА", "Виктор Абрамов", "МА", "Мария Абрамова", "ТА", "Тимур Абрамов"),
-    submissionsCount: 2,
-    title: "Семья Абрамовых",
-  },
-  {
-    id: "FAM-008",
-    lastActivity: "1 сен 2026",
-    members: familyMembers("НЛ", "Николай Ларин", "ЕЛ", "Екатерина Ларина", "АЛ", "Алиса Ларина", "in_progress"),
-    submissionsCount: 4,
-    title: "Семья Лариных",
-  },
-  {
-    id: "FAM-009",
-    lastActivity: "3 сен 2026",
-    members: familyMembers("АК", "Андрей Крылов", "ЮК", "Юлия Крылова", "МК", "Марк Крылов"),
-    submissionsCount: 1,
-    title: "Семья Крыловых",
-  },
-  {
-    id: "FAM-010",
-    lastActivity: "5 сен 2026",
-    members: familyMembers("СР", "Сергей Рыбаков", "ИР", "Ирина Рыбакова", "ВР", "Вера Рыбакова", "missing_docs"),
-    submissionsCount: 2,
-    title: "Семья Рыбаковых",
-  },
-];
-
-const visualIndividuals = [
-  {
-    id: "IND-001",
-    initials: "АС",
-    lastActivity: "Сегодня",
-    name: "Алина Смирнова",
-    status: "in_progress" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-002",
-    initials: "ДВ",
-    lastActivity: "5 авг 2026",
-    name: "Дмитрий Волков",
-    status: "ready" as const,
-    submissionsCount: 3,
-  },
-  {
-    id: "IND-003",
-    initials: "МИ",
-    lastActivity: "Сегодня",
-    name: "Михаил Иванов",
-    status: "missing_docs" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-004",
-    initials: "АК",
-    lastActivity: "Вчера",
-    name: "Анна Каренина",
-    status: "missing_docs" as const,
-    submissionsCount: 2,
-  },
-  {
-    id: "IND-005",
-    initials: "ВЦ",
-    lastActivity: "14 авг 2026",
-    name: "Виктор Цой",
-    status: "ready" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-006",
-    initials: "ЕЛ",
-    lastActivity: "18 авг 2026",
-    name: "Елена Летучая",
-    status: "ready" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-007",
-    initials: "ПД",
-    lastActivity: "22 авг 2026",
-    name: "Павел Дуров",
-    status: "ready" as const,
-    submissionsCount: 2,
-  },
-  {
-    id: "IND-008",
-    initials: "НП",
-    lastActivity: "26 авг 2026",
-    name: "Никита Павлов",
-    status: "ready" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-009",
-    initials: "ОТ",
-    lastActivity: "30 авг 2026",
-    name: "Олег Тиньков",
-    status: "in_progress" as const,
-    submissionsCount: 1,
-  },
-  {
-    id: "IND-010",
-    initials: "МЗ",
-    lastActivity: "4 сен 2026",
-    name: "Мария Захарова",
-    status: "in_progress" as const,
-    submissionsCount: 1,
-  },
-];
-
-const actionSortLabels: Record<VisualActionSort, string> = {
-  created_asc: "Сначала старые",
-  created_desc: "Сначала новые",
-  trip_asc: "Ближайшая поездка",
-  trip_desc: "Поздняя поездка",
+const emptySummary: AgentActionSummary = {
+  completed: 0,
+  open: 0,
+  overdue: 0,
+  today: 0,
+  week: 0,
 };
 
-function visualSubmissionFromSubmission(submission: Submission): VisualSubmission {
-  const issues = submission.issues.filter(
-    (issue) => issue.status === "open" || issue.status === "fixed_by_agent",
-  );
-  const openIssues = openIssueCount(submission);
-  const fixedIssues = fixedIssueCount(submission);
-  const visualStatus = visualStatusForSubmission(submission);
-
-  return {
-    agentId: submission.agentId,
-    agentName: agentDisplayName(submission.agentId),
-    applicantsCount: submission.applicants.length,
-    blocker: issues[0]?.reason,
-    city: submission.city,
-    createdAt: submission.createdAt,
-    id: submission.id,
-    issueCount: openIssues + fixedIssues,
-    progress: submission.completeness.total,
-    source: submission,
-    status: visualStatus,
-    statusLabel: visualStatusLabel(visualStatus, openIssues, fixedIssues),
-    title: submission.title,
-    tripDates: tripDates(submission).replace("-", " – "),
-    type: submission.type,
-    updated: submission.updatedAt,
-  };
-}
-
-function visualStatusForSubmission(submission: Submission): VisualStatus {
-  if (
-    submission.status === "returned" ||
-    submission.status === "requires_action" ||
-    blockerCount(submission) > 0 ||
-    openIssueCount(submission) > 0
-  ) {
-    return "returned";
-  }
-
-  if (
-    submission.status === "submitted_for_review" ||
-    submission.status === "corrections_received"
-  ) {
-    return "submitted_for_review";
-  }
-
-  if (submission.status === "ready_for_export" || submission.status === "exported") {
-    return "ready_for_export";
-  }
-
-  return "in_progress";
-}
-
-function visualStatusLabel(
-  status: VisualStatus,
-  openIssues: number,
-  fixedIssues: number,
-) {
-  if (status === "returned") return openIssues > 0 ? "Ошибки" : "Возврат";
-  if (status === "submitted_for_review") {
-    return fixedIssues > 0 ? "Исправлено" : "На проверке";
-  }
-  if (status === "ready_for_export") return "Готово";
-  return "В работе";
-}
-
-function searchText(item: VisualSubmission) {
-  return [
-    item.id,
-    item.title,
-    item.city,
-    item.agentName,
-    item.statusLabel,
-    item.blocker,
-    item.source?.applicants.map((applicant) => applicant.fullName).join(" "),
-    item.source?.issues.map((issue) => `${issue.reason} ${issue.comment}`).join(" "),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-function matchesActionFilter(item: VisualSubmission, filter: VisualActionFilter) {
-  if (filter === "issues") return item.status === "returned" || Boolean(item.issueCount);
-  if (filter === "review") return item.status === "submitted_for_review";
-  return true;
-}
-
-function shortDateScore(value?: string) {
-  if (!value) return 0;
-  const [day, month] = value.split(".").map((part) => Number(part));
-  if (!day || !month) return 0;
-  return new Date(2026, month - 1, day).getTime();
-}
-
-function visualSortScore(item: VisualSubmission, sort: VisualActionSort) {
-  if (sort === "trip_asc" || sort === "trip_desc") {
-    return shortDateScore(item.source?.tripDateFrom ?? item.tripDates);
-  }
-  return shortDateScore(item.createdAt);
-}
-
-function sortVisualSubmissions(items: VisualSubmission[], sort: VisualActionSort) {
-  return [...items].sort((left, right) => {
-    const leftScore = visualSortScore(left, sort);
-    const rightScore = visualSortScore(right, sort);
-    const direction = sort === "created_asc" || sort === "trip_asc" ? 1 : -1;
-    const score = (leftScore - rightScore) * direction;
-    return score || left.title.localeCompare(right.title, "ru");
-  });
-}
-
-function uniqueFilterOptions(
-  items: VisualSubmission[],
-  key: "agentName" | "city",
-) {
-  return Array.from(new Set(items.map((item) => item[key]).filter(Boolean))).sort(
-    (left, right) => String(left).localeCompare(String(right), "ru"),
-  ) as string[];
-}
-
 function statusDot(status: VisualStatus) {
-  if (status === "returned") return "vf-figma-dot-warning";
-  if (status === "in_progress") return "vf-figma-dot-blue";
-  if (status === "submitted_for_review") return "vf-figma-dot-indigo";
+  if (status === "returned" || status === "requires_action") {
+    return "vf-figma-dot-danger";
+  }
+  if (status === "draft" || status === "in_progress") return "vf-figma-dot-blue";
+  if (status === "submitted_for_review" || status === "corrections_received") {
+    return "vf-figma-dot-indigo";
+  }
   return "vf-figma-dot-green";
 }
 
-function statusBadge(item: VisualSubmission) {
-  if (item.status === "returned") {
+function statusBadge(item: VisualActionRow) {
+  if (item.status === "returned" || item.status === "requires_action") {
     return (
-      <span className="vf-figma-status is-warning">
+      <span className="vf-figma-status is-danger">
         <AlertCircle aria-hidden="true" size={15} />
         {item.statusLabel}
       </span>
     );
   }
 
-  if (item.status === "in_progress") {
+  if (item.status === "draft" || item.status === "in_progress") {
     return (
       <span className="vf-figma-status is-blue">
         <Clock aria-hidden="true" size={15} />
@@ -667,11 +109,11 @@ function statusBadge(item: VisualSubmission) {
     );
   }
 
-  if (item.status === "submitted_for_review") {
+  if (item.status === "submitted_for_review" || item.status === "corrections_received") {
     return (
       <span className="vf-figma-status is-indigo">
         <Clock aria-hidden="true" size={15} />
-        {item.statusLabel}
+        Проверка
       </span>
     );
   }
@@ -682,13 +124,6 @@ function statusBadge(item: VisualSubmission) {
       {item.statusLabel}
     </span>
   );
-}
-
-function blockerLabel(item: VisualSubmission) {
-  if (item.blocker) return item.blocker;
-  if (item.status === "returned") return "Скан паспорта не читается";
-  if (item.status === "in_progress") return "Нет фин. гарантии";
-  return "";
 }
 
 function memberStatusIcon(status: VisualMember["status"]) {
@@ -703,14 +138,6 @@ function memberStatusIcon(status: VisualMember["status"]) {
   return <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />;
 }
 
-function visualOpenIntent(item: VisualSubmission): VisualOpenIntent {
-  return item.status === "returned" ? "issues" : "detail";
-}
-
-function visualActionLabel(item: VisualSubmission) {
-  return item.status === "returned" ? "Исправить" : "Открыть";
-}
-
 function activateKeyboardCard(
   event: KeyboardEvent<HTMLElement>,
   action: () => void,
@@ -721,63 +148,93 @@ function activateKeyboardCard(
 }
 
 function VisualToolbar({
-  activeFilter,
-  agentFilter,
-  agentOptions,
+  category,
   categoryCounts,
   cityFilter,
   cityOptions,
-  onAgentFilter,
+  filterPanel,
+  filterPopoverOpen,
+  layoutMode,
+  onCategory,
   onCityFilter,
-  onFilter,
-  onSearch,
-  onSort,
-  viewMode,
-  onViewMode,
-  resultCount,
-  searchQuery,
-  sort,
+  onFilterPanel,
+  onFilterPopoverOpen,
+  onLayoutMode,
+  onQuery,
+  onSortMode,
+  onTypeFilter,
+  query,
+  sortMode,
+  typeFilter,
 }: {
-  activeFilter: VisualActionFilter;
-  agentFilter: string;
-  agentOptions: string[];
-  categoryCounts: Record<VisualActionFilter, number>;
-  cityFilter: string;
-  cityOptions: string[];
-  onAgentFilter: (agent: string) => void;
-  onCityFilter: (city: string) => void;
-  onFilter: (filter: VisualActionFilter) => void;
-  onSearch: (value: string) => void;
-  onSort: (sort: VisualActionSort) => void;
-  onViewMode: (mode: "columns" | "list") => void;
-  resultCount: number;
-  searchQuery: string;
-  sort: VisualActionSort;
-  viewMode: "columns" | "list";
+  category: VisualActionCategory;
+  categoryCounts: Record<VisualActionCategory, number>;
+  cityFilter: City | "Все города";
+  cityOptions: Array<City | "Все города">;
+  filterPanel: VisualFilterPanel;
+  filterPopoverOpen: boolean;
+  layoutMode: VisualLayoutMode;
+  onCategory: (category: VisualActionCategory) => void;
+  onCityFilter: (city: City | "Все города") => void;
+  onFilterPanel: (panel: VisualFilterPanel) => void;
+  onFilterPopoverOpen: (open: boolean) => void;
+  onLayoutMode: (mode: VisualLayoutMode) => void;
+  onQuery: (query: string) => void;
+  onSortMode: (mode: VisualSortMode) => void;
+  onTypeFilter: (filter: VisualTypeFilter) => void;
+  query: string;
+  sortMode: VisualSortMode;
+  typeFilter: VisualTypeFilter;
 }) {
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterTabs: Array<{ id: VisualActionFilter; label: string }> = [
+  const tabs: Array<{ id: VisualActionCategory; label: string }> = [
     { id: "all", label: "Все действия" },
     { id: "issues", label: "Ошибки" },
     { id: "review", label: "На проверке" },
   ];
+  const layoutModes: VisualLayoutMode[] = ["list", "vertical"];
+  const layoutMeta: Record<
+    VisualLayoutMode,
+    { Icon: typeof List; label: string; nextLabel: string }
+  > = {
+    list: { Icon: List, label: "Список", nextLabel: "колонкам" },
+    vertical: { Icon: Columns3, label: "Колонки", nextLabel: "списку" },
+  };
+  const filterTabs: Array<{ id: VisualFilterPanel; label: string }> = [
+    { id: "date", label: "Даты" },
+    { id: "type", label: "Тип" },
+    { id: "id", label: "Номер" },
+    { id: "city", label: "Город" },
+  ];
+  const activeLayout = layoutMeta[layoutMode];
+  const LayoutIcon = activeLayout.Icon;
 
-  function chooseViewMode(mode: "columns" | "list") {
-    onViewMode(mode);
+  function cycleLayoutMode() {
+    const nextMode = layoutModes[(layoutModes.indexOf(layoutMode) + 1) % layoutModes.length];
+    onLayoutMode(nextMode);
+    window.requestAnimationFrame(() => {
+      document.querySelector(".vf-figma-screen")?.scrollTo({ left: 0 });
+    });
   }
 
   return (
     <div className="vf-figma-actions-toolbar">
-      <div className="vf-figma-tabs" aria-label="Фильтры действий">
-        {filterTabs.map((tab) => (
+      <div className="vf-figma-tabs" aria-label="Фильтры действий" role="tablist">
+        {tabs.map((tab) => (
           <button
-            aria-pressed={activeFilter === tab.id}
-            className={activeFilter === tab.id ? "is-active" : ""}
+            aria-selected={category === tab.id}
+            className={category === tab.id ? "is-active" : ""}
             key={tab.id}
+            role="tab"
             type="button"
-            onClick={() => onFilter(tab.id)}
+            onClick={() => {
+              onCategory(tab.id);
+              onFilterPopoverOpen(false);
+            }}
           >
-            {tab.label} <span>{categoryCounts[tab.id]}</span>
+            <span className="vf-figma-tab-label">{tab.label}</span>
+            {tab.id === "all" ? null : (
+              <span className="vf-figma-tab-badge">{categoryCounts[tab.id]}</span>
+            )}
           </button>
         ))}
       </div>
@@ -786,87 +243,172 @@ function VisualToolbar({
         <div className="vf-figma-search">
           <Search aria-hidden="true" size={20} />
           <input
-            aria-label="Поиск"
+            aria-label="Поиск по действиям"
             placeholder="Поиск..."
             type="search"
-            value={searchQuery}
-            onChange={(event) => onSearch(event.target.value)}
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
           />
         </div>
-        <div className="vf-figma-filter-menu">
+        <div className="vf-figma-tool-buttons">
+          <div className="vf-figma-filter-menu">
+            <button
+              aria-expanded={filterPopoverOpen}
+              aria-label="Открыть фильтры действий"
+              className="vf-figma-icon-button vf-figma-filter-button"
+              data-testid="agent-actions-filter-toggle"
+              type="button"
+              onClick={() => onFilterPopoverOpen(!filterPopoverOpen)}
+            >
+              <SlidersHorizontal aria-hidden="true" size={18} />
+            </button>
+            {filterPopoverOpen ? (
+              <div className="vf-figma-filter-popover vf-figma-filter-popover--matrix">
+                <div className="vf-figma-filter-header">
+                  <strong>Фильтр</strong>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSortMode("default");
+                      onTypeFilter("all");
+                      onCityFilter("Все города");
+                      onFilterPopoverOpen(false);
+                    }}
+                  >
+                    Сбросить
+                  </button>
+                </div>
+                <div className="vf-figma-filter-grid" aria-label="Тип фильтра">
+                  {filterTabs.map((filterTab) => (
+                    <button
+                      className={filterPanel === filterTab.id ? "is-active" : ""}
+                      key={filterTab.id}
+                      type="button"
+                      onClick={() => onFilterPanel(filterTab.id)}
+                    >
+                      {filterTab.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="vf-figma-filter-options">
+                  {filterPanel === "date" ? (
+                    <>
+                      <span>Даты вылета</span>
+                      <button
+                        className={sortMode === "dateAsc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "dateAsc" ? "default" : "dateAsc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Сначала ранние
+                      </button>
+                      <button
+                        className={sortMode === "dateDesc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "dateDesc" ? "default" : "dateDesc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Сначала поздние
+                      </button>
+                    </>
+                  ) : null}
+                  {filterPanel === "type" ? (
+                    <>
+                      <span>Семьи и заявители</span>
+                      <button
+                        className={typeFilter === "all" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onTypeFilter("all");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Все
+                      </button>
+                      <button
+                        className={typeFilter === "family" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onTypeFilter("family");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Семьи
+                      </button>
+                      <button
+                        className={typeFilter === "single" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onTypeFilter("single");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        Заявители
+                      </button>
+                    </>
+                  ) : null}
+                  {filterPanel === "id" ? (
+                    <>
+                      <span>Номер заявки</span>
+                      <button
+                        className={sortMode === "idAsc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "idAsc" ? "default" : "idAsc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        По возрастанию
+                      </button>
+                      <button
+                        className={sortMode === "idDesc" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => {
+                          onSortMode(sortMode === "idDesc" ? "default" : "idDesc");
+                          onFilterPopoverOpen(false);
+                        }}
+                      >
+                        По убыванию
+                      </button>
+                    </>
+                  ) : null}
+                  {filterPanel === "city" ? (
+                    <>
+                      <span>Город</span>
+                      {cityOptions.map((city) => (
+                        <button
+                          className={cityFilter === city ? "is-active" : ""}
+                          key={city}
+                          type="button"
+                          onClick={() => {
+                            onCityFilter(city);
+                            onFilterPopoverOpen(false);
+                          }}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button
-            className="vf-figma-icon-button"
-            aria-label="Фильтр и вид"
-            aria-expanded={filterOpen}
+            aria-label={`${activeLayout.label}. Переключить к ${activeLayout.nextLabel}`}
+            className="vf-figma-icon-button vf-figma-layout-cycle"
+            data-layout-mode={layoutMode}
+            data-testid="agent-actions-layout-toggle"
+            title={activeLayout.label}
             type="button"
-            onClick={() => setFilterOpen((open) => !open)}
+            onClick={cycleLayoutMode}
           >
-            <Filter aria-hidden="true" size={21} />
+            <LayoutIcon aria-hidden="true" size={19} />
           </button>
-          {filterOpen ? (
-            <div className="vf-figma-filter-popover" role="menu" aria-label="Фильтр и вид">
-              <span>Найдено</span>
-              <strong className="vf-figma-filter-result">{resultCount} пакетов</strong>
-              <span>Город</span>
-              {["Все города", ...cityOptions].map((city) => (
-                <button
-                  aria-checked={cityFilter === city}
-                  className={cityFilter === city ? "is-active" : ""}
-                  key={city}
-                  role="menuitemradio"
-                  type="button"
-                  onClick={() => onCityFilter(city)}
-                >
-                  {city}
-                </button>
-              ))}
-              <span>Агент</span>
-              {["Все агенты", ...agentOptions].map((agent) => (
-                <button
-                  aria-checked={agentFilter === agent}
-                  className={agentFilter === agent ? "is-active" : ""}
-                  key={agent}
-                  role="menuitemradio"
-                  type="button"
-                  onClick={() => onAgentFilter(agent)}
-                >
-                  {agent}
-                </button>
-              ))}
-              <span>Сортировка</span>
-              {(Object.keys(actionSortLabels) as VisualActionSort[]).map((sortKey) => (
-                <button
-                  aria-checked={sort === sortKey}
-                  className={sort === sortKey ? "is-active" : ""}
-                  key={sortKey}
-                  role="menuitemradio"
-                  type="button"
-                  onClick={() => onSort(sortKey)}
-                >
-                  {actionSortLabels[sortKey]}
-                </button>
-              ))}
-              <span>Вид</span>
-              <button
-                className={viewMode === "list" ? "is-active" : ""}
-                role="menuitemradio"
-                aria-checked={viewMode === "list"}
-                type="button"
-                onClick={() => chooseViewMode("list")}
-              >
-                Список
-              </button>
-              <button
-                className={viewMode === "columns" ? "is-active" : ""}
-                role="menuitemradio"
-                aria-checked={viewMode === "columns"}
-                type="button"
-                onClick={() => chooseViewMode("columns")}
-              >
-                Колонки
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
@@ -877,31 +419,26 @@ function ListRow({
   item,
   onOpen,
 }: {
-  item: VisualSubmission;
-  onOpen?: VisualOpenHandler;
+  item: VisualActionRow;
+  onOpen: VisualOpenHandler;
 }) {
   return (
     <div
       className="vf-figma-action-row"
+      data-submission-id={item.id}
       role="button"
       tabIndex={0}
-      onClick={() => onOpen?.(item.id, visualOpenIntent(item))}
-      onKeyDown={(event) =>
-        activateKeyboardCard(event, () => onOpen?.(item.id, visualOpenIntent(item)))
-      }
+      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
+      onClick={() => onOpen(item.submission, item.tab)}
+      onKeyDown={(event) => activateKeyboardCard(event, () => onOpen(item.submission, item.tab))}
     >
       <span className={`vf-figma-dot ${statusDot(item.status)}`} aria-hidden="true" />
       <span className="vf-figma-action-title">
         <strong>{item.title}</strong>
         <em>
-          ID: <span>{item.id}</span> Обновлено: {item.updated}
+          <span className="vf-figma-action-id">{item.id}</span>
+          <span className="vf-figma-action-updated">Обновлено: {item.updated}</span>
         </em>
-        <small className="vf-figma-action-agent">
-          Агент: {item.agentName ?? "не указан"}
-        </small>
-        {item.blocker ? (
-          <small className="vf-figma-action-problem">{item.blocker}</small>
-        ) : null}
       </span>
       <span className="vf-figma-action-meta">
         <strong>{item.city}</strong>
@@ -918,12 +455,13 @@ function ListRow({
       <button
         className="vf-figma-open-button"
         type="button"
+        aria-label={`${item.cta}: ${item.title}, ${item.id}`}
         onClick={(event) => {
           event.stopPropagation();
-          onOpen?.(item.id, visualOpenIntent(item));
+          onOpen(item.submission, item.tab);
         }}
       >
-        {visualActionLabel(item)}
+        {item.cta}
       </button>
     </div>
   );
@@ -933,19 +471,21 @@ function ColumnCard({
   item,
   onOpen,
 }: {
-  item: VisualSubmission;
-  onOpen?: VisualOpenHandler;
+  item: VisualActionRow;
+  onOpen: VisualOpenHandler;
 }) {
-  const blocker = blockerLabel(item);
+  const tone = visualToneForStatus(item.status);
+  const showRail = tone !== "blue";
 
   return (
     <button
       className="vf-figma-column-card"
+      data-submission-id={item.id}
       type="button"
-      onClick={() => onOpen?.(item.id, visualOpenIntent(item))}
+      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
+      onClick={() => onOpen(item.submission, item.tab)}
     >
-      {item.status === "returned" ? <span className="vf-figma-card-rail is-danger" /> : null}
-      {item.status === "in_progress" ? <span className="vf-figma-card-rail is-warning" /> : null}
+      {showRail ? <span className={`vf-figma-card-rail is-${tone}`} /> : null}
       <span className="vf-figma-column-card-head">
         <span>{item.id}</span>
         <em>
@@ -957,21 +497,18 @@ function ColumnCard({
       <span className="vf-figma-column-subline">
         {item.city} <i aria-hidden="true" /> {item.tripDates}
       </span>
-      <span className="vf-figma-column-subline">
-        {item.agentName ?? "Агент не указан"}
-      </span>
       <span className="vf-figma-column-footer">
-        {blocker ? (
-          <span className={item.status === "returned" ? "is-danger" : "is-warning"}>
-            <AlertCircle aria-hidden="true" size={15} />
-            {blocker}
+        {item.blocker ? (
+          <span className={`is-${tone}`}>
+            {visualToneIcon(tone)}
+            {item.blocker}
           </span>
         ) : (
           <>
             <span className="vf-figma-progress">
-              <span style={{ width: `${item.progress ?? 100}%` }} />
+              <span style={{ width: `${item.progress}%` }} />
             </span>
-            <em>{item.progress ?? 100}%</em>
+            <em>{item.progress}%</em>
           </>
         )}
       </span>
@@ -980,121 +517,163 @@ function ColumnCard({
 }
 
 export function FigmaActionQueueVisual({
+  cityFilter,
+  cityOptions,
+  completedActions,
+  onCityFilter,
   onOpen,
-  submissions,
+  onSearch,
+  openActions,
+  query,
+  summary = emptySummary,
 }: {
-  onOpen?: VisualOpenHandler;
-  submissions?: Submission[];
+  cityFilter: City | "Все города";
+  cityOptions: Array<City | "Все города">;
+  completedActions: AgentActionItem[];
+  onCityFilter: (city: City | "Все города") => void;
+  onOpen: VisualOpenHandler;
+  onSearch: (query: string) => void;
+  openActions: AgentActionItem[];
+  query: string;
+  summary?: AgentActionSummary;
 }) {
-  const [activeFilter, setActiveFilter] = useState<VisualActionFilter>("all");
-  const [agentFilter, setAgentFilter] = useState("Все агенты");
-  const [cityFilter, setCityFilter] = useState("Все города");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sort, setSort] = useState<VisualActionSort>("created_desc");
-  const [viewMode, setViewMode] = useState<"columns" | "list">("list");
-  const screenRef = useRef<HTMLElement | null>(null);
-  const visualItems = useMemo(
-    () =>
-      submissions?.length
-        ? submissions.map(visualSubmissionFromSubmission)
-        : visualSubmissions,
-    [submissions],
-  );
-  const cityOptions = useMemo(
-    () => uniqueFilterOptions(visualItems, "city"),
-    [visualItems],
-  );
-  const agentOptions = useMemo(
-    () => uniqueFilterOptions(visualItems, "agentName"),
-    [visualItems],
+  const [layoutMode, setLayoutMode] = useState<VisualLayoutMode>("list");
+  const [category, setCategory] = useState<VisualActionCategory>("all");
+  const [filterPanel, setFilterPanel] = useState<VisualFilterPanel>("date");
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const [sortMode, setSortMode] = useState<VisualSortMode>("default");
+  const [typeFilter, setTypeFilter] = useState<VisualTypeFilter>("all");
+  const allItems = useMemo(
+    () => [...openActions, ...completedActions].map(toVisualActionRow),
+    [completedActions, openActions],
   );
   const categoryCounts = useMemo(
     () => ({
-      all: visualItems.length,
-      issues: visualItems.filter((item) => matchesActionFilter(item, "issues")).length,
-      review: visualItems.filter((item) => matchesActionFilter(item, "review")).length,
+      all: allItems.length,
+      issues: allItems.filter((item) => visualCategoryMatches(item, "issues")).length,
+      review: allItems.filter((item) => visualCategoryMatches(item, "review")).length,
     }),
-    [visualItems],
+    [allItems],
   );
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    const scoped = visualItems.filter((item) => {
-      if (!matchesActionFilter(item, activeFilter)) return false;
-      if (cityFilter !== "Все города" && item.city !== cityFilter) return false;
-      if (agentFilter !== "Все агенты" && item.agentName !== agentFilter) return false;
-      if (normalizedQuery && !searchText(item).includes(normalizedQuery)) return false;
-      return true;
-    });
+  const visibleItems = useMemo(
+    () => {
+      const filteredItems = allItems.filter((item) => {
+        if (!visualCategoryMatches(item, category)) return false;
+        if (typeFilter !== "all" && item.type !== typeFilter) return false;
+        if (cityFilter !== "Все города" && item.city !== cityFilter) return false;
+        return true;
+      });
 
-    return sortVisualSubmissions(scoped, sort);
-  }, [activeFilter, agentFilter, cityFilter, searchQuery, sort, visualItems]);
-
-  useEffect(() => {
-    if (cityFilter !== "Все города" && !cityOptions.includes(cityFilter)) {
-      setCityFilter("Все города");
-    }
-  }, [cityFilter, cityOptions]);
-
-  useEffect(() => {
-    if (agentFilter !== "Все агенты" && !agentOptions.includes(agentFilter)) {
-      setAgentFilter("Все агенты");
-    }
-  }, [agentFilter, agentOptions]);
-
-  useEffect(() => {
-    screenRef.current?.scrollTo({ top: 0, left: 0 });
-  }, [activeFilter, agentFilter, cityFilter, searchQuery, sort, viewMode]);
+      if (sortMode === "dateAsc") {
+        return [...filteredItems].sort((first, second) =>
+          first.tripDateFrom.localeCompare(second.tripDateFrom),
+        );
+      }
+      if (sortMode === "dateDesc") {
+        return [...filteredItems].sort((first, second) =>
+          second.tripDateFrom.localeCompare(first.tripDateFrom),
+        );
+      }
+      if (sortMode === "idAsc") {
+        return [...filteredItems].sort((first, second) =>
+          first.id.localeCompare(second.id, "ru", { numeric: true }),
+        );
+      }
+      if (sortMode === "idDesc") {
+        return [...filteredItems].sort((first, second) =>
+          second.id.localeCompare(first.id, "ru", { numeric: true }),
+        );
+      }
+      return filteredItems;
+    },
+    [allItems, category, cityFilter, sortMode, typeFilter],
+  );
+  const columns: VisualColumn[] = [
+    {
+      id: "docs",
+      label: "Сбор документов",
+      matches: (item) => item.status === "draft" || item.status === "in_progress",
+      tone: "warning",
+    },
+    {
+      id: "errors",
+      label: "Ошибки",
+      matches: (item) => visualCategoryMatches(item, "issues"),
+      tone: "danger",
+    },
+    {
+      id: "review",
+      label: "На проверке",
+      matches: (item) => visualCategoryMatches(item, "review"),
+      tone: "indigo",
+    },
+    {
+      id: "ready",
+      label: "Готово к выгрузке",
+      matches: (item) => isReadyVisualStatus(item.status),
+      tone: "green",
+    },
+  ];
 
   return (
-    <section
-      ref={screenRef}
-      className="vf-figma-screen vf-figma-actions-screen"
-      aria-label="Мои действия"
-    >
+    <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
       <VisualToolbar
-        activeFilter={activeFilter}
-        agentFilter={agentFilter}
-        agentOptions={agentOptions}
+        category={category}
         categoryCounts={categoryCounts}
         cityFilter={cityFilter}
         cityOptions={cityOptions}
-        resultCount={filteredItems.length}
-        searchQuery={searchQuery}
-        sort={sort}
-        viewMode={viewMode}
-        onAgentFilter={setAgentFilter}
-        onCityFilter={setCityFilter}
-        onFilter={setActiveFilter}
-        onSearch={setSearchQuery}
-        onSort={setSort}
-        onViewMode={setViewMode}
+        filterPanel={filterPanel}
+        filterPopoverOpen={filterPopoverOpen}
+        layoutMode={layoutMode}
+        onCategory={(nextCategory) => {
+          setCategory(nextCategory);
+          setFilterPopoverOpen(false);
+        }}
+        onCityFilter={onCityFilter}
+        onFilterPanel={setFilterPanel}
+        onFilterPopoverOpen={setFilterPopoverOpen}
+        onLayoutMode={setLayoutMode}
+        onQuery={onSearch}
+        onSortMode={setSortMode}
+        onTypeFilter={setTypeFilter}
+        query={query}
+        sortMode={sortMode}
+        typeFilter={typeFilter}
       />
 
-      <div className={`vf-figma-view-stage is-${viewMode}`} key={viewMode}>
-        {viewMode === "list" ? (
+      <div
+        className={`vf-figma-view-stage is-${layoutMode}`}
+        data-agent-action-open-count={summary.open}
+      >
+        {visibleItems.length === 0 ? (
+          <div className="vf-figma-action-list" role="status">
+            <div className="vf-figma-section-rule">
+              <span aria-hidden="true" />
+              <strong>Нет действий</strong>
+              <span aria-hidden="true" />
+            </div>
+            <div className="vf-figma-column-card">
+              <strong>По текущим фильтрам ничего не найдено</strong>
+              <span className="vf-figma-column-subline">
+                Измените поиск или категорию. Данные берутся из реальных подач агента.
+              </span>
+            </div>
+          </div>
+        ) : layoutMode === "list" ? (
           <div className="vf-figma-action-list">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
-              <strong>Найдено</strong>
+              <strong>Сегодня</strong>
               <span aria-hidden="true" />
             </div>
-            {filteredItems.length ? (
-              filteredItems.map((item) => (
-                <ListRow item={item} key={item.id} onOpen={onOpen} />
-              ))
-            ) : (
-              <div className="vf-figma-empty-state" role="status">
-                <strong>Подачи не найдены</strong>
-                <span>Измените поиск, город, агента или категорию.</span>
-              </div>
-            )}
+            {visibleItems.map((item) => (
+              <ListRow item={item} key={item.actionId} onOpen={onOpen} />
+            ))}
           </div>
         ) : (
           <div className="vf-figma-column-board">
-            {visualColumns.map((column) => {
-              const items = filteredItems.filter((item) =>
-                column.statuses.includes(item.status),
-              );
+            {columns.map((column) => {
+              const items = visibleItems.filter(column.matches);
 
               return (
                 <section className="vf-figma-column" key={column.id}>
@@ -1106,9 +685,18 @@ export function FigmaActionQueueVisual({
                     <em>{items.length}</em>
                   </header>
                   <div className="vf-figma-column-stack">
-                    {items.map((item) => (
-                      <ColumnCard item={item} key={item.id} onOpen={onOpen} />
-                    ))}
+                    {items.length ? (
+                      items.map((item) => (
+                        <ColumnCard item={item} key={item.actionId} onOpen={onOpen} />
+                      ))
+                    ) : (
+                      <div className="vf-figma-column-card" role="status">
+                        <strong>Нет подач</strong>
+                        <span className="vf-figma-column-subline">
+                          Колонка пуста для текущих фильтров.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </section>
               );
@@ -1122,92 +710,255 @@ export function FigmaActionQueueVisual({
 
 export function FigmaApplicantsVisual({
   onOpen,
+  submissions = [],
 }: {
   onOpen?: VisualOpenHandler;
+  submissions?: Submission[];
 }) {
+  const familySubmissions = submissions.filter((submission) => submission.type === "family");
+  const individualSubmissions = submissions.filter((submission) => submission.type === "single");
+
   return (
     <section className="vf-figma-screen vf-figma-applicants-screen" aria-label="Мои подачи">
       <div className="vf-figma-applicants-section">
-        <h2>Семьи</h2>
+        <h2>Семейные подачи</h2>
         <div className="vf-figma-family-grid">
-          {visualFamilies.map((family) => (
-            <article
-              className="vf-figma-family-card"
-              key={family.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onOpen?.(family.id)}
-              onKeyDown={(event) =>
-                activateKeyboardCard(event, () => onOpen?.(family.id))
-              }
-            >
+          {familySubmissions.length ? (
+            familySubmissions.map((submission) => (
+              <article
+                className="vf-figma-family-card"
+                data-submission-id={submission.id}
+                key={submission.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submission.id}`}
+                onClick={() => onOpen?.(submission)}
+                onKeyDown={(event) =>
+                  activateKeyboardCard(event, () => onOpen?.(submission))
+                }
+              >
+                <span className="vf-figma-family-head">
+                  <span className="vf-figma-family-icon">
+                    <Users aria-hidden="true" size={26} />
+                  </span>
+                  <span>
+                    <strong>{formatSubmissionListTitle(submission)}</strong>
+                    <em>{applicantCountLabel(submission.applicants.length)}</em>
+                  </span>
+                </span>
+                <span className="vf-figma-member-list">
+                  {submission.applicants.map((applicant) => {
+                    const member = visualMemberForApplicant(submission, applicant);
+                    return (
+                      <button
+                        className="vf-figma-member-row"
+                        key={`${submission.id}-${applicant.id}`}
+                        type="button"
+                        aria-label={`Открыть заявителя: ${member.name}, ${formatSubmissionListTitle(submission)}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpen?.(submission, "applicants");
+                        }}
+                      >
+                        <em>{member.initials}</em>
+                        <strong>{member.name}</strong>
+                        <small>{member.role}</small>
+                        {memberStatusIcon(member.status)}
+                      </button>
+                    );
+                  })}
+                </span>
+                <span className="vf-figma-family-footer">
+                  <span>Акт: {submission.updatedAt}</span>
+                  <em>
+                    <Folder aria-hidden="true" size={17} />
+                    {submission.files.length} файлов
+                  </em>
+                </span>
+              </article>
+            ))
+          ) : (
+            <div className="vf-figma-family-card" role="status">
               <span className="vf-figma-family-head">
-                <span className="vf-figma-family-icon">
-                  <Users aria-hidden="true" size={26} />
-                </span>
                 <span>
-                  <strong>{family.title}</strong>
-                  <em>{family.members.length} человека</em>
+                  <strong>Семейных подач нет</strong>
+                  <em>Создайте семейный пакет, чтобы он появился здесь.</em>
                 </span>
               </span>
-              <span className="vf-figma-member-list">
-                {family.members.map((member) => (
-                  <button
-                    className="vf-figma-member-row"
-                    key={`${family.id}-${member.name}`}
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpen?.(family.id);
-                    }}
-                  >
-                    <em>{member.initials}</em>
-                    <strong>{member.name}</strong>
-                    <small>{member.role}</small>
-                    {memberStatusIcon(member.status)}
-                  </button>
-                ))}
-              </span>
-              <span className="vf-figma-family-footer">
-                <span>Акт: {family.lastActivity}</span>
-                <em>
-                  <Folder aria-hidden="true" size={17} />
-                  {family.submissionsCount} пакета
-                </em>
-              </span>
-            </article>
-          ))}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="vf-figma-applicants-divider" />
 
       <div className="vf-figma-applicants-section">
-        <h2>Одиночные профили</h2>
+        <h2>Заявители</h2>
         <div className="vf-figma-individual-grid">
-          {visualIndividuals.map((individual) => (
-            <button
-              className="vf-figma-individual-card"
-              key={individual.id}
-              type="button"
-              onClick={() => onOpen?.(individual.id)}
-            >
-              <span className="vf-figma-avatar">{individual.initials}</span>
+          {individualSubmissions.length ? (
+            individualSubmissions.map((submission) => {
+              const applicant = submission.applicants[0];
+              const member = applicant
+                ? visualMemberForApplicant(submission, applicant)
+                : null;
+              return (
+                <button
+                  className="vf-figma-individual-card"
+                  data-submission-id={submission.id}
+                  key={submission.id}
+                  type="button"
+                  aria-label={`Открыть заявителя: ${member?.name ?? submission.title}, ${submission.id}`}
+                  onClick={() => onOpen?.(submission)}
+                >
+                  <span className="vf-figma-avatar">
+                    {member?.initials ?? initialsForName(submission.title)}
+                  </span>
+                  <span>
+                    <strong>{member?.name ?? submission.title}</strong>
+                    <em>
+                      {member ? memberStatusIcon(member.status) : null}
+                      {statusLabelFor(submission.status, "compact")}
+                    </em>
+                  </span>
+                  <span className="vf-figma-family-footer">
+                    <span>Акт: {submission.updatedAt}</span>
+                    <em>
+                      <Folder aria-hidden="true" size={17} />
+                      {submission.files.length} файлов
+                    </em>
+                  </span>
+                </button>
+              );
+            })
+          ) : (
+            <div className="vf-figma-individual-card" role="status">
               <span>
-                <strong>{individual.name}</strong>
-                <em>{memberStatusIcon(individual.status)} Профиль готов</em>
+                <strong>Индивидуальных подач нет</strong>
+                <em>По текущему списку нет одиночных заявителей.</em>
               </span>
-              <span className="vf-figma-family-footer">
-                <span>Акт: {individual.lastActivity}</span>
-                <em>
-                  <Folder aria-hidden="true" size={17} />
-                  {individual.submissionsCount} пакета
-                </em>
-              </span>
-            </button>
-          ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
   );
+}
+
+function toVisualActionRow(action: AgentActionItem): VisualActionRow {
+  const submission = action.submission;
+
+  return {
+    actionId: action.id,
+    applicantsCount: submission.applicants.length,
+    badges: action.badges,
+    blocker: visualActionBlocker(action),
+    city: submission.city,
+    completed: action.completed,
+    context: action.context,
+    createdAt: submission.createdAt,
+    cta: action.cta,
+    id: submission.id,
+    progress: submission.completeness.total,
+    severity: action.severity,
+    status: submission.status,
+    statusLabel: statusLabelFor(submission.status, "compact"),
+    submission,
+    tab: action.tab,
+    title: action.title || formatSubmissionListTitle(submission),
+    tripDates: tripDates(submission),
+    tripDateFrom: submission.tripDateFrom,
+    type: submission.type,
+    updated: submission.updatedAt,
+  };
+}
+
+function visualCategoryMatches(item: VisualActionRow, category: VisualActionCategory) {
+  if (category === "all") return true;
+  if (category === "issues") {
+    return (
+      !item.completed &&
+      (item.status === "returned" ||
+        item.status === "requires_action" ||
+        item.severity === "blocker")
+    );
+  }
+  return isReviewVisualStatus(item.status);
+}
+
+function visualActionBlocker(action: AgentActionItem) {
+  if (action.severity !== "blocker" && action.severity !== "warning") return undefined;
+  return action.context;
+}
+
+function isReviewVisualStatus(status: VisualStatus) {
+  return status === "submitted_for_review" || status === "corrections_received";
+}
+
+function isReadyVisualStatus(status: VisualStatus) {
+  return status === "ready_for_export" || status === "exported";
+}
+
+function visualToneForStatus(status: VisualStatus): VisualTone {
+  if (status === "returned" || status === "requires_action") return "danger";
+  if (status === "draft" || status === "in_progress") return "warning";
+  if (isReviewVisualStatus(status)) return "indigo";
+  if (isReadyVisualStatus(status)) return "green";
+  return "blue";
+}
+
+function visualToneIcon(tone: VisualTone) {
+  if (tone === "green") return <CheckCircle2 aria-hidden="true" size={15} />;
+  if (tone === "indigo" || tone === "blue") {
+    return <Clock aria-hidden="true" size={15} />;
+  }
+  return <AlertCircle aria-hidden="true" size={15} />;
+}
+
+function visualMemberForApplicant(
+  submission: Submission,
+  applicant: Submission["applicants"][number],
+): VisualMember {
+  return {
+    initials: initialsForName(applicant.fullName),
+    name: applicant.fullName,
+    role: applicantRoleLabel(applicant.role ?? "main"),
+    status: memberStatus(submission, applicant.id, applicant.questionnaireStatus),
+  };
+}
+
+function memberStatus(
+  submission: Submission,
+  applicantId: string,
+  questionnaireStatus: Submission["applicants"][number]["questionnaireStatus"],
+): VisualMember["status"] {
+  const files = submission.files.filter((file) => file.applicantId === applicantId);
+  if (
+    questionnaireStatus === "needs_fix" ||
+    files.some((file) => file.status === "missing" || file.status === "needs_replacement")
+  ) {
+    return "missing_docs";
+  }
+  if (
+    questionnaireStatus === "empty" ||
+    questionnaireStatus === "partial" ||
+    files.some((file) => file.status === "uploaded" || file.status === "pending_review")
+  ) {
+    return "in_progress";
+  }
+  return "ready";
+}
+
+function applicantRoleLabel(role: string) {
+  if (role === "main") return "Основной";
+  if (role === "spouse") return "Супруга";
+  if (role === "child") return "Ребенок";
+  return role;
+}
+
+function initialsForName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 }

@@ -8,16 +8,34 @@ const baseSettings = {
   drawerHints: true,
 };
 
+const sampleAccessRequests = [
+  {
+    city: "Москва",
+    companyName: "Visa Center Test",
+    id: "access-request-1",
+    email: "new.agent@example.com",
+    fullName: "Новый Агент",
+    phone: "+7 900 000-00-00",
+    requestedRole: "agent" as const,
+    status: "pending" as const,
+    createdAt: "2026-06-28T10:00:00.000Z",
+  },
+];
+
 function renderSettings(
   overrides: Partial<Parameters<typeof SettingsScreen>[0]> = {},
 ) {
   const props: Parameters<typeof SettingsScreen>[0] = {
+    accessRequests: [],
+    accessRequestsBusy: false,
     confirmLeave: false,
     dirty: false,
     email: "admin@visaflow.local",
     isSupabaseMode: false,
+    onApproveAccessRequest: vi.fn(),
     onCancelLeave: vi.fn(),
     onConfirmLeave: vi.fn(),
+    onRejectAccessRequest: vi.fn(),
     onReset: vi.fn(),
     onSave: vi.fn(),
     onSettings: vi.fn(),
@@ -46,10 +64,19 @@ describe("SettingsScreen", () => {
     });
 
     expect(sections).toHaveTextContent("Профиль");
+    expect(sections).toHaveTextContent("Входящие заявки");
     expect(sections).toHaveTextContent("Команда и роли");
     expect(sections).toHaveTextContent("Уведомления");
     expect(sections).toHaveTextContent("Выгрузка");
     expect(sections).toHaveTextContent("Интерфейс");
+    expect(screen.getByRole("heading", { name: "Уведомления" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Входящие заявки" }));
+
+    expect(screen.getByRole("heading", { name: "Входящие заявки" })).toBeVisible();
+    expect(screen.getByText("Новых заявок нет.")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Уведомления" }));
     expect(screen.getByRole("heading", { name: "Уведомления" })).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Профиль" }));
@@ -69,8 +96,26 @@ describe("SettingsScreen", () => {
     expect(sections).toHaveTextContent("Профиль");
     expect(sections).toHaveTextContent("Уведомления");
     expect(sections).toHaveTextContent("Интерфейс");
+    expect(sections).not.toHaveTextContent("Входящие заявки");
     expect(sections).not.toHaveTextContent("Команда и роли");
     expect(sections).not.toHaveTextContent("Выгрузка");
+  });
+
+  test("renders admin access requests and fires review actions", () => {
+    const props = renderSettings({ accessRequests: sampleAccessRequests });
+
+    fireEvent.click(screen.getByRole("button", { name: "Входящие заявки" }));
+
+    expect(screen.getByTestId("admin-access-queue")).toBeVisible();
+    expect(screen.getByText("Новый Агент")).toBeVisible();
+    expect(screen.getByText(/Visa Center Test/)).toBeVisible();
+    expect(screen.getByText(/new.agent@example.com/)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Одобрить" }));
+    expect(props.onApproveAccessRequest).toHaveBeenCalledWith("access-request-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Отклонить" }));
+    expect(props.onRejectAccessRequest).toHaveBeenCalledWith("access-request-1");
   });
 
   test("updates notification and interface settings through prototype controls", () => {

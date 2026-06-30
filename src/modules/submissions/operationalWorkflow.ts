@@ -3,13 +3,22 @@ import {
   visaApplicationPdfReviewsForSubmission,
   type VisaApplicationPdfArtifactInput,
 } from "./visaApplicationPdfReconciliation";
-import { buildExportPackageIdentity, exportSummary } from "./exportRules";
+import {
+  buildExportPackageIdentity,
+  buildExportRows,
+  exportSummary,
+} from "./exportRules";
 import { createDraft, submitForReview } from "./domainEngine";
 import {
   mediaStorageBucket,
   validateAppointmentPdfStorageTarget,
   validateVisaApplicationPdfStorageTarget,
 } from "./mediaStoragePolicy";
+import {
+  applicantHasPassportNumber,
+  buildApplicantDocumentFileName,
+} from "./filenamePolicy";
+import { agentOwnerDisplayName } from "./ownership";
 import {
   passportGateReason,
   requiresPassportExtractionReviewBeforeAction,
@@ -62,7 +71,15 @@ type VisaApplicationPdfReviewArtifact = NonNullable<
 
 type ReturnedPdfArtifactLike = Pick<
   ReturnedPdfArtifact,
-  "fileName" | "mimeType" | "sha256" | "sizeBytes" | "storageBucket" | "storagePath"
+  | "deletedAtIso"
+  | "failureReason"
+  | "fileName"
+  | "mimeType"
+  | "sha256"
+  | "sizeBytes"
+  | "storageBucket"
+  | "storagePath"
+  | "uploadStatus"
 >;
 
 export type OperationalWorkflowResult<T> = CommandResult<T>;
@@ -171,6 +188,7 @@ export type ReturnedPdfPackageReviewInput = {
   applicationPdfs: ReturnedApplicationPdfInput[];
   commonAppointmentPdf?: ReturnedPdfArtifact;
   nowIso?: string;
+  ownerAgentName?: string;
 };
 
 export type ReturnedPdfMismatchIssueConfirmationInput = {
@@ -181,8 +199,10 @@ export type ReturnedPdfMismatchIssueConfirmationInput = {
 
 export type ApplicantArtifactFileNames = {
   application: string;
+  applicationFormPdf: string;
   appointment: string;
   passportScan: string;
+  questionnaire: string;
   selfie: string;
   selfie2: string;
 };
@@ -197,17 +217,237 @@ export type AgentHandoffApplicantPdf = {
   status: VisaApplicationPdfReviewState["status"];
 };
 
+export type ReturnedPdfPackageMapping = {
+  applicantId?: string;
+  applicantName?: string;
+  artifactKind: "application_form_pdf" | "appointment_list_pdf";
+  city: City;
+  excelRowNumber?: number;
+  exportPackageId: string;
+  fileName: string;
+  ownerAgentId: string;
+  ownerAgentName?: string;
+  reviewId?: string;
+  sha256: string;
+  storageBucket: string;
+  storagePath: string;
+  submissionId: string;
+};
+
 export type AgentHandoffPackage = {
   applicantPdfs: AgentHandoffApplicantPdf[];
   blockers: string[];
   commonAppointmentPdf?: ReturnedPdfArtifact;
+  mappings: ReturnedPdfPackageMapping[];
   ready: boolean;
+};
+
+export type AgentReturnedPdfPackageView = AgentHandoffPackage & {
+  visible: boolean;
 };
 
 export type ReturnedPdfPackageReviewResult = {
   handoffPackage: AgentHandoffPackage;
   submission: Submission;
 };
+
+export type AppointmentListPdfRowExtraction = {
+  appointmentDateTime?: string;
+  maskedApplicantName?: string;
+  passportLast3?: string;
+  referenceNumber?: string;
+};
+
+export type AppointmentListPdfExtraction = {
+  appointmentDate?: string;
+  appointmentTime?: string;
+  centerAddress?: string;
+  centerCity?: string;
+  groupUrn?: string;
+  rows: AppointmentListPdfRowExtraction[];
+  serviceType?: string;
+  visaType?: string;
+};
+
+export type AppointmentListPdfMappingResult = {
+  agentHandoffAllowed: boolean;
+  artifactKind: "appointment_list_pdf";
+  blockerReasons: string[];
+  exportPackageId?: string;
+  groupUrn?: string;
+  matchedApplicantsCount: number;
+  matchedApplicantIds: string[];
+  mixedAgentBlocker?: string;
+  packageLevel: true;
+  passportLast3Collisions: string[];
+  unmatchedRows: AppointmentListPdfRowExtraction[];
+};
+
+export function extractBlsAppointmentListPdfData(
+  text: string,
+): AppointmentListPdfExtraction {
+  const normalized = text.replace(/\r/g, "\n");
+  const groupUrn = normalized.match(/\b[A-Z]{3}\d{9,}\b/)?.[0];
+  const appointmentDate =
+    normalized.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] ??
+    normalized.match(/\b\d{2}[./-]\d{2}[./-]\d{4}\b/)?.[0];
+  const appointmentTime = normalized.match(/\b\d{1,2}:\d{2}\b/)?.[0];
+  const rows = normalized
+    .split("\n")
+    .map((line) => appointmentListRowFromLine(line))
+    .filter((row): row is AppointmentListPdfRowExtraction => Boolean(row));
+
+  return {
+    appointmentDate,
+    appointmentTime,
+    centerAddress: normalized.match(/(?:address|адрес)[:\s]+(.+)/i)?.[1]?.trim(),
+    centerCity: ["Москва", "Санкт-Петербург", "Казань", "SPB", "Moscow"].find(
+      (city) => normalized.toLowerCase().includes(city.toLowerCase()),
+    ),
+    groupUrn,
+    rows,
+    serviceType: normalized.match(/(?:service type|service)[:\s]+(.+)/i)?.[1]?.trim(),
+    visaType: normalized.match(/(?:visa type|visa)[:\s]+(.+)/i)?.[1]?.trim(),
+  };
+}
+
+export function buildAppointmentListPdfMapping(input: {
+  expectedGroupUrn?: string;
+  exportPackageId?: string;
+  pdfText: string;
+  submissions: Submission[];
+}): AppointmentListPdfMappingResult {
+  const extraction = extractBlsAppointmentListPdfData(input.pdfText);
+  const rows = buildExportRows(input.submissions);
+  const ownerAgentIds = new Set(input.submissions.map((submission) => submission.agentId));
+  const blockerReasons: string[] = [];
+  const groupUrnAgrees =
+    !input.expectedGroupUrn ||
+    (Boolean(extraction.groupUrn) && extraction.groupUrn === input.expectedGroupUrn);
+  if (!groupUrnAgrees) {
+    blockerReasons.push("Appointment list group URN does not match export package.");
+  }
+
+  const passportLast3Collisions = duplicateValues(
+    rows.map((row) => row.passportLast3).filter(Boolean),
+  );
+  const matchedApplicantIds: string[] = [];
+  const unmatchedRows: AppointmentListPdfRowExtraction[] = [];
+
+  for (const extractedRow of extraction.rows) {
+    const matchedRow = groupUrnAgrees
+      ? uniqueMatchedAppointmentRow(rows, extractedRow)
+      : undefined;
+    if (matchedRow) {
+      matchedApplicantIds.push(matchedRow.applicantId);
+    } else {
+      unmatchedRows.push(extractedRow);
+    }
+  }
+
+  if (unmatchedRows.length > 0) {
+    blockerReasons.push("Appointment list contains rows that cannot be safely matched.");
+  }
+
+  const mixedAgentBlocker =
+    ownerAgentIds.size > 1
+      ? "Mixed-agent appointment list PDF is admin-only until the export package is split or scoped."
+      : undefined;
+  if (mixedAgentBlocker) blockerReasons.push(mixedAgentBlocker);
+
+  return {
+    agentHandoffAllowed: ownerAgentIds.size === 1 && blockerReasons.length === 0,
+    artifactKind: "appointment_list_pdf",
+    blockerReasons: uniqueMessages(blockerReasons),
+    exportPackageId: input.exportPackageId,
+    groupUrn: extraction.groupUrn,
+    matchedApplicantsCount: new Set(matchedApplicantIds).size,
+    matchedApplicantIds: [...new Set(matchedApplicantIds)],
+    mixedAgentBlocker,
+    packageLevel: true,
+    passportLast3Collisions,
+    unmatchedRows,
+  };
+}
+
+function appointmentListRowFromLine(
+  line: string,
+): AppointmentListPdfRowExtraction | null {
+  const referenceNumber = line.match(/\b[A-Z]{3}\d{9,}\/\d+\b/)?.[0];
+  const passportLast3 = line.match(/\*{2,}\s*(\d{3,4})\b/)?.[1]?.slice(-3);
+  const maskedNameMatch = line.match(
+    /\b([\p{L}]{2,}\*{2,})\s+([\p{L}]{2,}\*{2,})/u,
+  );
+  if (!referenceNumber && !passportLast3 && !maskedNameMatch) return null;
+
+  const date =
+    line.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] ??
+    line.match(/\b\d{2}[./-]\d{2}[./-]\d{4}\b/)?.[0];
+  const time = line.match(/\b\d{1,2}:\d{2}\b/)?.[0];
+
+  return {
+    appointmentDateTime: [date, time].filter(Boolean).join(" ") || undefined,
+    maskedApplicantName: maskedNameMatch
+      ? `${maskedNameMatch[1]} ${maskedNameMatch[2]}`
+      : undefined,
+    passportLast3,
+    referenceNumber,
+  };
+}
+
+function uniqueMatchedAppointmentRow(
+  rows: ExportContractRow[],
+  extractedRow: AppointmentListPdfRowExtraction,
+): ExportContractRow | undefined {
+  if (!extractedRow.passportLast3 || !extractedRow.maskedApplicantName) {
+    return undefined;
+  }
+
+  const candidates = rows.filter(
+    (row) =>
+      row.passportLast3 === extractedRow.passportLast3 &&
+      maskedNameMatchesApplicantName(extractedRow.maskedApplicantName!, row),
+  );
+
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+function maskedNameMatchesApplicantName(
+  maskedApplicantName: string,
+  row: ExportContractRow,
+): boolean {
+  const prefixes = maskedApplicantName
+    .split(/\s+/)
+    .map((part) => normalizeAppointmentName(part.replace(/\*/g, "")))
+    .filter(Boolean);
+  if (prefixes.length < 2) return false;
+
+  const applicantParts = [
+    row.firstName,
+    row.surnameFamilyName,
+    row.lastName,
+    row.applicantName,
+  ].map(normalizeAppointmentName);
+
+  return prefixes.every((prefix) =>
+    applicantParts.some((part) => part.startsWith(prefix)),
+  );
+}
+
+function normalizeAppointmentName(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .toUpperCase();
+}
+
+function duplicateValues(values: string[]): string[] {
+  const counts = new Map<string, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([value]) => value);
+}
 
 const passportAutofillTargets = {
   birthCountry: { fieldId: "birth-country", sectionKey: "personal" },
@@ -691,11 +931,29 @@ export function buildAgentHandoffPackage(
 ): AgentHandoffPackage {
   const blockers: string[] = [];
   const applicantPdfs: AgentHandoffApplicantPdf[] = [];
+  const mappings: ReturnedPdfPackageMapping[] = [];
   const commonAppointmentPdf =
     options.commonAppointmentPdf ?? submission.returnedPdfPackage?.commonAppointmentPdf;
+  const exportPackageId =
+    submission.returnedPdfPackage?.exportPackageId ??
+    submission.exportPackage?.idempotencyKey;
+  const ownerAgentId = submission.returnedPdfPackage?.ownerAgentId ?? submission.agentId;
+  const ownerAgentName = agentOwnerDisplayName(
+    ownerAgentId,
+    submission.returnedPdfPackage?.ownerAgentName,
+  );
+  const excelRowsByApplicantId = exportExcelRowNumbersByApplicantId(submission);
 
   if (submission.status !== "exported") {
     blockers.push("PDF package can be handed to agent only after export.");
+  }
+
+  if (!exportPackageId) {
+    blockers.push("Returned PDF handoff requires a durable export package identity.");
+  }
+
+  if (ownerAgentId !== submission.agentId) {
+    blockers.push("Returned PDF handoff owner does not match submission owner.");
   }
 
   const commonPdfBlocker = returnedPdfArtifactBlocker(
@@ -706,6 +964,19 @@ export function buildAgentHandoffPackage(
   );
   if (commonPdfBlocker) {
     blockers.push(commonPdfBlocker);
+  } else if (commonAppointmentPdf && exportPackageId) {
+    mappings.push({
+      artifactKind: "appointment_list_pdf",
+      city: submission.city,
+      exportPackageId,
+      fileName: commonAppointmentPdf.fileName,
+      ownerAgentId,
+      ownerAgentName,
+      sha256: commonAppointmentPdf.sha256,
+      storageBucket: commonAppointmentPdf.storageBucket ?? "",
+      storagePath: commonAppointmentPdf.storagePath ?? "",
+      submissionId: submission.id,
+    });
   }
 
   for (const issue of unresolvedReturnedPdfMismatchIssues(submission)) {
@@ -727,6 +998,11 @@ export function buildAgentHandoffPackage(
   for (const applicant of submission.applicants) {
     const fileNames = buildApplicantArtifactFileNames(submission, applicant.id);
     if (!fileNames) {
+      blockers.push(`Applicant is missing for returned PDF file naming.`);
+      continue;
+    }
+
+    if (!applicantHasPassportNumber(applicant)) {
       blockers.push(`Passport number is missing for ${applicant.fullName}.`);
       continue;
     }
@@ -799,19 +1075,103 @@ export function buildAgentHandoffPackage(
       applicantId: applicant.id,
       applicantName: applicant.fullName,
       artifact: review.artifact,
-      fileName: review.artifact.fileName,
+      fileName: fileNames.applicationFormPdf,
       fileNames,
       reviewId: review.id,
       status: review.status,
     });
+    if (exportPackageId) {
+      mappings.push({
+        applicantId: applicant.id,
+        applicantName: applicant.fullName,
+        artifactKind: "application_form_pdf",
+        city: submission.city,
+        excelRowNumber: excelRowsByApplicantId.get(applicant.id),
+        exportPackageId,
+        fileName: fileNames.applicationFormPdf,
+        ownerAgentId,
+        ownerAgentName,
+        reviewId: review.id,
+        sha256: review.artifact.sha256,
+        storageBucket: review.artifact.storageBucket ?? "",
+        storagePath: review.artifact.storagePath ?? "",
+        submissionId: submission.id,
+      });
+    }
   }
 
   return {
     applicantPdfs,
     blockers: uniqueMessages(blockers),
     commonAppointmentPdf,
+    mappings: blockers.length === 0 ? mappings : [],
     ready: blockers.length === 0,
   };
+}
+
+export function buildReturnedPdfAgentHandoffGate(
+  submission: Submission,
+  packageSubmissions: Submission[] = [submission],
+  options: { commonAppointmentPdf?: ReturnedPdfArtifact } = {},
+): AgentHandoffPackage {
+  const handoffPackage = buildAgentHandoffPackage(submission, options);
+  const exportPackageId = returnedPdfExportPackageId(submission);
+  const scopedSubmissions = exportPackageId
+    ? packageSubmissions.filter(
+        (candidate) => returnedPdfExportPackageId(candidate) === exportPackageId,
+      )
+    : [submission];
+  const ownerAgentIds = new Set(
+    (scopedSubmissions.length ? scopedSubmissions : [submission]).map(
+      (candidate) => candidate.returnedPdfPackage?.ownerAgentId ?? candidate.agentId,
+    ),
+  );
+
+  if (ownerAgentIds.size <= 1) {
+    return handoffPackage;
+  }
+
+  return {
+    ...handoffPackage,
+    blockers: uniqueMessages([
+      ...handoffPackage.blockers,
+      "Mixed-agent appointment list PDF is admin-only until the export package is split or scoped.",
+    ]),
+    mappings: [],
+    ready: false,
+  };
+}
+
+export function buildAgentReturnedPdfPackageView(
+  submission: Submission,
+  agentId: string,
+  options: { commonAppointmentPdf?: ReturnedPdfArtifact } = {},
+): AgentReturnedPdfPackageView {
+  const ownerAgentId = submission.returnedPdfPackage?.ownerAgentId ?? submission.agentId;
+  if (submission.agentId !== agentId || ownerAgentId !== agentId) {
+    return {
+      applicantPdfs: [],
+      blockers: ["Agent can see only own returned PDF package."],
+      commonAppointmentPdf: undefined,
+      mappings: [],
+      ready: false,
+      visible: false,
+    };
+  }
+
+  const handoffPackage = buildAgentHandoffPackage(submission, options);
+  return {
+    ...handoffPackage,
+    visible: handoffPackage.ready,
+  };
+}
+
+function returnedPdfExportPackageId(submission: Submission): string {
+  return (
+    submission.returnedPdfPackage?.exportPackageId ??
+    submission.exportPackage?.idempotencyKey ??
+    ""
+  );
 }
 
 export function confirmReturnedPdfMismatchIssue(
@@ -890,17 +1250,40 @@ export function buildApplicantArtifactFileNames(
     return null;
   }
 
-  const passportNumber = questionnaireFieldValue(applicant, "passport-no").trim();
-  if (!passportNumber) {
-    return null;
-  }
+  const applicationFormPdf = buildApplicantDocumentFileName({
+    applicant,
+    applicantId,
+    documentType: "application_form_pdf",
+  });
 
   return {
-    application: `${passportNumber}_application.pdf`,
-    appointment: `${passportNumber}_appointment.pdf`,
-    passportScan: `${passportNumber}_passport_scan.pdf`,
-    selfie: `${passportNumber}_selfie.jpg`,
-    selfie2: `${passportNumber}_selfie_2.jpg`,
+    application: applicationFormPdf,
+    applicationFormPdf,
+    appointment: buildApplicantDocumentFileName({
+      applicant,
+      applicantId,
+      documentType: "application_form_pdf",
+    }),
+    passportScan: buildApplicantDocumentFileName({
+      applicant,
+      applicantId,
+      documentType: "passport_scan",
+    }),
+    questionnaire: buildApplicantDocumentFileName({
+      applicant,
+      applicantId,
+      documentType: "questionnaire",
+    }),
+    selfie: buildApplicantDocumentFileName({
+      applicant,
+      applicantId,
+      documentType: "selfie",
+    }),
+    selfie2: buildApplicantDocumentFileName({
+      applicant,
+      applicantId,
+      documentType: "selfie_2",
+    }),
   };
 }
 
@@ -917,6 +1300,11 @@ function applyReturnedPdfPackageState(
     returnedPdfPackage: {
       ...submission.returnedPdfPackage,
       commonAppointmentPdf: input.commonAppointmentPdf,
+      exportPackageId:
+        submission.exportPackage?.idempotencyKey ??
+        submission.returnedPdfPackage?.exportPackageId,
+      ownerAgentId: submission.agentId,
+      ownerAgentName: input.ownerAgentName ?? submission.returnedPdfPackage?.ownerAgentName,
       reviewedAtIso: operationalEventTimestamp(input.nowIso),
       reviewedBy: input.actorId ?? submission.returnedPdfPackage?.reviewedBy,
     },
@@ -1362,6 +1750,18 @@ function returnedPdfArtifactBlocker(
     return `${label} is missing.`;
   }
 
+  if (
+    artifact.uploadStatus === "failed" ||
+    artifact.uploadStatus === "deleted" ||
+    artifact.uploadStatus === "pending" ||
+    artifact.uploadStatus === "none"
+  ) {
+    const suffix = artifact.failureReason ? ` ${artifact.failureReason}` : "";
+    if (artifact.uploadStatus === "failed") return `${label} upload failed.${suffix}`;
+    if (artifact.uploadStatus === "deleted") return `${label} was deleted.`;
+    return `${label} is not uploaded.`;
+  }
+
   if (artifact.mimeType !== "application/pdf") {
     return `${label} must be a PDF.`;
   }
@@ -1422,6 +1822,24 @@ function returnedPdfArtifactBlocker(
   }
 
   return "";
+}
+
+function exportExcelRowNumbersByApplicantId(submission: Submission): Map<string, number> {
+  const rows = buildExportRows([submission]);
+  const rowNumbersByApplicantId = new Map<string, number>();
+
+  for (const applicant of submission.applicants) {
+    const row = rows.find(
+      (candidate) =>
+        candidate.submissionId === submission.id &&
+        candidate.applicantName === applicant.fullName,
+    );
+    if (row) {
+      rowNumbersByApplicantId.set(applicant.id, row.applicantIndex + 1);
+    }
+  }
+
+  return rowNumbersByApplicantId;
 }
 
 function unresolvedReturnedPdfMismatchIssues(submission: Submission): Issue[] {
@@ -1487,17 +1905,6 @@ function questionnaireFieldLocation(
   }
 
   return null;
-}
-
-function questionnaireFieldValue(
-  applicant: Submission["applicants"][number],
-  fieldId: string,
-) {
-  return (
-    applicant.sections
-      .flatMap((section) => section.fields)
-      .find((field) => field.id === fieldId)?.value ?? ""
-  );
 }
 
 function normalizedComparable(value: string) {

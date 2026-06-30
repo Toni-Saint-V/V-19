@@ -110,7 +110,8 @@ function applicantTitle(applicantName?: string) {
 }
 
 function replacementActionLabel(fileType: SubmissionFileType) {
-  return fileType === "photo" || fileType === "selfie" || fileType === "selfie_2"
-    ? "Заменить фото"
-    : "Заменить файл";
+  if (fileType === "selfie") return "Заменить селфи";
+  if (fileType === "selfie_2") return "Заменить селфи N2";
+  if (fileType === "passport_scan") return "Заменить скан паспорта";
+  return "Заменить архивный файл";
 }

@@ -19,7 +19,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { applicantCountLabel } from "../selectors";
-import { agentDisplayName } from "../agentDirectory";
 import {
   adminIssueGuard,
   fileStatusLabels,
@@ -45,6 +44,7 @@ type AdminReviewTab = "passport" | "selfie" | "questionnaire" | "issues";
 
 type RemarkTargetType =
   | "checklistItem"
+  | "document"
   | "questionnaire"
   | "section"
   | AdminReviewFileTarget;
@@ -77,6 +77,13 @@ type ReviewSection = {
   isPassport?: boolean;
   rows: ReviewFieldRow[];
   title: string;
+};
+
+type ChecklistItem = {
+  helper: string;
+  id: string;
+  label: string;
+  reason: string;
 };
 
 const adminReviewTabs: Array<{
@@ -112,6 +119,11 @@ const mediaTargets: Array<{
   { id: "selfie", label: "Селфи 1", shortLabel: "Селфи 1" },
   { id: "selfie_2", label: "Селфи N2", shortLabel: "Селфи 2" },
 ];
+
+const localAgentNames: Record<string, string> = {
+  "local-agent-alex": "Алексей Сидоров",
+  "local-agent-tony": "Татьяна Николаева",
+};
 
 export function AdminReviewDrawer({
   actionError = "",
@@ -185,7 +197,6 @@ export function AdminReviewDrawer({
     submission.applicants[0];
   const primaryAction = getPrimaryAction(submission, "admin", "review");
   const issueGuard = adminIssueGuard(submission, "admin");
-  const submissionAgentName = agentDisplayName(submission.agentId);
 
   function openQuestionnaireRemark(row: ReviewFieldRow) {
     if (!selectedApplicant) return;
@@ -231,10 +242,10 @@ export function AdminReviewDrawer({
     if (!selectedApplicant) return;
     setRemarkContext({
       applicantId: selectedApplicant.id,
-      reason: "Требуется уточнение по проверке",
+      reason: "Требуется уточнение",
       sectionLabel: "Анкета",
-      targetLabel: "Общая проверка",
-      targetType: "section",
+      targetLabel: "Анкета",
+      targetType: "questionnaire",
     });
   }
 
@@ -283,11 +294,9 @@ export function AdminReviewDrawer({
                 <strong>{submission.id}</strong>
               </p>
               <h2>{selectedApplicant?.fullName ?? submission.title}</h2>
-              <span className="admin-review-agent-chip">
-                Агент: {submissionAgentName}
-              </span>
               <span className="admin-review-meta">
                 {submission.title} · {applicantCountLabel(submission.applicants.length)} ·{" "}
+                {submission.city} · Агент: {agentName(submission.agentId)} ·{" "}
                 {openIssueCount(submission)} открытых замечаний
               </span>
             </div>
@@ -371,6 +380,17 @@ export function AdminReviewDrawer({
                         fileType: "passport_scan",
                       });
                     }}
+                    onChecklistRemark={(item) =>
+                      openFileRemark("passport_scan", item.reason, {
+                        checklistItemId: item.id,
+                        checklistItemLabel: item.label,
+                        field: item.label,
+                        sectionId: "passport",
+                        sectionLabel: "Паспорт",
+                        targetLabel: item.label,
+                        targetType: "checklistItem",
+                      })
+                    }
                     onFieldRemark={openQuestionnaireRemark}
                     onNext={() => selectReviewTab("questionnaire")}
                     onRemark={() => openFileRemark("passport_scan", "Скан паспорта требует замены")}
@@ -388,6 +408,17 @@ export function AdminReviewDrawer({
                         fileType,
                       });
                     }}
+                    onChecklistRemark={(fileType, item) =>
+                      openFileRemark(fileType, `${fileLabel(fileType)}: ${item.reason}`, {
+                        checklistItemId: item.id,
+                        checklistItemLabel: item.label,
+                        field: item.label,
+                        sectionId: "selfie",
+                        sectionLabel: "Селфи",
+                        targetLabel: item.label,
+                        targetType: "checklistItem",
+                      })
+                    }
                     onFileRemark={openFileRemark}
                     onReviewTarget={setReviewTarget}
                   />
@@ -403,7 +434,7 @@ export function AdminReviewDrawer({
                 ) : (
                   <IssuesTab
                     submission={submission}
-                    onCreate={openGeneralRemark}
+                    onAddRemark={openGeneralRemark}
                     onJump={(issue) => {
                       if (issue.target.applicantId) setSelectedApplicantId(issue.target.applicantId);
                       if (issue.target.fileType === "passport_scan") {
@@ -423,7 +454,7 @@ export function AdminReviewDrawer({
               ) : (
                 <IssuesTab
                   submission={submission}
-                  onCreate={openGeneralRemark}
+                  onAddRemark={openGeneralRemark}
                   onJump={() => selectReviewTab("questionnaire")}
                 />
               )}
@@ -526,6 +557,7 @@ function PassportReviewTab({
   selectedApplicant,
   submission,
   onAcceptFile,
+  onChecklistRemark,
   onFieldRemark,
   onNext,
   onRemark,
@@ -534,6 +566,7 @@ function PassportReviewTab({
   selectedApplicant?: Applicant;
   submission: Submission;
   onAcceptFile: () => void;
+  onChecklistRemark: (item: ChecklistItem) => void;
   onFieldRemark: (row: ReviewFieldRow) => void;
   onNext: () => void;
   onRemark: () => void;
@@ -577,6 +610,22 @@ function PassportReviewTab({
           </button>
         </header>
 
+        <div className="admin-review-check-card">
+          {passportChecklist().map((item) => (
+            <article key={item.id}>
+              <CheckCircle2 aria-hidden="true" size={15} />
+              <div>
+                <strong>{item.label}</strong>
+                <span>{item.helper}</span>
+              </div>
+              <button type="button" onClick={() => onChecklistRemark(item)}>
+                <MessageSquarePlus aria-hidden="true" size={14} />
+                Замечание
+              </button>
+            </article>
+          ))}
+        </div>
+
         <div className="admin-review-passport-fields">
           <h4>Поля, сверяемые с паспортом</h4>
           {passportRows.map((row) => (
@@ -610,6 +659,7 @@ function SelfieReviewTab({
   selectedApplicant,
   submission,
   onAcceptFile,
+  onChecklistRemark,
   onFileRemark,
   onReviewTarget,
 }: {
@@ -618,6 +668,7 @@ function SelfieReviewTab({
   selectedApplicant?: Applicant;
   submission: Submission;
   onAcceptFile: (fileType: AdminReviewFileTarget) => void;
+  onChecklistRemark: (fileType: AdminReviewFileTarget, item: ChecklistItem) => void;
   onFileRemark: (fileType: AdminReviewFileTarget, reason?: string) => void;
   onReviewTarget: (target: AdminReviewFileTarget) => void;
 }) {
@@ -655,6 +706,22 @@ function SelfieReviewTab({
             Принять селфи
           </button>
         </header>
+
+        <div className="admin-review-check-card">
+          {selfieChecklist().map((item) => (
+            <article key={item.id}>
+              <CheckCircle2 aria-hidden="true" size={15} />
+              <div>
+                <strong>{item.label}</strong>
+                <span>{item.helper}</span>
+              </div>
+              <button type="button" onClick={() => onChecklistRemark(reviewTarget, item)}>
+                <MessageSquarePlus aria-hidden="true" size={14} />
+                Замечание
+              </button>
+            </article>
+          ))}
+        </div>
 
         {!file || file.status === "missing" ? (
           <div className="admin-review-empty-card">
@@ -1054,7 +1121,7 @@ function AdminRemarkForm({
       field: field.trim() || context.checklistItemLabel || undefined,
       fileType: selectedFileType,
       reason: reason.trim(),
-      section: context.sectionLabel ?? (selectedFileType ? "Медиа" : "Анкета"),
+      section: selectedFileType ? "Файлы" : (context.sectionLabel ?? "Анкета"),
       severity: severity === "high" ? "blocker" : "warning",
       type: selectedFileType ? "file" : targetType === "section" ? "section" : "field",
     });
@@ -1070,7 +1137,7 @@ function AdminRemarkForm({
     >
       <motion.div
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        aria-label="Создать замечание"
+        aria-label="Новое замечание"
         aria-modal="true"
         className="admin-remark-form"
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
@@ -1117,7 +1184,7 @@ function AdminRemarkForm({
             <div className="admin-remark-targets">
               {[
                 { id: "questionnaire" as const, icon: FileText, label: "Анкета" },
-                { id: "passport_scan" as const, icon: ImageIcon, label: "Скан паспорта" },
+                { id: "passport_scan" as const, icon: ImageIcon, label: "Скан загранпаспорта" },
                 { id: "selfie" as const, icon: User, label: "Селфи" },
                 { id: "selfie_2" as const, icon: User, label: "Селфи N2" },
               ].map((target) => {
@@ -1230,7 +1297,7 @@ function AdminRemarkForm({
           </button>
           <button disabled={!canSubmit} type="button" onClick={submit}>
             <Save aria-hidden="true" size={16} />
-            Создать
+            Создать замечание
           </button>
         </footer>
       </motion.div>
@@ -1239,12 +1306,12 @@ function AdminRemarkForm({
 }
 
 function IssuesTab({
+  onAddRemark,
   submission,
-  onCreate,
   onJump,
 }: {
+  onAddRemark: () => void;
   submission: Submission;
-  onCreate: () => void;
   onJump: (issue: Submission["issues"][number]) => void;
 }) {
   if (!submission.issues.length) {
@@ -1253,7 +1320,7 @@ function IssuesTab({
         <ShieldCheck aria-hidden="true" size={18} />
         <strong>Замечаний пока нет</strong>
         <span>Если паспорт, селфи и анкета корректны, можно принимать заявку.</span>
-        <button type="button" onClick={onCreate}>
+        <button type="button" onClick={onAddRemark}>
           <MessageSquarePlus aria-hidden="true" size={15} />
           Добавить замечание
         </button>
@@ -1263,11 +1330,15 @@ function IssuesTab({
 
   return (
     <div className="admin-review-issues-list">
+      <button type="button" onClick={onAddRemark}>
+        <MessageSquarePlus aria-hidden="true" size={15} />
+        Добавить замечание
+      </button>
       {submission.issues.map((issue) => (
         <article className={`is-${issue.severity}`} key={issue.id}>
           <header>
             <span>{issue.id}</span>
-            <em>{issue.status}</em>
+            <em>{issueStatusLabel(issue.status)}</em>
           </header>
           <strong>{issue.reason}</strong>
           <p>{issue.comment}</p>
@@ -1279,6 +1350,12 @@ function IssuesTab({
       ))}
     </div>
   );
+}
+
+function issueStatusLabel(status: Submission["issues"][number]["status"]) {
+  if (status === "open") return "Открыто";
+  if (status === "fixed_by_agent") return "Исправлено агентом";
+  return "Закрыто администратором";
 }
 
 function buildReviewSections(applicant: Applicant): ReviewSection[] {
@@ -1355,6 +1432,10 @@ function nextAdminIssueId(submission: Submission) {
   return `зм-${submission.id}-новое-${submission.issues.length + 1}`;
 }
 
+function agentName(agentId: string) {
+  return localAgentNames[agentId] ?? agentId;
+}
+
 function issueTargetPath(issue: Submission["issues"][number]) {
   if (issue.target.fileType && issue.target.field) {
     return `${fileLabel(issue.target.fileType)} / ${issue.target.field}`;
@@ -1401,6 +1482,58 @@ function mediaChecklist(target: AdminReviewFileTarget) {
     return ["Лицо заявителя видно", "Документ совпадает с заявителем", "Нет бликов и сильного размытия"];
   }
   return ["Дополнительное селфи читаемо", "Лицо совпадает с заявителем", "Файл соответствует требованиям центра"];
+}
+
+function passportChecklist(): ChecklistItem[] {
+  return [
+    {
+      helper: "Имя, фамилия и дата рождения читаются и совпадают с анкетой.",
+      id: "passport-identity",
+      label: "Имя/фамилия/дата рождения совпадают",
+      reason: "Паспортные личные данные не совпадают с анкетой",
+    },
+    {
+      helper: "Номер паспорта виден, формат не повреждён, поле анкеты совпадает.",
+      id: "passport-number",
+      label: "Номер паспорта виден и совпадает",
+      reason: "Номер паспорта не читается или не совпадает",
+    },
+    {
+      helper: "Срок действия виден и не истёк на период поездки.",
+      id: "passport-expiry",
+      label: "Срок действия паспорта валиден",
+      reason: "Срок действия паспорта требует проверки",
+    },
+    {
+      helper: "MRZ, фото и края страницы не обрезаны.",
+      id: "passport-readable",
+      label: "Страница читаемая и не обрезана",
+      reason: "Скан паспорта нечитаемый или обрезан",
+    },
+  ];
+}
+
+function selfieChecklist(): ChecklistItem[] {
+  return [
+    {
+      helper: "Лицо полностью видно, нет сильного размытия или бликов.",
+      id: "selfie-face-visible",
+      label: "Лицо видно и фото читаемое",
+      reason: "Селфи нечитаемое или лицо плохо видно",
+    },
+    {
+      helper: "Заявитель на селфи соответствует выбранному профилю.",
+      id: "selfie-matches-applicant",
+      label: "Заявитель соответствует анкете",
+      reason: "Селфи не соответствует выбранному заявителю",
+    },
+    {
+      helper: "Файл доступен и подходит для визуальной проверки центра.",
+      id: "selfie-requirements",
+      label: "Файл соответствует требованиям",
+      reason: "Селфи не соответствует требованиям",
+    },
+  ];
 }
 
 function applicantRoleLabel(role: Applicant["role"] | undefined) {
