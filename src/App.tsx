@@ -1600,8 +1600,105 @@ function MainApp() {
     setDrawerMode("detail");
   }
 
-  function uploadActiveSubmissionFile(fileId: string) {
-    updateActiveSubmission((submission) => uploadRequiredFile(submission, fileId));
+  function markPassportExtractionUnavailableForUpload(
+    submissionId: string,
+    fileId: string,
+    fallbackFile: SubmissionFile,
+  ) {
+    updateSubmissionById(submissionId, (submission) => {
+      const latestFile =
+        submission.files.find((candidate) => candidate.id === fileId) ??
+        fallbackFile;
+      return failPassportExtraction(
+        submission,
+        latestFile,
+        "Распознавание паспорта недоступно. Проверьте данные вручную.",
+      );
+    });
+  }
+
+  function uploadActiveSubmissionFile(fileId: string, selectedFile: File) {
+    if (!activeSubmission) return;
+    const currentSubmission =
+      submissionsRef.current.find(
+        (submission) => submission.id === activeSubmission.id,
+      ) ?? activeSubmission;
+    const targetFile = currentSubmission.files.find((file) => file.id === fileId);
+    if (!targetFile) return;
+    if (
+      targetFile.type === "passport_scan" &&
+      !passportScanUploadMimeTypes.has(selectedFile.type)
+    ) {
+      return;
+    }
+
+    if (isSupabaseMode) {
+      if (!remoteProfile) {
+        setRemoteSaveState("error");
+        setRemoteSaveError("Сначала войдите в Supabase, чтобы сохранить файл.");
+        return;
+      }
+
+      void enqueueSupabaseMediaUpload(currentSubmission.id, async () => {
+        const updatedSubmission = await performSupabaseMediaUpload(
+          currentSubmission.id,
+          fileId,
+          selectedFile,
+          remoteProfile,
+        );
+        if (updatedSubmission && targetFile.type === "passport_scan") {
+          if (passportExtractionEnabled) {
+            void extractPassportForSubmission(updatedSubmission.id, fileId, true);
+          } else {
+            markPassportExtractionUnavailableForUpload(
+              updatedSubmission.id,
+              fileId,
+              targetFile,
+            );
+          }
+        }
+      });
+      setSubmissionActionError(null);
+      setActiveDrawerTab("files");
+      setDrawerMode("detail");
+      return;
+    }
+
+    const applicant = currentSubmission.applicants.find(
+      (item) => item.id === targetFile.applicantId,
+    );
+    const generatedFileName = applicant
+      ? applicantFileDisplayName({
+          applicant,
+          fileType: targetFile.type,
+          mimeType: selectedFile.type,
+        }) || selectedFile.name
+      : selectedFile.name;
+
+    updateActiveSubmission((submission) =>
+      applyUploadedFileMetadata(submission, fileId, {
+        generatedFileName,
+        mimeType: selectedFile.type,
+        originalFileName: selectedFile.name,
+        sizeBytes: selectedFile.size,
+        storageAdapter: "local-dev" as const,
+        storageBucket: "",
+        storagePath: "",
+        uploadedAtIso: new Date().toISOString(),
+      }),
+    );
+    if (targetFile.type === "passport_scan") {
+      rememberLocalPassportFile(fileId, selectedFile);
+      if (passportExtractionEnabled) {
+        void extractPassportForSubmission(currentSubmission.id, fileId, true);
+      } else {
+        markPassportExtractionUnavailableForUpload(
+          currentSubmission.id,
+          fileId,
+          targetFile,
+        );
+      }
+    }
     setSubmissionActionError(null);
     setActiveDrawerTab("files");
     setDrawerMode("detail");

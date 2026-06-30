@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
@@ -65,7 +65,7 @@ type FigmaSubmissionDrawerProps = {
   onAction: (action: SubmissionAction) => void;
   onClose: () => void;
   onMarkIssueFixed?: (issueId: string) => void;
-  onUploadFile?: (fileId: string) => void;
+  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onOpenQuestionnaireWorkspace: () => void;
   role: Role;
   submission: Submission;
@@ -156,6 +156,53 @@ function fileStatusLabel(file: SubmissionFile) {
 
 function fileActionLabel(file: SubmissionFile) {
   return file.status === "needs_replacement" ? "Заменить" : "Загрузить";
+}
+
+function fileAccept(file: SubmissionFile) {
+  if (file.type === "passport_scan") return "image/jpeg,image/png,application/pdf";
+  if (file.type === "selfie" || file.type === "selfie_2") return "image/*";
+  return undefined;
+}
+
+function fileSummary(file: SubmissionFile) {
+  const uploadedName = file.originalFileName ?? file.generatedFileName;
+  if (!uploadedName) return fileStatusLabel(file);
+  return `${fileStatusLabel(file)} · ${uploadedName}`;
+}
+
+type FileApplicantSection = {
+  files: SubmissionFile[];
+  id: string;
+  name: string;
+};
+
+function fileApplicantSections(submission: Submission): FileApplicantSection[] {
+  const applicantNameById = new Map(
+    submission.applicants.map((applicant) => [applicant.id, applicant.fullName]),
+  );
+  const applicantOrder = new Map(
+    submission.applicants.map((applicant, index) => [applicant.id, index]),
+  );
+  const filesByApplicantId = new Map<string, SubmissionFile[]>();
+
+  for (const file of submission.files) {
+    const files = filesByApplicantId.get(file.applicantId) ?? [];
+    files.push(file);
+    filesByApplicantId.set(file.applicantId, files);
+  }
+
+  return Array.from(filesByApplicantId.entries())
+    .sort(
+      ([leftId], [rightId]) =>
+        (applicantOrder.get(leftId) ?? Number.MAX_SAFE_INTEGER) -
+          (applicantOrder.get(rightId) ?? Number.MAX_SAFE_INTEGER) ||
+        leftId.localeCompare(rightId),
+    )
+    .map(([applicantId, files], index) => ({
+      files,
+      id: applicantId,
+      name: applicantNameById.get(applicantId) ?? `Заявитель ${index + 1}`,
+    }));
 }
 
 const Skeleton = ({ className = "" }: { className?: string }) => (
@@ -378,66 +425,169 @@ const FilesTab = ({
   onUploadFile,
   submission,
 }: {
-  onUploadFile?: (fileId: string) => void;
+  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   submission: Submission;
-}) => (
-  <div className="space-y-5">
-    <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
-      <div>
-        <h3 className="text-[15px] font-semibold text-white">Файлы подачи</h3>
-        <p className="text-[12px] text-white/40 mt-0.5">
-          Загрузите недостающие файлы. OCR и хранение остаются в текущем pilot-режиме.
-        </p>
+}) => {
+  const applicantSections = fileApplicantSections(submission);
+  const firstUploadableApplicant =
+    applicantSections.find((section) =>
+      section.files.some(
+        (file) =>
+          file.status === "needs_replacement" ||
+          (submission.status !== "returned" && file.status === "missing"),
+      ),
+    )?.id ?? applicantSections[0]?.id;
+  const [expandedApplicantIds, setExpandedApplicantIds] = useState<string[]>(
+    firstUploadableApplicant ? [firstUploadableApplicant] : [],
+  );
+  const fileInputsRef = useRef(new Map<string, HTMLInputElement>());
+
+  useEffect(() => {
+    setExpandedApplicantIds(firstUploadableApplicant ? [firstUploadableApplicant] : []);
+  }, [firstUploadableApplicant, submission.id]);
+
+  function toggleApplicant(applicantId: string) {
+    setExpandedApplicantIds((current) =>
+      current.includes(applicantId)
+        ? current.filter((id) => id !== applicantId)
+        : [...current, applicantId],
+    );
+  }
+
+  function handleFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+    fileId: string,
+  ) {
+    const selectedFile = event.currentTarget.files?.[0];
+    if (!selectedFile) return;
+
+    void onUploadFile?.(fileId, selectedFile);
+    event.currentTarget.value = "";
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
+        <div>
+          <h3 className="text-[15px] font-semibold text-white">Файлы подачи</h3>
+          <p className="text-[12px] text-white/40 mt-0.5">
+            Выберите файл для конкретного заявителя. Local/dev хранит файл только в
+            этом браузере; Supabase-режим использует приватное Storage.
+          </p>
+        </div>
+        <span className="min-w-8 px-2.5 py-1 bg-white/5 text-white/60 rounded-lg text-[12px] font-semibold border border-white/10 shrink-0 text-center">
+          {submission.files.filter((file) => file.status !== "missing").length}/
+          {submission.files.length}
+        </span>
       </div>
-      <span className="min-w-8 px-2.5 py-1 bg-white/5 text-white/60 rounded-lg text-[12px] font-semibold border border-white/10 shrink-0 text-center">
-        {submission.files.filter((file) => file.status !== "missing").length}/
-        {submission.files.length}
-      </span>
-    </div>
 
-    <div className="space-y-3">
-      {submission.files.map((file) => {
-        const applicant = submission.applicants.find(
-          (item) => item.id === file.applicantId,
-        );
-        const canUpload = file.status === "missing" || file.status === "needs_replacement";
+      <div className="space-y-2.5">
+        {applicantSections.map((section) => {
+          const isExpanded = expandedApplicantIds.includes(section.id);
+          const uploadedCount = section.files.filter(
+            (file) => file.status !== "missing" && file.status !== "needs_replacement",
+          ).length;
+          const actionCount = section.files.length - uploadedCount;
 
-        return (
-          <div
-            className="grid grid-cols-[40px_minmax(0,1fr)] sm:grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center rounded-xl border border-white/5 bg-white/[0.02] p-4"
-            key={file.id}
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50">
-              <UploadCloud className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[14px] font-semibold text-white">
-                {fileTypeLabel(file.type)}
-              </div>
-              <div className="mt-1 text-[12px] text-white/45">
-                {applicant?.fullName ?? "Заявитель"} · {fileStatusLabel(file)}
-              </div>
-            </div>
-            {canUpload ? (
+          return (
+            <section
+              className="overflow-hidden rounded-xl border border-white/8 bg-white/[0.025]"
+              key={section.id}
+            >
               <button
-                className="col-start-2 sm:col-start-auto h-9 rounded-lg border border-white/10 bg-white/[0.08] px-4 text-[13px] font-medium text-white/85 transition-colors hover:border-white/20 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!onUploadFile}
+                aria-expanded={isExpanded}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04]"
                 type="button"
-                onClick={() => onUploadFile?.(file.id)}
+                onClick={() => toggleApplicant(section.id)}
               >
-                {fileActionLabel(file)}
+                <span className="min-w-0">
+                  <span className="block truncate text-[14px] font-semibold text-white">
+                    {section.name}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] text-white/45">
+                    {uploadedCount}/{section.files.length} файлов готово
+                    {actionCount > 0 ? ` · требуется ${actionCount}` : ""}
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white/55">
+                  {isExpanded ? "Свернуть" : "Раскрыть"}
+                </span>
               </button>
-            ) : (
-              <span className="col-start-2 sm:col-start-auto inline-flex h-9 items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[12px] font-medium text-emerald-400">
-                Готово
-              </span>
-            )}
-          </div>
-        );
-      })}
+
+              {isExpanded ? (
+                <div className="space-y-2 border-t border-white/6 p-3">
+                  {section.files.map((file) => {
+                    const canUpload =
+                      file.status === "missing" || file.status === "needs_replacement";
+
+                    return (
+                      <div
+                        className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 rounded-lg border border-white/5 bg-black/10 p-3 sm:grid-cols-[36px_minmax(0,1fr)_auto] sm:items-center"
+                        key={file.id}
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50">
+                          <UploadCloud className="h-4.5 w-4.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-[13px] font-semibold text-white">
+                            {fileTypeLabel(file.type)}
+                          </div>
+                          <div className="mt-1 truncate text-[12px] text-white/45">
+                            {fileSummary(file)}
+                          </div>
+                        </div>
+                        {canUpload ? (
+                          <>
+                            <input
+                              accept={fileAccept(file)}
+                              aria-label={`${fileActionLabel(file)} ${fileTypeLabel(file.type)} — ${section.name}`}
+                              className="drawer-file-input"
+                              disabled={!onUploadFile}
+                              ref={(node) => {
+                                if (node) fileInputsRef.current.set(file.id, node);
+                                else fileInputsRef.current.delete(file.id);
+                              }}
+                              style={{
+                                border: 0,
+                                clip: "rect(0 0 0 0)",
+                                clipPath: "inset(50%)",
+                                height: 1,
+                                margin: -1,
+                                overflow: "hidden",
+                                padding: 0,
+                                position: "absolute",
+                                whiteSpace: "nowrap",
+                                width: 1,
+                              }}
+                              type="file"
+                              onChange={(event) => handleFileChange(event, file.id)}
+                            />
+                            <button
+                              className="col-start-2 h-9 rounded-lg border border-white/10 bg-white/[0.08] px-4 text-[13px] font-medium text-white/85 transition-colors hover:border-white/20 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50 sm:col-start-auto"
+                              disabled={!onUploadFile}
+                              type="button"
+                              onClick={() => fileInputsRef.current.get(file.id)?.click()}
+                            >
+                              {fileActionLabel(file)}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="col-start-2 inline-flex h-9 items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[12px] font-medium text-emerald-400 sm:col-start-auto">
+                            Готово
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const IssuesTab = ({
   data,
@@ -874,6 +1024,7 @@ export function FigmaSubmissionDrawer({
             <footer className="p-4 lg:px-8 lg:py-5 border-t border-white/10 bg-[#111113]/95 backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
               <div className="text-[12px] text-white/40 hidden sm:block">
                 {actionError ||
+                  (primaryAction.disabled && primaryAction.reason) ||
                   (data.status === "returned"
                     ? "Исправьте замечания перед повторной отправкой."
                     : statusLabels[submission.status])}
