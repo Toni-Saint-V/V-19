@@ -1,0 +1,764 @@
+{
+  "generatedAt": "2026-06-30T05:22:15.940Z",
+  "results": [
+    {
+      "viewport": {
+        "name": "1366x768",
+        "width": 1366,
+        "height": 768
+      },
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/create-desktop-no-microscroll-20260630/after-create-desktop-1366x768.png",
+      "metrics": {
+        "url": "http://127.0.0.1:5180/",
+        "title": "Подачи",
+        "inner": {
+          "width": 1366,
+          "height": 768
+        },
+        "createTitle": "Сборка документов",
+        "selectors": {
+          "html": {
+            "selector": "html",
+            "className": "",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1366,
+              "h": 768,
+              "top": 0,
+              "bottom": 768
+            },
+            "scrollHeight": 768,
+            "clientHeight": 768,
+            "hDelta": 0,
+            "scrollWidth": 1366,
+            "clientWidth": 1366,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          "body": {
+            "selector": "body",
+            "className": "",
+            "rect": {
+              "x": 0,
+              "y": 8,
+              "w": 1366,
+              "h": 752,
+              "top": 8,
+              "bottom": 760
+            },
+            "scrollHeight": 752,
+            "clientHeight": 752,
+            "hDelta": 0,
+            "scrollWidth": 1366,
+            "clientWidth": 1366,
+            "wDelta": 0,
+            "overflowY": "auto",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer": {
+            "selector": ".create-submission-drawer",
+            "className": "vf-figma-surface create-submission-drawer is-passport-step fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1366,
+              "h": 768,
+              "top": 0,
+              "bottom": 768
+            },
+            "scrollHeight": 768,
+            "clientHeight": 768,
+            "hDelta": 0,
+            "scrollWidth": 1366,
+            "clientWidth": 1366,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer > header": {
+            "selector": ".create-submission-drawer > header",
+            "className": "h-[64px] shrink-0 border-b border-[#202124] flex items-center px-6 gap-4 bg-[#0e0e10]/80 backdrop-blur-xl",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1366,
+              "h": 64,
+              "top": 0,
+              "bottom": 64
+            },
+            "scrollHeight": 64,
+            "clientHeight": 64,
+            "hDelta": 0,
+            "scrollWidth": 1366,
+            "clientWidth": 1366,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 24px 0px 24px"
+          },
+          ".create-submission-drawer > .flex-1": {
+            "selector": ".create-submission-drawer > .flex-1",
+            "className": "flex-1 overflow-y-auto p-6 lg:p-10",
+            "rect": {
+              "x": 0,
+              "y": 64,
+              "w": 1366,
+              "h": 636,
+              "top": 64,
+              "bottom": 700
+            },
+            "scrollHeight": 636,
+            "clientHeight": 636,
+            "hDelta": 0,
+            "scrollWidth": 1366,
+            "clientWidth": 1366,
+            "wDelta": 0,
+            "overflowY": "auto",
+            "overflowX": "auto",
+            "padding": "22px 40px 22px 40px"
+          },
+          ".create-submission-drawer > .flex-1 .max-w-\\[1140px\\] > .grid.grid-cols-1": {
+            "selector": ".create-submission-drawer > .flex-1 .max-w-\\[1140px\\] > .grid.grid-cols-1",
+            "className": "grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full",
+            "rect": {
+              "x": 113,
+              "y": 86,
+              "w": 1140,
+              "h": 592,
+              "top": 86,
+              "bottom": 678
+            },
+            "scrollHeight": 592,
+            "clientHeight": 592,
+            "hDelta": 0,
+            "scrollWidth": 1140,
+            "clientWidth": 1140,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-passport-topbar": {
+            "selector": ".create-passport-topbar",
+            "className": "create-passport-topbar",
+            "rect": {
+              "x": 113,
+              "y": 86,
+              "w": 626.25,
+              "h": 96.5,
+              "top": 86,
+              "bottom": 182.5
+            },
+            "scrollHeight": 97,
+            "clientHeight": 97,
+            "hDelta": 0,
+            "scrollWidth": 626,
+            "clientWidth": 626,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer .flex-1.min-h-\\[360px\\]": {
+            "selector": ".create-submission-drawer .flex-1.min-h-\\[360px\\]",
+            "className": "flex-1 min-h-[360px] rounded-[16px] transition-all duration-300 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden border border-[#202124] bg-[#121214] hover:border-white/10 hover:bg-[#141416]",
+            "rect": {
+              "x": 113,
+              "y": 331,
+              "w": 626.25,
+              "h": 347,
+              "top": 331,
+              "bottom": 678
+            },
+            "scrollHeight": 345,
+            "clientHeight": 345,
+            "hDelta": 0,
+            "scrollWidth": 624,
+            "clientWidth": 624,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "24px 24px 24px 24px"
+          },
+          ".create-submission-drawer > footer": {
+            "selector": ".create-submission-drawer > footer",
+            "className": "shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+            "rect": {
+              "x": 0,
+              "y": 700,
+              "w": 1366,
+              "h": 68,
+              "top": 700,
+              "bottom": 768
+            },
+            "scrollHeight": 68,
+            "clientHeight": 68,
+            "hDelta": 0,
+            "scrollWidth": 1366,
+            "clientWidth": 1366,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "12px 40px 12px 40px"
+          },
+          ".ops-shell": {
+            "selector": ".ops-shell",
+            "className": "ops-shell surface-agent-actions is-v19-collection-surface role-agent has-open-drawer ",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "w": 1350,
+              "h": 752,
+              "top": 8,
+              "bottom": 760
+            },
+            "scrollHeight": 762,
+            "clientHeight": 752,
+            "hDelta": 10,
+            "scrollWidth": 1350,
+            "clientWidth": 1350,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".workspace": {
+            "selector": ".workspace",
+            "className": "workspace",
+            "rect": {
+              "x": 304,
+              "y": 18,
+              "w": 1044,
+              "h": 752,
+              "top": 18,
+              "bottom": 770
+            },
+            "scrollHeight": 750,
+            "clientHeight": 750,
+            "hDelta": 0,
+            "scrollWidth": 1042,
+            "clientWidth": 1042,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 24px 44px 22px"
+          }
+        },
+        "visibleCreateOverflow": []
+      },
+      "consoleMessages": [],
+      "requestFailures": []
+    },
+    {
+      "viewport": {
+        "name": "1280x800",
+        "width": 1280,
+        "height": 800
+      },
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/create-desktop-no-microscroll-20260630/after-create-desktop-1280x800.png",
+      "metrics": {
+        "url": "http://127.0.0.1:5180/",
+        "title": "Подачи",
+        "inner": {
+          "width": 1280,
+          "height": 800
+        },
+        "createTitle": "Сборка документов",
+        "selectors": {
+          "html": {
+            "selector": "html",
+            "className": "",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1280,
+              "h": 800,
+              "top": 0,
+              "bottom": 800
+            },
+            "scrollHeight": 800,
+            "clientHeight": 800,
+            "hDelta": 0,
+            "scrollWidth": 1280,
+            "clientWidth": 1280,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          "body": {
+            "selector": "body",
+            "className": "",
+            "rect": {
+              "x": 0,
+              "y": 8,
+              "w": 1280,
+              "h": 784,
+              "top": 8,
+              "bottom": 792
+            },
+            "scrollHeight": 784,
+            "clientHeight": 784,
+            "hDelta": 0,
+            "scrollWidth": 1280,
+            "clientWidth": 1280,
+            "wDelta": 0,
+            "overflowY": "auto",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer": {
+            "selector": ".create-submission-drawer",
+            "className": "vf-figma-surface create-submission-drawer is-passport-step fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden",
+            "rect": {
+              "x": 0,
+              "y": -0.24200889468193054,
+              "w": 1280,
+              "h": 800,
+              "top": -0.24200889468193054,
+              "bottom": 799.7579911053181
+            },
+            "scrollHeight": 800,
+            "clientHeight": 800,
+            "hDelta": 0,
+            "scrollWidth": 1280,
+            "clientWidth": 1280,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer > header": {
+            "selector": ".create-submission-drawer > header",
+            "className": "h-[64px] shrink-0 border-b border-[#202124] flex items-center px-6 gap-4 bg-[#0e0e10]/80 backdrop-blur-xl",
+            "rect": {
+              "x": 0,
+              "y": -0.24200889468193054,
+              "w": 1280,
+              "h": 64,
+              "top": -0.24200889468193054,
+              "bottom": 63.75799110531807
+            },
+            "scrollHeight": 64,
+            "clientHeight": 64,
+            "hDelta": 0,
+            "scrollWidth": 1280,
+            "clientWidth": 1280,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 24px 0px 24px"
+          },
+          ".create-submission-drawer > .flex-1": {
+            "selector": ".create-submission-drawer > .flex-1",
+            "className": "flex-1 overflow-y-auto p-6 lg:p-10",
+            "rect": {
+              "x": 0,
+              "y": 63.757991790771484,
+              "w": 1280,
+              "h": 668,
+              "top": 63.757991790771484,
+              "bottom": 731.7579917907715
+            },
+            "scrollHeight": 668,
+            "clientHeight": 668,
+            "hDelta": 0,
+            "scrollWidth": 1280,
+            "clientWidth": 1280,
+            "wDelta": 0,
+            "overflowY": "auto",
+            "overflowX": "auto",
+            "padding": "22px 40px 22px 40px"
+          },
+          ".create-submission-drawer > .flex-1 .max-w-\\[1140px\\] > .grid.grid-cols-1": {
+            "selector": ".create-submission-drawer > .flex-1 .max-w-\\[1140px\\] > .grid.grid-cols-1",
+            "className": "grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full",
+            "rect": {
+              "x": 70,
+              "y": 85.75798797607422,
+              "w": 1140,
+              "h": 624,
+              "top": 85.75798797607422,
+              "bottom": 709.7579879760742
+            },
+            "scrollHeight": 624,
+            "clientHeight": 624,
+            "hDelta": 0,
+            "scrollWidth": 1140,
+            "clientWidth": 1140,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-passport-topbar": {
+            "selector": ".create-passport-topbar",
+            "className": "create-passport-topbar",
+            "rect": {
+              "x": 70,
+              "y": 85.75798797607422,
+              "w": 626.25,
+              "h": 96.50000762939453,
+              "top": 85.75798797607422,
+              "bottom": 182.25799560546875
+            },
+            "scrollHeight": 97,
+            "clientHeight": 97,
+            "hDelta": 0,
+            "scrollWidth": 626,
+            "clientWidth": 626,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer .flex-1.min-h-\\[360px\\]": {
+            "selector": ".create-submission-drawer .flex-1.min-h-\\[360px\\]",
+            "className": "flex-1 min-h-[360px] rounded-[16px] transition-all duration-300 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden border border-[#202124] bg-[#121214] hover:border-white/10 hover:bg-[#141416]",
+            "rect": {
+              "x": 70,
+              "y": 330.75799560546875,
+              "w": 626.25,
+              "h": 379,
+              "top": 330.75799560546875,
+              "bottom": 709.7579956054688
+            },
+            "scrollHeight": 377,
+            "clientHeight": 377,
+            "hDelta": 0,
+            "scrollWidth": 624,
+            "clientWidth": 624,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "24px 24px 24px 24px"
+          },
+          ".create-submission-drawer > footer": {
+            "selector": ".create-submission-drawer > footer",
+            "className": "shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+            "rect": {
+              "x": 0,
+              "y": 731.7579956054688,
+              "w": 1280,
+              "h": 68,
+              "top": 731.7579956054688,
+              "bottom": 799.7579956054688
+            },
+            "scrollHeight": 68,
+            "clientHeight": 68,
+            "hDelta": 0,
+            "scrollWidth": 1280,
+            "clientWidth": 1280,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "12px 40px 12px 40px"
+          },
+          ".ops-shell": {
+            "selector": ".ops-shell",
+            "className": "ops-shell surface-agent-actions is-v19-collection-surface role-agent has-open-drawer ",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "w": 1264,
+              "h": 784,
+              "top": 8,
+              "bottom": 792
+            },
+            "scrollHeight": 794,
+            "clientHeight": 784,
+            "hDelta": 10,
+            "scrollWidth": 1264,
+            "clientWidth": 1264,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".workspace": {
+            "selector": ".workspace",
+            "className": "workspace",
+            "rect": {
+              "x": 304,
+              "y": 18,
+              "w": 958,
+              "h": 784,
+              "top": 18,
+              "bottom": 802
+            },
+            "scrollHeight": 782,
+            "clientHeight": 782,
+            "hDelta": 0,
+            "scrollWidth": 956,
+            "clientWidth": 956,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 24px 44px 22px"
+          }
+        },
+        "visibleCreateOverflow": []
+      },
+      "consoleMessages": [],
+      "requestFailures": []
+    },
+    {
+      "viewport": {
+        "name": "1440x900",
+        "width": 1440,
+        "height": 900
+      },
+      "screenshot": "/Users/user/v19-product-pipeline-20260628-192759/99-final-integration-emergency-20260629-073635/docs/qa/create-desktop-no-microscroll-20260630/after-create-desktop-1440x900.png",
+      "metrics": {
+        "url": "http://127.0.0.1:5180/",
+        "title": "Подачи",
+        "inner": {
+          "width": 1440,
+          "height": 900
+        },
+        "createTitle": "Сборка документов",
+        "selectors": {
+          "html": {
+            "selector": "html",
+            "className": "",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1440,
+              "h": 900,
+              "top": 0,
+              "bottom": 900
+            },
+            "scrollHeight": 900,
+            "clientHeight": 900,
+            "hDelta": 0,
+            "scrollWidth": 1440,
+            "clientWidth": 1440,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          "body": {
+            "selector": "body",
+            "className": "",
+            "rect": {
+              "x": 0,
+              "y": 8,
+              "w": 1440,
+              "h": 884,
+              "top": 8,
+              "bottom": 892
+            },
+            "scrollHeight": 884,
+            "clientHeight": 884,
+            "hDelta": 0,
+            "scrollWidth": 1440,
+            "clientWidth": 1440,
+            "wDelta": 0,
+            "overflowY": "auto",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer": {
+            "selector": ".create-submission-drawer",
+            "className": "vf-figma-surface create-submission-drawer is-passport-step fixed inset-0 z-50 bg-[#0e0e10] flex flex-col overflow-hidden",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1440,
+              "h": 900,
+              "top": 0,
+              "bottom": 900
+            },
+            "scrollHeight": 900,
+            "clientHeight": 900,
+            "hDelta": 0,
+            "scrollWidth": 1440,
+            "clientWidth": 1440,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer > header": {
+            "selector": ".create-submission-drawer > header",
+            "className": "h-[64px] shrink-0 border-b border-[#202124] flex items-center px-6 gap-4 bg-[#0e0e10]/80 backdrop-blur-xl",
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1440,
+              "h": 64,
+              "top": 0,
+              "bottom": 64
+            },
+            "scrollHeight": 64,
+            "clientHeight": 64,
+            "hDelta": 0,
+            "scrollWidth": 1440,
+            "clientWidth": 1440,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 24px 0px 24px"
+          },
+          ".create-submission-drawer > .flex-1": {
+            "selector": ".create-submission-drawer > .flex-1",
+            "className": "flex-1 overflow-y-auto p-6 lg:p-10",
+            "rect": {
+              "x": 0,
+              "y": 64,
+              "w": 1440,
+              "h": 760,
+              "top": 64,
+              "bottom": 824
+            },
+            "scrollHeight": 760,
+            "clientHeight": 760,
+            "hDelta": 0,
+            "scrollWidth": 1440,
+            "clientWidth": 1440,
+            "wDelta": 0,
+            "overflowY": "auto",
+            "overflowX": "auto",
+            "padding": "40px 40px 40px 40px"
+          },
+          ".create-submission-drawer > .flex-1 .max-w-\\[1140px\\] > .grid.grid-cols-1": {
+            "selector": ".create-submission-drawer > .flex-1 .max-w-\\[1140px\\] > .grid.grid-cols-1",
+            "className": "grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full",
+            "rect": {
+              "x": 150,
+              "y": 104,
+              "w": 1140,
+              "h": 680,
+              "top": 104,
+              "bottom": 784
+            },
+            "scrollHeight": 680,
+            "clientHeight": 680,
+            "hDelta": 0,
+            "scrollWidth": 1140,
+            "clientWidth": 1140,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-passport-topbar": {
+            "selector": ".create-passport-topbar",
+            "className": "create-passport-topbar",
+            "rect": {
+              "x": 150,
+              "y": 104,
+              "w": 617.203125,
+              "h": 96.5,
+              "top": 104,
+              "bottom": 200.5
+            },
+            "scrollHeight": 97,
+            "clientHeight": 97,
+            "hDelta": 0,
+            "scrollWidth": 617,
+            "clientWidth": 617,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".create-submission-drawer .flex-1.min-h-\\[360px\\]": {
+            "selector": ".create-submission-drawer .flex-1.min-h-\\[360px\\]",
+            "className": "flex-1 min-h-[360px] rounded-[16px] transition-all duration-300 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden border border-[#202124] bg-[#121214] hover:border-white/10 hover:bg-[#141416]",
+            "rect": {
+              "x": 150,
+              "y": 369,
+              "w": 617.203125,
+              "h": 415,
+              "top": 369,
+              "bottom": 784
+            },
+            "scrollHeight": 413,
+            "clientHeight": 413,
+            "hDelta": 0,
+            "scrollWidth": 615,
+            "clientWidth": 615,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "32px 32px 32px 32px"
+          },
+          ".create-submission-drawer > footer": {
+            "selector": ".create-submission-drawer > footer",
+            "className": "shrink-0 sticky bottom-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/95 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+            "rect": {
+              "x": 0,
+              "y": 824,
+              "w": 1440,
+              "h": 76,
+              "top": 824,
+              "bottom": 900
+            },
+            "scrollHeight": 76,
+            "clientHeight": 76,
+            "hDelta": 0,
+            "scrollWidth": 1440,
+            "clientWidth": 1440,
+            "wDelta": 0,
+            "overflowY": "visible",
+            "overflowX": "visible",
+            "padding": "16px 40px 16px 40px"
+          },
+          ".ops-shell": {
+            "selector": ".ops-shell",
+            "className": "ops-shell surface-agent-actions is-v19-collection-surface role-agent has-open-drawer ",
+            "rect": {
+              "x": 8,
+              "y": 8,
+              "w": 1424,
+              "h": 884,
+              "top": 8,
+              "bottom": 892
+            },
+            "scrollHeight": 894,
+            "clientHeight": 884,
+            "hDelta": 10,
+            "scrollWidth": 1424,
+            "clientWidth": 1424,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 0px 0px 0px"
+          },
+          ".workspace": {
+            "selector": ".workspace",
+            "className": "workspace",
+            "rect": {
+              "x": 304,
+              "y": 18,
+              "w": 1118,
+              "h": 884,
+              "top": 18,
+              "bottom": 902
+            },
+            "scrollHeight": 882,
+            "clientHeight": 882,
+            "hDelta": 0,
+            "scrollWidth": 1116,
+            "clientWidth": 1116,
+            "wDelta": 0,
+            "overflowY": "hidden",
+            "overflowX": "hidden",
+            "padding": "0px 24px 44px 22px"
+          }
+        },
+        "visibleCreateOverflow": []
+      },
+      "consoleMessages": [],
+      "requestFailures": []
+    }
+  ]
+}

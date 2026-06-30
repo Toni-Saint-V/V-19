@@ -69,7 +69,7 @@ describe("submission list formatters", () => {
         kind: "replace_file",
       }),
     ).toEqual({
-      subtitle: "Заменить селфи",
+      subtitle: "Заменить селфи 1",
       title: "Мария Иванова",
     });
   });

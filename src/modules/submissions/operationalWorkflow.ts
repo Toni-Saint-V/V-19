@@ -887,7 +887,7 @@ export function applyReturnedPdfPackageReview(
   if (submission.status !== "exported") {
     return failure(
       "INVALID_TRANSITION",
-      "Returned PDF package can be reviewed only after export.",
+      "PDF можно проверить после выгрузки.",
     );
   }
 
@@ -920,7 +920,7 @@ export function applyReturnedPdfPackageReview(
   } catch (error) {
     return failure(
       "VALIDATION_ERROR",
-      error instanceof Error ? error.message : "Returned PDF package is invalid.",
+      error instanceof Error ? error.message : "PDF пакет не готов.",
     );
   }
 }
@@ -945,20 +945,20 @@ export function buildAgentHandoffPackage(
   const excelRowsByApplicantId = exportExcelRowNumbersByApplicantId(submission);
 
   if (submission.status !== "exported") {
-    blockers.push("PDF package can be handed to agent only after export.");
+    blockers.push("PDF можно передать агенту после выгрузки.");
   }
 
   if (!exportPackageId) {
-    blockers.push("Returned PDF handoff requires a durable export package identity.");
+    blockers.push("Нет номера выгрузки.");
   }
 
   if (ownerAgentId !== submission.agentId) {
-    blockers.push("Returned PDF handoff owner does not match submission owner.");
+    blockers.push("Агент PDF не совпадает с подачей.");
   }
 
   const commonPdfBlocker = returnedPdfArtifactBlocker(
     commonAppointmentPdf,
-    "Common appointment/list PDF",
+    "PDF записи",
     "common_pdf",
     { submissionId: submission.id },
   );
@@ -991,19 +991,19 @@ export function buildAgentHandoffPackage(
 
     blockers.push(
       criticalPdfReason(review) ??
-        `Application PDF has a critical mismatch: ${review.fileName ?? "unmatched file"}.`,
+        `PDF анкеты не совпадает: ${review.fileName ?? "файл"}.`,
     );
   }
 
   for (const applicant of submission.applicants) {
     const fileNames = buildApplicantArtifactFileNames(submission, applicant.id);
     if (!fileNames) {
-      blockers.push(`Applicant is missing for returned PDF file naming.`);
+      blockers.push("Не найден заявитель для PDF.");
       continue;
     }
 
     if (!applicantHasPassportNumber(applicant)) {
-      blockers.push(`Passport number is missing for ${applicant.fullName}.`);
+      blockers.push(`Нет номера паспорта: ${applicant.fullName}.`);
       continue;
     }
 
@@ -1011,7 +1011,7 @@ export function buildAgentHandoffPackage(
       (candidate) => candidate.applicantId === applicant.id,
     );
     if (!applicantReviews.length) {
-      blockers.push(`Application PDF is missing for ${applicant.fullName}.`);
+      blockers.push(`Нет PDF анкеты: ${applicant.fullName}.`);
       continue;
     }
 
@@ -1026,33 +1026,27 @@ export function buildAgentHandoffPackage(
             candidate.handoffStatus !== "ready_for_agent",
         )
       ) {
-        blockers.push(
-          `Application PDF requires manual confirmation for ${applicant.fullName}.`,
-        );
+        blockers.push(`Проверьте PDF анкеты: ${applicant.fullName}.`);
       } else {
-        blockers.push(
-          `Application PDF must have exactly one ready review for ${applicant.fullName}.`,
-        );
+        blockers.push(`Нужен один готовый PDF анкеты: ${applicant.fullName}.`);
       }
       continue;
     }
 
     const review = readyReviews[0];
     if (!review) {
-      blockers.push(`Application PDF is missing for ${applicant.fullName}.`);
+      blockers.push(`Нет PDF анкеты: ${applicant.fullName}.`);
       continue;
     }
 
     if (!review.artifact) {
-      blockers.push(
-        `Uploaded application PDF artifact is missing for ${applicant.fullName}.`,
-      );
+      blockers.push(`Нет файла PDF анкеты: ${applicant.fullName}.`);
       continue;
     }
 
     const applicationPdfBlocker = returnedPdfArtifactBlocker(
       review.artifact,
-      `Application PDF for ${applicant.fullName}`,
+      `PDF анкеты: ${applicant.fullName}`,
       "application_pdf",
       { applicantId: applicant.id, submissionId: submission.id },
     );
@@ -1065,9 +1059,7 @@ export function buildAgentHandoffPackage(
       review.status === "needs_review" &&
       review.handoffStatus !== "ready_for_agent"
     ) {
-      blockers.push(
-        `Application PDF requires manual confirmation for ${applicant.fullName}.`,
-      );
+      blockers.push(`Проверьте PDF анкеты: ${applicant.fullName}.`);
       continue;
     }
 
@@ -1151,7 +1143,7 @@ export function buildAgentReturnedPdfPackageView(
   if (submission.agentId !== agentId || ownerAgentId !== agentId) {
     return {
       applicantPdfs: [],
-      blockers: ["Agent can see only own returned PDF package."],
+      blockers: ["Агент видит только свой PDF пакет."],
       commonAppointmentPdf: undefined,
       mappings: [],
       ready: false,
@@ -1180,25 +1172,25 @@ export function confirmReturnedPdfMismatchIssue(
   input: ReturnedPdfMismatchIssueConfirmationInput,
 ): OperationalWorkflowResult<Submission> {
   if (role !== "admin") {
-    return failure("PERMISSION_DENIED", "Only admin can confirm returned PDF issues.");
+    return failure("PERMISSION_DENIED", "Подтвердить может только администратор.");
   }
 
   if (submission.status !== "exported") {
     return failure(
       "INVALID_TRANSITION",
-      "Returned PDF issue confirmation is available only after export.",
+      "PDF замечания закрываются после выгрузки.",
     );
   }
 
   const issue = submission.issues.find((candidate) => candidate.id === input.issueId);
   if (!issue) {
-    return failure("ISSUE_NOT_FOUND", "Issue not found.");
+    return failure("ISSUE_NOT_FOUND", "Замечание не найдено.");
   }
 
   if (!isReturnedPdfMismatchIssue(issue)) {
     return failure(
       "VALIDATION_ERROR",
-      "Only returned PDF mismatch issues can be confirmed after export.",
+      "Можно закрыть только PDF замечание.",
     );
   }
 
@@ -1209,7 +1201,7 @@ export function confirmReturnedPdfMismatchIssue(
   if (returnedPdfReviewStillBlocksIssue(submission, issue)) {
     return failure(
       "VALIDATION_ERROR",
-      "Returned PDF mismatch is still present in the latest PDF review.",
+      "В PDF всё ещё есть расхождение.",
     );
   }
 
@@ -1234,7 +1226,7 @@ export function confirmReturnedPdfMismatchIssue(
         input.nowIso,
       ),
       source: "admin",
-      text: "Администратор подтвердил исправление расхождения returned PDF",
+      text: "Администратор подтвердил PDF исправление",
     }),
   );
 }
@@ -1262,7 +1254,7 @@ export function buildApplicantArtifactFileNames(
     appointment: buildApplicantDocumentFileName({
       applicant,
       applicantId,
-      documentType: "application_form_pdf",
+      documentType: "appointment_pdf",
     }),
     passportScan: buildApplicantDocumentFileName({
       applicant,
@@ -1602,7 +1594,7 @@ function attachCriticalPdfIssues(
           history: pdfIssueHistory(
             nextSubmission,
             nextIssue,
-            "PDF mismatch issue reopened from returned PDF",
+            "PDF замечание открыто повторно",
             nowIso,
             actorSource,
             actorId,
@@ -1632,7 +1624,7 @@ function attachCriticalPdfIssues(
         history: pdfIssueHistory(
           nextSubmission,
           nextIssue,
-          "PDF mismatch issue created from returned PDF",
+          "Создано PDF замечание",
           nowIso,
           actorSource,
           actorId,
@@ -1677,7 +1669,7 @@ function pdfFindingIssue(
     createdAt: nowIso,
     createdBy: "system",
     id: `зм-${submission.id}-pdf-${applicant.id}-${finding.field}`,
-    reason: "Returned PDF mismatch",
+    reason: "PDF не совпадает",
     severity: "blocker",
     status: "open",
     target: {
@@ -1747,7 +1739,7 @@ function returnedPdfArtifactBlocker(
   context: { applicantId?: string; submissionId?: string } = {},
 ) {
   if (!artifact) {
-    return `${label} is missing.`;
+    return `${label} отсутствует.`;
   }
 
   if (
@@ -1757,29 +1749,29 @@ function returnedPdfArtifactBlocker(
     artifact.uploadStatus === "none"
   ) {
     const suffix = artifact.failureReason ? ` ${artifact.failureReason}` : "";
-    if (artifact.uploadStatus === "failed") return `${label} upload failed.${suffix}`;
-    if (artifact.uploadStatus === "deleted") return `${label} was deleted.`;
-    return `${label} is not uploaded.`;
+    if (artifact.uploadStatus === "failed") return `${label}: ошибка загрузки.${suffix}`;
+    if (artifact.uploadStatus === "deleted") return `${label} удалён.`;
+    return `${label} не загружен.`;
   }
 
   if (artifact.mimeType !== "application/pdf") {
-    return `${label} must be a PDF.`;
+    return `${label}: нужен PDF.`;
   }
 
   if (!/^[a-fA-F0-9]{64}$/.test(artifact.sha256)) {
-    return `${label} must include a SHA-256 checksum.`;
+    return `${label}: нет SHA-256.`;
   }
 
   if (!Number.isInteger(artifact.sizeBytes) || artifact.sizeBytes <= 0) {
-    return `${label} must include a positive file size.`;
+    return `${label}: нет размера файла.`;
   }
 
   if (!artifact.storageBucket || !artifact.storagePath) {
-    return `${label} must include private storage identity.`;
+    return `${label}: нет private storage.`;
   }
 
   if (artifact.storageBucket !== mediaStorageBucket) {
-    return `${label} must use the private submission-media bucket.`;
+    return `${label}: неверный bucket.`;
   }
 
   if (storageKind === "application_pdf") {
@@ -1799,7 +1791,7 @@ function returnedPdfArtifactBlocker(
         },
       });
     } catch {
-      return `${label} has invalid application PDF storage identity.`;
+      return `${label}: неверный storage path.`;
     }
   } else {
     try {
@@ -1817,7 +1809,7 @@ function returnedPdfArtifactBlocker(
         },
       });
     } catch {
-      return `${label} has invalid appointment PDF storage identity.`;
+      return `${label}: неверный storage path.`;
     }
   }
 
@@ -1852,7 +1844,7 @@ function unresolvedReturnedPdfMismatchIssues(submission: Submission): Issue[] {
 }
 
 function isReturnedPdfMismatchIssue(issue: Issue): boolean {
-  return issue.reason === "Returned PDF mismatch";
+  return issue.reason === "PDF не совпадает" || issue.reason === "Returned PDF mismatch";
 }
 
 function returnedPdfReviewStillBlocksIssue(submission: Submission, issue: Issue) {
@@ -1867,9 +1859,9 @@ function returnedPdfIssueBlocker(issue: Issue) {
   const target = [issue.target.section, issue.target.field].filter(Boolean).join(" / ");
   const status =
     issue.status === "fixed_by_agent"
-      ? "marked fixed by agent but not closed by admin"
-      : "open";
-  return `${applicantName}: returned PDF mismatch issue is ${status}${target ? ` (${target})` : ""}.`;
+      ? "исправлено агентом"
+      : "открыто";
+  return `${applicantName}: PDF замечание ${status}${target ? ` (${target})` : ""}.`;
 }
 
 function criticalPdfReason(review: VisaApplicationPdfReviewState) {

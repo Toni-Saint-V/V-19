@@ -18,6 +18,7 @@ export const requiredMigrationOrder = [
   "20260624001000_questionnaire_answers_persistence.sql",
   "20260627001000_returned_pdf_storage_policies.sql",
   "20260628000100_trip_date_range_persistence.sql",
+  "20260629193805_v19_access_requests_admin_pdfs.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -40,6 +41,7 @@ export const requiredRemoteMigrationOrder = [
   "20260624001000_questionnaire_answers_persistence",
   "20260627001000_returned_pdf_storage_policies",
   "20260628000100_trip_date_range_persistence",
+  "20260629193805_v19_access_requests_admin_pdfs",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

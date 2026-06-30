@@ -1171,6 +1171,91 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(loaded.submissions[0]?.completeness.files).toBeGreaterThan(0);
   });
 
+  it("does not rehydrate legacy media_assets rows into V-19 runtime files", async () => {
+    const submission = initialSubmissions[2] as Submission;
+    const passportFile = submission.files.find((file) => file.type === "passport_scan");
+    if (!passportFile) throw new Error("Missing passport file");
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.mediaAssetRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000777",
+        applicant_id: passportFile.applicantId,
+        submission_id: submission.id,
+        type: "passport_scan",
+        original_file_name: "passport-scan.jpg",
+        generated_file_name: "v1900abcde_passport_scan.jpg",
+        storage_bucket: "submission-media",
+        storage_path: `${submission.id}/${passportFile.applicantId}/passport_scan/v1900abcde_passport_scan.jpg`,
+        mime_type: "image/jpeg",
+        size_bytes: 2048,
+        upload_status: "uploaded",
+        review_status: "not_reviewed",
+        uploaded_at: "2026-06-16T10:00:00.000Z",
+        reviewed_at: null,
+        reviewed_by: null,
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000778",
+        applicant_id: passportFile.applicantId,
+        submission_id: submission.id,
+        type: "photo",
+        original_file_name: "legacy-photo.jpg",
+        generated_file_name: "legacy_photo.jpg",
+        storage_bucket: "submission-media",
+        storage_path: `${submission.id}/${passportFile.applicantId}/photo/legacy_photo.jpg`,
+        mime_type: "image/jpeg",
+        size_bytes: 2048,
+        upload_status: "uploaded",
+        review_status: "not_reviewed",
+        uploaded_at: "2026-06-16T10:00:00.000Z",
+        reviewed_at: null,
+        reviewed_by: null,
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000779",
+        applicant_id: passportFile.applicantId,
+        submission_id: submission.id,
+        type: "video",
+        original_file_name: "legacy-video.mp4",
+        generated_file_name: "legacy_video.mp4",
+        storage_bucket: "submission-media",
+        storage_path: `${submission.id}/${passportFile.applicantId}/video/legacy_video.mp4`,
+        mime_type: "video/mp4",
+        size_bytes: 4096,
+        upload_status: "uploaded",
+        review_status: "not_reviewed",
+        uploaded_at: "2026-06-16T10:00:00.000Z",
+        reviewed_at: null,
+        reviewed_by: null,
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+    const files = loaded.submissions[0]?.files ?? [];
+
+    expect(files.map((file) => file.type)).toEqual([
+      "passport_scan",
+      "selfie",
+      "selfie_2",
+    ]);
+    expect(files.find((file) => file.type === "passport_scan")).toMatchObject({
+      generatedFileName: "v1900abcde_passport_scan.jpg",
+      storageAdapter: "supabase-private",
+    });
+  });
+
   it("does not restore another agent's media rows through the agent load path", async () => {
     const submission = initialSubmissions[2] as Submission;
     const payload = toCockpitDraftPersistencePayload(

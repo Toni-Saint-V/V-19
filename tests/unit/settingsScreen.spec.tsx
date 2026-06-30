@@ -10,10 +10,12 @@ const baseSettings = {
 
 const sampleAccessRequests = [
   {
+    city: "Москва",
+    companyName: "Visa Center Test",
     id: "access-request-1",
     email: "new.agent@example.com",
-    displayName: "Новый Агент",
-    organizationName: "Visa Center Test",
+    fullName: "Новый Агент",
+    phone: "+7 900 000-00-00",
     requestedRole: "agent" as const,
     status: "pending" as const,
     createdAt: "2026-06-28T10:00:00.000Z",
@@ -106,7 +108,7 @@ describe("SettingsScreen", () => {
 
     expect(screen.getByTestId("admin-access-queue")).toBeVisible();
     expect(screen.getByText("Новый Агент")).toBeVisible();
-    expect(screen.getByText("Visa Center Test")).toBeVisible();
+    expect(screen.getByText(/Visa Center Test/)).toBeVisible();
     expect(screen.getByText(/new.agent@example.com/)).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Одобрить" }));

@@ -749,7 +749,7 @@ export function FigmaSubmissionDrawer({
         }}
         key="figma-drawer-panel"
         role="dialog"
-        transition={{ damping: 28, mass: 0.8, stiffness: 240, type: "spring" }}
+        transition={{ duration: 0.18, ease: "easeOut", type: "tween" }}
       >
         <div className="lg:hidden sticky top-0 z-30 w-full flex items-center justify-center py-3 bg-[#111113]/90 backdrop-blur-md">
           <div className="w-12 h-1.5 rounded-full bg-white/20" />
@@ -881,6 +881,8 @@ export function FigmaSubmissionDrawer({
               <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 w-full sm:flex sm:w-auto">
                 <button
                   className="w-full sm:w-auto h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors"
+                  aria-label="Закрыть подачу"
+                  type="button"
                   onClick={onClose}
                 >
                   Закрыть

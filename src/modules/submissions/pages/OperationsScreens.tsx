@@ -24,7 +24,6 @@ import {
   adminWorkEventTitle,
   adminWorkPresentation,
   blockerCount,
-  defaultDrawerTab,
   openIssueCount,
   statusLabels,
 } from "../status";
@@ -43,7 +42,6 @@ import {
   CollectionToolbar,
   ContextRail,
   type CollectionActiveFilter,
-  SubmissionCollectionRow,
   SvgIcon,
   ToolbarIconButton,
   ToolbarTools,
@@ -55,6 +53,7 @@ import {
   targetForIssue,
   type WorkspaceTarget,
 } from "../workspaceModel";
+import { FigmaApplicantsVisual } from "./FigmaVisualScreens";
 
 function pluralRu(count: number, one: string, few: string, many: string) {
   const mod10 = Math.abs(count) % 10;
@@ -70,7 +69,6 @@ type ViewTransitionLike = {
 };
 
 const viewTransitionClass = "vf-vt";
-const v17RailPreferenceKey = "visaflow-v19-v17-rail";
 
 function transitionUiState(update: () => void) {
   if (
@@ -103,37 +101,6 @@ function transitionUiState(update: () => void) {
   } catch {
     transitionRoot.classList.remove(viewTransitionClass);
     update();
-  }
-}
-
-function readV17RailPreference(route: "submissions" | "export") {
-  if (typeof window === "undefined") return true;
-
-  try {
-    const value = JSON.parse(
-      window.sessionStorage.getItem(v17RailPreferenceKey) ?? "{}",
-    ) as Partial<Record<"submissions" | "export", boolean>>;
-
-    return value[route] !== false;
-  } catch {
-    return true;
-  }
-}
-
-function saveV17RailPreference(route: "submissions" | "export", value: boolean) {
-  if (typeof window === "undefined") return;
-
-  try {
-    const current = JSON.parse(
-      window.sessionStorage.getItem(v17RailPreferenceKey) ?? "{}",
-    ) as Partial<Record<"submissions" | "export", boolean>>;
-
-    window.sessionStorage.setItem(
-      v17RailPreferenceKey,
-      JSON.stringify({ ...current, [route]: value }),
-    );
-  } catch {
-    // sessionStorage may be unavailable in private or embedded contexts.
   }
 }
 
@@ -1183,47 +1150,15 @@ function inboxPassportNumber(submission: Submission) {
   return extractedPassport || questionnairePassport || "—";
 }
 
-function agentSubmissionDisplaySearchText(submission: Submission) {
-  const applicantText = submission.applicants.flatMap((applicant) => {
-    const passportFields = applicant.sections
-      .flatMap((section) => section.fields)
-      .filter(
-        (field) =>
-          field.id === "passport-no" ||
-          field.label.toLocaleLowerCase("ru-RU").includes("паспорт"),
-      )
-      .map((field) => field.value);
-
-    return [applicant.fullName, ...passportFields];
-  });
-
-  return [
-    submission.id,
-    submission.title,
-    submission.listTitle ?? "",
-    submission.city,
-    statusLabels[submission.status],
-    tripDates(submission),
-    ...applicantText,
-  ]
-    .join(" ")
-    .toLocaleLowerCase("ru-RU");
-}
-
 export function AgentSubmissionsScreen({
   activeTab,
   agentList,
-  hasSearchQuery = false,
-  mobileTitle = "Мои подачи",
+  hasSearchQuery,
   onClearFilters,
-  onCreate,
   onOpen,
   onSelect,
   onTab,
-  searchQuery = "",
   searchControl,
-  visibleSubmission,
-  summary,
 }: {
   activeTab: AgentTab;
   agentList: Submission[];
@@ -1239,482 +1174,74 @@ export function AgentSubmissionsScreen({
   visibleSubmission: Submission | null;
   summary: ReturnType<typeof counts>;
 }) {
-  const [blockersOnly, setBlockersOnly] = useState(false);
-  const [comfortableView, setComfortableView] = useState(true);
-  const [panelOpen, setPanelOpen] = useState(() =>
-    readV17RailPreference("submissions"),
+  const orderedApplicants = useMemo(
+    () => sortSubmissionsForOperations(agentList, "priority"),
+    [agentList],
   );
-  const [sortNewest, setSortNewest] = useState(true);
 
-  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
-  const searchFilteredSubmissions = useMemo(
-    () =>
-      normalizedSearchQuery
-        ? agentList.filter((submission) =>
-            agentSubmissionDisplaySearchText(submission).includes(
-              normalizedSearchQuery,
-            ),
-          )
-        : agentList,
-    [agentList, normalizedSearchQuery],
-  );
-  const filteredSubmissions = useMemo(
-    () =>
-      blockersOnly
-        ? searchFilteredSubmissions.filter(
-            (submission) => blockerCount(submission) > 0,
-          )
-        : searchFilteredSubmissions,
-    [searchFilteredSubmissions, blockersOnly],
-  );
-  const orderedSubmissions = useMemo(
-    () => (sortNewest ? filteredSubmissions : [...filteredSubmissions].reverse()),
-    [filteredSubmissions, sortNewest],
-  );
-  const visibleSubmissionInList =
-    visibleSubmission &&
-    orderedSubmissions.some((submission) => submission.id === visibleSubmission.id)
-      ? visibleSubmission
-      : null;
-  const prioritySubmission = visibleSubmissionInList ?? orderedSubmissions[0] ?? null;
-  const priorityIssue = prioritySubmission
-    ? primarySubmissionIssue(prioritySubmission)
-    : null;
-  const railCompact = panelOpen;
-  const tabCounts = {
-    all:
-      summary.requiresAction +
-      summary.draft +
-      summary.inProgress +
-      summary.inReview +
-      summary.corrections +
-      summary.ready +
-      summary.exported,
-    action: summary.requiresAction,
-    done: summary.ready + summary.exported,
-    progress: summary.draft + summary.inProgress,
-    review: summary.inReview + summary.corrections,
-  };
-  const visibleTab: AgentTab = activeTab;
-  const activeFilters = ([
-    hasSearchQuery
-      ? {
-          id: "search",
-          label: "Поиск",
-          onRemove: () => onClearFilters?.(),
-        }
-      : null,
-    blockersOnly
-      ? {
-          id: "blockers",
-          label: "Только блокеры",
-          onRemove: () => transitionUiState(() => setBlockersOnly(false)),
-        }
-      : null,
-    sortNewest
-      ? null
-      : {
-          id: "sort",
-          label: "Обратный порядок",
-          onRemove: () => transitionUiState(() => setSortNewest(true)),
-        },
-    comfortableView
-      ? null
-      : {
-          id: "density",
-          label: "Компактный вид",
-          onRemove: () => transitionUiState(() => setComfortableView(true)),
-        },
-  ] as Array<CollectionActiveFilter | null>
-  ).filter((filter): filter is CollectionActiveFilter => filter !== null);
-  const hasFiltering = activeFilters.length > 0;
-  const resetFilters = () => {
-    transitionUiState(() => {
-      setBlockersOnly(false);
-      setSortNewest(true);
-      setComfortableView(true);
-      onClearFilters?.();
-    });
-  };
-  function setV17PanelOpen(value: boolean) {
-    transitionUiState(() => {
-      setPanelOpen(value);
-      saveV17RailPreference("submissions", value);
-    });
-  }
-
-  function toggleV17Panel() {
-    setV17PanelOpen(!panelOpen);
-  }
-
-  function openPriorityTarget(
-    submission: Submission,
-    tab: DrawerTab,
-    target?: WorkspaceTarget,
-  ) {
-    onSelect(submission);
-    onOpen(submission, tab, target);
-  }
-
-  const panelToggleTool = (
-    <ToolbarIconButton
-      label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-      icon="panel"
-      pressed={panelOpen}
-      onClick={toggleV17Panel}
-    />
-  );
-  const toolbarToolButtons = (
-    <>
-      <ToolbarIconButton
-        label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
-        icon="filter"
-        pressed={blockersOnly}
-        onClick={() =>
-          transitionUiState(() => setBlockersOnly((value) => !value))
-        }
-      />
-      <ToolbarIconButton
-        label={sortNewest ? "Сначала приоритетные" : "Обратный порядок"}
-        icon="sort"
-        pressed={!sortNewest}
-        onClick={() => transitionUiState(() => setSortNewest((value) => !value))}
-      />
-      {panelToggleTool}
-    </>
-  );
-  const familySubmissions = orderedSubmissions.filter(
-    (submission) => submission.type === "family",
-  );
-  const individualSubmissions = orderedSubmissions.filter(
-    (submission) => submission.type === "single",
-  );
-  const submissionGroups = [
-    {
-      empty: "Семейных подач по текущим фильтрам нет.",
-      items: familySubmissions,
-      label: "Семейные подачи",
-    },
-    {
-      empty: "Индивидуальных подач по текущим фильтрам нет.",
-      items: individualSubmissions,
-      label: "Индивидуальные подачи",
-    },
-  ];
-  const mobileFilterOptions: Array<MobileFilterOption<AgentTab>> = [
-    { count: tabCounts.all, id: "all", label: "Все" },
-    { count: tabCounts.action, id: "action", label: "Действия" },
-    { count: tabCounts.progress, id: "progress", label: "В работе" },
-    { count: tabCounts.review, id: "review", label: "Проверка" },
-    { count: tabCounts.done, id: "done", label: "Готово" },
-  ];
-  const toolbarTools = (
-    <ToolbarTools>
-      <div className="v19-desktop-toolbar-tools">{toolbarToolButtons}</div>
-      <MobileFilterSheet<AgentTab>
-        label="Фильтры подач"
-        options={mobileFilterOptions}
-        title="Статус подач"
-        value={visibleTab}
-        onValueChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
-      />
-    </ToolbarTools>
-  );
   return (
-    <div
-      className={`v19-screen-grid v19-inbox-screen v19-submissions-screen ${
-        panelOpen ? "" : "is-panel-closed"
-      } ${comfortableView ? "is-comfortable" : "is-compact"}`}
-    >
-      <CardComponent
-        as="section"
-        className={
-          activeFilters.length
-            ? "v19-collection-panel has-active-filters"
-            : "v19-collection-panel"
-        }
-        aria-labelledby="agent-title"
-      >
-        <h2 id="agent-title" className="sr-only">
-          Рабочая область подач агента
-        </h2>
-
-        <CollectionToolbar
-          activeFilters={activeFilters}
-          ariaLabel="Инструменты подач"
-          className="v19-agent-mobile-toolbar"
-          mobileTitle={mobileTitle}
-          onClearActiveFilters={activeFilters.length ? resetFilters : undefined}
-          onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
-          search={searchControl}
-          tabs={[
-            { count: tabCounts.all, id: "all", label: "Все" },
-            { count: tabCounts.action, id: "action", label: "Требуют действия" },
-            { count: tabCounts.progress, id: "progress", label: "В работе" },
-            { count: tabCounts.review, id: "review", label: "На проверке" },
-            { count: tabCounts.done, id: "done", label: "Готово" },
-          ]}
-          tabsAriaLabel="Состояние подач"
-          tools={toolbarTools}
-          value={visibleTab}
-        />
-
-        {orderedSubmissions.length ? (
-          <>
-            <div className="v19-submission-list-head" aria-hidden="true">
-              <span>Подача</span>
-              <span>Поездка</span>
-              <span>Статус</span>
-              {!railCompact ? <span>Файлы</span> : null}
-              <span>Готовность</span>
-              <span />
-            </div>
-            <div className="v19-event-list v19-submission-list v19-submission-grouped-list">
-              {submissionGroups.map((group) => (
-                <section className="v19-submission-type-section" key={group.label}>
-                  <CollectionGroupLabel className="v19-submission-type-label">
-                    {group.label} <span>{group.items.length}</span>
-                  </CollectionGroupLabel>
-                  {group.items.length ? (
-                    group.items.map((submission) => (
-                      <SubmissionCollectionRow
-                        action={submissionActionLabel(submission)}
-                        compact={railCompact}
-                        completeness={submissionReadinessDisplay(submission)}
-                        extraTagCount={
-                          railCompact ? 0 : submissionExtraTagCount(submission)
-                        }
-                        extraTagLabel={
-                          railCompact ? undefined : submissionExtraTagLabel(submission)
-                        }
-                        fileDetail={submissionFileDetailLabel(submission)}
-                        fileState={submissionFileStateLabel(submission)}
-                        fileTone={submissionFileStateTone(submission)}
-                        kind={submission.applicants.length > 1 ? "family" : "single"}
-                        key={submission.id}
-                        meta={submissionIdentityMeta(submission)}
-                        status={submission.status}
-                        statusDetail={
-                          railCompact
-                            ? submissionStatusDetailLine(submission)
-                            : submissionIssueDetailLine(submission)
-                        }
-                        statusLabel={submissionStatusChipLabel(submission)}
-                        submissionId={submission.id}
-                        title={submission.title}
-                        trip={submission.city}
-                        tripDetail={tripDates(submission)}
-                        onOpen={() => {
-                          onSelect(submission);
-                          onOpen(submission, defaultDrawerTab(submission));
-                        }}
-                      />
-                    ))
-                  ) : activeTab === "all" && !hasFiltering ? (
-                    <div className="v19-submission-type-empty" role="status">
-                      {group.empty}
-                    </div>
-                  ) : null}
-                </section>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="v19-empty-state" key={`submissions-empty-${visibleTab}-${activeFilters.map((filter) => (typeof filter === "string" ? filter : filter.id)).join("-")}`}>
-            <h3>{hasFiltering ? "Ничего не найдено" : "В этой вкладке нет подач"}</h3>
-            <p>
-              {hasFiltering
-                ? "Измените поиск, город или локальный фильтр, чтобы вернуть подачи в список."
-                : "Список обновится после создания или изменения статуса подачи."}
-            </p>
-            <Button variant="secondary" onClick={hasFiltering ? resetFilters : onCreate}>
-              {hasFiltering ? "Сбросить фильтры" : "Новая подача"}
-            </Button>
-          </div>
-        )}
-      </CardComponent>
-
-      {panelOpen && prioritySubmission ? (
-        <AgentSubmissionContextRail
-          applicantSummary={applicantCountLabel(prioritySubmission.applicants.length)}
-          fileSummary={submissionFileStateLabel(prioritySubmission).replace("Файлы ", "")}
-          history={prioritySubmission.history}
-          issues={prioritySubmission.issues
-            .filter((issue) => issue.status === "open")
-            .slice(0, 4)
-            .map((issue) => ({
-              id: issue.id,
-              reason: issue.reason,
-              targetLine: issueTargetLine(issue),
-              tone: issue.severity === "blocker" ? "danger" : "warning",
-              onOpen: () => {
-                openPriorityTarget(
-                  prioritySubmission,
-                  drawerTabForIssue(issue),
-                  targetForIssue(issue),
-                );
-              },
-            }))}
-          nextAction={{
-            description:
-              priorityIssue?.comment ?? submissionPriorityLine(prioritySubmission),
-            label: priorityIssue
-              ? issueActionLabel(priorityIssue)
-              : submissionActionLabel(prioritySubmission),
-            title: priorityIssue?.reason ?? submissionActionLabel(prioritySubmission),
-            onOpen: () => {
-              openPriorityTarget(
-                prioritySubmission,
-                priorityIssue
-                  ? drawerTabForIssue(priorityIssue)
-                  : defaultDrawerTab(prioritySubmission),
-                priorityIssue ? targetForIssue(priorityIssue) : undefined,
-              );
-            },
-          }}
-          openIssueCount={openIssueCount(prioritySubmission)}
-          status={{
-            label: submissionStatusChipLabel(prioritySubmission),
-            tone: submissionRailTone(prioritySubmission),
-          }}
-          submission={prioritySubmission}
-          tripSummary={tripDates(prioritySubmission)}
-          onClose={() => setV17PanelOpen(false)}
-          onOpenTab={(tab) => {
-            openPriorityTarget(prioritySubmission, tab);
+    <section className="vf-applicants-transfer" aria-label="Мои подачи">
+      <div className="vf-applicants-transfer-toolbar">
+        {searchControl}
+        <div className="vf-applicants-transfer-tabs" role="tablist" aria-label="Фильтр подач">
+          {[
+            ["all", "Все подачи"],
+            ["action", "Требуют действия"],
+            ["progress", "В работе"],
+            ["review", "На проверке"],
+            ["done", "Готово"],
+          ].map(([id, label]) => (
+            <button
+              aria-selected={activeTab === id}
+              className={activeTab === id ? "is-active" : ""}
+              key={id}
+              role="tab"
+              type="button"
+              onClick={() => onTab(id as AgentTab)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {onClearFilters && (hasSearchQuery || activeTab !== "all") ? (
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onClearFilters}
+          >
+            Сбросить фильтры
+          </button>
+        ) : null}
+      </div>
+      {orderedApplicants.length === 0 ? (
+        <div className="vf-applicants-transfer-empty" role="status">
+          <h2>Ничего не найдено</h2>
+          <p>Измените поиск или сбросьте фильтры.</p>
+          {onClearFilters ? (
+            <button className="secondary-button" type="button" onClick={onClearFilters}>
+              Сбросить фильтры
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <FigmaApplicantsVisual
+          maxVisiblePerGroup={2}
+          submissions={orderedApplicants}
+          onOpen={(submission, tab) => {
+            onSelect(submission);
+            onOpen(submission, tab ?? "applicants");
           }}
         />
-      ) : null}
-    </div>
+      )}
+    </section>
   );
 }
-
-function submissionIdentityMeta(submission: Submission) {
-  if (submission.applicants.length === 1) {
-    const passportNumber = submission.applicants[0]?.sections
-      .flatMap((section) => section.fields)
-      .find((field) => field.id === "passport-no")?.value.trim();
-
-    if (passportNumber) return `Паспорт ${passportNumber}`;
-    return "Паспорт не указан";
-  }
-
-  return submission.id;
-}
-
 function submissionFileStateLabel(submission: Submission) {
   const ready = submission.files.filter(
     (file) => file.status !== "missing" && file.status !== "needs_replacement",
   ).length;
 
   return `${ready} из ${submission.files.length}`;
-}
-
-function submissionFileDetailLabel(submission: Submission) {
-  const replacementCount = submission.files.filter(
-    (file) => file.status === "needs_replacement" || file.status === "pending_review",
-  ).length;
-
-  if (replacementCount > 0) {
-    return `${replacementCount} ${pluralRu(replacementCount, "заменен", "заменены", "заменены")}`;
-  }
-
-  return submission.files.length > 0 ? "обязательные" : "нет файлов";
-}
-
-function submissionFileStateTone(submission: Submission): "amber" | "muted" | "teal" {
-  const ready = submission.files.filter(
-    (file) => file.status !== "missing" && file.status !== "needs_replacement",
-  ).length;
-
-  if (ready === 0) return "muted";
-  if (ready === submission.files.length) return "teal";
-  return "amber";
-}
-
-function submissionReadinessDisplay(submission: Submission) {
-  if (submission.status === "ready_for_export") return "Готово к выгрузке";
-  if (submission.status === "exported") return "Выгружено";
-  if (
-    submission.completeness.questionnaire === 100 &&
-    submission.completeness.files === 100 &&
-    submission.completeness.total < 100
-  ) {
-    return "Проверить статус";
-  }
-
-  return `${submission.completeness.total}%`;
-}
-
-function submissionExtraTagCount(submission: Submission) {
-  if (submission.status === "returned" || submission.status === "requires_action") {
-    return 0;
-  }
-
-  const openIssues = openIssueCount(submission);
-  const blockers = blockerCount(submission);
-  const statusTags = [statusLabels[submission.status]];
-
-  if (blockers > 0) statusTags.push("Блокер");
-  if (openIssues > blockers) statusTags.push("Замечания");
-
-  return Math.max(statusTags.length - 1, 0);
-}
-
-function submissionExtraTagLabel(submission: Submission) {
-  const blockers = blockerCount(submission);
-  if (blockers > 0) return `${blockers} блокера`;
-
-  const openIssues = openIssueCount(submission);
-  if (openIssues > 0) return `${openIssues} замечания`;
-
-  return undefined;
-}
-
-function submissionActionLabel(submission: Submission) {
-  if (submission.status === "requires_action" || submission.status === "returned") {
-    const issue = submission.issues.find((item) => item.status === "open");
-    if (issue?.target.fileType) return fileActionLabel(issue.target.fileType);
-    if (issue?.target.field) return "Исправить поле";
-    if (issue?.target.section) return "Исправить раздел";
-    return "Исправить замечания";
-  }
-  if (submission.status === "draft" || submission.status === "in_progress") {
-    const missingFile = submission.files.find(
-      (file) => file.status === "missing" || file.status === "needs_replacement",
-    );
-    if (submission.completeness.questionnaire < 100) return "Заполнить анкету";
-    if (missingFile) return fileActionLabel(missingFile.type);
-    return "Отправить на проверку";
-  }
-  if (
-    submission.status === "submitted_for_review" ||
-    submission.status === "corrections_received"
-  ) {
-    return "Смотреть статус";
-  }
-  if (submission.status === "ready_for_export") return "Готово к выгрузке";
-  return "Открыть историю";
-}
-
-function submissionStatusDetailLine(submission: Submission) {
-  const blockers = blockerCount(submission);
-  const files = submissionFileStateLabel(submission);
-
-  if (blockers > 0) {
-    return `${blockers} ${pluralRu(blockers, "блокер", "блокера", "блокеров")} · ${files}`;
-  }
-
-  return `${submission.updatedAt} · ${files}`;
-}
-
-function submissionIssueDetailLine(submission: Submission) {
-  const blockers = blockerCount(submission);
-  if (blockers > 0) {
-    return `${blockers} ${pluralRu(blockers, "блокер", "блокера", "блокеров")}`;
-  }
-
-  return openIssueCount(submission) > 0 ? "есть замечания" : undefined;
 }
 
 function submissionStatusChipLabel(submission: Submission) {
@@ -1737,12 +1264,6 @@ function drawerTabForIssue(issue: Submission["issues"][number]): DrawerTab {
   return "issues";
 }
 
-function issueActionLabel(issue: Submission["issues"][number]) {
-  if (issue.target.fileType) return "Открыть файл";
-  if (issue.target.field || issue.target.section) return "Открыть точное поле";
-  return "Открыть замечание";
-}
-
 function issueTargetLine(issue: Submission["issues"][number]) {
   return [
     issue.target.applicantName,
@@ -1762,22 +1283,6 @@ function submissionRailTone(submission: Submission) {
   }
   if (submission.status === "draft" || submission.status === "exported") return "muted";
   return "amber";
-}
-
-function fileActionLabel(fileType: Submission["files"][number]["type"]) {
-  if (fileType === "photo") return "Архивный файл";
-  if (fileType === "selfie") return "Добавить селфи";
-  if (fileType === "selfie_2") return "Добавить селфи N2";
-  if (fileType === "passport_scan") return "Заменить паспорт";
-  return "Заменить файл";
-}
-
-function submissionPriorityLine(submission: Submission) {
-  const blockers = blockerCount(submission);
-  if (blockers > 0) return `${blockers} блокера · обновлено ${submission.updatedAt}`;
-  const open = openIssueCount(submission);
-  if (open > 0) return `${open} замечания · обновлено ${submission.updatedAt}`;
-  return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
 }
 
 export type AdminWorkTab = "review" | "corrections" | "events";

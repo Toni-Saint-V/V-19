@@ -918,7 +918,7 @@ describe("V-19 submission actions", () => {
       canPerformAction(withAllReplacements, "submit_corrections", "agent"),
     ).toEqual({
       ok: false,
-      reason: "Загранпаспорт не подтвержден: распознавание еще не выполнено.",
+      reason: "Скан паспорта не проверен.",
     });
 
     const withExtractedPassport = finishPassportExtraction(
@@ -1329,7 +1329,7 @@ describe("V-19 submission actions", () => {
 
     expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
       ok: false,
-      reason: "Загранпаспорт не подтвержден: распознавание еще не выполнено.",
+      reason: "Скан паспорта не проверен.",
     });
 
     const failed = failPassportExtraction(inProgress, passportFile, "Не распознано");
@@ -1817,12 +1817,12 @@ describe("V-19 ББ helper suggestions", () => {
     expect(suggestions.length).toBeGreaterThan(0);
     expect(fileSuggestion).toMatchObject({
       severity: "blocker",
-      title: "Запросить файл: Селфи",
-      reason: expect.stringContaining("нельзя безопасно отправить дальше"),
+      title: "Нет файла: Селфи 1",
+      reason: "Артём Соколов: загрузите файл.",
       target: {
         applicantId: "з-1051-1",
         applicantName: "Артём Соколов",
-        section: "Медиа",
+        section: "Файлы",
         fileType: "selfie",
       },
     });
@@ -1835,7 +1835,7 @@ describe("V-19 ББ helper suggestions", () => {
       suggestions.some(
         (suggestion) =>
           suggestion.target.applicantName === "Мария Иванова" &&
-          suggestion.target.section === "Медиа" &&
+          suggestion.target.section === "Файлы" &&
           suggestion.target.fileType === "selfie",
       ),
     ).toBe(false);
@@ -1893,7 +1893,7 @@ describe("V-19 ББ helper suggestions", () => {
       severity: "warning",
       target: {
         applicantName: "Нина Волкова",
-        section: "Медиа",
+        section: "Файлы",
         fileType: "selfie",
       },
     });
@@ -1904,7 +1904,7 @@ describe("V-19 ББ helper suggestions", () => {
     ).toBe(false);
     expect(next.history[0]).toMatchObject({
       text: "Подсказка ББ принята администратором",
-      detail: "Нина Волкова · Медиа · Селфи",
+      detail: "Нина Волкова · Файлы · Селфи 1",
       source: "bb",
     });
   });

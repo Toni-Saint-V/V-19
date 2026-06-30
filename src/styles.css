@@ -1,5 +1,69 @@
 @import "./shared/ui/tokens.css";
 
+@keyframes vf-state-view-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0.96;
+  }
+}
+
+@media (max-width: 900px) {
+  .vf-figma-surface[role="dialog"] {
+    box-sizing: border-box !important;
+    height: calc(100vh - 48px) !important;
+    max-height: calc(100vh - 48px) !important;
+    overflow: hidden !important;
+  }
+
+  .create-submission-drawer[role="dialog"] {
+    inset: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+}
+
+@keyframes vf-state-view-in {
+  from {
+    opacity: 0.96;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html.vf-vt::view-transition-old(root),
+  html.vf-vt::view-transition-new(root) {
+    animation-duration: var(--v19-motion-normal);
+    animation-timing-function: var(--v19-motion-ease-out);
+  }
+
+  html.vf-vt::view-transition-old(root) {
+    animation-name: vf-state-view-out;
+  }
+
+  html.vf-vt::view-transition-new(root) {
+    animation-name: vf-state-view-in;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  html.vf-vt::view-transition-old(root),
+  html.vf-vt::view-transition-new(root) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 .vf-figma-surface,
 .vf-figma-surface * {
   box-sizing: border-box;
@@ -370,7 +434,7 @@
   padding: 0 10px 0 15px;
   border: 1px solid transparent;
   border-radius: 9px;
-  color: rgb(255 255 255 / 0.5);
+  color: rgb(255 255 255 / 0.78);
   font-size: 14px;
   font-weight: 560;
   line-height: 1;
@@ -402,6 +466,9 @@
 
 .vf-figma-tab-label {
   min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
 }
 
 .vf-figma-tabs button .vf-figma-tab-badge {
@@ -908,12 +975,190 @@
 .vf-figma-applicants-screen {
   display: grid;
   align-content: start;
-  gap: 34px;
+  gap: 24px;
   padding-top: 30px;
+}
+
+.workspace > .vf-applicants-transfer {
+  width: 100%;
+  max-width: var(--v19-agent-screen-max-width);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin-right: auto;
+  margin-left: auto;
+  overflow: hidden;
+}
+
+.vf-applicants-transfer .vf-figma-applicants-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px 24px 48px;
+  overflow: auto;
+  background: #141416;
+}
+
+.vf-applicants-transfer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px 0;
+  background: #141416;
+}
+
+.vf-applicants-transfer-toolbar .search {
+  max-width: 360px;
+}
+
+.vf-applicants-transfer-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid #242529;
+  border-radius: 10px;
+  background: #1e1e21;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.vf-applicants-transfer-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.vf-applicants-transfer-tabs button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgb(255 255 255 / 0.74);
+  font-size: 12px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+.vf-applicants-transfer-tabs button.is-active {
+  background: var(--vf-selected-bg, #25272d);
+  color: var(--vf-selected-text, #f3f4f6);
+}
+
+.vf-applicants-transfer-empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  min-height: 360px;
+  margin: 18px 24px 48px;
+  border: 1px solid #242529;
+  border-radius: 14px;
+  background: #141416;
+  color: rgb(255 255 255 / 0.72);
+  text-align: center;
+}
+
+.vf-applicants-transfer-empty h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+}
+
+.vf-applicants-transfer-empty p {
+  margin: 0;
+  color: rgb(255 255 255 / 0.62);
+  font-size: 13px;
+}
+
+.vf-applicants-transfer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.vf-applicants-transfer-actions button {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 40px;
+  min-height: 40px;
+  flex: 0 0 auto;
+  padding: 0 15px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1;
+  white-space: nowrap;
+  transform: none;
+  transition:
+    border-color var(--v19-motion-fast) var(--v19-motion-ease),
+    background-color var(--v19-motion-fast) var(--v19-motion-ease),
+    color var(--v19-motion-fast) var(--v19-motion-ease);
+}
+
+.vf-applicants-transfer-actions .vf-applicants-transfer-upload {
+  width: 116px;
+  min-width: 116px;
+}
+
+.vf-applicants-transfer-actions .vf-applicants-transfer-create {
+  width: 152px;
+  min-width: 152px;
+}
+
+.vf-applicants-transfer-actions svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.vf-applicants-transfer-upload {
+  border-color: #242529;
+  background: #202124;
+  color: rgb(255 255 255 / 0.86);
+}
+
+.vf-applicants-transfer-create {
+  border-color: transparent;
+  background: #3947d1;
+  color: #fff;
+}
+
+.ops-shell.surface-agent-submissions .vf-applicants-transfer-actions button:active,
+.ops-shell.surface-agent-submissions .vf-applicants-transfer-actions button:hover,
+.ops-shell.surface-agent-submissions .ops-sidebar-create:active,
+.ops-shell.surface-agent-submissions .ops-sidebar-create:hover,
+.ops-shell.surface-agent-submissions .mobile-create-dock .primary-button:hover,
+.ops-shell.surface-agent-submissions .mobile-create-dock .primary-button:active {
+  transform: none;
+}
+
+.ops-shell.surface-agent-submissions .mobile-create-dock .primary-button {
+  height: 50px;
+  min-height: 50px;
+  transform: none;
+}
+
+@media (min-width: 1040px) and (max-width: 1759px) {
+  .ops-shell.surface-agent-submissions.has-open-drawer .workspace {
+    padding-right: 0;
+  }
 }
 
 .vf-figma-applicants-section {
   display: grid;
+  flex: 0 0 auto;
   gap: 20px;
 }
 
@@ -929,19 +1174,19 @@
 
 .vf-figma-family-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(320px, 1fr));
-  gap: 24px;
-  max-width: 1030px;
+  grid-template-columns: repeat(2, minmax(0, 357px));
+  gap: 16px;
+  max-width: 730px;
 }
 
 .vf-figma-family-card,
 .vf-figma-individual-card {
   display: grid;
-  gap: 22px;
-  min-height: 350px;
-  padding: 32px;
+  gap: 20px;
+  min-height: 356px;
+  padding: 20px;
   border: 1px solid #242529;
-  border-radius: 16px;
+  border-radius: 14px;
   background: linear-gradient(180deg, #1a1a1d, #141416);
   color: inherit;
   text-align: left;
@@ -958,16 +1203,16 @@
 .vf-figma-family-head {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
 }
 
 .vf-figma-family-icon {
   display: grid;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid rgb(255 255 255 / 0.05);
-  border-radius: 18px;
+  border-radius: 13px;
   background: rgb(255 255 255 / 0.05);
   color: rgb(255 255 255 / 0.7);
 }
@@ -989,6 +1234,21 @@
   font-style: normal;
 }
 
+.vf-figma-family-summary {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #242529;
+  border-radius: 8px;
+  background: #1e1e21;
+  color: rgb(255 255 255 / 0.76);
+  font-size: 12px;
+  font-weight: 560;
+}
+
 .vf-figma-member-list {
   display: grid;
   gap: 6px;
@@ -996,9 +1256,9 @@
 
 .vf-figma-member-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 86px 22px;
+  grid-template-columns: 30px minmax(0, 1fr) 118px;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   min-height: 36px;
   color: rgb(255 255 255 / 0.8);
 }
@@ -1026,8 +1286,31 @@
 }
 
 .vf-figma-member-row small {
-  color: rgb(255 255 255 / 0.4);
+  color: rgb(255 255 255 / 0.52);
   font-size: 11px;
+}
+
+.vf-figma-member-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  height: 22px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.vf-figma-member-state span {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.vf-figma-member-status-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
 }
 
 .vf-figma-member-ready {
@@ -1038,12 +1321,12 @@
   color: #ff5c67;
 }
 
+.vf-figma-member-review {
+  color: #f4b840;
+}
+
 .vf-figma-member-progress {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #60a5fa;
-  box-shadow: 0 0 0 4px #161617;
+  color: #60a5fa;
 }
 
 .vf-figma-family-footer {
@@ -1052,7 +1335,7 @@
   justify-content: space-between;
   gap: 16px;
   margin-top: auto;
-  padding-top: 22px;
+  padding-top: 20px;
   border-top: 1px solid #242529;
   color: rgb(255 255 255 / 0.4);
   font-size: 12px;
@@ -1072,27 +1355,28 @@
 }
 
 .vf-figma-applicants-divider {
+  flex: 0 0 auto;
   height: 1px;
   background: #202124;
 }
 
 .vf-figma-individual-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(260px, 360px));
-  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 264px));
+  gap: 16px;
 }
 
 .vf-figma-individual-card {
-  min-height: 190px;
-  grid-template-columns: 56px minmax(0, 1fr);
+  min-height: 150px;
+  grid-template-columns: 44px minmax(0, 1fr);
   align-items: start;
-  gap: 20px;
+  gap: 14px;
 }
 
 .vf-figma-avatar {
   display: grid;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid rgb(255 255 255 / 0.1);
   border-radius: 999px;
@@ -1274,6 +1558,67 @@
 
   .vf-figma-individual-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .ops-shell.surface-agent-submissions .v19-topbar-menu {
+    width: 34px;
+    height: 34px;
+  }
+
+  .ops-shell.surface-agent-submissions .topbar h1 {
+    font-size: 14px;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-applicants-transfer-actions {
+    gap: 6px;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-applicants-transfer-actions button {
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-applicants-transfer-actions button {
+    font-size: 0;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-applicants-transfer-actions svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-applicants-transfer .vf-figma-applicants-screen {
+    padding: 18px 16px 112px;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-family-grid,
+  .ops-shell.surface-agent-submissions .vf-figma-individual-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    max-width: none;
+    overflow: visible;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-member-row {
+    grid-template-columns: 28px minmax(0, 1fr) 104px;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-member-row small {
+    display: inline-flex;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-family-card {
+    min-height: 356px;
+  }
+
+  .ops-shell.surface-agent-submissions .vf-figma-individual-card {
+    min-height: 150px;
   }
 }
 
@@ -1568,6 +1913,7 @@ body {
   background: var(--v19-canvas);
   color: var(--v19-fg);
   overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 body:has(.ops-shell.has-open-drawer .submission-drawer) {
@@ -4242,6 +4588,23 @@ p {
   transform: translateY(5px);
 }
 
+@media (min-width: 761px) {
+  .ops-shell.has-unified-side-menu .v19-topbar-menu {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-shell.has-unified-side-menu .v19-topbar-menu {
+    display: grid;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    flex: 0 0 40px;
+  }
+}
+
 .v19-topbar-cta.primary-button span {
   font-size: 20px;
   font-weight: 420;
@@ -4261,6 +4624,26 @@ p {
   border-right: 1px solid rgb(32 33 36);
   background: rgb(16 16 17);
   box-shadow: none;
+}
+
+.ops-shell .ops-sidebar--mobile {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .ops-shell .ops-sidebar--desktop {
+    display: none !important;
+  }
+
+  .ops-shell.is-mobile-nav-open .ops-sidebar--mobile {
+    display: grid;
+  }
+}
+
+@media (min-width: 761px) {
+  .ops-shell .ops-sidebar--mobile {
+    display: none !important;
+  }
 }
 
 .ops-shell .ops-brand {
@@ -4689,233 +5072,160 @@ p {
 
 @media (min-width: 761px) {
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) {
-    --v19-sidebar-width: clamp(360px, 33vw, 520px);
-    --vf-action-menu-width: min(472px, calc(var(--v19-sidebar-width) - 48px));
-    --vf-action-menu-icon-size: 56px;
+    --v19-sidebar-width: 248px;
+    --vf-action-menu-width: 100%;
+    --vf-action-menu-icon-size: 17px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-sidebar {
-    align-items: center;
+    align-items: stretch;
     width: var(--v19-sidebar-width);
-    max-width: 520px;
-    padding: 38px 24px 28px;
+    max-width: none;
+    padding: 16px 12px 12px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-brand {
-    justify-content: center;
-    width: var(--vf-action-menu-width);
-    min-height: 88px;
-    padding: 0 0 26px;
-    border-bottom: 1px solid rgb(255 255 255 / 0.08);
+    justify-content: flex-start;
+    width: auto;
+    min-height: 56px;
+    padding: 0 6px 14px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-brand-logo {
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    font-size: 22px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 15px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
-    :is(.ops-brand-copy, .ops-mobile-close) {
+    .ops-brand-copy {
+    display: block;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-mobile-close {
     display: none;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav {
-    justify-items: center;
-    width: var(--vf-action-menu-width);
-    gap: 18px;
-    margin-top: 18px;
+    justify-items: stretch;
+    width: 100%;
+    gap: 3px;
+    margin-top: 14px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav::before {
     width: 100%;
-    padding: 0 0 2px;
-    text-align: center;
-    letter-spacing: 0.06em;
+    padding: 0 10px 8px;
+    text-align: left;
+    letter-spacing: 0.04em;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-item {
-    justify-content: center;
-    width: var(--vf-action-menu-icon-size);
-    height: var(--vf-action-menu-icon-size);
-    min-height: var(--vf-action-menu-icon-size);
-    padding: 0;
-    gap: 0;
-    border-radius: 18px;
+    justify-content: flex-start;
+    width: 100%;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 10px;
+    gap: 10px;
+    border-radius: 10px;
     transition:
-      width var(--v19-motion-normal) var(--v19-motion-ease),
       background-color var(--v19-motion-fast) var(--v19-motion-ease),
       color var(--v19-motion-fast) var(--v19-motion-ease);
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .ops-nav-item.is-active::before {
-    left: -18px;
-    width: 3px;
-    height: 28px;
+    left: -12px;
+    width: 2px;
+    height: 20px;
     background: rgb(243 243 245 / 0.86);
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-icon {
-    width: 22px;
-    height: 22px;
-    flex-basis: 22px;
+    width: var(--vf-action-menu-icon-size);
+    height: var(--vf-action-menu-icon-size);
+    flex-basis: var(--vf-action-menu-icon-size);
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-nav-icon svg {
-    width: 22px;
-    height: 22px;
+    width: var(--vf-action-menu-icon-size);
+    height: var(--vf-action-menu-icon-size);
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
-    :is(.ops-nav-copy, .ops-nav-count, .ops-nav-action) {
+    :is(.ops-nav-copy, .ops-nav-count) {
+    display: block;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-nav-count {
+    display: grid;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-admin-review)
+    .ops-nav-action {
     display: none;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .ops-sidebar-create {
-    width: var(--vf-action-menu-width);
-    height: 58px;
-    min-height: 58px;
+    width: 100%;
+    height: 40px;
+    min-height: 40px;
     margin-top: auto;
-    border-radius: 18px;
+    border-radius: 12px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .ops-sidebar-create
     span {
-    width: 32px;
-    height: 32px;
+    width: 18px;
+    height: 18px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .ops-sidebar-create
     strong {
-    display: none;
+    display: block;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .ops-sidebar-footer {
-    width: var(--vf-action-menu-width);
-    margin-top: 26px;
-    padding: 26px 0 0;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px 0 0;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .vf-figma-admin-zone.secondary-button {
-    width: var(--vf-action-menu-width);
-    height: 58px;
-    border-radius: 18px;
+    width: 100%;
+    height: 40px;
+    border-radius: 12px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-session {
+    gap: 10px;
     justify-content: flex-start;
-    width: var(--vf-action-menu-width);
-    height: 56px;
-    min-height: 56px;
-    padding: 0;
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 2px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-session > span {
-    width: 44px;
-    height: 44px;
-    flex-basis: 44px;
-    font-size: 14px;
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+    font-size: 12px;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .ops-session
     > div,
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .ops-user-more {
-    display: none;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-nav-item {
-    justify-content: flex-start;
-    width: var(--vf-action-menu-width);
-    padding: 0 18px;
-    gap: 12px;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-nav-item.is-active::before {
-    left: -24px;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-nav-copy {
-    display: block;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-nav-count {
-    display: grid;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-sidebar-create {
-    justify-content: center;
-    gap: 10px;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-sidebar-create
-    strong {
-    display: block;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-session {
-    gap: 10px;
-    padding: 0 6px;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-session
-    > div {
-    display: block;
-  }
-
-  .ops-shell:is(.surface-agent-actions, .surface-admin-review):is(
-      .is-mobile-nav-open,
-      :has(.ops-sidebar:hover),
-      :has(.ops-sidebar:focus-within)
-    )
-    .ops-user-more {
     display: block;
   }
 }
@@ -6823,7 +7133,7 @@ p {
     background: rgba(0, 0, 0, 0.42);
   }
 
-  .ops-shell.is-mobile-nav-open .ops-sidebar {
+  .ops-shell.is-mobile-nav-open .ops-sidebar--mobile {
     z-index: 180 !important;
   }
 }
@@ -6876,12 +7186,18 @@ p {
   }
 }
 
+.surface-export .export-mobile-select-all {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .ops-shell:is(.surface-agent-actions, .surface-admin-review)
     .vf-figma-actions-toolbar {
     align-items: stretch !important;
     flex-direction: column !important;
+    flex-wrap: nowrap !important;
     gap: 10px !important;
+    min-height: 0 !important;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .vf-figma-tools {
@@ -6988,7 +7304,28 @@ p {
   }
 }
 
+@media (max-width: 900px) {
+  .vf-figma-surface[role="dialog"] {
+    box-sizing: border-box !important;
+    height: calc(100vh - 48px) !important;
+    max-height: calc(100vh - 48px) !important;
+    overflow: hidden !important;
+  }
+}
+
 @media (max-width: 560px) {
+  .surface-export .export-mobile-select-all {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    padding: 8px 10px 0 !important;
+    color: rgb(var(--html-builder-fg-3)) !important;
+    font-size: 11px !important;
+    font-weight: 680 !important;
+    letter-spacing: 0 !important;
+  }
+
   .surface-export .data-table {
     min-width: 0 !important;
   }
@@ -7142,7 +7479,9 @@ p {
     .vf-figma-actions-toolbar {
     align-items: stretch !important;
     flex-direction: column !important;
+    flex-wrap: nowrap !important;
     gap: 10px !important;
+    min-height: 0 !important;
   }
 
   .ops-shell:is(.surface-agent-actions, .surface-admin-review) .vf-figma-tools {

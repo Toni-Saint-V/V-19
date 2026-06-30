@@ -61,7 +61,7 @@ export type SubmissionNextStepBrief = {
 const guardrails = [
   "Подсказка не является решением.",
   "Детерминированные проверки остаются источником истины.",
-  "Оператор принимает медиа и заявку вручную.",
+  "Файлы остаются частью ручной проверки.",
 ];
 
 export function buildSubmissionNextStepBrief({
@@ -320,12 +320,12 @@ function summaryFor(
   fileCounts: ReturnType<typeof mediaCounts>,
 ) {
   if (surface === "review") {
-    return `Этап ручной проверки. Готовность ${submission.completeness.total}%.`;
+    return `Проверка. Готовность ${submission.completeness.total}%.`;
   }
   if (surface === "export") {
-    return `Медиа принято ${fileCounts.accepted}/${fileCounts.required}.`;
+    return `Файлы приняты: ${fileCounts.accepted}/${fileCounts.required}.`;
   }
-  return `Готовность ${submission.completeness.total}%. Загружено ${fileCounts.uploaded}/${fileCounts.required}, принято оператором ${fileCounts.accepted}/${fileCounts.required}.`;
+  return `Готовность ${submission.completeness.total}%. Файлы: ${fileCounts.uploaded}/${fileCounts.required}.`;
 }
 
 function nextActions({
@@ -353,7 +353,7 @@ function nextActions({
   if (role === "admin" && surface === "review") {
     const actions = [
       `Сначала проверьте ${typeLabels[submission.type].toLowerCase()} и ${submission.applicants.length} заявителя(ей).`,
-      `Медиа: ${fileCounts.uploaded}/${fileCounts.required} загружено, ${fileCounts.accepted}/${fileCounts.required} принято оператором.`,
+      `Файлы: ${fileCounts.uploaded}/${fileCounts.required} загружено, ${fileCounts.accepted}/${fileCounts.required} принято.`,
     ];
     if (openIssueCount(submission)) {
       actions.push("Верните точечные замечания агенту вместо общего комментария.");

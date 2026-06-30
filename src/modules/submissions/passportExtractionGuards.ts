@@ -123,7 +123,7 @@ function applicantPassportGateIssues(
           issue(
             applicant,
             "passport_not_confirmed",
-            "Загранпаспорт не подтвержден: распознавание еще не выполнено.",
+            "Скан паспорта не проверен.",
           ),
         ]
       : [];
@@ -134,7 +134,7 @@ function applicantPassportGateIssues(
       issue(
         applicant,
         "passport_not_confirmed",
-        "Дождитесь завершения распознавания загранпаспорта.",
+        "Дождитесь проверки скана.",
       ),
     ];
   }
@@ -149,7 +149,7 @@ function applicantPassportGateIssues(
       issue(
         applicant,
         "passport_not_confirmed",
-        "Загранпаспорт не подтвержден: паспортные поля не извлечены.",
+        "Паспортные данные не прочитаны.",
       ),
     ];
   }

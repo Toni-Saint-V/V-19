@@ -173,7 +173,7 @@ export function getExportWarnings(submissions: Submission[]): ExportBlocker[] {
     return [
       {
         reason:
-          "Пакет содержит подачи разных агентов: Excel разрешён, returned PDF останется agent-scoped.",
+          "В пакете подачи разных агентов. Excel доступен, PDF останется у своих агентов.",
       },
     ];
   }
