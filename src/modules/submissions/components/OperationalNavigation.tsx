@@ -68,21 +68,21 @@ export function OperationalSideMenu({
       />
 
       {mobileOpen ? (
+        <button
+          className="ops-mobile-menu-backdrop"
+          type="button"
+          aria-label="Закрыть меню"
+          onClick={onMobileClose}
+        />
+      ) : null}
+
+      {mobileOpen ? (
         <OperationalMobileSidebar
           createAction={mobileCreateAction}
           items={mobileItems}
           onMobileClose={onMobileClose}
           mobileTitle={mobileTitle}
           footer={footer}
-        />
-      ) : null}
-
-      {mobileOpen ? (
-        <button
-          className="ops-mobile-menu-backdrop"
-          type="button"
-          aria-label="Закрыть меню"
-          onClick={onMobileClose}
         />
       ) : null}
     </>
@@ -102,6 +102,7 @@ export function OperationalSidebar(props: OperationalSidebarProps) {
 }
 
 function OperationalSidebarFrame({
+  brand = "VisaFlow",
   className,
   createAction,
   footer,
@@ -120,7 +121,7 @@ function OperationalSidebarFrame({
           <span aria-hidden="true">VF</span>
         </div>
       ) : null}
-      <div className="ops-brand">
+      <div className="ops-brand" aria-label={`${brand} 19`}>
         <span
           className="ops-brand-logo ops-brand-mark vf-brand-capital vf-brand-capital--nav"
           aria-hidden="true"
