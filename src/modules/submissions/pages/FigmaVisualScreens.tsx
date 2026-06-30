@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -19,7 +19,7 @@ import type {
 } from "../agentActions";
 import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
-import { statusLabelFor } from "../status";
+import { blockerCount, statusLabelFor } from "../status";
 import type { City, DrawerTab, Submission } from "../types";
 
 type VisualStatus = Submission["status"];
@@ -66,7 +66,8 @@ type VisualMember = {
   initials: string;
   name: string;
   role: string;
-  status: "in_progress" | "missing_docs" | "ready";
+  status: "in_progress" | "needs_fix" | "ready" | "review";
+  statusLabel: string;
 };
 
 type VisualOpenHandler = (submission: Submission, tab?: DrawerTab) => void;
@@ -126,25 +127,17 @@ function statusBadge(item: VisualActionRow) {
   );
 }
 
-function memberStatusIcon(status: VisualMember["status"]) {
-  if (status === "missing_docs") {
-    return <AlertCircle className="vf-figma-member-issue" aria-hidden="true" size={15} />;
+function submissionCardSummary(submission: Submission) {
+  const readyFiles = submission.files.filter(
+    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  ).length;
+  const blockers = blockerCount(submission);
+
+  if (blockers > 0) {
+    return `${blockers} ${blockers === 1 ? "блокер" : "блокера"} · ${readyFiles} из ${submission.files.length}`;
   }
 
-  if (status === "in_progress") {
-    return <span className="vf-figma-member-progress" aria-hidden="true" />;
-  }
-
-  return <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />;
-}
-
-function activateKeyboardCard(
-  event: KeyboardEvent<HTMLElement>,
-  action: () => void,
-) {
-  if (event.key !== "Enter" && event.key !== " ") return;
-  event.preventDefault();
-  action();
+  return `${readyFiles} из ${submission.files.length} файлов`;
 }
 
 function VisualToolbar({
@@ -318,7 +311,7 @@ function VisualToolbar({
                   ) : null}
                   {filterPanel === "type" ? (
                     <>
-                      <span>Семьи и заявители</span>
+                      <span>Семейные подачи и заявители</span>
                       <button
                         className={typeFilter === "all" ? "is-active" : ""}
                         type="button"
@@ -337,7 +330,7 @@ function VisualToolbar({
                           onFilterPopoverOpen(false);
                         }}
                       >
-                        Семьи
+                        Семейные подачи
                       </button>
                       <button
                         className={typeFilter === "single" ? "is-active" : ""}
@@ -423,14 +416,12 @@ function ListRow({
   onOpen: VisualOpenHandler;
 }) {
   return (
-    <div
+    <button
       className="vf-figma-action-row"
       data-submission-id={item.id}
-      role="button"
-      tabIndex={0}
+      type="button"
       aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
       onClick={() => onOpen(item.submission, item.tab)}
-      onKeyDown={(event) => activateKeyboardCard(event, () => onOpen(item.submission, item.tab))}
     >
       <span className={`vf-figma-dot ${statusDot(item.status)}`} aria-hidden="true" />
       <span className="vf-figma-action-title">
@@ -452,18 +443,13 @@ function ListRow({
         <em>Даты поездки</em>
       </span>
       <span className="vf-figma-action-status">{statusBadge(item)}</span>
-      <button
+      <span
         className="vf-figma-open-button"
-        type="button"
-        aria-label={`${item.cta}: ${item.title}, ${item.id}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpen(item.submission, item.tab);
-        }}
+        aria-hidden="true"
       >
         {item.cta}
-      </button>
-    </div>
+      </span>
+    </button>
   );
 }
 
@@ -709,14 +695,20 @@ export function FigmaActionQueueVisual({
 }
 
 export function FigmaApplicantsVisual({
+  maxVisiblePerGroup,
   onOpen,
   submissions = [],
 }: {
+  maxVisiblePerGroup?: number;
   onOpen?: VisualOpenHandler;
   submissions?: Submission[];
 }) {
-  const familySubmissions = submissions.filter((submission) => submission.type === "family");
-  const individualSubmissions = submissions.filter((submission) => submission.type === "single");
+  const familySubmissions = submissions
+    .filter((submission) => submission.type === "family")
+    .slice(0, maxVisiblePerGroup);
+  const individualSubmissions = submissions
+    .filter((submission) => submission.type === "single")
+    .slice(0, maxVisiblePerGroup);
 
   return (
     <section className="vf-figma-screen vf-figma-applicants-screen" aria-label="Мои подачи">
@@ -725,17 +717,13 @@ export function FigmaApplicantsVisual({
         <div className="vf-figma-family-grid">
           {familySubmissions.length ? (
             familySubmissions.map((submission) => (
-              <article
+              <button
                 className="vf-figma-family-card"
                 data-submission-id={submission.id}
                 key={submission.id}
-                role="button"
-                tabIndex={0}
+                type="button"
                 aria-label={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submission.id}`}
                 onClick={() => onOpen?.(submission)}
-                onKeyDown={(event) =>
-                  activateKeyboardCard(event, () => onOpen?.(submission))
-                }
               >
                 <span className="vf-figma-family-head">
                   <span className="vf-figma-family-icon">
@@ -743,28 +731,30 @@ export function FigmaApplicantsVisual({
                   </span>
                   <span>
                     <strong>{formatSubmissionListTitle(submission)}</strong>
-                    <em>{applicantCountLabel(submission.applicants.length)}</em>
+                    <em>
+                      {statusLabelFor(submission.status, "compact")} ·{" "}
+                      {applicantCountLabel(submission.applicants.length)}
+                    </em>
                   </span>
+                </span>
+                <span className="vf-figma-family-summary">
+                  {submissionCardSummary(submission)}
                 </span>
                 <span className="vf-figma-member-list">
                   {submission.applicants.map((applicant) => {
                     const member = visualMemberForApplicant(submission, applicant);
                     return (
-                      <button
+                      <span
                         className="vf-figma-member-row"
                         key={`${submission.id}-${applicant.id}`}
-                        type="button"
-                        aria-label={`Открыть заявителя: ${member.name}, ${formatSubmissionListTitle(submission)}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpen?.(submission, "applicants");
-                        }}
                       >
                         <em>{member.initials}</em>
                         <strong>{member.name}</strong>
-                        <small>{member.role}</small>
-                        {memberStatusIcon(member.status)}
-                      </button>
+                        <small className={`vf-figma-member-state is-${member.status}`}>
+                          {memberStatusIcon(member.status, member.statusLabel)}
+                          <span>{member.statusLabel}</span>
+                        </small>
+                      </span>
                     );
                   })}
                 </span>
@@ -775,7 +765,7 @@ export function FigmaApplicantsVisual({
                     {submission.files.length} файлов
                   </em>
                 </span>
-              </article>
+              </button>
             ))
           ) : (
             <div className="vf-figma-family-card" role="status">
@@ -793,7 +783,7 @@ export function FigmaApplicantsVisual({
       <div className="vf-figma-applicants-divider" />
 
       <div className="vf-figma-applicants-section">
-        <h2>Заявители</h2>
+        <h2>Индивидуальные подачи</h2>
         <div className="vf-figma-individual-grid">
           {individualSubmissions.length ? (
             individualSubmissions.map((submission) => {
@@ -816,8 +806,8 @@ export function FigmaApplicantsVisual({
                   <span>
                     <strong>{member?.name ?? submission.title}</strong>
                     <em>
-                      {member ? memberStatusIcon(member.status) : null}
-                      {statusLabelFor(submission.status, "compact")}
+                      {member ? memberStatusIcon(member.status, member.statusLabel) : null}
+                      {member?.statusLabel ?? statusLabelFor(submission.status, "compact")}
                     </em>
                   </span>
                   <span className="vf-figma-family-footer">
@@ -918,11 +908,19 @@ function visualMemberForApplicant(
   submission: Submission,
   applicant: Submission["applicants"][number],
 ): VisualMember {
+  const status = memberStatus(
+    submission,
+    applicant.id,
+    applicant.questionnaireStatus,
+    applicant.fileStatus,
+  );
+
   return {
     initials: initialsForName(applicant.fullName),
     name: applicant.fullName,
     role: applicantRoleLabel(applicant.role ?? "main"),
-    status: memberStatus(submission, applicant.id, applicant.questionnaireStatus),
+    status,
+    statusLabel: memberStatusLabel(status),
   };
 }
 
@@ -930,22 +928,82 @@ function memberStatus(
   submission: Submission,
   applicantId: string,
   questionnaireStatus: Submission["applicants"][number]["questionnaireStatus"],
+  fileStatus: Submission["applicants"][number]["fileStatus"],
 ): VisualMember["status"] {
   const files = submission.files.filter((file) => file.applicantId === applicantId);
+  const applicantIssues = submission.issues.filter(
+    (issue) => issue.target.applicantId === applicantId,
+  );
+  const hasOpenBlocker = applicantIssues.some(
+    (issue) => issue.status === "open" && issue.severity === "blocker",
+  );
+  const hasAgentFixedIssue = applicantIssues.some(
+    (issue) => issue.status === "fixed_by_agent",
+  );
+
   if (
+    hasOpenBlocker ||
     questionnaireStatus === "needs_fix" ||
-    files.some((file) => file.status === "missing" || file.status === "needs_replacement")
+    files.some((file) => file.status === "needs_replacement")
   ) {
-    return "missing_docs";
+    return "needs_fix";
+  }
+  if (
+    hasAgentFixedIssue ||
+    files.some((file) => file.status === "pending_review") ||
+    (submission.status === "submitted_for_review" && files.length > 0)
+  ) {
+    return "review";
   }
   if (
     questionnaireStatus === "empty" ||
     questionnaireStatus === "partial" ||
-    files.some((file) => file.status === "uploaded" || file.status === "pending_review")
+    fileStatus === "empty" ||
+    fileStatus === "partial" ||
+    fileStatus === "needs_fix" ||
+    files.some((file) => file.status === "missing" || file.status === "uploaded")
   ) {
     return "in_progress";
   }
   return "ready";
+}
+
+function memberStatusLabel(status: VisualMember["status"]) {
+  if (status === "needs_fix") return "Нужна правка";
+  if (status === "review") return "На проверке";
+  if (status === "ready") return "Готов";
+  return "В работе";
+}
+
+function memberStatusIcon(status: VisualMember["status"], label?: string) {
+  const ariaLabel = label ?? memberStatusLabel(status);
+  if (status === "ready") {
+    return (
+      <CheckCircle2
+        aria-label={ariaLabel}
+        className="vf-figma-member-status-icon vf-figma-member-ready"
+        size={15}
+      />
+    );
+  }
+  if (status === "needs_fix") {
+    return (
+      <AlertCircle
+        aria-label={ariaLabel}
+        className="vf-figma-member-status-icon vf-figma-member-issue"
+        size={15}
+      />
+    );
+  }
+  return (
+    <Clock
+      aria-label={ariaLabel}
+      className={`vf-figma-member-status-icon ${
+        status === "review" ? "vf-figma-member-review" : "vf-figma-member-progress"
+      }`}
+      size={15}
+    />
+  );
 }
 
 function applicantRoleLabel(role: string) {
