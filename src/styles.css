@@ -4827,6 +4827,10 @@ p {
   box-shadow: none;
 }
 
+.ops-shell .ops-nav-item > * {
+  pointer-events: none;
+}
+
 .ops-shell .ops-nav-item:not(:disabled):hover {
   color: rgb(243 243 245);
   background: rgb(34 34 38 / 0.7);

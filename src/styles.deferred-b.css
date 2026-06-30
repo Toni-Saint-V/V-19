@@ -1449,6 +1449,10 @@
     gap: 0;
   }
 
+  .ops-shell .ops-nav-item > * {
+    pointer-events: none !important;
+  }
+
   .ops-shell .ops-nav-item.is-active::before {
     left: -8px;
     height: 18px;
