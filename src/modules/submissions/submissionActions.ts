@@ -38,6 +38,7 @@ import type {
   ExportState,
   Issue,
   IssueInput,
+  PassportExtractionReviewState,
   PreliminaryIntakeDraft,
   QuestionnaireSection,
   Submission,
@@ -479,15 +480,26 @@ export function uploadRequiredFile(
   const targetFile = submission.files.find((file) => file.id === fileId);
   if (!targetFile || !isFileUploadable(targetFile.status)) return submission;
   if (!isCanonicalFrontendMediaType(targetFile.type)) return submission;
+  const isPassportReplacementUpload =
+    targetFile.type === "passport_scan" && targetFile.status === "needs_replacement";
 
   const files = submission.files.map((file) =>
     file.id === fileId
       ? {
           ...file,
           status: "uploaded" as const,
-          generatedFileName: metadata?.generatedFileName ?? file.generatedFileName,
-          mimeType: metadata?.mimeType ?? file.mimeType,
-          originalFileName: metadata?.originalFileName ?? file.originalFileName,
+          generatedFileName:
+            metadata?.generatedFileName ??
+            file.generatedFileName ??
+            (isPassportReplacementUpload ? replacementUploadFileName(file) : undefined),
+          mimeType:
+            metadata?.mimeType ??
+            file.mimeType ??
+            (isPassportReplacementUpload ? "image/jpeg" : undefined),
+          originalFileName:
+            metadata?.originalFileName ??
+            file.originalFileName ??
+            (isPassportReplacementUpload ? replacementUploadFileName(file) : undefined),
           reviewedAtIso: undefined,
           reviewedBy: undefined,
           reviewStatus: "not_reviewed" as const,
@@ -502,6 +514,7 @@ export function uploadRequiredFile(
         }
       : file,
   );
+  const uploadedTargetFile = files.find((file) => file.id === fileId) ?? targetFile;
   const applicant = submission.applicants.find(
     (item) => item.id === targetFile.applicantId,
   );
@@ -516,7 +529,9 @@ export function uploadRequiredFile(
       ),
       passportExtraction:
         targetFile.type === "passport_scan" && item.id === targetFile.applicantId
-          ? undefined
+          ? isPassportReplacementUpload
+            ? passportReplacementManualFallback(uploadedTargetFile, metadata)
+            : undefined
           : item.passportExtraction,
     })),
     files,
@@ -535,6 +550,31 @@ export function uploadRequiredFile(
       },
       ...submission.history,
     ],
+  };
+}
+
+function replacementUploadFileName(file: SubmissionFile) {
+  const safeId = file.id.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "");
+  return `pilot-replacement-${safeId || "file"}-${file.type}.jpg`;
+}
+
+function passportReplacementManualFallback(
+  file: SubmissionFile,
+  metadata?: UploadedFileMetadata,
+): PassportExtractionReviewState {
+  return {
+    appliedFieldKeys: [],
+    dismissedAtIso: metadata?.uploadedAtIso ?? new Date().toISOString(),
+    extractedFields: [],
+    lastAttemptAtIso: metadata?.uploadedAtIso,
+    sourceFileId: file.id,
+    sourceFileName:
+      metadata?.originalFileName ??
+      file.originalFileName ??
+      file.generatedFileName,
+    sourceStoragePath: metadata?.storagePath ?? file.storagePath,
+    status: "unavailable",
+    summary: "Новый скан загружен. OCR не выполнен; проверьте паспортные поля вручную.",
   };
 }
 

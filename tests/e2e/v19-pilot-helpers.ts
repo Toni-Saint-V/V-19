@@ -106,7 +106,7 @@ export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
 }
 
 export function drawer(page: Page) {
-  return page.getByRole("dialog").first();
+  return page.locator('[role="dialog"]:visible').first();
 }
 
 export function submissionCard(page: Page, name: string) {
@@ -196,11 +196,16 @@ export async function uploadAllVisibleFiles(page: Page) {
   await uploadButtons.first().waitFor({ state: "visible", timeout: 2000 }).catch(() => {});
 
   for (let pass = 0; pass < 40; pass += 1) {
-    if ((await uploadButtons.count()) === 0) {
+    await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
+
+    const before = await uploadButtons.count();
+    if (before === 0) {
       return;
     }
 
     await uploadButtons.first().click();
+    await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
+    await expect.poll(() => uploadButtons.count()).toBeLessThan(before);
   }
 
   throw new Error("Unable to upload all visible files.");
@@ -232,7 +237,7 @@ export async function markVisibleIssuesFixed(page: Page) {
     if ((await fixedButtons.count()) === 0) return;
 
     await fixedButtons.first().click();
-    await page.waitForTimeout(120);
+    await expect(drawer(page).getByRole("heading", { name: "Замечания" })).toBeVisible();
   }
 
   throw new Error("Too many visible issue fix buttons.");
