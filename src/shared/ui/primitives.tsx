@@ -7,11 +7,13 @@ import {
   type KeyboardEvent,
   type ReactNode,
   type Ref,
+  type RefObject,
   type SelectHTMLAttributes,
   useEffect,
   useId,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "./cn";
 
 function mergeAriaIds(
@@ -488,6 +490,15 @@ export function StateTabs<T extends string>(props: StateTabsProps<T>) {
   );
 }
 
+export function StatusTabs<T extends string>(props: StateTabsProps<T>) {
+  return (
+    <SegmentedControl
+      {...props}
+      className={cn("v19-status-tabs", "v19-state-tabs", props.className)}
+    />
+  );
+}
+
 export function TabCount({ children }: { children: ReactNode }) {
   return <span className="tab-count v19-tab-count">{children}</span>;
 }
@@ -673,5 +684,133 @@ export function SheetFrame({
     >
       {children}
     </div>
+  );
+}
+
+interface BottomSheetProps {
+  ariaLabel?: string;
+  children: ReactNode;
+  className?: string;
+  closeLabel?: string;
+  footer?: ReactNode;
+  id?: string;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  open: boolean;
+  title: string;
+  onClose: () => void;
+}
+
+export function BottomSheet({
+  ariaLabel,
+  children,
+  className,
+  closeLabel = "Закрыть",
+  footer,
+  id,
+  initialFocusRef,
+  open,
+  title,
+  onClose,
+}: BottomSheetProps) {
+  const generatedTitleId = useId();
+  const titleId = `${generatedTitleId}-title`;
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previouslyFocused = document.activeElement;
+
+    window.requestAnimationFrame(() => {
+      const focusTarget = initialFocusRef?.current ?? closeButtonRef.current;
+      focusTarget?.focus({ preventScroll: true });
+    });
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusableElements = sheetRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      const focusable = focusableElements ? Array.from(focusableElements) : [];
+
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+        return;
+      }
+
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+
+      if (previouslyFocused instanceof HTMLElement) {
+        previouslyFocused.focus({ preventScroll: true });
+      }
+    };
+  }, [initialFocusRef, onClose, open]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
+    <>
+      <button
+        aria-label={`${closeLabel} по фону`}
+        className="mp-bottom-sheet-backdrop"
+        type="button"
+        onClick={onClose}
+      >
+        <span aria-hidden="true" className="sr-only">
+          {closeLabel}
+        </span>
+      </button>
+      <div
+        className={cn("mp-bottom-sheet", className)}
+        id={id}
+        ref={sheetRef}
+        role="dialog"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabel ? undefined : titleId}
+        aria-modal="true"
+      >
+        <div className="mp-bottom-sheet-grabber" aria-hidden="true" />
+        <div className="mp-bottom-sheet-head">
+          <strong id={ariaLabel ? undefined : titleId}>{title}</strong>
+          <Button
+            ref={closeButtonRef}
+            aria-label={closeLabel}
+            className="mp-bottom-sheet-close"
+            variant="ghost"
+            onClick={onClose}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </Button>
+        </div>
+        <div className="mp-bottom-sheet-body">{children}</div>
+        {footer ? <div className="mp-bottom-sheet-footer">{footer}</div> : null}
+      </div>
+    </>,
+    document.body,
   );
 }

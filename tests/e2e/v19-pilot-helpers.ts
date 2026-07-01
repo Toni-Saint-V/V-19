@@ -31,7 +31,7 @@ export async function openFreshWorkspace(
 
     browserGlobal.localStorage.clear();
     if (workspaceEmail) {
-      browserGlobal.localStorage.setItem("visaflow.workspaceEmail.v1", workspaceEmail);
+      browserGlobal.localStorage.setItem("visaflow.workspaceEmail.v2", workspaceEmail);
     }
   }, options.workspaceEmail ?? "");
   await page.reload();

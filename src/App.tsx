@@ -106,6 +106,7 @@ import {
   CityFilterMenu,
   type AgentFilterValue,
 } from "./modules/submissions/components/OperationalFilters";
+import { AppShell, PageHeader } from "./modules/submissions/components/AppShell";
 import { OperationalSideMenu } from "./modules/submissions/components/OperationalSideMenu";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
@@ -3085,110 +3086,229 @@ function MainApp() {
     );
   }
 
-  return (
-    <main
-      className={`ops-shell has-unified-side-menu surface-${surface} ${
-        isV19CollectionSurface ? "is-v19-collection-surface" : ""
-      } role-${role} ${drawerMode !== "closed" ? "has-open-drawer" : ""} ${
-        mobileNavOpen ? "is-mobile-nav-open" : ""
-      }`}
-      aria-label="Рабочая область подач"
-    >
-      <OperationalSideMenu
-        createAction={
-          role === "agent"
-            ? {
-                label: "Новая подача",
-                onClick: openCreateSubmissionDrawer,
-              }
-            : undefined
-        }
-        items={operationalNavItems}
-        mobileOpen={mobileNavOpen}
-        mobileTitle={workspaceSurfaceTitle}
-        onChooseRole={chooseRole}
-        onCloseMobile={() => setMobileNavOpen(false)}
-        onResetWorkspace={resetWorkspaceEmail}
-        role={role}
-        sessionDisplayName={sessionDisplayName}
-        sessionInitials={sessionInitials}
-        sessionRoleLabel={sessionRoleLabel}
-        showAdminZoneSwitch={role === "agent" && isFigmaVisualSurface}
-        showRoleSwitcher={showRoleSwitcher}
-      />
+  const shellSidebar = (
+    <OperationalSideMenu
+      createAction={
+        role === "agent"
+          ? {
+              label: "Новая подача",
+              onClick: openCreateSubmissionDrawer,
+            }
+          : undefined
+      }
+      items={operationalNavItems}
+      mobileOpen={mobileNavOpen}
+      mobileTitle={workspaceSurfaceTitle}
+      onChooseRole={chooseRole}
+      onCloseMobile={() => setMobileNavOpen(false)}
+      onResetWorkspace={resetWorkspaceEmail}
+      role={role}
+      sessionDisplayName={sessionDisplayName}
+      sessionInitials={sessionInitials}
+      sessionRoleLabel={sessionRoleLabel}
+      showAdminZoneSwitch={role === "agent" && isFigmaVisualSurface}
+      showRoleSwitcher={showRoleSwitcher}
+    />
+  );
 
-      <section className="workspace">
-        <header className="topbar">
-          <button
-            className="v19-topbar-menu"
-            type="button"
-            aria-label={mobileNavOpen ? "Закрыть меню" : "Меню"}
-            aria-expanded={mobileNavOpen}
-            disabled={drawerMode !== "closed"}
-            onClick={() => {
-              if (drawerMode !== "closed") return;
-              setMobileNavOpen((open) => !open);
-            }}
+  const pageHeaderDescription =
+    surface !== "agent-actions" &&
+    surface !== "agent-inbox" &&
+    surface !== "agent-submissions" &&
+    surface !== "export"
+      ? workspaceSurfaceDescription
+      : null;
+
+  const pageHeaderActions = isFigmaVisualSurface ? null : surface === "agent-submissions" ? (
+    <div className="topbar-actions v19-agent-submissions-actions">
+      <Button
+        aria-label="Новая подача"
+        className="v19-topbar-cta"
+        variant="primary"
+        onClick={openCreateSubmissionDrawer}
+      >
+        Новая подача
+      </Button>
+    </div>
+  ) : surface === "agent-inbox" ? (
+    <div className="v19-topbar-city-filter">{cityFilterControl}</div>
+  ) : !isV19CollectionSurface || isSupabaseMode ? (
+    <div className="topbar-actions">
+      {!isV19CollectionSurface && surface !== "settings" ? (
+        <span className="service-logo vf-brand-wordmark" aria-label="VisaFlow 19">
+          <span
+            className="vf-brand-capital vf-brand-capital--mini"
+            aria-hidden="true"
           >
-            <span aria-hidden="true" />
-          </button>
-          <div className="topbar-heading">
-            <h1>{workspaceSurfaceTitle}</h1>
-            {surface !== "agent-actions" &&
-            surface !== "agent-inbox" &&
-            surface !== "agent-submissions" &&
-            surface !== "export" ? (
-              <p>{workspaceSurfaceDescription}</p>
-            ) : null}
-          </div>
-          {isFigmaVisualSurface ? null : surface === "agent-submissions" ? (
-            <div className="topbar-actions v19-agent-submissions-actions">
-              <Button
-                aria-label="Новая подача"
-                className="v19-topbar-cta"
-                variant="primary"
-                onClick={openCreateSubmissionDrawer}
-              >
-                Новая подача
-              </Button>
-            </div>
-          ) : surface === "agent-inbox" ? (
-            <div className="v19-topbar-city-filter">{cityFilterControl}</div>
-          ) : !isV19CollectionSurface || isSupabaseMode ? (
-            <div className="topbar-actions">
-              {!isV19CollectionSurface && surface !== "settings" ? (
-                <span
-                  className="service-logo vf-brand-wordmark"
-                  aria-label="VisaFlow 19"
-                >
-                  <span
-                    className="vf-brand-capital vf-brand-capital--mini"
-                    aria-hidden="true"
-                  >
-                    <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
-                  </span>
-                  <span aria-hidden="true">isaFlow</span>
-                  <span className="vf-brand-comma-version" aria-hidden="true">
-                    19
-                  </span>
-                </span>
-              ) : null}
-              {isSupabaseMode ? (
-                <p
-                  className="save-status"
-                  role={remoteSaveState === "error" ? "alert" : "status"}
-                >
-                  {remoteSaveState === "saving"
-                    ? "Сохранение"
-                    : remoteSaveState === "error"
-                      ? remoteSaveError
-                      : "Supabase"}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </header>
+            <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
+          </span>
+          <span aria-hidden="true">isaFlow</span>
+          <span className="vf-brand-comma-version" aria-hidden="true">
+            19
+          </span>
+        </span>
+      ) : null}
+      {isSupabaseMode ? (
+        <p
+          className="save-status"
+          role={remoteSaveState === "error" ? "alert" : "status"}
+        >
+          {remoteSaveState === "saving"
+            ? "Сохранение"
+            : remoteSaveState === "error"
+              ? remoteSaveError
+              : "Supabase"}
+        </p>
+      ) : null}
+    </div>
+  ) : null;
 
+  const pageHeader = (
+    <PageHeader
+      actions={pageHeaderActions}
+      description={pageHeaderDescription}
+      menuButton={
+        <button
+          className="v19-topbar-menu"
+          type="button"
+          aria-label={mobileNavOpen ? "Закрыть меню" : "Меню"}
+          aria-expanded={mobileNavOpen}
+          disabled={drawerMode !== "closed"}
+          onClick={() => {
+            if (drawerMode !== "closed") return;
+            setMobileNavOpen((open) => !open);
+          }}
+        >
+          <span aria-hidden="true" />
+        </button>
+      }
+      title={workspaceSurfaceTitle}
+    />
+  );
+
+  const shellOverlays = (
+    <>
+      {agentQuestionnaireOpen && activeSubmission && role === "agent" ? (
+        <FigmaQuestionnaireScreen
+          initialFocus={agentQuestionnaireFocus}
+          onBack={() => {
+            setAgentQuestionnaireOpen(false);
+            setAgentQuestionnaireFocus(undefined);
+          }}
+          onComplete={completeActiveQuestionnaire}
+          submission={activeSubmission}
+        />
+      ) : null}
+
+      {drawerMode === "detail" && activeSubmission && role === "admin" ? (
+        <Suspense fallback={null}>
+          <AdminReviewDrawer
+            actionError={activeSubmissionActionError}
+            activeTab={activeDrawerTab}
+            onAction={updateSubmission}
+            onAddIssue={addAdminIssue}
+            onClose={closeDrawer}
+            onReviewFileAccept={acceptAdminReviewFile}
+            onTab={setActiveDrawerTab}
+            submission={activeSubmission}
+          />
+        </Suspense>
+      ) : drawerMode === "detail" && activeSubmission && role === "agent" ? (
+        <FigmaSubmissionDrawer
+          actionError={activeSubmissionActionError}
+          activeTab={activeDrawerTab}
+          onAction={updateSubmission}
+          onClose={closeDrawer}
+          onMarkIssueFixed={markActiveIssueFixed}
+          onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
+          onUploadFile={uploadActiveSubmissionFile}
+          role={role}
+          surface="agent"
+          submission={activeSubmission}
+        />
+      ) : null}
+
+      {drawerMode === "create" ? (
+        <Suspense fallback={null}>
+          <CreateSubmissionDrawer
+            city={createCity}
+            familyCount={createFamilyCount}
+            focusCloseToken={createCloseFocusToken}
+            onClose={closeDrawer}
+            onCreate={createDraft}
+            onCity={(city) => {
+              setCreateCity(city);
+              setDirty(true);
+            }}
+            onFamilyCount={(count) => {
+              const safeCount = Math.max(2, Math.min(6, count || 2));
+              setCreateFamilyCount(safeCount);
+              setCreateApplicantNames((current) =>
+                normalizeCreateApplicantNames(current, safeCount),
+              );
+              setDirty(true);
+            }}
+            onPassportFilesSelected={() => {
+              setDirty(true);
+            }}
+            onType={(type) => {
+              setCreateType(type);
+              if (type === "single") {
+                setCreateFamilyCount(2);
+                setCreateApplicantNames((current) =>
+                  normalizeCreateApplicantNames(current, 1),
+                );
+              } else {
+                setCreateApplicantNames((current) =>
+                  normalizeCreateApplicantNames(current, createFamilyCount),
+                );
+              }
+              setDirty(true);
+            }}
+            type={createType}
+          />
+        </Suspense>
+      ) : null}
+
+      {passportReviewRequest ? (
+        <PassportExtractionReviewDialog
+          onCancel={returnToPassportReviewFields}
+          onDismiss={() => resolvePassportReviewRequest("dismissed")}
+          onVerified={() => resolvePassportReviewRequest("verified")}
+        />
+      ) : null}
+
+      {confirmClose ? (
+        <ConfirmationDialog
+          onCancel={() => {
+            setConfirmClose(false);
+            if (drawerMode === "create") {
+              setCreateCloseFocusToken((token) => token + 1);
+              return;
+            }
+            focusDrawerRecoveryTarget();
+          }}
+          onConfirm={() => {
+            setConfirmClose(false);
+            setDirty(false);
+            setDrawerMode("closed");
+          }}
+        />
+      ) : null}
+    </>
+  );
+
+  return (
+    <AppShell
+      collectionSurface={isV19CollectionSurface}
+      drawerOpen={drawerMode !== "closed"}
+      header={pageHeader}
+      mobileNavOpen={mobileNavOpen}
+      overlays={shellOverlays}
+      role={role}
+      sidebar={shellSidebar}
+      surface={surface}
+    >
         {emptyRemoteWorkspace ? (
           <RemoteWorkspaceEmptyState
             role={role}
@@ -3340,117 +3460,7 @@ function MainApp() {
             />
           </Suspense>
         ) : null}
-
-      </section>
-
-      {agentQuestionnaireOpen && activeSubmission && role === "agent" ? (
-        <FigmaQuestionnaireScreen
-          initialFocus={agentQuestionnaireFocus}
-          onBack={() => {
-            setAgentQuestionnaireOpen(false);
-            setAgentQuestionnaireFocus(undefined);
-          }}
-          onComplete={completeActiveQuestionnaire}
-          submission={activeSubmission}
-        />
-      ) : null}
-
-      {drawerMode === "detail" && activeSubmission && role === "admin" ? (
-        <Suspense fallback={null}>
-          <AdminReviewDrawer
-            actionError={activeSubmissionActionError}
-            activeTab={activeDrawerTab}
-            onAction={updateSubmission}
-            onAddIssue={addAdminIssue}
-            onClose={closeDrawer}
-            onReviewFileAccept={acceptAdminReviewFile}
-            onTab={setActiveDrawerTab}
-            submission={activeSubmission}
-          />
-        </Suspense>
-      ) : drawerMode === "detail" && activeSubmission && role === "agent" ? (
-        <FigmaSubmissionDrawer
-          actionError={activeSubmissionActionError}
-          activeTab={activeDrawerTab}
-          onAction={updateSubmission}
-          onClose={closeDrawer}
-          onMarkIssueFixed={markActiveIssueFixed}
-          onOpenQuestionnaireWorkspace={openAgentQuestionnaireWorkspace}
-          onUploadFile={uploadActiveSubmissionFile}
-          role={role}
-          surface="agent"
-          submission={activeSubmission}
-        />
-      ) : null}
-
-      {drawerMode === "create" ? (
-        <Suspense fallback={null}>
-          <CreateSubmissionDrawer
-            city={createCity}
-            familyCount={createFamilyCount}
-            focusCloseToken={createCloseFocusToken}
-            onClose={closeDrawer}
-            onCreate={createDraft}
-            onCity={(city) => {
-              setCreateCity(city);
-              setDirty(true);
-            }}
-            onFamilyCount={(count) => {
-              const safeCount = Math.max(2, Math.min(6, count || 2));
-              setCreateFamilyCount(safeCount);
-              setCreateApplicantNames((current) =>
-                normalizeCreateApplicantNames(current, safeCount),
-              );
-              setDirty(true);
-            }}
-            onPassportFilesSelected={() => {
-              setDirty(true);
-            }}
-            onType={(type) => {
-              setCreateType(type);
-              if (type === "single") {
-                setCreateFamilyCount(2);
-                setCreateApplicantNames((current) =>
-                  normalizeCreateApplicantNames(current, 1),
-                );
-              } else {
-                setCreateApplicantNames((current) =>
-                  normalizeCreateApplicantNames(current, createFamilyCount),
-                );
-              }
-              setDirty(true);
-            }}
-            type={createType}
-          />
-        </Suspense>
-      ) : null}
-
-      {passportReviewRequest ? (
-        <PassportExtractionReviewDialog
-          onCancel={returnToPassportReviewFields}
-          onDismiss={() => resolvePassportReviewRequest("dismissed")}
-          onVerified={() => resolvePassportReviewRequest("verified")}
-        />
-      ) : null}
-
-      {confirmClose ? (
-        <ConfirmationDialog
-          onCancel={() => {
-            setConfirmClose(false);
-            if (drawerMode === "create") {
-              setCreateCloseFocusToken((token) => token + 1);
-              return;
-            }
-            focusDrawerRecoveryTarget();
-          }}
-          onConfirm={() => {
-            setConfirmClose(false);
-            setDirty(false);
-            setDrawerMode("closed");
-          }}
-        />
-      ) : null}
-    </main>
+    </AppShell>
   );
 }
 

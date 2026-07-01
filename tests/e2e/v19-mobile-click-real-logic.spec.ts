@@ -193,23 +193,8 @@ async function expectNoFixedLayerOverControls(page: Page, context: string) {
 
 async function expectMobileTabbarCompact(page: Page) {
   const tabbar = page.locator(".ops-mobile-tabbar");
-  await expect(tabbar).toBeVisible();
-
-  const metrics = await tabbar.evaluate((element) => {
-    const browser = globalThis as unknown as BrowserGlobal;
-    const targetElement = element as unknown as BrowserElement;
-    const rect = targetElement.getBoundingClientRect();
-    return {
-      buttons: targetElement.querySelectorAll("button").length,
-      columns: browser.getComputedStyle(targetElement).gridTemplateColumns.split(" ")
-        .length,
-      height: Math.round(rect.height),
-    };
-  });
-
-  expect(metrics.columns, JSON.stringify(metrics)).toBe(metrics.buttons);
-  expect(metrics.buttons, JSON.stringify(metrics)).toBeGreaterThanOrEqual(3);
-  expect(metrics.height, JSON.stringify(metrics)).toBeLessThanOrEqual(82);
+  await expect(tabbar).toBeHidden();
+  await expect(page.locator(".mobile-create-dock")).toBeHidden();
 }
 
 async function expectDisabledExportActionsExplainWhy(page: Page) {
@@ -222,12 +207,14 @@ async function expectDisabledExportActionsExplainWhy(page: Page) {
 
     if (await button.isDisabled()) {
       disabledActionCount += 1;
-      await expect(button).toHaveAttribute("aria-describedby", "export-action-hint");
+      const reasonId = await button.getAttribute("aria-describedby");
+
+      expect(reasonId, `${buttonName} disabled reason id`).toBeTruthy();
+      await expect(page.locator(`[id="${reasonId}"]`)).toBeVisible();
     }
   }
 
   expect(disabledActionCount).toBeGreaterThan(0);
-  await expect(page.locator("#export-action-hint")).toBeVisible();
 }
 
 function drawerCloseButton(page: Page) {

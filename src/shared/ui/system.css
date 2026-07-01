@@ -168,6 +168,8 @@
     82px minmax(132px, 0.78fr);
   --v19-agent-submission-grid-narrow: minmax(210px, 1.35fr)
     minmax(126px, 0.78fr) 122px 78px minmax(124px, 0.74fr);
+  --v19-submission-grid-compact: var(--v19-agent-submission-grid-narrow);
+  --v19-submission-grid-full: var(--v19-agent-submission-grid);
   --v19-agent-submission-head-height: 24px;
   --v19-agent-submission-head-padding-x: 16px;
   --v19-agent-submission-row-padding: 12px 16px;
@@ -199,11 +201,23 @@
   --v19-agent-wide-tabs-width: 420px;
   --v19-agent-wide-filter-width: 420px;
   --v19-agent-submission-tabs-padding-x: 9px;
-  --v19-context-panel-width: 360px;
-  --v19-context-panel-max: 360px;
+  --v19-space-xs: 4px;
+  --v19-space-sm: 8px;
+  --v19-space-md: 12px;
+  --v19-space-lg: 16px;
+  --v19-space-xl: 24px;
+  --v19-space-2xl: 32px;
+  --v19-shell-sidebar-width: clamp(240px, 18vw, 280px);
+  --v19-shell-padding: clamp(16px, 1.6vw, 24px);
+  --v19-mobile-page-padding: clamp(12px, 4vw, 16px);
+  --v19-mobile-header-height: clamp(52px, 14vw, 64px);
+  --v19-control-row-height: 44px;
+  --v19-sticky-cta-height: 52px;
+  --v19-context-panel-width: clamp(360px, 27vw, 420px);
+  --v19-context-panel-max: clamp(360px, 27vw, 420px);
   --v19-agent-context-panel-offset-top: 68px;
   --v19-agent-context-panel-sticky-top: 20px;
-  --v19-agent-context-padding: 16px;
+  --v19-agent-context-padding: var(--v19-space-lg);
   --v19-inbox-search-height: 40px;
   --v19-agent-search-width: 260px;
   --v19-agent-search-max-width: 332px;
@@ -211,8 +225,10 @@
   --v19-agent-select-height: 38px;
   --v19-drawer-max-width: 840px;
   --v19-radius-control: 10px;
-  --v19-radius-card: 12px;
-  --v19-radius-panel: 16px;
+  --v19-radius-card: 16px;
+  --v19-radius-panel: 20px;
+  --v19-radius-sheet: 24px;
+  --v19-radius-button: 12px;
   --v19-radius-pill: 999px;
   --v19-font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -427,6 +443,7 @@
   --vf-ref-color-rgb-255-183-77-0neg-9: rgb(255 183 77 / 0.9);
   --vf-ref-color-rgb-255-255-255-0: rgb(255 255 255 / 0);
   --vf-ref-color-rgb-255-255-255-0neg-012: rgb(255 255 255 / 0.012);
+  --vf-ref-color-rgb-255-255-255-0neg-018: rgb(255 255 255 / 0.018);
   --vf-ref-color-rgb-255-255-255-0neg-02: rgb(255 255 255 / 0.02);
   --vf-ref-color-rgb-255-255-255-0neg-025: rgb(255 255 255 / 0.025);
   --vf-ref-color-rgb-255-255-255-0neg-026: rgb(255 255 255 / 0.026);
@@ -463,6 +480,8 @@
   --vf-ref-color-rgb-255-255-255-0neg-58: rgb(255 255 255 / 0.58);
   --vf-ref-color-rgb-255-255-255-0neg-6: rgb(255 255 255 / 0.6);
   --vf-ref-color-rgb-255-255-255-0neg-62: rgb(255 255 255 / 0.62);
+  --vf-ref-color-rgb-0-0-0-0neg-18: rgb(0 0 0 / 0.18);
+  --vf-ref-color-rgb-0-0-0-0neg-22: rgb(0 0 0 / 0.22);
   --vf-ref-color-rgb-255-255-255-0neg-7: rgb(255 255 255 / 0.7);
   --vf-ref-color-rgb-255-255-255-0neg-72: rgb(255 255 255 / 0.72);
   --vf-ref-color-rgb-255-255-255-0neg-78: rgb(255 255 255 / 0.78);
@@ -929,6 +948,9 @@
   --v19-motion-slow: 350ms;
   --v19-motion-ease: ease;
   --v19-motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --vf-figma-motion-ease: var(--v19-motion-ease-out);
+  --vf-overlay: var(--v19-dialog-backdrop);
+  --v19b-size-0: 0px;
   --v19-toolbar-many-tabs-overflow-padding: 4px;
   --v19-toolbar-filter-row-gap: 8px;
   --v19-toolbar-filter-row-margin-top: 8px;
@@ -942,6 +964,7 @@
   --v19-dialog-wide-width: 720px;
   --v19-dialog-padding: 20px;
   --v19-dialog-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  --v19b-shadow-panel: var(--v19-dialog-shadow);
   --drawer-mobile-card-padding: 14px;
   --drawer-mobile-gap: 12px;
   --drawer-mobile-tight-gap: 8px;
@@ -31682,5 +31705,515 @@ p {
       var(--vf-ref-size-18px),
       env(safe-area-inset-bottom)
     ) !important;
+  }
+}
+
+/* Shared responsive shell contract: AppShell, context panels, and mobile sheets. */
+.ops-shell.has-unified-side-menu {
+  display: grid !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 100svh !important;
+  max-height: 100svh !important;
+  overflow: hidden !important;
+}
+
+.ops-shell.has-unified-side-menu .workspace {
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  align-content: stretch !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.v19-page-header {
+  min-width: 0 !important;
+}
+
+.v19-page-header .topbar-heading {
+  min-width: 0 !important;
+}
+
+.workspace > .v19-screen-grid,
+.workspace > .export-grid {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
+  overflow: hidden !important;
+}
+
+.v19-screen-grid {
+  min-width: 0 !important;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(var(--v19-context-panel-width), var(--v19-context-panel-max)) !important;
+}
+
+.v19-screen-grid.is-panel-closed {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.export-grid.magic-export-stage {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-self: stretch !important;
+}
+
+.ops-shell.surface-export .export-grid.magic-export-stage {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+@media (min-width: 1024px) {
+  .ops-shell.surface-export
+    .export-grid.magic-export-stage:has(> .v19-context-panel) {
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(var(--v19-context-panel-width), var(--v19-context-panel-max)) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .ops-shell.surface-export .export-grid.magic-export-stage > .magic-export-queue {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .ops-shell.surface-export
+    .export-grid.magic-export-stage
+    > :is(.v19-context-panel, .v17-export-context-rail) {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: stretch !important;
+    justify-self: stretch !important;
+  }
+}
+
+.v19-collection-panel {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.magic-export-queue {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.v19-context-panel {
+  box-sizing: border-box !important;
+  position: relative !important;
+  top: auto !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  align-content: stretch !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: var(--v19-context-panel-max) !important;
+  max-height: 100% !important;
+  padding: var(--v19-agent-context-padding) !important;
+  overflow: hidden !important;
+}
+
+.v19-context-panel-body {
+  display: grid !important;
+  align-content: start !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  gap: var(--v19-space-md) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding-bottom: var(--v19-space-sm) !important;
+  scroll-padding-bottom: calc(
+    var(--v19-sticky-cta-height) + var(--v19-space-lg)
+  ) !important;
+}
+
+.v19-context-panel-footer {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 2 !important;
+  margin: var(--v19-space-md) calc(var(--v19-agent-context-padding) * -1)
+    calc(var(--v19-agent-context-padding) * -1) !important;
+  padding: var(--v19-space-md) var(--v19-agent-context-padding) !important;
+  border-top: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  background: color-mix(in srgb, var(--v19-panel) 92%, black) !important;
+}
+
+.ops-shell.surface-export
+  .v19-context-panel-body
+  :is(.v17-blocker-callout, .magic-export-preview) {
+  display: none !important;
+}
+
+.v19-panel-action-footer {
+  display: grid !important;
+  gap: var(--v19-space-sm) !important;
+}
+
+.v19-panel-action-status {
+  margin: 0 !important;
+  color: var(--v19-fg-muted) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  line-height: var(--vf-ref-line-height-1neg-3) !important;
+}
+
+.v19-panel-action-buttons {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: var(--v19-space-sm) !important;
+}
+
+.v19-panel-action-footer small {
+  color: var(--v19-fg-muted) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  line-height: var(--vf-ref-line-height-1neg-3) !important;
+}
+
+.mp-bottom-sheet-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 260 !important;
+  border: 0 !important;
+  background: var(--v19-dialog-backdrop) !important;
+}
+
+.mp-bottom-sheet {
+  position: fixed !important;
+  right: var(--v19-mobile-page-padding) !important;
+  bottom: 0 !important;
+  left: var(--v19-mobile-page-padding) !important;
+  z-index: 270 !important;
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+  max-height: min(84svh, var(--vf-ref-size-720px)) !important;
+  padding-bottom: env(safe-area-inset-bottom) !important;
+  border: var(--vf-ref-size-1px) solid var(--v19-line-strong) !important;
+  border-bottom: 0 !important;
+  border-radius: var(--v19-radius-sheet) var(--v19-radius-sheet) 0 0 !important;
+  background: var(--v19-panel) !important;
+  box-shadow: var(--v19b-shadow-panel) !important;
+  overflow: hidden !important;
+}
+
+.mp-bottom-sheet-grabber {
+  justify-self: center !important;
+  width: var(--vf-ref-size-44px) !important;
+  height: var(--vf-ref-size-4px) !important;
+  margin-block: var(--v19-space-sm) var(--v19-space-xs) !important;
+  border-radius: var(--v19-radius-pill) !important;
+  background: var(--v19-line-strong) !important;
+}
+
+.mp-bottom-sheet-head {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) var(--v19-control-row-height) !important;
+  align-items: center !important;
+  gap: var(--v19-space-sm) !important;
+  min-height: var(--v19-mobile-header-height) !important;
+  padding: 0 var(--v19-space-lg) !important;
+  border-bottom: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+}
+
+.mp-bottom-sheet-head strong {
+  min-width: 0 !important;
+  color: var(--v19-fg) !important;
+  font-size: var(--vf-ref-size-18px) !important;
+  overflow-wrap: anywhere !important;
+}
+
+.mp-bottom-sheet-close {
+  width: var(--v19-control-row-height) !important;
+  min-width: var(--v19-control-row-height) !important;
+  height: var(--v19-control-row-height) !important;
+  min-height: var(--v19-control-row-height) !important;
+  padding: 0 !important;
+}
+
+.mp-bottom-sheet-close svg {
+  width: var(--vf-ref-size-18px) !important;
+  height: var(--vf-ref-size-18px) !important;
+}
+
+.mp-bottom-sheet-body {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: var(--v19-space-lg) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  scroll-padding-bottom: calc(
+    var(--v19-sticky-cta-height) + env(safe-area-inset-bottom)
+  ) !important;
+}
+
+.mp-bottom-sheet-footer {
+  position: sticky !important;
+  bottom: 0 !important;
+  padding: var(--v19-space-md) var(--v19-space-lg)
+    max(var(--v19-space-md), env(safe-area-inset-bottom)) !important;
+  border-top: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  background: var(--v19-panel) !important;
+}
+
+.v19-mobile-filter-sheet {
+  width: auto !important;
+  max-width: none !important;
+}
+
+.v19-mobile-filter-options {
+  display: grid !important;
+  gap: var(--v19-space-sm) !important;
+}
+
+@media (min-width: 768px) {
+  .ops-shell.has-unified-side-menu {
+    --v19-sidebar-width: var(--v19-shell-sidebar-width) !important;
+    grid-template-columns: var(--v19-sidebar-width) minmax(0, 1fr) !important;
+    padding: var(--v19-space-sm) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .workspace {
+    height: calc(100svh - (var(--v19-space-sm) * 2)) !important;
+    max-height: calc(100svh - (var(--v19-space-sm) * 2)) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-sidebar {
+    box-sizing: border-box !important;
+    position: relative !important;
+    z-index: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--v19-space-md) !important;
+    width: var(--v19-sidebar-width) !important;
+    min-width: var(--v19-sidebar-width) !important;
+    max-width: var(--v19-sidebar-width) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: var(--v19-space-lg) var(--v19-space-md) !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-mobile-screen-title,
+  .ops-shell.has-unified-side-menu .ops-mobile-close {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-brand-copy,
+  .ops-shell.has-unified-side-menu .ops-nav-copy,
+  .ops-shell.has-unified-side-menu .ops-nav-action,
+  .ops-shell.has-unified-side-menu .ops-sidebar-create strong,
+  .ops-shell.has-unified-side-menu .ops-session > div,
+  .ops-shell.has-unified-side-menu .ops-user-more {
+    display: block !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-brand {
+    display: grid !important;
+    grid-template-columns: var(--v19-control-row-height) minmax(0, 1fr) !important;
+    align-items: center !important;
+    justify-items: stretch !important;
+    gap: var(--v19-space-md) !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: var(--v19-mobile-header-height) !important;
+    padding: 0 0 var(--v19-space-md) !important;
+    border-bottom: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-brand-logo {
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-nav {
+    display: grid !important;
+    justify-items: stretch !important;
+    align-content: start !important;
+    width: 100% !important;
+    gap: var(--v19-space-sm) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-nav::before,
+  .ops-shell.has-unified-side-menu .ops-nav-item::after,
+  .ops-shell.has-unified-side-menu .ops-sidebar-create::after,
+  .ops-shell.has-unified-side-menu .ops-session::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-nav-item,
+  .ops-shell.has-unified-side-menu .ops-sidebar-create,
+  .ops-shell.has-unified-side-menu .vf-figma-admin-zone.secondary-button,
+  .ops-shell.has-unified-side-menu .ops-session {
+    display: grid !important;
+    grid-template-columns: var(--v19-control-row-height) minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    justify-items: stretch !important;
+    gap: var(--v19-space-sm) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: var(--v19-control-row-height) !important;
+    height: auto !important;
+    padding: 0 var(--v19-space-sm) !important;
+    border-radius: var(--v19-radius-button) !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-nav-copy strong,
+  .ops-shell.has-unified-side-menu .ops-session strong,
+  .ops-shell.has-unified-side-menu .ops-sidebar-create strong {
+    display: block !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-sidebar-create {
+    margin-top: auto !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-sidebar-footer {
+    display: grid !important;
+    gap: var(--v19-space-sm) !important;
+    width: 100% !important;
+    margin-top: 0 !important;
+    padding-top: var(--v19-space-md) !important;
+    border-top: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu {
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 0 !important;
+  }
+
+  .ops-shell.has-unified-side-menu .workspace {
+    grid-template-rows: var(--v19-mobile-header-height) minmax(0, 1fr) !important;
+    padding: var(--v19-mobile-page-padding) !important;
+    gap: var(--v19-space-sm) !important;
+  }
+
+  .v19-page-header {
+    min-height: var(--v19-mobile-header-height) !important;
+    height: var(--v19-mobile-header-height) !important;
+    padding: 0 !important;
+  }
+
+  .v19-page-header .topbar-heading h1 {
+    font-size: clamp(18px, 5.4vw, 22px) !important;
+    line-height: var(--vf-ref-line-height-1neg-1) !important;
+  }
+
+  .v19-page-header .topbar-heading p {
+    display: none !important;
+  }
+
+  .v19-topbar-menu,
+  .v19-page-header .mp-button,
+  .v19-page-header button {
+    min-width: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  .v19-mobile-toolbar-title {
+    display: none !important;
+  }
+
+  .v19-collection-toolbar {
+    gap: var(--v19-space-sm) !important;
+    padding: 0 !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-cockpit-summary,
+  .ops-shell.surface-agent-actions
+    .v19-actions-mobile-stage
+    > .v19-actions-panel-header {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-mobile-stage {
+    gap: var(--v19-space-sm) !important;
+    padding: var(--v19-space-sm) var(--v19-space-lg)
+      max(var(--v19-space-lg), env(safe-area-inset-bottom)) !important;
+  }
+
+  .v19-toolbar-primary-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: var(--v19-space-sm) !important;
+  }
+
+  .v19-toolbar-control-stack {
+    min-width: 0 !important;
+  }
+
+  .v19-toolbar-secondary-row {
+    display: flex !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+  }
+
+  .v19-toolbar-secondary-row::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .v19-screen-grid,
+  .export-grid.magic-export-stage {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: var(--v19-space-sm) !important;
+    overflow: hidden !important;
+  }
+
+  .v19-context-panel,
+  .export-grid.magic-export-stage > .v19-context-panel {
+    position: fixed !important;
+    inset: auto var(--v19-mobile-page-padding) 0 var(--v19-mobile-page-padding) !important;
+    z-index: 230 !important;
+    max-width: none !important;
+    max-height: min(84svh, var(--vf-ref-size-720px)) !important;
+    border-radius: var(--v19-radius-sheet) var(--v19-radius-sheet) 0 0 !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+
+  .v19-context-panel-footer {
+    padding-bottom: max(var(--v19-space-md), env(safe-area-inset-bottom)) !important;
+  }
+
+  .v19-panel-action-buttons {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .v19-panel-action-buttons .mp-button {
+    width: 100% !important;
+    min-height: var(--v19-sticky-cta-height) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-mobile-nav-open .ops-sidebar {
+    inset: var(--v19-space-sm) auto var(--v19-space-sm) var(--v19-space-sm) !important;
+    width: min(var(--vf-ref-size-360px), calc(100vw - var(--v19-space-lg))) !important;
+    max-width: calc(100vw - var(--v19-space-lg)) !important;
+    padding: var(--v19-space-lg) var(--v19-space-md) !important;
+    border-radius: var(--v19-radius-panel) !important;
   }
 }

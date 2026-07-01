@@ -2,18 +2,17 @@ import {
   type ButtonHTMLAttributes,
   type Ref,
   type ReactNode,
-  useEffect,
   useId,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   Badge,
+  BottomSheet,
   Button,
   CardComponent,
   IconButton,
-  StateTabs,
+  StatusTabs,
   TabCount,
 } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
@@ -30,6 +29,23 @@ type CollectionTab<T extends string> = {
   label: string;
 };
 
+type CollectionToolbarProps<T extends string> = {
+  activeFilters?: CollectionActiveFilter[];
+  ariaLabel: string;
+  cityControl?: ReactNode;
+  className?: string;
+  filterTabs?: ReactNode;
+  filters?: ReactNode;
+  mobileCityControl?: ReactNode;
+  onClearActiveFilters?: () => void;
+  onTabChange: (value: T) => void;
+  search: ReactNode;
+  tabs: Array<CollectionTab<T>>;
+  tabsAriaLabel?: string;
+  tools?: ReactNode;
+  value: T;
+};
+
 export type CollectionActiveFilter =
   | string
   | {
@@ -42,8 +58,11 @@ type SummaryFilterTone = "amber" | "danger" | "neutral";
 
 type SummaryFilterTab<T extends string> = {
   count: number;
+  disabled?: boolean;
+  disabledReason?: string;
   id: T;
   label: string;
+  note?: string;
   tone?: SummaryFilterTone;
 };
 
@@ -61,7 +80,6 @@ export function CollectionToolbar<T extends string>({
   filterTabs,
   filters,
   mobileCityControl,
-  mobileTitle,
   onClearActiveFilters,
   onTabChange,
   search,
@@ -69,23 +87,7 @@ export function CollectionToolbar<T extends string>({
   tabsAriaLabel,
   tools = null,
   value,
-}: {
-  activeFilters?: CollectionActiveFilter[];
-  ariaLabel: string;
-  cityControl?: ReactNode;
-  className?: string;
-  filterTabs?: ReactNode;
-  filters?: ReactNode;
-  mobileCityControl?: ReactNode;
-  mobileTitle?: string;
-  onClearActiveFilters?: () => void;
-  onTabChange: (value: T) => void;
-  search: ReactNode;
-  tabs: Array<CollectionTab<T>>;
-  tabsAriaLabel?: string;
-  tools?: ReactNode;
-  value: T;
-}) {
+}: CollectionToolbarProps<T>) {
   return (
     <>
       <div
@@ -102,9 +104,6 @@ export function CollectionToolbar<T extends string>({
         )}
         aria-label={ariaLabel}
       >
-        {mobileTitle ? (
-          <h2 className="v19-mobile-toolbar-title">{mobileTitle}</h2>
-        ) : null}
         <div className="v19-toolbar-primary-row">
           <ToolbarControlStack filters={filters} search={search} />
           {tools}
@@ -113,7 +112,7 @@ export function CollectionToolbar<T extends string>({
           <div className="v19-toolbar-filter-row">{filterTabs}</div>
         ) : null}
         <div className="v19-toolbar-secondary-row">
-          <StateTabs
+          <StatusTabs
             ariaLabel={tabsAriaLabel ?? "Состояние списка"}
             onValueChange={onTabChange}
             tabs={tabs}
@@ -138,6 +137,10 @@ export function CollectionToolbar<T extends string>({
       ) : null}
     </>
   );
+}
+
+export function ListToolbar<T extends string>(props: CollectionToolbarProps<T>) {
+  return <CollectionToolbar {...props} />;
 }
 
 function ActiveFiltersRow({
@@ -206,91 +209,35 @@ export function MobileFilterSheet<T extends string>({
   value: T;
 }) {
   const [open, setOpen] = useState(false);
-  const titleId = useId();
   const sheetId = useId();
-  const sheetRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const previouslyFocused = document.activeElement;
-    const triggerElement = triggerRef.current;
-
-    window.requestAnimationFrame(() => {
-      closeButtonRef.current?.focus({ preventScroll: true });
-    });
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setOpen(false);
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-      const focusableElements = sheetRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      const focusable = focusableElements ? Array.from(focusableElements) : [];
-      if (!focusable.length) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      if (previouslyFocused instanceof HTMLElement) {
-        previouslyFocused.focus({ preventScroll: true });
-      } else {
-        triggerElement?.focus({ preventScroll: true });
-      }
-    };
-  }, [open]);
 
   function handleValueChange(nextValue: T) {
     onValueChange(nextValue);
     setOpen(false);
   }
 
-  const mobileFilterDialog = open ? (
-    <>
-      <button
-        className="v19-mobile-filter-backdrop v19-mobile-filter-portal-backdrop"
-        type="button"
-        onClick={() => setOpen(false)}
-      >
-        <span className="sr-only">Закрыть фильтры</span>
-      </button>
-      <div
-        className="v19-mobile-filter-sheet v19-mobile-filter-portal-sheet"
+  return (
+    <div className="v19-mobile-filter">
+      <ToolbarIconButton
+        className="v19-mobile-filter-trigger"
+        icon="filter"
+        label={label}
+        pressed={open}
+        ref={triggerRef}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls={open ? sheetId : undefined}
+        onClick={() => setOpen((current) => !current)}
+      />
+      <BottomSheet
+        className="v19-mobile-filter-sheet"
+        closeLabel="Закрыть фильтры"
         id={sheetId}
-        ref={sheetRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
+        open={open}
+        title={title}
+        onClose={() => setOpen(false)}
       >
-        <div className="v19-mobile-filter-head">
-          <strong id={titleId}>{title}</strong>
-          <Button
-            ref={closeButtonRef}
-            variant="ghost"
-            onClick={() => setOpen(false)}
-          >
-            Готово
-          </Button>
-        </div>
         <div className="v19-mobile-filter-options">
           {options.map((option) => (
             <Button
@@ -308,24 +255,7 @@ export function MobileFilterSheet<T extends string>({
             </Button>
           ))}
         </div>
-      </div>
-    </>
-  ) : null;
-
-  return (
-    <div className="v19-mobile-filter">
-      <ToolbarIconButton
-        className="v19-mobile-filter-trigger"
-        icon="filter"
-        label={label}
-        pressed={open}
-        ref={triggerRef}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-controls={open ? sheetId : undefined}
-        onClick={() => setOpen((current) => !current)}
-      />
-      {mobileFilterDialog ? createPortal(mobileFilterDialog, document.body) : null}
+      </BottomSheet>
     </div>
   );
 }
@@ -365,31 +295,80 @@ export function SummaryFilterTabs<T extends string>({
   value: T | null;
 }) {
   return (
+    <StatusSummaryStrip
+      ariaLabel={ariaLabel}
+      items={tabs.map((tab) => ({
+        disabled: tab.disabled,
+        disabledReason: tab.disabledReason,
+        id: tab.id,
+        label: tab.label,
+        note: tab.note,
+        tone: tab.tone,
+        value: tab.count,
+      }))}
+      selectedId={value}
+      onSelect={onValueChange}
+    />
+  );
+}
+
+export function StatusSummaryStrip<T extends string>({
+  ariaLabel,
+  items,
+  selectedId = null,
+  onSelect,
+}: {
+  ariaLabel: string;
+  items: Array<{
+    disabled?: boolean;
+    disabledReason?: string;
+    id: T;
+    label: string;
+    note?: string;
+    tone?: SummaryFilterTone;
+    value: number | string;
+  }>;
+  selectedId?: T | null;
+  onSelect?: (value: T) => void;
+}) {
+  return (
     <div className="v19-summary-filters" aria-label={ariaLabel}>
-      {tabs.map((tab) => {
-        const selected = value === tab.id;
-        const tone = tab.tone ?? "neutral";
+      {items.map((item) => {
+        const selected = selectedId === item.id;
+        const tone = item.tone ?? "neutral";
+        const disabledReasonId = item.disabledReason
+          ? `summary-${item.id}-reason`
+          : undefined;
 
         return (
           <Button
+            aria-describedby={disabledReasonId}
             aria-pressed={selected}
             className={cn(
               "v19-summary-filter-tab",
               `tone-${tone}`,
               selected && "is-active",
             )}
-            key={tab.id}
+            disabled={item.disabled}
+            key={item.id}
             variant="plain"
             type="button"
-            onClick={() => onValueChange(tab.id)}
+            onClick={() => onSelect?.(item.id)}
           >
-            {tab.label} <TabCount>{tab.count}</TabCount>
+            <span>{item.label}</span>
+            <TabCount>{item.value}</TabCount>
+            {item.note ? <em>{item.note}</em> : null}
+            {item.disabledReason ? (
+              <small id={disabledReasonId}>{item.disabledReason}</small>
+            ) : null}
           </Button>
         );
       })}
     </div>
   );
 }
+
+export const StatusSummaryGrid = StatusSummaryStrip;
 
 export function CollectionGroupLabel({
   children,
@@ -428,10 +407,14 @@ export function ToolbarIconButton({
 export function ContextPanel({
   children,
   className,
+  footer,
+  header,
   label,
 }: {
   children: ReactNode;
   className?: string;
+  footer?: ReactNode;
+  header?: ReactNode;
   label: string;
 }) {
   return (
@@ -440,7 +423,9 @@ export function ContextPanel({
       className={cn("v19-context-panel", className)}
       aria-label={label}
     >
-      {children}
+      {header}
+      <div className="v19-context-panel-body">{children}</div>
+      {footer ? <div className="v19-context-panel-footer">{footer}</div> : null}
     </CardComponent>
   );
 }
@@ -448,6 +433,7 @@ export function ContextPanel({
 export function ContextRail({
   children,
   className,
+  footer,
   label,
   onClose,
   showHeader = true,
@@ -455,33 +441,127 @@ export function ContextRail({
 }: {
   children: ReactNode;
   className?: string;
+  footer?: ReactNode;
   label: string;
   onClose: () => void;
   showHeader?: boolean;
   title: string;
 }) {
+  const header = showHeader ? (
+    <div className="v19-rail-header">
+      <div>
+        <p className="kicker">{label}</p>
+        <h2>{title}</h2>
+      </div>
+      <button
+        className="v19-rail-close"
+        type="button"
+        aria-label="Скрыть контекст"
+        onClick={onClose}
+      >
+        <SvgIcon>
+          <path d="m6 6 12 12M18 6 6 18" />
+        </SvgIcon>
+      </button>
+    </div>
+  ) : null;
+
   return (
-    <ContextPanel className={cn("v19-context-rail", className)} label={label}>
-      {showHeader ? (
-        <div className="v19-rail-header">
-          <div>
-            <p className="kicker">{label}</p>
-            <h2>{title}</h2>
-          </div>
-          <button
-            className="v19-rail-close"
-            type="button"
-            aria-label="Скрыть контекст"
-            onClick={onClose}
-          >
-            <SvgIcon>
-              <path d="m6 6 12 12M18 6 6 18" />
-            </SvgIcon>
-          </button>
-        </div>
-      ) : null}
+    <ContextPanel
+      className={cn("v19-context-rail", className)}
+      footer={footer}
+      header={header}
+      label={label}
+    >
       {children}
     </ContextPanel>
+  );
+}
+
+type PanelFooterAction = {
+  disabled?: boolean;
+  disabledReason?: string;
+  label: string;
+  variant?: "primary" | "secondary" | "ghost";
+  onClick: () => void;
+};
+
+export function PanelActionFooter({
+  primary,
+  secondary,
+  status,
+}: {
+  primary: PanelFooterAction;
+  secondary?: PanelFooterAction | PanelFooterAction[];
+  status?: ReactNode;
+}) {
+  const statusId = useId();
+  const secondaryBaseReasonId = useId();
+  const secondaryActions = Array.isArray(secondary)
+    ? secondary
+    : secondary
+      ? [secondary]
+      : [];
+  const actions = [...secondaryActions, primary];
+  const statusText = typeof status === "string" ? status.trim() : "";
+  const disabledReasons = Array.from(
+    new Set(
+      actions
+        .map((action) =>
+          action.disabled && action.disabledReason
+            ? action.disabledReason.trim()
+            : "",
+        )
+        .filter((reason) => reason && reason !== statusText),
+    ),
+  );
+  const reasonIds = new Map(
+    disabledReasons.map((reason, index) => [
+      reason,
+      `${secondaryBaseReasonId}-${index}`,
+    ]),
+  );
+  const describedBy = (action: PanelFooterAction) => {
+    if (!action.disabled || !action.disabledReason) return undefined;
+    const reason = action.disabledReason.trim();
+    if (statusText && reason === statusText) return statusId;
+    return reasonIds.get(reason);
+  };
+
+  return (
+    <div className="v19-panel-action-footer">
+      {status ? (
+        <p className="v19-panel-action-status" id={statusId} role="status">
+          {status}
+        </p>
+      ) : null}
+      <div className="v19-panel-action-buttons">
+        {secondaryActions.map((action) => (
+          <Button
+            aria-describedby={describedBy(action)}
+            disabled={action.disabled}
+            key={action.label}
+            variant={action.variant ?? "secondary"}
+            onClick={action.onClick}
+          >
+            {action.label}
+          </Button>
+        ))}
+        <Button
+          aria-describedby={describedBy(primary)}
+          disabled={primary.disabled}
+          variant={primary.variant ?? "primary"}
+          onClick={primary.onClick}
+        >
+          {primary.label}
+        </Button>
+      </div>
+      {disabledReasons.map((reason) => (
+        <small id={reasonIds.get(reason)} key={reason}>
+          {reason}
+        </small>
+      ))}
+    </div>
   );
 }
 
