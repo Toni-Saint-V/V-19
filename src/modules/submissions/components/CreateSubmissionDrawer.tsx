@@ -1252,8 +1252,11 @@ function missingApplicantPassportLabels(
 }
 
 function passportUploadReadinessLabel(upload: PassportUploadDraft | undefined) {
-  if (isPassportUploadReady(upload)) return "Паспорт принят";
   if (upload?.status === "extracting") return "Проверка файла";
+  if (upload?.status === "unavailable" || upload?.status === "failed") {
+    return "Проверка оператором";
+  }
+  if (isPassportUploadReady(upload)) return "Паспорт принят";
   if (upload?.file) return "Файл не принят";
   return "Нужен файл паспорта";
 }
