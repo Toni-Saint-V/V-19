@@ -1,0 +1,93 @@
+{
+  "browserProblems": [],
+  "rows": [
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Action Timeline visible; detail sheet opened; CTA opened existing drawer.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "n/a",
+      "viewport": "320"
+    },
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Action Timeline visible; detail sheet opened; CTA opened existing drawer.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "n/a",
+      "viewport": "375"
+    },
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Action Timeline visible; detail sheet opened; CTA opened existing drawer.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "n/a",
+      "viewport": "390"
+    },
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Action Timeline visible; detail sheet opened; CTA opened existing drawer.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "n/a",
+      "viewport": "430"
+    },
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Queue and Active Submission visible; Next Action repeated in Active panel.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "n/a",
+      "viewport": "768"
+    },
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Queue and Active Submission visible; Next Action repeated in Active panel.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "yes",
+      "viewport": "1024"
+    },
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Queue, Active Submission, and Next Action columns visible.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "yes",
+      "viewport": "1280"
+    },
+    {
+      "cardsStable": "yes",
+      "clipping": "no",
+      "contentReadable": "yes",
+      "horizontalOverflow": "no",
+      "notes": "Queue, Active Submission, and Next Action columns visible.",
+      "primaryActionUsable": "yes",
+      "result": "PASS",
+      "sidebarCorrect": "yes",
+      "viewport": "1440"
+    }
+  ]
+}

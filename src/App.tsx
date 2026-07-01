@@ -196,9 +196,11 @@ type AgentQuestionnaireFocus = {
 };
 
 const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
-const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
-const fallbackAdminEmails = ["admin@visaflow.local"];
-const fallbackAgentEmails = ["agent@visaflow.local", "agent2@visaflow.local"];
+const workspaceEmailStorageKey = "visaflow.workspaceEmail.v2";
+const localDevTestAgentCredentials = { email: "111@1.ru", password: "1111" };
+const localDevTestAdminCredentials = { email: "222@2.ru", password: "2222" };
+const fallbackAdminEmails = [localDevTestAdminCredentials.email];
+const fallbackAgentEmails = [localDevTestAgentCredentials.email];
 
 type WorkspaceSettings = {
   compactLists: boolean;
@@ -282,6 +284,13 @@ const workspaceEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidWorkspaceEmail(email: string) {
   return workspaceEmailPattern.test(normalizeEmail(email));
+}
+
+function localDevTestPasswordForEmail(email: string) {
+  const normalized = normalizeEmail(email);
+  return fallbackAdminEmails.includes(normalized)
+    ? localDevTestAdminCredentials.password
+    : localDevTestAgentCredentials.password;
 }
 
 function isAuthAccessError(error: unknown): error is { code: string; message: string } {
@@ -713,7 +722,7 @@ function MainApp() {
             icon: "М",
             id: "agent-actions",
             label: "Мои действия",
-            meta: "активная очередь",
+            meta: "Очередь",
             onClick: showAgentActions,
           },
           {
@@ -721,7 +730,7 @@ function MainApp() {
             icon: "П",
             id: "agent-submissions",
             label: "Мои подачи",
-            meta: "все рабочие подачи",
+            meta: "Реестр",
             onClick: () => showAgentTab("all"),
           },
           {
@@ -729,7 +738,7 @@ function MainApp() {
             icon: "Н",
             id: "agent-settings",
             label: "Настройки",
-            meta: "роль и доступ",
+            meta: "Доступ",
             onClick: showSettingsSurface,
           },
         ]
@@ -740,7 +749,7 @@ function MainApp() {
             icon: "М",
             id: "admin-work",
             label: "Проверка",
-            meta: "очередь проверки",
+            meta: "Очередь",
             onClick: () => showReviewTab("review"),
           },
           {
@@ -749,7 +758,7 @@ function MainApp() {
             icon: "Э",
             id: "admin-export",
             label: "Выгрузка",
-            meta: "готово к Excel",
+            meta: "Excel",
             onClick: showExportSurface,
             tone: summary.ready > 0 ? "success" : "default",
           },
@@ -759,7 +768,7 @@ function MainApp() {
             icon: "Н",
             id: "admin-settings",
             label: "Настройки",
-            meta: "доступ и роли",
+            meta: "Роли",
             onClick: showSettingsSurface,
             tone: pendingAccessRequests.length > 0 ? "warning" : "default",
           },
@@ -922,7 +931,7 @@ function MainApp() {
         const bootstrapEmail = requestedWorkspaceEmail || fallbackAgentEmails[0];
         const bootstrapSession = await authRepository.loginApprovedUser(
           bootstrapEmail,
-          "local-dev-password",
+          localDevTestPasswordForEmail(bootstrapEmail),
         );
         if (cancelled) return;
 
@@ -3086,6 +3095,14 @@ function MainApp() {
       aria-label="Рабочая область подач"
     >
       <OperationalSideMenu
+        createAction={
+          role === "agent"
+            ? {
+                label: "Новая подача",
+                onClick: openCreateSubmissionDrawer,
+              }
+            : undefined
+        }
         items={operationalNavItems}
         mobileOpen={mobileNavOpen}
         mobileTitle={workspaceSurfaceTitle}
@@ -3177,25 +3194,23 @@ function MainApp() {
             role={role}
             onCreate={role === "agent" ? openCreateSubmissionDrawer : undefined}
           />
-        ) : surface === "agent-actions" || surface === "admin-review" ? (
+        ) : surface === "agent-actions" ? (
+          <AgentActionsScreen
+            completedActions={searchedCompletedAgentActions}
+            onOpen={openSubmission}
+            openActions={searchedOpenAgentActions}
+            searchControl={agentActionsSearchControl}
+            summary={agentActions.summary}
+          />
+        ) : surface === "admin-review" ? (
           <Suspense fallback={null}>
             <FigmaActionQueueVisual
-              completedActions={
-                surface === "admin-review"
-                  ? searchedCompletedAdminActions
-                  : searchedCompletedAgentActions
-              }
+              completedActions={searchedCompletedAdminActions}
               onOpen={openSubmission}
               onSearch={setQuery}
-              openActions={
-                surface === "admin-review"
-                  ? searchedOpenAdminActions
-                  : searchedOpenAgentActions
-              }
+              openActions={searchedOpenAdminActions}
               query={query}
-              summary={
-                surface === "admin-review" ? adminActions.summary : agentActions.summary
-              }
+              summary={adminActions.summary}
             />
           </Suspense>
         ) : surface === "agent-inbox" ? (

@@ -7198,6 +7198,548 @@ p {
   display: none;
 }
 
+.ops-shell.surface-agent-actions .v19-actions-cockpit-shell {
+  display: grid;
+  gap: var(--v19-agent-collection-panel-gap);
+  min-width: 0;
+  width: 100%;
+  border: var(--vf-ref-size-1px) solid var(--v19-line-default);
+  border-radius: var(--v19-radius-panel);
+  background: var(--v19-panel);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-cockpit {
+  display: grid;
+  gap: var(--v19-agent-collection-panel-gap);
+  min-width: 0;
+  padding: 0 var(--v19-agent-panel-padding) var(--v19-agent-panel-padding);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-cockpit-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-metric {
+  display: grid;
+  gap: var(--vf-ref-size-2px);
+  min-width: 0;
+  padding: var(--vf-ref-size-10px) var(--vf-ref-size-12px);
+  border: var(--vf-ref-size-1px) solid var(--v19-line);
+  border-radius: var(--v19-radius-card);
+  background: var(--v19-surface);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-metric strong {
+  color: var(--v19-fg);
+  font-size: var(--vf-ref-size-16px);
+  line-height: var(--vf-ref-line-height-1);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-metric em {
+  overflow: hidden;
+  color: var(--v19-fg-tertiary);
+  font-size: var(--vf-ref-size-11px);
+  font-style: normal;
+  line-height: var(--vf-ref-line-height-1neg-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-metric.tone-danger strong {
+  color: var(--v19-danger);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-metric.tone-amber strong {
+  color: var(--v19-warning);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-metric.tone-teal strong {
+  color: var(--v19-success);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-desktop-grid {
+  display: none;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-stage,
+.ops-shell.surface-agent-actions .v19-actions-queue-panel,
+.ops-shell.surface-agent-actions .v19-actions-active-panel,
+.ops-shell.surface-agent-actions .v19-actions-next-panel {
+  min-width: 0;
+  border: var(--vf-ref-size-1px) solid var(--v19-line);
+  border-radius: var(--v19-radius-panel);
+  background: var(--v19-surface);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-stage,
+.ops-shell.surface-agent-actions .v19-actions-queue-panel,
+.ops-shell.surface-agent-actions .v19-actions-active-panel,
+.ops-shell.surface-agent-actions .v19-actions-next-panel,
+.ops-shell.surface-agent-actions .v19-actions-cockpit-empty {
+  display: grid;
+  gap: var(--v19-agent-list-gap);
+  padding: var(--v19-agent-panel-padding);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-panel-header {
+  display: grid;
+  gap: var(--vf-ref-size-4px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-panel-header p,
+.ops-shell.surface-agent-actions .v19-actions-active-head p,
+.ops-shell.surface-agent-actions .v19-actions-blockers p,
+.ops-shell.surface-agent-actions .v19-actions-recent-history p,
+.ops-shell.surface-agent-actions .v19-actions-mobile-detail-head p {
+  margin: 0;
+  color: var(--v19-fg-tertiary);
+  font-size: var(--vf-ref-size-11px);
+  font-weight: var(--vf-ref-font-weight-700);
+  line-height: var(--vf-ref-line-height-1);
+  text-transform: uppercase;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-panel-header h3,
+.ops-shell.surface-agent-actions .v19-actions-active-head h3,
+.ops-shell.surface-agent-actions .v19-actions-mobile-detail-head h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--v19-fg);
+  font-size: var(--vf-ref-size-16px);
+  line-height: var(--vf-ref-line-height-1neg-2);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline {
+  position: relative;
+  display: grid;
+  gap: var(--vf-ref-size-10px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline::before {
+  position: absolute;
+  top: var(--vf-ref-size-12px);
+  bottom: var(--vf-ref-size-12px);
+  left: var(--vf-ref-size-5px);
+  width: var(--vf-ref-size-1px);
+  background: var(--v19-line-strong);
+  content: "";
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-event {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--vf-ref-size-12px) minmax(0, 1fr);
+  gap: var(--vf-ref-size-10px);
+  min-width: 0;
+  padding: var(--vf-ref-size-10px) 0 var(--vf-ref-size-10px);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-node,
+.ops-shell.surface-agent-actions .v19-actions-status-node {
+  width: var(--v19-agent-dot-size);
+  height: var(--v19-agent-dot-size);
+  border-radius: var(--v19-radius-pill);
+  background: var(--v19-info);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-node {
+  z-index: 1;
+  grid-column: 1;
+  margin-top: var(--vf-ref-size-12px);
+}
+
+.ops-shell.surface-agent-actions
+  .v19-actions-timeline-event.severity-blocker
+  .v19-actions-timeline-node,
+.ops-shell.surface-agent-actions
+  .v19-actions-queue-item.severity-blocker
+  > .v19-actions-status-node,
+.ops-shell.surface-agent-actions .v19-actions-status-node.severity-blocker {
+  background: var(--v19-danger);
+}
+
+.ops-shell.surface-agent-actions
+  .v19-actions-timeline-event.severity-warning
+  .v19-actions-timeline-node,
+.ops-shell.surface-agent-actions
+  .v19-actions-queue-item.severity-warning
+  > .v19-actions-status-node,
+.ops-shell.surface-agent-actions .v19-actions-status-node.severity-warning {
+  background: var(--v19-warning);
+}
+
+.ops-shell.surface-agent-actions
+  .v19-actions-timeline-event.severity-ready
+  .v19-actions-timeline-node,
+.ops-shell.surface-agent-actions
+  .v19-actions-queue-item.severity-ready
+  > .v19-actions-status-node,
+.ops-shell.surface-agent-actions .v19-actions-status-node.severity-ready {
+  background: var(--v19-success);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-hit {
+  display: grid;
+  gap: var(--vf-ref-size-4px);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-title,
+.ops-shell.surface-agent-actions .v19-actions-queue-topline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-title strong,
+.ops-shell.surface-agent-actions .v19-actions-queue-topline strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--v19-fg);
+  font-size: var(--vf-ref-size-14px);
+  line-height: var(--vf-ref-line-height-1neg-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-title small,
+.ops-shell.surface-agent-actions .v19-actions-queue-topline small,
+.ops-shell.surface-agent-actions .v19-actions-timeline-meta,
+.ops-shell.surface-agent-actions .v19-actions-queue-meta,
+.ops-shell.surface-agent-actions .v19-actions-timeline-state,
+.ops-shell.surface-agent-actions .v19-actions-queue-state {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--v19-fg-tertiary);
+  font-size: var(--vf-ref-size-12px);
+  line-height: var(--vf-ref-line-height-1neg-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-state,
+.ops-shell.surface-agent-actions .v19-actions-queue-state {
+  color: var(--v19-fg-secondary);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-timeline-cta {
+  grid-column: 2;
+  justify-self: start;
+  min-height: var(--v19-control-height-touch);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-head {
+  display: grid;
+  grid-template-columns: var(--v19-agent-dot-size) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--vf-ref-size-10px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-head > div,
+.ops-shell.surface-agent-actions .v19-actions-next-copy,
+.ops-shell.surface-agent-actions .v19-actions-blocker-list span,
+.ops-shell.surface-agent-actions .v19-actions-recent-history span {
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-meta span {
+  display: grid;
+  gap: var(--vf-ref-size-2px);
+  min-width: 0;
+  padding: var(--vf-ref-size-10px);
+  border: var(--vf-ref-size-1px) solid var(--v19-line);
+  border-radius: var(--v19-radius-card);
+  background: var(--v19-panel);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-meta small,
+.ops-shell.surface-agent-actions .v19-actions-queue-metric small,
+.ops-shell.surface-agent-actions .v19-actions-recent-history small,
+.ops-shell.surface-agent-actions .v19-actions-blocker-list small,
+.ops-shell.surface-agent-actions .v19-actions-next-copy small,
+.ops-shell.surface-agent-actions .v19-actions-secondary-actions span {
+  color: var(--v19-fg-tertiary);
+  font-size: var(--vf-ref-size-11px);
+  line-height: var(--vf-ref-line-height-1neg-2);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-meta strong,
+.ops-shell.surface-agent-actions .v19-actions-blockers strong,
+.ops-shell.surface-agent-actions .v19-actions-recent-history strong,
+.ops-shell.surface-agent-actions .v19-actions-next-copy strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--v19-fg);
+  font-size: var(--vf-ref-size-13px);
+  line-height: var(--vf-ref-line-height-1neg-2);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-readiness,
+.ops-shell.surface-agent-actions .v19-actions-blocker-list,
+.ops-shell.surface-agent-actions .v19-actions-recent-history,
+.ops-shell.surface-agent-actions .v19-actions-active-next,
+.ops-shell.surface-agent-actions .v19-actions-secondary-actions {
+  display: grid;
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-readiness-line,
+.ops-shell.surface-agent-actions .v19-actions-blocker-list button {
+  display: grid;
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+  padding: var(--vf-ref-size-10px);
+  border: var(--vf-ref-size-1px) solid var(--v19-line);
+  border-radius: var(--v19-radius-card);
+  color: inherit;
+  background: var(--v19-panel);
+  font: inherit;
+  text-align: left;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-readiness-line span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-readiness-line strong,
+.ops-shell.surface-agent-actions .v19-actions-readiness-line small {
+  color: var(--v19-fg-secondary);
+  font-size: var(--vf-ref-size-12px);
+  line-height: var(--vf-ref-line-height-1neg-2);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-blockers {
+  display: grid;
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+  padding: var(--vf-ref-size-12px);
+  border: var(--vf-ref-size-1px) solid var(--v19-line);
+  border-radius: var(--v19-radius-card);
+  background: var(--v19-panel);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-blockers-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vf-ref-size-8px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-blocker-list button {
+  grid-template-columns: var(--v19-agent-dot-size) minmax(0, 1fr);
+  align-items: start;
+  background: var(--v19-surface);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-secondary-link {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  color: var(--v19-fg-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: var(--vf-ref-size-12px);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-next,
+.ops-shell.surface-agent-actions .v19-actions-next-panel {
+  background: var(--v19-next-card-background);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-next-copy {
+  display: grid;
+  gap: var(--vf-ref-size-6px);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-next-copy p {
+  margin: 0;
+  color: var(--v19-fg-secondary);
+  font-size: var(--vf-ref-size-13px);
+  line-height: var(--vf-ref-line-height-1neg-35);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: grid;
+  align-items: end;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: var(--vf-overlay);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-detail {
+  position: relative;
+  z-index: 181;
+  display: grid;
+  gap: var(--v19-agent-list-gap);
+  max-height: calc(100dvh - var(--vf-ref-size-24px));
+  min-width: 0;
+  padding: var(--v19-agent-panel-padding);
+  border: var(--vf-ref-size-1px) solid var(--v19-line-default);
+  border-radius: var(--v19-radius-panel) var(--v19-radius-panel) 0 0;
+  background: var(--v19-panel);
+  overflow-y: auto;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--vf-ref-size-12px);
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-detail-head > div {
+  min-width: 0;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-detail-head button {
+  flex: 0 0 auto;
+  min-height: var(--v19-control-height-touch);
+  padding: 0 var(--vf-ref-size-12px);
+  border: var(--vf-ref-size-1px) solid var(--v19-control-border);
+  border-radius: var(--v19-control-radius);
+  color: var(--v19-fg-secondary);
+  background: var(--v19-control);
+  font: inherit;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-mobile-detail .v19-actions-active-panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ops-shell.surface-agent-actions
+  :is(
+    .v19-actions-queue-item,
+    .v19-actions-timeline-hit,
+    .v19-actions-timeline-cta,
+    .v19-actions-readiness-line,
+    .v19-actions-blocker-list button,
+    .v19-actions-secondary-link,
+    .v19-actions-mobile-detail-head button
+  ):focus-visible {
+  outline: var(--vf-ref-size-2px) solid var(--vf-accent-border);
+  outline-offset: var(--vf-ref-size-2px);
+}
+
+@media (min-width: 768px) {
+  .ops-shell.surface-agent-actions .v19-actions-cockpit {
+    padding: 0 var(--v19-agent-panel-padding) var(--v19-agent-panel-padding);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-mobile-stage {
+    display: none;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-desktop-grid {
+    display: grid;
+    grid-template-columns:
+      minmax(var(--vf-ref-size-260px), var(--vf-ref-size-320px))
+      minmax(0, 1fr);
+    gap: var(--v19-agent-screen-gap);
+    min-width: 0;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-list {
+    display: grid;
+    gap: var(--vf-ref-size-8px);
+    min-width: 0;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-item {
+    display: grid;
+    grid-template-columns: var(--v19-agent-dot-size) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--vf-ref-size-10px);
+    min-width: 0;
+    padding: var(--vf-ref-size-10px);
+    border: var(--vf-ref-size-1px) solid var(--v19-line);
+    border-radius: var(--v19-radius-card);
+    color: inherit;
+    background: var(--v19-panel);
+    font: inherit;
+    text-align: left;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-item.is-selected {
+    border-color: var(--v19-line-strong);
+    background: var(--v19-selected);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-main,
+  .ops-shell.surface-agent-actions .v19-actions-queue-metric {
+    display: grid;
+    gap: var(--vf-ref-size-3px);
+    min-width: 0;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-metric {
+    justify-items: end;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-metric strong {
+    color: var(--v19-fg);
+    font-size: var(--vf-ref-size-13px);
+    line-height: var(--vf-ref-line-height-1);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-next-panel {
+    display: none;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ops-shell.surface-agent-actions .v19-actions-desktop-grid {
+    grid-template-columns:
+      minmax(var(--vf-ref-size-320px), var(--vf-ref-size-380px))
+      minmax(0, 1fr)
+      minmax(var(--vf-ref-size-280px), var(--vf-ref-size-340px));
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-next-panel {
+    display: grid;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-active-next {
+    display: none;
+  }
+}
+
 .v19-rail-header {
   position: sticky;
   top: 0;
@@ -30279,6 +30821,40 @@ p {
   }
 }
 
+/* My Actions visual-lock pass: mobile uses top navigation only on this surface. */
+@media (max-width: 760px) {
+  .ops-shell.surface-agent-actions .ops-mobile-tabbar {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .workspace {
+    padding-bottom: max(var(--vf-ref-size-16px), env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: max(
+      var(--vf-ref-size-16px),
+      env(safe-area-inset-bottom)
+    ) !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-actions-screen {
+    height: calc(100dvh - var(--vf-ref-size-84px) - env(safe-area-inset-bottom)) !important;
+    max-height: calc(100dvh - var(--vf-ref-size-84px) - env(safe-area-inset-bottom)) !important;
+    padding-bottom: max(var(--vf-ref-size-18px), env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: max(
+      var(--vf-ref-size-18px),
+      env(safe-area-inset-bottom)
+    ) !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-view-stage.is-list,
+  .ops-shell.surface-agent-actions .vf-figma-action-list {
+    padding-bottom: max(var(--vf-ref-size-18px), env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: max(
+      var(--vf-ref-size-18px),
+      env(safe-area-inset-bottom)
+    ) !important;
+  }
+}
+
 /* My Submissions comment pass: scoped spacing, rail, chips, and state motion. */
 .ops-shell.surface-agent-submissions {
   --v19-submission-state-motion: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -32453,5 +33029,51 @@ p {
     font-size: var(--vf-ref-size-10px) !important;
     font-weight: var(--vf-ref-font-weight-620) !important;
     line-height: var(--vf-ref-line-height-1) !important;
+  }
+}
+
+/* My Actions visual-lock pass: final active-surface override. */
+.ops-shell.surface-agent-actions .vf-figma-action-status {
+  min-width: 0 !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 760px) {
+  .ops-shell.surface-agent-actions .ops-mobile-tabbar {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .workspace {
+    padding-bottom: max(var(--vf-ref-size-16px), env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: max(
+      var(--vf-ref-size-16px),
+      env(safe-area-inset-bottom)
+    ) !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-actions-screen {
+    height: calc(100dvh - var(--vf-ref-size-84px) - env(safe-area-inset-bottom)) !important;
+    max-height: calc(100dvh - var(--vf-ref-size-84px) - env(safe-area-inset-bottom)) !important;
+    padding-bottom: max(var(--vf-ref-size-18px), env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: max(
+      var(--vf-ref-size-18px),
+      env(safe-area-inset-bottom)
+    ) !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-view-stage.is-list,
+  .ops-shell.surface-agent-actions .vf-figma-action-list {
+    padding-bottom: max(var(--vf-ref-size-18px), env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: max(
+      var(--vf-ref-size-18px),
+      env(safe-area-inset-bottom)
+    ) !important;
   }
 }
