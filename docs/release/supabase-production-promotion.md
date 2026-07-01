@@ -44,6 +44,8 @@ Apply migrations only in the repository order declared by
 - `20260627001000_returned_pdf_storage_policies.sql`
 - `20260628000100_trip_date_range_persistence.sql`
 - `20260629193805_v19_access_requests_admin_pdfs.sql`
+- `20260630222703_returned_pdf_handoff_security_invoker.sql`
+- `20260630235513_allow_trip_date_sync_during_submit_handoff.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

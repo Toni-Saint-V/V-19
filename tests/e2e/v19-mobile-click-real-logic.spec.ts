@@ -38,6 +38,7 @@ type BrowserElement = {
   contains: (element: BrowserElement | null) => boolean;
   getAttribute: (name: string) => string | null;
   getBoundingClientRect: () => BrowserRect;
+  querySelectorAll: (selector: string) => ArrayLike<BrowserElement>;
   tagName: string;
   textContent: string | null;
 };
@@ -149,6 +150,22 @@ async function expectNoFixedLayerOverControls(page: Page, context: string) {
         Math.max(rect.top + rect.height / 2, 0),
         browser.innerHeight - 1,
       );
+      const clip = control.closest?.(
+        ".v19-submission-grouped-list, .v19-submission-list, .v19-event-list, .magic-export-list, .table-wrap",
+      );
+
+      if (clip) {
+        const clipRect = clip.getBoundingClientRect();
+        if (
+          x < clipRect.left ||
+          x > clipRect.right ||
+          y < clipRect.top ||
+          y > clipRect.bottom
+        ) {
+          return [];
+        }
+      }
+
       const top = browser.document.elementFromPoint(x, y);
 
       if (!top || top === control || control.contains(top)) {
@@ -183,13 +200,15 @@ async function expectMobileTabbarCompact(page: Page) {
     const targetElement = element as unknown as BrowserElement;
     const rect = targetElement.getBoundingClientRect();
     return {
+      buttons: targetElement.querySelectorAll("button").length,
       columns: browser.getComputedStyle(targetElement).gridTemplateColumns.split(" ")
         .length,
       height: Math.round(rect.height),
     };
   });
 
-  expect(metrics.columns, JSON.stringify(metrics)).toBe(4);
+  expect(metrics.columns, JSON.stringify(metrics)).toBe(metrics.buttons);
+  expect(metrics.buttons, JSON.stringify(metrics)).toBeGreaterThanOrEqual(3);
   expect(metrics.height, JSON.stringify(metrics)).toBeLessThanOrEqual(82);
 }
 
@@ -211,6 +230,12 @@ async function expectDisabledExportActionsExplainWhy(page: Page) {
   await expect(page.locator("#export-action-hint")).toBeVisible();
 }
 
+function drawerCloseButton(page: Page) {
+  return drawer(page)
+    .getByRole("button", { name: /Закрыть (подачу|проверку)/ })
+    .first();
+}
+
 test.describe("V-19 mobile click real logic", () => {
   test("390px agent cards, filters, drawer, and bottom actions stay clickable", async ({
     page,
@@ -219,20 +244,22 @@ test.describe("V-19 mobile click real logic", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await page.setViewportSize({ height: 844, width: 390 });
-    await openFreshWorkspace(page, { heading: "Входящие" });
+    await openFreshWorkspace(page, { heading: "Мои действия" });
     await expectNoHorizontalOverflow(page, "390 agent inbox");
     await expectMobileTabbarCompact(page);
     await expectNoFixedLayerOverControls(page, "390 agent inbox");
 
-    const lastEventAction = page.getByRole("button", { name: /^Открыть:/ }).last();
+    const lastEventAction = page
+      .getByRole("button", { name: /^Открыть подачу:/ })
+      .last();
     await expectCenterHitTarget(lastEventAction, "390 inbox last event action");
     await lastEventAction.click();
     await expect(drawer(page)).toBeVisible();
     await expectCenterHitTarget(
-      drawer(page).getByRole("button", { name: "Закрыть подачу" }),
+      drawerCloseButton(page),
       "390 drawer close from inbox event",
     );
-    await drawer(page).getByRole("button", { name: "Закрыть подачу" }).click();
+    await drawerCloseButton(page).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await clickOperationalNav(page, /Мои подачи/);
@@ -253,14 +280,24 @@ test.describe("V-19 mobile click real logic", () => {
     await page.keyboard.press("Escape");
     await expect(statusDialog).toHaveCount(0);
 
-    await submissionCardById(page, "ПД-1048").click();
+    await clickOperationalNav(page, /Настройки/);
     await expect(
-      drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
+      page.getByRole("heading", { level: 1, name: "Настройки" }),
     ).toBeVisible();
+    await expectNoHorizontalOverflow(page, "390 agent settings");
+    await expectNoFixedLayerOverControls(page, "390 agent settings");
+
+    await clickOperationalNav(page, /Мои подачи/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Мои подачи" }),
+    ).toBeVisible();
+
+    await submissionCardById(page, "ПД-1048").click();
+    await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toBeVisible();
     await expect(page.locator(".ops-mobile-tabbar")).toBeHidden();
     await expect(page.locator(".mobile-create-dock")).toBeHidden();
     await expectCenterHitTarget(
-      drawer(page).getByRole("button", { name: "Закрыть подачу" }),
+      drawerCloseButton(page),
       "390 submission drawer close",
     );
     await expectNoHorizontalOverflow(page, "390 submission drawer");
@@ -276,21 +313,20 @@ test.describe("V-19 mobile click real logic", () => {
 
     await page.setViewportSize({ height: 844, width: 390 });
     await openFreshWorkspace(page, {
-      heading: "Работа",
+      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
     await expectNoHorizontalOverflow(page, "390 admin review");
     await expectNoFixedLayerOverControls(page, "390 admin review");
 
-    const firstReviewRow = page.locator(".v17-admin-work-row").first();
+    const firstReviewRow = page
+      .getByRole("button", { name: /^Открыть подачу:/ })
+      .first();
     await expectCenterHitTarget(firstReviewRow, "390 admin review row");
     await firstReviewRow.click();
     await expect(drawer(page)).toBeVisible();
-    await expectCenterHitTarget(
-      drawer(page).getByRole("button", { name: "Закрыть подачу" }),
-      "390 admin drawer close",
-    );
-    await drawer(page).getByRole("button", { name: "Закрыть подачу" }).click();
+    await expectCenterHitTarget(drawerCloseButton(page), "390 admin drawer close");
+    await drawerCloseButton(page).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     await openMobileMenu(page);
@@ -345,8 +381,14 @@ test.describe("V-19 mobile click real logic", () => {
     for (const viewport of breakpointMatrix) {
       await page.setViewportSize({ height: viewport.height, width: viewport.width });
 
-      await openFreshWorkspace(page, { heading: "Входящие" });
+      await openFreshWorkspace(page, { heading: "Мои действия" });
       await expectNoHorizontalOverflow(page, `${viewport.label} agent inbox`);
+      await clickOperationalNav(page, /Настройки/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Настройки" }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, `${viewport.label} agent settings`);
+      await expectNoFixedLayerOverControls(page, `${viewport.label} agent settings`);
       await clickOperationalNav(page, /Мои подачи/);
       await expect(
         page.getByRole("heading", { level: 1, name: "Мои подачи" }),
@@ -355,11 +397,17 @@ test.describe("V-19 mobile click real logic", () => {
       await expectNoFixedLayerOverControls(page, `${viewport.label} agent submissions`);
 
       await openFreshWorkspace(page, {
-        heading: "Работа",
+        heading: "Проверка",
         workspaceEmail: "admin@visaflow.local",
       });
       await expectNoHorizontalOverflow(page, `${viewport.label} admin review`);
       await expectNoFixedLayerOverControls(page, `${viewport.label} admin review`);
+      await clickOperationalNav(page, /Настройки/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Настройки" }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page, `${viewport.label} admin settings`);
+      await expectNoFixedLayerOverControls(page, `${viewport.label} admin settings`);
       await clickOperationalNav(page, /Выгрузка\. готово к Excel/);
       await expect(
         page.getByRole("heading", { level: 1, name: "Выгрузка" }),

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
+import {
+  V19EntityTypeSwitch,
+  V19FamilyProfileCard,
+  V19IndividualProfileCard,
+  type V19EntityViewMode,
+  type V19MemberStatusTone,
+} from "../../../shared/ui/v19-design-system";
 import type {
   AgentActionItem,
   AgentActionSummary,
@@ -551,17 +558,7 @@ export function AgentActionsScreen({
                 );
               },
             }))}
-          nextAction={{
-            description: `${selectedAction.context}`,
-            label: selectedAction.cta,
-            title: selectedAction.title,
-            onOpen: () => openAction(selectedAction),
-          }}
           openIssueCount={openIssueCount(selectedAction.submission)}
-          status={{
-            label: submissionStatusChipLabel(selectedAction.submission),
-            tone: submissionRailTone(selectedAction.submission),
-          }}
           submission={selectedAction.submission}
           tripSummary={tripDates(selectedAction.submission)}
           onClose={closePanel}
@@ -1059,6 +1056,69 @@ function inboxPassportNumber(submission: Submission) {
   return extractedPassport || questionnairePassport || "—";
 }
 
+function applicantInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function applicantRoleLabel(role: Submission["applicants"][number]["role"]) {
+  if (role === "spouse") return "Супруга";
+  if (role === "child") return "Ребенок";
+  return "Основной";
+}
+
+function applicantVisualStatus(
+  submission: Submission,
+  applicant: Submission["applicants"][number],
+): V19MemberStatusTone {
+  const files = submission.files.filter((file) => file.applicantId === applicant.id);
+
+  if (
+    applicant.questionnaireStatus === "needs_fix" ||
+    files.some((file) => file.status === "missing" || file.status === "needs_replacement")
+  ) {
+    return "issue";
+  }
+
+  if (
+    applicant.questionnaireStatus === "empty" ||
+    applicant.questionnaireStatus === "partial" ||
+    files.some((file) => file.status === "uploaded" || file.status === "pending_review")
+  ) {
+    return "progress";
+  }
+
+  return "ready";
+}
+
+function submissionTypeCounts(submissions: Submission[]): Record<V19EntityViewMode, number> {
+  const family = submissions.filter((submission) => submission.type === "family").length;
+  const single = submissions.filter((submission) => submission.type === "single").length;
+
+  return {
+    all: submissions.length,
+    family,
+    single,
+  };
+}
+
+function filterByEntityMode(submissions: Submission[], mode: V19EntityViewMode) {
+  if (mode === "family") {
+    return submissions.filter((submission) => submission.type === "family");
+  }
+
+  if (mode === "single") {
+    return submissions.filter((submission) => submission.type === "single");
+  }
+
+  return submissions;
+}
+
 export function AgentSubmissionsScreen({
   activeTab,
   agentList,
@@ -1099,6 +1159,7 @@ export function AgentSubmissionsScreen({
   summary: ReturnType<typeof counts>;
 }) {
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
+  const [entityMode, setEntityMode] = useState<V19EntityViewMode>("all");
   const hasContextRail = visibleSubmission != null && totalSubmissionCount > 0;
   const railDisclosure = useRailDisclosure({
     defaultOpen: defaultContextRailOpen(),
@@ -1116,6 +1177,8 @@ export function AgentSubmissionsScreen({
   const singleSubmissions = orderedApplicants.filter(
     (submission) => submission.type === "single",
   );
+  const entityCounts = submissionTypeCounts(orderedApplicants);
+  const profileSubmissions = filterByEntityMode(orderedApplicants, entityMode);
   const agentSortModes: SubmissionSortMode[] = ["priority", "updated", "trip"];
   const agentTabs: Array<{ count: number; id: AgentTab; label: string }> = [
     { count: tabCounts.all, id: "all", label: "Все подачи" },
@@ -1170,6 +1233,7 @@ export function AgentSubmissionsScreen({
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setSortMode("priority");
+      setEntityMode("all");
       onClearFilters?.();
     });
   function closePanel() {
@@ -1180,6 +1244,18 @@ export function AgentSubmissionsScreen({
     railDisclosure.toggle();
   }
 
+  const submissionSortTool = (
+    <ToolbarIconButton
+      label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
+      icon="sort"
+      pressed={sortMode !== "priority"}
+      onClick={() =>
+        transitionUiState(() =>
+          setSortMode((value) => nextSubmissionSortMode(value, agentSortModes)),
+        )
+      }
+    />
+  );
   const panelToggleTool = hasContextRail ? (
     <ToolbarIconButton
       label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
@@ -1188,30 +1264,24 @@ export function AgentSubmissionsScreen({
       onClick={togglePanel}
     />
   ) : null;
-  const mobilePanelToggleTool = hasContextRail ? (
-    <div className="v19-mobile-context-tool">
-      <ToolbarIconButton
-        label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-        icon="panel"
-        pressed={panelOpen}
-        onClick={togglePanel}
-      />
+  const mobilePanelToggleTool = (
+    <div className="v19-mobile-context-tool v19-mobile-toolbar-action-set">
+      {submissionSortTool}
+      {hasContextRail ? (
+        <ToolbarIconButton
+          label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
+          icon="panel"
+          pressed={panelOpen}
+          onClick={togglePanel}
+        />
+      ) : null}
     </div>
-  ) : null;
+  );
   const toolbarTools = (
     <CollectionToolbarTools
       desktopTools={
         <>
-          <ToolbarIconButton
-            label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
-            icon="sort"
-            pressed={sortMode !== "priority"}
-            onClick={() =>
-              transitionUiState(() =>
-                setSortMode((value) => nextSubmissionSortMode(value, agentSortModes)),
-              )
-            }
-          />
+          {submissionSortTool}
           {panelToggleTool}
         </>
       }
@@ -1249,12 +1319,10 @@ export function AgentSubmissionsScreen({
         fileTone={submissionFileTone(submission)}
         kind={submission.type === "single" ? "single" : "family"}
         key={submission.id}
-        meta={
-          <>
-            {applicantCountLabel(submission.applicants.length)} · {submission.city}
-          </>
-        }
+        meta={applicantCountLabel(submission.applicants.length)}
         onOpen={() => openSubmissionFromCard(submission)}
+        routeDetail={trip}
+        routeLabel={submission.city}
         searchText={submission.applicants.map((applicant) => applicant.fullName).join(" ")}
         selected={visibleSubmission?.id === submission.id}
         status={submission.status}
@@ -1294,6 +1362,50 @@ export function AgentSubmissionsScreen({
     );
   }
 
+  function renderSubmissionProfileCard(submission: Submission) {
+    const footerLabel = [submission.city, tripDates(submission)].filter(Boolean).join(" · ");
+    const packageLabel = submissionFileStateLabel(submission);
+
+    if (submission.type === "family") {
+      return (
+        <V19FamilyProfileCard
+          dataSubmissionId={submission.id}
+          footerLabel={footerLabel}
+          key={submission.id}
+          members={submission.applicants.map((applicant) => ({
+            initials: applicantInitials(applicant.fullName),
+            name: applicant.fullName,
+            role: applicantRoleLabel(applicant.role),
+            statusTone: applicantVisualStatus(submission, applicant),
+          }))}
+          packageLabel={packageLabel}
+          title={formatSubmissionListTitle(submission)}
+          totalLabel={`${applicantCountLabel(submission.applicants.length)} · ${statusLabelFor(
+            submission.status,
+          )}`}
+          onMemberOpen={() => openSubmissionFromCard(submission)}
+          onOpen={() => openSubmissionFromCard(submission)}
+        />
+      );
+    }
+
+    const applicant = submission.applicants[0];
+
+    return (
+      <V19IndividualProfileCard
+        dataSubmissionId={submission.id}
+        footerLabel={footerLabel}
+        initials={applicantInitials(applicant?.fullName ?? submission.title)}
+        key={submission.id}
+        packageLabel={packageLabel}
+        statusLabel={statusLabelFor(submission.status)}
+        statusTone={applicant ? applicantVisualStatus(submission, applicant) : "progress"}
+        title={applicant?.fullName ?? formatSubmissionListTitle(submission)}
+        onOpen={() => openSubmissionFromCard(submission)}
+      />
+    );
+  }
+
   const railSubmission = visibleSubmission;
 
   return (
@@ -1324,6 +1436,11 @@ export function AgentSubmissionsScreen({
             tools={toolbarTools}
             value={activeTab}
           />
+          <V19EntityTypeSwitch
+            counts={entityCounts}
+            value={entityMode}
+            onChange={(mode) => transitionUiState(() => setEntityMode(mode))}
+          />
 
           {loading ? (
             <AgentSubmissionsLoadingState />
@@ -1353,7 +1470,7 @@ export function AgentSubmissionsScreen({
                 </Button>
               ) : null}
             </div>
-          ) : (
+          ) : entityMode === "all" ? (
             <div
               className="v19-collection-list v19-submission-grouped-list"
               aria-label="Список подач"
@@ -1370,6 +1487,25 @@ export function AgentSubmissionsScreen({
                 items: singleSubmissions,
                 title: "Индивидуальные подачи",
               })}
+            </div>
+          ) : (
+            <div
+              className={`v19-submission-profile-stage is-${entityMode}`}
+              aria-label={
+                entityMode === "family" ? "Семейные карточки" : "Одиночные карточки"
+              }
+            >
+              {profileSubmissions.length ? (
+                <div className="v19-submission-profile-grid">
+                  {profileSubmissions.map(renderSubmissionProfileCard)}
+                </div>
+              ) : (
+                <div className="v19-submission-type-empty" role="status">
+                  {entityMode === "family"
+                    ? "Семейных подач нет."
+                    : "Индивидуальных подач нет."}
+                </div>
+              )}
             </div>
           )}
         </CardComponent>
@@ -1402,18 +1538,8 @@ export function AgentSubmissionsScreen({
                 );
               },
             }))}
-          nextAction={{
-            description: agentSubmissionStatusDetail(railSubmission),
-            label: agentSubmissionCardAction(railSubmission).label,
-            title: nextProblem(railSubmission),
-            onOpen: () => openSubmissionFromCard(railSubmission),
-          }}
           openIssueCount={openIssueCount(railSubmission)}
           showHeader
-          status={{
-            label: submissionStatusChipLabel(railSubmission),
-            tone: submissionRailTone(railSubmission),
-          }}
           submission={railSubmission}
           tripSummary={tripDates(railSubmission)}
           onClose={closePanel}
@@ -1576,10 +1702,6 @@ function submissionFileStateLabel(submission: Submission) {
   return `${ready} из ${submission.files.length}`;
 }
 
-function submissionStatusChipLabel(submission: Submission) {
-  return statusLabels[submission.status];
-}
-
 function primarySubmissionIssue(submission: Submission) {
   return (
     submission.issues.find(
@@ -1605,16 +1727,6 @@ function issueTargetLine(issue: Submission["issues"][number]) {
   ]
     .filter(Boolean)
     .join(" · ");
-}
-
-function submissionRailTone(submission: Submission) {
-  if (submission.status === "ready_for_export") return "teal";
-  if (submission.status === "submitted_for_review") return "blue";
-  if (submission.status === "returned" || submission.status === "requires_action") {
-    return "danger";
-  }
-  if (submission.status === "draft" || submission.status === "exported") return "muted";
-  return "amber";
 }
 
 export type AdminWorkTab = "review" | "corrections" | "events";
@@ -2325,6 +2437,7 @@ export function ExportScreen({
   const unresolvedCount = mappingAudit.unresolvedCount;
   const [exportPanelOpen, setExportPanelOpen] = useState(true);
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("updated");
+  const [entityMode, setEntityMode] = useState<V19EntityViewMode>("all");
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
@@ -2332,10 +2445,6 @@ export function ExportScreen({
   const exportReadyList = useMemo(
     () => readyList.filter(isSubmissionSelectableForExport),
     [readyList],
-  );
-  const exportReadyIdSet = useMemo(
-    () => new Set(exportReadyList.map((submission) => submission.id)),
-    [exportReadyList],
   );
   const sortedReadyList = useMemo(
     () => sortSubmissionsForOperations(exportReadyList, sortMode),
@@ -2345,18 +2454,33 @@ export function ExportScreen({
     () => sortSubmissionsForOperations(historyList, sortMode),
     [historyList, sortMode],
   );
+  const visibleReadyList = useMemo(
+    () => filterByEntityMode(sortedReadyList, entityMode),
+    [entityMode, sortedReadyList],
+  );
+  const visibleHistoryList = useMemo(
+    () => filterByEntityMode(sortedHistoryList, entityMode),
+    [entityMode, sortedHistoryList],
+  );
+  const visibleExportTypeCounts = submissionTypeCounts(
+    exportTab === "ready" ? sortedReadyList : sortedHistoryList,
+  );
+  const visibleReadyIdSet = useMemo(
+    () => new Set(visibleReadyList.map((submission) => submission.id)),
+    [visibleReadyList],
+  );
   const selectedVisibleExportIds = selectedExportIds.filter((id) =>
-    exportReadyIdSet.has(id),
+    visibleReadyIdSet.has(id),
   );
   const selectedSubmissionCount = new Set(
     exportPlan.rows.map((row) => row.submissionId),
   ).size;
   const hiddenNotReadyCount = readyList.length - exportReadyList.length;
   const allReadySelected =
-    exportReadyList.length > 0 &&
-    exportReadyList.every((submission) => selectedExportIdSet.has(submission.id));
+    visibleReadyList.length > 0 &&
+    visibleReadyList.every((submission) => selectedExportIdSet.has(submission.id));
   const handleToggleAllReady = (checked: boolean) => {
-    exportReadyList.forEach((submission) => {
+    visibleReadyList.forEach((submission) => {
       const selected = selectedExportIdSet.has(submission.id);
       if (checked !== selected) onToggle(submission.id);
     });
@@ -2424,6 +2548,11 @@ export function ExportScreen({
             tools={toolbarTools}
             value={exportTab}
           />
+          <V19EntityTypeSwitch
+            counts={visibleExportTypeCounts}
+            value={entityMode}
+            onChange={(mode) => setEntityMode(mode)}
+          />
           {exportTab === "ready" ? (
             <div className="magic-export-list export-contract-table">
               <div className="table-wrap">
@@ -2435,7 +2564,7 @@ export function ExportScreen({
                           aria-label="Выбрать все совместимые"
                           checked={allReadySelected}
                           className="checkbox"
-                          disabled={exportBusy || exportReadyList.length === 0}
+                          disabled={exportBusy || visibleReadyList.length === 0}
                           type="checkbox"
                           onChange={(event) =>
                             handleToggleAllReady(event.currentTarget.checked)
@@ -2451,7 +2580,7 @@ export function ExportScreen({
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedReadyList.map((submission) => {
+                    {visibleReadyList.map((submission) => {
                       const selected = selectedExportIdSet.has(submission.id);
 
                       return (
@@ -2534,7 +2663,7 @@ export function ExportScreen({
                   </span>
                 </div>
               ) : null}
-              {exportReadyList.length === 0 ? (
+              {visibleReadyList.length === 0 ? (
                 <EmptyState text="Нет подач готовых к выгрузке." />
               ) : null}
               {selectedVisibleExportIds.length ? (
@@ -2564,7 +2693,7 @@ export function ExportScreen({
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedHistoryList.map((submission) => {
+                    {visibleHistoryList.map((submission) => {
                       const pdfState = returnedPdfPackageSummary(submission);
 
                       return (
@@ -2605,7 +2734,7 @@ export function ExportScreen({
                   </tbody>
                 </table>
               </div>
-              {sortedHistoryList.length === 0 ? (
+              {visibleHistoryList.length === 0 ? (
                 <EmptyState text="История выгрузки пока пуста." />
               ) : null}
             </div>

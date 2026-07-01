@@ -361,4 +361,23 @@ describe("V-19 domain engine", () => {
     });
     expect(getDefaultDrawerTab(returned)).toBe("issues");
   });
+
+  it("keeps next action helpers aligned with submit guards", () => {
+    const missingTripDates = {
+      ...completeInProgressSubmission(),
+      tripDateFrom: "не указано",
+      tripDateTo: "не указано",
+    };
+
+    expect(canPerformAction(missingTripDates, "submit_for_review", "agent")).toEqual({
+      ok: false,
+      reason: "Укажите даты поездки перед отправкой",
+    });
+    expect(getNextAction(missingTripDates, "agent")).toEqual({
+      action: "submit_for_review",
+      disabled: true,
+      label: "Отправить",
+      reason: "Укажите даты поездки перед отправкой",
+    });
+  });
 });

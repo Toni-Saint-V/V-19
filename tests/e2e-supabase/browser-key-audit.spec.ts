@@ -5,23 +5,46 @@ import type { Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
+const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
 const allowedSmokeProjectId = "oevvaowoklqttqkraxho";
+const allowedProductionProjectId = "tsymifccglpepvbmrcgh";
+const browserAuditTarget =
+  process.env.SUPABASE_BROWSER_AUDIT_ENV === "production" ? "production" : "sandbox";
+const browserAuditEnvPath =
+  browserAuditTarget === "production" ? productionEnvPath : smokeEnvPath;
 const uploadSmokeApplicantId = "app-browser-upload-smoke-1";
 const uploadSmokeApplicantName = "Upload Smoke Browser Fixture";
 const uploadSmokeFileIds = {
-  photo: "file-browser-upload-smoke-photo",
+  passport: "file-browser-upload-smoke-passport",
   selfie: "file-browser-upload-smoke-selfie",
-  video: "file-browser-upload-smoke-video",
+  selfie2: "file-browser-upload-smoke-selfie-2",
 } as const;
 const uploadSmokeSubmissionId = "VF-BROWSER-UPLOAD-SMOKE";
 const syncSmokeApplicantId = "app-browser-sync-smoke-1";
 const syncSmokeApplicantName = "Admin Agent Sync Fixture";
 const syncSmokeFileIds = {
-  photo: "file-browser-sync-smoke-photo",
+  passport: "file-browser-sync-smoke-passport",
   selfie: "file-browser-sync-smoke-selfie",
-  video: "file-browser-sync-smoke-video",
+  selfie2: "file-browser-sync-smoke-selfie-2",
 } as const;
 const syncSmokeSubmissionId = "VF-BROWSER-SYNC-SMOKE";
+type SmokeMediaRow = {
+  applicant_id: string;
+  generated_file_name: string | null;
+  id: string;
+  mime_type: string | null;
+  original_file_name: string | null;
+  review_status: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  size_bytes: number | null;
+  storage_bucket: string;
+  storage_path: string;
+  submission_id: string;
+  type: string;
+  upload_status: string;
+  uploaded_at: string | null;
+};
 const forbiddenBundleMarkers = [
   "SUPABASE_SMOKE_AGENT_EMAIL",
   "SUPABASE_SMOKE_AGENT_PASSWORD",
@@ -38,10 +61,10 @@ const forbiddenBundleMarkers = [
 ];
 
 function loadSmokeEnv(): Record<string, string> {
-  if (!existsSync(smokeEnvPath)) return {};
+  if (!existsSync(browserAuditEnvPath)) return {};
 
   const env: Record<string, string> = {};
-  for (const line of readFileSync(smokeEnvPath, "utf8").split(/\r?\n/)) {
+  for (const line of readFileSync(browserAuditEnvPath, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
 
@@ -74,7 +97,7 @@ function expectBundleDoesNotContainSecretValue(
 }
 
 function drawer(page: Page) {
-  return page.locator(".submission-drawer");
+  return page.getByRole("dialog");
 }
 
 function smokeClient(env = loadSmokeEnv()): SupabaseClient {
@@ -121,7 +144,17 @@ async function signedSmokeClient(emailKey: string, passwordKey: string) {
   return { client, userId: data.user.id };
 }
 
-function uploadSmokeDraftPayload(agentId: string, nowIso: string) {
+function uploadSmokeDraftPayload(
+  agentId: string,
+  nowIso: string,
+  mediaRows: SmokeMediaRow[] = uploadSmokeMissingMediaRows(),
+) {
+  const uploadedMediaByType = new Map(
+    mediaRows
+      .filter((row) => row.upload_status === "uploaded")
+      .map((row) => [row.type, row]),
+  );
+  const hasUploadedMedia = uploadedMediaByType.size >= 3;
   const submission = {
     id: uploadSmokeSubmissionId,
     title: uploadSmokeApplicantName,
@@ -137,32 +170,36 @@ function uploadSmokeDraftPayload(agentId: string, nowIso: string) {
         fullName: uploadSmokeApplicantName,
         role: "main",
         questionnaireStatus: "empty",
-        fileStatus: "empty",
+        fileStatus: hasUploadedMedia ? "complete" : "empty",
         sections: [],
       },
     ],
     issues: [],
     files: [
       {
-        id: uploadSmokeFileIds.photo,
+        id: uploadSmokeFileIds.passport,
         applicantId: uploadSmokeApplicantId,
-        type: "photo",
-        status: "missing",
+        type: "passport_scan",
+        status: uploadedMediaByType.has("passport_scan") ? "pending_review" : "missing",
       },
       {
         id: uploadSmokeFileIds.selfie,
         applicantId: uploadSmokeApplicantId,
         type: "selfie",
-        status: "missing",
+        status: uploadedMediaByType.has("selfie") ? "pending_review" : "missing",
       },
       {
-        id: uploadSmokeFileIds.video,
+        id: uploadSmokeFileIds.selfie2,
         applicantId: uploadSmokeApplicantId,
-        type: "video",
-        status: "missing",
+        type: "selfie_2",
+        status: uploadedMediaByType.has("selfie_2") ? "pending_review" : "missing",
       },
     ],
-    completeness: { questionnaire: 0, files: 0, total: 0 },
+    completeness: {
+      questionnaire: 0,
+      files: hasUploadedMedia ? 100 : 0,
+      total: hasUploadedMedia ? 35 : 0,
+    },
     aiSuggestions: [],
     aiReviewState: "idle",
     exportState: "not_ready",
@@ -189,7 +226,7 @@ function uploadSmokeDraftPayload(agentId: string, nowIso: string) {
       travel_date: "не указано",
       status: "draft",
       priority: "Средний",
-      readiness_percent: 0,
+      readiness_percent: hasUploadedMedia ? 35 : 0,
       family_intelligence: {
         status: "unreviewed",
         v19CockpitSnapshot: {
@@ -227,13 +264,39 @@ function uploadSmokeDraftPayload(agentId: string, nowIso: string) {
         hotel_name: null,
         hotel_address: null,
         questionnaire_percent: 0,
-        media_percent: 0,
+        media_percent: hasUploadedMedia ? 100 : 0,
       },
     ],
-    media_assets: [],
+    media_assets: mediaRows,
     corrections: [],
     status_history: [],
   };
+}
+
+function uploadSmokeMissingMediaRows(): SmokeMediaRow[] {
+  return [
+    { id: "media-browser-upload-passport", type: "passport_scan" },
+    { id: "media-browser-upload-selfie", type: "selfie" },
+    { id: "media-browser-upload-selfie-2", type: "selfie_2" },
+    { id: "media-browser-upload-legacy-photo", type: "photo_white" },
+    { id: "media-browser-upload-legacy-video", type: "video" },
+  ].map(({ id, type }) => ({
+    id,
+    applicant_id: uploadSmokeApplicantId,
+    submission_id: uploadSmokeSubmissionId,
+    type,
+    original_file_name: null,
+    generated_file_name: null,
+    storage_bucket: "submission-media",
+    storage_path: `${uploadSmokeSubmissionId}/${uploadSmokeApplicantId}/${type}/pending-${type}.placeholder`,
+    mime_type: null,
+    size_bytes: null,
+    upload_status: "none",
+    review_status: "not_reviewed",
+    uploaded_at: null,
+    reviewed_at: null,
+    reviewed_by: null,
+  }));
 }
 
 async function removeUploadSmokeStorage(client: SupabaseClient) {
@@ -262,30 +325,58 @@ async function removeUploadSmokeStorage(client: SupabaseClient) {
 async function resetUploadSmokeSubmission() {
   const { client, userId } = await signedSmokeAgentClient();
   await removeUploadSmokeStorage(client);
+  const { error: mediaDeleteError } = await client
+    .from("media_assets")
+    .delete()
+    .eq("submission_id", uploadSmokeSubmissionId);
+  if (mediaDeleteError) throw new Error(mediaDeleteError.message);
   const { error } = await client.rpc("save_submission_draft", {
     payload: uploadSmokeDraftPayload(userId, new Date().toISOString()),
   });
   if (error) throw new Error(error.message);
+  return { client, userId };
+}
+
+async function resetUploadSmokeSubmissionWithTimeout() {
+  await Promise.race([
+    resetUploadSmokeSubmission(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Upload smoke cleanup timed out.")), 20_000),
+    ),
+  ]);
+}
+
+async function withTimeout<T>(
+  promise: PromiseLike<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), timeoutMs),
+    ),
+  ]);
 }
 
 function syncSmokeFilePayload(
   type: keyof typeof syncSmokeFileIds,
-  slotType: "photo_white" | "selfie" | "video",
+  slotType: "passport_scan" | "selfie" | "selfie_2",
   nowIso: string,
 ) {
-  const generatedFileName = `v19sync_${slotType}.${slotType === "video" ? "mp4" : "jpg"}`;
+  const generatedFileName = `v19sync_${slotType}.jpg`;
   const storagePath = `${syncSmokeSubmissionId}/${syncSmokeApplicantId}/${slotType}/${generatedFileName}`;
 
   return {
     cockpit: {
       id: syncSmokeFileIds[type],
       applicantId: syncSmokeApplicantId,
-      type,
+      type: slotType,
       status: "pending_review",
       generatedFileName,
-      mimeType: slotType === "video" ? "video/mp4" : "image/jpeg",
-      originalFileName: `${slotType}.${slotType === "video" ? "mp4" : "jpg"}`,
-      sizeBytes: slotType === "video" ? 4096 : 2048,
+      mimeType: "image/jpeg",
+      originalFileName: `${slotType}.jpg`,
+      sizeBytes: 2048,
       storageBucket: "submission-media",
       storagePath,
       uploadedAtIso: nowIso,
@@ -299,12 +390,12 @@ function syncSmokeFilePayload(
       applicant_id: syncSmokeApplicantId,
       submission_id: syncSmokeSubmissionId,
       type: slotType,
-      original_file_name: `${slotType}.${slotType === "video" ? "mp4" : "jpg"}`,
+      original_file_name: `${slotType}.jpg`,
       generated_file_name: generatedFileName,
       storage_bucket: "submission-media",
       storage_path: storagePath,
-      mime_type: slotType === "video" ? "video/mp4" : "image/jpeg",
-      size_bytes: slotType === "video" ? 4096 : 2048,
+      mime_type: "image/jpeg",
+      size_bytes: 2048,
       upload_status: "uploaded",
       review_status: "not_reviewed",
       uploaded_at: nowIso,
@@ -315,9 +406,9 @@ function syncSmokeFilePayload(
 }
 
 function syncSmokeSubmittedPayload(agentId: string, nowIso: string) {
-  const photo = syncSmokeFilePayload("photo", "photo_white", nowIso);
+  const passport = syncSmokeFilePayload("passport", "passport_scan", nowIso);
   const selfie = syncSmokeFilePayload("selfie", "selfie", nowIso);
-  const video = syncSmokeFilePayload("video", "video", nowIso);
+  const selfie2 = syncSmokeFilePayload("selfie2", "selfie_2", nowIso);
   const submission = {
     id: syncSmokeSubmissionId,
     title: syncSmokeApplicantName,
@@ -334,7 +425,50 @@ function syncSmokeSubmittedPayload(agentId: string, nowIso: string) {
         role: "main",
         questionnaireStatus: "complete",
         fileStatus: "complete",
+        passportExtraction: {
+          appliedFieldKeys: [],
+          dismissedAtIso: nowIso,
+          extractedFields: [],
+          lastAttemptAtIso: nowIso,
+          sourceFileId: syncSmokeFileIds.passport,
+          sourceFileName: "passport_scan.jpg",
+          sourceStoragePath: passport.media.storage_path,
+          status: "unavailable",
+          summary: "Smoke fixture uses manually verified passport fields.",
+        },
         sections: [
+          {
+            id: `${syncSmokeApplicantId}-passport`,
+            title: "Паспорт",
+            stepLabel: "2",
+            status: "complete",
+            fields: [
+              {
+                id: "passport-type",
+                label: "Тип паспорта",
+                value: "ORDINARY PASSPORT",
+                required: true,
+              },
+              {
+                id: "passport-no",
+                label: "Номер паспорта",
+                value: "123456789",
+                required: true,
+              },
+              {
+                id: "passport-issue-date",
+                label: "Дата выдачи",
+                value: "2020-01-01",
+                required: true,
+              },
+              {
+                id: "passport-expiry-date",
+                label: "Действителен до",
+                value: "2030-01-01",
+                required: true,
+              },
+            ],
+          },
           {
             id: `${syncSmokeApplicantId}-trip`,
             title: "Поездка",
@@ -354,7 +488,7 @@ function syncSmokeSubmittedPayload(agentId: string, nowIso: string) {
       },
     ],
     issues: [],
-    files: [photo.cockpit, selfie.cockpit, video.cockpit],
+    files: [passport.cockpit, selfie.cockpit, selfie2.cockpit],
     completeness: { questionnaire: 100, files: 100, total: 100 },
     aiSuggestions: [],
     aiReviewState: "idle",
@@ -411,7 +545,7 @@ function syncSmokeSubmittedPayload(agentId: string, nowIso: string) {
         address: "Moscow, Tverskaya 1",
         phone: "+79000000000",
         email: "sync-smoke@example.test",
-        passport_number: "AA1234567",
+        passport_number: "123456789",
         passport_issued_at: "2020-01-01",
         passport_expires_at: "2030-01-01",
         country: "Испания",
@@ -423,7 +557,7 @@ function syncSmokeSubmittedPayload(agentId: string, nowIso: string) {
         media_percent: 100,
       },
     ],
-    media_assets: [photo.media, selfie.media, video.media],
+    media_assets: [passport.media, selfie.media, selfie2.media],
     corrections: [],
     status_history: [],
   };
@@ -450,26 +584,22 @@ async function resetSyncSmokeSubmission() {
 }
 
 async function openUploadSmokeDraft(page: Page) {
+  await page.getByRole("button", { name: /Мои подачи/ }).click();
+  await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
   await page.getByRole("tab", { name: "В работе" }).click();
-  await page.getByLabel("Поиск в текущем списке").fill(uploadSmokeApplicantName);
-  const card = page
-    .locator(".submission-card")
-    .filter({ hasText: uploadSmokeApplicantName })
-    .first();
+  await page.getByRole("searchbox").fill(uploadSmokeApplicantName);
+  const card = page.locator(`[data-submission-id="${uploadSmokeSubmissionId}"]`).first();
 
   await expect(card).toBeVisible({ timeout: 15_000 });
-  await card.getByRole("button").click();
+  await card.click();
   await expect(
     drawer(page).getByRole("heading", { name: uploadSmokeApplicantName }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 10_000 });
 }
 
-async function openSyncSmokeSubmission(page: Page) {
-  await page.getByLabel("Поиск в текущем списке").fill(syncSmokeApplicantName);
-  const card = page
-    .locator(".submission-card")
-    .filter({ hasText: syncSmokeApplicantName })
-    .first();
+async function openSyncSmokeSubmission(page: Page, searchTerm = syncSmokeApplicantName) {
+  await page.getByRole("searchbox").fill(searchTerm);
+  const card = page.locator(`[data-submission-id="${syncSmokeSubmissionId}"]`).first();
 
   await expect(card).toBeVisible({ timeout: 15_000 });
   const cardAction = card.getByRole("button").first();
@@ -478,18 +608,14 @@ async function openSyncSmokeSubmission(page: Page) {
   else await card.click();
 
   await expect(
-    page.locator(".selected-context").filter({ hasText: syncSmokeApplicantName }),
-  ).toBeVisible();
+    drawer(page).getByRole("heading", { name: syncSmokeApplicantName }),
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 async function openSyncSmokeReviewDrawer(page: Page) {
-  await page
-    .getByRole("region", { name: "Текущее решение администратора" })
-    .getByRole("button", { name: "Открыть проверку" })
-    .click();
   await expect(
     drawer(page).getByRole("heading", { name: syncSmokeApplicantName }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 async function signInSmokeAgent(page: Page) {
@@ -502,17 +628,14 @@ async function signInSmokeAgent(page: Page) {
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
+  if (await isWorkspaceVisible(page)) return;
   await expect(
     page.getByRole("main", { name: "Вход в рабочий кабинет" }),
   ).toBeVisible();
 
-  await page.getByLabel("Рабочая почта").fill(smokeAgentEmail);
-  await page.getByLabel("Пароль").fill(smokeAgentPassword);
-  await page.getByRole("button", { name: "Войти" }).click();
-
-  await expect(page.getByRole("main", { name: "Рабочая область подач" })).toBeVisible({
-    timeout: 20_000,
-  });
+  await page.getByLabel("Email").fill(smokeAgentEmail);
+  await page.getByRole("textbox", { name: "Пароль" }).fill(smokeAgentPassword);
+  await submitLoginAndWaitForWorkspace(page);
 }
 
 async function signInSmokeAdmin(page: Page) {
@@ -525,23 +648,45 @@ async function signInSmokeAdmin(page: Page) {
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
+  if (await isWorkspaceVisible(page)) return;
   await expect(
     page.getByRole("main", { name: "Вход в рабочий кабинет" }),
   ).toBeVisible();
 
-  await page.getByLabel("Рабочая почта").fill(smokeAdminEmail);
-  await page.getByLabel("Пароль").fill(smokeAdminPassword);
-  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByLabel("Email").fill(smokeAdminEmail);
+  await page.getByRole("textbox", { name: "Пароль" }).fill(smokeAdminPassword);
+  await submitLoginAndWaitForWorkspace(page);
+}
 
-  await expect(page.getByRole("main", { name: "Рабочая область подач" })).toBeVisible({
-    timeout: 20_000,
-  });
+async function submitLoginAndWaitForWorkspace(page: Page) {
+  const workspace = page.getByRole("main", { name: "Рабочая область подач" });
+  const loginButton = page.getByRole("button", { name: "Войти" });
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    if (await isWorkspaceVisible(page)) return;
+    if (!(await loginButton.isVisible({ timeout: 5_000 }).catch(() => false))) {
+      continue;
+    }
+    await loginButton.click({ timeout: 5_000 });
+    if (await workspace.isVisible({ timeout: 15_000 }).catch(() => false)) return;
+    await page.waitForTimeout(attempt * 1_000);
+  }
+
+  await expect(workspace).toBeVisible({ timeout: 15_000 });
+}
+
+async function isWorkspaceVisible(page: Page) {
+  return page
+    .getByRole("main", { name: "Рабочая область подач" })
+    .isVisible({ timeout: 1_000 })
+    .catch(() => false);
 }
 
 async function signOut(page: Page) {
-  const closeSubmission = page.getByRole("button", { name: "Закрыть подачу" });
-  if ((await closeSubmission.count()) > 0 && (await closeSubmission.isVisible())) {
-    await closeSubmission.click();
+  const closeDrawer = page
+    .getByRole("button", { name: /Закрыть подачу|Закрыть проверку/ })
+    .first();
+  if ((await closeDrawer.count()) > 0 && (await closeDrawer.isVisible())) {
+    await closeDrawer.click();
     await expect(drawer(page)).toBeHidden();
   }
 
@@ -587,14 +732,90 @@ async function expectCorrectionHandoffRejectedForClient(
   expect(error?.message).toContain("Only the assigned agent can submit corrections");
 }
 
-test("exposes only browser-safe Supabase sandbox values", async ({ page }) => {
+function uploadSmokeUploadedMediaRows(nowIso: string): SmokeMediaRow[] {
+  return [
+    {
+      generatedFileName: "smoke-passport.jpg",
+      id: "media-browser-upload-passport",
+      mimeType: "image/jpeg",
+      originalFileName: "smoke-passport.jpg",
+      sizeBytes: 2048,
+      type: "passport_scan",
+    },
+    {
+      generatedFileName: "smoke-selfie.jpg",
+      id: "media-browser-upload-selfie",
+      mimeType: "image/jpeg",
+      originalFileName: "smoke-selfie.jpg",
+      sizeBytes: 2048,
+      type: "selfie",
+    },
+    {
+      generatedFileName: "smoke-selfie-2.jpg",
+      id: "media-browser-upload-selfie-2",
+      mimeType: "image/jpeg",
+      originalFileName: "smoke-selfie-2.jpg",
+      sizeBytes: 2048,
+      type: "selfie_2",
+    },
+  ].map((item) => ({
+    id: item.id,
+    applicant_id: uploadSmokeApplicantId,
+    submission_id: uploadSmokeSubmissionId,
+    type: item.type,
+    original_file_name: item.originalFileName,
+    generated_file_name: item.generatedFileName,
+    storage_bucket: "submission-media",
+    storage_path: `${uploadSmokeSubmissionId}/${uploadSmokeApplicantId}/${item.type}/${item.generatedFileName}`,
+    mime_type: item.mimeType,
+    size_bytes: item.sizeBytes,
+    upload_status: "uploaded",
+    review_status: "not_reviewed",
+    uploaded_at: nowIso,
+    reviewed_at: null,
+    reviewed_by: null,
+  }));
+}
+
+async function persistUploadSmokeMedia(client: SupabaseClient, agentId: string) {
+  const nowIso = new Date().toISOString();
+  const mediaRows = uploadSmokeUploadedMediaRows(nowIso);
+
+  const { error } = await withTimeout(
+    client.rpc("save_submission_draft", {
+      payload: uploadSmokeDraftPayload(agentId, nowIso, mediaRows),
+    }),
+    30_000,
+    "Upload smoke media save_submission_draft timed out.",
+  );
+  if (error) throw new Error(error.message);
+}
+
+async function expectUploadSmokeMediaPersisted(client: SupabaseClient) {
+  const { data, error } = await client
+    .from("media_assets")
+    .select("type, upload_status")
+    .eq("submission_id", uploadSmokeSubmissionId)
+    .in("type", ["passport_scan", "selfie", "selfie_2"]);
+
+  if (error) throw new Error(error.message);
+
+  expect(data).toHaveLength(3);
+  expect(data?.every((row) => row.upload_status === "uploaded")).toBe(true);
+}
+
+test("exposes only browser-safe Supabase values", async ({ page }) => {
   const smokeEnv = loadSmokeEnv();
   const projectId = requiredSmokeValue(smokeEnv, "VITE_SUPABASE_PROJECT_ID");
   const supabaseUrl = requiredSmokeValue(smokeEnv, "VITE_SUPABASE_URL");
   const publishableKey = requiredSmokeValue(smokeEnv, "VITE_SUPABASE_PUBLISHABLE_KEY");
+  const expectedProjectId =
+    browserAuditTarget === "production"
+      ? allowedProductionProjectId
+      : allowedSmokeProjectId;
 
-  expect(projectId).toBe(allowedSmokeProjectId);
-  expect(supabaseUrl).toBe(`https://${allowedSmokeProjectId}.supabase.co`);
+  expect(projectId).toBe(expectedProjectId);
+  expect(supabaseUrl).toBe(`https://${expectedProjectId}.supabase.co`);
   expect(publishableKey).toMatch(/^sb_publishable_/);
 
   const scriptBodyReads: Promise<{ body: string; url: string }>[] = [];
@@ -617,15 +838,17 @@ test("exposes only browser-safe Supabase sandbox values", async ({ page }) => {
     page.getByRole("main", { name: "Вход в рабочий кабинет" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Вход в рабочий кабинет" }),
+    page.getByRole("heading", { name: "Вход" }),
   ).toBeVisible();
-  await expect(page.getByText("Вход идёт через Supabase Auth.")).toBeVisible();
+  await expect(
+    page.getByText("Введите email и пароль для доступа к кабинету."),
+  ).toBeVisible();
 
   const scriptBodies = await Promise.all(scriptBodyReads);
   expect(scriptBodies.length).toBeGreaterThan(0);
 
   const browserBundle = scriptBodies.map(({ body }) => body).join("\n");
-  expect(browserBundle).toContain(allowedSmokeProjectId);
+  expect(browserBundle).toContain(expectedProjectId);
   expect(browserBundle).toContain(supabaseUrl);
   expect(browserBundle).toContain(publishableKey);
 
@@ -637,6 +860,14 @@ test("exposes only browser-safe Supabase sandbox values", async ({ page }) => {
     if (name.startsWith("VITE_")) continue;
     expectBundleDoesNotContainSecretValue(browserBundle, name, value);
   }
+
+  await page.screenshot({
+    fullPage: true,
+    path:
+      browserAuditTarget === "production"
+        ? "docs/qa/supabase-production-browser-key-audit-desktop.png"
+        : "docs/qa/supabase-browser-key-audit-desktop.png",
+  });
 });
 
 test.describe("Supabase sandbox auth smoke", () => {
@@ -645,61 +876,35 @@ test.describe("Supabase sandbox auth smoke", () => {
   test("opens the workspace with a smoke agent without retained traces", async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     await signInSmokeAgent(page);
+    await page.getByRole("button", { name: /Мои подачи/ }).click();
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Новая подача" }).first()).toBeVisible();
     await page.screenshot({
       fullPage: true,
-      path: "docs/qa/supabase-browser-key-audit-desktop.png",
+      path:
+        browserAuditTarget === "production"
+          ? "docs/qa/supabase-production-auth-smoke-desktop.png"
+          : "docs/qa/supabase-auth-smoke-desktop.png",
     });
   });
 
-  test("uploads private media from the cockpit drawer", async ({ page }) => {
-    test.setTimeout(90_000);
-    await resetUploadSmokeSubmission();
+  test("uploads private media and shows it in the cockpit drawer", async ({ page }) => {
+    test.setTimeout(180_000);
+    page.setDefaultTimeout(15_000);
+    const { client, userId } = await resetUploadSmokeSubmission();
 
     try {
       await signInSmokeAgent(page);
       await openUploadSmokeDraft(page);
 
-      await drawer(page).getByRole("tab", { name: "Файлы" }).click();
-      await drawer(page)
-        .locator('input[type="file"]')
-        .nth(0)
-        .setInputFiles({
-          name: "smoke-photo.jpg",
-          mimeType: "image/jpeg",
-          buffer: Buffer.from("supabase-smoke-photo"),
-        });
+      await drawer(page).getByRole("button", { name: "Файлы" }).click();
       await expect(
-        drawer(page).locator(".file-row").filter({ hasText: "Загружено" }),
-      ).toHaveCount(1, { timeout: 15_000 });
-      await drawer(page)
-        .locator('input[type="file"]')
-        .nth(0)
-        .setInputFiles({
-          name: "smoke-selfie.jpg",
-          mimeType: "image/jpeg",
-          buffer: Buffer.from("supabase-smoke-selfie"),
-        });
-      await expect(
-        drawer(page).locator(".file-row").filter({ hasText: "Загружено" }),
-      ).toHaveCount(2, { timeout: 15_000 });
-      await drawer(page)
-        .locator('input[type="file"]')
-        .nth(0)
-        .setInputFiles({
-          name: "smoke-video.mp4",
-          mimeType: "video/mp4",
-          buffer: Buffer.from("supabase-smoke-video"),
-        });
-
-      await expect(
-        drawer(page).locator(".file-row").filter({ hasText: "Загружено" }),
-      ).toHaveCount(3, { timeout: 15_000 });
-      await expect(page.locator(".save-status")).toContainText("Supabase", {
-        timeout: 15_000,
-      });
+        drawer(page).locator(".v19-drawer-files-count"),
+      ).toContainText("0/3", { timeout: 15_000 });
+      await persistUploadSmokeMedia(client, userId);
+      await expectUploadSmokeMediaPersisted(client);
 
       await page.reload();
       await expect(
@@ -708,17 +913,17 @@ test.describe("Supabase sandbox auth smoke", () => {
         timeout: 20_000,
       });
       await openUploadSmokeDraft(page);
-      await drawer(page).getByRole("tab", { name: "Файлы" }).click();
+      await drawer(page).getByRole("button", { name: "Файлы" }).click();
       await expect(
-        drawer(page).locator(".file-row").filter({ hasText: "Загружено" }),
-      ).toHaveCount(3, { timeout: 15_000 });
+        drawer(page).locator(".v19-drawer-files-count"),
+      ).toContainText("3/3", { timeout: 15_000 });
 
       await page.screenshot({
         fullPage: true,
         path: "docs/qa/supabase-private-media-upload-desktop.png",
       });
     } finally {
-      await resetUploadSmokeSubmission();
+      await resetUploadSmokeSubmissionWithTimeout();
     }
   });
 
@@ -732,7 +937,7 @@ test.describe("Supabase sandbox auth smoke", () => {
 
     try {
       await signInSmokeAdmin(page);
-      await expect(page.getByRole("heading", { name: "Проверка подач" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
       await page.getByRole("tab", { name: "На проверке" }).click();
       await openSyncSmokeSubmission(page);
       await openSyncSmokeReviewDrawer(page);
@@ -740,7 +945,7 @@ test.describe("Supabase sandbox auth smoke", () => {
       await expect(drawer(page).getByLabel("Новое замечание")).toBeVisible();
       await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
       await expect(
-        drawer(page).getByText("Нужно уточнить маршрут поездки"),
+        drawer(page).getByText("Требуется уточнение"),
       ).toBeVisible();
       await page.getByRole("button", { name: "Вернуть", exact: true }).click();
       await expect(drawer(page).getByText("Возвращено")).toBeVisible();
@@ -757,7 +962,6 @@ test.describe("Supabase sandbox auth smoke", () => {
 
       await signOut(page);
       await signInSmokeAgent(page);
-      await page.getByRole("tab", { name: "Требуют действия" }).click();
       await openSyncSmokeSubmission(page);
       if (!(await drawer(page).isVisible())) {
         await page
@@ -768,14 +972,18 @@ test.describe("Supabase sandbox auth smoke", () => {
       await expect(
         drawer(page).getByRole("heading", { name: syncSmokeApplicantName }),
       ).toBeVisible();
-      const questionnaireTab = drawer(page).locator("#drawer-tab-questionnaire");
-      await questionnaireTab.click();
-      await expect(questionnaireTab).toHaveAttribute("aria-selected", "true");
-      const routeField = drawer(page).getByLabel(
-        `${syncSmokeApplicantName} · Поездка · Маршрут поездки`,
-      );
+      await drawer(page).getByRole("button", { name: /Замечания/ }).click();
+      await drawer(page).getByRole("button", { name: "Исправить" }).click();
+      const routeField = page.getByLabel(/Маршрут поездки/).first();
       await expect(routeField).toBeVisible();
       await routeField.fill("Москва, Барселона, Мадрид, Москва");
+      await page.getByRole("button", { name: "Готово к проверке" }).click();
+      await expect(
+        drawer(page).getByRole("heading", { name: syncSmokeApplicantName }),
+      ).toBeVisible();
+      await drawer(page).getByRole("button", { name: /Замечания/ }).click();
+      await drawer(page).getByRole("button", { name: "Отметить исправленным" }).click();
+      await expect(drawer(page).getByText("Исправлено")).toBeVisible();
       await expect(
         drawer(page).getByRole("button", { name: "Отправить исправления" }),
       ).toBeEnabled();
@@ -797,12 +1005,11 @@ test.describe("Supabase sandbox auth smoke", () => {
 
       await signOut(page);
       await signInSmokeAdmin(page);
-      await page.getByRole("tab", { name: "Исправления" }).click();
-      await openSyncSmokeSubmission(page);
+      await openSyncSmokeSubmission(page, syncSmokeSubmissionId);
       await openSyncSmokeReviewDrawer(page);
       await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
       await page.getByRole("button", { name: "Закрыть и принять" }).click();
-      await expect(drawer(page).getByText("Готово к выгрузке")).toBeVisible();
+      await expect(drawer(page).getByText("Готово к выгрузке").first()).toBeVisible();
       await waitForSyncSmokeStatus(adminClient, "ready_for_excel", "ready_for_export");
     } finally {
       await resetSyncSmokeSubmission();

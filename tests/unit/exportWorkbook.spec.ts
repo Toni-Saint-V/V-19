@@ -16,6 +16,7 @@ import {
   verifyExportWorkbookArtifact,
 } from "../../src/modules/submissions/exportWorkbook";
 import {
+  buildExportContractRows,
   EXPORT_WORKBOOK_COLUMN_COUNT,
   EXPORT_WORKBOOK_RANGE,
   EXPORT_WORKBOOK_SHEET_NAME,
@@ -26,6 +27,7 @@ import {
 } from "../../src/modules/submissions/exportContract";
 import { buildApplicantDocumentFileName } from "../../src/modules/submissions/filenamePolicy";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { createQuestionnaireSections } from "../../src/modules/submissions/questionnaire";
 import { searchSubmissions } from "../../src/modules/submissions/selectors";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type {
@@ -133,6 +135,26 @@ function withSubmissionIdentity(
   };
 }
 
+function withFirstApplicantNameOnly(
+  submission: Submission,
+  fullName: string,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant, index) => ({
+      ...applicant,
+      fullName: index === 0 ? fullName : applicant.fullName,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.filter(
+          (field) =>
+            !["first-name", "surname", "surname-at-birth"].includes(field.id),
+        ),
+      })),
+    })),
+  };
+}
+
 describe("V-19 export workbook contract", () => {
   test("generates a parseable Sheet1 workbook with exact A:BD 56-column shape", async () => {
     const selection = applyExportStateToSelection(
@@ -152,7 +174,7 @@ describe("V-19 export workbook contract", () => {
     expect(artifact.sheetName).toBe(EXPORT_WORKBOOK_SHEET_NAME);
     expect(artifact.range).toBe(EXPORT_WORKBOOK_RANGE);
     expect(parsed.sheetName).toBe("Sheet1");
-    expect(parsed.dimension).toBe(`A1:BD${artifact.rows.length}`);
+    expect(parsed.dimension).toBe("A1:BE1048572");
     expect(parsed.rows[0]).toHaveLength(EXPORT_WORKBOOK_COLUMN_COUNT);
     expect(exportContractHeaders()).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
     expect(parsed.rows[0]).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
@@ -175,6 +197,33 @@ describe("V-19 export workbook contract", () => {
     expect(exportContractHeaders()).not.toEqual(
       expect.arrayContaining(["Agent", "Family", "Debug"]),
     );
+  });
+
+  test("maps Russian surname-first applicant names into BLS surname and first name columns", () => {
+    const [row] = buildExportContractRows([
+      withFirstApplicantNameOnly(readySubmission(), "Сергеева Анна"),
+    ]);
+
+    expect(row?.surnameFamilyName).toBe("Сергеева");
+    expect(row?.firstName).toBe("Анна");
+    expect(row?.lastName).toBe("Сергеева");
+  });
+
+  test("pre-fills questionnaire first name and surname correctly for Russian surname-first names", () => {
+    const sections = createQuestionnaireSections(
+      "applicant-test",
+      "Сергеева Анна",
+      "complete",
+    );
+    const fields = new Map(
+      sections.flatMap((section) =>
+        section.fields.map((field) => [field.id, field.value]),
+      ),
+    );
+
+    expect(fields.get("first-name")).toBe("ANNA");
+    expect(fields.get("surname")).toBe("SERGEEVA");
+    expect(fields.get("surname-at-birth")).toBe("SERGEEVA");
   });
 
   test("ignores blank BLS template rows without Passport No and applicant name", () => {

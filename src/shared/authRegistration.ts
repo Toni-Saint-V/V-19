@@ -106,6 +106,7 @@ const localDevAuthStorageKey = "visaflow.auth.localDev.v1";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const localDevSeedPassword = "local-dev-password";
 const seededAgentOwnerId = "local-agent-tony";
+const seededSecondAgentOwnerId = "local-agent-alex";
 
 function approvedSeed(
   id: string,
@@ -161,6 +162,16 @@ const localDevApprovedUsers: User[] = [
     "Санкт-Петербург",
     "+7 000 000-00-02",
     seededAgentOwnerId,
+  ),
+  approvedSeed(
+    "agent-local-2",
+    "agent2@visaflow.local",
+    "agent",
+    "Алексей Морозов",
+    "Mira Travel",
+    "Казань",
+    "+7 000 000-00-03",
+    seededSecondAgentOwnerId,
   ),
 ];
 

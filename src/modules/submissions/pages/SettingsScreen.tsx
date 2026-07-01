@@ -106,6 +106,15 @@ export default function SettingsScreen({
               {sectionLabels[section]}
             </button>
           ))}
+          {activeSectionSafe !== "profile" ? (
+            <button
+              className="settings-nav-signout"
+              type="button"
+              onClick={() => void onSignOut()}
+            >
+              {isSupabaseMode ? "Выйти" : "Сбросить почту"}
+            </button>
+          ) : null}
         </nav>
 
         <div className="settings-form">
@@ -184,7 +193,7 @@ function SettingsSectionContent({
 }) {
   if (activeSection === "profile") {
     return (
-      <SettingsBlock title="Профиль" description="Имя и рабочие контакты пользователя.">
+      <SettingsBlock title="Профиль">
         <SettingsRow label="Имя" help="Отображается в истории действий.">
           <input className="settings-field-control" readOnly value={userDisplayName} />
         </SettingsRow>
@@ -260,7 +269,7 @@ function SettingsSectionContent({
 
   if (activeSection === "interface") {
     return (
-      <SettingsBlock title="Интерфейс" description="Тёмная тема — фиксированный baseline текущего scope.">
+      <SettingsBlock title="Интерфейс">
         <SettingsRow label="Тема" help="Светлая тема не реализована.">
           <button className="settings-small-button" disabled type="button">
             Тёмная
@@ -290,10 +299,7 @@ function SettingsSectionContent({
   }
 
   return (
-    <SettingsBlock
-      title="Уведомления"
-      description="События попадают во «Входящие»; здесь настраиваются только каналы."
-    >
+    <SettingsBlock title="Уведомления">
       <SettingsRow label="Возврат подачи" help="Показывать событие и точное действие.">
         <SwitchButton
           ariaLabel="Возврат подачи"
@@ -344,13 +350,13 @@ function SettingsBlock({
   title,
 }: {
   children: ReactNode;
-  description: string;
+  description?: string;
   title: string;
 }) {
   return (
     <section className="settings-block" aria-labelledby="settings-title">
       <h2 id="settings-title">{title}</h2>
-      <p>{description}</p>
+      {description ? <p>{description}</p> : null}
       {children}
     </section>
   );

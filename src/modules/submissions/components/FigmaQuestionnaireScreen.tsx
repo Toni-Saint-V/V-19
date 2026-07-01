@@ -33,6 +33,7 @@ type SectionId =
 
 type FormFieldProps = {
   excelMap?: string;
+  focused?: boolean;
   fullWidth?: boolean;
   label: string;
   number?: string;
@@ -46,13 +47,67 @@ type FormFieldProps = {
 };
 
 type FigmaQuestionnaireScreenProps = {
+  initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
-  onComplete: (values: { travelEnd: string; travelStart: string }) => void;
+  onComplete: (values: {
+    focusedUpdate?: {
+      applicantId: string;
+      fieldId: string;
+      sectionId: string;
+      value: string;
+    };
+    travelEnd: string;
+    travelStart: string;
+  }) => void;
   submission: Submission;
+};
+
+type QuestionnaireInitialFocus = {
+  applicantId?: string;
+  field?: string;
+  section?: string;
+};
+
+type QuestionnaireFormData = {
+  birthCountry: string;
+  birthPlace: string;
+  citizenship: string;
+  contactAddress: string;
+  contactEmail: string;
+  contactPhone: string;
+  currentJob: string;
+  dob: string;
+  employerAddress: string;
+  employerName: string;
+  firstEntryCountry: string;
+  firstName: string;
+  hotelAddress: string;
+  hotelName: string;
+  maritalStatus: string;
+  passportExpiry: string;
+  passportIssued: string;
+  passportNumber: string;
+  passportType: string;
+  paymentSponsor: string;
+  paymentType: string;
+  sex: string;
+  stayPurpose: string;
+  stayRoute: string;
+  surname: string;
+  travelEnd: string;
+  travelStart: string;
+};
+
+type FocusableQuestionnaireField = {
+  fieldId: string;
+  formKey: keyof QuestionnaireFormData;
+  labels: string[];
+  sectionId: SectionId;
 };
 
 function FormField({
   excelMap,
+  focused,
   fullWidth,
   label,
   number,
@@ -88,6 +143,8 @@ function FormField({
 
   return (
     <div
+      data-field-focused={focused ? "true" : undefined}
+      data-field-label={label}
       className={`flex flex-col gap-1.5 ${
         fullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
       }`}
@@ -153,6 +210,7 @@ function FormField({
         />
       ) : (
         <input
+          aria-label={label}
           className={`${baseClasses} ${stateClasses}`}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
@@ -190,22 +248,104 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
   }
 
   return submission.applicants.map((applicant, index) => ({
-    hasIssue: index === 0 && submission.issues.some((issue) => issue.status !== "closed_by_admin"),
+    hasIssue: submission.issues.some(
+      (issue) =>
+        issue.status !== "closed_by_admin" &&
+        issue.target.applicantId === applicant.id,
+    ),
     id: applicant.id ?? `app-${index + 1}`,
     index: index + 1,
     name: applicant.fullName || (index === 0 ? "Иван Петров" : `Заявитель ${index + 1}`),
   }));
 }
 
+const focusableQuestionnaireFields: FocusableQuestionnaireField[] = [
+  {
+    fieldId: "passport-type",
+    formKey: "passportType",
+    labels: ["Тип паспорта", "Тип проездного документа"],
+    sectionId: "passport",
+  },
+  {
+    fieldId: "passport-no",
+    formKey: "passportNumber",
+    labels: ["Номер паспорта"],
+    sectionId: "passport",
+  },
+  {
+    fieldId: "passport-issue-date",
+    formKey: "passportIssued",
+    labels: ["Дата выдачи паспорта", "Дата выдачи"],
+    sectionId: "passport",
+  },
+  {
+    fieldId: "passport-expiry-date",
+    formKey: "passportExpiry",
+    labels: ["Дата окончания паспорта", "Действителен до"],
+    sectionId: "passport",
+  },
+  {
+    fieldId: "arrival-date",
+    formKey: "travelStart",
+    labels: ["Дата въезда"],
+    sectionId: "trip",
+  },
+  {
+    fieldId: "departure-date",
+    formKey: "travelEnd",
+    labels: ["Дата выезда"],
+    sectionId: "trip",
+  },
+  {
+    fieldId: "route",
+    formKey: "stayRoute",
+    labels: ["Маршрут поездки"],
+    sectionId: "trip",
+  },
+];
+
+function normalizeFocusLabel(value?: string) {
+  return (value ?? "").trim().toLocaleLowerCase("ru-RU");
+}
+
+function sameFieldLabel(left?: string, right?: string) {
+  return normalizeFocusLabel(left) === normalizeFocusLabel(right);
+}
+
+function focusableFieldFor(field?: string) {
+  return focusableQuestionnaireFields.find((target) =>
+    target.labels.some((label) => sameFieldLabel(label, field)),
+  );
+}
+
+function sectionForFocus(
+  focus: QuestionnaireInitialFocus | undefined,
+  target: FocusableQuestionnaireField | undefined,
+): SectionId {
+  if (target) return target.sectionId;
+  const section = normalizeFocusLabel(focus?.section);
+  if (section.includes("паспорт")) return "passport";
+  if (section.includes("поезд") || section.includes("маршрут")) return "trip";
+  if (section.includes("адрес") || section.includes("контакт")) return "contact";
+  if (section.includes("работ")) return "employment";
+  return "personal";
+}
+
 export function FigmaQuestionnaireScreen({
+  initialFocus,
   onBack,
   onComplete,
   submission,
 }: FigmaQuestionnaireScreenProps) {
   const applicants = applicantTabs(submission);
-  const [activeApplicant, setActiveApplicant] = useState(applicants[0]?.id ?? "app-1");
-  const [activeSection, setActiveSection] = useState<SectionId>("personal");
-  const [formData, setFormData] = useState({
+  const initialFieldTarget = focusableFieldFor(initialFocus?.field);
+  const [activeApplicant, setActiveApplicant] = useState(
+    initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1",
+  );
+  const [activeSection, setActiveSection] = useState<SectionId>(
+    sectionForFocus(initialFocus, initialFieldTarget),
+  );
+  const [formData, setFormData] = useState<QuestionnaireFormData>({
     birthCountry: "USSR",
     birthPlace: "MOSCOW",
     citizenship: "RUSSIAN FEDERATION",
@@ -260,6 +400,18 @@ export function FigmaQuestionnaireScreen({
     setFormData((current) => ({ ...current, [key]: value }));
   }
 
+  function fieldReviewState(label: string): FieldState {
+    return initialFieldTarget?.labels.some((candidate) => sameFieldLabel(candidate, label))
+      ? "needs_review"
+      : "normal";
+  }
+
+  function fieldReviewSource(label: string) {
+    return fieldReviewState(label) === "needs_review"
+      ? "замечание администратора"
+      : undefined;
+  }
+
   function goToNextSection() {
     const currentIndex = sections.findIndex((section) => section.id === activeSection);
     const nextSection = sections[(currentIndex + 1) % sections.length];
@@ -292,6 +444,16 @@ export function FigmaQuestionnaireScreen({
     "В разводе (Divorced)",
     "Вдовец / Вдова (Widowed)",
   ];
+  const focusedApplicantId = initialFocus?.applicantId ?? activeApplicant;
+  const focusedUpdatePayload =
+    initialFieldTarget && focusedApplicantId !== undefined
+      ? {
+          applicantId: focusedApplicantId,
+          fieldId: initialFieldTarget.fieldId,
+          sectionId: initialFieldTarget.sectionId,
+          value: formData[initialFieldTarget.formKey],
+        }
+      : undefined;
 
   function renderSectionFields() {
     if (activeSection === "passport") {
@@ -299,34 +461,46 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: C2"
+            focused={fieldReviewState("Тип проездного документа") === "needs_review"}
             label="Тип проездного документа"
             number="12"
             options={["Обычный паспорт (Ordinary passport)", "Служебный паспорт", "Дипломатический паспорт"]}
             required
+            reviewSource={fieldReviewSource("Тип проездного документа")}
+            state={fieldReviewState("Тип проездного документа")}
             value={formData.passportType}
             onChange={(value) => updateField("passportType", value)}
           />
           <FormField
             excelMap="Cell: C3"
+            focused={fieldReviewState("Номер паспорта") === "needs_review"}
             label="Номер паспорта"
             number="13"
             required
+            reviewSource={fieldReviewSource("Номер паспорта")}
+            state={fieldReviewState("Номер паспорта")}
             value={formData.passportNumber}
             onChange={(value) => updateField("passportNumber", value)}
           />
           <FormField
             excelMap="Cell: C4"
+            focused={fieldReviewState("Дата выдачи") === "needs_review"}
             label="Дата выдачи"
             number="14"
             required
+            reviewSource={fieldReviewSource("Дата выдачи")}
+            state={fieldReviewState("Дата выдачи")}
             value={formData.passportIssued}
             onChange={(value) => updateField("passportIssued", value)}
           />
           <FormField
             excelMap="Cell: C5"
+            focused={fieldReviewState("Действителен до") === "needs_review"}
             label="Действителен до"
             number="15"
             required
+            reviewSource={fieldReviewSource("Действителен до")}
+            state={fieldReviewState("Действителен до")}
             value={formData.passportExpiry}
             onChange={(value) => updateField("passportExpiry", value)}
           />
@@ -415,17 +589,23 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Cell: F3"
+            focused={fieldReviewState("Дата въезда") === "needs_review"}
             label="Дата въезда"
             number="25"
             required
+            reviewSource={fieldReviewSource("Дата въезда")}
+            state={fieldReviewState("Дата въезда")}
             value={formData.travelStart}
             onChange={(value) => updateField("travelStart", value)}
           />
           <FormField
             excelMap="Cell: F4"
+            focused={fieldReviewState("Дата выезда") === "needs_review"}
             label="Дата выезда"
             number="26"
             required
+            reviewSource={fieldReviewSource("Дата выезда")}
+            state={fieldReviewState("Дата выезда")}
             value={formData.travelEnd}
             onChange={(value) => updateField("travelEnd", value)}
           />
@@ -438,9 +618,12 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("firstEntryCountry", value)}
           />
           <FormField
+            focused={fieldReviewState("Маршрут поездки") === "needs_review"}
             fullWidth
             label="Маршрут поездки"
             number="28"
+            reviewSource={fieldReviewSource("Маршрут поездки")}
+            state={fieldReviewState("Маршрут поездки")}
             value={formData.stayRoute}
             onChange={(value) => updateField("stayRoute", value)}
           />
@@ -621,6 +804,7 @@ export function FigmaQuestionnaireScreen({
             type="button"
             onClick={() =>
               onComplete({
+                focusedUpdate: focusedUpdatePayload,
                 travelEnd: formData.travelEnd,
                 travelStart: formData.travelStart,
               })
@@ -686,6 +870,7 @@ export function FigmaQuestionnaireScreen({
             <aside className="v19-questionnaire-section-nav">
               {sections.map((section) => (
                 <button
+                  aria-selected={activeSection === section.id}
                   className={`v19-questionnaire-section-tab ${
                     activeSection === section.id ? "is-active" : ""
                   }`}

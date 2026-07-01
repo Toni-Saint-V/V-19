@@ -1,13 +1,9 @@
 import type { DrawerTab, Issue, Submission, SubmissionHistoryItem } from "../types";
 import { ContextRail, SvgIcon } from "./CollectionPrimitives";
 import {
-  RailActionCard,
-  RailCard,
   RailHistoryList,
   RailIssueList,
   RailQuickLinks,
-  RailStatusLine,
-  type RailBadgeTone,
 } from "./RightRailPrimitives";
 
 type AgentSubmissionContextRailIssue = {
@@ -23,18 +19,8 @@ type AgentSubmissionContextRailProps = {
   fileSummary: string;
   history: SubmissionHistoryItem[];
   issues: AgentSubmissionContextRailIssue[];
-  nextAction: {
-    description: string;
-    label: string;
-    title: string;
-    onOpen: () => void;
-  };
   openIssueCount: number;
   showHeader?: boolean;
-  status: {
-    label: string;
-    tone: RailBadgeTone;
-  };
   submission: Submission;
   tripSummary: string;
   onClose: () => void;
@@ -42,16 +28,11 @@ type AgentSubmissionContextRailProps = {
 };
 
 export function AgentSubmissionContextRail({
-  applicantSummary,
-  fileSummary,
   history,
   issues,
-  nextAction,
   openIssueCount,
   showHeader = false,
-  status,
   submission,
-  tripSummary,
   onClose,
   onOpenTab,
 }: AgentSubmissionContextRailProps) {
@@ -63,29 +44,6 @@ export function AgentSubmissionContextRail({
       showHeader={showHeader}
       onClose={onClose}
     >
-      <RailCard className="v19-rail-card-primary">
-        <p className="v19-rail-meta">
-          {submission.id} · {submission.city}
-        </p>
-        <RailStatusLine
-          label={status.label}
-          percent={submission.completeness.total}
-          tone={status.tone}
-        />
-        <p className="v19-rail-meta">
-          {applicantSummary} · {tripSummary} · {fileSummary}
-        </p>
-      </RailCard>
-
-      <RailActionCard
-        description={nextAction.description}
-        label={nextAction.label}
-        statusLabel={status.label}
-        title={nextAction.title}
-        tone={status.tone}
-        onAction={nextAction.onOpen}
-      />
-
       <RailIssueList count={openIssueCount} issues={issues} />
 
       <RailQuickLinks

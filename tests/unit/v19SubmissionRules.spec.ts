@@ -44,9 +44,11 @@ import {
 import { buildMediaStoragePath } from "../../src/modules/submissions/mediaStorage";
 import { withRecomputedFileCompletion } from "../../src/modules/submissions/fileAsset";
 import {
+  applySafePassportExtractionFields,
   failPassportExtraction,
   finishPassportExtraction,
   markPassportExtractionReviewed,
+  passportExtractionRows,
 } from "../../src/modules/submissions/passportExtraction";
 import {
   addPreciseAdminIssue,
@@ -1483,6 +1485,119 @@ describe("V-19 submission actions", () => {
     });
   });
 
+  it("keeps replacement passport upload metadata available for immediate OCR review", () => {
+    const returned = byId("ПД-1048");
+    const passportFile = returned.files.find(
+      (file) => file.applicantId === "з-1048-3" && file.type === "passport_scan",
+    );
+    if (!passportFile) throw new Error("Missing Sofia passport replacement file");
+    const metadata = {
+      generatedFileName: "v19sofia_passport_scan.jpg",
+      mimeType: "image/jpeg",
+      originalFileName: "sofia-passport-live.jpg",
+      sizeBytes: 1_340_672,
+      storageAdapter: "local-dev" as const,
+      storageBucket: "",
+      storagePath: "",
+      uploadedAtIso: "2026-07-01T01:00:00.000Z",
+    };
+
+    const result = mergeUploadedFileMetadataIntoSubmissions(
+      [returned],
+      returned.id,
+      passportFile.id,
+      metadata,
+    );
+    const updatedSubmission = result.submission;
+    const uploadedPassport = updatedSubmission?.files.find(
+      (file) => file.id === passportFile.id,
+    );
+    if (!updatedSubmission || !uploadedPassport) {
+      throw new Error("Expected uploaded passport replacement");
+    }
+
+    const withExtractedPassport = finishPassportExtraction(
+      updatedSubmission,
+      uploadedPassport,
+      {
+        fields: [
+          {
+            confidence: "high",
+            key: "surname",
+            needsManualReview: true,
+            value: "VOLKOV",
+          },
+          {
+            confidence: "high",
+            key: "firstName",
+            needsManualReview: true,
+            value: "ANTON",
+          },
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: true,
+            value: "752869613",
+          },
+        ],
+        guardrails: [],
+        source: "local-ocr",
+        status: "extracted",
+        summary: "Паспорт распознан.",
+      },
+    );
+    const autofilled = applySafePassportExtractionFields(
+      withExtractedPassport,
+      passportFile.applicantId,
+    );
+    const sofia = autofilled.applicants.find(
+      (applicant) => applicant.id === passportFile.applicantId,
+    );
+    if (!sofia) throw new Error("Expected Sofia applicant");
+    const sofiaFields = new Map(
+      sofia.sections.flatMap((section) =>
+        section.fields.map((field) => [field.id, field.value] as const),
+      ),
+    );
+
+    expect(uploadedPassport).toMatchObject({
+      originalFileName: "sofia-passport-live.jpg",
+      status: "uploaded",
+      uploadStatus: "uploaded",
+    });
+    expect(sofiaFields.get("surname")).toBe("IVANOVA");
+    expect(sofiaFields.get("first-name")).toBe("SOFIYA");
+    expect(sofiaFields.get("passport-no")).toBe("660010483");
+    expect(passportExtractionRows(sofia)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          conflict: true,
+          currentValue: "IVANOVA",
+          extractedValue: "VOLKOV",
+          key: "surname",
+        }),
+        expect.objectContaining({
+          conflict: true,
+          currentValue: "SOFIYA",
+          extractedValue: "ANTON",
+          key: "firstName",
+        }),
+        expect.objectContaining({
+          conflict: true,
+          currentValue: "660010483",
+          extractedValue: "752869613",
+          key: "passportNumber",
+        }),
+      ]),
+    );
+    expect(autofilled.applicants[0]?.sections.flatMap((section) => section.fields)).not
+      .toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "passport-no", value: "752869613" }),
+        ]),
+      );
+  });
+
   it("blocks file uploads after the submission leaves editable agent states", () => {
     const draft = createDraftSubmission({
       city: "Москва",
@@ -1824,6 +1939,141 @@ describe("V-19 ББ helper suggestions", () => {
         applicantName: "Артём Соколов",
         section: "Файлы",
         fileType: "selfie",
+      },
+    });
+  });
+
+  it("surfaces passport gate blockers as ББ suggestions", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      preliminaryIntake: datedPreliminaryIntake(),
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const passportFile = draft.files.find(
+      (file) =>
+        file.type === "passport_scan" && file.applicantId === draft.applicants[0]?.id,
+    );
+    if (!passportFile) throw new Error("Missing passport file");
+
+    const withExpiredPassport = finishPassportExtraction(draft, passportFile, {
+      fields: [
+        {
+          confidence: "high",
+          key: "passportType",
+          needsManualReview: true,
+          value: "Ordinary Passport",
+        },
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: true,
+          value: "752869613",
+        },
+        {
+          confidence: "medium",
+          key: "passportExpiresAt",
+          needsManualReview: true,
+          value: "26.02.2026",
+        },
+      ],
+      guardrails: [],
+      source: "local-ocr",
+      status: "extracted",
+      summary: "Локальный OCR нашел паспорт.",
+    });
+    const reviewed = runAiReview(withExpiredPassport);
+    const passportSuggestion = activeAiSuggestions(reviewed).find(
+      (suggestion) => suggestion.title === "Паспорт просрочен",
+    );
+
+    expect(passportSuggestion).toMatchObject({
+      confidence: "high",
+      severity: "blocker",
+      reason: "Паспорт 752869613 просрочен.",
+      target: {
+        applicantId: draft.applicants[0]?.id,
+        applicantName: "VOLKOV ANTON",
+        section: "Паспорт",
+        field: "Дата окончания паспорта",
+      },
+    });
+  });
+
+  it("lets reviewed passport OCR resolve a ББ passport review issue", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      preliminaryIntake: datedPreliminaryIntake(),
+      submissions: initialSubmissions,
+      type: "single",
+    });
+    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const passportFile = filled.files.find(
+      (file) =>
+        file.type === "passport_scan" &&
+        file.applicantId === filled.applicants[0]?.id,
+    );
+    if (!passportFile) throw new Error("Missing passport file");
+
+    const withPassportReviewPending = {
+      ...finishPassportExtraction(filled, passportFile, {
+        fields: [
+          {
+            confidence: "high",
+            key: "passportType",
+            needsManualReview: true,
+            value: "Ordinary Passport",
+          },
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: true,
+            value: "752869613",
+          },
+          {
+            confidence: "medium",
+            key: "passportExpiresAt",
+            needsManualReview: true,
+            value: "10.01.2031",
+          },
+        ],
+        guardrails: [],
+        source: "local-ocr",
+        status: "extracted",
+        summary: "Локальный OCR нашел паспорт.",
+      }),
+      status: "submitted_for_review" as const,
+    };
+    const reviewed = runAiReview(withPassportReviewPending);
+    const passportReviewSuggestion = activeAiSuggestions(reviewed).find(
+      (suggestion) =>
+        suggestion.target.section === "Паспорт" &&
+        suggestion.target.field === "Распознанные данные паспорта",
+    );
+    if (!passportReviewSuggestion) throw new Error("Missing passport review suggestion");
+
+    const withIssue = acceptAiSuggestionAsIssue(
+      reviewed,
+      passportReviewSuggestion.id,
+      "admin",
+    );
+    const returned = applySubmissionAction(withIssue, "return_with_issues", "admin");
+    const verified = markPassportExtractionReviewed(returned, "verified");
+    const fixed = markSubmissionIssueFixedResult(
+      verified,
+      withIssue.issues[0]?.id ?? "",
+      "agent",
+    );
+
+    expect(returned.status).toBe("returned");
+    expect(fixed).toMatchObject({
+      ok: true,
+      data: {
+        issues: [expect.objectContaining({ status: "fixed_by_agent" })],
       },
     });
   });

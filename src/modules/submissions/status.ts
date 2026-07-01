@@ -12,6 +12,7 @@ import type {
 } from "./types";
 import { clearOpenQuestionnaireIssueErrors } from "./questionnaire";
 import {
+  passportGateIssues,
   passportGateReason,
   requiresPassportExtractionReviewBeforeAction,
   requiresPassportGateBeforeAction,
@@ -876,6 +877,12 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
     return issue.snapshot ? file.status !== issue.snapshot : true;
   }
 
+  if (isPassportExtractionReviewIssue(issue)) {
+    return !passportGateIssues(submission).some(
+      (passportIssue) => passportIssue.applicantId === issue.target.applicantId,
+    );
+  }
+
   const applicant = submission.applicants.find(
     (item) => item.id === issue.target.applicantId,
   );
@@ -896,4 +903,11 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
   const value = field.value.trim();
   if (!value) return false;
   return issue.snapshot ? value !== issue.snapshot : true;
+}
+
+function isPassportExtractionReviewIssue(issue: Issue) {
+  return (
+    issue.target.section === "Паспорт" &&
+    issue.target.field === "Распознанные данные паспорта"
+  );
 }

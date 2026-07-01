@@ -19,6 +19,8 @@ export const requiredMigrationOrder = [
   "20260627001000_returned_pdf_storage_policies.sql",
   "20260628000100_trip_date_range_persistence.sql",
   "20260629193805_v19_access_requests_admin_pdfs.sql",
+  "20260630222703_returned_pdf_handoff_security_invoker.sql",
+  "20260630235513_allow_trip_date_sync_during_submit_handoff.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -28,9 +30,9 @@ export const requiredRemoteMigrationOrder = [
   "20260613005039_visaflow_runtime_write_guards",
   "20260613010029_visaflow_rpc_submit_boundary",
   "20260614000000_ai_helper_audit_quota",
-  "20260616001949_ai_helper_security_advisor_hardening",
   "20260616000000_export_batch_identity",
   "20260616001000_complete_export_package_rpc",
+  "20260616001949_ai_helper_security_advisor_hardening",
   "20260616002000_prevent_export_regression",
   "20260617001000_submit_corrections_handoff_rpc",
   "20260617002000_preserve_applicant_profile_on_cockpit_save",
@@ -42,6 +44,8 @@ export const requiredRemoteMigrationOrder = [
   "20260627001000_returned_pdf_storage_policies",
   "20260628000100_trip_date_range_persistence",
   "20260629193805_v19_access_requests_admin_pdfs",
+  "20260630222703_returned_pdf_handoff_security_invoker",
+  "20260630235513_allow_trip_date_sync_during_submit_handoff",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

@@ -1,15 +1,13 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState } from "react";
 import {
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Columns3,
-  Folder,
-  List,
-  Search,
-  User,
-  Users,
-} from "lucide-react";
+  V19ActionBoardCard,
+  V19FamilyProfileCard,
+  V19IndividualProfileCard,
+  V19LongListCell,
+  V19UnifiedToolbar,
+  type V19MemberStatusTone,
+  type V19VisualTone,
+} from "../../../shared/ui/v19-design-system";
 import type {
   AgentActionBadge,
   AgentActionItem,
@@ -20,12 +18,11 @@ import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
 import { statusLabelFor } from "../status";
 import type { City, DrawerTab, Submission } from "../types";
-import { ProgressMeter } from "../components/CollectionPrimitives";
 
 type VisualStatus = Submission["status"];
 
 type VisualActionCategory = "all" | "issues" | "review";
-type VisualTone = "blue" | "danger" | "green" | "indigo" | "warning";
+type VisualTone = V19VisualTone;
 
 type VisualActionRow = {
   actionId: string;
@@ -62,7 +59,7 @@ type VisualMember = {
   initials: string;
   name: string;
   role: string;
-  status: "in_progress" | "missing_docs" | "ready";
+  statusTone: V19MemberStatusTone;
 };
 
 type VisualOpenHandler = (submission: Submission, tab?: DrawerTab) => void;
@@ -74,259 +71,6 @@ const emptySummary: AgentActionSummary = {
   today: 0,
   week: 0,
 };
-
-function statusDot(status: VisualStatus) {
-  if (status === "returned" || status === "requires_action") {
-    return "vf-figma-dot-danger";
-  }
-  if (status === "draft" || status === "in_progress") return "vf-figma-dot-blue";
-  if (status === "submitted_for_review" || status === "corrections_received") {
-    return "vf-figma-dot-indigo";
-  }
-  return "vf-figma-dot-green";
-}
-
-function statusBadge(item: VisualActionRow) {
-  if (item.status === "returned" || item.status === "requires_action") {
-    return (
-      <span className="vf-figma-status is-danger">
-        <AlertCircle aria-hidden="true" size={15} />
-        {item.statusLabel}
-      </span>
-    );
-  }
-
-  if (item.status === "draft" || item.status === "in_progress") {
-    return (
-      <span className="vf-figma-status is-blue">
-        <Clock aria-hidden="true" size={15} />
-        {item.statusLabel}
-      </span>
-    );
-  }
-
-  if (item.status === "submitted_for_review" || item.status === "corrections_received") {
-    return (
-      <span className="vf-figma-status is-indigo">
-        <Clock aria-hidden="true" size={15} />
-        {item.statusLabel}
-      </span>
-    );
-  }
-
-  return (
-    <span className="vf-figma-status is-green">
-      <CheckCircle2 aria-hidden="true" size={15} />
-      {item.statusLabel}
-    </span>
-  );
-}
-
-function memberStatusIcon(status: VisualMember["status"]) {
-  if (status === "missing_docs") {
-    return <AlertCircle className="vf-figma-member-issue" aria-hidden="true" size={15} />;
-  }
-
-  if (status === "in_progress") {
-    return <span className="vf-figma-member-progress" aria-hidden="true" />;
-  }
-
-  return <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />;
-}
-
-function activateKeyboardCard(
-  event: KeyboardEvent<HTMLElement>,
-  action: () => void,
-) {
-  if (event.key !== "Enter" && event.key !== " ") return;
-  event.preventDefault();
-  action();
-}
-
-function VisualToolbar({
-  category,
-  categoryCounts,
-  onCategory,
-  onQuery,
-  onViewMode,
-  query,
-  viewMode,
-}: {
-  category: VisualActionCategory;
-  categoryCounts: Record<VisualActionCategory, number>;
-  onCategory: (category: VisualActionCategory) => void;
-  onQuery: (query: string) => void;
-  onViewMode: (mode: "columns" | "list") => void;
-  query: string;
-  viewMode: "columns" | "list";
-}) {
-  const tabs: Array<{ id: VisualActionCategory; label: string }> = [
-    { id: "all", label: "Все действия" },
-    { id: "issues", label: "Ошибки" },
-    { id: "review", label: "На проверке" },
-  ];
-
-  function chooseViewMode(mode: "columns" | "list") {
-    onViewMode(mode);
-    window.requestAnimationFrame(() => {
-      document.querySelector(".vf-figma-screen")?.scrollTo({ left: 0 });
-    });
-  }
-
-  return (
-    <div className="vf-figma-actions-toolbar">
-      <div className="vf-figma-tabs" aria-label="Фильтры действий" role="tablist">
-        {tabs.map((tab) => (
-          <button
-            aria-selected={category === tab.id}
-            className={category === tab.id ? "is-active" : ""}
-            key={tab.id}
-            role="tab"
-            type="button"
-            onClick={() => onCategory(tab.id)}
-          >
-            <span className="vf-figma-tab-label">{tab.label}</span>
-            <span className="vf-figma-tab-badge">{categoryCounts[tab.id]}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="vf-figma-tools">
-        <div className="vf-figma-search">
-          <Search aria-hidden="true" size={20} />
-          <input
-            aria-label="Поиск по действиям"
-            placeholder="Поиск..."
-            type="search"
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-          />
-        </div>
-        <div className="vf-figma-view-toggle" aria-label="Вид списка">
-          <button
-            className={viewMode === "list" ? "is-active" : ""}
-            type="button"
-            aria-label="Показать списком"
-            aria-pressed={viewMode === "list"}
-            title="Список"
-            onClick={() => chooseViewMode("list")}
-          >
-            <List aria-hidden="true" size={16} />
-            <span className="vf-figma-view-toggle-label">Список</span>
-          </button>
-          <button
-            className={viewMode === "columns" ? "is-active" : ""}
-            type="button"
-            aria-label="Показать колонками"
-            aria-pressed={viewMode === "columns"}
-            title="Колонки"
-            onClick={() => chooseViewMode("columns")}
-          >
-            <Columns3 aria-hidden="true" size={16} />
-            <span className="vf-figma-view-toggle-label">Колонки</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ListRow({
-  item,
-  onOpen,
-}: {
-  item: VisualActionRow;
-  onOpen: VisualOpenHandler;
-}) {
-  return (
-    <button
-      className="vf-figma-action-row"
-      data-submission-id={item.id}
-      type="button"
-      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
-      onClick={() => onOpen(item.submission, item.tab)}
-    >
-      <span className={`vf-figma-dot ${statusDot(item.status)}`} aria-hidden="true" />
-      <span className="vf-figma-action-title">
-        <strong>{item.title}</strong>
-        <em>
-          <span className="vf-figma-action-id">{item.id}</span>
-          <span className="vf-figma-action-updated">Обновлено: {item.updated}</span>
-        </em>
-      </span>
-      <span className="vf-figma-action-meta">
-        <strong>{item.city}</strong>
-        <em>
-          {item.type === "family" ? <Users aria-hidden="true" size={14} /> : <User aria-hidden="true" size={14} />}
-          {applicantCountLabel(item.applicantsCount)}
-        </em>
-      </span>
-      <span className="vf-figma-action-dates">
-        <strong>{item.tripDates}</strong>
-        <em>Даты поездки</em>
-      </span>
-      <span className="vf-figma-action-status">{statusBadge(item)}</span>
-      <span
-        className="vf-figma-open-button"
-        aria-hidden="true"
-      >
-        {item.cta}
-      </span>
-    </button>
-  );
-}
-
-function ColumnCard({
-  item,
-  onOpen,
-}: {
-  item: VisualActionRow;
-  onOpen: VisualOpenHandler;
-}) {
-  const tone = visualToneForStatus(item.status);
-  const showRail = tone !== "blue";
-
-  return (
-    <button
-      className="vf-figma-column-card"
-      data-submission-id={item.id}
-      type="button"
-      aria-label={`Открыть подачу: ${item.title}, ${item.id}`}
-      onClick={() => onOpen(item.submission, item.tab)}
-    >
-      {showRail ? <span className={`vf-figma-card-rail is-${tone}`} /> : null}
-      <span className="vf-figma-column-card-head">
-        <span>{item.id}</span>
-        <em>
-          {item.type === "family" ? <Users aria-hidden="true" size={12} /> : <User aria-hidden="true" size={12} />}
-          {item.applicantsCount}
-        </em>
-      </span>
-      <strong>{item.title}</strong>
-      <span className="vf-figma-column-subline">
-        {item.city} <i aria-hidden="true" /> {item.tripDates}
-      </span>
-      <span className="vf-figma-column-footer">
-        {item.blocker ? (
-          <span className={`is-${tone}`}>
-            {visualToneIcon(tone)}
-            {item.blocker}
-          </span>
-        ) : (
-          <>
-          <ProgressMeter
-            ariaHidden
-            className="vf-figma-progress"
-            tone={tone === "green" ? "success" : tone === "warning" ? "warning" : "accent"}
-            value={item.progress}
-          />
-            <em>{item.progress}%</em>
-          </>
-        )}
-      </span>
-    </button>
-  );
-}
 
 export function FigmaActionQueueVisual({
   completedActions,
@@ -345,10 +89,21 @@ export function FigmaActionQueueVisual({
 }) {
   const [viewMode, setViewMode] = useState<"columns" | "list">("list");
   const [category, setCategory] = useState<VisualActionCategory>("all");
+  const [cityFilter, setCityFilter] = useState<string>("all");
   const allItems = useMemo(
     () => [...openActions, ...completedActions].map(toVisualActionRow),
     [completedActions, openActions],
   );
+  const cityOptions = useMemo(() => {
+    const seen = new Set<City>();
+    return allItems.reduce<City[]>((options, item) => {
+      if (!seen.has(item.city)) {
+        seen.add(item.city);
+        options.push(item.city);
+      }
+      return options;
+    }, []);
+  }, [allItems]);
   const categoryCounts = useMemo(
     () => ({
       all: allItems.length,
@@ -358,8 +113,13 @@ export function FigmaActionQueueVisual({
     [allItems],
   );
   const visibleItems = useMemo(
-    () => allItems.filter((item) => visualCategoryMatches(item, category)),
-    [allItems, category],
+    () =>
+      allItems.filter(
+        (item) =>
+          visualCategoryMatches(item, category) &&
+          (cityFilter === "all" || item.city === cityFilter),
+      ),
+    [allItems, category, cityFilter],
   );
   const columns: VisualColumn[] = [
     {
@@ -393,18 +153,66 @@ export function FigmaActionQueueVisual({
       items: visibleItems.filter(column.matches),
     }))
     .filter((column) => column.items.length > 0);
+  const readyCount = allItems.filter((item) => isReadyVisualStatus(item.status)).length;
 
   return (
     <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
-      <VisualToolbar
-        category={category}
-        categoryCounts={categoryCounts}
-        onCategory={setCategory}
+      <V19UnifiedToolbar
+        cityFilter={cityFilter}
+        cityOptions={cityOptions}
+        onCityFilter={setCityFilter}
         onQuery={onSearch}
+        onTab={setCategory}
         onViewMode={setViewMode}
         query={query}
+        searchLabel="Поиск по действиям"
+        tabs={[
+          {
+            compactLabel: "Все",
+            count: categoryCounts.all,
+            id: "all",
+            label: "Все действия",
+          },
+          {
+            compactLabel: "Ошибки",
+            count: categoryCounts.issues,
+            id: "issues",
+            label: "Ошибки",
+          },
+          {
+            compactLabel: "Проверка",
+            count: categoryCounts.review,
+            id: "review",
+            label: "На проверке",
+          },
+        ]}
+        tabsLabel="Фильтры действий"
+        value={category}
         viewMode={viewMode}
       />
+
+      <div className="vf-figma-queue-summary" aria-label="Сводка очереди проверки">
+        <div className="vf-figma-queue-summary-card is-primary">
+          <span>Всего в работе</span>
+          <strong>{categoryCounts.all}</strong>
+          <em>активная очередь</em>
+        </div>
+        <div className="vf-figma-queue-summary-card is-danger">
+          <span>Ошибки</span>
+          <strong>{categoryCounts.issues}</strong>
+          <em>требуют решения</em>
+        </div>
+        <div className="vf-figma-queue-summary-card is-indigo">
+          <span>На проверке</span>
+          <strong>{categoryCounts.review}</strong>
+          <em>ждут оператора</em>
+        </div>
+        <div className="vf-figma-queue-summary-card is-green">
+          <span>Готово</span>
+          <strong>{readyCount}</strong>
+          <em>к выгрузке</em>
+        </div>
+      </div>
 
       <div
         className={`vf-figma-view-stage is-${viewMode}`}
@@ -415,13 +223,14 @@ export function FigmaActionQueueVisual({
           <div className="vf-figma-action-list" role="status">
             <div className="vf-figma-section-rule">
               <span aria-hidden="true" />
-              <strong>Нет действий</strong>
+              <strong>Пустой список</strong>
               <span aria-hidden="true" />
             </div>
             <div className="vf-figma-column-card">
-              <strong>По текущим фильтрам ничего не найдено</strong>
+              <strong>Нет действий</strong>
               <span className="vf-figma-column-subline">
-                Измените поиск или категорию. Данные берутся из реальных подач агента.
+                По текущим фильтрам ничего не найдено. Измените поиск или категорию.
+                Данные берутся из реальных подач агента.
               </span>
             </div>
           </div>
@@ -433,7 +242,21 @@ export function FigmaActionQueueVisual({
               <span aria-hidden="true" />
             </div>
             {visibleItems.map((item) => (
-              <ListRow item={item} key={item.actionId} onOpen={onOpen} />
+              <V19LongListCell
+                city={item.city}
+                cta={item.cta}
+                dates={item.tripDates}
+                id={item.id}
+                key={item.actionId}
+                peopleCount={item.applicantsCount}
+                peopleLabel={applicantCountLabel(item.applicantsCount)}
+                statusLabel={item.statusLabel}
+                statusTone={visualToneForStatus(item.status)}
+                title={item.title}
+                type={item.type}
+                updated={item.updated}
+                onOpen={() => onOpen(item.submission, item.tab)}
+              />
             ))}
           </div>
         ) : (
@@ -449,9 +272,25 @@ export function FigmaActionQueueVisual({
                     <em>{column.items.length}</em>
                   </header>
                   <div className="vf-figma-column-stack">
-                    {column.items.map((item) => (
-                      <ColumnCard item={item} key={item.actionId} onOpen={onOpen} />
-                    ))}
+                    {column.items.map((item) => {
+                      const tone = visualToneForStatus(item.status);
+
+                      return (
+                        <V19ActionBoardCard
+                          blocker={item.blocker}
+                          city={item.city}
+                          dates={item.tripDates}
+                          id={item.id}
+                          key={item.actionId}
+                          peopleCount={item.applicantsCount}
+                          progress={item.progress}
+                          title={item.title}
+                          tone={tone}
+                          type={item.type}
+                          onOpen={() => onOpen(item.submission, item.tab)}
+                        />
+                      );
+                    })}
                   </div>
                 </section>
               ))
@@ -493,57 +332,20 @@ export function FigmaApplicantsVisual({
         <div className="vf-figma-family-grid">
           {familySubmissions.length ? (
             familySubmissions.map((submission) => (
-              <article
-                className="vf-figma-family-card"
-                data-submission-id={submission.id}
+              <V19FamilyProfileCard
+                ariaLabel={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submission.id}`}
+                dataSubmissionId={submission.id}
+                footerLabel={`Акт: ${submission.updatedAt}`}
                 key={submission.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Открыть семейную подачу: ${formatSubmissionListTitle(submission)}, ${submission.id}`}
-                onClick={() => onOpen?.(submission)}
-                onKeyDown={(event) =>
-                  activateKeyboardCard(event, () => onOpen?.(submission))
-                }
-              >
-                <span className="vf-figma-family-head">
-                  <span className="vf-figma-family-icon">
-                    <Users aria-hidden="true" size={26} />
-                  </span>
-                  <span>
-                    <strong>{formatSubmissionListTitle(submission)}</strong>
-                    <em>{applicantCountLabel(submission.applicants.length)}</em>
-                  </span>
-                </span>
-                <span className="vf-figma-member-list">
-                  {submission.applicants.map((applicant) => {
-                    const member = visualMemberForApplicant(submission, applicant);
-                    return (
-                      <button
-                        className="vf-figma-member-row"
-                        key={`${submission.id}-${applicant.id}`}
-                        type="button"
-                        aria-label={`Открыть заявителя: ${member.name}, ${formatSubmissionListTitle(submission)}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpen?.(submission, "applicants");
-                        }}
-                      >
-                        <em>{member.initials}</em>
-                        <strong>{member.name}</strong>
-                        <small>{member.role}</small>
-                        {memberStatusIcon(member.status)}
-                      </button>
-                    );
-                  })}
-                </span>
-                <span className="vf-figma-family-footer">
-                  <span>Акт: {submission.updatedAt}</span>
-                  <em>
-                    <Folder aria-hidden="true" size={17} />
-                    {submission.files.length} файлов
-                  </em>
-                </span>
-              </article>
+                members={submission.applicants.map((applicant) =>
+                  visualMemberForApplicant(submission, applicant),
+                )}
+                packageLabel={`${submission.files.length} файлов`}
+                title={formatSubmissionListTitle(submission)}
+                totalLabel={applicantCountLabel(submission.applicants.length)}
+                onMemberOpen={() => onOpen?.(submission, "applicants")}
+                onOpen={() => onOpen?.(submission)}
+              />
             ))
           ) : (
             <div className="vf-figma-family-card" role="status">
@@ -570,32 +372,18 @@ export function FigmaApplicantsVisual({
                 ? visualMemberForApplicant(submission, applicant)
                 : null;
               return (
-                <button
-                  className="vf-figma-individual-card"
-                  data-submission-id={submission.id}
+                <V19IndividualProfileCard
+                  ariaLabel={`Открыть заявителя: ${member?.name ?? submission.title}, ${submission.id}`}
+                  dataSubmissionId={submission.id}
+                  footerLabel={`Акт: ${submission.updatedAt}`}
+                  initials={member?.initials ?? initialsForName(submission.title)}
                   key={submission.id}
-                  type="button"
-                  aria-label={`Открыть заявителя: ${member?.name ?? submission.title}, ${submission.id}`}
-                  onClick={() => onOpen?.(submission)}
-                >
-                  <span className="vf-figma-avatar">
-                    {member?.initials ?? initialsForName(submission.title)}
-                  </span>
-                  <span>
-                    <strong>{member?.name ?? submission.title}</strong>
-                    <em>
-                      {member ? memberStatusIcon(member.status) : null}
-                      {statusLabelFor(submission.status, "compact")}
-                    </em>
-                  </span>
-                  <span className="vf-figma-family-footer">
-                    <span>Акт: {submission.updatedAt}</span>
-                    <em>
-                      <Folder aria-hidden="true" size={17} />
-                      {submission.files.length} файлов
-                    </em>
-                  </span>
-                </button>
+                  packageLabel={`${submission.files.length} файлов`}
+                  statusLabel={statusLabelFor(submission.status, "compact")}
+                  statusTone={member?.statusTone ?? "progress"}
+                  title={member?.name ?? submission.title}
+                  onOpen={() => onOpen?.(submission)}
+                />
               );
             })
           ) : (
@@ -674,14 +462,6 @@ function visualToneForStatus(status: VisualStatus): VisualTone {
   return "blue";
 }
 
-function visualToneIcon(tone: VisualTone) {
-  if (tone === "green") return <CheckCircle2 aria-hidden="true" size={15} />;
-  if (tone === "indigo" || tone === "blue") {
-    return <Clock aria-hidden="true" size={15} />;
-  }
-  return <AlertCircle aria-hidden="true" size={15} />;
-}
-
 function visualMemberForApplicant(
   submission: Submission,
   applicant: Submission["applicants"][number],
@@ -690,7 +470,7 @@ function visualMemberForApplicant(
     initials: initialsForName(applicant.fullName),
     name: applicant.fullName,
     role: applicantRoleLabel(applicant.role ?? "main"),
-    status: memberStatus(submission, applicant.id, applicant.questionnaireStatus),
+    statusTone: memberStatus(submission, applicant.id, applicant.questionnaireStatus),
   };
 }
 
@@ -698,20 +478,20 @@ function memberStatus(
   submission: Submission,
   applicantId: string,
   questionnaireStatus: Submission["applicants"][number]["questionnaireStatus"],
-): VisualMember["status"] {
+): V19MemberStatusTone {
   const files = submission.files.filter((file) => file.applicantId === applicantId);
   if (
     questionnaireStatus === "needs_fix" ||
     files.some((file) => file.status === "missing" || file.status === "needs_replacement")
   ) {
-    return "missing_docs";
+    return "issue";
   }
   if (
     questionnaireStatus === "empty" ||
     questionnaireStatus === "partial" ||
     files.some((file) => file.status === "uploaded" || file.status === "pending_review")
   ) {
-    return "in_progress";
+    return "progress";
   }
   return "ready";
 }

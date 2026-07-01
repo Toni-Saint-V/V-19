@@ -1,11 +1,17 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   Briefcase,
   Calendar,
   CheckCircle2,
-  Clock,
   CreditCard,
   Edit3,
   FileDigit,
@@ -14,13 +20,15 @@ import {
   Image as ImageIcon,
   MapPin,
   Plane,
-  ShieldAlert,
   UploadCloud,
   User,
-  X,
 } from "lucide-react";
 import { getPrimaryAction, statusLabels } from "../status";
 import { ProgressMeter } from "./CollectionPrimitives";
+import {
+  V19DrawerHeader,
+  type V19DrawerTab,
+} from "../../../shared/ui/v19-design-system";
 import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
 import type {
   DrawerTab,
@@ -40,6 +48,35 @@ type SourceStatus =
   | "exported";
 
 type TabId = "overview" | "questionnaire" | "files" | "issues" | "history";
+
+type DrawerTabConfig = Omit<V19DrawerTab<TabId>, "count"> & {
+  getCount?: (detail: FigmaSubmissionDetail) => number;
+};
+
+const drawerFocusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function getDrawerFocusableElements(container: HTMLElement | null) {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>(drawerFocusableSelector)).filter(
+    (element) =>
+      !element.hasAttribute("disabled") &&
+      element.getAttribute("aria-hidden") !== "true" &&
+      element.offsetParent !== null,
+  );
+}
+
+type QuestionnaireFocusTarget = {
+  applicantId?: string;
+  field?: string;
+  section?: string;
+};
 
 type FigmaApplicant = {
   completeness: number;
@@ -70,7 +107,7 @@ type FigmaSubmissionDrawerProps = {
   onClose: () => void;
   onMarkIssueFixed?: (issueId: string) => void;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
-  onOpenQuestionnaireWorkspace: () => void;
+  onOpenQuestionnaireWorkspace: (target?: QuestionnaireFocusTarget) => void;
   role: Role;
   submission: Submission;
   surface: "agent" | "review" | "export";
@@ -138,8 +175,11 @@ function fileTypeLabel(type: SubmissionFile["type"]) {
 }
 
 function fileStatusLabel(file: SubmissionFile) {
+  if (file.status === "missing") return "Не загружено";
   if (file.status === "needs_replacement") return "Нужна замена";
-  if (file.status === "uploaded" || file.status === "accepted") return "Загружено";
+  if (file.status === "pending_review") return "На проверке";
+  if (file.status === "accepted") return "Принято";
+  if (file.status === "uploaded") return "Загружено";
   return "Не загружено";
 }
 
@@ -157,6 +197,13 @@ function fileSummary(file: SubmissionFile) {
   const uploadedName = file.originalFileName ?? file.generatedFileName;
   if (!uploadedName) return fileStatusLabel(file);
   return `${fileStatusLabel(file)} · ${uploadedName}`;
+}
+
+function fileReadyBadgeLabel(file: SubmissionFile) {
+  if (file.status === "pending_review") return "На проверке";
+  if (file.status === "accepted") return "Принято";
+  if (file.status === "uploaded") return "Загружено";
+  return "Готово";
 }
 
 type FileApplicantSection = {
@@ -198,102 +245,116 @@ const Skeleton = ({ className = "" }: { className?: string }) => (
   <div className={`v19-figma-skeleton ${className}`} />
 );
 
-const StatusBadge = ({ status }: { status: SourceStatus }) => {
-  switch (status) {
-    case "in_progress":
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[11px] font-medium uppercase tracking-wide">
-          <Clock className="w-3.5 h-3.5" /> В работе
-        </span>
-      );
-    case "returned":
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[11px] font-medium uppercase tracking-wide">
-          <AlertCircle className="w-3.5 h-3.5" /> Возвращено (Ошибки)
-        </span>
-      );
-    case "submitted_for_review":
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#3a45b4]/20 border border-[#3a45b4]/30 text-[#8fa3ff] text-[11px] font-medium uppercase tracking-wide">
-          <ShieldAlert className="w-3.5 h-3.5" /> На проверке
-        </span>
-      );
-    case "ready_for_export":
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium uppercase tracking-wide">
-          <CheckCircle2 className="w-3.5 h-3.5" /> Готово к выгрузке
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-[11px] font-medium uppercase tracking-wide">
-          <FileText className="w-3.5 h-3.5" /> Черновик
-        </span>
-      );
-  }
-};
+function compactStatusLabel(status: SourceStatus) {
+  if (status === "returned") return "возвращено";
+  if (status === "submitted_for_review") return "проверка";
+  if (status === "ready_for_export") return "готово";
+  if (status === "exported") return "выгружено";
+  if (status === "in_progress") return "в работе";
+  return "черновик";
+}
 
-const OverviewTab = ({ data }: { data: FigmaSubmissionDetail }) => (
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
-        <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-5">
-          Маршрут и подача
-        </h3>
-        <div className="space-y-4 text-sm">
-          <div className="flex gap-4">
-            <Calendar className="w-5 h-5 text-white/30 shrink-0" />
-            <div>
-              <div className="text-white/90 font-medium">{data.tripDates}</div>
-              <div className="text-white/40 text-[11px] mt-0.5">Даты поездки</div>
+function isFileReady(file: SubmissionFile) {
+  return file.status !== "missing" && file.status !== "needs_replacement";
+}
+
+function documentPackageItems(submission: Submission) {
+  const byType = new Map<
+    SubmissionFile["type"],
+    { ready: number; total: number; type: SubmissionFile["type"] }
+  >();
+
+  for (const file of submission.files) {
+    const current = byType.get(file.type) ?? { ready: 0, total: 0, type: file.type };
+    byType.set(file.type, {
+      ...current,
+      ready: current.ready + (isFileReady(file) ? 1 : 0),
+      total: current.total + 1,
+    });
+  }
+
+  return Array.from(byType.values()).map((item) => ({
+    label:
+      item.total > 1
+        ? `${fileTypeLabel(item.type)} (${item.ready}/${item.total})`
+        : fileTypeLabel(item.type),
+    status:
+      item.ready === item.total
+        ? "done"
+        : item.ready > 0
+          ? "in_progress"
+          : "pending",
+  }));
+}
+
+const OverviewTab = ({
+  data,
+  submission,
+}: {
+  data: FigmaSubmissionDetail;
+  submission: Submission;
+}) => {
+  const documentItems = documentPackageItems(submission);
+  const readyFilesCount = submission.files.filter(isFileReady).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
+          <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-5">
+            Маршрут и подача
+          </h3>
+          <div className="space-y-4 text-sm">
+            <div className="flex gap-4">
+              <Calendar className="w-5 h-5 text-white/30 shrink-0" />
+              <div>
+                <div className="text-white/90 font-medium">{data.tripDates}</div>
+                <div className="text-white/40 text-[11px] mt-0.5">Даты поездки</div>
+              </div>
             </div>
-          </div>
-          <div className="flex gap-4">
-            <MapPin className="w-5 h-5 text-white/30 shrink-0" />
-            <div>
-              <div className="text-white/90 font-medium">{data.city}</div>
-              <div className="text-white/40 text-[11px] mt-0.5">
-                Визовый центр подачи
+            <div className="flex gap-4">
+              <MapPin className="w-5 h-5 text-white/30 shrink-0" />
+              <div>
+                <div className="text-white/90 font-medium">{data.city}</div>
+                <div className="text-white/40 text-[11px] mt-0.5">
+                  Визовый центр подачи
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider">
-            Чеклист документов
-          </h3>
-          <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
-            8/10
-          </span>
-        </div>
-        <div className="space-y-3 flex-1 flex flex-col justify-center">
-          {[
-            { label: "Паспорта (Загран, РФ)", status: "done" },
-            { label: "Финансовые гарантии", status: "done" },
-            { label: "Справки с работы", status: "pending" },
-            { label: "Бронирования (Отель, Авиа)", status: "done" },
-          ].map((doc) => (
-            <div key={doc.label} className="flex items-center gap-3">
-              {doc.status === "done" ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              ) : (
-                <div className="w-4 h-4 rounded-full border border-white/20" />
-              )}
-              <span
-                className={`text-[13px] ${
-                  doc.status === "done" ? "text-white/70" : "text-white"
-                }`}
-              >
-                {doc.label}
-              </span>
-            </div>
-          ))}
+        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider">
+              Пакет документов
+            </h3>
+            <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
+              {readyFilesCount}/{submission.files.length}
+            </span>
+          </div>
+          <div className="space-y-3 flex-1 flex flex-col justify-center">
+            {documentItems.map((doc) => (
+              <div key={doc.label} className="flex items-center gap-3">
+                {doc.status === "done" ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                ) : doc.status === "in_progress" ? (
+                  <div className="v19-document-package-dot is-progress" />
+                ) : (
+                  <div className="v19-document-package-dot" />
+                )}
+                <span
+                  className={`text-[13px] ${
+                    doc.status === "pending" ? "text-white" : "text-white/70"
+                  }`}
+                >
+                  {doc.label}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
 
     <div className="space-y-3">
       <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider pl-1">
@@ -326,25 +387,26 @@ const OverviewTab = ({ data }: { data: FigmaSubmissionDetail }) => (
         ))}
       </div>
     </div>
-  </div>
-);
+    </div>
+  );
+};
 
 const QuestionnaireTab = ({
   onOpenQuestionnaire,
 }: {
-  onOpenQuestionnaire: () => void;
+  onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
 }) => (
   <div className="space-y-6">
     <div className="flex items-center justify-between">
       <div>
         <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
-        <p className="text-[12px] text-white/50 mt-1">
+        <p className="v19-questionnaire-progress-helper text-[12px] text-white/50 mt-1">
           Осталось заполнить 2 блока данных
         </p>
       </div>
       <button
         className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
-        onClick={onOpenQuestionnaire}
+        onClick={() => onOpenQuestionnaire()}
         type="button"
       >
         <Edit3 className="w-4 h-4" /> Открыть анкету
@@ -371,7 +433,7 @@ const QuestionnaireTab = ({
           className="p-4 bg-white/[0.02] border border-white/5 rounded-xl flex items-center gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer"
           role="button"
           tabIndex={0}
-          onClick={onOpenQuestionnaire}
+          onClick={() => onOpenQuestionnaire()}
           onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
@@ -467,22 +529,15 @@ const FilesTab = ({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
-        <div>
-          <h3 className="text-[15px] font-semibold text-white">Файлы подачи</h3>
-          <p className="text-[12px] text-white/40 mt-0.5">
-            Выберите файл для конкретного заявителя. Local/dev хранит файл только в
-            этом браузере; Supabase-режим использует приватное Storage.
-          </p>
-        </div>
-        <span className="min-w-8 px-2.5 py-1 bg-white/5 text-white/60 rounded-lg text-[12px] font-semibold border border-white/10 shrink-0 text-center">
-          {submission.files.filter((file) => file.status !== "missing").length}/
-          {submission.files.length}
+    <div className="v19-drawer-files">
+      <div className="v19-drawer-files-head">
+        <h3 className="v19-drawer-files-title">Файлы подачи</h3>
+        <span className="v19-drawer-files-count">
+          {submission.files.filter(isFileReady).length}/{submission.files.length}
         </span>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="v19-drawer-file-sections">
         {applicantSections.map((section) => {
           const isExpanded = expandedApplicantIds.includes(section.id);
           const uploadedCount = section.files.filter(
@@ -492,48 +547,49 @@ const FilesTab = ({
 
           return (
             <section
-              className="overflow-hidden rounded-xl border border-white/8 bg-white/[0.025]"
+              className="v19-drawer-file-section"
               key={section.id}
             >
               <button
                 aria-expanded={isExpanded}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                className="v19-drawer-file-section-head"
                 type="button"
                 onClick={() => toggleApplicant(section.id)}
               >
-                <span className="min-w-0">
-                  <span className="block truncate text-[14px] font-semibold text-white">
+                <span className="v19-drawer-file-section-copy">
+                  <span className="v19-drawer-file-section-title">
                     {section.name}
                   </span>
-                  <span className="mt-0.5 block text-[12px] text-white/45">
+                  <span className="v19-drawer-file-section-meta">
                     {uploadedCount}/{section.files.length} файлов готово
                     {actionCount > 0 ? ` · требуется ${actionCount}` : ""}
                   </span>
                 </span>
-                <span className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white/55">
+                <span className="v19-drawer-file-section-toggle">
                   {isExpanded ? "Свернуть" : "Раскрыть"}
                 </span>
               </button>
 
               {isExpanded ? (
-                <div className="space-y-2 border-t border-white/6 p-3">
+                <div className="v19-drawer-file-list">
                   {section.files.map((file) => {
                     const canUpload =
                       file.status === "missing" || file.status === "needs_replacement";
+                    const actionLabel = `${fileActionLabel(file)} ${fileTypeLabel(file.type)} — ${section.name}`;
 
                     return (
                       <div
-                        className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 rounded-lg border border-white/5 bg-black/10 p-3 sm:grid-cols-[36px_minmax(0,1fr)_auto] sm:items-center"
+                        className="v19-drawer-file-item"
                         key={file.id}
                       >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50">
-                          <UploadCloud className="h-4.5 w-4.5" />
+                        <div className="v19-drawer-file-icon">
+                          <UploadCloud aria-hidden="true" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="truncate text-[13px] font-semibold text-white">
+                        <div className="v19-drawer-file-copy">
+                          <div className="v19-drawer-file-title">
                             {fileTypeLabel(file.type)}
                           </div>
-                          <div className="mt-1 truncate text-[12px] text-white/45">
+                          <div className="v19-drawer-file-meta">
                             {fileSummary(file)}
                           </div>
                         </div>
@@ -541,7 +597,7 @@ const FilesTab = ({
                           <>
                             <input
                               accept={fileAccept(file)}
-                              aria-label={`${fileActionLabel(file)} ${fileTypeLabel(file.type)} — ${section.name}`}
+                              aria-label={actionLabel}
                               className="drawer-file-input"
                               disabled={!onUploadFile}
                               ref={(node) => {
@@ -552,7 +608,8 @@ const FilesTab = ({
                               onChange={(event) => handleFileChange(event, file.id)}
                             />
                             <button
-                              className="col-start-2 h-9 rounded-lg border border-white/10 bg-white/[0.08] px-4 text-[13px] font-medium text-white/85 transition-colors hover:border-white/20 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50 sm:col-start-auto"
+                              aria-label={actionLabel}
+                              className="v19-drawer-file-action"
                               disabled={!onUploadFile}
                               type="button"
                               onClick={() => fileInputsRef.current.get(file.id)?.click()}
@@ -561,8 +618,8 @@ const FilesTab = ({
                             </button>
                           </>
                         ) : (
-                          <span className="col-start-2 inline-flex h-9 items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[12px] font-medium text-emerald-400 sm:col-start-auto">
-                            Готово
+                          <span className="v19-drawer-file-status is-ready">
+                            {fileReadyBadgeLabel(file)}
                           </span>
                         )}
                       </div>
@@ -587,25 +644,12 @@ const IssuesTab = ({
 }: {
   data: FigmaSubmissionDetail;
   onMarkIssueFixed?: (issueId: string) => void;
-  onOpenQuestionnaire: () => void;
+  onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
   role: Role;
   submission: Submission;
 }) => (
   <div className="space-y-6">
-    <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
-      <div>
-        <h3 className="text-[15px] font-semibold text-white">
-          Замечания
-        </h3>
-        <p className="text-[12px] text-white/40 mt-0.5">
-          Исправьте пункты ниже
-        </p>
-      </div>
-      <span className="min-w-8 px-2.5 py-1 bg-orange-500/10 text-orange-400 rounded-lg text-[12px] font-semibold border border-orange-500/20 shrink-0 text-center">
-        {data.issuesCount}
-      </span>
-    </div>
-
+    <h3 className="text-[16px] font-semibold text-white">Замечания</h3>
     {data.issuesCount > 0 ? (
       <div className="space-y-3">
         {submission.issues
@@ -632,28 +676,35 @@ const IssuesTab = ({
                     {issue.reason}
                   </h4>
                   <div className="text-[11px] font-medium text-orange-400/70 mt-1.5">
-                    {issue.target.applicantName} · {issue.target.section ?? "Подача"}
+                    {issueTargetLine(issue)}
                   </div>
                 </div>
                 <p className="col-start-2 text-[13px] text-white/50 leading-relaxed">
                   {issue.comment}
                 </p>
               </div>
-              {canMarkFixed ? (
+              {issue.type === "field" && issue.status === "open" ? (
                 <button
                   className="mt-4 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
+                  type="button"
+                  onClick={() =>
+                    onOpenQuestionnaire({
+                      applicantId: issue.target.applicantId,
+                      field: issue.target.field,
+                      section: issue.target.section,
+                    })
+                  }
+                >
+                  Исправить
+                </button>
+              ) : null}
+              {canMarkFixed ? (
+                <button
+                  className="mt-2 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
                   type="button"
                   onClick={() => onMarkIssueFixed?.(issue.id)}
                 >
                   Отметить исправленным
-                </button>
-              ) : issue.type === "field" && issue.status === "open" ? (
-                <button
-                  className="mt-4 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
-                  type="button"
-                  onClick={onOpenQuestionnaire}
-                >
-                  Исправить
                 </button>
               ) : null}
             </div>
@@ -676,62 +727,67 @@ const IssuesTab = ({
   </div>
 );
 
-const HistoryTab = () => (
-  <div className="relative pl-6 space-y-8 before:absolute before:inset-y-2 before:left-[31px] before:w-px before:bg-white/10">
-    {[
-      {
-        icon: <AlertCircle className="w-4 h-4 text-orange-400" />,
-        time: "Сегодня, 14:30",
-        title: "Возвращено с замечаниями",
-        type: "warning",
-        user: "Система",
-      },
-      {
-        icon: <UploadCloud className="w-4 h-4 text-[#8fa3ff]" />,
-        time: "Вчера, 18:45",
-        title: "Отправлено на проверку",
-        type: "info",
-        user: "Вы",
-      },
-      {
-        icon: <ImageIcon className="w-4 h-4 text-white/60" />,
-        time: "Вчера, 15:10",
-        title: "Загружены сканы паспортов",
-        type: "neutral",
-        user: "Вы",
-      },
-      {
-        icon: <FileText className="w-4 h-4 text-white/40" />,
-        time: "Вчера, 12:00",
-        title: "Создан черновик",
-        type: "neutral",
-        user: "Вы",
-      },
-    ].map((event) => (
-      <div key={event.title} className="relative flex gap-5">
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 bg-[#111113] z-10 ${
-            event.type === "warning"
-              ? "border-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.2)]"
-              : event.type === "info"
-                ? "border-[#3a45b4]/50"
-                : "border-white/10"
-          }`}
-        >
-          {event.icon}
+function issueTargetLine(issue: Submission["issues"][number]) {
+  const parts = [
+    issue.target.applicantName,
+    issue.target.fileType ? "Файлы" : (issue.target.section ?? "Анкета"),
+    issue.target.field,
+  ];
+  return parts.filter(Boolean).join(" · ");
+}
+
+const HistoryTab = () => {
+  const events = [
+    {
+      Icon: AlertCircle,
+      time: "Сегодня, 14:30",
+      title: "Возвращено с замечаниями",
+      tone: "warning",
+      user: "Система",
+    },
+    {
+      Icon: UploadCloud,
+      time: "Вчера, 18:45",
+      title: "Отправлено на проверку",
+      tone: "info",
+      user: "Вы",
+    },
+    {
+      Icon: ImageIcon,
+      time: "Вчера, 15:10",
+      title: "Загружены сканы паспортов",
+      tone: "neutral",
+      user: "Вы",
+    },
+    {
+      Icon: FileText,
+      time: "Вчера, 12:00",
+      title: "Создан черновик",
+      tone: "neutral",
+      user: "Вы",
+    },
+  ];
+
+  return (
+    <section className="v19-history-composition" aria-label="История подачи">
+      {events.map((event) => (
+        <div className="v19-history-item" key={event.title}>
+          <span className={`v19-history-icon is-${event.tone}`}>
+            <event.Icon aria-hidden="true" />
+          </span>
+          <span className="v19-history-copy">
+            <strong>{event.title}</strong>
+            <span>
+              {event.time}
+              <i aria-hidden="true" />
+              {event.user}
+            </span>
+          </span>
         </div>
-        <div className="pt-1.5">
-          <div className="text-[14px] font-medium text-white/90">{event.title}</div>
-          <div className="flex items-center gap-2 mt-1.5 text-[12px] text-white/40">
-            <span>{event.time}</span>
-            <span className="w-1 h-1 rounded-full bg-white/20" />
-            <span>{event.user}</span>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-);
+      ))}
+    </section>
+  );
+};
 
 function initialTab(tab: DrawerTab): TabId {
   if (tab === "files") return "files";
@@ -755,9 +811,19 @@ export function FigmaSubmissionDrawer({
 }: FigmaSubmissionDrawerProps) {
   const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
   const [status, setStatus] = useState<"loading" | "success">("loading");
+  const drawerRef = useRef<HTMLDivElement>(null);
   const drawerTabsRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const data = useMemo(() => buildDetail(submission), [submission]);
   const primaryAction = getPrimaryAction(submission, role, surface);
+
+  useEffect(() => {
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      previouslyFocusedElementRef.current?.focus({ preventScroll: true });
+    };
+  }, [submission.id]);
 
   useEffect(() => {
     setStatus("loading");
@@ -786,16 +852,56 @@ export function FigmaSubmissionDrawer({
     activeButton?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
-      inline: "center",
+      inline: "nearest",
     });
   }, [status, tab]);
 
-  const tabs: Array<{
-    getCount?: (detail: FigmaSubmissionDetail) => number;
-    id: TabId;
-    isWarning?: boolean;
-    label: string;
-  }> = [
+  useEffect(() => {
+    if (status !== "success") return;
+    window.requestAnimationFrame(() => {
+      drawerRef.current?.focus({ preventScroll: true });
+    });
+  }, [status, submission.id]);
+
+  function handleDrawerKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+
+    const focusableElements = getDrawerFocusableElements(drawerRef.current);
+    if (focusableElements.length === 0) {
+      event.preventDefault();
+      drawerRef.current?.focus({ preventScroll: true });
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (event.shiftKey && activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus({ preventScroll: true });
+      return;
+    }
+
+    if (!event.shiftKey && activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus({ preventScroll: true });
+      return;
+    }
+
+    if (!drawerRef.current?.contains(activeElement)) {
+      event.preventDefault();
+      firstElement.focus({ preventScroll: true });
+    }
+  }
+
+  const tabs: DrawerTabConfig[] = [
     { id: "overview", label: "Обзор" },
     { id: "questionnaire", label: "Анкета" },
     { id: "files", label: "Файлы" },
@@ -836,6 +942,12 @@ export function FigmaSubmissionDrawer({
     (data.status === "returned"
       ? "Исправьте замечания перед повторной отправкой."
       : statusLabels[submission.status]);
+  const drawerTabs = tabs.map((item) => ({
+    count: item.getCount ? item.getCount(data) : undefined,
+    id: item.id,
+    isWarning: item.isWarning,
+    label: item.label,
+  }));
 
   return (
     <AnimatePresence>
@@ -859,10 +971,13 @@ export function FigmaSubmissionDrawer({
           y: 0,
         }}
         key="figma-drawer-panel"
+        ref={drawerRef}
         role="dialog"
         aria-label={`Подача ${data.id}`}
         aria-modal="true"
+        tabIndex={-1}
         transition={{ damping: 28, mass: 0.8, stiffness: 240, type: "spring" }}
+        onKeyDown={handleDrawerKeyDown}
       >
         <div className="v19-figma-drawer-grabber-wrap">
           <div className="v19-figma-drawer-grabber" />
@@ -879,84 +994,16 @@ export function FigmaSubmissionDrawer({
           </div>
         ) : (
           <>
-            <header className="v19-figma-drawer-header">
-              <div className="flex items-start justify-between gap-4 mb-6">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-[11px] lg:text-xs text-white/50 mb-2">
-                    <span className="font-mono font-medium tracking-wider text-white/70">
-                      {data.id}
-                    </span>
-                    <span className="w-1 h-1 rounded-full bg-white/20" />
-                    <span className="uppercase tracking-wider">
-                      {data.type === "family" ? "Семейная" : "Индивидуальная"}
-                    </span>
-                  </div>
-                  <h2 className="text-[24px] font-semibold text-white leading-tight tracking-tight mb-4">
-                    {data.title}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <StatusBadge status={data.status} />
-                    <span className="text-[12px] text-white/40 flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" /> Обновлено {data.updated}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  className="v19-figma-drawer-close"
-                  aria-label="Закрыть подачу"
-                  type="button"
-                  onClick={onClose}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div
-                className="w-full overflow-x-auto scrollbar-hide -mx-5 px-5 lg:mx-0 lg:px-0"
-                ref={drawerTabsRef}
-              >
-                <div className="flex items-center gap-1.5 w-max mb-[-1px]">
-                  {tabs.map((item) => {
-                    const count = item.getCount ? item.getCount(data) : 0;
-                    const isActive = tab === item.id;
-                    return (
-                      <button
-                        className={`relative min-h-[44px] px-4 text-[13px] font-medium transition-colors flex items-center gap-2 focus-visible:outline-none whitespace-nowrap ${
-                          isActive ? "text-white" : "text-white/50 hover:text-white/80"
-                        }`}
-                        data-drawer-tab={item.id}
-                        key={item.id}
-                        onClick={() => setTab(item.id)}
-                        type="button"
-                      >
-                        <span>{item.label}</span>
-                        {count > 0 ? (
-                          <span
-                            className={`px-1.5 py-0.5 rounded-md text-[10px] leading-none ml-1 ${
-                              item.isWarning
-                                ? "bg-orange-500/20 text-orange-400"
-                                : "bg-white/10 text-white/70"
-                            }`}
-                          >
-                            {count}
-                          </span>
-                        ) : null}
-                        {isActive ? (
-                          <motion.div
-                            className="absolute bottom-0 inset-x-0 h-0.5 bg-white"
-                            initial={false}
-                            layoutId="drawerAgentActiveTab"
-                            transition={{ bounce: 0.2, duration: 0.5, type: "spring" }}
-                          />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </header>
-
+            <V19DrawerHeader
+              activeTab={tab}
+              layoutId="drawerAgentActiveTab"
+              meta={[data.id, data.type === "family" ? "семейная" : "индивидуальная"]}
+              onTab={setTab}
+              status={compactStatusLabel(data.status)}
+              tabs={drawerTabs}
+              tabsRef={drawerTabsRef}
+              title={data.title}
+            />
             <div className="v19-submission-drawer-body flex-1 min-h-0 overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -966,7 +1013,9 @@ export function FigmaSubmissionDrawer({
                   key={tab}
                   transition={{ duration: 0.2 }}
                 >
-                  {tab === "overview" ? <OverviewTab data={data} /> : null}
+                  {tab === "overview" ? (
+                    <OverviewTab data={data} submission={submission} />
+                  ) : null}
                   {tab === "questionnaire" ? (
                     <QuestionnaireTab
                       onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
@@ -993,7 +1042,7 @@ export function FigmaSubmissionDrawer({
             </div>
 
             <footer className="v19-figma-drawer-footer">
-              <div className="text-[12px] text-white/40 hidden sm:block">
+              <div className="v19-figma-drawer-footer-status text-[12px] text-white/40">
                 {footerStatusText}
               </div>
               <div className="flex gap-3 w-full sm:w-auto">
@@ -1003,7 +1052,7 @@ export function FigmaSubmissionDrawer({
                   type="button"
                   onClick={onClose}
                 >
-                  Отмена
+                  Закрыть
                 </button>
                 {footerAction}
               </div>

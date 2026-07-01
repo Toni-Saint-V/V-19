@@ -1365,12 +1365,12 @@ test.describe("V-19 operations workspace", () => {
     await page.getByRole("button", { name: "Отметить выгружено" }).click();
 
     await page.getByRole("tab", { name: "История" }).click();
-    await expect(
-      page.locator(".submission-panel").getByText("Новая подача"),
-    ).toBeVisible();
-    await expect(
-      page.locator(".submission-panel").getByText("Выгружено").first(),
-    ).toBeVisible();
+    const exportedHistoryRow = page.getByRole("row", {
+      name: /Выгруженный пакет Новая подача/,
+    });
+
+    await expect(exportedHistoryRow).toBeVisible();
+    await expect(exportedHistoryRow.getByRole("button", { name: /Новая подача/ })).toBeVisible();
   });
 
   test("two families and two single applicants pass issue, return, correction and export corner cases", async ({

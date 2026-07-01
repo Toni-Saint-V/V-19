@@ -99,6 +99,7 @@ function installBrowserImageMocks(options: BrowserMockOptions) {
                 data: rgbaImage(canvas.width, canvas.height, options.luma),
               };
             }),
+            putImageData: vi.fn(),
             rotate: vi.fn(),
             translate: vi.fn(),
           })),
@@ -255,6 +256,318 @@ describe("passport extraction service local OCR quality integration", () => {
     );
   });
 
+  test("uses visual passport fields when phone-photo OCR breaks strict MRZ validation", () => {
+    const fields = parsePassportVisualText(
+      [
+        "POPT/PASSPORY Tun / Type rocyaapcTaa/ Code of Hom",
+        "pecs RUS / issuing State 75 2869 613",
+        "Was - Given Names",
+        "ANTON",
+        "TpasgancTao/ Nationality",
+        "POCCHIACKAS GE/IEPALINS/ RUSSIAN FEDERATION",
+        "Dara poxaewws/ Date of birth",
+        "NN20081990LWV",
+        "Non / Sex MecTo poxgens / Place of birth",
+        "MMNEHWUHTPAJL / USSR",
+        "Nava swaasw / Date of issue Bic BLIAABLIMIA nOKyMeHT / Authority",
+        "26022016DMC78039",
+        "Date of expiry Holder's signature",
+        "2602202674",
+        "P<RU < VOLKOVESANTONSS <<< CLLELLLLLLLLLLLLLLnss",
+        "7528696137 US9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+      [],
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+        expect.objectContaining({ key: "birthDate", value: "20.08.1990" }),
+        expect.objectContaining({ key: "citizenship", value: "Russian Federation" }),
+        expect.objectContaining({ key: "gender", value: "Male - Мужской" }),
+        expect.objectContaining({ key: "birthCountry", value: "USSR" }),
+        expect.objectContaining({ key: "birthPlace", value: "LENINGRAD" }),
+        expect.objectContaining({ key: "passportIssuedAt", value: "26.02.2016" }),
+        expect.objectContaining({ key: "passportIssuePlace", value: "FMS 78039" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+  });
+
+  test("recovers birth and expiry from noisy MRZ-like date hints when strict MRZ fails", () => {
+    const fields = parsePassportVisualText(
+      [
+        "pecs RUS / issuing State 75 2869 613",
+        "POCCHIACKAS GE/IEPALINS/ RUSSIAN FEDERATION",
+        "P<RU < VOLKOVESANTONSS <<< CLLELLLLLLLLLLLLLLnss",
+        "7528696137 US9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+      [],
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+        expect.objectContaining({ key: "birthDate", value: "20.08.1990" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+  });
+
+  test("recovers printed Latin names when MRZ name OCR is too noisy", () => {
+    const fields = parsePassportVisualText(
+      [
+        "POCCHUCKAAPEDJEPAILMARUSSIANFEDERATION",
+        "MACMOPTPASSPORT TT K CHP N",
+        "P 752069613",
+        "MS",
+        "BONKOB",
+        "VOLKOV",
+        "AHTOHMFOPEBM4 KL",
+        "CANTON AN",
+        "4 POCCHIICKAREMEPAUMS RUSSIANFEDERATION",
+        "MM NEHMHIPARUSSR",
+        "26022016 OMC78039",
+        "26022026",
+        "P<RUSVO FROWEMAMTONK<<<<<<<<<<<5<<<6<566688",
+        "75286961 37RUS9OOBZOSM2602268<<<<<<<<<<<<<500",
+      ].join("\n"),
+      [],
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752069613" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+  });
+
+  test("prefers Cyrillic OCR given-name hints over noisy printed Latin name junk", () => {
+    const fields = parsePassportVisualText(
+      [
+        "POCCUMCKASA ®ENEPAILIS / RUSSIAN FEDERATION",
+        "rocyaspcTea/ Code ol Homep nacnopra / Passport No",
+        "ge aus Co 75 2869613",
+        "BONKOB /",
+        "VOLKOV",
+        "E AHTOH UTOPEBHMY / ATR",
+        "+ SELLE @N\\S",
+        "POCCHICKAS GEAEPALIMA / RUSSIAN FEDERATION",
+        "Non / Sex Meco poxaenns / P f birth",
+        "M/M NEHWUHIPALL / USSR",
+        "Date of issue Opras, BbiAaBLUMK poxymenT / Authority",
+        "26.02.2016 ®MC 78039",
+        "26.02.2026",
+        "P<RUSVO ROP ERREBIE << <<< SLELELLCLCLLLLCLRLRRS",
+        "75286961 <7 RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+      [],
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+      ]),
+    );
+  });
+
+  test("rejects noisy MRZ names when the document number line is valid", () => {
+    const mrzFields = parsePassportMrzText(
+      [
+        "P<RUSVOROPERREBIE<<CLECLCLLCLLCLRLRRSOUD",
+        "7528696137RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(mrzFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+        expect.objectContaining({ key: "birthDate", value: "20.08.1990" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+    expect(mrzFields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOROPERREBIE" }),
+        expect.objectContaining({ key: "firstName", value: "CLECLCLLCLLCLRLRRSOUD" }),
+      ]),
+    );
+  });
+
+  test("normalizes Cyrillic OCR given-name noise from otherwise valid MRZ", () => {
+    const fields = parsePassportMrzText(
+      [
+        "P<RUSVOLKOV<<XAHTOHUTOPEBMYAE<<<<<<<<<<<<",
+        "7528696137RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+      ]),
+    );
+    expect(fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "firstName", value: "XAHTOHUTOPEBMYAE" }),
+      ]),
+    );
+  });
+
+  test("falls back to printed names when live phone-photo MRZ name is garbage", () => {
+    const fields = parsePassportVisualText(
+      [
+        "POCCUMCKASA ®ENEPAILIS / RUSSIAN FEDERATION",
+        "rocyaspcTea/ Code ol Homep nacnopra / Passport No",
+        "ge aus Co 75 2869613",
+        "BONKOB /",
+        "VOLKOV",
+        "E AHTOH UTOPEBHMY / ATR",
+        "+ SELLE @N\\S",
+        "POCCHICKAS GEAEPALIMA / RUSSIAN FEDERATION",
+        "Non / Sex Meco poxaenns / P f birth",
+        "M/M NEHWUHIPALL / USSR",
+        "Date of issue Opras, BbiAaBLUMK poxymenT / Authority",
+        "26.02.2016 ®MC 78039",
+        "26.02.2026",
+        "P<RUSVOROPERREBIE<<CLECLCLLCLLCLRLRRSOUD",
+        "7528696137RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+      [],
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+      ]),
+    );
+    expect(fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOROPERREBIE" }),
+        expect.objectContaining({ key: "firstName", value: "CLECLCLLCLLCLRLRRSOUD" }),
+      ]),
+    );
+  });
+
+  test("normalizes Cyrillic OCR given-name noise from printed name fallback", () => {
+    const fields = parsePassportVisualText(
+      [
+        "POCCUMCKASA ®ENEPAILIS / RUSSIAN FEDERATION",
+        "rocyaspcTea/ Code ol Homep nacnopra / Passport No",
+        "ge aus Co 75 2869613",
+        "BONKOB /",
+        "VOLKOV",
+        "XAHTOHUTOPEBMYAE",
+        "POCCHICKAS GEAEPALIMA / RUSSIAN FEDERATION",
+        "P<RUSVOROPERREBIE<<CLECLCLLCLLCLRLRRSOUD",
+        "7528696137RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+      [],
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+      ]),
+    );
+    expect(fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "firstName", value: "XAHTOHUTOPEBMYAE" }),
+      ]),
+    );
+  });
+
+  test("returns a visual-only extraction result for noisy passport phone photos", async () => {
+    installBrowserImageMocks({
+      height: 700,
+      luma: (x) => (Math.floor(x / 12) % 2 === 0 ? 30 : 230),
+      width: 1200,
+    });
+    tesseractMock.text = [
+      "pecs RUS / issuing State 75 2869 613",
+      "POCCHIACKAS GE/IEPALINS/ RUSSIAN FEDERATION",
+      "Dara poxaewws/ Date of birth",
+      "NN20081990LWV",
+      "Non / Sex MecTo poxgens / Place of birth",
+      "MMNEHWUHTPAJL / USSR",
+      "Nava swaasw / Date of issue Bic BLIAABLIMIA nOKyMeHT / Authority",
+      "26022016DMC78039",
+      "Date of expiry Holder's signature",
+      "2602202674",
+      "P<RU < VOLKOVESANTONSS <<< CLLELLLLLLLLLLLLLLnss",
+      "7528696137 US9008205M2602268<<<<<<<<<<<<<<00",
+    ].join("\n");
+
+    const result = await invokeLocalPassport("image/jpeg", 1_340_672);
+
+    expect(result.status).toBe("extracted");
+    expect(result.summary).toContain("визуальных паспортных полей");
+    expect(result.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+        expect.objectContaining({ key: "birthDate", value: "20.08.1990" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+  });
+
+  test("continues visual-only OCR candidates until passport identity appears", async () => {
+    installBrowserImageMocks({
+      height: 700,
+      luma: (x) => (Math.floor(x / 12) % 2 === 0 ? 30 : 230),
+      width: 1200,
+    });
+    tesseractMock.recognize
+      .mockResolvedValueOnce({
+        data: {
+          text: [
+            "pecs RUS / issuing State 75 2869 613",
+            "POCCHIACKAS GE/IEPALINS/ RUSSIAN FEDERATION",
+            "Dara poxaewws/ Date of birth",
+            "NN20081990LWV",
+            "Date of expiry Holder's signature",
+            "2602202674",
+          ].join("\n"),
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          text: "P<RU < VOLKOVESANTONSS <<< CLLELLLLLLLLLLLLLLnss",
+        },
+      });
+
+    const result = await invokeLocalPassport("image/jpeg", 1_340_672);
+
+    expect(tesseractMock.recognize).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe("extracted");
+    expect(result.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "surname", value: "VOLKOV" }),
+        expect.objectContaining({ key: "firstName", value: "ANTON" }),
+        expect.objectContaining({ key: "passportNumber", value: "752869613" }),
+        expect.objectContaining({ key: "birthDate", value: "20.08.1990" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+  });
+
   test("continues OCR when image quality pixels are unavailable", async () => {
     installBrowserImageMocks({
       getImageDataThrows: true,
@@ -293,7 +606,7 @@ describe("passport extraction service local OCR quality integration", () => {
 
     const result = await invokeLocalPassport("image/png", 120_000);
 
-    expect(tesseractMock.recognize).toHaveBeenCalledTimes(16);
+    expect(tesseractMock.recognize.mock.calls.length).toBeGreaterThanOrEqual(16);
     expect(result.status).toBe("unavailable");
     expect(result.summary).toContain("Скан паспорта не готов к OCR");
   });

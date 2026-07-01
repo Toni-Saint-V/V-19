@@ -1,6 +1,8 @@
 import type {
   Applicant,
   QuestionnaireField,
+  QuestionnaireReviewSource,
+  QuestionnaireReviewState,
   QuestionnaireSection,
   QuestionnaireStatus,
   Submission,
@@ -460,6 +462,9 @@ export type QuestionnaireFieldUpdate = {
   sectionId: string;
   fieldId: string;
   value: string;
+  reviewOriginSource?: QuestionnaireReviewSource;
+  reviewSource?: QuestionnaireReviewSource;
+  reviewState?: QuestionnaireReviewState;
 };
 
 export function questionnaireSectionPreviews(): QuestionnaireSectionPreview[] {
@@ -517,7 +522,7 @@ export function updateQuestionnaireField(
         sections: normalizeApplicantSections({
           ...applicant,
           sections: applicant.sections.map((section) => {
-            if (section.id !== update.sectionId) return section;
+            if (!sectionMatchesUpdate(section.id, update.sectionId)) return section;
 
             return {
               ...section,
@@ -526,6 +531,10 @@ export function updateQuestionnaireField(
                   ? {
                       ...field,
                       value: update.value,
+                      reviewOriginSource:
+                        update.reviewOriginSource ?? field.reviewOriginSource,
+                      reviewSource: update.reviewSource ?? field.reviewSource,
+                      reviewState: update.reviewState ?? field.reviewState,
                       error:
                         update.value.trim() &&
                         !hasOpenQuestionnaireFieldIssue(
@@ -548,6 +557,10 @@ export function updateQuestionnaireField(
   };
 
   return recalculateQuestionnaire(next);
+}
+
+function sectionMatchesUpdate(sectionId: string, updateSectionId: string) {
+  return sectionId === updateSectionId || sectionId.endsWith(`-${updateSectionId}`);
 }
 
 export function completeQuestionnaireSections(submission: Submission): Submission {
@@ -873,10 +886,20 @@ function isFieldReady(field: QuestionnaireField) {
 
 function applicantNameParts(applicantName: string) {
   const parts = applicantName.trim().split(/\s+/).filter(Boolean);
-  const first = transliterate(parts[0] ?? applicantName).toUpperCase();
-  const surname = transliterate(parts.at(-1) ?? applicantName).toUpperCase();
+  const [firstPart = applicantName, ...rest] = parts;
+  const surnameFirst = rest.length > 0 && looksLikeRussianSurname(firstPart);
+  const firstSource = surnameFirst ? rest.join(" ") : firstPart;
+  const surnameSource = surnameFirst ? firstPart : parts.at(-1) ?? applicantName;
+  const first = transliterate(firstSource).toUpperCase();
+  const surname = transliterate(surnameSource).toUpperCase();
 
   return { first, surname };
+}
+
+function looksLikeRussianSurname(value: string) {
+  return /(?:ов|ова|ев|ева|ёв|ёва|ин|ина|ын|ына|ский|ская|цкий|цкая|ых|их|ко|чук|юк)$/i.test(
+    value.trim(),
+  );
 }
 
 function transliterate(input: string) {

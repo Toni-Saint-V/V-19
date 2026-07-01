@@ -589,6 +589,9 @@ describe("Supabase security contract", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260627001000_returned_pdf_storage_policies.sql",
     );
+    const securityInvokerMigration = readProjectFile(
+      "supabase/migrations/20260630222703_returned_pdf_handoff_security_invoker.sql",
+    );
     const readPolicy =
       sqlStatements(migration).find((statement) =>
         statement.includes('create policy "media storage read owner or admin"'),
@@ -694,6 +697,20 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(
       "grant execute on function public.publish_returned_pdf_handoff(jsonb) to authenticated",
     );
+    expect(securityInvokerMigration).toContain(
+      "alter function public.publish_returned_pdf_handoff(jsonb) security invoker",
+    );
+    expect(securityInvokerMigration).toContain(
+      "grant insert on public.returned_pdf_handoff_artifacts to authenticated",
+    );
+    expect(securityInvokerMigration).toContain(
+      'create policy "returned pdf handoff artifacts admin insert"',
+    );
+    expect(securityInvokerMigration).toContain(
+      "(select app_private.current_profile_role()) = 'admin'",
+    );
+    expect(securityInvokerMigration).not.toContain("grant update");
+    expect(securityInvokerMigration).not.toContain("grant delete");
     expect(migration).toContain("'visa_application_pdf'");
     expect(migration).toContain("'appointment_pdf'");
     expect(migration).toContain("split_part(name, '/', 2) = 'common'");

@@ -1,4 +1,4 @@
-import { type DragEvent, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type DragEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { invokePassportExtraction } from "../passportExtractionService";
 import {
+  CANONICAL_CITIES,
+  type City,
   type PassportExtractedField,
   type PassportExtractedFieldKey,
   type PassportUploadDraft,
@@ -22,6 +24,7 @@ import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimiti
 const maxFamilyApplicants = 6;
 
 type CreateSubmissionStep = "passport" | "questionnaire";
+type PassportLiveTone = "red" | "yellow" | "green";
 
 const submissionTypeOptions: Array<{ label: string; value: Submission["type"] }> = [
   { label: "Заявитель", value: "single" },
@@ -113,7 +116,12 @@ function passportUploadFullName(upload: PassportUploadDraft | undefined) {
 }
 
 function hasRequiredPassportIdentity(upload: PassportUploadDraft | undefined) {
-  return Boolean(passportUploadFullName(upload));
+  return Boolean(
+    passportUploadFullName(upload) &&
+      upload?.extractedFields
+        .find((field) => field.key === "passportNumber")
+        ?.value.trim(),
+  );
 }
 
 function hasAcceptedPassportFile(upload: PassportUploadDraft | undefined) {
@@ -142,6 +150,97 @@ function passportUploadVisualStatus(
   if (upload.status === "ready") return "unavailable";
 
   return "selected";
+}
+
+function passportUploadTone(upload: PassportUploadDraft | undefined): PassportLiveTone {
+  const visualStatus = passportUploadVisualStatus(upload);
+  if (visualStatus === "ready") return "green";
+  if (
+    visualStatus === "extracting" ||
+    visualStatus === "selected" ||
+    visualStatus === "unavailable"
+  ) {
+    return "yellow";
+  }
+  return "red";
+}
+
+function passportUploadStatusCopy(upload: PassportUploadDraft | undefined) {
+  const visualStatus = passportUploadVisualStatus(upload);
+  if (visualStatus === "ready") {
+    return {
+      description: "ФИО и номер паспорта извлечены. Оператор проверит данные перед отправкой.",
+      title: "Паспорт принят",
+    };
+  }
+  if (visualStatus === "extracting") {
+    return {
+      description: "Файл выбран. OCR читает MRZ, номер паспорта и ФИО.",
+      title: "OCR читает паспорт",
+    };
+  }
+  if (visualStatus === "unavailable") {
+    return {
+      description: "Файл принят, но OCR не подтвердил все ключевые поля. Понадобится ручная проверка.",
+      title: "Проверка оператором",
+    };
+  }
+  if (visualStatus === "selected") {
+    return {
+      description: "Файл добавлен в очередь. Проверка начнется автоматически.",
+      title: "Файл выбран",
+    };
+  }
+  return {
+    description: "Загрузите JPEG или PNG с разворотом загранпаспорта и MRZ.",
+    title: "Нужен файл паспорта",
+  };
+}
+
+function passportLiveState({
+  activeUpload,
+  missingPassportLabels,
+  passportFileError,
+  passportReady,
+  type,
+}: {
+  activeUpload: PassportUploadDraft | undefined;
+  missingPassportLabels: string[];
+  passportFileError: string;
+  passportReady: boolean;
+  type: Submission["type"];
+}) {
+  if (passportFileError) {
+    return {
+      description: "Проверьте формат: нужен JPEG или PNG с разворотом загранпаспорта.",
+      title: "Файл не принят",
+      tone: "red" as const,
+    };
+  }
+
+  if (activeUpload) {
+    return {
+      ...passportUploadStatusCopy(activeUpload),
+      tone: passportUploadTone(activeUpload),
+    };
+  }
+
+  if (passportReady) {
+    return {
+      description: "Можно сохранить черновик. Данные останутся доступными после перезагрузки.",
+      title: "Все паспорта приняты",
+      tone: "green" as const,
+    };
+  }
+
+  return {
+    description:
+      type === "family" && missingPassportLabels.length
+        ? `Нет файла: ${missingPassportLabels.join(", ")}.`
+        : "Паспорт ещё не выбран.",
+    title: "Нужен файл паспорта",
+    tone: "red" as const,
+  };
 }
 
 function passportUploadFieldValue(
@@ -200,15 +299,18 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
 }
 
 export function CreateSubmissionDrawer({
+  city,
   familyCount,
   focusCloseToken = 0,
   onClose,
   onCreate,
+  onCity,
   onFamilyCount,
   onPassportFilesSelected,
   onType,
   type,
 }: {
+  city: City;
   familyCount: number;
   focusCloseToken?: number;
   onClose: () => void;
@@ -216,6 +318,7 @@ export function CreateSubmissionDrawer({
     passportUploads?: PassportUploadDraft[],
     preliminaryIntake?: PreliminaryIntakeDraft,
   ) => void;
+  onCity: (city: City) => void;
   onFamilyCount: (count: number) => void;
   onPassportFilesSelected: () => void;
   onType: (type: Submission["type"]) => void;
@@ -223,7 +326,8 @@ export function CreateSubmissionDrawer({
 }) {
   const applicantCount = type === "family" ? familyCount : 1;
   const passportFileInputRef = useRef<HTMLInputElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const headerCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const passportCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const uploadBatchRef = useRef(0);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [passportFileError, setPassportFileError] = useState("");
@@ -252,7 +356,13 @@ export function CreateSubmissionDrawer({
     : type === "family"
       ? `Нужен файл паспорта: ${missingPassportLabels.join(", ")}.`
       : "Нужен файл паспорта.";
-  const firstUploadedApplicantName = passportUploadFullName(passportUploads[0]);
+  const liveState = passportLiveState({
+    activeUpload,
+    missingPassportLabels,
+    passportFileError,
+    passportReady,
+    type,
+  });
 
   function selectType(nextType: Submission["type"]) {
     const nextApplicantCount = nextType === "family" ? Math.max(2, familyCount) : 1;
@@ -262,6 +372,13 @@ export function CreateSubmissionDrawer({
     }
     setActiveApplicantIndex(0);
     setPassportUploads((current) => prunePassportUploads(current, nextApplicantCount));
+  }
+
+  function handleCityChange(event: ChangeEvent<HTMLSelectElement>) {
+    const nextCity = event.currentTarget.value;
+    const cityOption = CANONICAL_CITIES.find((candidate) => candidate === nextCity);
+    if (!cityOption) return;
+    onCity(cityOption);
   }
 
   function updatePreliminaryIntake<Key extends keyof PreliminaryIntakeDraft>(
@@ -429,7 +546,15 @@ export function CreateSubmissionDrawer({
 
   useEffect(() => {
     if (!focusCloseToken) return;
-    closeButtonRef.current?.focus({ preventScroll: true });
+    window.setTimeout(() => {
+      const candidates = [
+        headerCloseButtonRef.current,
+        passportCloseButtonRef.current,
+      ].filter((element): element is HTMLButtonElement => Boolean(element));
+      const visibleCandidate =
+        candidates.find((element) => element.offsetParent !== null) ?? candidates[0];
+      visibleCandidate?.focus({ preventScroll: true });
+    }, 80);
   }, [focusCloseToken]);
 
   useEffect(() => {
@@ -459,7 +584,7 @@ export function CreateSubmissionDrawer({
     >
       <header className="v19-create-drawer-header">
         <button
-          ref={closeButtonRef}
+          ref={headerCloseButtonRef}
           className="v19-create-drawer-close"
           type="button"
           aria-label="Закрыть создание"
@@ -495,6 +620,7 @@ export function CreateSubmissionDrawer({
               <div className="flex flex-col gap-6">
                 <div className="create-passport-topbar">
                   <button
+                    ref={passportCloseButtonRef}
                     className="create-passport-back"
                     type="button"
                     aria-label="Закрыть создание"
@@ -552,11 +678,28 @@ export function CreateSubmissionDrawer({
                   </div>
                 </section>
 
-                {firstUploadedApplicantName ? (
-                  <p className="text-[12px] text-white/45">
-                    {firstUploadedApplicantName}
-                  </p>
-                ) : null}
+                <section className="rounded-[14px] border border-[#202124] bg-[#121214] p-3.5">
+                  <label
+                    className="grid gap-2 text-[12px] text-white/60"
+                    htmlFor="create-submission-city"
+                  >
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
+                      Город подачи
+                    </span>
+                    <select
+                      className="h-10 rounded-[8px] border border-[#242529] bg-[#161617] px-3 text-[13px] font-medium text-white/80 outline-none transition-colors hover:border-white/12 focus:border-white/24"
+                      id="create-submission-city"
+                      value={city}
+                      onChange={handleCityChange}
+                    >
+                      {CANONICAL_CITIES.map((candidate) => (
+                        <option key={candidate} value={candidate}>
+                          {candidate}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </section>
 
                 {type === "family" ? (
                   <section
@@ -574,6 +717,7 @@ export function CreateSubmissionDrawer({
                       </div>
                       <button
                         className="h-8 px-3 rounded-[7px] border border-[#242529] bg-[#161617] text-[12px] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        aria-label="Добавить заявителя в семью"
                         type="button"
                         disabled={applicantCount >= maxFamilyApplicants}
                         onClick={addFamilyMember}
@@ -588,11 +732,12 @@ export function CreateSubmissionDrawer({
                           (candidate) => candidate.applicantIndex === index,
                         );
                         const readinessLabel = passportUploadReadinessLabel(upload);
+                        const tone = passportUploadTone(upload);
 
                         return (
                           <button
                             key={index}
-                            className={`rounded-[10px] border px-3 py-2 text-left transition-colors ${
+                            className={`flex items-start justify-between gap-3 rounded-[10px] border px-3 py-2 text-left transition-colors ${
                               safeActiveApplicantIndex === index
                                 ? "border-white/16 bg-white/8"
                                 : "border-[#202124] bg-[#151517] hover:border-white/10"
@@ -601,15 +746,21 @@ export function CreateSubmissionDrawer({
                             aria-pressed={safeActiveApplicantIndex === index}
                             onClick={() => setActiveApplicantIndex(index)}
                           >
-                            <strong className="block truncate text-[13px] text-white/78 font-medium">
-                              {applicantLabel(index, type)}
-                            </strong>
-                            <em className="block truncate text-[11px] not-italic text-white/60 mt-0.5">
-                              {upload?.fileName ?? "Паспорт не загружен"}
-                            </em>
-                            <span className="mt-1 block truncate text-[10px] text-white/38">
-                              {readinessLabel}
+                            <span className="min-w-0">
+                              <strong className="block truncate text-[13px] text-white/78 font-medium">
+                                {applicantLabel(index, type)}
+                              </strong>
+                              <em className="block truncate text-[11px] not-italic text-white/60 mt-0.5">
+                                {upload?.fileName ?? "Паспорт не загружен"}
+                              </em>
+                              <span className="mt-1 block truncate text-[10px] text-white/38">
+                                {readinessLabel}
+                              </span>
                             </span>
+                            <i
+                              className={`v19-passport-live-dot is-${tone}`}
+                              aria-hidden="true"
+                            />
                           </button>
                         );
                       })}
@@ -701,6 +852,17 @@ export function CreateSubmissionDrawer({
                   >
                     Выбрать файлы
                   </button>
+                  <div
+                    className={`v19-passport-live-indicator is-${liveState.tone}`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <i aria-hidden="true" />
+                    <span>
+                      <strong>{liveState.title}</strong>
+                      <em>{liveState.description}</em>
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -734,7 +896,7 @@ export function CreateSubmissionDrawer({
                       const upload = passportUploads.find(
                         (candidate) => candidate.applicantIndex === index,
                       );
-                      const visualStatus = passportUploadVisualStatus(upload);
+                      const tone = passportUploadTone(upload);
                       const readinessLabel = passportUploadReadinessLabel(upload);
 
                       return (
@@ -761,14 +923,7 @@ export function CreateSubmissionDrawer({
                             </small>
                           </span>
                           <i
-                            className={`h-2 w-2 rounded-full ${
-                              visualStatus === "ready"
-                                ? "bg-emerald-400"
-                                : visualStatus === "extracting" ||
-                                    visualStatus === "unavailable"
-                                  ? "bg-amber-400"
-                                  : "bg-white/18"
-                            }`}
+                            className={`v19-passport-live-dot is-${tone}`}
                             aria-hidden="true"
                           />
                         </button>
@@ -825,6 +980,8 @@ export function CreateSubmissionDrawer({
                     <AnimatePresence>
                       {passportUploads.map((upload) => {
                         const visualStatus = passportUploadVisualStatus(upload);
+                        const tone = passportUploadTone(upload);
+                        const statusCopy = passportUploadStatusCopy(upload);
                         const isProcessing = visualStatus === "extracting";
                         const isReady = visualStatus === "ready";
                         return (
@@ -832,7 +989,7 @@ export function CreateSubmissionDrawer({
                             key={upload.id}
                             layout
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-3.5 rounded-[12px] bg-[#141416] border border-[#202124] relative overflow-hidden group hover:border-[#2a2a2e] transition-colors"
+                            className={`v19-passport-queue-card is-${tone} p-3.5 rounded-[12px] bg-[#141416] border border-[#202124] relative overflow-hidden group hover:border-[#2a2a2e] transition-colors`}
                             exit={{ opacity: 0, scale: 0.95 }}
                             initial={{ opacity: 0, y: 10 }}
                           >
@@ -859,37 +1016,25 @@ export function CreateSubmissionDrawer({
                                   </span>
                                   <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
                                   {isProcessing ? (
-                                    <span className="text-[11px] text-white/60 flex items-center gap-1.5 font-medium tracking-wide uppercase">
+                                    <span className={`v19-passport-queue-state is-${tone}`}>
                                       <ScanLine className="w-3 h-3 animate-pulse opacity-50" />
-                                      Processing
+                                      {statusCopy.title}
                                     </span>
                                   ) : isReady ? (
-                                    <span className="text-[11px] text-white/40 flex items-center gap-1 font-medium tracking-wide uppercase">
+                                    <span className={`v19-passport-queue-state is-${tone}`}>
                                       <CheckCircle2 className="w-3 h-3 opacity-50" />
-                                      Done
+                                      {statusCopy.title}
                                     </span>
                                   ) : visualStatus === "unavailable" ? (
-                                    <span className="text-[11px] text-amber-200/70 tracking-wide uppercase">
-                                      Проверка оператором
+                                    <span className={`v19-passport-queue-state is-${tone}`}>
+                                      {statusCopy.title}
                                     </span>
                                   ) : (
-                                    <span className="text-[11px] text-white/40 tracking-wide uppercase">
-                                      Waiting
+                                    <span className={`v19-passport-queue-state is-${tone}`}>
+                                      {statusCopy.title}
                                     </span>
                                   )}
                                 </div>
-                                {upload.extractedFields.length ? (
-                                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                                    {upload.extractedFields.slice(0, 3).map((field) => (
-                                      <span
-                                        key={`${upload.id}-${field.key}`}
-                                        className="px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-[10px] text-white/50 font-medium"
-                                      >
-                                        {field.value}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : null}
                               </div>
                             </div>
                           </motion.div>
@@ -1013,16 +1158,6 @@ export function CreateSubmissionDrawer({
               onClick={() => onCreate(passportUploads, preliminaryIntake)}
             >
               Сохранить черновик
-            </button>
-            <button
-              disabled={!primaryActionAvailable}
-              className={`v19-create-footer-action v19-create-footer-action--primary ${
-                primaryActionAvailable ? "is-enabled" : "is-disabled"
-              }`}
-              type="button"
-              onClick={handlePrimaryAction}
-            >
-              Дальше
             </button>
           </div>
         </footer>

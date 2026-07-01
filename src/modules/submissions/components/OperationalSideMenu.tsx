@@ -12,7 +12,6 @@ export function OperationalSideMenu({
   mobileTitle,
   onChooseRole,
   onCloseMobile,
-  onCreateSubmission,
   onResetWorkspace,
   role,
   sessionDisplayName,
@@ -26,7 +25,6 @@ export function OperationalSideMenu({
   mobileTitle: string;
   onChooseRole: (role: Role) => void;
   onCloseMobile: () => void;
-  onCreateSubmission?: () => void;
   onResetWorkspace: () => void | Promise<void>;
   role: Role;
   sessionDisplayName: string;
@@ -42,28 +40,6 @@ export function OperationalSideMenu({
       onCloseMobile();
     },
   }));
-  const mobileNavItems: OperationalNavItem[] =
-    role === "agent"
-      ? navItems
-          .filter((item) =>
-            ["agent-actions", "agent-submissions", "agent-settings"].includes(item.id),
-          )
-          .map((item) =>
-            item.id === "agent-settings"
-              ? { ...item, label: "Настройки", meta: "профиль и настройки" }
-              : item,
-          )
-      : [];
-  const createAction =
-    role === "agent" && onCreateSubmission
-      ? {
-          label: "Новая подача",
-          onClick: () => {
-            onCreateSubmission();
-            onCloseMobile();
-          },
-        }
-      : undefined;
   const footer = (
     <>
       {showRoleSwitcher ? (
@@ -136,7 +112,6 @@ export function OperationalSideMenu({
   return (
     <>
       <OperationalSidebar
-        createAction={createAction}
         footer={footer}
         items={navItems}
         mobileTitle={mobileTitle}
@@ -151,7 +126,7 @@ export function OperationalSideMenu({
           onClick={onCloseMobile}
         />
       ) : null}
-      {role === "agent" ? <OperationalMobileTabBar items={mobileNavItems} /> : null}
+      {role === "agent" ? <OperationalMobileTabBar items={navItems} /> : null}
     </>
   );
 }
