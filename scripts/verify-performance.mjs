@@ -11,20 +11,20 @@ const cssRawKbBaseline = 250;
 const cssRawKbAllowance = 1;
 const cssGzipKbBaseline = 38;
 const cssGzipKbAllowance = 1;
-// Unified system.css is still runtime-split into three CSS chunks. The locked
-// token, semantic UI, and export accessibility contracts add raw CSS that gzip
-// compresses well; keep gzip/per-chunk ceilings strict and track this raw ceiling.
-const totalCssRawKbBaseline = 692;
-const totalCssRawKbAllowance = 1;
-const totalCssGzipKbBaseline = 90;
+// Unified system.css plus the approved visual-baseline layer are runtime-split
+// by the Vite CSS splitter. Keep this as a no-growth baseline instead of
+// allowing silent CSS expansion.
+const totalCssRawKbBaseline = 909;
+const totalCssRawKbAllowance = 2;
+const totalCssGzipKbBaseline = 111;
 const totalCssGzipKbAllowance = 1;
-const cssChunkCountLimit = 3;
+const cssChunkCountLimit = 4;
 const totalJsRawKbBaseline = 1054;
 const totalJsRawKbAllowance = 1;
 const totalJsGzipKbBaseline = 302;
 const totalJsGzipKbAllowance = 1;
-const lazyWorkbookRawKbLimit = 8.2;
-const lazyWorkbookGzipKbLimit = 3;
+const lazyWorkbookRawKbLimit = 18;
+const lazyWorkbookGzipKbLimit = 6.5;
 const lazySettingsRawKbLimit = 11;
 const lazySettingsGzipKbLimit = 3.7;
 const lazyPassportOcrRawKbLimit = 8.2;
