@@ -3,17 +3,13 @@ import { flushSync } from "react-dom";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import {
   V19EntityTypeSwitch,
-  V19FamilyProfileCard,
-  V19IndividualProfileCard,
   type V19EntityViewMode,
-  type V19MemberStatusTone,
 } from "../../../shared/ui/v19-design-system";
 import {
   buildAgentActionTasks,
   summarizeAgentActionTasks,
   type AgentActionItem,
   type AgentActionTask,
-  type AgentActionTaskStatus,
   type OperationalInboxEvent,
 } from "../agentActions";
 import {
@@ -46,7 +42,6 @@ import {
 import { EmptyState } from "../components/Primitives";
 import {
   AgentActionsCommandCockpit,
-  type AgentActionsSummaryFilter,
 } from "../components/AgentActionsCommandCockpit";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
@@ -125,6 +120,40 @@ function transitionUiState(update: () => void) {
 }
 
 type InboxEvent = OperationalInboxEvent;
+type ActionStatusFilter = "all" | "error" | "ready" | "urgent";
+type CanonicalMediaType = "passport_scan" | "selfie" | "selfie_2";
+type CanonicalMediaRow = {
+  status: string;
+  type: string;
+};
+
+const canonicalMediaTypes: CanonicalMediaType[] = [
+  "passport_scan",
+  "selfie",
+  "selfie_2",
+];
+
+type SummaryStripItem = {
+  count: number;
+  label: string;
+};
+
+function OperationalSummaryStrip({ items }: { items: SummaryStripItem[] }) {
+  return (
+    <div className="v19-operational-summary-strip">
+      {items.map((item) => (
+        <span key={item.label}>
+          <strong>{compactCount(item.count)}</strong>
+          <em>{item.label}</em>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function compactCount(count: number) {
+  return count > 999 ? "999+" : String(count);
+}
 
 function firstFileWorkspaceTarget(submission: Submission): WorkspaceTarget | undefined {
   const file =
@@ -212,26 +241,28 @@ export function AgentActionsScreen({
   cityControl,
   completedActions,
   errorMessage = "",
+  hasSearchQuery = false,
   loading = false,
+  onClearSearch,
   onRetryError,
   onOpen,
   openActions,
   searchControl,
+  totalActionCount,
 }: {
   cityControl?: ReactNode;
   completedActions: AgentActionItem[];
   errorMessage?: string;
+  hasSearchQuery?: boolean;
   loading?: boolean;
+  onClearSearch?: () => void;
   onRetryError?: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   openActions: AgentActionItem[];
   searchControl: ReactNode;
+  totalActionCount?: number;
 }) {
-  type ActionStatusFilter = "all" | AgentActionTaskStatus;
-
   const [statusFilter, setStatusFilter] = useState<ActionStatusFilter>("all");
-  const [summaryFilter, setSummaryFilter] =
-    useState<AgentActionsSummaryFilter | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [sortOldest, setSortOldest] = useState(false);
 
@@ -240,28 +271,26 @@ export function AgentActionsScreen({
     [completedActions, openActions],
   );
   const taskSummary = useMemo(() => summarizeAgentActionTasks(allTasks), [allTasks]);
-  const filteredTasks = summaryFilter
-    ? filterAgentActionSummaryTasks(allTasks, summaryFilter)
-    : statusFilter === "all"
-      ? allTasks
-      : allTasks.filter((task) => task.status === statusFilter);
+  const urgentCount = allTasks.filter((task) => task.priority.level === "urgent").length;
+  const sourceActionCount = totalActionCount ?? allTasks.length;
+  const filteredTasks = allTasks.filter((task) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "urgent") return task.priority.level === "urgent";
+    return task.status === statusFilter;
+  });
   const visibleTasks = sortOldest ? [...filteredTasks].reverse() : filteredTasks;
   const selectedTask =
     visibleTasks.find((task) => task.id === selectedTaskId) ?? visibleTasks[0];
-  const actionGroupLabel = summaryFilter
-    ? actionSummaryFilterLabel(summaryFilter)
-    : actionStatusFilterLabel(statusFilter);
-  const emptyState = summaryFilter
-    ? actionSummaryFilterEmptyState(summaryFilter)
+  const actionGroupLabel = actionStatusFilterLabel(statusFilter);
+  const noSearchResults = hasSearchQuery && sourceActionCount > 0 && allTasks.length === 0;
+  const emptyState = noSearchResults
+    ? {
+        action: "Сбросить поиск",
+        body: "Попробуйте другой ID, имя или город.",
+        title: "Ничего не найдено по запросу.",
+      }
     : actionFilterEmptyState(statusFilter);
   const activeFilters = compactActiveFilters([
-    summaryFilter
-      ? {
-          id: "summary",
-          label: actionSummaryFilterLabel(summaryFilter),
-          onRemove: () => transitionUiState(() => setSummaryFilter(null)),
-        }
-      : null,
     sortOldest
       ? {
           id: "sort",
@@ -272,7 +301,6 @@ export function AgentActionsScreen({
   ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
-      setSummaryFilter(null);
       setSortOldest(false);
     });
   const toolbarToolButtons = (
@@ -328,23 +356,23 @@ export function AgentActionsScreen({
           className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
           mobileCityControl={cityControl}
           onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-          onTabChange={(nextFilter) =>
-            transitionUiState(() => {
-              setSummaryFilter(null);
-              setStatusFilter(nextFilter);
-            })
-          }
+          onTabChange={(nextFilter) => transitionUiState(() => setStatusFilter(nextFilter))}
           search={searchControl}
+          summary={
+            <OperationalSummaryStrip
+              items={[
+                { count: taskSummary.errors, label: "Блокеры" },
+                { count: urgentCount, label: "Срочно" },
+                { count: taskSummary.ready, label: "Готово" },
+                { count: taskSummary.all, label: "Всего" },
+              ]}
+            />
+          }
           tabs={[
             { count: taskSummary.all, id: "all", label: "Все" },
-            { count: taskSummary.errors, id: "error", label: "Ошибки" },
-            {
-              count: taskSummary.actionRequired,
-              id: "action_required",
-              label: "Требуют действия",
-            },
+            { count: taskSummary.errors, id: "error", label: "Блокеры" },
+            { count: urgentCount, id: "urgent", label: "Срочно" },
             { count: taskSummary.ready, id: "ready", label: "Готово" },
-            { count: taskSummary.blocked, id: "blocked", label: "Заблокировано" },
           ]}
           tabsAriaLabel="Рабочее состояние действий"
           tools={toolbarTools}
@@ -356,15 +384,12 @@ export function AgentActionsScreen({
           emptyState={emptyState}
           errorMessage={errorMessage}
           loading={loading}
-          activeSummaryFilter={summaryFilter}
           selectedTask={selectedTask}
-          summary={taskSummary}
-          summaryTasks={allTasks}
           tasks={visibleTasks}
           onEmptyAction={() =>
             transitionUiState(() => {
-              if (summaryFilter) {
-                setSummaryFilter(null);
+              if (noSearchResults) {
+                onClearSearch?.();
                 return;
               }
 
@@ -381,96 +406,20 @@ export function AgentActionsScreen({
           onOpenSecondary={openFullSubmission}
           onOpenTab={openTaskTab}
           onSelectTask={(task) => setSelectedTaskId(task.id)}
-          onSummaryFilterChange={(filter) =>
-            transitionUiState(() => {
-              setStatusFilter("all");
-              setSummaryFilter((current) => (current === filter ? null : filter));
-            })
-          }
         />
       </section>
     </div>
   );
 }
 
-function actionStatusFilterLabel(status: "all" | AgentActionTaskStatus) {
-  if (status === "error") return "Ошибки";
-  if (status === "action_required") return "Требуют действия";
+function actionStatusFilterLabel(status: ActionStatusFilter) {
+  if (status === "error") return "Блокеры";
+  if (status === "urgent") return "Срочные";
   if (status === "ready") return "Готово";
-  if (status === "blocked") return "Заблокировано";
-  if (status === "in_review") return "На проверке";
   return "Все действия";
 }
 
-function actionSummaryFilterLabel(filter: AgentActionsSummaryFilter) {
-  if (filter === "in_work") return "В работе";
-  if (filter === "in_review") return "На проверке";
-  if (filter === "in_correction") return "На исправлении";
-  return "Готово";
-}
-
-function filterAgentActionSummaryTasks(
-  tasks: AgentActionTask[],
-  filter: AgentActionsSummaryFilter,
-) {
-  if (filter === "in_work") {
-    return tasks.filter((task) =>
-      ["draft", "in_progress"].includes(task.submission.status),
-    );
-  }
-
-  if (filter === "in_review") {
-    return tasks.filter((task) =>
-      ["corrections_received", "submitted_for_review"].includes(
-        task.submission.status,
-      ),
-    );
-  }
-
-  if (filter === "in_correction") {
-    return tasks.filter((task) =>
-      ["requires_action", "returned"].includes(task.submission.status),
-    );
-  }
-
-  return tasks.filter((task) =>
-    ["exported", "ready_for_export"].includes(task.submission.status),
-  );
-}
-
-function actionSummaryFilterEmptyState(filter: AgentActionsSummaryFilter) {
-  if (filter === "in_work") {
-    return {
-      action: "Показать все",
-      body: "Нет подач, которые агент ещё заполняет.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-
-  if (filter === "in_review") {
-    return {
-      action: "Показать все",
-      body: "Нет подач, отправленных админу.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-
-  if (filter === "in_correction") {
-    return {
-      action: "Показать все",
-      body: "Нет подач, где админ вернул замечания.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-
-  return {
-    action: "Показать все",
-    body: "Нет принятых или выгруженных подач.",
-    title: "Нет действий, требующих внимания",
-  };
-}
-
-function actionFilterEmptyState(status: "all" | AgentActionTaskStatus) {
+function actionFilterEmptyState(status: ActionStatusFilter) {
   if (status === "error") {
     return {
       action: "Показать все",
@@ -478,10 +427,10 @@ function actionFilterEmptyState(status: "all" | AgentActionTaskStatus) {
       title: "Нет действий, требующих внимания",
     };
   }
-  if (status === "action_required") {
+  if (status === "urgent") {
     return {
       action: "Показать все",
-      body: "Нет неблокирующих задач, которые агент может выполнить сейчас.",
+      body: "Нет срочных задач для агента.",
       title: "Нет действий, требующих внимания",
     };
   }
@@ -492,25 +441,11 @@ function actionFilterEmptyState(status: "all" | AgentActionTaskStatus) {
       title: "Нет действий, требующих внимания",
     };
   }
-  if (status === "blocked") {
-    return {
-      action: "Показать все",
-      body: "Нет задач, где агент ждёт внешнее событие.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-  if (status === "in_review") {
-    return {
-      action: "Показать все",
-      body: "Нет задач, ожидающих проверки.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
 
   return {
     action: "Обновить очередь",
     body: "Новые задачи появятся после изменений в подачах.",
-    title: "Нет действий, требующих внимания",
+    title: "Нет действий. Всё обработано.",
   };
 }
 
@@ -809,7 +744,7 @@ export function AgentInboxScreen({
                   label: selectedEvent.action,
                   onClick: () => openPanelNextEvent(selectedEvent),
                 }}
-                status={`Next: ${selectedEvent.action}`}
+                status={`Следующее: ${selectedEvent.action}`}
               />
             ) : undefined
           }
@@ -1000,46 +935,6 @@ function inboxPassportNumber(submission: Submission) {
   return extractedPassport || questionnairePassport || "—";
 }
 
-function applicantInitials(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function applicantRoleLabel(role: Submission["applicants"][number]["role"]) {
-  if (role === "spouse") return "Супруга";
-  if (role === "child") return "Ребенок";
-  return "Основной";
-}
-
-function applicantVisualStatus(
-  submission: Submission,
-  applicant: Submission["applicants"][number],
-): V19MemberStatusTone {
-  const files = submission.files.filter((file) => file.applicantId === applicant.id);
-
-  if (
-    applicant.questionnaireStatus === "needs_fix" ||
-    files.some((file) => file.status === "missing" || file.status === "needs_replacement")
-  ) {
-    return "issue";
-  }
-
-  if (
-    applicant.questionnaireStatus === "empty" ||
-    applicant.questionnaireStatus === "partial" ||
-    files.some((file) => file.status === "uploaded" || file.status === "pending_review")
-  ) {
-    return "progress";
-  }
-
-  return "ready";
-}
-
 function submissionTypeCounts(submissions: Submission[]): Record<V19EntityViewMode, number> {
   const family = submissions.filter((submission) => submission.type === "family").length;
   const single = submissions.filter((submission) => submission.type === "single").length;
@@ -1078,6 +973,7 @@ export function AgentSubmissionsScreen({
   onTab,
   searchQuery = "",
   searchControl,
+  summary,
   tabCounts,
   totalSubmissionCount,
   visibleSubmission,
@@ -1102,7 +998,6 @@ export function AgentSubmissionsScreen({
   summary: ReturnType<typeof counts>;
 }) {
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
-  const [entityMode, setEntityMode] = useState<V19EntityViewMode>("all");
   const hasContextRail = visibleSubmission != null && totalSubmissionCount > 0;
   const railDisclosure = useRailDisclosure({
     defaultOpen: defaultContextRailOpen(),
@@ -1114,19 +1009,11 @@ export function AgentSubmissionsScreen({
     () => sortSubmissionsForOperations(agentList, sortMode),
     [agentList, sortMode],
   );
-  const familySubmissions = orderedApplicants.filter(
-    (submission) => submission.type === "family",
-  );
-  const singleSubmissions = orderedApplicants.filter(
-    (submission) => submission.type === "single",
-  );
-  const entityCounts = submissionTypeCounts(orderedApplicants);
-  const profileSubmissions = filterByEntityMode(orderedApplicants, entityMode);
   const agentSortModes: SubmissionSortMode[] = ["priority", "updated", "trip"];
   const agentTabs: Array<{ count: number; id: AgentTab; label: string }> = [
-    { count: tabCounts.all, id: "all", label: "Все подачи" },
-    { count: tabCounts.action, id: "action", label: "Требуют действия" },
-    { count: tabCounts.progress, id: "progress", label: "В работе" },
+    { count: tabCounts.all, id: "all", label: "Все" },
+    { count: tabCounts.progress, id: "progress", label: "Черновики" },
+    { count: tabCounts.action, id: "action", label: "С замечаниями" },
     { count: tabCounts.review, id: "review", label: "На проверке" },
     { count: tabCounts.done, id: "done", label: "Готово" },
   ];
@@ -1176,7 +1063,6 @@ export function AgentSubmissionsScreen({
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setSortMode("priority");
-      setEntityMode("all");
       onClearFilters?.();
     });
   function closePanel() {
@@ -1248,103 +1134,33 @@ export function AgentSubmissionsScreen({
   };
 
   function renderSubmissionRow(submission: Submission) {
-    const action = agentSubmissionCardAction(submission);
     const issueCount = openIssueCount(submission) + fixedIssueCount(submission);
-    const trip = tripDates(submission);
+    const trip = safeTripDates(submission);
 
     return (
       <SubmissionCollectionRow
-        action={action.label}
+        action="Открыть"
         completeness={`${submission.completeness.total}%`}
         extraTagCount={issueCount}
-        fileDetail="Файлы"
+        fileDetail="Обязательные файлы"
         fileState={submissionFileStateLabel(submission)}
         fileTone={submissionFileTone(submission)}
         kind={submission.type === "single" ? "single" : "family"}
         key={submission.id}
         meta={applicantCountLabel(submission.applicants.length)}
         onOpen={() => openSubmissionFromCard(submission)}
+        operationalDetails={submissionOperationalDetails(submission)}
         routeDetail={trip}
-        routeLabel={submission.city}
+        routeLabel={safeSubmissionCity(submission.city)}
         searchText={submission.applicants.map((applicant) => applicant.fullName).join(" ")}
         selected={visibleSubmission?.id === submission.id}
         status={submission.status}
-        statusDetail={agentSubmissionStatusDetail(submission)}
+        statusDetail={submissionReasonLabel(submission)}
         statusLabel={statusLabelFor(submission.status)}
-        submissionId={submission.id}
+        submissionId={safeSubmissionId(submission.id)}
         title={formatSubmissionListTitle(submission)}
         trip={trip}
-        tripDetail={trip ? "Даты поездки" : undefined}
-      />
-    );
-  }
-
-  function renderSubmissionSection({
-    emptyText,
-    items,
-    title,
-  }: {
-    emptyText: string;
-    items: Submission[];
-    title: string;
-  }) {
-    return (
-      <section className="v19-submission-type-section" aria-label={title}>
-        <div className="v19-submission-type-label">
-          <strong>{title}</strong>
-          <span>{items.length}</span>
-        </div>
-        {items.length ? (
-          items.map(renderSubmissionRow)
-        ) : (
-          <div className="v19-submission-type-empty" role="status">
-            {emptyText}
-          </div>
-        )}
-      </section>
-    );
-  }
-
-  function renderSubmissionProfileCard(submission: Submission) {
-    const footerLabel = [submission.city, tripDates(submission)].filter(Boolean).join(" · ");
-    const packageLabel = submissionFileStateLabel(submission);
-
-    if (submission.type === "family") {
-      return (
-        <V19FamilyProfileCard
-          dataSubmissionId={submission.id}
-          footerLabel={footerLabel}
-          key={submission.id}
-          members={submission.applicants.map((applicant) => ({
-            initials: applicantInitials(applicant.fullName),
-            name: applicant.fullName,
-            role: applicantRoleLabel(applicant.role),
-            statusTone: applicantVisualStatus(submission, applicant),
-          }))}
-          packageLabel={packageLabel}
-          title={formatSubmissionListTitle(submission)}
-          totalLabel={`${applicantCountLabel(submission.applicants.length)} · ${statusLabelFor(
-            submission.status,
-          )}`}
-          onMemberOpen={() => openSubmissionFromCard(submission)}
-          onOpen={() => openSubmissionFromCard(submission)}
-        />
-      );
-    }
-
-    const applicant = submission.applicants[0];
-
-    return (
-      <V19IndividualProfileCard
-        dataSubmissionId={submission.id}
-        footerLabel={footerLabel}
-        initials={applicantInitials(applicant?.fullName ?? submission.title)}
-        key={submission.id}
-        packageLabel={packageLabel}
-        statusLabel={statusLabelFor(submission.status)}
-        statusTone={applicant ? applicantVisualStatus(submission, applicant) : "progress"}
-        title={applicant?.fullName ?? formatSubmissionListTitle(submission)}
-        onOpen={() => openSubmissionFromCard(submission)}
+        tripDetail="Поездка"
       />
     );
   }
@@ -1373,15 +1189,23 @@ export function AgentSubmissionsScreen({
             onClearActiveFilters={hasActiveFilters ? resetActiveFilters : undefined}
             onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
             search={searchControl}
+            summary={
+              <OperationalSummaryStrip
+                items={[
+                  { count: summary.draft, label: "Черновики" },
+                  { count: summary.requiresAction, label: "Замечания" },
+                  { count: summary.ready, label: "Готово" },
+                  {
+                    count: summary.inReview + summary.corrections,
+                    label: "На проверке",
+                  },
+                ]}
+              />
+            }
             tabs={agentTabs}
             tabsAriaLabel="Фильтр подач"
             tools={toolbarTools}
             value={activeTab}
-          />
-          <V19EntityTypeSwitch
-            counts={entityCounts}
-            value={entityMode}
-            onChange={(mode) => transitionUiState(() => setEntityMode(mode))}
           />
 
           {loading ? (
@@ -1393,7 +1217,7 @@ export function AgentSubmissionsScreen({
             />
           ) : totalSubmissionCount === 0 ? (
             <div className="v19-submission-empty-state" role="status">
-              <h3>Подач пока нет</h3>
+              <h3>Подач пока нет.</h3>
               <p>Создайте первую подачу для клиента или семьи.</p>
               <Button type="button" onClick={onCreate}>
                 Новая подача
@@ -1401,7 +1225,9 @@ export function AgentSubmissionsScreen({
             </div>
           ) : orderedApplicants.length === 0 ? (
             <div className="v19-submission-empty-state is-filtered" role="status">
-              <h3>Ничего не найдено</h3>
+              <h3>
+                {hasSearchQuery ? "Ничего не найдено по запросу." : "Ничего не найдено."}
+              </h3>
               <p>
                 По текущему поиску и фильтрам подач нет. Сбросьте фильтры или
                 измените запрос.
@@ -1412,42 +1238,12 @@ export function AgentSubmissionsScreen({
                 </Button>
               ) : null}
             </div>
-          ) : entityMode === "all" ? (
+          ) : (
             <div
               className="v19-collection-list v19-submission-grouped-list"
               aria-label="Список подач"
             >
-              {renderSubmissionSection({
-                emptyText:
-                  "Семейных подач нет. По текущему фильтру ничего не найдено.",
-                items: familySubmissions,
-                title: "Семейные подачи",
-              })}
-              {renderSubmissionSection({
-                emptyText:
-                  "Индивидуальных подач нет. По текущему фильтру ничего не найдено.",
-                items: singleSubmissions,
-                title: "Индивидуальные подачи",
-              })}
-            </div>
-          ) : (
-            <div
-              className={`v19-submission-profile-stage is-${entityMode}`}
-              aria-label={
-                entityMode === "family" ? "Семейные карточки" : "Одиночные карточки"
-              }
-            >
-              {profileSubmissions.length ? (
-                <div className="v19-submission-profile-grid">
-                  {profileSubmissions.map(renderSubmissionProfileCard)}
-                </div>
-              ) : (
-                <div className="v19-submission-type-empty" role="status">
-                  {entityMode === "family"
-                    ? "Семейных подач нет."
-                    : "Индивидуальных подач нет."}
-                </div>
-              )}
+              {orderedApplicants.map(renderSubmissionRow)}
             </div>
           )}
         </CardComponent>
@@ -1462,6 +1258,7 @@ export function AgentSubmissionsScreen({
       {hasContextRail && panelOpen && railSubmission ? (
         <AgentSubmissionContextRail
           applicantSummary={applicantCountLabel(railSubmission.applicants.length)}
+          canonicalMedia={submissionCanonicalMediaRows(railSubmission)}
           fileSummary={submissionFileStateLabel(railSubmission)}
           history={railSubmission.history}
           issues={railSubmission.issues
@@ -1481,9 +1278,14 @@ export function AgentSubmissionsScreen({
               },
             }))}
           openIssueCount={openIssueCount(railSubmission)}
+          ownerLabel={submissionOwnerLabel(railSubmission)}
+          readinessLabel={submissionReadinessLabel(railSubmission)}
+          reasonLabel={submissionReasonLabel(railSubmission)}
           showHeader
+          statusLabel={statusLabelFor(railSubmission.status)}
           submission={railSubmission}
-          tripSummary={tripDates(railSubmission)}
+          tripSummary={`${safeSubmissionCity(railSubmission.city)} · ${safeTripDates(railSubmission)}`}
+          nextActionLabel={submissionNextActionLabel(railSubmission)}
           onClose={closePanel}
           onOpenTab={(tab) => {
             const target = targetForSubmissionTab(railSubmission, tab);
@@ -1523,7 +1325,7 @@ function AgentSubmissionsErrorState({
 }) {
   return (
     <div className="v19-submission-empty-state is-error" role="alert">
-      <h3>Не удалось сохранить изменения</h3>
+      <h3>Не удалось загрузить подачи.</h3>
       <p>{message}</p>
       {onRetry ? (
         <Button type="button" onClick={onRetry}>
@@ -1625,23 +1427,156 @@ function agentSubmissionStatusDetail(submission: Submission) {
   return nextProblem(submission);
 }
 
-function submissionFileTone(submission: Submission): "amber" | "muted" | "teal" {
-  if (!submission.files.length) return "muted";
+function submissionReasonLabel(submission: Submission) {
+  const issue = primarySubmissionIssue(submission);
+
+  if (issue) return issue.reason;
+
+  return agentSubmissionStatusDetail(submission);
+}
+
+function submissionOperationalDetails(submission: Submission) {
+  const missing = canonicalMissingFilesLabel(submission);
+
+  return [
+    { label: "Статус", value: statusLabelFor(submission.status) },
+    { label: "Файлы", value: submissionFileStateLabel(submission) },
+    missing ? { label: "Не хватает", value: missing } : null,
+    { label: "Ответственный", value: submissionOwnerLabel(submission) },
+    { label: "Следующее", value: submissionNextActionLabel(submission) },
+    { label: "Готовность", value: submissionReadinessLabel(submission) },
+  ].filter((item): item is { label: string; value: string } => item != null);
+}
+
+function submissionOwnerLabel(submission: Submission) {
   if (
-    submission.files.some(
-      (file) => file.status === "missing" || file.status === "needs_replacement",
-    )
+    submission.status === "draft" ||
+    submission.status === "in_progress" ||
+    submission.status === "requires_action" ||
+    submission.status === "returned"
   ) {
+    return "Действие за агентом";
+  }
+
+  if (
+    submission.status === "submitted_for_review" ||
+    submission.status === "corrections_received"
+  ) {
+    return "Проверка админом";
+  }
+
+  if (submission.status === "ready_for_export") return "Админская выгрузка";
+
+  return "Архив";
+}
+
+function submissionNextActionLabel(submission: Submission) {
+  const missingFile = firstMissingCanonicalFile(submission);
+
+  if (missingFile) return `Добавить ${missingFile}`;
+  if (submission.status === "draft" || submission.status === "in_progress") {
+    return "Заполнить подачу";
+  }
+  if (submission.status === "requires_action" || submission.status === "returned") {
+    return "Проверить замечания";
+  }
+  if (
+    submission.status === "submitted_for_review" ||
+    submission.status === "corrections_received"
+  ) {
+    return "Ждать проверки админа";
+  }
+  if (submission.status === "ready_for_export") return "Открыть статус выгрузки";
+
+  return "Открыть подачу";
+}
+
+function submissionReadinessLabel(submission: Submission) {
+  return Number.isFinite(submission.completeness.total)
+    ? `${submission.completeness.total}%`
+    : "нет данных";
+}
+
+function submissionFileTone(submission: Submission): "amber" | "muted" | "teal" {
+  const files = submissionCanonicalMediaRows(submission);
+
+  if (!files.length) return "muted";
+  if (files.some((file) => file.status === "не хватает" || file.status === "заменить")) {
     return "amber";
   }
+
   return "teal";
 }
+
 function submissionFileStateLabel(submission: Submission) {
-  const ready = submission.files.filter(
-    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  const files = submissionCanonicalMediaRows(submission);
+
+  if (!files.length) return "Файлы не найдены";
+
+  const ready = files.filter(
+    (file) => file.status !== "не хватает" && file.status !== "заменить",
   ).length;
 
-  return `${ready} из ${submission.files.length}`;
+  return `${ready}/${files.length}`;
+}
+
+function submissionCanonicalMediaRows(submission: Submission): CanonicalMediaRow[] {
+  return canonicalMediaTypes.map((type) => {
+    const file = submission.files.find((item) => item.type === type);
+
+    return {
+      status: canonicalMediaStatus(file?.status),
+      type: canonicalMediaTypeLabel(type),
+    };
+  });
+}
+
+function firstMissingCanonicalFile(submission: Submission) {
+  return submissionCanonicalMediaRows(submission).find(
+    (file) => file.status === "не хватает" || file.status === "заменить",
+  )?.type;
+}
+
+function canonicalMissingFilesLabel(submission: Submission) {
+  const missing = submissionCanonicalMediaRows(submission)
+    .filter((file) => file.status === "не хватает" || file.status === "заменить")
+    .map((file) => file.type);
+
+  return missing.length ? missing.join(", ") : "";
+}
+
+function canonicalMediaStatus(
+  status: Submission["files"][number]["status"] | undefined,
+) {
+  if (!status || status === "missing") return "не хватает";
+  if (status === "needs_replacement") return "заменить";
+  if (status === "accepted") return "принято";
+  if (status === "pending_review") return "на проверке";
+  return "загружено";
+}
+
+function canonicalMediaTypeLabel(type: CanonicalMediaType) {
+  if (type === "passport_scan") return "Паспорт";
+  if (type === "selfie") return "Селфи 1";
+  return "Селфи 2";
+}
+
+function safeSubmissionId(id: string) {
+  return id.trim() || "ID не указан";
+}
+
+function safeSubmissionCity(city: string) {
+  return city.trim() || "Город не указан";
+}
+
+function safeTripDates(submission: Submission) {
+  const from = submission.tripDateFrom.trim();
+  const to = submission.tripDateTo.trim();
+
+  if (!from && !to) return "Дата не указана";
+  if (!from || !to) return from || to;
+
+  return tripDates(submission);
 }
 
 function primarySubmissionIssue(submission: Submission) {
@@ -1888,13 +1823,13 @@ export function AdminReviewScreen({
           onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
           search={searchControl}
           tabs={[
-            { count: tabCounts.review, id: "review", label: "К проверке" },
+            { count: tabCounts.review, id: "review", label: "На проверке" },
             {
               count: tabCounts.corrections,
               id: "corrections",
-              label: "Исправления",
+              label: "Исправления получены",
             },
-            { count: tabCounts.events, id: "events", label: "События" },
+            { count: tabCounts.events, id: "events", label: "Входящие" },
           ]}
           tabsAriaLabel="Рабочая очередь администратора"
           tools={toolbarTools}
@@ -2288,7 +2223,9 @@ export function ExportScreen({
   const mappedCount = mappingAudit.mappedCount;
   const derivedCount = mappingAudit.derivedCount;
   const unresolvedCount = mappingAudit.unresolvedCount;
-  const [exportPanelOpen, setExportPanelOpen] = useState(true);
+  const [exportPanelOpen, setExportPanelOpen] = useState(() =>
+    defaultContextRailOpen(),
+  );
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("updated");
   const [entityMode, setEntityMode] = useState<V19EntityViewMode>("all");
   const selectedExportIdSet = useMemo(
@@ -2338,6 +2275,33 @@ export function ExportScreen({
       if (checked !== selected) onToggle(submission.id);
     });
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const resetHorizontalScroll = () => {
+      document
+        .querySelectorAll<HTMLElement>(
+          ".ops-shell.surface-export, .ops-shell.surface-export .workspace, .ops-shell.surface-export .export-grid, .ops-shell.surface-export .magic-export-queue, .ops-shell.surface-export .v19-export-toolbar, .ops-shell.surface-export .v19-state-tabs, .ops-shell.surface-export .v19-entity-switch, .ops-shell.surface-export .magic-export-list, .ops-shell.surface-export .table-wrap",
+        )
+        .forEach((element) => {
+          element.scrollLeft = 0;
+        });
+    };
+
+    resetHorizontalScroll();
+    const frameId = window.requestAnimationFrame(resetHorizontalScroll);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [
+    entityMode,
+    exportPanelOpen,
+    exportTab,
+    selectedExportIds.length,
+    sortMode,
+    visibleHistoryList.length,
+    visibleReadyList.length,
+  ]);
+
   const toolbarTools = (
     <CollectionToolbarTools
       desktopTools={
@@ -2394,7 +2358,11 @@ export function ExportScreen({
             onTabChange={onTab}
             search={searchControl}
             tabs={[
-              { count: exportReadyList.length, id: "ready", label: "Готово" },
+              {
+                count: exportReadyList.length,
+                id: "ready",
+                label: "Готово к выгрузке",
+              },
               { count: sortedHistoryList.length, id: "history", label: "История" },
             ]}
             tabsAriaLabel="Состояние выгрузки"

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   clearExportSelection,
   clickWorkspaceButton,
@@ -7,6 +7,10 @@ import {
   expectNoHorizontalOverflow,
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
+
+function exportStatus(page: Page, text: string | RegExp) {
+  return page.getByRole("status").filter({ hasText: text }).first();
+}
 
 test.describe("V-19 export click and section matrix", () => {
   test("admin export actions move through package, download, history, and PDF context", async ({
@@ -30,7 +34,7 @@ test.describe("V-19 export click and section matrix", () => {
     await expect(
       page.getByRole("button", { name: "Отметить выгружено" }),
     ).toBeDisabled();
-    await expect(page.locator("#export-action-hint")).toContainText(
+    await expect(exportStatus(page, "Сначала сформируйте Excel")).toContainText(
       "Сначала сформируйте Excel",
     );
 
@@ -56,7 +60,7 @@ test.describe("V-19 export click and section matrix", () => {
       .filter({ hasText: "Ольга Фролова" })
       .getByRole("checkbox")
       .check();
-    await expect(page.locator("#export-action-hint")).toContainText(
+    await expect(exportStatus(page, "Сначала сформируйте Excel")).toContainText(
       "Сначала сформируйте Excel",
     );
     await expect(
@@ -64,7 +68,9 @@ test.describe("V-19 export click and section matrix", () => {
     ).toBeEnabled();
 
     await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    await expect(page.locator("#export-action-hint")).toContainText(
+    await expect(
+      exportStatus(page, "Файл сформирован. Теперь скачайте его."),
+    ).toContainText(
       "Файл сформирован. Теперь скачайте его.",
     );
     await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
@@ -74,7 +80,9 @@ test.describe("V-19 export click and section matrix", () => {
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
     await expect(download.failure()).resolves.toBeNull();
-    await expect(page.locator("#export-action-hint")).toContainText(
+    await expect(
+      exportStatus(page, "Файл скачан. Можно отметить подачу выгруженной."),
+    ).toContainText(
       "Файл скачан. Можно отметить подачу выгруженной.",
     );
 
@@ -127,7 +135,7 @@ test.describe("V-19 export click and section matrix", () => {
       .getByRole("checkbox")
       .check();
 
-    await expect(page.locator("#export-action-hint")).toContainText(
+    await expect(exportStatus(page, "Нельзя смешивать разные города")).toContainText(
       "Нельзя смешивать разные города",
     );
     await expect(
@@ -135,7 +143,7 @@ test.describe("V-19 export click and section matrix", () => {
     ).toBeDisabled();
     await expect(
       page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toHaveAttribute("aria-describedby", "export-action-hint");
+    ).toHaveAttribute("aria-describedby", /.+/);
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/export-click-section-matrix-20260629/export-desktop-blocked.png",

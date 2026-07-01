@@ -253,6 +253,10 @@
   --v19-control-bg-active: var(--vf-selected-bg);
   --v19-control-fg: var(--vf-text-secondary);
   --v19-control-fg-active: var(--vf-text-primary);
+  --v19b-size-0: 0;
+  --v19b-shadow-panel: var(--shadow-dialog);
+  --vf-figma-motion-ease: var(--v19-motion-ease-out);
+  --vf-overlay: var(--vf-ref-color-rgb-0-0-0-0neg-58);
   --v19-menu-row-height: 28px;
   --v19-command-search-height: 62px;
   --v19-command-row-height: 46px;
@@ -385,7 +389,9 @@
   --vf-ref-color-hexneg-fff: #fff;
   --vf-ref-color-hexneg-ffffff: #ffffff;
   --vf-ref-color-rgb-0-0-0-0neg-1: rgb(0 0 0 / 0.1);
+  --vf-ref-color-rgb-0-0-0-0neg-18: rgb(0 0 0 / 0.18);
   --vf-ref-color-rgb-0-0-0-0neg-2: rgb(0 0 0 / 0.2);
+  --vf-ref-color-rgb-0-0-0-0neg-22: rgb(0 0 0 / 0.22);
   --vf-ref-color-rgb-0-0-0-0neg-32: rgb(0 0 0 / 0.32);
   --vf-ref-color-rgb-0-0-0-0neg-4: rgb(0 0 0 / 0.4);
   --vf-ref-color-rgb-0-0-0-0neg-42: rgb(0 0 0 / 0.42);
@@ -31848,12 +31854,6 @@ p {
   padding: var(--v19-space-md) var(--v19-agent-context-padding) !important;
   border-top: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
   background: color-mix(in srgb, var(--v19-panel) 92%, black) !important;
-}
-
-.ops-shell.surface-export
-  .v19-context-panel-body
-  :is(.v17-blocker-callout, .magic-export-preview) {
-  display: none !important;
 }
 
 .v19-panel-action-footer {

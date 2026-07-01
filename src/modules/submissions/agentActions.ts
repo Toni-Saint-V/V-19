@@ -325,7 +325,7 @@ function actionTaskStatus(action: AgentActionItem): AgentActionTaskStatus {
 }
 
 function actionTaskStatusLabel(status: AgentActionTaskStatus) {
-  if (status === "error") return "Ошибка";
+  if (status === "error") return "Требует исправления";
   if (status === "action_required") return "Требует действия";
   if (status === "ready") return "Готово";
   if (status === "blocked") return "Заблокировано";

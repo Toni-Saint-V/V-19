@@ -13,8 +13,8 @@ import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchBar, StateTabs } from "./shared/ui/primitives";
 import {
-  adminActionQueue,
   agentActionQueue,
+  adminInboxEvents,
   searchAgentActions,
 } from "./modules/submissions/agentActions";
 import {
@@ -113,6 +113,7 @@ import { FigmaQuestionnaireScreen } from "./modules/submissions/components/Figma
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import {
   AgentActionsScreen,
+  AdminReviewScreen,
   AgentInboxScreen,
   AgentSubmissionsScreen,
   ExportScreen,
@@ -173,11 +174,6 @@ import { buildReturnedPdfAgentHandoffGate } from "./modules/submissions/operatio
 import { publishReturnedPdfAgentHandoff } from "./modules/submissions/returnedPdfHandoffPersistence";
 import type { AppProfile } from "./types/session";
 
-const FigmaActionQueueVisual = lazy(() =>
-  import("./modules/submissions/pages/FigmaVisualScreens").then((module) => ({
-    default: module.FigmaActionQueueVisual,
-  })),
-);
 const CreateSubmissionDrawer = lazy(() =>
   import("./modules/submissions/components/CreateSubmissionDrawer").then((module) => ({
     default: module.CreateSubmissionDrawer,
@@ -600,25 +596,8 @@ function MainApp() {
     () => searchSubmissions(adminReviewSource, query, visualSurfaceCityFilter),
     [adminReviewSource, query, visualSurfaceCityFilter],
   );
-  const adminActions = useMemo(
-    () => adminActionQueue(searchedReviewQueue),
-    [searchedReviewQueue],
-  );
-  const searchedOpenAdminActions = useMemo(
-    () => searchAgentActions(adminActions.open, query),
-    [adminActions.open, query],
-  );
-  const searchedCompletedAdminActions = useMemo(
-    () => searchAgentActions(adminActions.completed, query),
-    [adminActions.completed, query],
-  );
-  const adminWorkSubmissionCount = useMemo(
-    () =>
-      searchedReviewQueue.filter(
-        (submission) =>
-          matchesReviewTab("review")(submission) ||
-          matchesReviewTab("corrections")(submission),
-      ).length,
+  const searchedAdminInboxEvents = useMemo(
+    () => adminInboxEvents(searchedReviewQueue),
     [searchedReviewQueue],
   );
   const agentList = highestPriorityFirst(
@@ -672,11 +651,10 @@ function MainApp() {
     surface === "agent-actions" ||
     surface === "agent-inbox" ||
     surface === "agent-submissions" ||
-    surface === "admin-review";
-  const workspaceSurfaceTitle =
-    surface === "admin-review" ? "Проверка" : surfaceTitle(surface);
-  const workspaceSurfaceDescription =
-    surface === "admin-review" ? "Проверка и события" : surfaceDescription(surface);
+    surface === "admin-review" ||
+    surface === "export";
+  const workspaceSurfaceTitle = surfaceTitle(surface);
+  const workspaceSurfaceDescription = surfaceDescription(surface);
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
   const localAuthHasWorkspaceAccess =
     localAuthSession?.status === "active" &&
@@ -709,14 +687,23 @@ function MainApp() {
   const sessionRoleLabel =
     isSupabaseMode && remoteProfile
       ? remoteProfile.role === "admin"
-        ? "Admin profile"
-        : "Agent profile"
+        ? "Профиль админа"
+        : "Профиль агента"
       : localAuthSession
-        ? `${localAuthSession.role === "admin" ? "Админ" : "Агент"} · local/dev auth`
-        : `${role === "agent" ? "Агент" : "Админ"} · VisaFlow Operations`;
+        ? `${localAuthSession.role === "admin" ? "Админ" : "Агент"} · локальный доступ`
+        : `${role === "agent" ? "Агент" : "Админ"} · операции VisaFlow`;
   const operationalNavItems: OperationalNavItem[] =
     role === "agent"
       ? [
+          {
+            active: surface === "agent-inbox" && agentInboxMode === "events",
+            count: agentInboxUnreadCount,
+            icon: "В",
+            id: "agent-inbox",
+            label: "Входящие",
+            meta: "События",
+            onClick: showAgentInbox,
+          },
           {
             active: surface === "agent-actions",
             count: agentActions.summary.open,
@@ -745,10 +732,28 @@ function MainApp() {
         ]
       : [
           {
-            active: surface === "admin-review",
-            count: adminWorkSubmissionCount,
+            active: surface === "admin-review" && reviewTab === "events",
+            count: searchedAdminInboxEvents.length,
+            icon: "В",
+            id: "admin-inbox",
+            label: "Входящие",
+            meta: "События",
+            onClick: () => showReviewTab("events"),
+          },
+          {
+            active: surface === "admin-review" && reviewTab === "corrections",
+            count: searchedReviewQueue.filter(matchesReviewTab("corrections")).length,
+            icon: "Д",
+            id: "admin-actions",
+            label: "Мои действия",
+            meta: "Исправления",
+            onClick: () => showReviewTab("corrections"),
+          },
+          {
+            active: surface === "admin-review" && reviewTab === "review",
+            count: searchedReviewQueue.filter(matchesReviewTab("review")).length,
             icon: "М",
-            id: "admin-work",
+            id: "admin-review",
             label: "Проверка",
             meta: "Очередь",
             onClick: () => showReviewTab("review"),
@@ -1214,6 +1219,17 @@ function MainApp() {
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
       const nextSubmission = firstAgentActionSubmission();
+      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
+  function showAgentInbox() {
+    requestSettingsLeave(() => {
+      setSurface("agent-inbox");
+      setAgentInboxMode("events");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+      const nextSubmission = searchedAgentQueue[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
@@ -3111,26 +3127,23 @@ function MainApp() {
     />
   );
 
-  const pageHeaderDescription =
-    surface !== "agent-actions" &&
-    surface !== "agent-inbox" &&
-    surface !== "agent-submissions" &&
-    surface !== "export"
-      ? workspaceSurfaceDescription
-      : null;
+  const pageHeaderDescription = workspaceSurfaceDescription;
 
-  const pageHeaderActions = isFigmaVisualSurface ? null : surface === "agent-submissions" ? (
-    <div className="topbar-actions v19-agent-submissions-actions">
+  const primaryTopbarActionLabel =
+    surface === "agent-submissions" ? "Новая подача" : null;
+
+  const pageHeaderActions = primaryTopbarActionLabel ? (
+    <div className="topbar-actions v19-agent-primary-actions v19-agent-submissions-actions">
       <Button
-        aria-label="Новая подача"
+        aria-label={primaryTopbarActionLabel}
         className="v19-topbar-cta"
         variant="primary"
         onClick={openCreateSubmissionDrawer}
       >
-        Новая подача
+        {primaryTopbarActionLabel}
       </Button>
     </div>
-  ) : surface === "agent-inbox" ? (
+  ) : isFigmaVisualSurface ? null : surface === "agent-inbox" ? (
     <div className="v19-topbar-city-filter">{cityFilterControl}</div>
   ) : !isV19CollectionSurface || isSupabaseMode ? (
     <div className="topbar-actions">
@@ -3318,7 +3331,9 @@ function MainApp() {
           <AgentActionsScreen
             completedActions={searchedCompletedAgentActions}
             errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
+            hasSearchQuery={query.trim().length > 0}
             loading={remoteSaveState === "loading"}
+            onClearSearch={() => setQuery("")}
             onOpen={openSubmission}
             onRetryError={
               remoteSaveState === "error"
@@ -3327,18 +3342,28 @@ function MainApp() {
             }
             openActions={searchedOpenAgentActions}
             searchControl={agentActionsSearchControl}
+            totalActionCount={agentActions.open.length + agentActions.completed.length}
           />
         ) : surface === "admin-review" ? (
-          <Suspense fallback={null}>
-            <FigmaActionQueueVisual
-              completedActions={searchedCompletedAdminActions}
-              onOpen={openSubmission}
-              onSearch={setQuery}
-              openActions={searchedOpenAdminActions}
-              query={query}
-              summary={adminActions.summary}
-            />
-          </Suspense>
+          <AdminReviewScreen
+            error={remoteSaveState === "error" ? remoteSaveError : ""}
+            filterControl={adminFilterControl}
+            inboxEvents={searchedAdminInboxEvents}
+            loading={remoteSaveState === "loading"}
+            onAddIssue={(submission) => {
+              selectSubmission(submission);
+              openSubmission(submission, "issues");
+            }}
+            onOpen={openSubmission}
+            onSelect={selectSubmission}
+            onTab={showReviewTab}
+            permissionDenied={role !== "admin"}
+            reviewList={reviewList}
+            reviewSource={searchedReviewQueue}
+            reviewTab={reviewTab}
+            searchControl={searchControl}
+            visibleSubmission={activeSubmission}
+          />
         ) : surface === "agent-inbox" ? (
           <>
             <div className="v19-inbox-mode-tabs">
@@ -3374,7 +3399,9 @@ function MainApp() {
               <AgentActionsScreen
                 completedActions={searchedCompletedAgentActions}
                 errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
+                hasSearchQuery={query.trim().length > 0}
                 loading={remoteSaveState === "loading"}
+                onClearSearch={() => setQuery("")}
                 onOpen={openSubmission}
                 onRetryError={
                   remoteSaveState === "error"
@@ -3383,6 +3410,7 @@ function MainApp() {
                 }
                 openActions={searchedOpenAgentActions}
                 searchControl={agentActionsSearchControl}
+                totalActionCount={agentActions.open.length + agentActions.completed.length}
               />
             )}
           </>

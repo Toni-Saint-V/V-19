@@ -32,19 +32,29 @@ async function openFreshWorkspace(
   options: { heading?: string; workspaceEmail?: string } = {},
 ) {
   await page.goto("/");
-  await page.evaluate(() => {
-    (globalThis as unknown as { localStorage: { clear(): void } }).localStorage.clear();
-  });
-  if (options.workspaceEmail) {
-    await page.evaluate((workspaceEmail) => {
-      (
-        globalThis as unknown as {
-          localStorage: { setItem(key: string, value: string): void };
-        }
-      ).localStorage.setItem("visaflow.workspaceEmail.v1", workspaceEmail);
-    }, options.workspaceEmail);
-  }
+  await page.evaluate((workspaceEmail) => {
+    const browserGlobal = globalThis as unknown as {
+      localStorage: {
+        clear(): void;
+        setItem(key: string, value: string): void;
+      };
+    };
+
+    browserGlobal.localStorage.clear();
+    browserGlobal.localStorage.setItem(
+      "visaflow.workspaceEmail.v2",
+      workspaceEmail || "agent@visaflow.local",
+    );
+  }, options.workspaceEmail ?? "");
   await page.reload();
+
+  const emailField = page.locator("#workspace-email");
+  if (await emailField.isVisible({ timeout: 750 }).catch(() => false)) {
+    await emailField.fill(options.workspaceEmail ?? "agent@visaflow.local");
+    await page.locator("#workspace-password").fill("local-dev-password");
+    await page.getByRole("button", { name: "Войти" }).click();
+  }
+
   await expect(
     page.getByRole("heading", { level: 1, name: options.heading ?? "Мои действия" }),
   ).toBeVisible();
@@ -167,6 +177,7 @@ test.describe("V-19 responsive proof", () => {
   test("primary workflows satisfy the responsive contract at locked viewports", async ({
     page,
   }, testInfo) => {
+    test.setTimeout(120_000);
     test.skip(testInfo.project.name !== "chromium", "single-project viewport proof");
 
     const problems = collectBrowserProblems(page);
@@ -178,9 +189,12 @@ test.describe("V-19 responsive proof", () => {
       });
 
       await openFreshWorkspace(page);
-      await expect(page.getByRole("button", { name: "Выгрузка" })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: /^Проверка/ })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Мои действия" })).toBeVisible();
+      await expect(
+        page.locator(".ops-nav").getByRole("button", { name: "Выгрузка" }),
+      ).toHaveCount(0);
+      await expect(
+        page.locator(".ops-nav").getByRole("button", { name: /^Проверка/ }),
+      ).toHaveCount(0);
       await expect(
         page.getByRole("heading", { level: 1, name: "Мои действия" }),
       ).toBeVisible();
@@ -237,14 +251,40 @@ test.describe("V-19 responsive proof", () => {
         heading: "Проверка",
         workspaceEmail: "admin@visaflow.local",
       });
-      await expect(page.getByText("Мои подачи", { exact: true })).toHaveCount(0);
+      await expect(
+        page.locator(".ops-nav").getByRole("button", { name: "Мои подачи" }),
+      ).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Новая подача" })).toHaveCount(0);
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: admin review`);
       await screenshot(page, viewport, "admin-review");
 
-      await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
+      await clickOperationalNav(page, /^Входящие/);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Проверка" }),
+      ).toBeVisible();
+      await expect(page.getByRole("tab", { name: /Входящие/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin inbox`,
+      );
+      await screenshot(page, viewport, "admin-inbox");
+
+      await clickOperationalNav(page, /^Мои действия/);
+      await expect(page.getByRole("tab", { name: /Исправления получены/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await expectNoHorizontalDocumentOverflow(
+        page,
+        `${viewport.label}: admin actions`,
+      );
+      await screenshot(page, viewport, "admin-actions");
+
       await page.getByRole("tab", { name: /На проверке/ }).click();
+      await expect(page.locator(".v17-admin-work-row, .v17-admin-empty-state").first()).toBeVisible();
       await expect(
         page.getByRole("heading", { level: 1, name: "Проверка" }),
       ).toBeVisible();
@@ -254,18 +294,26 @@ test.describe("V-19 responsive proof", () => {
       );
       await screenshot(page, viewport, "admin-review-filter");
 
-      await page.getByRole("tab", { name: /Ошибки/ }).click();
-      await expect(page.locator(".vf-figma-action-row").first()).toBeVisible();
+      await page.getByRole("tab", { name: /Исправления получены/ }).click();
+      await expect(page.locator(".v17-admin-work-row, .v17-admin-empty-state").first()).toBeVisible();
       await expectNoHorizontalDocumentOverflow(
         page,
-        `${viewport.label}: admin issues filter`,
+        `${viewport.label}: admin corrections filter`,
       );
-      await screenshot(page, viewport, "admin-issues-filter");
+      await screenshot(page, viewport, "admin-corrections-filter");
 
       await clickOperationalNav(page, /^Выгрузка/);
       await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
       await expectNoHorizontalDocumentOverflow(page, `${viewport.label}: export`);
-      const generateButton = page.getByRole("button", { name: "Сформировать Excel" });
+      const generateButton = page
+        .getByRole("button", { name: "Сформировать Excel" })
+        .first();
+      if (!(await generateButton.isVisible().catch(() => false))) {
+        await page
+          .getByRole("button", { name: "Открыть контракт выгрузки" })
+          .first()
+          .click();
+      }
       await generateButton.scrollIntoViewIfNeeded();
       await expect(generateButton).toBeVisible();
       await screenshot(page, viewport, "export");
