@@ -41,6 +41,7 @@ import {
   type ExportTab,
 } from "../uiTypes";
 import { EmptyState } from "../components/Primitives";
+import { AgentActionsCommandCockpit } from "../components/AgentActionsCommandCockpit";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
   CollectionToolbarTools,
@@ -48,7 +49,6 @@ import {
 } from "../components/CollectionComposition";
 import { RailCard, useRailDisclosure } from "../components/RightRailPrimitives";
 import {
-  ActionRow,
   CollectionGroupLabel,
   CollectionRow,
   CollectionToolbar,
@@ -217,17 +217,9 @@ export function AgentActionsScreen({
   summary: AgentActionSummary;
 }) {
   const [activeTab, setActiveTab] = useState<"open" | "completed">("open");
-  const [comfortableView, setComfortableView] = useState(true);
   const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "today" | "week">(
     "all",
   );
-  const hasContextRail = cityControl != null;
-  const railDisclosure = useRailDisclosure({
-    defaultOpen: defaultContextRailOpen(),
-    enabled: hasContextRail,
-    transition: transitionUiState,
-  });
-  const panelOpen = railDisclosure.open;
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [sortOldest, setSortOldest] = useState(false);
 
@@ -307,46 +299,12 @@ export function AgentActionsScreen({
             onRemove: () => transitionUiState(() => setSortOldest(false)),
           }
         : null,
-      comfortableView
-        ? null
-        : {
-            id: "density",
-            label: "Компактный вид",
-            onRemove: () => transitionUiState(() => setComfortableView(true)),
-          },
     ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setDueFilter("all");
       setSortOldest(false);
-      setComfortableView(true);
     });
-  function closePanel() {
-    railDisclosure.close();
-  }
-
-  function togglePanel() {
-    railDisclosure.toggle();
-  }
-
-  const panelToggleTool = (
-    <ToolbarIconButton
-      label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-      icon="panel"
-      pressed={panelOpen}
-      onClick={togglePanel}
-    />
-  );
-  const mobilePanelToggleTool = hasContextRail ? (
-    <div className="v19-mobile-context-tool">
-      <ToolbarIconButton
-        label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-        icon="panel"
-        pressed={panelOpen}
-        onClick={togglePanel}
-      />
-    </div>
-  ) : null;
   const toolbarToolButtons = (
     <>
       <ToolbarIconButton
@@ -365,7 +323,6 @@ export function AgentActionsScreen({
         pressed={sortOldest}
         onClick={() => transitionUiState(() => setSortOldest((value) => !value))}
       />
-      {hasContextRail ? panelToggleTool : null}
     </>
   );
   type ActionMobileFilter = "completed" | "open" | "overdue" | "today";
@@ -384,7 +341,6 @@ export function AgentActionsScreen({
   const toolbarTools = (
     <CollectionToolbarTools
       desktopTools={toolbarToolButtons}
-      mobileContextTool={mobilePanelToggleTool}
       mobileFilter={
       <MobileFilterSheet<ActionMobileFilter>
         label="Фильтры действий"
@@ -415,159 +371,82 @@ export function AgentActionsScreen({
     onOpen(action.submission, drawerTabForScreenTarget(target, action.tab), target);
   }
 
+  function openActionTab(action: AgentActionItem, tab: DrawerTab) {
+    const target = targetForSubmissionTab(action.submission, tab);
+
+    setSelectedActionId(action.id);
+    onOpen(action.submission, drawerTabForScreenTarget(target, tab), target);
+  }
+
+  function openActionIssue(action: AgentActionItem, issue: Submission["issues"][number]) {
+    setSelectedActionId(action.id);
+    onOpen(action.submission, drawerTabForIssue(issue), targetForIssue(issue));
+  }
+
   return (
-    <>
-      <div
-        className={`v19-screen-grid v19-inbox-screen v19-actions-screen ${
-          panelOpen ? "" : "is-panel-closed"
-        } ${comfortableView ? "is-comfortable" : "is-compact"}`}
+    <div className="v19-screen-grid v19-inbox-screen v19-actions-screen is-panel-closed">
+      <section
+        className={
+          activeFilters.length
+            ? "v19-actions-cockpit-shell has-active-filters"
+            : "v19-actions-cockpit-shell"
+        }
+        aria-labelledby="agent-inbox-actions-title"
       >
-        <CardComponent
-          as="section"
-          className={
-            activeFilters.length
-              ? "v19-collection-panel has-active-filters"
-              : "v19-collection-panel"
-          }
-          aria-labelledby="agent-inbox-actions-title"
-        >
-          <h2 id="agent-inbox-actions-title" className="sr-only">
-            Мои действия
-          </h2>
+        <h2 id="agent-inbox-actions-title" className="sr-only">
+          Мои действия
+        </h2>
 
-          <CollectionToolbar
-            activeFilters={activeFilters}
-            ariaLabel="Инструменты действий"
-            className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
-            mobileCityControl={cityControl}
-            mobileTitle="Мои действия"
-            onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-            onTabChange={(nextTab) => transitionUiState(() => setActiveTab(nextTab))}
-            search={searchControl}
-            tabs={[
-              { count: summary.open, id: "open", label: "Открытые" },
-              {
-                count: summary.completed || undefined,
-                id: "completed",
-                label: "Выполненные",
-              },
-            ]}
-            tabsAriaLabel="Состояние действий"
-            tools={toolbarTools}
-            value={activeTab}
-          />
-
-          {visibleActions.length ? (
-            <div
-              className="v19-event-list v19-action-list"
-              aria-label="Список действий"
-            >
-              <div className="v19-action-insights" aria-label="Сводка действий">
-                <span className="tone-danger">
-                  <strong>{summary.overdue}</strong>
-                  <em>просрочено</em>
-                </span>
-                <span className="tone-amber">
-                  <strong>{summary.today}</strong>
-                  <em>сегодня</em>
-                </span>
-                <span className="tone-teal">
-                  <strong>{summary.completed}</strong>
-                  <em>выполнено</em>
-                </span>
-              </div>
-              <CollectionGroupLabel className="v19-action-group-label">
-                {actionGroupLabel}
-              </CollectionGroupLabel>
-              {visibleActions.map((action) => (
-                <ActionRow
-                  badges={action.badges}
-                  context={`${action.context}`}
-                  cta={action.cta}
-                  dueLabel={action.dueLabel}
-                  key={action.id}
-                  severity={action.severity}
-                  selected={selectedAction?.id === action.id}
-                  submissionId={action.submission.id}
-                  title={action.title}
-                  onOpen={() => openAction(action)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div
-              className="v19-empty-state"
-              key={`actions-empty-${activeTab}-${dueFilter}`}
-            >
-              <h3>{emptyState.title}</h3>
-              <p>{emptyState.body}</p>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  transitionUiState(() => {
-                    if (activeTab === "completed") {
-                      setActiveTab("open");
-                      return;
-                    }
-
-                    if (dueFilter !== "all") {
-                      setDueFilter("all");
-                      return;
-                    }
-
-                    setActiveTab("completed");
-                  })
-                }
-              >
-                {emptyState.action}
-              </Button>
-            </div>
-          )}
-        </CardComponent>
-      </div>
-
-      {hasContextRail && panelOpen ? (
-        <button className="v19-context-backdrop" type="button" onClick={closePanel}>
-          <span className="sr-only">Закрыть контекст</span>
-        </button>
-      ) : null}
-
-      {hasContextRail && panelOpen && selectedAction ? (
-        <AgentSubmissionContextRail
-          applicantSummary={applicantCountLabel(
-            selectedAction.submission.applicants.length,
-          )}
-          fileSummary={submissionFileStateLabel(selectedAction.submission).replace(
-            "Файлы ",
-            "",
-          )}
-          history={selectedAction.submission.history}
-          issues={selectedAction.submission.issues
-            .filter((issue) => issue.status === "open")
-            .slice(0, 4)
-            .map((issue) => ({
-              id: issue.id,
-              reason: issue.reason,
-              targetLine: issueTargetLine(issue),
-              tone: issue.severity === "blocker" ? "danger" : "warning",
-              onOpen: () => {
-                onOpen(
-                  selectedAction.submission,
-                  drawerTabForIssue(issue),
-                  targetForIssue(issue),
-                );
-              },
-            }))}
-          openIssueCount={openIssueCount(selectedAction.submission)}
-          submission={selectedAction.submission}
-          tripSummary={tripDates(selectedAction.submission)}
-          onClose={closePanel}
-          onOpenTab={(tab) => {
-            onOpen(selectedAction.submission, tab);
-          }}
+        <CollectionToolbar
+          activeFilters={activeFilters}
+          ariaLabel="Инструменты действий"
+          className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
+          mobileCityControl={cityControl}
+          mobileTitle="Мои действия"
+          onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
+          onTabChange={(nextTab) => transitionUiState(() => setActiveTab(nextTab))}
+          search={searchControl}
+          tabs={[
+            { count: summary.open, id: "open", label: "Открытые" },
+            {
+              count: summary.completed || undefined,
+              id: "completed",
+              label: "Выполненные",
+            },
+          ]}
+          tabsAriaLabel="Состояние действий"
+          tools={toolbarTools}
+          value={activeTab}
         />
-      ) : null}
-    </>
+
+        <AgentActionsCommandCockpit
+          actionGroupLabel={actionGroupLabel}
+          actions={visibleActions}
+          emptyState={emptyState}
+          selectedAction={selectedAction}
+          summary={summary}
+          onEmptyAction={() =>
+            transitionUiState(() => {
+              if (activeTab === "completed") {
+                setActiveTab("open");
+                return;
+              }
+
+              if (dueFilter !== "all") {
+                setDueFilter("all");
+                return;
+              }
+
+              setActiveTab("completed");
+            })
+          }
+          onOpenAction={openAction}
+          onOpenIssue={openActionIssue}
+          onOpenTab={openActionTab}
+          onSelectAction={(action) => setSelectedActionId(action.id)}
+        />
+      </section>
+    </div>
   );
 }
 
