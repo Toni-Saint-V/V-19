@@ -90,14 +90,23 @@ export async function openMobileMenu(page: Page) {
 
 export async function clickFirstVisible(locator: Locator) {
   const count = await locator.count();
+  let lastError: unknown = null;
 
   for (let index = 0; index < count; index += 1) {
     const candidate = locator.nth(index);
 
     if (await isVisible(candidate)) {
-      await candidate.click();
-      return;
+      try {
+        await candidate.click({ timeout: 10_000 });
+        return;
+      } catch (error) {
+        lastError = error;
+      }
     }
+  }
+
+  if (lastError) {
+    throw lastError;
   }
 
   throw new Error("No visible locator matched.");
@@ -115,19 +124,49 @@ export async function expectAtLeastOneVisible(locator: Locator, message: string)
   throw new Error(message);
 }
 
+async function hasAtLeastOneVisible(locator: Locator) {
+  const count = await locator.count();
+
+  for (let index = 0; index < count; index += 1) {
+    if (await isVisible(locator.nth(index))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export async function expectVisibleText(
+  scope: Locator,
+  text: string | RegExp,
+  message?: string,
+) {
+  const matches = scope.getByText(text);
+  const count = await matches.count();
+
+  for (let index = 0; index < count; index += 1) {
+    const candidate = matches.nth(index);
+
+    if (await isVisible(candidate)) {
+      await expect(candidate).toBeVisible();
+      return;
+    }
+  }
+
+  throw new Error(message ?? `No visible text matched ${String(text)}.`);
+}
+
 export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
   const button = page.getByRole("button", { name });
 
-  if (!(await isVisible(button.first()))) {
+  if (!(await hasAtLeastOneVisible(button))) {
     await openMobileMenu(page);
   }
 
-  await button
-    .first()
-    .waitFor({ state: "visible", timeout: 5_000 })
-    .catch(async () => {
-      await openMobileMenu(page);
-    });
+  await expectAtLeastOneVisible(
+    button,
+    `No visible workspace button matched ${String(name)}.`,
+  );
 
   await clickFirstVisible(button);
 }

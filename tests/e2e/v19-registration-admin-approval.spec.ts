@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
+import {
+  clickWorkspaceButton,
+  collectBrowserProblems,
+  openFreshWorkspace,
+} from "./v19-pilot-helpers";
 
 const userPassword = "secure-local-password";
 
@@ -76,7 +80,7 @@ test.describe("V-19 registration admin approval", () => {
     await logout(page);
     await login(page, "admin@visaflow.local", "local-dev-password");
     await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
-    await page.getByRole("button", { name: /Настройки/ }).click();
+    await clickWorkspaceButton(page, /^Настройки$/);
     await page.getByRole("button", { name: "Входящие заявки" }).click();
     const queue = page.getByTestId("admin-access-queue");
     await expect(queue).toBeVisible();
@@ -100,7 +104,7 @@ test.describe("V-19 registration admin approval", () => {
     await logout(page);
     await login(page, "admin@visaflow.local", "local-dev-password");
     await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
-    await page.getByRole("button", { name: /Настройки/ }).click();
+    await clickWorkspaceButton(page, /^Настройки$/);
     await page.getByRole("button", { name: "Входящие заявки" }).click();
     await expect(queue.getByText(secondAgentEmail)).toBeVisible();
     await queue

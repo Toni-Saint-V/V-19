@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { clickWorkspaceButton } from "./v19-pilot-helpers";
 
 async function openFreshWorkspace(
   page: Page,
@@ -62,7 +63,7 @@ test.describe("V-19 accessibility contract", () => {
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
     await expectNoAxeViolations(page, "agent actions");
 
-    await page.getByRole("button", { name: "Мои подачи" }).click();
+    await clickWorkspaceButton(page, /^Мои подачи$/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Мои подачи" }),
     ).toBeVisible();
@@ -89,7 +90,7 @@ test.describe("V-19 accessibility contract", () => {
 
     await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Мои действия" })).toHaveCount(0);
-    await page.getByRole("button", { name: /^Проверка/ }).click();
+    await clickWorkspaceButton(page, /^Проверка$/);
     await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
 
     await page.locator(".submission-card, [data-submission-card], .vf-figma-action-row").first().click();
@@ -98,7 +99,7 @@ test.describe("V-19 accessibility contract", () => {
     await expectNoAxeViolations(page, "submission drawer");
     await drawer.getByRole("button", { name: /Закрыть (подачу|проверку)/ }).first().click();
 
-    await page.getByRole("button", { name: "Выгрузка" }).click();
+    await clickWorkspaceButton(page, /^Выгрузка$/);
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
     await expectNoAxeViolations(page, "admin export");
   });
