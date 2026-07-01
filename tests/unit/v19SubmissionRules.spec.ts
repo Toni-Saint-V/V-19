@@ -12,6 +12,7 @@ import {
   adminActionQueue,
   adminInboxEvents,
   agentActionQueue,
+  buildAgentActionTasks,
 } from "../../src/modules/submissions/agentActions";
 import {
   buildExportMappingAudit,
@@ -834,6 +835,75 @@ describe("V-19 submission actions", () => {
     );
     expect(queue.open.some((action) => action.title.includes("Заполнить"))).toBe(false);
     expect(queue.open.some((action) => action.cta === "Добавить")).toBe(true);
+  });
+
+  it("derives agent action tasks with status, reason, readiness, and fail-closed export CTA", () => {
+    const queue = agentActionQueue(
+      agentQueue(initialSubmissions, defaultLocalAgentOwnerId),
+    );
+    const tasks = buildAgentActionTasks([...queue.open, ...queue.completed]);
+
+    const fileErrorTask = tasks.find((task) => task.id.startsWith("replace-"));
+    expect(fileErrorTask).toMatchObject({
+      nextAction: {
+        detail: "Заменить файл «селфи 1».",
+        label: "Заменить селфи 1",
+        primaryLabel: "Заменить файл",
+        tab: "files",
+        target: "files",
+      },
+      priority: {
+        label: "Срочно",
+        reason: "Дедлайн сегодня",
+        source: "deadline",
+      },
+      problem: "Файлы не готовы",
+      problemDetail: "Файл «селфи 1» требует замены.",
+      problemScope: "applicant",
+      progressSummary: {
+        files: "Файлы 4/6",
+        form: "Анкета с ошибками",
+        review: "Проверка ожидает",
+      },
+      status: "error",
+      statusLabel: "Ошибка",
+      statusLine: "Ошибка: файлы не готовы",
+    });
+    expect(fileErrorTask?.importanceText).toBe("Без этого подачу нельзя продолжить.");
+    expect(fileErrorTask?.reason).toContain("файл требует замены");
+    expect(fileErrorTask?.readiness.files.label).toContain("Файлы:");
+    expect(fileErrorTask?.readiness.finalResult.label).toBe(
+      "Итог: нельзя продолжить",
+    );
+
+    const questionnaireTask = tasks.find((task) => task.id.startsWith("questionnaire-"));
+    expect(questionnaireTask).toMatchObject({
+      nextAction: { label: "Открыть анкету", tab: "questionnaire", target: "form" },
+      priority: { label: "Срочно", reason: "Дедлайн сегодня" },
+      problem: "Анкета заполнена не полностью",
+      status: "action_required",
+      statusLabel: "Требует действия",
+      statusLine: "Требует действия: анкета неполная",
+    });
+
+    const exportReadyTask = tasks.find(
+      (task) => task.submission.status === "ready_for_export",
+    );
+    expect(exportReadyTask).toMatchObject({
+      nextAction: {
+        label: "Открыть статус выгрузки",
+        primaryLabel: "Проверить статус",
+        tab: "history",
+        target: "history",
+      },
+      problem: "Подача готова к выгрузке",
+      priority: { label: "", reason: "", source: "none" },
+      problemScope: "submission",
+      status: "ready",
+      statusLabel: "Готово",
+      statusLine: "Готово: можно выгружать",
+    });
+    expect(exportReadyTask?.reason).toContain("агентских прав на выгрузку нет");
   });
 
   it("derives admin inbox and action queues from review and export states", () => {

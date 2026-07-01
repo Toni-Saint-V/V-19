@@ -188,15 +188,12 @@
   --v19b-button-padding-x: var(--v19b-size-14);
   --v19b-card-padding: var(--v19b-size-18);
   --v19b-card-padding-mobile: var(--v19b-size-12);
-  --v19b-sidebar-padding: var(--v19b-size-18);
   --v19b-right-rail-padding: var(--v19b-size-16);
   --v19b-section-gap: var(--v19b-size-16);
   --v19b-control-gap: var(--v19b-size-2);
   --v19b-list-gap: var(--v19b-size-8);
   --v19b-row-grid-gap: var(--v19b-size-14);
   --v19b-mobile-safe-bottom: max(var(--v19b-size-24), env(safe-area-inset-bottom));
-
-  --v19-sidebar-width: var(--v19b-size-288);
   --v19-topbar-height: var(--v19b-size-64);
   --v19-workspace-content-max-width: var(--v19b-size-1460);
   --v19-agent-screen-max-width: var(--v19b-size-1460);
@@ -223,73 +220,6 @@
 }
 
 /* Primitive foundation */
-
-:where(
-    .mp-button,
-    .btn,
-    .icon-button,
-    .ghost-button,
-    .secondary-button,
-    .compact-button,
-    .primary-button,
-    .ops-nav-item,
-    .ops-sidebar-create,
-    .ops-mobile-tabbar-item,
-    .v19-toolbar-icon,
-    .v19-event-action,
-    .vf-figma-open-button,
-    .v17-export-close,
-    .export-table-row-action,
-    .v17-admin-summary-action
-  ) {
-  font-family: var(--v19b-font-family);
-  transition:
-    border-color var(--v19b-motion-fast),
-    background var(--v19b-motion-fast),
-    color var(--v19b-motion-fast),
-    box-shadow var(--v19b-motion-fast),
-    opacity var(--v19b-motion-fast),
-    transform var(--v19b-motion-fast);
-}
-
-:where(
-    .mp-button,
-    .btn,
-    .icon-button,
-    .ghost-button,
-    .secondary-button,
-    .compact-button,
-    .primary-button,
-    .ops-nav-item,
-    .ops-sidebar-create,
-    .ops-mobile-tabbar-item,
-    .v19-toolbar-icon,
-    .v19-event-action,
-    .vf-figma-open-button,
-    .v17-export-close,
-    .export-table-row-action,
-    .v17-admin-summary-action,
-    .search,
-    .mp-select,
-    .topbar-filter,
-    .v19-city-filter-trigger,
-    .v19-state-tabs button,
-    .vf-figma-tabs button,
-    .vf-figma-view-toggle button,
-    .v19-event-row,
-    .v19-submission-row,
-    .vf-figma-action-row,
-    .v19-rail-card,
-    .v17-rail-card,
-    .vf-figma-family-card,
-    .vf-figma-individual-card,
-    .v19-drawer-file-section-head,
-    .v19-drawer-file-action
-  ):focus-visible {
-  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
-  outline-offset: var(--v19b-size-2);
-  box-shadow: var(--v19b-focus-ring-shadow);
-}
 
 html,
 body,
@@ -321,12 +251,6 @@ body,
   --v19-accent: var(--v19b-color-primary);
   --v19-accent-hover: var(--v19b-color-primary-hover);
   color: var(--v19b-color-text);
-}
-
-.ops-shell.has-unified-side-menu .ops-sidebar {
-  width: var(--v19b-size-288);
-  border-color: var(--v19b-color-border);
-  background: var(--v19b-color-panel);
 }
 
 .workspace > .topbar {
@@ -888,14 +812,6 @@ body,
 
 /* Shared navigation primitives */
 
-.ops-shell.has-unified-side-menu .ops-sidebar,
-.ops-sidebar {
-  width: var(--v19-sidebar-width);
-  padding: var(--v19b-sidebar-padding);
-  border-right: var(--v19b-size-1) solid var(--v19b-color-border);
-  background: var(--v19b-color-panel);
-}
-
 .ops-brand,
 .opsu-brand {
   min-height: var(--v19b-size-64);
@@ -995,8 +911,7 @@ body,
 }
 
 .ops-nav-icon,
-.opsu-nav-icon,
-.ops-mobile-tabbar-icon {
+.opsu-nav-icon {
   width: var(--v19b-size-24);
   height: var(--v19b-size-24);
   color: currentColor;
@@ -1020,53 +935,6 @@ body,
   background: var(--v19b-color-tag);
   font-size: var(--v19b-size-11);
   font-weight: var(--v19b-weight-title);
-}
-
-.ops-sidebar-create,
-.opsu-sidebar-create {
-  min-height: var(--v19b-size-40);
-  gap: var(--v19b-size-10);
-  padding: var(--v19b-size-4) var(--v19b-size-12);
-  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
-  border-radius: var(--v19b-radius-control);
-  color: var(--v19b-color-text);
-  background: var(--v19b-color-control);
-}
-
-.ops-sidebar-create:not(:disabled):hover,
-.opsu-sidebar-create:not(:disabled):hover {
-  border-color: var(--v19b-color-border-selected);
-  background: var(--v19b-color-control-hover);
-}
-
-.ops-sidebar-footer,
-.opsu-sidebar-footer {
-  padding-top: var(--v19b-size-16);
-  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
-}
-
-.ops-mobile-tabbar {
-  gap: var(--v19b-size-2);
-  padding: var(--v19b-size-4);
-  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
-  border-radius: var(--v19b-radius-panel);
-  background: var(--v19b-color-panel);
-}
-
-.ops-mobile-tabbar-item {
-  min-height: var(--v19b-size-56);
-  padding: var(--v19b-size-6) var(--v19b-size-8);
-  border: var(--v19b-size-1) solid var(--v19b-color-clear);
-  border-radius: var(--v19b-radius-control);
-  color: var(--v19b-color-text-muted);
-  background: var(--v19b-color-clear);
-}
-
-.ops-mobile-tabbar-item.is-active,
-.ops-mobile-tabbar-item[aria-current="page"] {
-  border-color: var(--v19b-color-border-selected);
-  color: var(--v19b-color-text);
-  background: var(--v19b-color-control-hover);
 }
 
 .v19-topbar-cta,
@@ -3006,22 +2874,6 @@ body,
 
 /* Final mobile shell contract: side menu is the only mobile navigation surface. */
 @media (max-width: 767px) {
-  .ops-shell.has-unified-side-menu.role-agent .ops-sidebar {
-    display: none !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-agent.is-mobile-nav-open .ops-sidebar {
-    position: fixed !important;
-    inset: var(--v19b-size-8) !important;
-    z-index: 220 !important;
-    display: grid !important;
-    width: auto !important;
-    height: auto !important;
-    border: var(--v19b-size-1) solid var(--v19b-color-border-selected) !important;
-    border-radius: var(--v19b-radius-panel-lg) !important;
-    background: var(--v19b-color-panel) !important;
-    box-shadow: var(--v19b-shadow-panel) !important;
-  }
 
   .ops-shell.has-unified-side-menu.role-agent .v19-topbar-menu {
     display: grid !important;
@@ -3061,62 +2913,6 @@ body,
     font-size: var(--v19b-size-24);
     font-weight: var(--v19b-weight-control);
     line-height: var(--v19b-line-height-control);
-  }
-
-  .ops-shell.role-agent .ops-mobile-tabbar {
-    position: fixed !important;
-    right: var(--v19b-size-8) !important;
-    bottom: max(var(--v19b-size-8), env(safe-area-inset-bottom)) !important;
-    left: var(--v19b-size-8) !important;
-    z-index: var(--v19b-z-sticky) !important;
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
-    gap: var(--v19b-size-4) !important;
-    min-height: var(--v19b-size-72) !important;
-    padding: var(--v19b-size-6) var(--v19b-size-6)
-      max(var(--v19b-size-6), env(safe-area-inset-bottom)) !important;
-    border: var(--v19b-size-1) solid var(--v19b-color-border-selected) !important;
-    border-radius: var(--v19b-radius-panel) !important;
-    background: color-mix(in srgb, var(--v19b-color-app) 82%, black) !important;
-    box-shadow: var(--v19b-shadow-panel) !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    transform: var(--v19b-transform-rest) !important;
-    visibility: visible !important;
-  }
-
-  .ops-shell.role-agent .ops-mobile-tabbar-item {
-    position: relative !important;
-    display: grid !important;
-    grid-template-rows: var(--v19b-size-22) auto !important;
-    place-items: center !important;
-    min-width: var(--v19b-size-0) !important;
-    min-height: var(--v19b-size-58) !important;
-    padding: var(--v19b-size-6) var(--v19b-size-4) !important;
-  }
-
-  .ops-shell.role-agent .ops-mobile-tabbar-label {
-    max-width: var(--v19b-size-full) !important;
-    overflow: hidden !important;
-    font-size: var(--v19b-size-11) !important;
-    font-weight: var(--v19b-weight-title) !important;
-    line-height: var(--v19b-line-height-tight) !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-  }
-
-  .ops-shell.role-agent .ops-mobile-tabbar-item .ops-nav-count {
-    position: absolute !important;
-    top: var(--v19b-size-5) !important;
-    right: max(var(--v19b-size-6), calc(var(--v19b-size-half) - var(--v19b-size-28))) !important;
-  }
-
-  .ops-shell.role-agent:is(.is-mobile-nav-open, .has-open-drawer) .ops-mobile-tabbar {
-    display: none !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    transform: translateY(calc(var(--v19b-size-full) + var(--v19b-size-24))) !important;
-    visibility: hidden !important;
   }
 
   .ops-shell.role-agent .workspace {

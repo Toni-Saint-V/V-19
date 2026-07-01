@@ -1,7 +1,6 @@
 import { Button } from "../../../shared/ui/primitives";
 import type { Role } from "../types";
 import {
-  OperationalMobileTabBar,
   OperationalSidebar,
   type OperationalNavItem,
 } from "./OperationalNavigation";
@@ -10,6 +9,7 @@ export function OperationalSideMenu({
   items,
   mobileOpen,
   mobileTitle,
+  createAction,
   onChooseRole,
   onCloseMobile,
   onResetWorkspace,
@@ -20,6 +20,10 @@ export function OperationalSideMenu({
   showAdminZoneSwitch,
   showRoleSwitcher,
 }: {
+  createAction?: {
+    label: string;
+    onClick: () => void;
+  };
   items: OperationalNavItem[];
   mobileOpen: boolean;
   mobileTitle: string;
@@ -40,6 +44,15 @@ export function OperationalSideMenu({
       onCloseMobile();
     },
   }));
+  const sidebarCreateAction = createAction
+    ? {
+        ...createAction,
+        onClick: () => {
+          createAction.onClick();
+          onCloseMobile();
+        },
+      }
+    : undefined;
   const footer = (
     <>
       {showRoleSwitcher ? (
@@ -112,11 +125,11 @@ export function OperationalSideMenu({
   return (
     <>
       <OperationalSidebar
+        createAction={sidebarCreateAction}
         footer={footer}
         items={navItems}
         mobileTitle={mobileTitle}
         onMobileClose={onCloseMobile}
-        variant="single"
       />
       {mobileOpen ? (
         <button
@@ -126,7 +139,6 @@ export function OperationalSideMenu({
           onClick={onCloseMobile}
         />
       ) : null}
-      {role === "agent" ? <OperationalMobileTabBar items={navItems} /> : null}
     </>
   );
 }

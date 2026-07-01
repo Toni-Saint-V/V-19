@@ -3197,10 +3197,16 @@ function MainApp() {
         ) : surface === "agent-actions" ? (
           <AgentActionsScreen
             completedActions={searchedCompletedAgentActions}
+            errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
+            loading={remoteSaveState === "loading"}
             onOpen={openSubmission}
+            onRetryError={
+              remoteSaveState === "error"
+                ? () => void retryRemoteWorkspaceSave()
+                : undefined
+            }
             openActions={searchedOpenAgentActions}
             searchControl={agentActionsSearchControl}
-            summary={agentActions.summary}
           />
         ) : surface === "admin-review" ? (
           <Suspense fallback={null}>
@@ -3247,10 +3253,16 @@ function MainApp() {
             ) : (
               <AgentActionsScreen
                 completedActions={searchedCompletedAgentActions}
+                errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
+                loading={remoteSaveState === "loading"}
                 onOpen={openSubmission}
+                onRetryError={
+                  remoteSaveState === "error"
+                    ? () => void retryRemoteWorkspaceSave()
+                    : undefined
+                }
                 openActions={searchedOpenAgentActions}
                 searchControl={agentActionsSearchControl}
-                summary={agentActions.summary}
               />
             )}
           </>

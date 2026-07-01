@@ -2,18 +2,19 @@ import { useEffect, useState } from "react";
 
 import { Badge, Button } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
-import type { AgentActionItem, AgentActionSummary } from "../agentActions";
+import {
+  V19SignalButton,
+  type V19SignalButtonTone,
+} from "../../../shared/ui/v19-design-system";
+import type {
+  AgentActionTask,
+  AgentActionTaskReadiness,
+  AgentActionTaskStatus,
+  AgentActionTaskSummary,
+} from "../agentActions";
 import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
-import {
-  blockerCount,
-  fixedIssueCount,
-  nextProblem,
-  openIssueCount,
-  statusLabelFor,
-} from "../status";
-import type { DrawerTab, Issue, Submission } from "../types";
-import { ProgressMeter } from "./CollectionPrimitives";
+import type { DrawerTab, Issue } from "../types";
 
 type EmptyState = {
   action: string;
@@ -21,58 +22,113 @@ type EmptyState = {
   title: string;
 };
 
+export type AgentActionsSummaryFilter =
+  | "done"
+  | "in_correction"
+  | "in_review"
+  | "in_work";
+
 type AgentActionsCommandCockpitProps = {
   actionGroupLabel: string;
-  actions: AgentActionItem[];
+  activeSummaryFilter?: AgentActionsSummaryFilter | null;
   emptyState: EmptyState;
-  selectedAction?: AgentActionItem;
-  summary: AgentActionSummary;
+  errorMessage?: string;
+  loading?: boolean;
+  selectedTask?: AgentActionTask;
+  summary: AgentActionTaskSummary;
+  summaryTasks?: AgentActionTask[];
+  tasks: AgentActionTask[];
   onEmptyAction: () => void;
-  onOpenAction: (action: AgentActionItem) => void;
-  onOpenIssue: (action: AgentActionItem, issue: Issue) => void;
-  onOpenTab: (action: AgentActionItem, tab: DrawerTab) => void;
-  onSelectAction: (action: AgentActionItem) => void;
+  onOpenIssue: (task: AgentActionTask, issue: Issue) => void;
+  onOpenPrimary: (task: AgentActionTask) => void;
+  onOpenSecondary: (task: AgentActionTask) => void;
+  onOpenTab: (task: AgentActionTask, tab: DrawerTab) => void;
+  onSelectTask: (task: AgentActionTask) => void;
+  onSummaryFilterChange?: (filter: AgentActionsSummaryFilter) => void;
 };
 
 export function AgentActionsCommandCockpit({
   actionGroupLabel,
-  actions,
+  activeSummaryFilter = null,
   emptyState,
-  selectedAction,
+  errorMessage = "",
+  loading = false,
+  selectedTask,
   summary,
+  summaryTasks,
+  tasks,
   onEmptyAction,
-  onOpenAction,
   onOpenIssue,
+  onOpenPrimary,
+  onOpenSecondary,
   onOpenTab,
-  onSelectAction,
+  onSelectTask,
+  onSummaryFilterChange,
 }: AgentActionsCommandCockpitProps) {
-  const [mobileDetailActionId, setMobileDetailActionId] = useState<string | null>(null);
-  const mobileDetailAction =
-    actions.find((action) => action.id === mobileDetailActionId) ?? null;
+  const [mobileDetailTaskId, setMobileDetailTaskId] = useState<string | null>(null);
+  const mobileDetailTask =
+    tasks.find((task) => task.id === mobileDetailTaskId) ?? null;
 
   useEffect(() => {
-    if (!mobileDetailActionId) return;
-    if (actions.some((action) => action.id === mobileDetailActionId)) return;
-    setMobileDetailActionId(null);
-  }, [actions, mobileDetailActionId]);
+    if (!mobileDetailTaskId) return;
+    if (tasks.some((task) => task.id === mobileDetailTaskId)) return;
+    setMobileDetailTaskId(null);
+  }, [mobileDetailTaskId, tasks]);
 
   useEffect(() => {
-    if (!mobileDetailAction) return;
+    if (!mobileDetailTask) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileDetailActionId(null);
+      if (event.key === "Escape") setMobileDetailTaskId(null);
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [mobileDetailAction]);
+  }, [mobileDetailTask]);
 
-  function openMobileDetail(action: AgentActionItem) {
-    onSelectAction(action);
-    setMobileDetailActionId(action.id);
+  function openMobileDetail(task: AgentActionTask) {
+    onSelectTask(task);
+    setMobileDetailTaskId(task.id);
   }
 
-  if (!actions.length) {
+  if (errorMessage) {
+    return (
+      <div className="v19-actions-cockpit-empty" data-testid="agent-actions-cockpit">
+        <div className="v19-empty-state is-error" role="alert">
+          <h3>Очередь действий недоступна</h3>
+          <p>{errorMessage}</p>
+          <Button variant="secondary" onClick={onEmptyAction}>
+            Повторить
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div
+        className="v19-actions-cockpit is-loading"
+        data-testid="agent-actions-cockpit"
+        aria-busy="true"
+        aria-label="Загрузка действий"
+      >
+        <CockpitSummary
+          activeFilter={activeSummaryFilter}
+          summary={summary}
+          tasks={summaryTasks ?? tasks}
+          onFilterChange={onSummaryFilterChange}
+        />
+        <div className="v19-actions-loading-grid">
+          {["loading-1", "loading-2", "loading-3"].map((item) => (
+            <div className="v19-actions-loading-card" key={item} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!tasks.length) {
     return (
       <div className="v19-actions-cockpit-empty" data-testid="agent-actions-cockpit">
         <div className="v19-empty-state">
@@ -86,15 +142,20 @@ export function AgentActionsCommandCockpit({
     );
   }
 
-  const activeAction = selectedAction ?? actions[0];
+  const activeTask = selectedTask ?? tasks[0];
 
   return (
     <div
       className="v19-actions-cockpit"
       data-testid="agent-actions-cockpit"
-      aria-label="Командный центр действий"
+      aria-label="Очередь действий агента"
     >
-      <CockpitSummary summary={summary} />
+      <CockpitSummary
+        activeFilter={activeSummaryFilter}
+        summary={summary}
+        tasks={summaryTasks ?? tasks}
+        onFilterChange={onSummaryFilterChange}
+      />
 
       <div className="v19-actions-desktop-grid">
         <section
@@ -104,25 +165,24 @@ export function AgentActionsCommandCockpit({
         >
           <PanelHeader label="Очередь" title={actionGroupLabel} />
           <div className="v19-actions-queue-list">
-            {actions.map((action) => (
-              <QueueItem
-                action={action}
-                key={action.id}
-                selected={activeAction.id === action.id}
-                onSelect={() => onSelectAction(action)}
+            {tasks.map((task) => (
+              <ActionTaskCard
+                key={task.id}
+                selected={activeTask.id === task.id}
+                task={task}
+                onSelect={() => onSelectTask(task)}
               />
             ))}
           </div>
         </section>
 
-        <ActiveSubmissionPanel
-          action={activeAction}
-          onOpenAction={() => onOpenAction(activeAction)}
-          onOpenIssue={(issue) => onOpenIssue(activeAction, issue)}
-          onOpenTab={(tab) => onOpenTab(activeAction, tab)}
+        <ActionSummaryPanel
+          task={activeTask}
+          onOpenIssue={(issue) => onOpenIssue(activeTask, issue)}
+          onOpenPrimary={() => onOpenPrimary(activeTask)}
+          onOpenSecondary={() => onOpenSecondary(activeTask)}
+          onOpenTab={(tab) => onOpenTab(activeTask, tab)}
         />
-
-        <NextActionPanel action={activeAction} onOpen={() => onOpenAction(activeAction)} />
       </div>
 
       <section
@@ -132,33 +192,36 @@ export function AgentActionsCommandCockpit({
       >
         <PanelHeader label="Лента" title={actionGroupLabel} />
         <div className="v19-actions-timeline">
-          {actions.map((action) => (
+          {tasks.map((task) => (
             <TimelineEvent
-              action={action}
-              key={action.id}
-              selected={activeAction.id === action.id}
-              onOpen={() => onOpenAction(action)}
-              onSelect={() => openMobileDetail(action)}
+              key={task.id}
+              selected={activeTask.id === task.id}
+              task={task}
+              onSelect={() => openMobileDetail(task)}
             />
           ))}
         </div>
       </section>
 
-      {mobileDetailAction ? (
+      {mobileDetailTask ? (
         <MobileActionDetail
-          action={mobileDetailAction}
-          onClose={() => setMobileDetailActionId(null)}
-          onOpenAction={() => {
-            setMobileDetailActionId(null);
-            onOpenAction(mobileDetailAction);
-          }}
+          task={mobileDetailTask}
+          onClose={() => setMobileDetailTaskId(null)}
           onOpenIssue={(issue) => {
-            setMobileDetailActionId(null);
-            onOpenIssue(mobileDetailAction, issue);
+            setMobileDetailTaskId(null);
+            onOpenIssue(mobileDetailTask, issue);
+          }}
+          onOpenPrimary={() => {
+            setMobileDetailTaskId(null);
+            onOpenPrimary(mobileDetailTask);
+          }}
+          onOpenSecondary={() => {
+            setMobileDetailTaskId(null);
+            onOpenSecondary(mobileDetailTask);
           }}
           onOpenTab={(tab) => {
-            setMobileDetailActionId(null);
-            onOpenTab(mobileDetailAction, tab);
+            setMobileDetailTaskId(null);
+            onOpenTab(mobileDetailTask, tab);
           }}
         />
       ) : null}
@@ -166,30 +229,105 @@ export function AgentActionsCommandCockpit({
   );
 }
 
-function CockpitSummary({ summary }: { summary: AgentActionSummary }) {
+function CockpitSummary({
+  activeFilter,
+  onFilterChange,
+  tasks,
+}: {
+  activeFilter?: AgentActionsSummaryFilter | null;
+  onFilterChange?: (filter: AgentActionsSummaryFilter) => void;
+  summary: AgentActionTaskSummary;
+  tasks: AgentActionTask[];
+}) {
+  const inWorkCount = tasks.filter((task) =>
+    ["draft", "in_progress"].includes(task.submission.status),
+  ).length;
+  const inReviewCount = tasks.filter((task) =>
+    ["corrections_received", "submitted_for_review"].includes(task.submission.status),
+  ).length;
+  const inCorrectionCount = tasks.filter((task) =>
+    ["requires_action", "returned"].includes(task.submission.status),
+  ).length;
+  const doneCount = tasks.filter((task) =>
+    ["exported", "ready_for_export"].includes(task.submission.status),
+  ).length;
+
   return (
-    <div className="v19-actions-cockpit-summary" aria-label="Сводка действий">
-      <SummaryMetric label="просрочено" tone="danger" value={summary.overdue} />
-      <SummaryMetric label="сегодня" tone="amber" value={summary.today} />
-      <SummaryMetric label="выполнено" tone="teal" value={summary.completed} />
-    </div>
+    <section className="v19-actions-cockpit-summary" aria-label="Операционное табло">
+      <SummarySignal
+        active={activeFilter === "in_work"}
+        filter="in_work"
+        label="В работе"
+        note="Агент ещё заполняет подачу"
+        tone="green"
+        value={inWorkCount}
+        valueLabel={`${inWorkCount} задач: агент ещё заполняет подачу`}
+        onFilterChange={onFilterChange}
+      />
+      <SummarySignal
+        active={activeFilter === "in_review"}
+        filter="in_review"
+        label="На проверке"
+        note="Подача отправлена админу"
+        tone="blue"
+        value={inReviewCount}
+        valueLabel={`${inReviewCount} задач: подача отправлена админу`}
+        onFilterChange={onFilterChange}
+      />
+      <SummarySignal
+        active={activeFilter === "in_correction"}
+        filter="in_correction"
+        label="На исправлении"
+        note="Админ вернул замечания"
+        tone="amber"
+        value={inCorrectionCount}
+        valueLabel={`${inCorrectionCount} задач: админ вернул замечания`}
+        onFilterChange={onFilterChange}
+      />
+      <SummarySignal
+        active={activeFilter === "done"}
+        filter="done"
+        label="Готово"
+        note="Подача принята / выгружена"
+        tone="black"
+        value={doneCount}
+        valueLabel={`${doneCount} задач: подача принята или выгружена`}
+        onFilterChange={onFilterChange}
+      />
+    </section>
   );
 }
 
-function SummaryMetric({
+function SummarySignal({
+  active,
+  filter,
   label,
+  note,
+  onFilterChange,
   tone,
   value,
+  valueLabel,
 }: {
+  active: boolean;
+  filter: AgentActionsSummaryFilter;
   label: string;
-  tone: "amber" | "danger" | "teal";
+  note: string;
+  onFilterChange?: (filter: AgentActionsSummaryFilter) => void;
+  tone: V19SignalButtonTone;
   value: number;
+  valueLabel: string;
 }) {
   return (
-    <span className={`v19-actions-summary-metric tone-${tone}`}>
-      <strong>{value}</strong>
-      <em>{label}</em>
-    </span>
+    <V19SignalButton
+      active={active}
+      ariaLabel={`Фильтр: ${label}. ${valueLabel}. ${note}`}
+      className="v19-actions-summary-signal"
+      label={label}
+      note={note}
+      tone={tone}
+      value={value}
+      onClick={() => onFilterChange?.(filter)}
+    />
   );
 }
 
@@ -202,28 +340,26 @@ function PanelHeader({ label, title }: { label: string; title: string }) {
   );
 }
 
-function QueueItem({
-  action,
+function ActionTaskCard({
   selected,
+  task,
   onSelect,
 }: {
-  action: AgentActionItem;
   selected: boolean;
+  task: AgentActionTask;
   onSelect: () => void;
 }) {
-  const submission = action.submission;
-  const issues = openIssueCount(submission);
-
   return (
     <button
       className={cn(
         "v19-actions-queue-item",
-        `severity-${action.severity}`,
+        `status-${task.status}`,
         selected && "is-selected",
       )}
       aria-current={selected ? "true" : undefined}
-      aria-label={`Выбрать подачу: ${formatSubmissionListTitle(submission)}. ${action.dueLabel}. ${action.context}`}
-      data-submission-id={submission.id}
+      aria-label={`Выбрать действие: ${task.statusLabel}. ${task.title}. ${scopeText(task)}. ${task.problem}. Следующее действие: ${task.nextAction.label}${task.priority.reason ? `. ${task.priority.label}: ${task.priority.reason}` : ""}`}
+      data-action-status={task.status}
+      data-submission-id={task.submission.id}
       data-testid="agent-action-queue-item"
       type="button"
       onClick={onSelect}
@@ -231,105 +367,112 @@ function QueueItem({
       <span className="v19-actions-status-node" aria-hidden="true" />
       <span className="v19-actions-queue-main">
         <span className="v19-actions-queue-topline">
-          <strong>{formatSubmissionListTitle(submission)}</strong>
-          <small>{submission.id}</small>
+          <strong>{formatSubmissionListTitle(task.submission)}</strong>
+          <small>{task.submission.id}</small>
         </span>
-        <span className="v19-actions-queue-meta">
-          {submission.city} · {tripDates(submission)}
+        <span className="v19-actions-queue-scope">{queueSubjectText(task)}</span>
+        <span className="v19-actions-queue-status-row">
+          <strong>{task.statusLine}</strong>
+          {task.priority.reason ? <small>{priorityCopy(task)}</small> : null}
         </span>
-        <span className="v19-actions-queue-state">{action.dueLabel}</span>
-      </span>
-      <span className="v19-actions-queue-metric">
-        <strong>{submission.completeness.total}%</strong>
-        <small>{issues ? `${issues} замеч.` : "без блок."}</small>
+        <span className="v19-actions-queue-state">
+          Следующее: {task.nextAction.label}
+        </span>
       </span>
     </button>
   );
 }
 
-function ActiveSubmissionPanel({
-  action,
-  onOpenAction,
+function ActionSummaryPanel({
+  task,
   onOpenIssue,
+  onOpenPrimary,
+  onOpenSecondary,
   onOpenTab,
 }: {
-  action: AgentActionItem;
-  onOpenAction: () => void;
+  task: AgentActionTask;
   onOpenIssue: (issue: Issue) => void;
+  onOpenPrimary: () => void;
+  onOpenSecondary: () => void;
   onOpenTab: (tab: DrawerTab) => void;
 }) {
-  const submission = action.submission;
-  const openIssues = submission.issues.filter((issue) => issue.status === "open");
+  const openIssues = task.submission.issues.filter((issue) => issue.status === "open");
 
   return (
     <section
-      className="v19-actions-active-panel"
-      aria-label="Активная подача"
+      className="v19-actions-active-panel v19-actions-summary-panel"
+      aria-label="Краткая сводка выбранной задачи"
       data-testid="agent-action-active-panel"
     >
       <div className="v19-actions-active-head">
-        <span className={`v19-actions-status-node severity-${action.severity}`} />
+        <span
+          className={`v19-actions-status-node status-${task.status}`}
+          aria-hidden="true"
+        />
         <div>
-          <p>Активная подача</p>
-          <h3>{formatSubmissionListTitle(submission)}</h3>
+          <p>Сводка действия</p>
+          <h3>{formatSubmissionListTitle(task.submission)}</h3>
         </div>
-        <Badge tone={statusTone(submission)}>{statusLabelFor(submission.status)}</Badge>
+        <StatusBadge status={task.status} label={task.statusLabel} />
       </div>
 
-      <div className="v19-actions-active-meta" aria-label="Сводка подачи">
-        <MetaItem label="ID" value={submission.id} />
-        <MetaItem label="Город" value={submission.city} />
-        <MetaItem label="Даты" value={tripDates(submission)} />
+      <div className="v19-actions-active-meta" aria-label="Краткая сводка задачи">
+        <MetaItem label="ФИО" value={task.applicantName} />
+        <MetaItem label="ID" value={task.submission.id} />
+        <MetaItem label="Направление" value={task.destination} />
+        <MetaItem label="Даты поездки" value={tripDates(task.submission)} />
         <MetaItem
           label="Заявители"
-          value={applicantCountLabel(submission.applicants.length)}
+          value={applicantCountLabel(task.submission.applicants.length)}
         />
       </div>
 
-      <div className="v19-actions-readiness" aria-label="Комплектность">
-        <ReadinessLine
-          label="Анкета"
-          tab="questionnaire"
-          value={submission.completeness.questionnaire}
-          onOpen={onOpenTab}
-        />
-        <ReadinessLine
-          label="Файлы"
-          tab="files"
-          value={submission.completeness.files}
-          onOpen={onOpenTab}
-        />
-        <ReadinessLine
-          label="Итог"
-          tab="overview"
-          value={submission.completeness.total}
-          onOpen={onOpenTab}
-        />
+      <div className="v19-actions-task-problem" aria-label="Проблема и причина">
+        <p>Проблема</p>
+        <strong>{task.problem}</strong>
+        <span>{task.reason}</span>
       </div>
 
-      <BlockerPreview
-        action={action}
-        issues={openIssues}
-        onOpenIssue={onOpenIssue}
-        onOpenTab={onOpenTab}
-      />
-
-      <div className="v19-actions-recent-history" aria-label="Последние изменения">
-        <p>История</p>
-        {submission.history.slice(0, 2).map((item) => (
-          <span key={item.id}>
-            <strong>{item.text}</strong>
-            <small>{item.at}</small>
-          </span>
-        ))}
+      <div className="v19-actions-next-copy" aria-label="Что сделать дальше">
+        <p>Что сделать дальше</p>
+        <span>{task.nextAction.detail}</span>
       </div>
 
-      <div className="v19-actions-active-next">
-        <NextActionContent action={action} />
-        <Button variant="primary" onClick={onOpenAction}>
-          {action.cta}
+      <div className="v19-actions-summary-cta">
+        <Button variant="primary" wide onClick={onOpenPrimary}>
+          {task.nextAction.primaryLabel}
+        </Button>
+        <Button variant="secondary" wide onClick={onOpenSecondary}>
+          {task.secondaryAction.label}
         </Button>
       </div>
+
+      <div className="v19-actions-task-importance" aria-label="Почему это важно">
+        <p>Почему</p>
+        <span>{importanceCopy(task)}</span>
+      </div>
+
+      <ReadinessGrid readiness={task.readiness} onOpenTab={onOpenTab} />
+
+      {openIssues.length ? (
+        <div className="v19-actions-blockers" aria-label="Ключевые замечания">
+          <div className="v19-actions-blockers-head">
+            <p>Ключевые замечания</p>
+            <Badge tone="danger">{openIssues.length}</Badge>
+          </div>
+          <div className="v19-actions-blocker-list">
+            {openIssues.slice(0, 2).map((issue) => (
+              <button key={issue.id} type="button" onClick={() => onOpenIssue(issue)}>
+                <span className="v19-actions-status-node status-error" aria-hidden="true" />
+                <span>
+                  <strong>{issue.reason}</strong>
+                  <small>{issue.target.applicantName}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -343,147 +486,107 @@ function MetaItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function StatusBadge({
+  label,
+  status,
+}: {
+  label: string;
+  status: AgentActionTaskStatus;
+}) {
+  return (
+    <Badge
+      aria-label={`Статус действия: ${label}`}
+      className="v19-actions-status-badge"
+      tone={statusTone(status)}
+    >
+      {label}
+    </Badge>
+  );
+}
+
+function ReadinessGrid({
+  readiness,
+  onOpenTab,
+}: {
+  readiness: AgentActionTaskReadiness;
+  onOpenTab: (tab: DrawerTab) => void;
+}) {
+  return (
+    <div className="v19-actions-readiness" aria-label="Готовность по зонам">
+      <ReadinessLine
+        label={readiness.form.label}
+        state={readiness.form.state}
+        tab="questionnaire"
+        onOpen={onOpenTab}
+      />
+      <ReadinessLine
+        label={readiness.files.label}
+        state={readiness.files.state}
+        tab="files"
+        onOpen={onOpenTab}
+      />
+      <ReadinessLine
+        label={readiness.review.label}
+        state={readiness.review.state}
+        tab="history"
+        onOpen={onOpenTab}
+      />
+      <ReadinessLine
+        label={`${readiness.finalResult.label} · ${readiness.overallPercent}%`}
+        state={readiness.finalResult.state}
+        tab="overview"
+        onOpen={onOpenTab}
+      />
+    </div>
+  );
+}
+
 function ReadinessLine({
   label,
+  state,
   tab,
-  value,
   onOpen,
 }: {
   label: string;
+  state:
+    | AgentActionTaskReadiness["files"]["state"]
+    | AgentActionTaskReadiness["finalResult"]["state"]
+    | AgentActionTaskReadiness["form"]["state"]
+    | AgentActionTaskReadiness["review"]["state"];
   tab: DrawerTab;
-  value: number;
   onOpen: (tab: DrawerTab) => void;
 }) {
   return (
     <button
-      className="v19-actions-readiness-line"
+      className={cn("v19-actions-readiness-line", `state-${state}`)}
       type="button"
       onClick={() => onOpen(tab)}
     >
       <span>
         <strong>{label}</strong>
-        <small>{value}%</small>
       </span>
-      <ProgressMeter ariaHidden tone={readinessTone(value)} value={value} />
     </button>
   );
 }
 
-function BlockerPreview({
-  action,
-  issues,
-  onOpenIssue,
-  onOpenTab,
-}: {
-  action: AgentActionItem;
-  issues: Issue[];
-  onOpenIssue: (issue: Issue) => void;
-  onOpenTab: (tab: DrawerTab) => void;
-}) {
-  if (!issues.length) {
-    return (
-      <div className="v19-actions-blockers is-clear">
-        <p>Блокеры</p>
-        <strong>{nextProblem(action.submission)}</strong>
-      </div>
-    );
-  }
-
-  return (
-    <div className="v19-actions-blockers">
-      <div className="v19-actions-blockers-head">
-        <p>Блокеры</p>
-        <Badge tone={blockerCount(action.submission) ? "danger" : "amber"}>
-          {issues.length}
-        </Badge>
-      </div>
-      <div className="v19-actions-blocker-list">
-        {issues.slice(0, 3).map((issue) => (
-          <button key={issue.id} type="button" onClick={() => onOpenIssue(issue)}>
-            <span
-              className={cn(
-                "v19-actions-status-node",
-                issue.severity === "blocker" ? "severity-blocker" : "severity-warning",
-              )}
-              aria-hidden="true"
-            />
-            <span>
-              <strong>{issue.reason}</strong>
-              <small>{issue.target.applicantName}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-      <button
-        className="v19-actions-secondary-link"
-        type="button"
-        onClick={() => onOpenTab("issues")}
-      >
-        Все замечания
-      </button>
-    </div>
-  );
-}
-
-function NextActionPanel({
-  action,
-  onOpen,
-}: {
-  action: AgentActionItem;
-  onOpen: () => void;
-}) {
-  return (
-    <aside
-      className="v19-actions-next-panel"
-      aria-label="Следующее действие"
-      data-testid="agent-action-next-panel"
-    >
-      <PanelHeader label="Next Action" title={action.cta} />
-      <NextActionContent action={action} />
-      <Button variant="primary" wide onClick={onOpen}>
-        {action.cta}
-      </Button>
-      <div className="v19-actions-secondary-actions">
-        <Badge tone={action.severity === "blocker" ? "danger" : "default"}>
-          {action.dueLabel}
-        </Badge>
-        <span>{fixedIssueCount(action.submission)} исправлено</span>
-      </div>
-    </aside>
-  );
-}
-
-function NextActionContent({ action }: { action: AgentActionItem }) {
-  return (
-    <div className="v19-actions-next-copy">
-      <strong>{action.title}</strong>
-      <p>{action.context}</p>
-      <small>{nextProblem(action.submission)}</small>
-    </div>
-  );
-}
-
 function TimelineEvent({
-  action,
   selected,
-  onOpen,
+  task,
   onSelect,
 }: {
-  action: AgentActionItem;
   selected: boolean;
-  onOpen: () => void;
+  task: AgentActionTask;
   onSelect: () => void;
 }) {
-  const submission = action.submission;
-
   return (
     <article
       className={cn(
         "v19-actions-timeline-event",
-        `severity-${action.severity}`,
+        `status-${task.status}`,
         selected && "is-selected",
       )}
-      data-submission-id={submission.id}
+      data-action-status={task.status}
+      data-submission-id={task.submission.id}
     >
       <span className="v19-actions-timeline-node" aria-hidden="true" />
       <button
@@ -492,34 +595,35 @@ function TimelineEvent({
         onClick={onSelect}
       >
         <span className="v19-actions-timeline-title">
-          <strong>{formatSubmissionListTitle(submission)}</strong>
-          <small>{submission.id}</small>
+          <strong>{formatSubmissionListTitle(task.submission)}</strong>
+          <small>{task.submission.id}</small>
         </span>
-        <span className="v19-actions-timeline-meta">
-          {submission.city} · {tripDates(submission)}
-        </span>
+        <span className="v19-actions-queue-scope">{queueSubjectText(task)}</span>
+        <span className="v19-actions-timeline-state">{task.statusLine}</span>
+        {task.priority.reason ? (
+          <span className="v19-actions-timeline-meta">{priorityCopy(task)}</span>
+        ) : null}
         <span className="v19-actions-timeline-state">
-          {action.dueLabel} · {nextProblem(submission)}
+          Следующее: {task.nextAction.label}
         </span>
       </button>
-      <Button className="v19-actions-timeline-cta" variant="secondary" onClick={onOpen}>
-        {action.cta}
-      </Button>
     </article>
   );
 }
 
 function MobileActionDetail({
-  action,
+  task,
   onClose,
-  onOpenAction,
   onOpenIssue,
+  onOpenPrimary,
+  onOpenSecondary,
   onOpenTab,
 }: {
-  action: AgentActionItem;
+  task: AgentActionTask;
   onClose: () => void;
-  onOpenAction: () => void;
   onOpenIssue: (issue: Issue) => void;
+  onOpenPrimary: () => void;
+  onOpenSecondary: () => void;
   onOpenTab: (tab: DrawerTab) => void;
 }) {
   return (
@@ -535,22 +639,23 @@ function MobileActionDetail({
         className="v19-actions-mobile-detail"
         role="dialog"
         aria-modal="true"
-        aria-label={`Детали действия ${formatSubmissionListTitle(action.submission)}`}
+        aria-label={`Детали действия ${formatSubmissionListTitle(task.submission)}`}
         data-testid="agent-action-mobile-detail"
       >
         <div className="v19-actions-mobile-detail-head">
           <div>
-            <p>Активная подача</p>
-            <h3>{formatSubmissionListTitle(action.submission)}</h3>
+            <p>Сводка действия</p>
+            <h3>{formatSubmissionListTitle(task.submission)}</h3>
           </div>
           <button type="button" onClick={onClose}>
             Закрыть
           </button>
         </div>
-        <ActiveSubmissionPanel
-          action={action}
-          onOpenAction={onOpenAction}
+        <ActionSummaryPanel
+          task={task}
           onOpenIssue={onOpenIssue}
+          onOpenPrimary={onOpenPrimary}
+          onOpenSecondary={onOpenSecondary}
           onOpenTab={onOpenTab}
         />
       </section>
@@ -558,20 +663,36 @@ function MobileActionDetail({
   );
 }
 
-function readinessTone(value: number): "danger" | "success" | "warning" {
-  if (value >= 100) return "success";
-  if (value >= 70) return "warning";
-  return "danger";
+function statusTone(
+  status: AgentActionTaskStatus,
+): "amber" | "blue" | "danger" | "muted" | "teal" {
+  if (status === "error") return "danger";
+  if (status === "action_required") return "amber";
+  if (status === "ready") return "teal";
+  if (status === "blocked") return "muted";
+  return "blue";
 }
 
-function statusTone(submission: Submission): "amber" | "blue" | "danger" | "muted" | "teal" {
-  if (submission.status === "ready_for_export") return "teal";
-  if (submission.status === "submitted_for_review") return "blue";
-  if (submission.status === "returned" || submission.status === "requires_action") {
-    return "danger";
-  }
-  if (submission.status === "draft" || submission.status === "exported") {
-    return "muted";
-  }
-  return "amber";
+function scopeText(task: AgentActionTask) {
+  return task.problemScope === "applicant"
+    ? `Проблема у заявителя: ${task.applicantName}`
+    : "Проблема по подаче";
+}
+
+function queueSubjectText(task: AgentActionTask) {
+  return task.problemScope === "applicant" ? task.applicantName : "Вся подача";
+}
+
+function priorityCopy(task: AgentActionTask) {
+  if (!task.priority.reason) return "";
+  return `${task.priority.label}: ${lowercaseFirst(task.priority.reason)}`;
+}
+
+function importanceCopy(task: AgentActionTask) {
+  return `${task.reason}. ${task.importanceText}`;
+}
+
+function lowercaseFirst(value: string) {
+  if (!value) return value;
+  return value[0].toLocaleLowerCase("ru-RU") + value.slice(1);
 }

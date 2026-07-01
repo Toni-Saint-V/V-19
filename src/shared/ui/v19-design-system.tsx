@@ -1,4 +1,5 @@
 import {
+  type ButtonHTMLAttributes,
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
@@ -41,12 +42,53 @@ export type V19MemberStatusTone = "issue" | "progress" | "ready";
 
 export type V19BadgeTone = "amber" | "blue" | "danger" | "muted" | "teal";
 
+export type V19SignalButtonTone =
+  | "amber"
+  | "black"
+  | "blue"
+  | "danger"
+  | "green"
+  | "muted";
+
 export type V19FamilyMember = {
   initials: string;
   name: string;
   role: string;
   statusTone: V19MemberStatusTone;
 };
+
+export function V19SignalButton({
+  active = false,
+  ariaLabel,
+  className,
+  label,
+  note,
+  tone = "blue",
+  value,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  active?: boolean;
+  ariaLabel: string;
+  label: string;
+  note: string;
+  tone?: V19SignalButtonTone;
+  value: number | string;
+}) {
+  return (
+    <button
+      {...props}
+      aria-label={ariaLabel}
+      aria-pressed={active}
+      className={cn("v19-signal-button", `tone-${tone}`, active && "is-active", className)}
+      type={props.type ?? "button"}
+    >
+      <span className="v19-signal-button-label">{label}</span>
+      <strong>{value}</strong>
+      <small>{note}</small>
+      <span className="v19-signal-button-mark" aria-hidden="true" />
+    </button>
+  );
+}
 
 export function V19EntityTypeSwitch({
   actionLabel,

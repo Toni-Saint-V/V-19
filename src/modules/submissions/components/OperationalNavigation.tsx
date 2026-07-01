@@ -27,15 +27,12 @@ export type OperationalNavItem = {
   tone?: OperationalNavTone;
 };
 
-export type OperationalSidebarVariant = "desktop" | "mobile" | "single";
-
 export function OperationalSidebar({
   createAction,
   footer,
   items,
   onMobileClose,
   mobileTitle,
-  variant = "single",
 }: {
   brand?: string;
   createAction?: {
@@ -46,11 +43,10 @@ export function OperationalSidebar({
   items: OperationalNavItem[];
   onMobileClose?: () => void;
   mobileTitle?: string;
-  variant?: OperationalSidebarVariant;
 }) {
   return (
     <aside
-      className={cn("ops-sidebar opsu-sidebar", `opsu-sidebar--${variant}`)}
+      className={cn("ops-sidebar opsu-sidebar")}
       aria-label="Операционный центр"
     >
       {mobileTitle ? (
@@ -142,33 +138,6 @@ export function OperationalSidebar({
       ) : null}
       <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
     </aside>
-  );
-}
-
-export function OperationalMobileTabBar({ items }: { items: OperationalNavItem[] }) {
-  return (
-    <nav className="ops-mobile-tabbar" aria-label="Нижняя навигация">
-      {items.map((item) => (
-        <button
-          aria-current={item.active ? "page" : undefined}
-          aria-label={item.label}
-          className={cn("ops-mobile-tabbar-item", item.active && "is-active")}
-          data-nav-id={item.id}
-          disabled={item.disabled}
-          key={item.id}
-          type="button"
-          onClick={item.onClick}
-        >
-          <span className="ops-mobile-tabbar-icon" aria-hidden="true">
-            <OperationalIcon id={item.id} fallback={item.icon} />
-          </span>
-          <span className="ops-mobile-tabbar-label">{item.label}</span>
-          {typeof item.count === "number" ? (
-            <NavCount label={`${item.count}`}>{item.count}</NavCount>
-          ) : null}
-        </button>
-      ))}
-    </nav>
   );
 }
 
