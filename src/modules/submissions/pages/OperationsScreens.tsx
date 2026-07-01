@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import {
@@ -57,9 +57,11 @@ import { RailCard, useRailDisclosure } from "../components/RightRailPrimitives";
 import {
   CollectionGroupLabel,
   CollectionRow,
+  ContextPanel,
   CollectionToolbar,
   ContextRail,
   MobileFilterSheet,
+  PanelActionFooter,
   ProgressMeter,
   SubmissionCollectionRow,
   SvgIcon,
@@ -325,7 +327,6 @@ export function AgentActionsScreen({
           ariaLabel="Инструменты действий"
           className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
           mobileCityControl={cityControl}
-          mobileTitle="Мои действия"
           onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
           onTabChange={(nextFilter) =>
             transitionUiState(() => {
@@ -723,7 +724,6 @@ export function AgentInboxScreen({
             ariaLabel="Инструменты входящих"
             className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
             mobileCityControl={cityControl}
-            mobileTitle="Входящие"
             onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
             onTabChange={(nextTab) =>
               transitionUiState(() => {
@@ -802,6 +802,17 @@ export function AgentInboxScreen({
       {hasContextRail && panelOpen ? (
         <ContextRail
           className="v19-inbox-summary"
+          footer={
+            selectedEvent ? (
+              <PanelActionFooter
+                primary={{
+                  label: selectedEvent.action,
+                  onClick: () => openPanelNextEvent(selectedEvent),
+                }}
+                status={`Next: ${selectedEvent.action}`}
+              />
+            ) : undefined
+          }
           label="Фокус входящего"
           title={selectedEvent ? selectedEvent.badge : "Входящие"}
           onClose={closePanel}
@@ -832,15 +843,6 @@ export function AgentInboxScreen({
                 {inboxEventSourceLabel(selectedEvent)} · {selectedEvent.context} ·{" "}
                 {selectedEvent.time}
               </p>
-              <Button
-                variant="primary"
-                onClick={() => openPanelNextEvent(selectedEvent)}
-              >
-                {selectedEvent.action}
-                <SvgIcon>
-                  <path d="M9 6l6 6-6 6" />
-                </SvgIcon>
-              </Button>
             </RailCard>
           ) : null}
 
@@ -1086,7 +1088,6 @@ export function AgentSubmissionsScreen({
   errorMessage?: string;
   hasSearchQuery?: boolean;
   loading?: boolean;
-  mobileTitle?: string;
   onClearFilters?: () => void;
   onCreate: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
@@ -1369,7 +1370,6 @@ export function AgentSubmissionsScreen({
             activeFilters={activeFilters}
             ariaLabel="Инструменты подач"
             className="v19-agent-mobile-toolbar"
-            mobileTitle="Мои подачи"
             onClearActiveFilters={hasActiveFilters ? resetActiveFilters : undefined}
             onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
             search={searchControl}
@@ -1766,9 +1766,7 @@ export function AdminReviewScreen({
   visibleSubmission: Submission | null;
 }) {
   const [blockersOnly, setBlockersOnly] = useState(false);
-  const [summaryOpen, setSummaryOpen] = useState(false);
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
-  const summaryRef = useRef<HTMLDivElement>(null);
   const reviewQueue = reviewSource.filter(matchesReviewTab("review"));
   const correctionsQueue = reviewSource.filter(matchesReviewTab("corrections"));
   const tabCounts = {
@@ -1776,9 +1774,6 @@ export function AdminReviewScreen({
     events: inboxEvents.length,
     review: reviewQueue.length,
   };
-  const blockerSubmissions = reviewSource.filter(
-    (submission) => blockerCount(submission) > 0,
-  ).length;
   const filteredReviewList = useMemo(
     () =>
       blockersOnly
@@ -1803,13 +1798,6 @@ export function AdminReviewScreen({
     visibleReviewList.some((submission) => submission.id === visibleSubmission.id)
       ? visibleSubmission
       : null;
-  const summaryPrioritySubmission =
-    visibleSelectedSubmission ??
-    visibleReviewList[0] ??
-    correctionsQueue[0] ??
-    reviewQueue[0] ??
-    reviewSource[0] ??
-    null;
   const actionSubmission =
     reviewTab === "events" || permissionDenied || loading || error
       ? null
@@ -1843,26 +1831,6 @@ export function AdminReviewScreen({
       setSortMode("priority");
     });
 
-  useEffect(() => {
-    if (!summaryOpen) return;
-
-    const closeOnPointerDown = (event: PointerEvent) => {
-      if (!summaryRef.current?.contains(event.target as Node)) {
-        setSummaryOpen(false);
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSummaryOpen(false);
-    };
-
-    document.addEventListener("pointerdown", closeOnPointerDown);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnPointerDown);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [summaryOpen]);
-
   const toolbarTools = (
     <CollectionToolbarTools
       desktopTools={
@@ -1885,63 +1853,6 @@ export function AdminReviewScreen({
               }
             />
           ) : null}
-          <div className="v17-admin-summary-tool" ref={summaryRef}>
-            <ToolbarIconButton
-              label={summaryOpen ? "Скрыть сводку" : "Показать сводку"}
-              icon="panel"
-              pressed={summaryOpen}
-              onClick={() => setSummaryOpen((value) => !value)}
-            />
-            {summaryOpen ? (
-              <div
-                className="v17-admin-summary-popover"
-                role="dialog"
-                aria-label="Сводка очереди"
-              >
-                <div className="v17-admin-summary-head">
-                  <strong>Сводка очереди</strong>
-                </div>
-                <div className="v17-admin-summary-grid">
-                  <div>
-                    <strong>{tabCounts.review}</strong>
-                    <span>Новая проверка</span>
-                  </div>
-                  <div>
-                    <strong>{tabCounts.corrections}</strong>
-                    <span>Исправления</span>
-                  </div>
-                  <div>
-                    <strong>
-                      {summaryPrioritySubmission
-                        ? `с ${summaryPrioritySubmission.updatedAt}`
-                        : "-"}
-                    </strong>
-                    <span>Старейшая</span>
-                  </div>
-                  <div>
-                    <strong>{blockerSubmissions}</strong>
-                    <span>Блокеры</span>
-                  </div>
-                </div>
-                {summaryPrioritySubmission ? (
-                  <Button
-                    className="v17-admin-summary-action"
-                    variant="secondary"
-                    onClick={() => {
-                      setSummaryOpen(false);
-                      onSelect(summaryPrioritySubmission);
-                      onOpen(
-                        summaryPrioritySubmission,
-                        adminWorkDrawerTabFor(summaryPrioritySubmission),
-                      );
-                    }}
-                  >
-                    Проверить {summaryPrioritySubmission.title}
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
         </>
       }
     />
@@ -2684,28 +2595,60 @@ export function ExportScreen({
         </CardComponent>
 
         {exportPanelOpen ? (
-          <aside
+          <ContextPanel
             className="export-side magic-export-side v17-export-context-rail"
-            aria-label="Контекст выгрузки"
-          >
-            <div className="v17-export-rail-head">
-              <div>
-                <p className="kicker">Контракт выгрузки</p>
-                <h2>
-                  Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}
-                </h2>
+            label="Контекст выгрузки"
+            header={
+              <div className="v17-export-rail-head">
+                <div>
+                  <p className="kicker">Контракт выгрузки</p>
+                  <h2>
+                    Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}
+                  </h2>
+                </div>
+                <button
+                  className="icon-button v17-export-close"
+                  type="button"
+                  aria-label="Закрыть панель"
+                  onClick={() => setExportPanelOpen(false)}
+                >
+                  <SvgIcon>
+                    <path d="M6 6l12 12M18 6 6 18" />
+                  </SvgIcon>
+                </button>
               </div>
-              <button
-                className="icon-button v17-export-close"
-                type="button"
-                aria-label="Закрыть панель"
-                onClick={() => setExportPanelOpen(false)}
-              >
-                <SvgIcon>
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </SvgIcon>
-              </button>
-            </div>
+            }
+            footer={
+              <PanelActionFooter
+                primary={{
+                  disabled: exportBusy || !exportPlan.canGenerate,
+                  disabledReason:
+                    !exportPlan.canGenerate || exportBusy ? actionHint : undefined,
+                  label: "Сформировать Excel",
+                  onClick: onGenerate,
+                }}
+                secondary={[
+                  {
+                    disabled: exportBusy || !exportPlan.canDownload,
+                    disabledReason:
+                      !exportPlan.canDownload || exportBusy ? actionHint : undefined,
+                    label: "Скачать Excel",
+                    onClick: onDownload,
+                  },
+                  {
+                    disabled: exportBusy || !exportPlan.canMarkExported,
+                    disabledReason:
+                      !exportPlan.canMarkExported || exportBusy
+                        ? actionHint
+                        : undefined,
+                    label: "Отметить выгружено",
+                    onClick: onMarkExported,
+                  },
+                ]}
+                status={actionHint}
+              />
+            }
+          >
             <div className="v17-export-rail-body">
               <CardComponent as="section" className="v17-rail-card primary">
                 <div className="preview-header">
@@ -2788,57 +2731,6 @@ export function ExportScreen({
               </div>
               <CardComponent
                 as="section"
-                className="v17-rail-card v17-export-actions-card"
-              >
-                <div
-                  aria-busy={exportBusy || undefined}
-                  aria-describedby={actionHint ? "export-action-hint" : undefined}
-                  className="mp-action-dock export-action-dock"
-                  data-testid="export-action-dock"
-                >
-                  <div className="mp-action-dock-actions export-actions">
-                    <Button
-                      aria-describedby={actionHint ? "export-action-hint" : undefined}
-                      disabled={exportBusy || !exportPlan.canGenerate}
-                      onClick={onGenerate}
-                    >
-                      Сформировать Excel
-                    </Button>
-                    <Button
-                      aria-describedby={actionHint ? "export-action-hint" : undefined}
-                      disabled={exportBusy || !exportPlan.canDownload}
-                      variant="secondary"
-                      onClick={onDownload}
-                    >
-                      Скачать Excel
-                    </Button>
-                    <Button
-                      aria-describedby={actionHint ? "export-action-hint" : undefined}
-                      disabled={exportBusy || !exportPlan.canMarkExported}
-                      loading={exportBusy}
-                      variant="secondary"
-                      onClick={onMarkExported}
-                    >
-                      Отметить выгружено
-                    </Button>
-                  </div>
-                  {actionHint ? (
-                    <p
-                      aria-live="polite"
-                      className="mp-action-dock-hint export-action-hint"
-                      id="export-action-hint"
-                    >
-                      {actionHint}
-                    </p>
-                  ) : null}
-                </div>
-                <p className="sheet-caption">
-                  Скачивание доступно только для текущего выбранного пакета. Если выбор
-                  изменился, сформируйте Excel заново.
-                </p>
-              </CardComponent>
-              <CardComponent
-                as="section"
                 className="v17-rail-card export-preview magic-export-preview"
                 aria-label="Предпросмотр Excel"
                 tabIndex={0}
@@ -2916,7 +2808,7 @@ export function ExportScreen({
                 </div>
               </CardComponent>
             </div>
-          </aside>
+          </ContextPanel>
         ) : null}
       </div>
     </>
