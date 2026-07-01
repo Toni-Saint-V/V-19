@@ -228,7 +228,7 @@ export function V19UnifiedToolbar<T extends string>({
             value={cityFilter}
             onChange={(event) => onCityFilter(event.target.value)}
           >
-            <option value="all">Все города</option>
+            <option value="all">Все</option>
             {cityOptions.map((city) => (
               <option key={city} value={city}>
                 {city}
