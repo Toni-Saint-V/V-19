@@ -2485,6 +2485,8 @@ body,
     grid-template-rows: auto auto !important;
     align-items: stretch !important;
     gap: var(--v19b-size-8) !important;
+    position: relative !important;
+    padding-top: var(--v19b-size-48) !important;
     min-height: var(--v19b-mobile-toolbar-min-height) !important;
     height: auto !important;
   }
@@ -2495,10 +2497,22 @@ body,
   }
 
   .ops-shell.surface-agent-actions .vf-figma-toolbar-topline {
-    grid-template-columns:
-      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      minmax(var(--v19b-size-108), var(--v19b-size-136)) !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
     width: var(--v19b-size-full) !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-city-filter {
+    position: absolute !important;
+    top: var(--v19b-size-0) !important;
+    right: var(--v19b-size-0) !important;
+    width: var(--v19b-size-112) !important;
+    min-width: var(--v19b-size-112) !important;
+    max-width: var(--v19b-size-112) !important;
+  }
+
+  .ops-shell.surface-agent-actions .vf-figma-city-select {
+    padding-inline: var(--v19b-size-10) var(--v19b-size-24) !important;
+    text-overflow: ellipsis !important;
   }
 
   .ops-shell.surface-agent-actions .vf-figma-tabs button {
