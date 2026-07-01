@@ -38,7 +38,7 @@ test.describe("V-19 pilot agent click flow", () => {
     await agentActionSurface.getByRole("tab", { name: /Все действия/ }).click();
 
     await agentActionSurface
-      .getByRole("button", { name: /Переключить к колонкам/ })
+      .getByRole("button", { name: "Показать колонками" })
       .click();
     const reviewColumn = agentActionSurface
       .locator(".vf-figma-column")
@@ -57,7 +57,7 @@ test.describe("V-19 pilot agent click flow", () => {
     ).toBeVisible();
 
     await agentActionSurface
-      .getByRole("button", { name: /Переключить к списку/ })
+      .getByRole("button", { name: "Показать списком" })
       .click();
 
     await agentActionSearch.fill("ПД-1048");
@@ -94,9 +94,7 @@ test.describe("V-19 pilot agent click flow", () => {
 
     await page.getByRole("button", { name: "Новая подача" }).first().click();
     await expect(drawer(page).getByText("Новая подача")).toBeVisible();
-    const createNextButton = drawer(page)
-      .locator("footer")
-      .getByRole("button", { name: "Дальше" });
+    const createNextButton = drawer(page).getByRole("button", { name: "Дальше" });
     await expect(createNextButton).toBeDisabled();
 
     await drawer(page).getByRole("button", { exact: true, name: "Семья" }).click();

@@ -168,11 +168,24 @@ function fieldReader(applicant: Applicant) {
 
 function applicantNameParts(fullName: string) {
   const [first = "", ...rest] = fullName.trim().split(/\s+/);
+  if (rest.length && looksLikeRussianSurname(first)) {
+    return {
+      first: rest.join(" "),
+      surname: first,
+    };
+  }
+
   const surname = rest.join(" ");
   return {
     first: first || fullName,
     surname: surname || first || fullName,
   };
+}
+
+function looksLikeRussianSurname(value: string) {
+  return /(?:ов|ова|ев|ева|ёв|ёва|ин|ина|ын|ына|ский|ская|цкий|цкая|ых|их|ко|чук|юк)$/i.test(
+    value.trim(),
+  );
 }
 
 function normalizeCategory(value: string): string {

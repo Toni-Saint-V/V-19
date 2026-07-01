@@ -189,10 +189,16 @@ const AdminReviewDrawer = lazy(() =>
 );
 const SettingsScreen = lazy(() => import("./modules/submissions/pages/SettingsScreen"));
 
+type AgentQuestionnaireFocus = {
+  applicantId?: string;
+  field?: string;
+  section?: string;
+};
+
 const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v1";
 const fallbackAdminEmails = ["admin@visaflow.local"];
-const fallbackAgentEmails = ["agent@visaflow.local"];
+const fallbackAgentEmails = ["agent@visaflow.local", "agent2@visaflow.local"];
 
 type WorkspaceSettings = {
   compactLists: boolean;
@@ -457,6 +463,8 @@ function MainApp() {
     defaultDrawerTab(loadSubmissions()[0]),
   );
   const [agentQuestionnaireOpen, setAgentQuestionnaireOpen] = useState(false);
+  const [agentQuestionnaireFocus, setAgentQuestionnaireFocus] =
+    useState<AgentQuestionnaireFocus | undefined>(undefined);
   const [dirty, setDirty] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [createCloseFocusToken, setCreateCloseFocusToken] = useState(0);
@@ -476,7 +484,7 @@ function MainApp() {
   const [submissionActionError, setSubmissionActionError] =
     useState<SubmissionActionErrorState | null>(null);
   const [createType, setCreateType] = useState<Submission["type"]>("single");
-  const [createCity] = useState<City>("Москва");
+  const [createCity, setCreateCity] = useState<City>("Москва");
   const [createFamilyCount, setCreateFamilyCount] = useState(2);
   const [createApplicantNames, setCreateApplicantNames] = useState<string[]>([
     "Новый заявитель",
@@ -1311,9 +1319,10 @@ function MainApp() {
     openSubmission(target, "files");
   }
 
-  function openAgentQuestionnaireWorkspace() {
+  function openAgentQuestionnaireWorkspace(target?: AgentQuestionnaireFocus) {
     const targetSubmission = activeSubmission ?? firstAgentActionSubmission();
     if (!targetSubmission) return;
+    setAgentQuestionnaireFocus(target);
     setSelectedSubmissionId(targetSubmission.id);
     setActiveDrawerTab("questionnaire");
     setDrawerMode("closed");
@@ -1321,6 +1330,12 @@ function MainApp() {
   }
 
   function completeActiveQuestionnaire(values: {
+    focusedUpdate?: {
+      applicantId: string;
+      fieldId: string;
+      sectionId: string;
+      value: string;
+    };
     travelEnd: string;
     travelStart: string;
   }) {
@@ -1328,7 +1343,21 @@ function MainApp() {
     const applicant = submission?.applicants[0];
     if (!submission || !applicant) return;
 
-    const withArrivalDate = updateQuestionnaireField(submission, {
+    const completedBase = completeQuestionnaire(submission);
+    const safeFocusedUpdate = values.focusedUpdate
+      ? {
+          ...values.focusedUpdate,
+          applicantId: completedBase.applicants.some(
+            (candidate) => candidate.id === values.focusedUpdate?.applicantId,
+          )
+            ? values.focusedUpdate.applicantId
+            : (completedBase.applicants[0]?.id ?? values.focusedUpdate.applicantId),
+        }
+      : undefined;
+    const withFocusedUpdate = safeFocusedUpdate
+      ? updateQuestionnaireField(completedBase, safeFocusedUpdate)
+      : completedBase;
+    const withArrivalDate = updateQuestionnaireField(withFocusedUpdate, {
       applicantId: applicant.id,
       fieldId: "arrival-date",
       sectionId: "trip",
@@ -1340,7 +1369,7 @@ function MainApp() {
       sectionId: "trip",
       value: values.travelEnd,
     });
-    const completed = completeQuestionnaire(withDepartureDate);
+    const completed = withDepartureDate;
     const nextSubmissions = submissionsRef.current.map((candidate) =>
       candidate.id === completed.id ? completed : candidate,
     );
@@ -1352,6 +1381,7 @@ function MainApp() {
     setActiveDrawerTab("questionnaire");
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
+    setAgentQuestionnaireFocus(undefined);
   }
 
   function selectSubmission(submission: Submission) {
@@ -1394,6 +1424,24 @@ function MainApp() {
     document.addEventListener("keydown", handleMobileNavEscape);
     return () => document.removeEventListener("keydown", handleMobileNavEscape);
   }, [mobileNavOpen]);
+
+  useEffect(() => {
+    if (drawerMode !== "closed") {
+      setMobileNavOpen(false);
+    }
+  }, [drawerMode]);
+
+  useEffect(() => {
+    function closeMobileNavAbovePhone() {
+      if (window.innerWidth > 760) {
+        setMobileNavOpen(false);
+      }
+    }
+
+    closeMobileNavAbovePhone();
+    window.addEventListener("resize", closeMobileNavAbovePhone);
+    return () => window.removeEventListener("resize", closeMobileNavAbovePhone);
+  }, []);
 
   function updateActiveSubmission(transform: (submission: Submission) => Submission) {
     if (!activeSubmission) return;
@@ -1632,25 +1680,35 @@ function MainApp() {
         }) || selectedFile.name
       : selectedFile.name;
 
-    updateActiveSubmission((submission) =>
-      applyUploadedFileMetadata(submission, fileId, {
-        generatedFileName,
-        mimeType: selectedFile.type,
-        originalFileName: selectedFile.name,
-        sizeBytes: selectedFile.size,
-        storageAdapter: "local-dev" as const,
-        storageBucket: "",
-        storagePath: "",
-        uploadedAtIso: new Date().toISOString(),
-      }),
-    );
+    const uploadMetadata = {
+      generatedFileName,
+      mimeType: selectedFile.type,
+      originalFileName: selectedFile.name,
+      sizeBytes: selectedFile.size,
+      storageAdapter: "local-dev" as const,
+      storageBucket: "",
+      storagePath: "",
+      uploadedAtIso: new Date().toISOString(),
+    };
+    const { submission: updatedSubmission, submissions: nextSubmissions } =
+      mergeUploadedFileMetadataIntoSubmissions(
+        submissionsRef.current,
+        currentSubmission.id,
+        fileId,
+        uploadMetadata,
+      );
+    if (!updatedSubmission) {
+      return;
+    }
+    submissionsRef.current = nextSubmissions;
+    setSubmissions(nextSubmissions);
     if (targetFile.type === "passport_scan") {
       rememberLocalPassportFile(fileId, selectedFile);
       if (passportExtractionEnabled) {
-        void extractPassportForSubmission(currentSubmission.id, fileId, true);
+        void extractPassportForSubmission(updatedSubmission.id, fileId, true);
       } else {
         markPassportExtractionUnavailableForUpload(
-          currentSubmission.id,
+          updatedSubmission.id,
           fileId,
           targetFile,
         );
@@ -2990,7 +3048,6 @@ function MainApp() {
       onChange={setQuery}
     />
   );
-  const showMobileCreateDock = role === "agent" && surface === "agent-submissions";
   if (!isSupabaseMode && localAuthSession && !localAuthHasWorkspaceAccess) {
     return (
       <WorkspaceAccessStatusGate
@@ -3034,7 +3091,6 @@ function MainApp() {
         mobileTitle={workspaceSurfaceTitle}
         onChooseRole={chooseRole}
         onCloseMobile={() => setMobileNavOpen(false)}
-        onCreateSubmission={openCreateSubmissionDrawer}
         onResetWorkspace={resetWorkspaceEmail}
         role={role}
         sessionDisplayName={sessionDisplayName}
@@ -3051,7 +3107,11 @@ function MainApp() {
             type="button"
             aria-label={mobileNavOpen ? "Закрыть меню" : "Меню"}
             aria-expanded={mobileNavOpen}
-            onClick={() => setMobileNavOpen((open) => !open)}
+            disabled={drawerMode !== "closed"}
+            onClick={() => {
+              if (drawerMode !== "closed") return;
+              setMobileNavOpen((open) => !open);
+            }}
           >
             <span aria-hidden="true" />
           </button>
@@ -3064,7 +3124,18 @@ function MainApp() {
               <p>{workspaceSurfaceDescription}</p>
             ) : null}
           </div>
-          {isFigmaVisualSurface ? null : surface === "agent-inbox" ? (
+          {isFigmaVisualSurface ? null : surface === "agent-submissions" ? (
+            <div className="topbar-actions v19-agent-submissions-actions">
+              <Button
+                aria-label="Новая подача"
+                className="v19-topbar-cta"
+                variant="primary"
+                onClick={openCreateSubmissionDrawer}
+              >
+                Новая подача
+              </Button>
+            </div>
+          ) : surface === "agent-inbox" ? (
             <div className="v19-topbar-city-filter">{cityFilterControl}</div>
           ) : !isV19CollectionSurface || isSupabaseMode ? (
             <div className="topbar-actions">
@@ -3079,7 +3150,7 @@ function MainApp() {
                   >
                     <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
                   </span>
-                  <span aria-hidden="true">VisaFlow</span>
+                  <span aria-hidden="true">isaFlow</span>
                   <span className="vf-brand-comma-version" aria-hidden="true">
                     19
                   </span>
@@ -3243,22 +3314,15 @@ function MainApp() {
           </Suspense>
         ) : null}
 
-        {showMobileCreateDock ? (
-          <div className="mobile-create-dock">
-            <Button
-              aria-label="Новая подача"
-              variant="primary"
-              onClick={openCreateSubmissionDrawer}
-            >
-              Новая подача
-            </Button>
-          </div>
-        ) : null}
       </section>
 
       {agentQuestionnaireOpen && activeSubmission && role === "agent" ? (
         <FigmaQuestionnaireScreen
-          onBack={() => setAgentQuestionnaireOpen(false)}
+          initialFocus={agentQuestionnaireFocus}
+          onBack={() => {
+            setAgentQuestionnaireOpen(false);
+            setAgentQuestionnaireFocus(undefined);
+          }}
           onComplete={completeActiveQuestionnaire}
           submission={activeSubmission}
         />
@@ -3295,10 +3359,15 @@ function MainApp() {
       {drawerMode === "create" ? (
         <Suspense fallback={null}>
           <CreateSubmissionDrawer
+            city={createCity}
             familyCount={createFamilyCount}
             focusCloseToken={createCloseFocusToken}
             onClose={closeDrawer}
             onCreate={createDraft}
+            onCity={(city) => {
+              setCreateCity(city);
+              setDirty(true);
+            }}
             onFamilyCount={(count) => {
               const safeCount = Math.max(2, Math.min(6, count || 2));
               setCreateFamilyCount(safeCount);
@@ -3695,7 +3764,7 @@ function WorkspaceAccessGate({
                   <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
                 </span>
                 <span className="vf-brand-tail" aria-hidden="true">
-                  VisaFlow
+                  isaFlow
                 </span>
                 <span className="vf-brand-comma-version" aria-hidden="true">
                   19

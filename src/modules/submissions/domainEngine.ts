@@ -5,7 +5,12 @@ import {
   type ExportSummary,
 } from "./exportRules";
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
-import { defaultDrawerTab, hasUsableTripDateRange, isFixedIssueStatus } from "./status";
+import {
+  canPerformAction,
+  defaultDrawerTab,
+  hasUsableTripDateRange,
+  isFixedIssueStatus,
+} from "./status";
 import {
   canonicalRequiredMediaReadiness,
   isCanonicalSubmissionStatus,
@@ -444,50 +449,54 @@ export function getNextAction(
 ): ActionDecision | null {
   if (role === "agent") {
     if (submission.status === "draft") {
-      return { action: "save_progress", label: "Сохранить черновик" };
+      return guardedAction(submission, role, "save_progress", "Сохранить черновик");
     }
     if (submission.status === "in_progress") {
-      const complete = getCompleteness(submission).total === 100;
-      return {
-        action: "submit_for_review",
-        disabled: !complete,
-        label: "Отправить",
-        reason: complete ? undefined : "Есть незаполненные поля или недостающие файлы",
-      };
+      return guardedAction(submission, role, "submit_for_review", "Отправить");
     }
     if (submission.status === "returned") {
-      const hasOpen = getOpenIssues(submission).length > 0;
-      return {
-        action: "submit_corrections",
-        disabled: hasOpen,
-        label: "Отправить исправления",
-        reason: hasOpen ? "Сначала отметьте замечания исправленными" : undefined,
-      };
+      return guardedAction(
+        submission,
+        role,
+        "submit_corrections",
+        "Отправить исправления",
+      );
     }
     return null;
   }
 
   if (submission.status === "submitted_for_review") {
     const blocked = acceptanceBlockingIssues(submission).length > 0;
-    return {
-      action: blocked ? "return_with_issues" : "accept",
-      disabled: false,
-      label: blocked ? "Вернуть" : "Принять",
-    };
+    const action = blocked ? "return_with_issues" : "accept";
+    return guardedAction(submission, role, action, blocked ? "Вернуть" : "Принять");
   }
   if (submission.status === "corrections_received") {
-    const hasOpen = getOpenIssues(submission).length > 0;
-    return {
-      action: "close_issues_accept",
-      disabled: hasOpen,
-      label: "Закрыть и принять",
-      reason: hasOpen ? "Есть незакрытые замечания" : undefined,
-    };
+    return guardedAction(
+      submission,
+      role,
+      "close_issues_accept",
+      "Закрыть и принять",
+    );
   }
   if (submission.status === "ready_for_export") {
     return { action: "generate_export", label: "Сформировать Эксель" };
   }
   return null;
+}
+
+function guardedAction(
+  submission: Submission,
+  role: Role,
+  action: ActionDecision["action"],
+  label: string,
+): ActionDecision {
+  const guard = canPerformAction(submission, action, role);
+  return {
+    action,
+    disabled: guard.ok ? undefined : true,
+    label,
+    reason: guard.reason,
+  };
 }
 
 export function getDefaultDrawerTab(submission: Submission) {

@@ -282,7 +282,7 @@ export function AdminReviewDrawer({
         className="admin-review-drawer"
         key="admin-review-drawer"
         role="dialog"
-        initial={{ filter: "blur(10px)", opacity: 0.5, x: "100%" }}
+        initial={{ filter: "blur(10px)", opacity: 1, x: "100%" }}
         animate={{ filter: "blur(0px)", opacity: 1, x: 0 }}
         exit={{ filter: "blur(5px)", opacity: 0, x: "100%" }}
         transition={{ damping: 30, mass: 1, stiffness: 250, type: "spring" }}
@@ -369,8 +369,8 @@ export function AdminReviewDrawer({
             <motion.div
               animate={{ opacity: 1, y: 0 }}
               className="admin-review-tab-panel"
-              exit={{ opacity: 0, y: -10 }}
-              initial={{ opacity: 0, y: 10 }}
+              exit={{ opacity: 1, y: -10 }}
+              initial={{ opacity: 1, y: 10 }}
               key={activeTab}
               transition={{ duration: 0.2 }}
             >

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   Badge,
   Button,
@@ -16,6 +17,11 @@ import {
   TabCount,
 } from "../../../shared/ui/primitives";
 import { cn } from "../../../shared/ui/cn";
+import {
+  V19ProgressMeter,
+  V19SubmissionCollectionRow,
+  type V19BadgeTone,
+} from "../../../shared/ui/v19-design-system";
 import type { SubmissionStatus } from "../types";
 
 type CollectionTab<T extends string> = {
@@ -258,6 +264,54 @@ export function MobileFilterSheet<T extends string>({
     setOpen(false);
   }
 
+  const mobileFilterDialog = open ? (
+    <>
+      <button
+        className="v19-mobile-filter-backdrop v19-mobile-filter-portal-backdrop"
+        type="button"
+        onClick={() => setOpen(false)}
+      >
+        <span className="sr-only">Закрыть фильтры</span>
+      </button>
+      <div
+        className="v19-mobile-filter-sheet v19-mobile-filter-portal-sheet"
+        id={sheetId}
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <div className="v19-mobile-filter-head">
+          <strong id={titleId}>{title}</strong>
+          <Button
+            ref={closeButtonRef}
+            variant="ghost"
+            onClick={() => setOpen(false)}
+          >
+            Готово
+          </Button>
+        </div>
+        <div className="v19-mobile-filter-options">
+          {options.map((option) => (
+            <Button
+              aria-pressed={value === option.id}
+              className={cn(
+                "v19-mobile-filter-choice",
+                value === option.id && "is-active",
+              )}
+              key={option.id}
+              variant="plain"
+              onClick={() => handleValueChange(option.id)}
+            >
+              <span>{option.label}</span>
+              {typeof option.count === "number" ? <em>{option.count}</em> : null}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </>
+  ) : null;
+
   return (
     <div className="v19-mobile-filter">
       <ToolbarIconButton
@@ -271,53 +325,7 @@ export function MobileFilterSheet<T extends string>({
         aria-controls={open ? sheetId : undefined}
         onClick={() => setOpen((current) => !current)}
       />
-      {open ? (
-        <>
-          <button
-            className="v19-mobile-filter-backdrop"
-            type="button"
-            onClick={() => setOpen(false)}
-          >
-            <span className="sr-only">Закрыть фильтры</span>
-          </button>
-          <div
-            className="v19-mobile-filter-sheet"
-            id={sheetId}
-            ref={sheetRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-          >
-            <div className="v19-mobile-filter-head">
-              <strong id={titleId}>{title}</strong>
-              <Button
-                ref={closeButtonRef}
-                variant="ghost"
-                onClick={() => setOpen(false)}
-              >
-                Готово
-              </Button>
-            </div>
-            <div className="v19-mobile-filter-options">
-              {options.map((option) => (
-                <Button
-                  aria-pressed={value === option.id}
-                  className={cn(
-                    "v19-mobile-filter-choice",
-                    value === option.id && "is-active",
-                  )}
-                  key={option.id}
-                  variant="plain"
-                  onClick={() => handleValueChange(option.id)}
-                >
-                  <span>{option.label}</span>
-                  {typeof option.count === "number" ? <em>{option.count}</em> : null}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </>
-      ) : null}
+      {mobileFilterDialog ? createPortal(mobileFilterDialog, document.body) : null}
     </div>
   );
 }
@@ -640,6 +648,8 @@ export function SubmissionCollectionRow({
   statusLabel,
   submissionId,
   title,
+  routeDetail,
+  routeLabel,
   trip,
   tripDetail,
 }: {
@@ -661,135 +671,37 @@ export function SubmissionCollectionRow({
   statusLabel: string;
   submissionId: string;
   title: string;
+  routeDetail?: string;
+  routeLabel?: string;
   trip?: string;
   tripDetail?: string;
 }) {
   return (
-    <button
-      className={cn(
-        "v19-submission-row",
-        compact ? "is-rail-compact" : "is-rail-full",
-        `status-${status}`,
-        (status === "returned" || status === "requires_action") && "is-attention",
-        selected && "is-selected",
-      )}
-      aria-current={selected ? "true" : undefined}
-      aria-label={`${action}: ${title}, ${submissionId}`}
-      data-submission-card=""
-      data-submission-id={submissionId}
-      type="button"
-      onClick={onOpen}
-    >
-      <span className="v19-mobile-summary-head" aria-hidden="true">
-        <span className="v19-mobile-summary-id">{submissionId}</span>
-        <span className="v19-mobile-summary-status">
-          <Badge tone={submissionStatusTone(status)}>{statusLabel}</Badge>
-        </span>
-      </span>
-      <span className="v19-event-main">
-        <span className="v19-submission-kind-icon" aria-hidden="true">
-          <SvgIcon>
-            {kind === "family" ? (
-              <>
-                <path d="M16 21v-2a4 4 0 0 0-8 0v2" />
-                <circle cx="12" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                <path d="M2 21v-2a4 4 0 0 1 3-3.87" />
-                <path d="M8 3.13a4 4 0 0 0 0 7.75" />
-              </>
-            ) : (
-              <>
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </>
-            )}
-          </SvgIcon>
-        </span>
-        <strong title={title}>{title}</strong>
-        {searchText ? <span className="sr-only">{searchText}</span> : null}
-        {meta ? <em>{meta}</em> : null}
-      </span>
-      <span className="v19-mobile-summary-title">{title}</span>
-      {trip ? (
-        <span className="v19-submission-trip">
-          <strong title={trip}>{trip}</strong>
-          {tripDetail ? <em>{tripDetail}</em> : null}
-        </span>
-      ) : null}
-      <span className="v19-submission-status-tag" aria-label={`Статус: ${statusLabel}`}>
-        <Badge
-          className={cn(extraTagCount > 0 && "has-status-suffix")}
-          tone={submissionStatusTone(status)}
-        >
-          {statusLabel}
-          {extraTagCount > 0 ? (
-            <span className="v19-status-chip-suffix">
-              {extraTagLabel ?? `+${extraTagCount}`}
-            </span>
-          ) : null}
-        </Badge>
-        {statusDetail ? <em>{statusDetail}</em> : null}
-      </span>
-      {!compact ? (
-        <span className="v19-submission-file-tag" aria-label={`Файлы: ${fileState}`}>
-          <Badge tone={fileTone}>{fileState}</Badge>
-          {fileDetail ? <em>{fileDetail}</em> : null}
-        </span>
-      ) : null}
-      <span
-        className="v19-submission-percent-tag"
-        aria-label={`Готовность: ${completeness}`}
-      >
-        <ProgressCell value={completeness} />
-      </span>
-      <span
-        className="v19-event-action"
-        aria-label={`${action}: ${title}`}
-        title={action}
-      >
-        <span className="v19-event-action-label">{action}</span>
-        <SvgIcon>
-          <path d="M9 6l6 6-6 6" />
-        </SvgIcon>
-      </span>
-      <span className="v19-mobile-summary-foot" aria-hidden="true">
-        <span className="v19-mobile-summary-route">
-          {trip ? <strong>{trip}</strong> : null}
-          {tripDetail ? <em>{tripDetail}</em> : null}
-        </span>
-        <span className="v19-mobile-summary-tail">
-          <ProgressCell value={completeness} />
-          <SvgIcon>
-            <path d="M9 6l6 6-6 6" />
-          </SvgIcon>
-        </span>
-      </span>
-    </button>
-  );
-}
-
-function ProgressCell({ value }: { value: string }) {
-  const percent = Number.parseInt(value.replace("%", ""), 10);
-  const isPercentLabel = value.trim().endsWith("%") && Number.isFinite(percent);
-  const safePercent = isPercentLabel ? Math.min(Math.max(percent, 0), 100) : 100;
-
-  return (
-    <span
-      className={cn(
-        "v19-progress-cell",
-        !isPercentLabel
-          ? "is-label"
-          : safePercent === 100
-          ? "is-complete"
-          : safePercent <= 5
-            ? "is-empty"
-            : "is-partial",
-      )}
-    >
-      <span className="v19-progress-value">{value}</span>
-      <ProgressMeter value={safePercent} ariaHidden />
-    </span>
+    <V19SubmissionCollectionRow
+      action={action}
+      compact={compact}
+      completeness={completeness}
+      extraTagCount={extraTagCount}
+      extraTagLabel={extraTagLabel}
+      fileDetail={fileDetail}
+      fileState={fileState}
+      fileTone={fileTone}
+      kind={kind}
+      meta={meta}
+      routeDetail={routeDetail}
+      routeLabel={routeLabel}
+      onOpen={onOpen}
+      searchText={searchText}
+      selected={selected}
+      statusClassName={status}
+      statusDetail={statusDetail}
+      statusLabel={statusLabel}
+      statusTone={submissionStatusTone(status)}
+      submissionId={submissionId}
+      title={title}
+      trip={trip}
+      tripDetail={tripDetail}
+    />
   );
 }
 
@@ -808,25 +720,21 @@ export function ProgressMeter({
   tone?: "accent" | "danger" | "muted" | "success" | "warning";
   value: number;
 }) {
-  const safeMax = Number.isFinite(max) && max > 0 ? max : 100;
-  const safeValue = Number.isFinite(value)
-    ? Math.min(Math.max(value, 0), safeMax)
-    : 0;
-
   return (
-    <progress
-      aria-hidden={ariaHidden || label == null ? true : undefined}
-      aria-label={label}
-      className={cn("v19-progress-track", `tone-${tone}`, className)}
-      max={safeMax}
-      value={safeValue}
+    <V19ProgressMeter
+      ariaHidden={ariaHidden}
+      className={className}
+      label={label}
+      max={max}
+      tone={tone}
+      value={value}
     />
   );
 }
 
 function submissionStatusTone(
   status: SubmissionStatus,
-): "amber" | "blue" | "danger" | "muted" | "teal" {
+): V19BadgeTone {
   if (status === "ready_for_export") return "teal";
   if (status === "exported") return "muted";
   if (status === "submitted_for_review") return "blue";

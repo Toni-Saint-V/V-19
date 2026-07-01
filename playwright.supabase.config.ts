@@ -3,6 +3,14 @@ import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const smokeEnvPath = resolve(process.cwd(), ".env.supabase-smoke.local");
+const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
+const browserAuditTarget =
+  process.env.SUPABASE_BROWSER_AUDIT_ENV === "production" ? "production" : "sandbox";
+const browserAuditEnvPath =
+  browserAuditTarget === "production" ? productionEnvPath : smokeEnvPath;
+const productionSmokeUnlock =
+  browserAuditTarget === "production" &&
+  process.env.SUPABASE_PRODUCTION_SMOKE_UNLOCK === "1";
 const browserSafeEnvNames = [
   "VITE_SUPABASE_BACKEND_TARGET",
   "VITE_SUPABASE_SANDBOX_PROBE_ENABLED",
@@ -34,7 +42,7 @@ function loadEnvFile(path: string): Record<string, string> {
 }
 
 function loadBrowserSafeSmokeEnv(): Record<string, string> {
-  const smokeEnv = loadEnvFile(smokeEnvPath);
+  const smokeEnv = loadEnvFile(browserAuditEnvPath);
   const selectedEnv: Record<string, string> = {};
 
   for (const name of browserSafeEnvNames) {
@@ -45,9 +53,23 @@ function loadBrowserSafeSmokeEnv(): Record<string, string> {
   return {
     ...selectedEnv,
     VITE_SUPABASE_BACKEND_TARGET: "supabase",
-    VITE_SUPABASE_SANDBOX_PROBE_ENABLED: "true",
-    VITE_SUPABASE_RELEASE_ENABLED: "false",
-    VITE_SUPABASE_ACTIVATION_TARGET: "sandbox",
+    VITE_SUPABASE_SANDBOX_PROBE_ENABLED:
+      browserAuditTarget === "production" ? "false" : "true",
+    VITE_SUPABASE_RELEASE_ENABLED: productionSmokeUnlock ? "true" : "false",
+    VITE_SUPABASE_ACTIVATION_TARGET: browserAuditTarget,
+    ...(productionSmokeUnlock
+      ? {
+          VITE_SUPABASE_TRANSACTIONAL_PERSISTENCE_TESTED: "true",
+          VITE_SUPABASE_MIGRATION_APPROVED: "true",
+          VITE_SUPABASE_MIGRATIONS_APPLIED: "true",
+          VITE_SUPABASE_RLS_POLICY_TESTS_PASSED: "true",
+          VITE_SUPABASE_STORAGE_POLICY_TESTS_PASSED: "true",
+          VITE_SUPABASE_EDGE_FUNCTION_DRY_RUNS_PASSED: "true",
+          VITE_SUPABASE_BROWSER_QA_PASSED: "true",
+          VITE_SUPABASE_BROWSER_KEY_AUDITED: "true",
+          VITE_SUPABASE_PRODUCTION_APPROVED: "true",
+        }
+      : {}),
   };
 }
 
@@ -68,7 +90,12 @@ export default defineConfig({
   projects: [
     {
       name: "supabase-sandbox-browser-key-audit",
-      grep: /browser-safe Supabase sandbox values/,
+      grep: /browser-safe Supabase values/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "supabase-production-browser-key-audit",
+      grep: /browser-safe Supabase values/,
       use: { ...devices["Desktop Chrome"] },
     },
     {

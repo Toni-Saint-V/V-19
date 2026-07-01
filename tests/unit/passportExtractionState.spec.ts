@@ -33,18 +33,35 @@ function draftSubmission(): Submission {
   });
 }
 
-function passportFile(submission: Submission) {
-  const file = submission.files.find((item) => item.type === "passport_scan");
+function passportFile(submission: Submission, applicantIndex = 0) {
+  const applicantId = submission.applicants[applicantIndex]?.id;
+  const file = submission.files.find(
+    (item) => item.type === "passport_scan" && item.applicantId === applicantId,
+  );
   if (!file) throw new Error("expected passport slot");
   return file;
 }
 
-function questionnaireValue(submission: Submission, fieldId: string) {
+function questionnaireValue(
+  submission: Submission,
+  fieldId: string,
+  applicantIndex = 0,
+) {
   return (
-    submission.applicants[0]?.sections
+    submission.applicants[applicantIndex]?.sections
       .flatMap((section) => section.fields)
       .find((field) => field.id === fieldId)?.value ?? ""
   );
+}
+
+function questionnaireField(
+  submission: Submission,
+  fieldId: string,
+  applicantIndex = 0,
+) {
+  return submission.applicants[applicantIndex]?.sections
+    .flatMap((section) => section.fields)
+    .find((field) => field.id === fieldId);
 }
 
 function sectionIdForField(submission: Submission, fieldId: string) {
@@ -106,6 +123,11 @@ describe("passport extraction state", () => {
     );
 
     expect(questionnaireValue(applied, "passport-no")).toBe("765432100");
+    expect(questionnaireField(applied, "passport-no")).toMatchObject({
+      reviewOriginSource: "passport_ocr",
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+    });
     expect(applied.applicants[0]?.passportExtraction?.appliedFieldKeys).toContain(
       "passportNumber",
     );
@@ -197,6 +219,16 @@ describe("passport extraction state", () => {
     expect(questionnaireValue(autofilled, "passport-issue-date")).toBe("26.02.2016");
     expect(questionnaireValue(autofilled, "passport-issue-place")).toBe("FMS 78039");
     expect(questionnaireValue(autofilled, "passport-expiry-date")).toBe("26.02.2026");
+    expect(questionnaireField(autofilled, "surname")).toMatchObject({
+      reviewOriginSource: "passport_ocr",
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+    });
+    expect(questionnaireField(autofilled, "passport-no")).toMatchObject({
+      reviewOriginSource: "passport_ocr",
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+    });
     expect(autofilled.applicants[0]?.passportExtraction?.appliedFieldKeys).toEqual(
       expect.arrayContaining([
         "surname",
@@ -210,6 +242,115 @@ describe("passport extraction state", () => {
         "passportIssuePlace",
         "passportExpiresAt",
       ]),
+    );
+  });
+
+  test("autofills a family draft per applicant without mixing passport data", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON", "PETROVA ANNA"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "supabase",
+      submissions: [],
+      type: "family",
+    });
+    const primaryFile = passportFile(draft, 0);
+    const spouseFile = passportFile(draft, 1);
+
+    const withPrimaryExtraction = finishPassportExtraction(draft, primaryFile, {
+      fields: [
+        {
+          confidence: "high",
+          key: "surname",
+          needsManualReview: true,
+          value: "VOLKOV",
+        },
+        {
+          confidence: "high",
+          key: "firstName",
+          needsManualReview: true,
+          value: "ANTON",
+        },
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: true,
+          value: "752869613",
+        },
+        {
+          confidence: "medium",
+          key: "passportExpiresAt",
+          needsManualReview: true,
+          value: "26.02.2026",
+        },
+      ],
+      guardrails: [],
+      source: "local-ocr",
+      status: "extracted",
+      summary: "Primary passport extracted.",
+    });
+    const withBothExtractions = finishPassportExtraction(
+      withPrimaryExtraction,
+      spouseFile,
+      {
+        fields: [
+          {
+            confidence: "high",
+            key: "surname",
+            needsManualReview: true,
+            value: "PETROVA",
+          },
+          {
+            confidence: "high",
+            key: "firstName",
+            needsManualReview: true,
+            value: "ANNA",
+          },
+          {
+            confidence: "high",
+            key: "passportNumber",
+            needsManualReview: true,
+            value: "701234567",
+          },
+          {
+            confidence: "medium",
+            key: "passportExpiresAt",
+            needsManualReview: true,
+            value: "10.01.2031",
+          },
+        ],
+        guardrails: [],
+        source: "local-ocr",
+        status: "extracted",
+        summary: "Spouse passport extracted.",
+      },
+    );
+
+    const withPrimaryFields = applySafePassportExtractionFields(
+      withBothExtractions,
+      withBothExtractions.applicants[0]?.id ?? "",
+    );
+    const autofilled = applySafePassportExtractionFields(
+      withPrimaryFields,
+      withPrimaryFields.applicants[1]?.id ?? "",
+    );
+
+    expect(autofilled.title).toBe("Семья VOLKOVых");
+    expect(autofilled.applicants.map((applicant) => applicant.fullName)).toEqual([
+      "VOLKOV ANTON",
+      "PETROVA ANNA",
+    ]);
+    expect(questionnaireValue(autofilled, "surname", 0)).toBe("VOLKOV");
+    expect(questionnaireValue(autofilled, "first-name", 0)).toBe("ANTON");
+    expect(questionnaireValue(autofilled, "passport-no", 0)).toBe("752869613");
+    expect(questionnaireValue(autofilled, "passport-expiry-date", 0)).toBe(
+      "26.02.2026",
+    );
+    expect(questionnaireValue(autofilled, "surname", 1)).toBe("PETROVA");
+    expect(questionnaireValue(autofilled, "first-name", 1)).toBe("ANNA");
+    expect(questionnaireValue(autofilled, "passport-no", 1)).toBe("701234567");
+    expect(questionnaireValue(autofilled, "passport-expiry-date", 1)).toBe(
+      "10.01.2031",
     );
   });
 

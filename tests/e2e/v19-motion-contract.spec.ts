@@ -35,7 +35,7 @@ async function openFreshWorkspace(
   }
   await page.reload();
   await expect(
-    page.getByRole("heading", { level: 1, name: options.heading ?? "Входящие" }),
+    page.getByRole("heading", { level: 1, name: options.heading ?? "Мои действия" }),
   ).toBeVisible();
 }
 
@@ -82,7 +82,10 @@ test.describe("V-19 motion contract", () => {
         .toBe(false);
     }
 
-    await page.getByRole("button", { name: /Скрыть сводку|Показать сводку/ }).click();
+    await page
+      .getByLabel("Инструменты подач")
+      .getByRole("button", { name: /Скрыть контекст|Показать контекст/ })
+      .click();
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -132,9 +135,9 @@ test.describe("V-19 motion contract", () => {
       )
       .toBe("none");
 
-    const tool = page.getByRole("button", {
-      name: /Фильтр: только блокеры|Фильтр: все подачи/,
-    });
+    const tool = page
+      .getByLabel("Инструменты подач")
+      .getByRole("button", { name: /Сортировка: приоритет/ });
     await tool.hover();
     await expect
       .poll(() =>
@@ -164,7 +167,7 @@ test.describe("V-19 motion contract", () => {
     const problems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, {
-      heading: "Работа",
+      heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
     await page.getByRole("button", { name: "Выгрузка" }).click();

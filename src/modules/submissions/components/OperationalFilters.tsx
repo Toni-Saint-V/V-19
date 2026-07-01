@@ -47,8 +47,11 @@ export function CityFilterMenu({
             <circle cx="12" cy="10" r="2.2" />
           </svg>
         </span>
-        <span className="v19-city-filter-value">
+        <span className="v19-city-filter-value v19-city-filter-value-full">
           {value === "Все города" ? "Все города" : value}
+        </span>
+        <span className="v19-city-filter-value v19-city-filter-value-compact" aria-hidden="true">
+          {value === "Все города" ? "Все" : value}
         </span>
         <svg className="v19-city-filter-chevron" aria-hidden="true" viewBox="0 0 24 24">
           <path d="m7 10 5 5 5-5" />

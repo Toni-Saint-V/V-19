@@ -13,4 +13,5 @@ test-results/
 coverage/
 .DS_Store
 *.local
+*.local.json
 .vercel

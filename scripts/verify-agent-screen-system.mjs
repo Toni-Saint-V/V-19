@@ -219,7 +219,10 @@ function verifySingleStyleEntrypoint() {
   const cssFiles = listFiles(srcRoot)
     .map((file) => relative(file))
     .filter((file) => /\.(?:css|scss|less)$/i.test(file));
-  const expectedCssFiles = ["src/shared/ui/system.css"];
+  const expectedCssFiles = [
+    "src/shared/ui/system.css",
+    "src/shared/ui/visual-baseline.css",
+  ];
 
   assertSameSet(cssFiles, expectedCssFiles, "runtime stylesheet files");
 
@@ -253,10 +256,22 @@ function verifySingleStyleEntrypoint() {
     "runtime stylesheet import owners",
   );
 
+  const expectedCssImports = [
+    "src/shared/ui/system.css",
+    "src/shared/ui/visual-baseline.css",
+  ];
+  const resolvedCssImports = cssImports.map((cssImport) => cssImport.resolved);
+
+  assertSameOrderedList(
+    resolvedCssImports,
+    expectedCssImports,
+    "src/main.tsx runtime stylesheet import order",
+  );
+
   for (const cssImport of cssImports) {
-    if (cssImport.resolved !== "src/shared/ui/system.css") {
+    if (!expectedCssImports.includes(cssImport.resolved)) {
       failures.push(
-        `${cssImport.owner} imports stylesheet ${cssImport.specifier}; expected src/shared/ui/system.css`,
+        `${cssImport.owner} imports stylesheet ${cssImport.specifier}; expected approved V-19 runtime stylesheets`,
       );
     }
   }
@@ -465,6 +480,23 @@ function assertSameSet(actual, expected, label) {
 
   for (const item of actualSet) {
     if (!expectedSet.has(item)) failures.push(`${label} contains unexpected ${item}`);
+  }
+}
+
+function assertSameOrderedList(actual, expected, label) {
+  if (actual.length !== expected.length) {
+    failures.push(
+      `${label} expected ${expected.length} item(s), found ${actual.length}`,
+    );
+    return;
+  }
+
+  for (const [index, expectedItem] of expected.entries()) {
+    if (actual[index] !== expectedItem) {
+      failures.push(
+        `${label} item ${index + 1} expected ${expectedItem}, found ${actual[index]}`,
+      );
+    }
   }
 }
 

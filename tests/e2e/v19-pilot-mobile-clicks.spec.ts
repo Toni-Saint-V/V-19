@@ -17,7 +17,7 @@ test.describe("V-19 pilot mobile clicks", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await page.setViewportSize({ height: 844, width: 390 });
-    await openFreshWorkspace(page, { heading: "Входящие" });
+    await openFreshWorkspace(page, { heading: "Мои действия" });
     await expectNoHorizontalOverflow(page, "mobile inbox");
 
     await clickWorkspaceButton(page, /Мои подачи/);

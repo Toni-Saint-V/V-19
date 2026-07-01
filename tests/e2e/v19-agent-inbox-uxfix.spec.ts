@@ -7,7 +7,29 @@ const viewports = [
   { height: 844, label: "390x844", width: 390 },
 ];
 
-async function openFreshAgentInbox(page: Page) {
+async function isVisible(locator: ReturnType<Page["getByRole"]>) {
+  return locator.isVisible({ timeout: 750 }).catch(() => false);
+}
+
+async function openMobileMenu(page: Page) {
+  const menuButton = page.getByRole("button", { name: "Меню" });
+
+  if (await isVisible(menuButton)) {
+    await menuButton.click();
+  }
+}
+
+async function clickWorkspaceButton(page: Page, name: string | RegExp) {
+  const button = page.getByRole("button", { name });
+
+  if (!(await isVisible(button.first()))) {
+    await openMobileMenu(page);
+  }
+
+  await button.first().click();
+}
+
+async function openFreshAgentActions(page: Page) {
   await page.goto("/");
   await page.evaluate(() => {
     (
@@ -15,7 +37,7 @@ async function openFreshAgentInbox(page: Page) {
     ).localStorage.clear();
   });
   await page.reload();
-  await expect(page.getByRole("region", { name: "Входящие" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 }
 
 async function expectNoHorizontalOverflow(page: Page, context: string) {
@@ -35,30 +57,29 @@ async function expectNoHorizontalOverflow(page: Page, context: string) {
   expect(metrics.scrollWidth, context).toBeLessThanOrEqual(metrics.clientWidth + 1);
 }
 
-async function expectInboxRailFits(page: Page) {
-  const rail = page.locator(".v19-inbox-summary").first();
-  await expect(rail).toBeVisible();
-  await expect(rail).not.toContainText("Общее состояние всех подач");
+async function expectActionBoardFits(page: Page) {
+  const board = page.locator(".vf-figma-view-stage").first();
+  await expect(board).toBeVisible();
 
-  const metrics = await rail.evaluate((element) => {
-    const railElement = element as unknown as {
-      getBoundingClientRect(): { height: number };
-      scrollHeight: number;
+  const metrics = await board.evaluate((element) => {
+    const boardElement = element as unknown as {
+      clientWidth: number;
+      scrollWidth: number;
     };
 
     return {
-      clientHeight: railElement.getBoundingClientRect().height,
-      scrollHeight: railElement.scrollHeight,
+      clientWidth: boardElement.clientWidth,
+      scrollWidth: boardElement.scrollWidth,
     };
   });
 
-  expect(metrics.scrollHeight, "desktop inbox rail should fit without inner scroll").toBeLessThanOrEqual(
-    metrics.clientHeight + 1,
+  expect(metrics.scrollWidth, "agent actions board should not clip horizontally").toBeLessThanOrEqual(
+    metrics.clientWidth + 1,
   );
 }
 
-test.describe("V-19 agent inbox triage UX", () => {
-  test("row text is static and explicit row action opens drawer", async ({ page }) => {
+test.describe("V-19 agent actions triage UX", () => {
+  test("action row stays explicit and opens the real submission drawer", async ({ page }) => {
     const browserProblems: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") browserProblems.push(message.text());
@@ -66,33 +87,24 @@ test.describe("V-19 agent inbox triage UX", () => {
     page.on("pageerror", (error) => browserProblems.push(error.message));
 
     await page.setViewportSize({ height: 900, width: 1440 });
-    await openFreshAgentInbox(page);
+    await openFreshAgentActions(page);
 
-    const returnedRow = page
-      .locator(".v19-event-row")
-      .filter({ hasText: "Подачу «Семья Ивановых» вернули" })
+    const agentActionSurface = page.getByRole("region", { name: "Мои действия" });
+    const returnedRow = agentActionSurface
+      .locator('.vf-figma-action-row[data-submission-id="ПД-1048"]')
       .first();
-    const returnedAction = returnedRow.getByRole("button", { name: "Открыть" });
 
     await expect(returnedRow).toBeVisible();
-    await expect(returnedRow).toContainText("Администратор");
-    await expect(returnedRow).toContainText("12 мин назад");
-    await expect(returnedRow.getByRole("button")).toHaveCount(1);
-    await expect(returnedAction).toBeVisible();
-    await expect(returnedRow).not.toHaveClass(/is-selected/);
-    await expect(page.getByRole("button", { name: "Новая подача" })).toHaveClass(
-      /secondary-button/,
+    await expect(returnedRow).toContainText("ПД-1048");
+    await expect(returnedRow).toHaveAttribute(
+      "aria-label",
+      /Открыть подачу: .*ПД-1048/,
     );
 
-    await returnedRow.getByText("Подачу «Семья Ивановых» вернули").click();
-    await expect(page.locator(".submission-drawer")).toHaveCount(0);
-
-    await returnedAction.click();
-    await expect(page.locator(".submission-drawer")).toBeVisible();
-    await expect(page.locator(".submission-drawer")).toContainText("Семья Ивановых");
-    await expect(returnedRow).toHaveCount(1);
-    await expect(returnedRow).toHaveClass(/is-unread/);
-    await expect(returnedRow).not.toHaveClass(/is-selected/);
+    await returnedRow.click();
+    const openedDrawer = page.getByRole("dialog", { name: "Подача ПД-1048" });
+    await expect(openedDrawer).toBeVisible();
+    await expect(openedDrawer).toContainText("Семья Ивановых");
     expect(browserProblems).toEqual([]);
   });
 
@@ -108,14 +120,14 @@ test.describe("V-19 agent inbox triage UX", () => {
         height: viewport.height,
         width: viewport.width,
       });
-      await openFreshAgentInbox(page);
+      await openFreshAgentActions(page);
       await expectNoHorizontalOverflow(page, viewport.label);
       if (viewport.width >= 1280) {
-        await expectInboxRailFits(page);
+        await expectActionBoardFits(page);
       }
       await page.screenshot({
         fullPage: true,
-        path: `docs/qa/2026-06-24-inbox-uxfix-${viewport.label}.png`,
+        path: `docs/qa/2026-06-30-agent-actions-uxfix-${viewport.label}.png`,
       });
     }
 
@@ -139,14 +151,14 @@ test.describe("V-19 agent inbox triage UX", () => {
         height: viewport.height,
         width: viewport.width,
       });
-      await openFreshAgentInbox(page);
+      await openFreshAgentActions(page);
 
-      await page.getByRole("tab", { name: /Мои действия/ }).click();
+      await clickWorkspaceButton(page, /Мои действия/);
       await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
       await expectNoHorizontalOverflow(page, `${viewport.label}: agent actions`);
 
-      await page.getByRole("button", { name: "Мои подачи. все рабочие подачи" }).click();
-      await expect(page.getByRole("region", { name: /Рабочая область подач агента/ })).toBeVisible();
+      await clickWorkspaceButton(page, /Мои подачи/);
+      await expect(page.getByRole("region", { name: "Мои подачи" })).toBeVisible();
       await expectNoHorizontalOverflow(page, `${viewport.label}: agent submissions`);
     }
 

@@ -1,10 +1,15 @@
 import { fileTypeLabels } from "./status";
+import {
+  passportGateIssues,
+  type PassportGateIssue,
+} from "./passportExtractionGuards";
 import type { AiSuggestion, Submission, SubmissionFile } from "./types";
 
 export function generateAiSuggestions(submission: Submission): AiSuggestion[] {
   const suggestions = [
     ...questionnaireSuggestions(submission),
     ...fileSuggestions(submission),
+    ...passportGuardSuggestions(submission),
   ];
 
   return suggestions.filter((suggestion) => !hasMatchingIssue(submission, suggestion));
@@ -61,6 +66,68 @@ function fileSuggestions(submission: Submission): AiSuggestion[] {
       },
     ];
   });
+}
+
+function passportGuardSuggestions(submission: Submission): AiSuggestion[] {
+  return passportGateIssues(submission).map((issue) => ({
+    id: suggestionId(
+      submission.id,
+      issue.applicantId,
+      "passport",
+      issue.code,
+    ),
+    type: "field" as const,
+    target: {
+      applicantId: issue.applicantId,
+      applicantName: issue.applicantName,
+      section: "Паспорт",
+      field: passportGateFieldLabel(issue),
+    },
+    title: passportGateSuggestionTitle(issue),
+    reason: issue.message,
+    confidence: "high" as const,
+    severity: "blocker" as const,
+    status: "suggested" as const,
+    createdAt: "сейчас",
+  }));
+}
+
+function passportGateFieldLabel(issue: PassportGateIssue) {
+  if (
+    issue.code === "passport_expired" ||
+    issue.code === "passport_expires_before_trip"
+  ) {
+    return "Дата окончания паспорта";
+  }
+  if (issue.code === "passport_issued_after_expiry") return "Дата выдачи паспорта";
+  if (
+    issue.code === "duplicate_passport" ||
+    issue.code === "passport_number_missing" ||
+    issue.code === "passport_number_unexpected_format"
+  ) {
+    return "Номер паспорта";
+  }
+  if (issue.code === "passport_type_not_ordinary") return "Тип паспорта";
+  return "Распознанные данные паспорта";
+}
+
+function passportGateSuggestionTitle(issue: PassportGateIssue) {
+  if (issue.code === "duplicate_passport") return "Проверить дубль паспорта";
+  if (issue.code === "passport_expired") return "Паспорт просрочен";
+  if (issue.code === "passport_expires_before_trip") {
+    return "Паспорт истекает до поездки";
+  }
+  if (issue.code === "passport_issued_after_expiry") {
+    return "Проверить даты паспорта";
+  }
+  if (issue.code === "passport_number_missing") return "Нет номера паспорта";
+  if (issue.code === "passport_number_unexpected_format") {
+    return "Проверить формат номера паспорта";
+  }
+  if (issue.code === "passport_type_not_ordinary") {
+    return "Проверить тип паспорта";
+  }
+  return "Проверить распознанные паспортные данные";
 }
 
 function suggestionForFile(

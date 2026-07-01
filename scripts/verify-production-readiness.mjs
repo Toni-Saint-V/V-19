@@ -10,9 +10,10 @@ import {
 } from "./supabase-migration-contract.mjs";
 
 const repoRoot = process.cwd();
+const readinessRelativePath = "docs/release/supabase-production-readiness.json";
 const readinessPath = resolve(
   repoRoot,
-  "docs/release/supabase-production-readiness.json",
+  readinessRelativePath,
 );
 const packagePath = resolve(repoRoot, "package.json");
 const migrationsDir = resolve(repoRoot, "supabase/migrations");
@@ -26,16 +27,35 @@ const passes = [];
 
 const scopedDiffPaths = [
   "package.json",
+  "scripts/prepare-supabase-production-packet.mjs",
+  "scripts/provision-supabase-pilot-cohort.mjs",
+  "scripts/supabase-migration-contract.mjs",
   "scripts/verify-production-readiness.mjs",
   "scripts/verify-supabase-release.mjs",
+  "scripts/verify-supabase-production-workflow.mjs",
+  "supabase/migrations/20260630222703_returned_pdf_handoff_security_invoker.sql",
+  "supabase/migrations/20260630235513_allow_trip_date_sync_during_submit_handoff.sql",
   "docs/release/auth-data-production-readiness.md",
-  "docs/release/supabase-production-readiness.json",
   "docs/release/supabase-production-approval-checklist.md",
   "docs/release/supabase-production-promotion.md",
   "docs/release/supabase-workspace-pr-package.md",
   "docs/qa/release-ai-gate-20260627T200633.md",
   "docs/qa/release-ai-gate-browser-key-audit-unverified-20260627T200633.md",
+  "docs/qa/supabase-browser-key-audit-20260701.md",
+  "docs/qa/supabase-production-browser-key-audit-20260701.md",
+  "docs/qa/supabase-production-backup-discovery-20260701.md",
+  "docs/qa/supabase-production-edge-functions-20260701.md",
+  "docs/qa/supabase-production-env-evidence-20260701.md",
+  "docs/qa/supabase-production-migration-evidence-20260701.md",
+  "docs/qa/supabase-production-logs-20260701.md",
+  "docs/qa/supabase-production-owner-approval-20260701.md",
+  "docs/qa/supabase-production-pilot-cohort-20260701.md",
+  "docs/qa/supabase-production-security-advisors-20260701.md",
+  "docs/qa/supabase-production-smoke-discovery-20260701.md",
+  "docs/qa/supabase-production-workflow-smoke-20260701.md",
   "docs/qa/supabase-security-advisor-hardening-2026-06-15.md",
+  "tests/e2e-supabase/browser-key-audit.spec.ts",
+  "tests/unit/supabaseSecurityContract.spec.ts",
   "production-readiness-audit.md",
 ];
 
@@ -142,7 +162,25 @@ function currentScopedDiffSha256() {
     })
     .join("");
 
-  return sha256Text(`${diff}${untrackedPayload}`);
+  return sha256Text(
+    `${diff}\n--- canonical:${readinessRelativePath} ---\n${canonicalReadinessForScopedHash()}${untrackedPayload}`,
+  );
+}
+
+function canonicalReadinessForScopedHash() {
+  const packet = readJson(
+    readinessPath,
+    "Production readiness packet exists for scoped hash",
+  );
+  const stablePacket = {
+    ...packet,
+    preActivationVerification: {
+      readinessContractVersion:
+        packet.preActivationVerification?.readinessContractVersion ?? "",
+    },
+  };
+
+  return JSON.stringify(stablePacket, null, 2);
 }
 
 function unexpectedDirtyFiles() {
@@ -370,11 +408,11 @@ function verifyProductionMigrationEvidence(packet) {
   for (const [label, snippet] of [
     [
       "Production migration evidence records public base table count",
-      "Public base tables: `11`",
+      "Public base tables: `16`",
     ],
     [
       "Production migration evidence records all public tables have RLS",
-      "Public tables with RLS enabled: `11`",
+      "Public tables with RLS enabled: `16`",
     ],
     [
       "Production migration evidence records zero public tables without RLS",
@@ -751,6 +789,51 @@ function verifyAuthSecurityEvidence(packet, authSecurity) {
   }
 }
 
+function verifyProductionWorkflowEvidence(packet, env, post) {
+  const artifact =
+    post.workflowEvidenceArtifact ?? env.productionWorkflowEvidenceArtifact;
+  const hasWorkflowChecks = [
+    env.transactionalPersistenceTested,
+    env.rlsPolicyTestsPassed,
+    env.storagePolicyTestsPassed,
+    post.agentCanCreateDraft,
+    post.agentCanUploadRequiredMedia,
+    post.incompleteWaitingReviewRejected,
+    post.validWaitingReviewReachesQueue,
+    post.adminCanAcceptOrReturnCase,
+    post.postHandoffAgentMutationBlocked,
+    post.privateMediaSignedUrlScoped,
+  ].some((value) => value === true);
+
+  if (!hasWorkflowChecks) return;
+
+  requireExistingProjectFile(
+    artifact,
+    "Production workflow smoke evidence artifact exists",
+  );
+  if (!present(artifact)) return;
+
+  const evidence = readText(
+    resolve(repoRoot, artifact),
+    "Production workflow smoke evidence artifact exists",
+  );
+  if (!evidence) return;
+
+  requireSnippet(evidence, "Result: `PASS`", "Production workflow smoke passed");
+  if (present(packet.productionTarget?.projectId)) {
+    requireSnippet(
+      evidence,
+      packet.productionTarget.projectId,
+      "Production workflow smoke records project id",
+    );
+  }
+  requireSnippet(
+    evidence,
+    "No email, password, service-role key, signed URL, or personal identifier is recorded",
+    "Production workflow smoke records no-secret boundary",
+  );
+}
+
 function verifyPacket(packet, rawContent) {
   verifyNoCommittedSecrets(rawContent);
   const gitHead = currentGitHead();
@@ -1025,6 +1108,7 @@ function verifyPacket(packet, rawContent) {
   );
 
   const post = packet.postActivationChecks ?? {};
+  verifyProductionWorkflowEvidence(packet, env, post);
   for (const [key, label] of [
     ["agentSignInWorks", "Post-activation agent sign-in works"],
     ["adminSignInWorks", "Post-activation admin sign-in works"],

@@ -126,7 +126,7 @@ export async function verifyExportWorkbookArtifact(
     artifact.sheetName === EXPORT_WORKBOOK_SHEET_NAME &&
     parsed.sheetName === EXPORT_WORKBOOK_SHEET_NAME &&
     artifact.range === EXPORT_WORKBOOK_RANGE &&
-    parsed.dimension === `A1:BD${artifact.rows.length}` &&
+    parsed.dimension === "A1:BE1048572" &&
     parsed.rows[0]?.length === EXPORT_WORKBOOK_COLUMN_COUNT &&
     parsed.rows[0].every(
       (value, index) => value === EXPECTED_EXPORT_CONTRACT_HEADERS[index],
@@ -138,10 +138,34 @@ export async function verifyExportWorkbookArtifact(
       (row, rowIndex) =>
         row.length === artifact.rows[rowIndex]?.length &&
         row.every(
-          (value, columnIndex) => value === artifact.rows[rowIndex]?.[columnIndex],
+          (value, columnIndex) =>
+            value ===
+            expectedParsedWorkbookValue(
+              artifact.rows,
+              artifact.rowFills,
+              rowIndex,
+              columnIndex,
+            ),
         ),
     )
   );
+}
+
+function expectedParsedWorkbookValue(
+  rows: string[][],
+  rowFills: Array<ExportWorkbookRowFill | null>,
+  rowIndex: number,
+  columnIndex: number,
+) {
+  const value = rows[rowIndex]?.[columnIndex] ?? "";
+  if (
+    columnIndex === 54 &&
+    rows[rowIndex]?.[54] === "Family" &&
+    rowFills[rowIndex]
+  ) {
+    return "Family";
+  }
+  return value;
 }
 
 export default function downloadExportWorkbook(

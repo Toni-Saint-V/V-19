@@ -289,6 +289,9 @@ export function applyPassportExtractionField(
   const withField = updateQuestionnaireField(submission, {
     applicantId,
     fieldId: row.fieldId,
+    reviewOriginSource: "passport_ocr",
+    reviewSource: "passport_ocr",
+    reviewState: "needs_review",
     sectionId: row.sectionId,
     value: row.extractedValue,
   });
