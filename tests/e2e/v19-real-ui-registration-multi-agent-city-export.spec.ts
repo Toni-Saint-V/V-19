@@ -7,6 +7,7 @@ import {
   drawer,
   e2ePassportFile,
   expectDrawerStatus,
+  expectVisibleText,
   isVisible,
   markVisibleIssuesFixed,
   openDrawerTab,
@@ -72,9 +73,10 @@ async function login(page: Page, email: string, password = accessPassword) {
   await page.getByLabel("Пароль", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Войти" }).click();
   await expect(
-    page
-      .getByRole("button", { name: /^(Мои действия|Проверка|Выгрузка|Настройки)/ })
-      .first(),
+    page.getByRole("heading", {
+      level: 1,
+      name: /^(Мои действия|Проверка|Выгрузка|Настройки)$/,
+    }),
   ).toBeVisible();
 }
 
@@ -143,7 +145,11 @@ async function createFamilyAndSubmit(page: Page, family: FamilyDraft) {
   await drawer(page)
     .locator(".pi-file-input")
     .setInputFiles(family.applicants.map((name) => e2ePassportFile(name)));
-  await expect(drawer(page).getByText(family.applicants[0]).first()).toBeVisible();
+  await expectVisibleText(
+    drawer(page),
+    family.applicants[0],
+    `Uploaded passport applicant ${family.applicants[0]} was not visible.`,
+  );
   await drawer(page).getByRole("button", { name: "Сохранить черновик" }).click();
   await expect(drawer(page).getByRole("heading", { name: family.title })).toBeVisible();
 

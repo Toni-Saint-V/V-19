@@ -340,10 +340,10 @@ test.describe("V-19 mobile click real logic", () => {
 
     await openMobileMenu(page);
     await expectCenterHitTarget(
-      page.getByRole("button", { name: /Выгрузка\. готово к Excel/ }),
+      page.getByRole("button", { name: /^Выгрузка$/ }),
       "390 admin mobile menu export nav",
     );
-    await clickOperationalNav(page, /Выгрузка\. готово к Excel/);
+    await clickOperationalNav(page, /^Выгрузка$/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Выгрузка" }),
     ).toBeVisible();
@@ -408,7 +408,7 @@ test.describe("V-19 mobile click real logic", () => {
       ).toBeVisible();
       await expectNoHorizontalOverflow(page, `${viewport.label} admin settings`);
       await expectNoFixedLayerOverControls(page, `${viewport.label} admin settings`);
-      await clickOperationalNav(page, /Выгрузка\. готово к Excel/);
+      await clickOperationalNav(page, /^Выгрузка$/);
       await expect(
         page.getByRole("heading", { level: 1, name: "Выгрузка" }),
       ).toBeVisible();

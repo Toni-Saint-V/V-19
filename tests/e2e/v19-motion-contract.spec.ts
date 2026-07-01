@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { clickWorkspaceButton } from "./v19-pilot-helpers";
 
 function collectBrowserProblems(page: Page) {
   const problems: string[] = [];
@@ -46,7 +47,7 @@ test.describe("V-19 motion contract", () => {
     const problems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page);
-    await page.getByRole("button", { name: "Мои подачи" }).click();
+    await clickWorkspaceButton(page, /^Мои подачи$/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
 
     const viewTransitionSupported = await page.evaluate(
@@ -112,7 +113,7 @@ test.describe("V-19 motion contract", () => {
 
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openFreshWorkspace(page);
-    await page.getByRole("button", { name: "Мои подачи" }).click();
+    await clickWorkspaceButton(page, /^Мои подачи$/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
 
     const tab = page.getByRole("tab", { name: /В работе/ });
@@ -170,7 +171,7 @@ test.describe("V-19 motion contract", () => {
       heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
-    await page.getByRole("button", { name: "Выгрузка" }).click();
+    await clickWorkspaceButton(page, /^Выгрузка$/);
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
 
     const queue = page.locator(".magic-export-queue");

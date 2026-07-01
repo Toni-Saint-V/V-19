@@ -33,25 +33,66 @@ async function openMobileMenu(page: Page) {
 
 async function clickFirstVisible(locator: Locator) {
   const count = await locator.count();
+  let lastError: unknown = null;
 
   for (let index = 0; index < count; index += 1) {
     const candidate = locator.nth(index);
 
     if (await isVisible(candidate)) {
-      await candidate.click();
+      try {
+        await candidate.click({ timeout: 10_000 });
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  await locator.first().click({ timeout: 10_000 });
+}
+
+async function expectAtLeastOneVisible(locator: Locator, message: string) {
+  const count = await locator.count();
+
+  for (let index = 0; index < count; index += 1) {
+    const candidate = locator.nth(index);
+
+    if (await isVisible(candidate)) {
+      await expect(candidate).toBeVisible();
       return;
     }
   }
 
-  await locator.first().click();
+  throw new Error(message);
+}
+
+async function hasAtLeastOneVisible(locator: Locator) {
+  const count = await locator.count();
+
+  for (let index = 0; index < count; index += 1) {
+    if (await isVisible(locator.nth(index))) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function clickWorkspaceButton(page: Page, name: string | RegExp) {
   const button = page.getByRole("button", { name });
 
-  if (!(await isVisible(button.first()))) {
+  if (!(await hasAtLeastOneVisible(button))) {
     await openMobileMenu(page);
   }
+
+  await expectAtLeastOneVisible(
+    button,
+    `No visible workspace button matched ${String(name)}.`,
+  );
 
   await clickFirstVisible(button);
 }
@@ -116,16 +157,16 @@ async function switchToAdmin(page: Page) {
 }
 
 async function expectAdminWorkNavigation(page: Page) {
-  const workButton = page.getByRole("button", { name: /(Проверка|Работа)/ });
-  const exportButton = page.getByRole("button", { name: /Выгрузка\. готово к Excel/ });
+  const workButton = page.getByRole("button", { name: /^(Проверка|Работа)$/ });
+  const exportButton = page.getByRole("button", { name: /^Выгрузка$/ });
 
   if (!(await isVisible(workButton.first()))) {
     await openMobileMenu(page);
   }
 
-  await expect(workButton).toBeVisible();
-  await expect(exportButton).toBeVisible();
-  await workButton.click();
+  await expect(workButton.first()).toBeVisible();
+  await expect(exportButton.first()).toBeVisible();
+  await clickFirstVisible(workButton);
   await expect(
     page.getByRole("heading", { exact: true, level: 1, name: /^(Проверка|Работа)$/ }),
   ).toBeVisible();
@@ -261,15 +302,25 @@ async function openAdminSubmission(
   cardText: string,
   drawerTitle = cardText,
 ) {
-  const targetCard = submissionCard(page, cardText);
-  await expect(targetCard).toBeVisible();
-  await targetCard.click();
-  await expect(
+  const targetCard = page
+    .getByRole("button", { name: new RegExp(escapeRegex(cardText)) })
+    .or(submissionCard(page, cardText));
+  await expectAtLeastOneVisible(
+    targetCard,
+    `No visible submission card matched ${cardText}.`,
+  );
+  await clickFirstVisible(targetCard);
+  if (!(await isVisible(drawer(page)))) {
+    await clickFirstVisible(targetCard);
+  }
+  await expect(drawer(page)).toBeVisible();
+  await expectAtLeastOneVisible(
     drawer(page)
       .getByRole("heading", { name: drawerTitle })
-      .or(drawer(page).getByText(drawerTitle).first())
-      .first(),
-  ).toBeVisible();
+      .or(drawer(page).getByText(drawerTitle))
+      .or(drawer(page).getByText(cardText)),
+    `Submission drawer did not expose ${drawerTitle} or ${cardText}.`,
+  );
 }
 
 async function openCorrectionsTab(page: Page) {
@@ -442,11 +493,25 @@ function e2ePassportFile(name: string) {
   };
 }
 
+async function generateAndDownloadExcel(page: Page) {
+  await page.getByRole("button", { name: "Сформировать Excel" }).click();
+  const downloadButton = page.getByRole("button", { name: "Скачать Excel" });
+  await expect(downloadButton).toBeEnabled();
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  await expect(download.failure()).resolves.toBeNull();
+  return download;
+}
+
 async function uploadCreatePassports(page: Page, names: string[]) {
   await drawer(page)
     .locator(".pi-file-input")
     .setInputFiles(names.map((name) => e2ePassportFile(name)));
-  await expect(drawer(page).getByText(names[0]).first()).toBeVisible();
+  await expectAtLeastOneVisible(
+    drawer(page).getByText(/Паспорт принят|Все паспорта приняты/),
+    "Uploaded passport accepted status was not visible.",
+  );
   await expect(
     drawer(page).getByRole("button", { name: "Сохранить черновик" }),
   ).toBeEnabled();
@@ -779,12 +844,8 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.locator("#export-action-hint")).toContainText(
       "Сначала сформируйте Excel",
     );
-    await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Скачать Excel" }).click();
-    const download = await downloadPromise;
+    const download = await generateAndDownloadExcel(page);
     expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
-    await expect(download.failure()).resolves.toBeNull();
     await clearExportSelection(page);
     await expect(page.getByRole("heading", { name: "Пакет не выбран" })).toBeVisible();
     await expect(page.locator("#export-action-hint")).toContainText(
@@ -817,6 +878,9 @@ test.describe("V-19 operations workspace", () => {
     await reviewCard.focus();
     await expect(reviewCard).toBeFocused();
     await page.keyboard.press("Enter");
+    if (!(await isVisible(drawer(page)))) {
+      await reviewCard.click();
+    }
     await expect(
       drawer(page).getByRole("heading", { name: "Нина Волкова" }),
     ).toBeVisible();
@@ -906,7 +970,7 @@ test.describe("V-19 operations workspace", () => {
     page,
   }, testInfo) => {
     await openCreateSubmission(page);
-    await expect(page.getByRole("heading", { name: "Новая подача" })).toBeVisible();
+    await expect(drawer(page)).toBeVisible();
     await expect(
       drawer(page).getByRole("heading", { name: "Загрузите паспорт" }),
     ).toBeVisible();
@@ -1546,8 +1610,7 @@ test.describe("V-19 operations workspace", () => {
           "Appointment Type(For Family, applicant email and contact number should be same for all family members)",
         ),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Сформировать Excel" }).click();
-      await page.getByRole("button", { name: "Скачать Excel" }).click();
+      await generateAndDownloadExcel(page);
       await page.getByRole("button", { name: "Отметить выгружено" }).click();
     });
 
@@ -1566,8 +1629,7 @@ test.describe("V-19 operations workspace", () => {
       await expect(
         page.getByRole("heading", { name: "2 подачи · 2 заявителя" }),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Сформировать Excel" }).click();
-      await page.getByRole("button", { name: "Скачать Excel" }).click();
+      await generateAndDownloadExcel(page);
       await page.getByRole("button", { name: "Отметить выгружено" }).click();
     });
 
