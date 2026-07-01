@@ -77,6 +77,7 @@ describe("CreateSubmissionDrawer passport readiness", () => {
       expect(screen.getAllByText("ivan.jpg").length).toBeGreaterThan(0);
       expect(screen.getAllByText("Проверка оператором").length).toBeGreaterThan(0);
     });
+    expect(screen.queryByText("Паспорт принят")).not.toBeInTheDocument();
     expect(invokePassportExtraction).toHaveBeenCalledTimes(1);
     expect(nextButton).toBeDisabled();
 
@@ -90,6 +91,7 @@ describe("CreateSubmissionDrawer passport readiness", () => {
       expect(screen.getAllByText("Проверка оператором").length).toBeGreaterThanOrEqual(
         2,
       );
+      expect(screen.queryByText("Паспорт принят")).not.toBeInTheDocument();
       expect(nextButton).toBeEnabled();
     });
     expect(invokePassportExtraction).toHaveBeenCalledTimes(2);
