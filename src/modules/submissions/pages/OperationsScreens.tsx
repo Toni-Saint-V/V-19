@@ -8,10 +8,13 @@ import {
   type V19EntityViewMode,
   type V19MemberStatusTone,
 } from "../../../shared/ui/v19-design-system";
-import type {
-  AgentActionItem,
-  AgentActionSummary,
-  OperationalInboxEvent,
+import {
+  buildAgentActionTasks,
+  summarizeAgentActionTasks,
+  type AgentActionItem,
+  type AgentActionTask,
+  type AgentActionTaskStatus,
+  type OperationalInboxEvent,
 } from "../agentActions";
 import {
   buildExportMappingAudit,
@@ -41,7 +44,10 @@ import {
   type ExportTab,
 } from "../uiTypes";
 import { EmptyState } from "../components/Primitives";
-import { AgentActionsCommandCockpit } from "../components/AgentActionsCommandCockpit";
+import {
+  AgentActionsCommandCockpit,
+  type AgentActionsSummaryFilter,
+} from "../components/AgentActionsCommandCockpit";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
 import {
   CollectionToolbarTools,
@@ -56,7 +62,6 @@ import {
   MobileFilterSheet,
   ProgressMeter,
   SubmissionCollectionRow,
-  type MobileFilterOption,
   SvgIcon,
   ToolbarIconButton,
 } from "../components/CollectionPrimitives";
@@ -204,183 +209,101 @@ function defaultContextRailOpen() {
 export function AgentActionsScreen({
   cityControl,
   completedActions,
+  errorMessage = "",
+  loading = false,
+  onRetryError,
   onOpen,
   openActions,
   searchControl,
-  summary,
 }: {
   cityControl?: ReactNode;
   completedActions: AgentActionItem[];
+  errorMessage?: string;
+  loading?: boolean;
+  onRetryError?: () => void;
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   openActions: AgentActionItem[];
   searchControl: ReactNode;
-  summary: AgentActionSummary;
 }) {
-  const [activeTab, setActiveTab] = useState<"open" | "completed">("open");
-  const [dueFilter, setDueFilter] = useState<"all" | "overdue" | "today" | "week">(
-    "all",
-  );
-  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
+  type ActionStatusFilter = "all" | AgentActionTaskStatus;
+
+  const [statusFilter, setStatusFilter] = useState<ActionStatusFilter>("all");
+  const [summaryFilter, setSummaryFilter] =
+    useState<AgentActionsSummaryFilter | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [sortOldest, setSortOldest] = useState(false);
 
-  const baseActions = activeTab === "open" ? openActions : completedActions;
-  const filteredActions =
-    activeTab === "open" && dueFilter !== "all"
-      ? baseActions.filter((action) => {
-          if (dueFilter === "week") {
-            return action.due === "today" || action.due === "week";
-          }
-
-          return action.due === dueFilter;
-        })
-      : baseActions;
-  const orderedActions = sortOldest ? [...filteredActions].reverse() : filteredActions;
-  const visibleActions = orderedActions;
-  const selectedAction =
-    visibleActions.find((action) => action.id === selectedActionId) ??
-    visibleActions[0];
-  const actionGroupLabel =
-    activeTab === "completed"
-      ? "Выполненные действия"
-      : dueFilter === "overdue"
-        ? "Просрочено"
-        : dueFilter === "today"
-          ? "Сегодня"
-          : dueFilter === "week"
-            ? "На неделе"
-            : "Открытые действия";
-  const emptyState =
-    activeTab === "completed"
-      ? {
-          action: "Показать открытые",
-          body: "Завершенные шаги появятся здесь после отправки исправлений, файлов или анкет.",
-          title: "Выполненных действий пока нет",
-        }
-      : dueFilter === "overdue"
-        ? {
-            action: "Сбросить фильтр",
-            body: "В очереди нет просроченных шагов. Проверьте действия на сегодня или всю открытую очередь.",
-            title: "Просроченных действий нет",
-          }
-        : dueFilter === "today"
-          ? {
-              action: "Сбросить фильтр",
-              body: "На сегодня нет отдельных задач. Открытые действия на неделю остаются в общей очереди.",
-              title: "На сегодня чисто",
-            }
-          : dueFilter === "week"
-            ? {
-                action: "Сбросить фильтр",
-                body: "На этой неделе нет отфильтрованных действий. Можно вернуться ко всей очереди.",
-                title: "Действий на неделю нет",
-              }
-            : {
-                action: "Показать выполненные",
-                body: "Все текущие шаги выполнены. Новые действия появятся после изменений в подачах.",
-                title: "Открытых действий нет",
-              };
+  const allTasks = useMemo(
+    () => buildAgentActionTasks([...openActions, ...completedActions]),
+    [completedActions, openActions],
+  );
+  const taskSummary = useMemo(() => summarizeAgentActionTasks(allTasks), [allTasks]);
+  const filteredTasks = summaryFilter
+    ? filterAgentActionSummaryTasks(allTasks, summaryFilter)
+    : statusFilter === "all"
+      ? allTasks
+      : allTasks.filter((task) => task.status === statusFilter);
+  const visibleTasks = sortOldest ? [...filteredTasks].reverse() : filteredTasks;
+  const selectedTask =
+    visibleTasks.find((task) => task.id === selectedTaskId) ?? visibleTasks[0];
+  const actionGroupLabel = summaryFilter
+    ? actionSummaryFilterLabel(summaryFilter)
+    : actionStatusFilterLabel(statusFilter);
+  const emptyState = summaryFilter
+    ? actionSummaryFilterEmptyState(summaryFilter)
+    : actionFilterEmptyState(statusFilter);
   const activeFilters = compactActiveFilters([
-      dueFilter !== "all"
-        ? {
-            id: "due",
-            label:
-              dueFilter === "overdue"
-                ? "Просрочено"
-                : dueFilter === "today"
-                  ? "Сегодня"
-                  : "На неделе",
-            onRemove: () => transitionUiState(() => setDueFilter("all")),
-          }
-        : null,
-      sortOldest
-        ? {
-            id: "sort",
-            label: "Старые сверху",
-            onRemove: () => transitionUiState(() => setSortOldest(false)),
-          }
-        : null,
-    ]);
+    summaryFilter
+      ? {
+          id: "summary",
+          label: actionSummaryFilterLabel(summaryFilter),
+          onRemove: () => transitionUiState(() => setSummaryFilter(null)),
+        }
+      : null,
+    sortOldest
+      ? {
+          id: "sort",
+          label: "Старые сверху",
+          onRemove: () => transitionUiState(() => setSortOldest(false)),
+        }
+      : null,
+  ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
-      setDueFilter("all");
+      setSummaryFilter(null);
       setSortOldest(false);
     });
   const toolbarToolButtons = (
-    <>
-      <ToolbarIconButton
-        label={dueFilter === "all" ? "Фильтр: все действия" : "Фильтр: активен"}
-        icon="filter"
-        pressed={dueFilter !== "all"}
-        onClick={() =>
-          transitionUiState(() =>
-            setDueFilter((value) => (value === "all" ? "overdue" : "all")),
-          )
-        }
-      />
-      <ToolbarIconButton
-        label={sortOldest ? "Сортировка: поздние ниже" : "Сортировка: важные сверху"}
-        icon="sort"
-        pressed={sortOldest}
-        onClick={() => transitionUiState(() => setSortOldest((value) => !value))}
-      />
-    </>
-  );
-  type ActionMobileFilter = "completed" | "open" | "overdue" | "today";
-  const mobileFilterValue: ActionMobileFilter =
-    activeTab === "completed"
-      ? "completed"
-      : dueFilter === "overdue" || dueFilter === "today"
-        ? dueFilter
-        : "open";
-  const mobileFilterOptions: Array<MobileFilterOption<ActionMobileFilter>> = [
-    { count: summary.open, id: "open", label: "Открытые" },
-    { count: summary.overdue, id: "overdue", label: "Просрочено" },
-    { count: summary.today, id: "today", label: "Сегодня" },
-    { count: summary.completed, id: "completed", label: "Выполненные" },
-  ];
-  const toolbarTools = (
-    <CollectionToolbarTools
-      desktopTools={toolbarToolButtons}
-      mobileFilter={
-      <MobileFilterSheet<ActionMobileFilter>
-        label="Фильтры действий"
-        options={mobileFilterOptions}
-        title="Статус действий"
-        value={mobileFilterValue}
-        onValueChange={(nextFilter) =>
-          transitionUiState(() => {
-            if (nextFilter === "completed") {
-              setActiveTab("completed");
-              setDueFilter("all");
-              return;
-            }
-
-            setActiveTab("open");
-            setDueFilter(nextFilter === "open" ? "all" : nextFilter);
-          })
-        }
-      />
-      }
+    <ToolbarIconButton
+      label={sortOldest ? "Сортировка: старые сверху" : "Сортировка: важные сверху"}
+      icon="sort"
+      pressed={sortOldest}
+      onClick={() => transitionUiState(() => setSortOldest((value) => !value))}
     />
   );
+  const toolbarTools = <CollectionToolbarTools desktopTools={toolbarToolButtons} />;
 
-  function openAction(action: AgentActionItem) {
-    const target = targetForSubmissionTab(action.submission, action.tab);
-
-    setSelectedActionId(action.id);
-    onOpen(action.submission, drawerTabForScreenTarget(target, action.tab), target);
+  function openTask(task: AgentActionTask) {
+    openTaskTab(task, task.nextAction.tab);
   }
 
-  function openActionTab(action: AgentActionItem, tab: DrawerTab) {
-    const target = targetForSubmissionTab(action.submission, tab);
+  function openTaskTab(task: AgentActionTask, tab: DrawerTab) {
+    const target = targetForSubmissionTab(task.submission, tab);
 
-    setSelectedActionId(action.id);
-    onOpen(action.submission, drawerTabForScreenTarget(target, tab), target);
+    setSelectedTaskId(task.id);
+    onOpen(task.submission, drawerTabForScreenTarget(target, tab), target);
   }
 
-  function openActionIssue(action: AgentActionItem, issue: Submission["issues"][number]) {
-    setSelectedActionId(action.id);
-    onOpen(action.submission, drawerTabForIssue(issue), targetForIssue(issue));
+  function openFullSubmission(task: AgentActionTask) {
+    const target = targetForSubmissionTab(task.submission, "overview");
+
+    setSelectedTaskId(task.id);
+    onOpen(task.submission, drawerTabForScreenTarget(target, "overview"), target);
+  }
+
+  function openTaskIssue(task: AgentActionTask, issue: Submission["issues"][number]) {
+    setSelectedTaskId(task.id);
+    onOpen(task.submission, drawerTabForIssue(issue), targetForIssue(issue));
   }
 
   return (
@@ -397,57 +320,197 @@ export function AgentActionsScreen({
           Мои действия
         </h2>
 
-        <CollectionToolbar
+        <CollectionToolbar<ActionStatusFilter>
           activeFilters={activeFilters}
           ariaLabel="Инструменты действий"
           className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
           mobileCityControl={cityControl}
           mobileTitle="Мои действия"
           onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-          onTabChange={(nextTab) => transitionUiState(() => setActiveTab(nextTab))}
+          onTabChange={(nextFilter) =>
+            transitionUiState(() => {
+              setSummaryFilter(null);
+              setStatusFilter(nextFilter);
+            })
+          }
           search={searchControl}
           tabs={[
-            { count: summary.open, id: "open", label: "Открытые" },
+            { count: taskSummary.all, id: "all", label: "Все" },
+            { count: taskSummary.errors, id: "error", label: "Ошибки" },
             {
-              count: summary.completed || undefined,
-              id: "completed",
-              label: "Выполненные",
+              count: taskSummary.actionRequired,
+              id: "action_required",
+              label: "Требуют действия",
             },
+            { count: taskSummary.ready, id: "ready", label: "Готово" },
+            { count: taskSummary.blocked, id: "blocked", label: "Заблокировано" },
           ]}
-          tabsAriaLabel="Состояние действий"
+          tabsAriaLabel="Рабочее состояние действий"
           tools={toolbarTools}
-          value={activeTab}
+          value={statusFilter}
         />
 
         <AgentActionsCommandCockpit
           actionGroupLabel={actionGroupLabel}
-          actions={visibleActions}
           emptyState={emptyState}
-          selectedAction={selectedAction}
-          summary={summary}
+          errorMessage={errorMessage}
+          loading={loading}
+          activeSummaryFilter={summaryFilter}
+          selectedTask={selectedTask}
+          summary={taskSummary}
+          summaryTasks={allTasks}
+          tasks={visibleTasks}
           onEmptyAction={() =>
             transitionUiState(() => {
-              if (activeTab === "completed") {
-                setActiveTab("open");
+              if (summaryFilter) {
+                setSummaryFilter(null);
                 return;
               }
 
-              if (dueFilter !== "all") {
-                setDueFilter("all");
+              if (statusFilter !== "all") {
+                setStatusFilter("all");
                 return;
               }
 
-              setActiveTab("completed");
+              onRetryError?.();
             })
           }
-          onOpenAction={openAction}
-          onOpenIssue={openActionIssue}
-          onOpenTab={openActionTab}
-          onSelectAction={(action) => setSelectedActionId(action.id)}
+          onOpenIssue={openTaskIssue}
+          onOpenPrimary={openTask}
+          onOpenSecondary={openFullSubmission}
+          onOpenTab={openTaskTab}
+          onSelectTask={(task) => setSelectedTaskId(task.id)}
+          onSummaryFilterChange={(filter) =>
+            transitionUiState(() => {
+              setStatusFilter("all");
+              setSummaryFilter((current) => (current === filter ? null : filter));
+            })
+          }
         />
       </section>
     </div>
   );
+}
+
+function actionStatusFilterLabel(status: "all" | AgentActionTaskStatus) {
+  if (status === "error") return "Ошибки";
+  if (status === "action_required") return "Требуют действия";
+  if (status === "ready") return "Готово";
+  if (status === "blocked") return "Заблокировано";
+  if (status === "in_review") return "На проверке";
+  return "Все действия";
+}
+
+function actionSummaryFilterLabel(filter: AgentActionsSummaryFilter) {
+  if (filter === "in_work") return "В работе";
+  if (filter === "in_review") return "На проверке";
+  if (filter === "in_correction") return "На исправлении";
+  return "Готово";
+}
+
+function filterAgentActionSummaryTasks(
+  tasks: AgentActionTask[],
+  filter: AgentActionsSummaryFilter,
+) {
+  if (filter === "in_work") {
+    return tasks.filter((task) =>
+      ["draft", "in_progress"].includes(task.submission.status),
+    );
+  }
+
+  if (filter === "in_review") {
+    return tasks.filter((task) =>
+      ["corrections_received", "submitted_for_review"].includes(
+        task.submission.status,
+      ),
+    );
+  }
+
+  if (filter === "in_correction") {
+    return tasks.filter((task) =>
+      ["requires_action", "returned"].includes(task.submission.status),
+    );
+  }
+
+  return tasks.filter((task) =>
+    ["exported", "ready_for_export"].includes(task.submission.status),
+  );
+}
+
+function actionSummaryFilterEmptyState(filter: AgentActionsSummaryFilter) {
+  if (filter === "in_work") {
+    return {
+      action: "Показать все",
+      body: "Нет подач, которые агент ещё заполняет.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+
+  if (filter === "in_review") {
+    return {
+      action: "Показать все",
+      body: "Нет подач, отправленных админу.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+
+  if (filter === "in_correction") {
+    return {
+      action: "Показать все",
+      body: "Нет подач, где админ вернул замечания.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+
+  return {
+    action: "Показать все",
+    body: "Нет принятых или выгруженных подач.",
+    title: "Нет действий, требующих внимания",
+  };
+}
+
+function actionFilterEmptyState(status: "all" | AgentActionTaskStatus) {
+  if (status === "error") {
+    return {
+      action: "Показать все",
+      body: "Нет сломанных задач, которые блокируют продолжение подачи.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+  if (status === "action_required") {
+    return {
+      action: "Показать все",
+      body: "Нет неблокирующих задач, которые агент может выполнить сейчас.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+  if (status === "ready") {
+    return {
+      action: "Показать все",
+      body: "Нет подач, готовых к передаче дальше.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+  if (status === "blocked") {
+    return {
+      action: "Показать все",
+      body: "Нет задач, где агент ждёт внешнее событие.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+  if (status === "in_review") {
+    return {
+      action: "Показать все",
+      body: "Нет задач, ожидающих проверки.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+
+  return {
+    action: "Обновить очередь",
+    body: "Новые задачи появятся после изменений в подачах.",
+    title: "Нет действий, требующих внимания",
+  };
 }
 
 export function AgentInboxScreen({
