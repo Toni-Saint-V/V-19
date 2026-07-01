@@ -1252,12 +1252,14 @@ function missingApplicantPassportLabels(
 }
 
 function passportUploadReadinessLabel(upload: PassportUploadDraft | undefined) {
-  if (upload?.status === "extracting") return "Проверка файла";
-  if (upload?.status === "unavailable" || upload?.status === "failed") {
+  const visualStatus = passportUploadVisualStatus(upload);
+  if (visualStatus === "ready") return "Паспорт принят";
+  if (visualStatus === "extracting" || visualStatus === "selected") {
+    return "Проверка файла";
+  }
+  if (visualStatus === "unavailable") {
     return "Проверка оператором";
   }
-  if (isPassportUploadReady(upload)) return "Паспорт принят";
-  if (upload?.file) return "Файл не принят";
   return "Нужен файл паспорта";
 }
 

@@ -52,6 +52,51 @@ function renderCreateDrawer() {
 }
 
 describe("CreateSubmissionDrawer passport readiness", () => {
+  test("keeps incomplete extracted OCR under operator review", async () => {
+    vi.mocked(invokePassportExtraction).mockResolvedValueOnce({
+      fields: [
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: false,
+          value: "752869613",
+        },
+      ],
+      guardrails: [],
+      source: "local-ocr",
+      status: "extracted",
+      summary: "Partial passport extraction.",
+    });
+    const { input, nextButton } = renderCreateDrawer();
+
+    fireEvent.change(input, {
+      target: { files: [passportFile("partial.jpg")] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("partial.jpg").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Проверка оператором").length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText("Паспорт принят")).not.toBeInTheDocument();
+    expect(nextButton).toBeDisabled();
+  });
+
+  test("keeps failed OCR under operator review without accepted copy", async () => {
+    vi.mocked(invokePassportExtraction).mockRejectedValueOnce(new Error("OCR failed."));
+    const { input, nextButton } = renderCreateDrawer();
+
+    fireEvent.change(input, {
+      target: { files: [passportFile("failed.jpg")] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("failed.jpg").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Проверка оператором").length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText("Паспорт принят")).not.toBeInTheDocument();
+    expect(nextButton).toBeDisabled();
+  });
+
   test("allows accepted JPEG files to move to manual operator check without fake OCR", async () => {
     const { input, nextButton } = renderCreateDrawer();
 
