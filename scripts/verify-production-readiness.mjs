@@ -242,6 +242,10 @@ function requireActivationExistingProjectFile(value, label) {
   return false;
 }
 
+function projectFileExists(value) {
+  return present(value) && existsSync(resolve(repoRoot, value));
+}
+
 function requireNonNegativeInteger(value, label) {
   if (Number.isInteger(value) && value >= 0) pass(label);
   else block(label, "missing or invalid count");
@@ -532,7 +536,7 @@ function verifyPreActivationCheck(pre, key, command, label, verifierSha256) {
     readinessContractVersion,
     `${label} is bound to the current readiness contract`,
   );
-  requireEqual(
+  requireActivationEqual(
     check.readinessVerifierSha256,
     verifierSha256,
     `${label} is bound to the current readiness verifier`,
@@ -656,7 +660,7 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
       readinessContractVersion,
       "verify:full evidence is bound to the current readiness contract",
     );
-    requireEqual(
+    requireActivationEqual(
       pre.verifyFullReadinessVerifierSha256,
       verifierSha256,
       "verify:full evidence is bound to the current readiness verifier",
@@ -834,6 +838,12 @@ function verifyProductionWorkflowEvidence(packet, env, post) {
   );
 }
 
+function productionWorkflowEvidenceConfirmed(env, post) {
+  const artifact =
+    post.workflowEvidenceArtifact ?? env.productionWorkflowEvidenceArtifact;
+  return projectFileExists(artifact);
+}
+
 function verifyPacket(packet, rawContent) {
   verifyNoCommittedSecrets(rawContent);
   const gitHead = currentGitHead();
@@ -929,6 +939,10 @@ function verifyPacket(packet, rawContent) {
 
   const smoke = packet.smokeAccounts ?? {};
   const smokeDiscovery = packet.smokeAccountDiscovery ?? {};
+  const smokeDiscoveryConfirmed =
+    smokeDiscovery.checked === true &&
+    present(smokeDiscovery.checkedAt) &&
+    projectFileExists(smokeDiscovery.evidenceArtifact);
   requireActivationTrue(
     smokeDiscovery.checked,
     "Production smoke account discovery was checked",
@@ -988,12 +1002,21 @@ function verifyPacket(packet, rawContent) {
     ["otherAgent", "Other-agent smoke account"],
     ["admin", "Admin smoke account"],
   ]) {
-    requireActivationTrue(smoke[key]?.exists, `${label} exists`);
-    requireActivationTrue(smoke[key]?.roleVerified, `${label} role is verified`);
-    requireActivationTrue(
-      smoke[key]?.identifierRecorded,
-      `${label} identifier is recorded`,
-    );
+    if (!smokeDiscoveryConfirmed) {
+      activationBlock(`${label} exists`, "smoke discovery not confirmed");
+      activationBlock(`${label} role is verified`, "smoke discovery not confirmed");
+      activationBlock(
+        `${label} identifier is recorded`,
+        "smoke discovery not confirmed",
+      );
+    } else {
+      requireActivationTrue(smoke[key]?.exists, `${label} exists`);
+      requireActivationTrue(smoke[key]?.roleVerified, `${label} role is verified`);
+      requireActivationTrue(
+        smoke[key]?.identifierRecorded,
+        `${label} identifier is recorded`,
+      );
+    }
   }
 
   const backup = packet.backupRestore ?? {};
@@ -1109,6 +1132,7 @@ function verifyPacket(packet, rawContent) {
 
   const post = packet.postActivationChecks ?? {};
   verifyProductionWorkflowEvidence(packet, env, post);
+  const workflowEvidenceConfirmed = productionWorkflowEvidenceConfirmed(env, post);
   for (const [key, label] of [
     ["agentSignInWorks", "Post-activation agent sign-in works"],
     ["adminSignInWorks", "Post-activation admin sign-in works"],
@@ -1121,7 +1145,11 @@ function verifyPacket(packet, rawContent) {
     ["privateMediaSignedUrlScoped", "Private media signed URL is scoped"],
     ["logsAndErrorRateChecked", "Logs and error rate are checked"],
   ]) {
-    requireActivationTrue(post[key], label);
+    if (!workflowEvidenceConfirmed) {
+      activationBlock(label, "workflow evidence not confirmed");
+    } else {
+      requireActivationTrue(post[key], label);
+    }
   }
 
   if (packet.goNoGo?.decision === "GO") {

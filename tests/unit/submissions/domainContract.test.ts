@@ -4,6 +4,7 @@ import {
   CANONICAL_STORAGE_MEDIA_TYPES,
   CANONICAL_SUBMISSION_STATUSES,
   canonicalRequiredMediaReadiness,
+  isCanonicalSubmissionStatus,
   isExportedTerminal,
   isForbiddenIssueTransition,
   isForbiddenStatusTransition,
@@ -34,6 +35,10 @@ describe("Package 1 canonical domain contract", () => {
   });
 
   test("normalizes known legacy statuses and fails closed for unknown status", () => {
+    expect(isCanonicalSubmissionStatus("requires_action")).toBe(false);
+    expect(isStatusTransitionAllowed("requires_action", "corrections_received")).toBe(
+      false,
+    );
     expect(normalizeLegacySubmissionStatus("requires_action")).toEqual({
       ok: true,
       data: "returned",

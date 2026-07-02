@@ -91,19 +91,19 @@
   },
   "smokeAccounts": {
     "agent": {
-      "exists": true,
-      "roleVerified": true,
-      "identifierRecorded": true
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
     },
     "otherAgent": {
-      "exists": true,
-      "roleVerified": true,
-      "identifierRecorded": true
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
     },
     "admin": {
-      "exists": true,
-      "roleVerified": true,
-      "identifierRecorded": true
+      "exists": false,
+      "roleVerified": false,
+      "identifierRecorded": false
     }
   },
   "backupRestore": {
@@ -221,8 +221,8 @@
     "evidenceArtifact": ""
   },
   "postActivationChecks": {
-    "agentSignInWorks": true,
-    "adminSignInWorks": true,
+    "agentSignInWorks": false,
+    "adminSignInWorks": false,
     "agentCanCreateDraft": false,
     "agentCanUploadRequiredMedia": false,
     "incompleteWaitingReviewRejected": false,
