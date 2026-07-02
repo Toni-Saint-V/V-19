@@ -565,6 +565,46 @@ describe("passport extraction contract", () => {
           key: "passportIssueCountry",
           value: "Russian Federation",
         }),
+        expect.objectContaining({
+          key: "gender",
+          value: "Male - Мужской",
+        }),
+        expect.objectContaining({
+          key: "passportType",
+          value: "Ordinary Passport",
+        }),
+      ]),
+    );
+  });
+
+  test("uses the current-year pivot for TD3 birth-date century inference", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS3001019M2602268<<<<<<<<<<<<<<08",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "high",
+      needsManualReview: true,
+      source: "local-ocr",
+      status: "extracted",
+    });
+    expect(result.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "birthDate",
+          value: "01.01.1930",
+        }),
+      ]),
+    );
+    expect(result.fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "birthDate",
+          value: "01.01.2030",
+        }),
       ]),
     );
   });

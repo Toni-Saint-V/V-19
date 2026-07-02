@@ -226,8 +226,20 @@ function parseMrzDate(value: string, mode: "birth" | "expiry") {
   const year = Number(value.slice(0, 2));
   const month = Number(value.slice(2, 4));
   const day = Number(value.slice(4, 6));
-  const fullYear = mode === "expiry" ? 2000 + year : year <= 30 ? 2000 + year : 1900 + year;
-  const date = new Date(Date.UTC(fullYear, month - 1, day));
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
+  const currentYearShort = currentYear % 100;
+  let fullYear =
+    mode === "expiry"
+      ? 2000 + year
+      : year > currentYearShort
+        ? 1900 + year
+        : 2000 + year;
+  let date = new Date(Date.UTC(fullYear, month - 1, day));
+  if (mode === "birth" && date.getTime() > now.getTime()) {
+    fullYear -= 100;
+    date = new Date(Date.UTC(fullYear, month - 1, day));
+  }
   if (
     date.getUTCFullYear() !== fullYear ||
     date.getUTCMonth() !== month - 1 ||
