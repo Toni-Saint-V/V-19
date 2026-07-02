@@ -22,6 +22,11 @@ import {
   type ExportSummary,
 } from "../exportRules";
 import { formatSubmissionListTitle } from "../listFormatters";
+import {
+  adminTriageRadarItem,
+  buildAdminTriageRadar,
+  type AdminTriageRadarItem,
+} from "../adminTriageRadar";
 import { buildAgentHandoffPackage } from "../operationalWorkflow";
 import { applicantCountLabel, counts, tripDates } from "../selectors";
 import {
@@ -49,6 +54,10 @@ import {
   type AgentActionsSummaryFilter,
 } from "../components/AgentActionsCommandCockpit";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
+import {
+  AdminTriageRadarPanel,
+  type AdminTriageBandFilter,
+} from "../components/AdminTriageRadarPanel";
 import {
   CollectionToolbarTools,
   compactActiveFilters,
@@ -1696,7 +1705,21 @@ function sortSubmissionsForOperations(
   submissions: Submission[],
   mode: SubmissionSortMode,
 ) {
-  if (mode === "priority") return submissions;
+  if (mode === "priority") {
+    const order = new Map(
+      buildAdminTriageRadar(submissions).items.map((item, index) => [
+        item.submissionId,
+        index,
+      ]),
+    );
+
+    return [...submissions].sort(
+      (left, right) =>
+        (order.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(right.id) ?? Number.MAX_SAFE_INTEGER) ||
+        left.id.localeCompare(right.id),
+    );
+  }
 
   return [...submissions].sort((left, right) => {
     if (mode === "trip") {
@@ -1755,7 +1778,7 @@ export function AdminReviewScreen({
   inboxEvents: InboxEvent[];
   loading?: boolean;
   onAddIssue: (submission: Submission) => void;
-  onOpen: (submission: Submission, tab?: DrawerTab) => void;
+  onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: AdminWorkTab) => void;
   permissionDenied?: boolean;
@@ -1767,6 +1790,8 @@ export function AdminReviewScreen({
 }) {
   const [blockersOnly, setBlockersOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
+  const [triageBandFilter, setTriageBandFilter] =
+    useState<AdminTriageBandFilter>("all");
   const reviewQueue = reviewSource.filter(matchesReviewTab("review"));
   const correctionsQueue = reviewSource.filter(matchesReviewTab("corrections"));
   const tabCounts = {
@@ -1788,9 +1813,28 @@ export function AdminReviewScreen({
         : inboxEvents,
     [blockersOnly, inboxEvents],
   );
+  const triageRadar = useMemo(
+    () => buildAdminTriageRadar(filteredReviewList),
+    [filteredReviewList],
+  );
+  const triageBySubmissionId = useMemo(
+    () => new Map(triageRadar.items.map((item) => [item.submissionId, item])),
+    [triageRadar],
+  );
+  const triageFilteredReviewList = useMemo(
+    () =>
+      triageBandFilter === "all"
+        ? filteredReviewList
+        : filteredReviewList.filter(
+            (submission) =>
+              (triageBySubmissionId.get(submission.id) ?? adminTriageRadarItem(submission))
+                .band === triageBandFilter,
+          ),
+    [filteredReviewList, triageBandFilter, triageBySubmissionId],
+  );
   const visibleReviewList = useMemo(
-    () => sortSubmissionsForOperations(filteredReviewList, sortMode),
-    [filteredReviewList, sortMode],
+    () => sortSubmissionsForOperations(triageFilteredReviewList, sortMode),
+    [triageFilteredReviewList, sortMode],
   );
   const visibleEvents = useMemo(() => filteredEvents, [filteredEvents]);
   const visibleSelectedSubmission =
@@ -1824,11 +1868,19 @@ export function AdminReviewScreen({
             label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
             onRemove: () => transitionUiState(() => setSortMode("priority")),
           },
+      reviewTab === "events" || triageBandFilter === "all"
+        ? null
+        : {
+            id: "triage",
+            label: `AI-радар: ${adminTriageBandFilterLabel(triageBandFilter)}`,
+            onRemove: () => transitionUiState(() => setTriageBandFilter("all")),
+          },
     ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setBlockersOnly(false);
       setSortMode("priority");
+      setTriageBandFilter("all");
     });
 
   const toolbarTools = (
@@ -1905,6 +1957,14 @@ export function AdminReviewScreen({
           <span>{adminWorkNoteCopy(reviewTab)}</span>
         </div>
 
+        {reviewTab !== "events" && !permissionDenied && !loading && !error ? (
+          <AdminTriageRadarPanel
+            activeBand={triageBandFilter}
+            radar={triageRadar}
+            onBand={(band) => transitionUiState(() => setTriageBandFilter(band))}
+          />
+        ) : null}
+
         {permissionDenied ? (
           renderBlockedState(
             "Нет доступа к проверке",
@@ -1940,17 +2000,29 @@ export function AdminReviewScreen({
         ) : visibleReviewList.length ? (
           <>
             <div className="v17-admin-work-list" aria-label="Очередь проверки">
-              {visibleReviewList.map((submission) => (
-                <AdminWorkRow
-                  selected={visibleSelectedSubmission?.id === submission.id}
-                  key={submission.id}
-                  submission={submission}
-                  onOpen={() => {
-                    onSelect(submission);
-                    onOpen(submission, adminWorkDrawerTabFor(submission));
-                  }}
-                />
-              ))}
+              {visibleReviewList.map((submission) => {
+                const triage =
+                  triageBySubmissionId.get(submission.id) ??
+                  adminTriageRadarItem(submission);
+                const target = triage.target;
+                const tab = drawerTabForScreenTarget(
+                  target,
+                  adminWorkDrawerTabFor(submission),
+                );
+
+                return (
+                  <AdminWorkRow
+                    selected={visibleSelectedSubmission?.id === submission.id}
+                    key={submission.id}
+                    submission={submission}
+                    triage={triage}
+                    onOpen={() => {
+                      onSelect(submission);
+                      onOpen(submission, tab, target);
+                    }}
+                  />
+                );
+              })}
             </div>
           </>
         ) : (
@@ -1963,7 +2035,13 @@ export function AdminReviewScreen({
         )}
         {actionSubmission ? (
           <div className="v17-admin-primary-action">
-            <span>{adminReviewPriorityLine(actionSubmission)}</span>
+            <span>
+              {adminReviewPriorityLine(
+                actionSubmission,
+                triageBySubmissionId.get(actionSubmission.id) ??
+                  adminTriageRadarItem(actionSubmission),
+              )}
+            </span>
             <Button
               aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
               disabled={!canAddIssue}
@@ -1982,20 +2060,40 @@ export function AdminReviewScreen({
   );
 }
 
-function adminReviewPriorityLine(submission: Submission) {
-  const blockers = blockerCount(submission);
-  if (blockers > 0) return `${blockers} блокера ждут точного решения`;
+function adminReviewPriorityLine(
+  submission: Submission,
+  triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
+) {
+  const reason = triage.reasons[0] ?? statusLabels[submission.status];
 
-  const open = openIssueCount(submission);
-  if (open > 0) return `${open} замечания открыты`;
+  if (triage.band === "critical") return `${triage.score} · критично: ${reason}`;
+  if (triage.band === "attention") return `${triage.score} · внимание: ${reason}`;
+  if (triage.band === "ready") return `${triage.score} · готово: ${reason}`;
+  if (triage.band === "waiting") return `ждёт: ${triage.nextAction}`;
+  if (triage.band === "done") return "завершено";
 
   return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
 }
 
 function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
   if (reviewTab === "events") return "События открывают точный контекст подачи";
-  if (reviewTab === "corrections") return "Сначала исправления, затем новые проверки";
-  return "Очередь отсортирована по времени ожидания";
+  if (reviewTab === "corrections") return "AI-радар поднимает исправления, где есть риск повторного возврата";
+  return "AI-радар сортирует очередь по риску, блокерам и готовности к действию";
+}
+
+function adminTriageBandFilterLabel(band: AdminTriageBandFilter) {
+  if (band === "all") return "все";
+  if (band === "critical") return "critical";
+  if (band === "attention") return "attention";
+  if (band === "ready") return "ready";
+  if (band === "waiting") return "waiting";
+  return "done";
+}
+
+function adminIdentityStatusLabel(status: AdminTriageRadarItem["identityStatus"]) {
+  if (status === "blocked") return "blocked";
+  if (status === "needs_review") return "needs review";
+  return "clear";
 }
 
 function AdminWorkLoadingState() {
@@ -2058,10 +2156,12 @@ function AdminWorkRow({
   onOpen,
   selected,
   submission,
+  triage,
 }: {
   onOpen: () => void;
   selected: boolean;
   submission: Submission;
+  triage: AdminTriageRadarItem;
 }) {
   const presentation = adminWorkPresentation(submission);
   const family = submission.type === "family";
@@ -2101,6 +2201,9 @@ function AdminWorkRow({
           <span className="mono">{submission.id}</span> ·{" "}
           {applicantCountLabel(submission.applicants.length)}
         </em>
+        <small className={`v17-admin-identity-signal is-${triage.identityStatus}`}>
+          Личность: {adminIdentityStatusLabel(triage.identityStatus)}
+        </small>
         <small className="v17-admin-mobile-meta">
           {submission.city} · {applicantCountLabel(submission.applicants.length)} · ждет
           с {submission.updatedAt}
@@ -2130,8 +2233,13 @@ function AdminWorkRow({
         <i aria-hidden="true" />
         {presentation.stage}
       </span>
+      <span className={`v17-admin-triage-pill tone-${triage.band}`}>
+        <strong>{Math.max(0, triage.score)}</strong>
+        <em>{adminTriageBandFilterLabel(triage.band)}</em>
+      </span>
       <span className="v17-admin-row-action">
-        <span>{adminWorkActionLabel(submission, presentation.actionLabel)}</span>
+        <span>{adminWorkActionLabel(submission, presentation.actionLabel, triage)}</span>
+        <small className="v17-admin-triage-reason">{triage.reasons[0]}</small>
         <SvgIcon>
           <path d="m9 6 6 6-6 6" />
         </SvgIcon>
@@ -2140,7 +2248,14 @@ function AdminWorkRow({
   );
 }
 
-function adminWorkActionLabel(submission: Submission, fallback: string) {
+function adminWorkActionLabel(
+  submission: Submission,
+  fallback: string,
+  triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
+) {
+  if (triage.band === "critical" || triage.band === "attention" || triage.band === "ready") {
+    return triage.nextAction;
+  }
   if (submission.status === "submitted_for_review") return "Проверить";
   return fallback;
 }

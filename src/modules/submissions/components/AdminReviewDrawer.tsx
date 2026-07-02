@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
@@ -26,7 +26,11 @@ import {
   openIssueCount,
   statusLabels,
 } from "../status";
-import { fileLabel } from "../workspaceModel";
+import {
+  fileLabel,
+  targetElementId,
+  type WorkspaceTarget,
+} from "../workspaceModel";
 import type {
   Applicant,
   DrawerTab,
@@ -40,6 +44,14 @@ import {
   QuestionnaireSectionTabs,
   QuestionnaireWorkspaceShell,
 } from "./QuestionnaireWorkspacePrimitives";
+import {
+  buildIdentityConsistencyReport,
+  type IdentityConsistencyFinding,
+} from "../identityConsistency";
+import {
+  IdentityConsistencyPanel,
+  IdentityConsistencyStatusStrip,
+} from "./IdentityConsistencyPanel";
 
 type AdminReviewFileTarget = "passport_scan" | "selfie" | "selfie_2";
 
@@ -131,6 +143,8 @@ const localAgentNames: Record<string, string> = {
 export function AdminReviewDrawer({
   actionError = "",
   activeTab,
+  focusTarget,
+  onClearFocusTarget,
   onAction,
   onAddIssue,
   onClose,
@@ -140,6 +154,8 @@ export function AdminReviewDrawer({
 }: {
   actionError?: string;
   activeTab: DrawerTab;
+  focusTarget?: WorkspaceTarget;
+  onClearFocusTarget?: () => void;
   onAction: (action: SubmissionAction) => void;
   onAddIssue: (input: IssueInput) => void;
   onClose: () => void;
@@ -159,6 +175,8 @@ export function AdminReviewDrawer({
     drawerTabToReviewTab(activeTab),
   );
   const [remarkContext, setRemarkContext] = useState<RemarkContext | null>(null);
+  const [questionnaireFocusTarget, setQuestionnaireFocusTarget] =
+    useState<WorkspaceTarget | undefined>(undefined);
 
   useEffect(() => {
     if (submission.applicants.some((applicant) => applicant.id === selectedApplicantId)) {
@@ -200,6 +218,83 @@ export function AdminReviewDrawer({
     submission.applicants[0];
   const primaryAction = getPrimaryAction(submission, "admin", "review");
   const issueGuard = adminIssueGuard(submission, "admin");
+  const issueGuardReason = "reason" in issueGuard ? issueGuard.reason : "";
+  const identityReport = useMemo(
+    () => buildIdentityConsistencyReport(submission),
+    [submission],
+  );
+  const selectedApplicantIdentityFindings = useMemo(
+    () =>
+      selectedApplicant
+        ? identityReport.findings.filter(
+            (finding) => finding.applicantId === selectedApplicant.id,
+          )
+        : [],
+    [identityReport, selectedApplicant],
+  );
+
+  const selectReviewTab = useCallback(
+    (tab: AdminReviewTab) => {
+      setActiveReviewTab(tab);
+      onTab(tab === "issues" ? "issues" : "questionnaire");
+      if (tab === "passport") setReviewTarget("passport_scan");
+      if (tab === "selfie" && reviewTarget === "passport_scan") {
+        setReviewTarget("selfie");
+      }
+    },
+    [onTab, reviewTarget],
+  );
+
+  const jumpToWorkspaceTarget = useCallback((target: WorkspaceTarget) => {
+    if (target.tab !== "issues") setSelectedApplicantId(target.applicantId);
+
+    if (target.tab === "questionnaire") {
+      setQuestionnaireFocusTarget(target);
+      selectReviewTab("questionnaire");
+      return;
+    }
+
+    if (target.tab === "files" && isAdminReviewFileTarget(target.fileType)) {
+      setReviewTarget(target.fileType);
+      selectReviewTab(target.fileType === "passport_scan" ? "passport" : "selfie");
+      return;
+    }
+
+    selectReviewTab("issues");
+  }, [selectReviewTab]);
+
+  function handleIdentityFindingRemark(finding: IdentityConsistencyFinding) {
+    const target = finding.target;
+    const applicantId = target.tab !== "issues" ? target.applicantId : finding.applicantId;
+
+    if (target.tab === "files" && isAdminReviewFileTarget(target.fileType)) {
+      setRemarkContext({
+        applicantId,
+        field: finding.label,
+        fileType: target.fileType,
+        reason: finding.message,
+        sectionLabel: fileLabel(target.fileType),
+        targetLabel: finding.label,
+        targetType: target.fileType,
+      });
+      return;
+    }
+
+    setRemarkContext({
+      applicantId,
+      field: finding.label,
+      reason: finding.message,
+      sectionLabel: target.tab === "questionnaire" ? target.section ?? "Анкета" : "AI-сверка",
+      targetLabel: finding.label,
+      targetType: "questionnaire",
+    });
+  }
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    jumpToWorkspaceTarget(focusTarget);
+    onClearFocusTarget?.();
+  }, [focusTarget, jumpToWorkspaceTarget, onClearFocusTarget, submission.id]);
 
   function openQuestionnaireRemark(row: ReviewFieldRow) {
     if (!selectedApplicant) return;
@@ -257,13 +352,6 @@ export function AdminReviewDrawer({
     setRemarkContext(null);
   }
 
-  function selectReviewTab(tab: AdminReviewTab) {
-    setActiveReviewTab(tab);
-    onTab(tab === "issues" ? "issues" : "questionnaire");
-    if (tab === "passport") setReviewTarget("passport_scan");
-    if (tab === "selfie" && reviewTarget === "passport_scan") setReviewTarget("selfie");
-  }
-
   return (
     <AnimatePresence>
       <motion.div
@@ -318,6 +406,8 @@ export function AdminReviewDrawer({
             submission={submission}
             onApplicant={setSelectedApplicantId}
           />
+
+          <IdentityConsistencyStatusStrip compact report={identityReport} />
 
           <nav
             className="admin-review-tabs"
@@ -377,7 +467,17 @@ export function AdminReviewDrawer({
               {activeTab === "questionnaire" ? (
                 activeReviewTab === "passport" ? (
                   <PassportReviewTab
-                    issueGuardReason={issueGuard.ok ? "" : issueGuard.reason}
+                    identityPanel={
+                      <IdentityConsistencyPanel
+                        compact
+                        findings={selectedApplicantIdentityFindings}
+                        report={identityReport}
+                        selectedApplicantId={selectedApplicant?.id}
+                        onCreateRemark={handleIdentityFindingRemark}
+                        onJumpToFinding={(finding) => jumpToWorkspaceTarget(finding.target)}
+                      />
+                    }
+                    issueGuardReason={issueGuardReason}
                     selectedApplicant={selectedApplicant}
                     submission={submission}
                     onAcceptFile={() => {
@@ -404,7 +504,7 @@ export function AdminReviewDrawer({
                   />
                 ) : activeReviewTab === "selfie" ? (
                   <SelfieReviewTab
-                    issueGuardReason={issueGuard.ok ? "" : issueGuard.reason}
+                    issueGuardReason={issueGuardReason}
                     reviewTarget={reviewTarget === "passport_scan" ? "selfie" : reviewTarget}
                     selectedApplicant={selectedApplicant}
                     submission={submission}
@@ -431,17 +531,21 @@ export function AdminReviewDrawer({
                   />
                 ) : activeReviewTab === "questionnaire" ? (
                   <QuestionnaireReviewTab
-                  issueGuardReason={issueGuard.ok ? "" : issueGuard.reason}
-                  selectedApplicant={selectedApplicant}
-                  submission={submission}
-                  onFieldRemark={openQuestionnaireRemark}
-                  onSectionRemark={openSectionRemark}
-                  onVerifyPassport={() => selectReviewTab("passport")}
-                />
+                    focusTarget={questionnaireFocusTarget}
+                    issueGuardReason={issueGuardReason}
+                    selectedApplicant={selectedApplicant}
+                    submission={submission}
+                    onFieldRemark={openQuestionnaireRemark}
+                    onSectionRemark={openSectionRemark}
+                    onVerifyPassport={() => selectReviewTab("passport")}
+                  />
                 ) : (
                   <IssuesTab
+                    identityFindings={identityReport.findings}
                     submission={submission}
                     onAddRemark={openGeneralRemark}
+                    onIdentityJump={(finding) => jumpToWorkspaceTarget(finding.target)}
+                    onIdentityRemark={handleIdentityFindingRemark}
                     onJump={(issue) => {
                       if (issue.target.applicantId) setSelectedApplicantId(issue.target.applicantId);
                       if (issue.target.fileType === "passport_scan") {
@@ -460,8 +564,11 @@ export function AdminReviewDrawer({
                 )
               ) : (
                 <IssuesTab
+                  identityFindings={identityReport.findings}
                   submission={submission}
                   onAddRemark={openGeneralRemark}
+                  onIdentityJump={(finding) => jumpToWorkspaceTarget(finding.target)}
+                  onIdentityRemark={handleIdentityFindingRemark}
                   onJump={() => selectReviewTab("questionnaire")}
                 />
               )}
@@ -495,7 +602,7 @@ export function AdminReviewDrawer({
         {remarkContext ? (
           <AdminRemarkForm
             context={remarkContext}
-            issueGuardReason={issueGuard.ok ? "" : issueGuard.reason}
+            issueGuardReason={issueGuardReason}
             submission={submission}
             onClose={() => setRemarkContext(null)}
             onSubmit={submitRemark}
@@ -504,6 +611,13 @@ export function AdminReviewDrawer({
       </motion.aside>
     </AnimatePresence>
   );
+}
+
+
+function isAdminReviewFileTarget(
+  value: string | undefined,
+): value is AdminReviewFileTarget {
+  return value === "passport_scan" || value === "selfie" || value === "selfie_2";
 }
 
 function ApplicantChips({
@@ -560,6 +674,7 @@ function ApplicantChips({
 }
 
 function PassportReviewTab({
+  identityPanel,
   issueGuardReason,
   selectedApplicant,
   submission,
@@ -569,6 +684,7 @@ function PassportReviewTab({
   onNext,
   onRemark,
 }: {
+  identityPanel?: ReactNode;
   issueGuardReason: string;
   selectedApplicant?: Applicant;
   submission: Submission;
@@ -616,6 +732,8 @@ function PassportReviewTab({
             Принять паспорт
           </button>
         </header>
+
+        {identityPanel}
 
         <div className="admin-review-check-card">
           {passportChecklist().map((item) => (
@@ -670,6 +788,7 @@ function SelfieReviewTab({
   onFileRemark,
   onReviewTarget,
 }: {
+  identityPanel?: ReactNode;
   issueGuardReason: string;
   reviewTarget: Extract<AdminReviewFileTarget, "selfie" | "selfie_2">;
   selectedApplicant?: Applicant;
@@ -761,6 +880,7 @@ function SelfieReviewTab({
 }
 
 function QuestionnaireReviewTab({
+  focusTarget,
   issueGuardReason,
   selectedApplicant,
   submission,
@@ -768,6 +888,7 @@ function QuestionnaireReviewTab({
   onSectionRemark,
   onVerifyPassport,
 }: {
+  focusTarget?: WorkspaceTarget;
   issueGuardReason: string;
   selectedApplicant?: Applicant;
   submission: Submission;
@@ -789,6 +910,40 @@ function QuestionnaireReviewTab({
     if (reviewSections.some((section) => section.id === activeSectionId)) return;
     setActiveSectionId(firstNonPassportSection?.id ?? reviewSections[0]?.id ?? "");
   }, [activeSectionId, firstNonPassportSection?.id, reviewSections]);
+
+  useEffect(() => {
+    if (!focusTarget || focusTarget.tab !== "questionnaire" || !selectedApplicant) return;
+    if (focusTarget.applicantId !== selectedApplicant.id) return;
+
+    const matchingSection = reviewSections.find(
+      (section) =>
+        section.title === focusTarget.section ||
+        section.id === focusTarget.section ||
+        section.rows.some(
+          (row) =>
+            row.field?.id === focusTarget.field ||
+            row.label === focusTarget.field ||
+            row.field?.label === focusTarget.field,
+        ),
+    );
+
+    if (matchingSection) setActiveSectionId(matchingSection.id);
+  }, [focusTarget, reviewSections, selectedApplicant]);
+
+  useEffect(() => {
+    if (!focusTarget || focusTarget.tab !== "questionnaire" || !selectedApplicant) return;
+    if (focusTarget.applicantId !== selectedApplicant.id) return;
+
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(targetElementId(focusTarget));
+      if (!element) return;
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.classList.add("is-ai-focus");
+      window.setTimeout(() => element.classList.remove("is-ai-focus"), 1800);
+    }, 100);
+
+    return () => window.clearTimeout(timer);
+  }, [activeSectionId, focusTarget, selectedApplicant]);
 
   const activeSection =
     reviewSections.find((section) => section.id === activeSectionId) ??
@@ -855,7 +1010,17 @@ function QuestionnaireReviewTab({
           </div>
           {activeSection ? (
             <div className="admin-review-field-section" key={activeSection.id}>
-              <h3>
+              <h3
+                id={
+                  selectedApplicant
+                    ? targetElementId({
+                        applicantId: selectedApplicant.id,
+                        section: activeSection.title,
+                        tab: "questionnaire",
+                      })
+                    : undefined
+                }
+              >
                 {activeSection.title}
                 {activeSection.isPassport ? (
                   <button type="button" onClick={onVerifyPassport}>
@@ -865,6 +1030,25 @@ function QuestionnaireReviewTab({
               </h3>
               {activeSection.rows.map((row) => (
                 <FieldReviewRow
+                  domId={
+                    selectedApplicant
+                      ? targetElementId({
+                          applicantId: selectedApplicant.id,
+                          field: row.field?.id ?? row.label,
+                          section: activeSection.title,
+                          tab: "questionnaire",
+                        })
+                      : undefined
+                  }
+                  focused={Boolean(
+                    focusTarget &&
+                      selectedApplicant &&
+                      focusTarget.tab === "questionnaire" &&
+                      focusTarget.applicantId === selectedApplicant.id &&
+                      (focusTarget.field === row.field?.id ||
+                        focusTarget.field === row.label ||
+                        focusTarget.field === row.field?.label),
+                  )}
                   key={`${activeSection.id}-${row.field?.id ?? row.label}`}
                   row={row}
                   status={fieldStatus(submission, selectedApplicant?.id ?? "", row)}
@@ -933,7 +1117,19 @@ function MediaReviewPane({
     : undefined;
 
   return (
-    <section className="admin-review-media-pane" aria-label="Проверка файлов">
+    <section
+      id={
+        file
+          ? targetElementId({
+              applicantId: file.applicantId,
+              fileType: reviewTarget,
+              tab: "files",
+            })
+          : undefined
+      }
+      className="admin-review-media-pane"
+      aria-label="Проверка файлов"
+    >
       {targets.length > 1 ? (
         <div className="admin-review-media-switcher" role="tablist" aria-label="Файл">
           {mediaTargets.filter((target) => targets.includes(target.id)).map((target) => (
@@ -1026,18 +1222,25 @@ function MediaReviewPane({
 }
 
 function FieldReviewRow({
+  domId,
+  focused = false,
   row,
   status,
   onRemark,
   onVerifyPassport,
 }: {
+  domId?: string;
+  focused?: boolean;
   row: ReviewFieldRow;
   status: FieldStatus;
   onRemark: () => void;
   onVerifyPassport?: () => void;
 }) {
   return (
-    <div className={`admin-review-field-row is-${status}`}>
+    <div
+      id={domId}
+      className={`admin-review-field-row is-${status} ${focused ? "is-ai-target" : ""}`}
+    >
       <span aria-hidden="true" className="admin-review-row-dot" />
       <span className="admin-review-row-label" title={row.label}>
         {row.label}
@@ -1305,15 +1508,21 @@ function AdminRemarkForm({
 }
 
 function IssuesTab({
+  identityFindings = [],
   onAddRemark,
+  onIdentityJump,
+  onIdentityRemark,
   submission,
   onJump,
 }: {
+  identityFindings?: IdentityConsistencyFinding[];
   onAddRemark: () => void;
+  onIdentityJump?: (finding: IdentityConsistencyFinding) => void;
+  onIdentityRemark?: (finding: IdentityConsistencyFinding) => void;
   submission: Submission;
   onJump: (issue: Submission["issues"][number]) => void;
 }) {
-  if (!submission.issues.length) {
+  if (!submission.issues.length && !identityFindings.length) {
     return (
       <div className="admin-review-empty-card">
         <ShieldCheck aria-hidden="true" size={18} />
@@ -1333,8 +1542,45 @@ function IssuesTab({
         <MessageSquarePlus aria-hidden="true" size={15} />
         Добавить замечание
       </button>
+
+      {identityFindings.length ? (
+        <section className="admin-review-ai-conflicts" aria-label="AI-конфликты личности">
+          <header>
+            <span>AI-конфликты личности</span>
+            <em>{identityFindings.length}</em>
+          </header>
+          {identityFindings.map((finding) => (
+            <article className={`is-${finding.severity}`} key={finding.id}>
+              <header>
+                <span>{finding.severity}</span>
+                <em>{finding.applicantName}</em>
+              </header>
+              <strong>{finding.label}</strong>
+              <p>{finding.message}</p>
+              <small>{finding.evidence.map((item) => item.label).join(" · ")}</small>
+              <footer>
+                {onIdentityJump ? (
+                  <button type="button" onClick={() => onIdentityJump(finding)}>
+                    Открыть
+                  </button>
+                ) : null}
+                {onIdentityRemark ? (
+                  <button type="button" onClick={() => onIdentityRemark(finding)}>
+                    Замечание
+                  </button>
+                ) : null}
+              </footer>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
       {submission.issues.map((issue) => (
-        <article className={`is-${issue.severity}`} key={issue.id}>
+        <article
+          id={targetElementId({ issueId: issue.id, tab: "issues" })}
+          className={`is-${issue.severity}`}
+          key={issue.id}
+        >
           <header>
             <span>{issue.id}</span>
             <em>{issueStatusLabel(issue.status)}</em>

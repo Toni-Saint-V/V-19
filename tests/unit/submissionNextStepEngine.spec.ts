@@ -110,7 +110,7 @@ describe("submission next-step engine", () => {
       kind: "passport_review",
       target: {
         applicantId: applicantId(withPassport),
-        field: "Номер паспорта",
+        field: "passport-no",
         tab: "questionnaire",
       },
     });
@@ -143,7 +143,7 @@ describe("submission next-step engine", () => {
       id: "resolve_passport_conflicts",
       kind: "passport_review",
       target: {
-        field: "Номер паспорта",
+        field: "passport-no",
         tab: "questionnaire",
       },
     });

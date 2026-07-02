@@ -4,6 +4,7 @@ import {
   type SubmissionNextStepAction,
 } from "./submissionNextStepEngine";
 import { buildPassportExtractionBrief } from "./passportExtractionBrief";
+import { buildIdentityConsistencyReport, firstActionableIdentityFinding } from "./identityConsistency";
 import { fileTypeLabels } from "./status";
 import type { Role, Submission } from "./types";
 
@@ -15,6 +16,7 @@ export type AiHelperCaseStatus =
   | "complete";
 
 export type AiHelperHighlightKind =
+  | "identity"
   | "passport"
   | "questionnaire"
   | "files"
@@ -24,6 +26,7 @@ export type AiHelperHighlightKind =
 
 export type AiHelperHighlightSource =
   | "status"
+  | "identity"
   | "passport"
   | "questionnaire"
   | "files"
@@ -186,6 +189,8 @@ function buildHighlights(
   ];
   const passport = passportHighlight(submission);
   if (passport) highlights.unshift(passport);
+  const identity = identityHighlight(submission);
+  if (identity) highlights.splice(passport ? 1 : 0, 0, identity);
   const issues = issueHighlight(submission);
   if (issues) highlights.push(issues);
   if (submission.type === "family") {
@@ -213,6 +218,23 @@ function buildHighlights(
   }
 
   return highlights;
+}
+
+function identityHighlight(submission: Submission): AiHelperHighlight | null {
+  const report = buildIdentityConsistencyReport(submission);
+  if (report.status === "clear") return null;
+
+  const firstFinding = firstActionableIdentityFinding(report);
+  const prefix = firstFinding
+    ? `${firstFinding.applicantName} → ${firstFinding.label}: `
+    : "";
+
+  return {
+    detail: `${prefix}${report.operatorSummary}`,
+    kind: "identity",
+    label: "Личность",
+    source: "identity",
+  };
 }
 
 function passportHighlight(submission: Submission): AiHelperHighlight | null {
@@ -340,10 +362,22 @@ function buildDrafts({
   submission: Submission;
   surface: "agent" | "review" | "export";
 }): AiHelperDraft[] {
+  const identityReport = buildIdentityConsistencyReport(submission);
+  const firstIdentityFinding = firstActionableIdentityFinding(identityReport);
   const firstOpenIssue = submission.issues.find((issue) => issue.status === "open");
   const firstFixedIssue = submission.issues.find(
     (issue) => issue.status === "fixed_by_agent",
   );
+
+  if (role === "admin" && surface === "review" && firstIdentityFinding) {
+    return [
+      {
+        audience: "admin",
+        title: "Проверка личности",
+        body: `Сверить ${firstIdentityFinding.applicantName} → ${firstIdentityFinding.label}. ${firstIdentityFinding.message}`,
+      },
+    ];
+  }
 
   if (role === "admin" && surface === "review" && firstOpenIssue) {
     return [
@@ -398,6 +432,10 @@ function whyNow({
   }
   if (status === "complete") {
     return "Подача в терминальном состоянии для этого сценария; безопасное действие - смотреть историю.";
+  }
+  const identitySignal = highlights.find((highlight) => highlight.kind === "identity");
+  if (identitySignal && brief.primaryAction.id === "resolve_identity_consistency") {
+    return `${identitySignal.detail}. Следующий шаг: ${brief.primaryAction.label}.`;
   }
   const issueSignal = highlights.find((highlight) => highlight.kind === "issues");
   if (issueSignal) {
@@ -461,6 +499,7 @@ function sourceLabel(source: AiHelperHighlightSource) {
     export: "выгрузка",
     files: "файлы",
     issues: "замечания",
+    identity: "согласованность личности",
     passport: "паспорт",
     questionnaire: "анкета",
     status: "статус подачи",
