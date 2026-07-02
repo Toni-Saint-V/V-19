@@ -593,15 +593,6 @@ function MainApp() {
     () => searchSubmissions(adminReviewSource, query, visualSurfaceCityFilter),
     [adminReviewSource, query, visualSurfaceCityFilter],
   );
-  const adminWorkSubmissionCount = useMemo(
-    () =>
-      searchedReviewQueue.filter(
-        (submission) =>
-          matchesReviewTab("review")(submission) ||
-          matchesReviewTab("corrections")(submission),
-      ).length,
-    [searchedReviewQueue],
-  );
   const agentList = highestPriorityFirst(
     searchedAgentQueue.filter(matchesAgentTab(agentTab)),
   );
@@ -651,7 +642,8 @@ function MainApp() {
     surface === "agent-actions" ||
     surface === "agent-inbox" ||
     surface === "agent-submissions" ||
-    surface === "admin-review";
+    surface === "admin-review" ||
+    surface === "export";
   const workspaceSurfaceTitle =
     surface === "admin-review" ? "Проверка" : surfaceTitle(surface);
   const workspaceSurfaceDescription =
@@ -688,14 +680,23 @@ function MainApp() {
   const sessionRoleLabel =
     isSupabaseMode && remoteProfile
       ? remoteProfile.role === "admin"
-        ? "Admin profile"
-        : "Agent profile"
+        ? "Профиль админа"
+        : "Профиль агента"
       : localAuthSession
-        ? `${localAuthSession.role === "admin" ? "Админ" : "Агент"} · local/dev auth`
-        : `${role === "agent" ? "Агент" : "Админ"} · VisaFlow Operations`;
+        ? `${localAuthSession.role === "admin" ? "Админ" : "Агент"} · локальный доступ`
+        : `${role === "agent" ? "Агент" : "Админ"} · операции VisaFlow`;
   const operationalNavItems: OperationalNavItem[] =
     role === "agent"
       ? [
+          {
+            active: surface === "agent-inbox" && agentInboxMode === "events",
+            count: agentInboxUnreadCount,
+            icon: "В",
+            id: "agent-inbox",
+            label: "Входящие",
+            meta: "События",
+            onClick: showAgentInbox,
+          },
           {
             active: surface === "agent-actions",
             count: agentActions.summary.open,
@@ -724,10 +725,19 @@ function MainApp() {
         ]
       : [
           {
-            active: surface === "admin-review",
-            count: adminWorkSubmissionCount,
+            active: surface === "admin-review" && reviewTab === "corrections",
+            count: searchedReviewQueue.filter(matchesReviewTab("corrections")).length,
+            icon: "Д",
+            id: "admin-actions",
+            label: "Мои действия",
+            meta: "Исправления",
+            onClick: () => showReviewTab("corrections"),
+          },
+          {
+            active: surface === "admin-review" && reviewTab === "review",
+            count: searchedReviewQueue.filter(matchesReviewTab("review")).length,
             icon: "М",
-            id: "admin-work",
+            id: "admin-review",
             label: "Проверка",
             meta: "Очередь",
             onClick: () => showReviewTab("review"),
@@ -1191,6 +1201,17 @@ function MainApp() {
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
       const nextSubmission = firstAgentActionSubmission();
+      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
+  function showAgentInbox() {
+    requestSettingsLeave(() => {
+      setSurface("agent-inbox");
+      setAgentInboxMode("events");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+      const nextSubmission = searchedAgentQueue[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
@@ -3095,26 +3116,23 @@ function MainApp() {
     />
   );
 
-  const pageHeaderDescription =
-    surface !== "agent-actions" &&
-    surface !== "agent-inbox" &&
-    surface !== "agent-submissions" &&
-    surface !== "export"
-      ? workspaceSurfaceDescription
-      : null;
+  const pageHeaderDescription = workspaceSurfaceDescription;
 
-  const pageHeaderActions = isFigmaVisualSurface ? null : surface === "agent-submissions" ? (
-    <div className="topbar-actions v19-agent-submissions-actions">
+  const primaryTopbarActionLabel =
+    surface === "agent-submissions" ? "Новая подача" : null;
+
+  const pageHeaderActions = primaryTopbarActionLabel ? (
+    <div className="topbar-actions v19-agent-primary-actions v19-agent-submissions-actions">
       <Button
-        aria-label="Новая подача"
+        aria-label={primaryTopbarActionLabel}
         className="v19-topbar-cta"
         variant="primary"
         onClick={openCreateSubmissionDrawer}
       >
-        Новая подача
+        {primaryTopbarActionLabel}
       </Button>
     </div>
-  ) : surface === "agent-inbox" ? (
+  ) : isFigmaVisualSurface ? null : surface === "agent-inbox" ? (
     <div className="v19-topbar-city-filter">{cityFilterControl}</div>
   ) : !isV19CollectionSurface || isSupabaseMode ? (
     <div className="topbar-actions">
@@ -3302,7 +3320,9 @@ function MainApp() {
           <AgentActionsScreen
             completedActions={searchedCompletedAgentActions}
             errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
+            hasSearchQuery={query.trim().length > 0}
             loading={remoteSaveState === "loading"}
+            onClearSearch={() => setQuery("")}
             onOpen={openSubmission}
             onRetryError={
               remoteSaveState === "error"
@@ -3311,6 +3331,7 @@ function MainApp() {
             }
             openActions={searchedOpenAgentActions}
             searchControl={agentActionsSearchControl}
+            totalActionCount={agentActions.open.length + agentActions.completed.length}
           />
         ) : surface === "admin-review" ? (
           <AdminReviewScreen
@@ -3367,7 +3388,9 @@ function MainApp() {
               <AgentActionsScreen
                 completedActions={searchedCompletedAgentActions}
                 errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
+                hasSearchQuery={query.trim().length > 0}
                 loading={remoteSaveState === "loading"}
+                onClearSearch={() => setQuery("")}
                 onOpen={openSubmission}
                 onRetryError={
                   remoteSaveState === "error"
@@ -3376,6 +3399,7 @@ function MainApp() {
                 }
                 openActions={searchedOpenAgentActions}
                 searchControl={agentActionsSearchControl}
+                totalActionCount={agentActions.open.length + agentActions.completed.length}
               />
             )}
           </>

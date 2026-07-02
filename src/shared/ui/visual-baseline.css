@@ -2947,3 +2947,1044 @@ body,
     visibility: hidden !important;
   }
 }
+
+/* Codex B scoped agent-screen convergence: My Actions + My Submissions. */
+
+.v19-toolbar-summary-row {
+  display: flex;
+  align-items: center;
+  min-width: var(--v19b-size-0);
+  min-height: var(--v19b-size-48);
+}
+
+.v19-operational-summary-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--v19b-size-12);
+  min-width: var(--v19b-size-0);
+  color: var(--v19b-color-text-muted);
+  white-space: nowrap;
+}
+
+.v19-operational-summary-strip span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--v19b-size-5);
+  min-width: var(--v19b-size-0);
+}
+
+.v19-operational-summary-strip strong {
+  color: var(--v19b-color-text);
+  font-weight: var(--v19b-weight-title);
+}
+
+.v19-operational-summary-strip em {
+  color: var(--v19b-color-text-muted);
+  font-style: normal;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions) .workspace {
+  overflow-x: hidden !important;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-cockpit {
+  min-height: var(--v19b-size-0);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-desktop-grid {
+  display: grid !important;
+  grid-template-columns:
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    minmax(var(--v19-context-panel-width), var(--vf-ref-size-420px)) !important;
+  gap: var(--v19b-list-gap) !important;
+  min-width: var(--v19b-size-0);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-queue-panel,
+.ops-shell.surface-agent-actions .v19-actions-active-panel {
+  min-width: var(--v19b-size-0);
+  min-height: var(--v19b-size-0);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-queue-panel {
+  overflow: hidden;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-queue-list {
+  display: grid;
+  gap: var(--v19b-list-gap) !important;
+  min-width: var(--v19b-size-0);
+  overflow-y: auto;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-queue-item {
+  min-height: var(--v19b-size-104) !important;
+  padding: var(--v19b-size-16) !important;
+  border-color: var(--v19b-color-border) !important;
+  border-radius: var(--v19b-radius-row) !important;
+  background: var(--v19b-row-background) !important;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-queue-item:not(.is-selected):hover {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-row-background-hover) !important;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-queue-item.is-selected {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+}
+
+.ops-shell.surface-agent-actions
+  :is(
+    .v19-actions-queue-main,
+    .v19-actions-queue-topline,
+    .v19-actions-queue-title,
+    .v19-actions-queue-scope,
+    .v19-actions-queue-status-row,
+    .v19-actions-queue-state,
+    .v19-actions-timeline-title,
+    .v19-actions-timeline-state,
+    .v19-actions-timeline-meta,
+    .v19-actions-active-head,
+    .v19-actions-active-meta,
+    .v19-actions-task-problem,
+    .v19-actions-next-copy,
+    .v19-actions-task-importance,
+    .v19-actions-canonical-media
+  ) {
+  min-width: var(--v19b-size-0);
+  overflow-wrap: anywhere;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-active-panel {
+  display: flex !important;
+  flex-direction: column;
+  gap: var(--v19b-size-14);
+  padding: var(--v19b-size-16) !important;
+  overflow-y: auto;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-canonical-media {
+  display: grid;
+  gap: var(--v19b-size-8);
+  padding: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-tag);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-canonical-media p {
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text-muted);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-canonical-media > div {
+  display: grid;
+  gap: var(--v19b-size-6);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-canonical-media span,
+.ops-shell.surface-agent-submissions .v19-submission-context-files span {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--v19b-size-10);
+  min-width: var(--v19b-size-0);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-canonical-media em,
+.ops-shell.surface-agent-submissions .v19-submission-context-files em {
+  color: var(--v19b-color-text-muted);
+  font-style: normal;
+  text-align: right;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-detail-footer {
+  position: sticky;
+  bottom: var(--v19b-size-0);
+  z-index: var(--v19b-z-base);
+  margin-top: auto;
+  padding-top: var(--v19b-size-14);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+  background: var(--v19b-color-panel);
+}
+
+.ops-shell.surface-agent-actions .v19-actions-disabled-reason,
+.ops-shell.surface-agent-submissions .v19-submission-context-footer p {
+  margin: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-8);
+  color: var(--v19b-color-text-muted);
+}
+
+.ops-shell.surface-agent-submissions .v19-submissions-screen {
+  min-width: var(--v19b-size-0);
+}
+
+.ops-shell.surface-agent-submissions .v19-collection-list {
+  min-width: var(--v19b-size-0);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-row {
+  grid-template-columns:
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    var(--v19b-size-72)
+    var(--v19b-size-96) !important;
+  gap: var(--v19b-size-10) var(--v19b-size-14) !important;
+  align-items: center !important;
+  min-width: var(--v19b-size-0);
+  min-height: var(--v19b-size-112) !important;
+  padding: var(--v19b-size-16) !important;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-row > .v19-event-main {
+  grid-column: 1;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-row > .v19-submission-route {
+  grid-column: 2;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-row > .v19-submission-status-tag {
+  grid-column: 3;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-row > .v19-submission-file-tag {
+  grid-column: 4;
+}
+
+.ops-shell.surface-agent-submissions
+  .v19-submission-row
+  > .v19-submission-operational-lines {
+  grid-column: 1 / 5;
+  grid-row: 2;
+}
+
+.ops-shell.surface-agent-submissions
+  .v19-submission-row
+  > .v19-submission-progress-ring-cell {
+  grid-column: 5;
+  grid-row: 1 / 3;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-row > .v19-event-action {
+  grid-column: 6;
+  grid-row: 1 / 3;
+  min-width: var(--v19b-size-88);
+}
+
+.ops-shell.surface-agent-submissions
+  :is(
+    .v19-event-main,
+    .v19-event-main strong,
+    .v19-event-main em,
+    .v19-submission-route,
+    .v19-submission-route strong,
+    .v19-submission-route em,
+    .v19-submission-status-tag,
+    .v19-submission-status-tag em,
+    .v19-submission-file-tag,
+    .v19-submission-file-tag em,
+    .v19-submission-operational-lines,
+    .v19-mobile-summary-title,
+    .v19-mobile-summary-route,
+    .v19-mobile-summary-details
+  ) {
+  min-width: var(--v19b-size-0);
+  overflow-wrap: anywhere;
+  white-space: normal !important;
+}
+
+.v19-submission-operational-lines {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+  gap: var(--v19b-size-6) var(--v19b-size-10);
+  color: var(--v19b-color-text-muted);
+}
+
+.v19-submission-operational-lines span,
+.v19-mobile-summary-details span,
+.ops-shell.surface-agent-submissions .v19-submission-context-facts span {
+  display: grid;
+  gap: var(--v19b-size-2);
+  min-width: var(--v19b-size-0);
+}
+
+.v19-submission-operational-lines strong,
+.v19-mobile-summary-details strong,
+.ops-shell.surface-agent-submissions .v19-submission-context-facts strong {
+  color: var(--v19b-color-text);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-submission-operational-lines em,
+.v19-mobile-summary-details em,
+.ops-shell.surface-agent-submissions .v19-submission-context-facts em {
+  color: var(--v19b-color-text-muted);
+  font-style: normal;
+}
+
+.v19-mobile-summary-details {
+  display: none;
+}
+
+.ops-shell.surface-agent-submissions .v19-submissions-context {
+  display: flex;
+  flex-direction: column;
+  min-width: var(--v19b-size-0);
+  overflow: hidden;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-body {
+  display: grid;
+  gap: var(--v19b-size-12);
+  min-width: var(--v19b-size-0);
+  min-height: var(--v19b-size-0);
+  padding: var(--v19b-size-16);
+  overflow-y: auto;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-identity,
+.ops-shell.surface-agent-submissions .v19-submission-context-facts,
+.ops-shell.surface-agent-submissions .v19-submission-context-files {
+  display: grid;
+  gap: var(--v19b-size-8);
+  min-width: var(--v19b-size-0);
+  padding: var(--v19b-size-12);
+  border: var(--v19b-size-1) solid var(--v19b-color-border);
+  border-radius: var(--v19b-radius-control);
+  background: var(--v19b-color-tag);
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-identity p,
+.ops-shell.surface-agent-submissions .v19-submission-context-files p {
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text-muted);
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-identity h3 {
+  margin: var(--v19b-size-0);
+  color: var(--v19b-color-text);
+  font-size: var(--v19b-size-18);
+  overflow-wrap: anywhere;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-identity span {
+  color: var(--v19b-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-files > div {
+  display: grid;
+  gap: var(--v19b-size-6);
+  min-width: var(--v19b-size-0);
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-footer {
+  position: sticky;
+  bottom: var(--v19b-size-0);
+  z-index: var(--v19b-z-base);
+  margin-top: auto;
+  padding: var(--v19b-size-12) var(--v19b-size-16);
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border);
+  background: var(--v19b-color-panel);
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-context-footer .mp-button {
+  width: var(--v19b-size-full);
+  min-height: var(--v19b-size-48);
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-row:focus-visible,
+.ops-shell.surface-agent-submissions .v19-submission-context-footer .mp-button:focus-visible,
+.ops-shell.surface-agent-actions .v19-actions-detail-footer .mp-button:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+  box-shadow: var(--v19b-focus-ring-shadow);
+}
+
+@media (min-width: 768px) {
+  .ops-shell.surface-agent-submissions
+    .v19-screen-grid.v19-submissions-screen.is-panel-closed {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-grouped-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v19b-list-gap) !important;
+    grid-template-rows: none !important;
+    grid-auto-rows: auto !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-row {
+    height: auto !important;
+    min-height: var(--v19b-size-112) !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.role-agent.surface-agent-submissions
+    .v19-submission-row:is(.is-rail-full, .is-rail-compact) {
+    grid-template-columns:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19b-size-72)
+      var(--v19b-size-96) !important;
+    min-height: var(--v19b-size-112) !important;
+    padding: var(--v19b-size-14) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-operational-lines {
+    grid-template-columns: repeat(4, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-operational-lines strong,
+  .ops-shell.surface-agent-submissions .v19-submission-operational-lines em {
+    font-size: var(--v19b-size-13);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .ops-shell.surface-agent-submissions
+    .v19-submission-operational-lines
+    span:nth-child(-n + 2) {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-details {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .workspace {
+    padding-bottom: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .topbar {
+    min-height: var(--v19b-size-56) !important;
+    height: var(--v19b-size-56) !important;
+    padding-block: var(--v19b-size-0) !important;
+    gap: var(--v19b-size-10) !important;
+  }
+
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .topbar-heading h1 {
+    font-size: var(--v19b-size-18) !important;
+    line-height: var(--v19b-line-height-title) !important;
+  }
+
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-agent-primary-actions {
+    display: flex !important;
+    margin-left: auto !important;
+  }
+
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-topbar-cta {
+    display: inline-flex !important;
+    width: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
+    padding: var(--v19b-size-0) !important;
+    border-color: var(--v19b-color-primary-deep-border) !important;
+    color: var(--v19b-color-text) !important;
+    background: var(--v19b-color-primary-deep) !important;
+    font-size: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-topbar-cta::before {
+    content: "+";
+    font-size: var(--v19b-size-24);
+    font-weight: var(--v19b-weight-control);
+    line-height: var(--v19b-line-height-control);
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-mobile-toolbar-title {
+    display: none !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-collection-toolbar {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v19b-size-4) !important;
+    padding: var(--v19b-size-4) var(--v19b-size-12) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-primary-row {
+    order: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto !important;
+    align-items: center !important;
+    gap: var(--v19b-size-6) !important;
+    min-height: var(--v19b-size-44) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-control-stack {
+    grid-column: 1 !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-tools {
+    grid-column: 2 !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-desktop-toolbar-tools {
+    display: none !important;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-primary-row .search,
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-primary-row .search input {
+    height: var(--v19b-size-44) !important;
+    min-height: var(--v19b-size-44) !important;
+  }
+
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-primary-row
+    .search {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .ops-shell.role-agent:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-primary-row
+    > .v19-toolbar-tools {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  .v19-toolbar-summary-row {
+    order: 1 !important;
+    min-height: var(--v19b-size-36);
+    overflow-x: auto;
+  }
+
+  .ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-toolbar-secondary-row {
+    order: 2 !important;
+  }
+
+  .v19-operational-summary-strip {
+    gap: var(--v19b-size-10);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-cockpit,
+  .ops-shell.surface-agent-submissions .v19-collection-panel {
+    padding: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-cockpit-shell {
+    gap: var(--v19b-size-4) !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-desktop-grid {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-mobile-stage {
+    display: block !important;
+    padding: var(--v19b-size-0) var(--v19b-size-12) var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-mobile-stage .v19-actions-panel-header {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline {
+    gap: var(--v19b-list-gap) !important;
+    padding-top: var(--v19b-size-0);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline-event {
+    min-height: var(--v19b-size-136) !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline-hit {
+    min-height: var(--v19b-size-132, var(--v19b-size-136));
+    padding: var(--v19b-size-14) !important;
+    overflow-wrap: anywhere;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-mobile-detail {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - var(--v19b-size-80)) !important;
+    padding: var(--v19b-size-16) var(--v19b-size-16) var(--v19b-mobile-safe-bottom) !important;
+    overflow-y: auto !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-mobile-detail .v19-actions-active-panel {
+    flex: 1 1 auto;
+    min-height: var(--v19b-size-0);
+    overflow: visible;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-detail-footer {
+    padding-bottom: var(--v19b-mobile-safe-bottom);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-grouped-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v19b-size-10) !important;
+    grid-template-rows: none !important;
+    grid-auto-rows: auto !important;
+    padding: var(--v19b-size-0) var(--v19b-size-12) var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-row {
+    display: grid !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    gap: var(--v19b-size-8) !important;
+    height: auto !important;
+    min-height: var(--v19b-size-172) !important;
+    max-height: none !important;
+    padding: var(--v19b-size-16) !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.surface-agent-submissions
+    .v19-submission-row
+    > :not(.v19-mobile-summary-head):not(.v19-mobile-summary-title):not(.v19-mobile-summary-foot):not(.v19-mobile-summary-details) {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-head {
+    display: flex !important;
+    order: 0 !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--v19b-size-10);
+    min-width: var(--v19b-size-0);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-title {
+    display: block !important;
+    order: 1 !important;
+    color: var(--v19b-color-text);
+    font-weight: var(--v19b-weight-title);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-foot {
+    display: flex !important;
+    order: 2 !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--v19b-size-10);
+    min-width: var(--v19b-size-0);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-tail {
+    display: none !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-details {
+    display: grid !important;
+    order: 3 !important;
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    gap: var(--v19b-size-5);
+    min-width: var(--v19b-size-0);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-details span {
+    grid-template-columns:
+      auto
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    align-items: baseline;
+    column-gap: var(--v19b-size-5);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-details strong,
+  .ops-shell.surface-agent-submissions .v19-mobile-summary-details em {
+    font-size: var(--v19b-size-13);
+    line-height: var(--v19b-line-height-row);
+  }
+
+  .ops-shell.surface-agent-submissions .v19-context-backdrop,
+  .ops-shell.surface-agent-submissions .v19-submissions-context {
+    display: none !important;
+  }
+}
+
+@media (768px <= width < 1280px) {
+  .ops-shell.surface-agent-actions .v19-actions-desktop-grid {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    align-items: stretch !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-panel,
+  .ops-shell.surface-agent-actions .v19-actions-active-panel {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-queue-list {
+    max-height: min(var(--vf-ref-size-360px), calc(100dvh - var(--vf-ref-size-420px)));
+    overflow-y: auto !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ops-shell.surface-agent-actions .v19-actions-desktop-grid {
+    grid-template-columns:
+      minmax(var(--vf-ref-size-430px), var(--vf-ref-size-520px))
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+}
+
+@media (min-width: 901px) {
+  .ops-shell.surface-agent-submissions .v19-submissions-screen {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-collection-panel {
+    grid-column: 1 !important;
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+  }
+
+  .ops-shell.role-agent.surface-agent-submissions
+    .v19-submission-row:is(.is-rail-full, .is-rail-compact) {
+    grid-template-columns:
+      minmax(var(--v19b-size-0), 1.15fr)
+      minmax(var(--v19b-size-0), 0.95fr)
+      minmax(var(--v19b-size-0), 1fr)
+      minmax(var(--v19b-size-0), 0.9fr)
+      var(--vf-ref-size-56px)
+      var(--vf-ref-size-112px) !important;
+    column-gap: var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-row > .v19-event-action {
+    min-width: var(--vf-ref-size-112px) !important;
+  }
+
+  .ops-shell.surface-agent-submissions .v19-submission-row .v19-event-action-label {
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ops-shell.surface-agent-actions .v19-toolbar-summary-row {
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-operational-summary-strip {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    gap: var(--v19b-size-4) !important;
+    width: var(--v19b-size-full);
+  }
+
+  .ops-shell.surface-agent-actions .v19-operational-summary-strip span {
+    min-width: var(--v19b-size-0);
+    min-height: var(--v19b-size-32);
+    justify-content: center;
+    gap: var(--v19b-size-3);
+    padding: var(--v19b-size-4);
+    border: var(--v19b-size-1) solid var(--v19b-color-border);
+    border-radius: var(--v19b-radius-control);
+    background: var(--v19b-color-control);
+  }
+
+  .ops-shell.surface-agent-actions .v19-operational-summary-strip strong,
+  .ops-shell.surface-agent-actions .v19-operational-summary-strip em {
+    font-size: var(--v19b-size-11);
+    line-height: var(--v19b-line-height-control);
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-agent-actions .v19-toolbar-secondary-row .v19-state-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(var(--v19b-size-0), var(--v19b-grid-fr)));
+    overflow: visible !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-state-tabs button {
+    min-width: var(--v19b-size-0);
+    justify-content: center;
+    gap: var(--v19b-size-3);
+    padding-inline: var(--v19b-size-4) !important;
+    font-size: var(--v19b-size-11) !important;
+    white-space: nowrap;
+  }
+
+  .ops-shell.surface-agent-actions .v19-state-tabs .v19-tab-count {
+    font-size: var(--v19b-size-10);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-mobile-stage {
+    padding-inline: var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline-event {
+    grid-template-columns: var(--v19b-size-12) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    gap: var(--v19b-size-8) !important;
+    min-height: auto !important;
+    padding-block: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline-hit {
+    width: var(--v19b-size-full);
+    min-height: var(--v19b-size-124, var(--v19b-size-136)) !important;
+    padding: var(--v19b-size-14) var(--v19b-size-12) !important;
+    border: var(--v19b-size-1) solid var(--v19b-color-border) !important;
+    border-radius: var(--v19b-radius-row) !important;
+    background: var(--v19b-row-background) !important;
+    transition:
+      border-color var(--v19b-motion-fast),
+      background var(--v19b-motion-fast),
+      transform var(--v19b-motion-fast);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline-title {
+    display: grid !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
+    gap: var(--v19b-size-2);
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline-title strong {
+    font-size: var(--v19b-size-14) !important;
+    white-space: normal !important;
+  }
+
+  .ops-shell.surface-agent-actions .v19-actions-timeline-title small {
+    justify-self: start;
+    font-size: var(--v19b-size-11) !important;
+  }
+
+  .ops-shell.surface-agent-actions
+    :is(
+      .v19-actions-timeline-state,
+      .v19-actions-timeline-meta,
+      .v19-actions-queue-scope
+    ) {
+    max-width: var(--v19b-size-full);
+    overflow: visible !important;
+    overflow-wrap: anywhere;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (max-width: 767px) {
+  .ops-shell.surface-agent-actions .v19-actions-timeline-hit:not(:disabled):active {
+    transform: translateY(var(--vf-ref-size-1px)) scale(0.998);
+  }
+}
+
+@media (768px <= width <= 900px) {
+  .ops-shell.has-unified-side-menu {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    padding: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .workspace {
+    grid-column: 1 !important;
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+    min-width: var(--v19b-size-0) !important;
+    height: 100svh !important;
+    max-height: 100svh !important;
+    padding: var(--v19-mobile-page-padding) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .v19-topbar-menu {
+    display: grid !important;
+    flex: 0 0 var(--v19-control-row-height) !important;
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .ops-sidebar {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-mobile-nav-open .ops-sidebar {
+    position: fixed !important;
+    inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
+    z-index: 220 !important;
+    display: grid !important;
+    width: min(var(--vf-ref-size-360px), calc(100vw - var(--v19b-size-16))) !important;
+    min-width: var(--v19b-size-0) !important;
+    max-width: calc(100vw - var(--v19b-size-16)) !important;
+    height: auto !important;
+    max-height: calc(100svh - var(--v19b-size-16)) !important;
+    padding: var(--v19b-size-14) !important;
+    border: var(--v19b-size-1) solid var(--v19-line-strong) !important;
+    border-radius: var(--v19-radius-panel) !important;
+    background: var(--v19-panel) !important;
+    box-shadow: var(--v19b-shadow-panel) !important;
+    overflow: auto !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-mobile-nav-open .ops-mobile-menu-backdrop {
+    position: fixed !important;
+    inset: var(--v19b-size-0) !important;
+    z-index: 210 !important;
+    display: block !important;
+    width: var(--v19b-size-full) !important;
+    height: 100svh !important;
+    border: 0 !important;
+    background: var(--v19-dialog-backdrop) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .ops-shell.has-unified-side-menu.surface-export {
+    padding: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.surface-export,
+  .ops-shell.surface-export .workspace,
+  .ops-shell.surface-export .export-grid.magic-export-stage,
+  .ops-shell.surface-export .magic-export-queue,
+  .ops-shell.surface-export .v19-export-toolbar,
+  .ops-shell.surface-export .v19-toolbar-primary-row,
+  .ops-shell.surface-export .v19-toolbar-secondary-row,
+  .ops-shell.surface-export .v19-toolbar-tools,
+  .ops-shell.surface-export .v19-state-tabs,
+  .ops-shell.surface-export .v19-entity-switchbar,
+  .ops-shell.surface-export .v19-entity-switch,
+  .ops-shell.surface-export .magic-export-list,
+  .ops-shell.surface-export .table-wrap {
+    box-sizing: border-box !important;
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+    min-width: var(--v19b-size-0) !important;
+    justify-self: stretch !important;
+    margin-left: var(--v19b-size-0) !important;
+    margin-right: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.surface-export .export-grid.magic-export-stage {
+    overflow-x: hidden !important;
+  }
+
+  .ops-shell.surface-export .magic-export-queue {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    overflow-x: hidden !important;
+  }
+
+  .ops-shell.surface-export .v19-export-toolbar,
+  .ops-shell.surface-export .v19-toolbar-primary-row,
+  .ops-shell.surface-export .v19-toolbar-secondary-row,
+  .ops-shell.surface-export .v19-toolbar-tools {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    overflow-x: hidden !important;
+  }
+
+  .ops-shell.surface-export .v19-state-tabs,
+  .ops-shell.surface-export .v19-entity-switch {
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain !important;
+    scrollbar-width: none !important;
+  }
+
+  .ops-shell.surface-export .v19-state-tabs::-webkit-scrollbar,
+  .ops-shell.surface-export .v19-entity-switch::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .v19-state-tabs button,
+  .ops-shell.surface-export .v19-entity-switch button {
+    min-width: max-content !important;
+    flex: 0 0 auto !important;
+  }
+
+  .ops-shell.surface-export .v17-export-context-rail {
+    position: fixed !important;
+    inset: auto var(--v19-mobile-page-padding) var(--v19b-size-0)
+      var(--v19-mobile-page-padding) !important;
+    z-index: 230 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(84svh, var(--vf-ref-size-720px)) !important;
+    border: var(--v19b-size-1) solid var(--v19-line-strong) !important;
+    border-bottom: 0 !important;
+    border-radius: var(--v19-radius-sheet) var(--v19-radius-sheet) 0 0 !important;
+    background: var(--v19-panel) !important;
+    box-shadow: var(--v19b-shadow-panel) !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.surface-export .v17-export-context-rail .v17-export-rail-head {
+    position: sticky !important;
+    top: var(--v19b-size-0) !important;
+    z-index: 12 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19-control-row-height) !important;
+    align-items: center !important;
+    gap: var(--v19b-size-10) !important;
+    min-width: var(--v19b-size-0) !important;
+    min-height: var(--v19-mobile-header-height) !important;
+    padding: 0 var(--v19b-size-16) !important;
+    border-bottom: var(--v19b-size-1) solid var(--v19-line-default) !important;
+    background: var(--v19-panel) !important;
+  }
+
+  .ops-shell.surface-export .v17-export-context-rail .v17-export-rail-head > div {
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.surface-export .v17-export-context-rail .v17-export-rail-head h2 {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .ops-shell.surface-export .v17-export-context-rail .v17-export-close {
+    position: relative !important;
+    z-index: 13 !important;
+    display: grid !important;
+    place-items: center !important;
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+    padding: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.surface-export .v17-export-context-rail .v19-context-panel-body,
+  .ops-shell.surface-export .v17-export-rail-body {
+    display: grid !important;
+    min-width: var(--v19b-size-0) !important;
+    min-height: var(--v19b-size-0) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .ops-shell.surface-export .v17-export-rail-body {
+    gap: var(--v19b-size-12) !important;
+  }
+}

@@ -120,7 +120,9 @@ test.describe("V-19 release ops lists export flow", () => {
     });
     await clickWorkspaceButton(page, /Мои подачи/);
     await page.getByLabel("Поиск по подачам").fill("Ольга Фролова");
-    await expect(page.getByRole("status")).toContainText("Ничего не найдено");
+    await expect(
+      page.getByRole("status").filter({ hasText: "Ничего не найдено" }).first(),
+    ).toContainText("Ничего не найдено");
     await expect(
       page.locator("[data-submission-card]").filter({ hasText: "Ольга Фролова" }),
     ).toHaveCount(0);

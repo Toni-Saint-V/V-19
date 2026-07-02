@@ -40,6 +40,7 @@ type CollectionToolbarProps<T extends string> = {
   onClearActiveFilters?: () => void;
   onTabChange: (value: T) => void;
   search: ReactNode;
+  summary?: ReactNode;
   tabs: Array<CollectionTab<T>>;
   tabsAriaLabel?: string;
   tools?: ReactNode;
@@ -83,6 +84,7 @@ export function CollectionToolbar<T extends string>({
   onClearActiveFilters,
   onTabChange,
   search,
+  summary,
   tabs,
   tabsAriaLabel,
   tools = null,
@@ -108,6 +110,11 @@ export function CollectionToolbar<T extends string>({
           <ToolbarControlStack filters={filters} search={search} />
           {tools}
         </div>
+        {summary ? (
+          <div className="v19-toolbar-summary-row" role="status" aria-live="polite">
+            {summary}
+          </div>
+        ) : null}
         {filterTabs ? (
           <div className="v19-toolbar-filter-row">{filterTabs}</div>
         ) : null}
@@ -721,6 +728,7 @@ export function SubmissionCollectionRow({
   kind = "family",
   meta,
   onOpen,
+  operationalDetails,
   searchText,
   selected = false,
   status,
@@ -744,6 +752,7 @@ export function SubmissionCollectionRow({
   kind?: "family" | "single";
   meta?: ReactNode;
   onOpen: () => void;
+  operationalDetails?: Array<{ label: string; value: string }>;
   searchText?: string;
   selected?: boolean;
   status: SubmissionStatus;
@@ -771,6 +780,7 @@ export function SubmissionCollectionRow({
       routeDetail={routeDetail}
       routeLabel={routeLabel}
       onOpen={onOpen}
+      operationalDetails={operationalDetails}
       searchText={searchText}
       selected={selected}
       statusClassName={status}

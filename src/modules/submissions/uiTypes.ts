@@ -46,7 +46,7 @@ export function surfaceTitle(surface: Surface) {
 
 export function surfaceDescription(surface: Surface) {
   if (surface === "agent-actions") {
-    return "Очередь подач, ошибок и проверки.";
+    return "Очередь задач по подачам: блокеры, приоритет и следующий шаг.";
   }
 
   if (surface === "agent-inbox") {
@@ -54,16 +54,16 @@ export function surfaceDescription(surface: Surface) {
   }
 
   if (surface === "agent-submissions") {
-    return "Подачи, анкеты, файлы и замечания.";
+    return "Все подачи агента: статус, готовность, блокеры и следующий переход.";
   }
 
   if (surface === "admin-review") {
-    return "Проверка без потери контекста.";
+    return "Админская очередь: новые проверки, полученные исправления и готовность к выгрузке.";
   }
 
   if (surface === "settings") {
     return "Роль, режим данных и безопасный выход.";
   }
 
-  return "Безопасный Excel preview";
+  return "Пакеты Excel: готовые подачи, блокеры и состав выгрузки.";
 }
