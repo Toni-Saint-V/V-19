@@ -197,26 +197,6 @@ async function expectMobileTabbarCompact(page: Page) {
   await expect(page.locator(".mobile-create-dock")).toBeHidden();
 }
 
-async function expectDisabledExportActionsExplainWhy(page: Page) {
-  const buttonNames = ["Сформировать Excel", "Скачать Excel", "Отметить выгружено"];
-  let disabledActionCount = 0;
-
-  for (const buttonName of buttonNames) {
-    const button = page.getByRole("button", { name: buttonName });
-    await expect(button).toBeVisible();
-
-    if (await button.isDisabled()) {
-      disabledActionCount += 1;
-      const reasonId = await button.getAttribute("aria-describedby");
-
-      expect(reasonId, `${buttonName} disabled reason id`).toBeTruthy();
-      await expect(page.locator(`[id="${reasonId}"]`)).toBeVisible();
-    }
-  }
-
-  expect(disabledActionCount).toBeGreaterThan(0);
-}
-
 function drawerCloseButton(page: Page) {
   return drawer(page)
     .getByRole("button", { name: /Закрыть (подачу|проверку)/ })
@@ -306,11 +286,12 @@ test.describe("V-19 mobile click real logic", () => {
     await expectNoHorizontalOverflow(page, "390 admin review");
     await expectNoFixedLayerOverControls(page, "390 admin review");
 
-    const firstReviewRow = page
-      .getByRole("button", { name: /^Открыть подачу:/ })
-      .first();
-    await expectCenterHitTarget(firstReviewRow, "390 admin review row");
-    await firstReviewRow.click();
+    const firstReviewAction = page
+      .locator("[data-submission-card]")
+      .first()
+      .locator(".v17-admin-row-action");
+    await expectCenterHitTarget(firstReviewAction, "390 admin review card action");
+    await firstReviewAction.click();
     await expect(drawer(page)).toBeVisible();
     await expectCenterHitTarget(drawerCloseButton(page), "390 admin drawer close");
     await drawerCloseButton(page).click();
@@ -336,25 +317,25 @@ test.describe("V-19 mobile click real logic", () => {
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, "390 export");
     await expectNoFixedLayerOverControls(page, "390 export");
-    await expectDisabledExportActionsExplainWhy(page);
 
-    const bulkSelect = page.getByRole("checkbox", {
-      name: "Выбрать все совместимые",
-    });
-    await expectCenterHitTarget(bulkSelect, "390 export bulk select all");
+    await expect(page.getByText(/1 \/ 4\s+Выбрать пакет/)).toBeVisible();
+    const olgaPackage = page
+      .locator(".v19-export-mobile-package")
+      .filter({ hasText: "Ольга Фролова" });
+    const choosePackage = olgaPackage.getByRole("button", { name: "Выбрать пакет" });
 
-    const firstExportRow = page.locator(".export-contract-row").first();
-    await expect(firstExportRow).toBeVisible();
-    await bulkSelect.check();
-    await expect(firstExportRow.getByRole("checkbox").first()).toBeChecked();
+    await expectCenterHitTarget(choosePackage, "390 export choose package");
+    await choosePackage.click();
+    await expect(page.getByText(/2 \/ 4\s+Проверить условия/)).toBeVisible();
+
+    const continueExport = page.getByRole("button", { name: "Продолжить" });
     await expectCenterHitTarget(
-      firstExportRow.getByRole("checkbox").first(),
-      "390 export row checkbox",
+      continueExport,
+      "390 export continue after fail-closed validation",
     );
-    await expectCenterHitTarget(
-      firstExportRow.getByRole("button", { name: "Смотреть пакет" }).first(),
-      "390 export row open action",
-    );
+    await expect(continueExport).toBeEnabled();
+    await continueExport.click();
+    await expect(page.getByText(/3 \/ 4\s+Предпросмотр строк/)).toBeVisible();
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
