@@ -33631,6 +33631,42 @@ select,
   gap: var(--v19-space-sm) !important;
 }
 
+.ops-shell.surface-agent-actions .v19-actions-summary-signal {
+  --v19-signal-bg: var(--v19-control) !important;
+  --v19-signal-bg-hover: var(--v19-hover) !important;
+  --v19-signal-border: var(--v19-line-strong) !important;
+  background:
+    linear-gradient(
+      180deg,
+      var(--vf-ref-color-rgb-255-255-255-0neg-06),
+      var(--vf-ref-color-rgb-255-255-255-0neg-015) 48%,
+      var(--vf-ref-color-rgb-0-0-0-0neg-16)
+    ),
+    var(--v19-control) !important;
+  box-shadow:
+    inset 0 var(--vf-ref-size-1px) 0
+      var(--vf-ref-color-rgb-255-255-255-0neg-08),
+    inset 0 calc(var(--vf-ref-size-1px) * -1) var(--vf-ref-size-8px)
+      var(--vf-ref-color-rgb-0-0-0-0neg-22) !important;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-signal:not(:disabled):hover {
+  background:
+    linear-gradient(
+      180deg,
+      var(--vf-ref-color-rgb-255-255-255-0neg-07),
+      var(--vf-ref-color-rgb-255-255-255-0neg-02) 48%,
+      var(--vf-ref-color-rgb-0-0-0-0neg-14)
+    ),
+    var(--v19-hover) !important;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-summary-signal.is-active,
+.ops-shell.surface-agent-actions .v19-actions-summary-signal[aria-pressed="true"] {
+  border-color: var(--v19-selected-border) !important;
+  background: var(--v19-selected-bg) !important;
+}
+
 .ops-shell.surface-agent-actions .v19-actions-desktop-grid {
   grid-template-columns: minmax(var(--vf-ref-size-420px), 0.95fr)
     minmax(var(--vf-ref-size-480px), 1.2fr) !important;
@@ -33650,18 +33686,20 @@ select,
 
 .ops-shell.surface-agent-actions .v19-actions-queue-item {
   position: relative !important;
-  grid-template-columns: var(--vf-ref-size-38px) minmax(0, 1fr) !important;
+  grid-template-columns: var(--vf-ref-size-3px) var(--vf-ref-size-38px) minmax(0, 1fr) !important;
   gap: var(--vf-ref-size-12px) !important;
   min-height: var(--vf-ref-size-76px) !important;
   padding: var(--vf-ref-size-13px) var(--vf-ref-size-16px)
-    var(--vf-ref-size-13px) var(--vf-ref-size-18px) !important;
+    var(--vf-ref-size-13px) var(--vf-ref-size-12px) !important;
   overflow: hidden !important;
 }
 
 .ops-shell.surface-agent-actions .v19-actions-queue-strip {
-  position: absolute !important;
-  inset: var(--vf-ref-size-12px) auto var(--vf-ref-size-12px) 0 !important;
+  position: static !important;
+  grid-column: 1 !important;
+  align-self: stretch !important;
   width: var(--vf-ref-size-3px) !important;
+  min-height: var(--vf-ref-size-42px) !important;
   border-radius: 0 var(--v19-radius-pill) var(--v19-radius-pill) 0 !important;
   background: var(--v19-info) !important;
 }
@@ -33691,6 +33729,7 @@ select,
 }
 
 .ops-shell.surface-agent-actions .v19-actions-queue-icon {
+  grid-column: 2 !important;
   display: grid !important;
   place-items: center !important;
   width: var(--vf-ref-size-38px) !important;
@@ -33702,9 +33741,11 @@ select,
 }
 
 .ops-shell.surface-agent-actions .v19-actions-queue-main {
+  grid-column: 3 !important;
   display: grid !important;
   gap: var(--vf-ref-size-7px) !important;
   min-width: 0 !important;
+  width: 100% !important;
 }
 
 .ops-shell.surface-agent-actions .v19-actions-queue-topline strong {
@@ -33831,7 +33872,7 @@ select,
   }
 
   .ops-shell.surface-agent-actions .v19-actions-queue-item {
-    grid-template-columns: var(--vf-ref-size-36px) minmax(0, 1fr) !important;
+    grid-template-columns: var(--vf-ref-size-3px) var(--vf-ref-size-36px) minmax(0, 1fr) !important;
     min-height: var(--vf-ref-size-74px) !important;
   }
 

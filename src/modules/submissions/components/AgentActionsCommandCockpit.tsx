@@ -350,7 +350,6 @@ function ActionTaskCard({
   task: AgentActionTask;
   onSelect: () => void;
 }) {
-  const applicantLabel = applicantOrdinalLabel(task);
   const dateLabel = tripDates(task.submission);
 
   return (
@@ -375,7 +374,6 @@ function ActionTaskCard({
       <span className="v19-actions-queue-main">
         <span className="v19-actions-queue-topline">
           <strong>{task.applicantName || formatSubmissionListTitle(task.submission)}</strong>
-          <small>{applicantLabel}</small>
         </span>
         <span className="v19-actions-queue-facts">
           <span>{dateLabel}</span>
@@ -701,16 +699,6 @@ function statusTone(
 
 function queueSubjectText(task: AgentActionTask) {
   return task.problemScope === "applicant" ? task.applicantName : "Вся подача";
-}
-
-function applicantOrdinalLabel(task: AgentActionTask) {
-  const index = task.submission.applicants.findIndex(
-    (applicant) => applicant.fullName === task.applicantName,
-  );
-
-  if (index >= 0) return `Заявитель ${index + 1}`;
-  if (task.submission.applicants.length === 1) return "Заявитель 1";
-  return applicantCountLabel(task.submission.applicants.length);
 }
 
 function priorityCopy(task: AgentActionTask) {
