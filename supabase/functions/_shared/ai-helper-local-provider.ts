@@ -4,6 +4,7 @@ import {
   type AiHelperIntent,
   type AiHelperProvider,
   type AiHelperProviderRequest,
+  type AiHelperResult,
 } from "./ai-helper-contract.ts";
 
 type AiHelperRuntimeEnv = "local" | "demo" | "staging" | "production";
@@ -29,7 +30,7 @@ interface LiteLlmProviderConfig {
   maxOutputTokens: number;
 }
 
-function runtimeEnvFor(value: string | undefined): AiHelperRuntimeEnv {
+function runtimeEnvFor(value: string | undefined): AiHelperRuntimeEnv | null {
   if (
     value === "demo" ||
     value === "staging" ||
@@ -39,11 +40,15 @@ function runtimeEnvFor(value: string | undefined): AiHelperRuntimeEnv {
     return value;
   }
 
-  return "local";
+  return null;
 }
 
-function providerModeFor(value: string | undefined): AiHelperProviderMode {
-  return value === "local_litellm" ? "local_litellm" : "stub";
+function providerModeFor(value: string | undefined): AiHelperProviderMode | null {
+  if (value === "local_litellm" || value === "stub") {
+    return value;
+  }
+
+  return null;
 }
 
 function positiveIntegerFromEnv(value: string | undefined, fallback: number): number {
@@ -64,7 +69,7 @@ function isStubAllowed(
     return false;
   }
 
-  return env.AI_HELPER_ALLOW_STUB_PROVIDER !== "false";
+  return env.AI_HELPER_ALLOW_STUB_PROVIDER === "true";
 }
 
 function buildStubProvider(): AiHelperProvider {
@@ -110,18 +115,6 @@ function buildLiteLlmConfig(env: AiHelperLocalProviderEnv): LiteLlmProviderConfi
   };
 }
 
-function textArrayFrom(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter((item): item is string => typeof item === "string");
-}
-
-function stringFieldFrom(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -159,25 +152,49 @@ function contentFromLiteLlmResponse(value: unknown): unknown {
   return message?.content;
 }
 
+function requiredStringField(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("LiteLLM response string field is invalid.");
+  }
+
+  return value;
+}
+
+function requiredStringArrayField(value: unknown): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error("LiteLLM response array field is invalid.");
+  }
+
+  return value;
+}
+
+function optionalStringArrayField(value: unknown): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return requiredStringArrayField(value);
+}
+
 function normalizeProviderResult(
   intent: AiHelperIntent,
   value: Record<string, unknown>,
-) {
+): AiHelperResult {
   return {
     intent,
-    title: stringFieldFrom(value.title, "Helper draft"),
-    summary: stringFieldFrom(
-      value.summary,
-      "AI helper generated a draft that needs operator review.",
-    ),
-    suggestions: textArrayFrom(value.suggestions),
-    blockers: textArrayFrom(value.blockers),
+    title: requiredStringField(value.title),
+    summary: requiredStringField(value.summary),
+    suggestions: requiredStringArrayField(value.suggestions),
+    blockers: requiredStringArrayField(value.blockers),
     guardrails: [
-      ...new Set([...textArrayFrom(value.guardrails), ...aiHelperBaseGuardrails]),
+      ...new Set([
+        ...requiredStringArrayField(value.guardrails),
+        ...aiHelperBaseGuardrails,
+      ]),
     ],
     source: "edge-provider",
-    operatorSummary: textArrayFrom(value.operatorSummary),
-    agentFollowUpDrafts: textArrayFrom(value.agentFollowUpDrafts),
+    operatorSummary: optionalStringArrayField(value.operatorSummary),
+    agentFollowUpDrafts: optionalStringArrayField(value.agentFollowUpDrafts),
   };
 }
 
@@ -250,6 +267,10 @@ export function createAiHelperLocalProvider(
 ): AiHelperProvider {
   const runtimeEnv = runtimeEnvFor(env.AI_HELPER_RUNTIME_ENV);
   const mode = providerModeFor(env.AI_HELPER_PROVIDER_MODE);
+  if (!runtimeEnv || !mode) {
+    return buildFailClosedProvider();
+  }
+
   const stubAllowed = isStubAllowed(env, runtimeEnv);
 
   if (mode === "stub") {

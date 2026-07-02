@@ -113,7 +113,8 @@ Do not run `supabase/seed.sql` against sandbox or production.
 
 - Frontend calls should go through Supabase Functions, never directly to a model provider.
 - Requests and responses use the shared contract in `functions/_shared/ai-helper-contract.ts`.
-- Every request must include an actor with `id`, `role`, and `canUseAI`; admin review and export helpers require the admin role.
+- Requests keep the actor-shaped contract for browser compatibility, but deployed Supabase Functions derive the effective actor from the caller JWT plus `public.profiles`. Client-supplied actor fields are not trusted for access, quota, audit, or provider execution.
+- Admin review and export helpers require a server-derived admin role.
 - Durable audit and quota are mandatory server-side boundaries. If the edge function is deployed without `SUPABASE_URL`, `SUPABASE_FUNCTION_ADMIN_KEY`, and quota wiring, it fails closed with `503` instead of silently using console-only or in-memory protection.
 - `migrations/20260614000000_ai_helper_audit_quota.sql` creates the default audit table and `consume_ai_helper_quota` RPC with RLS enabled on helper audit/quota storage.
 - Audit writes use `AI_HELPER_AUDIT_TABLE` or default `ai_helper_audit_events`. Rows must store only redacted metadata: `event`, `intent`, `actor_id`, `actor_role`, `request_id`, `reason`, and `created_at`; raw helper context, prompts, documents, and direct contact data must not be written.
@@ -125,7 +126,7 @@ Do not run `supabase/seed.sql` against sandbox or production.
 - Model/provider keys must stay server-side in Supabase function secrets and must not use a `VITE_` prefix.
 - Local model execution is server-side only: `AI_HELPER_PROVIDER_MODE=local_litellm` posts sanitized helper context to a LiteLLM OpenAI-compatible gateway such as a local Ollama-backed runtime. Browser code still calls only `ai-helper`.
 - Provider input is rebuilt from aggregate facts, issue codes, readiness states, and anonymized applicant labels before execution. Raw names, contacts, passports, addresses, free text, storage paths, images, OCR/MRZ text, and document payloads must not reach the provider.
-- Local/demo can use `AI_HELPER_ALLOW_STUB_PROVIDER=true` for `edge-stub` fallback. Staging/production fail closed when provider config is missing or invalid; paid cloud fallback is not part of this contract.
+- Local/demo can use `AI_HELPER_ALLOW_STUB_PROVIDER=true` for `edge-stub` fallback only when `AI_HELPER_RUNTIME_ENV` and `AI_HELPER_PROVIDER_MODE` are explicitly configured. Missing or unknown provider env fails closed. Staging/production fail closed when provider config is missing or invalid; paid cloud fallback is not part of this contract.
 - The helper may summarize, explain, and draft text only.
 - Deterministic validation remains the source of truth for blockers, submit guards, media state, and export eligibility.
 - Human operators make final media/submission decisions.
