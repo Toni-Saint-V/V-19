@@ -42,6 +42,21 @@ export type V19MemberStatusTone = "issue" | "progress" | "ready";
 
 export type V19BadgeTone = "amber" | "blue" | "danger" | "muted" | "teal";
 
+export type V19AiTriageTone =
+  | "attention"
+  | "critical"
+  | "done"
+  | "ready"
+  | "waiting";
+
+export type V19AiTriageSummary = {
+  bandLabel: string;
+  identityLabel: string;
+  nextAction: string;
+  score: number;
+  tone: V19AiTriageTone;
+};
+
 export type V19SignalButtonTone =
   | "amber"
   | "black"
@@ -331,6 +346,7 @@ export function V19LongListCell({
   statusLabel,
   statusTone,
   title,
+  triage,
   type,
   updated,
 }: {
@@ -344,13 +360,14 @@ export function V19LongListCell({
   statusLabel: string;
   statusTone: V19VisualTone;
   title: string;
+  triage?: V19AiTriageSummary;
   type: "family" | "single";
   updated: string;
 }) {
   return (
     <button
       aria-label={`Открыть подачу: ${title}, ${id}`}
-      className="vf-figma-action-row"
+      className={cn("vf-figma-action-row", triage && "has-ai-triage")}
       data-submission-id={id}
       type="button"
       onClick={onOpen}
@@ -388,6 +405,23 @@ export function V19LongListCell({
         <strong>{dates}</strong>
         <em>Даты поездки</em>
       </span>
+      {triage ? (
+        <span
+          className={`vf-figma-ai-triage tone-${triage.tone}`}
+          data-ai-band={triage.tone}
+        >
+          <span className="vf-figma-ai-triage-score">
+            <strong>{triage.score}</strong>
+            <em>{triage.bandLabel}</em>
+          </span>
+          <span className="vf-figma-ai-triage-identity">
+            {triage.identityLabel}
+          </span>
+          <span className="vf-figma-ai-triage-action">
+            {triage.nextAction}
+          </span>
+        </span>
+      ) : null}
       <span className="vf-figma-action-status">
         <V19StatusBadge label={statusLabel} tone={statusTone} />
       </span>

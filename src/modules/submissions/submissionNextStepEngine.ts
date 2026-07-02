@@ -4,6 +4,11 @@ import {
 } from "./passportExtractionBrief";
 import { passportExtractionRows } from "./passportExtraction";
 import {
+  buildIdentityConsistencyReport,
+  firstActionableIdentityFinding,
+  type IdentityConsistencyReport,
+} from "./identityConsistency";
+import {
   blockerCount,
   fixedIssueCount,
   getPrimaryAction,
@@ -47,6 +52,7 @@ export type SubmissionNextStepBrief = {
   blockers: string[];
   guardrails: string[];
   metrics: {
+    identityFindings: number;
     passportConflicts: number;
     passportSafeFields: number;
     queueCount: number;
@@ -75,10 +81,12 @@ export function buildSubmissionNextStepBrief({
 }): SubmissionNextStepBrief {
   const queue = buildReadinessQueue(submission);
   const passportBrief = buildPassportExtractionBrief(submission);
-  const blockers = readinessBlockers(submission, role);
+  const identityReport = buildIdentityConsistencyReport(submission);
+  const blockers = readinessBlockers(submission, role, identityReport);
   const primaryAction =
     agentWaitingPrimaryAction(submission, role, surface) ??
     passportPrimaryAction(submission, passportBrief) ??
+    identityPrimaryAction(identityReport) ??
     queuePrimaryAction(submission) ??
     lifecyclePrimaryAction(submission, role, surface);
   const fileCounts = mediaCounts(submission);
@@ -87,6 +95,7 @@ export function buildSubmissionNextStepBrief({
     actions: nextActions({
       blockers,
       fileCounts,
+      identityReport,
       primaryAction,
       role,
       submission,
@@ -96,6 +105,7 @@ export function buildSubmissionNextStepBrief({
     blockers,
     guardrails,
     metrics: {
+      identityFindings: identityReport.totals.findings,
       passportConflicts: passportBrief.metrics.conflicts,
       passportSafeFields: passportBrief.metrics.safeFieldsToApply,
       queueCount: queue.length,
@@ -143,7 +153,9 @@ function passportPrimaryAction(
   }
 
   if (brief.status === "review_required") {
-    const review = firstPassportRow(submission, () => true);
+    const review =
+      firstPassportRow(submission, isExpiredPassportRow) ??
+      firstPassportRow(submission, () => true);
     return {
       id: "verify_passport_review",
       kind: "passport_review",
@@ -171,6 +183,24 @@ function passportPrimaryAction(
   }
 
   return null;
+}
+
+function identityPrimaryAction(
+  report: IdentityConsistencyReport,
+): SubmissionNextStepAction | null {
+  if (report.status === "clear") return null;
+
+  const finding = firstActionableIdentityFinding(report);
+  return {
+    id: "resolve_identity_consistency",
+    kind: "navigate_target",
+    label:
+      report.status === "blocked"
+        ? "Сверьте конфликт анкеты, паспорта и PDF"
+        : "Проверьте согласованность данных",
+    reason: finding?.message ?? report.operatorSummary,
+    target: finding?.target,
+  };
 }
 
 function queuePrimaryAction(submission: Submission): SubmissionNextStepAction | null {
@@ -255,9 +285,30 @@ function firstPassportRow(
 function passportRowTarget(match: NonNullable<ReturnType<typeof firstPassportRow>>) {
   return {
     applicantId: match.applicantId,
-    field: match.row.fieldLabel,
+    field: match.row.fieldId,
     tab: "questionnaire" as const,
   };
+}
+
+function isExpiredPassportRow(
+  row: ReturnType<typeof passportExtractionRows>[number],
+) {
+  if (row.key !== "passportExpiresAt") return false;
+  const parsed = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(row.extractedValue.trim());
+  if (!parsed) return false;
+
+  const day = Number(parsed[1]);
+  const month = Number(parsed[2]);
+  const year = Number(parsed[3]);
+  const expiry = new Date(year, month - 1, day);
+  if (
+    expiry.getFullYear() !== year ||
+    expiry.getMonth() !== month - 1 ||
+    expiry.getDate() !== day
+  ) {
+    return false;
+  }
+  return new Date(year, month - 1, day + 1).getTime() <= Date.now();
 }
 
 function statusFor(
@@ -269,6 +320,7 @@ function statusFor(
   if (primaryAction.kind === "none") return "complete";
   if (
     primaryAction.id === "resolve_passport_conflicts" ||
+    primaryAction.id === "resolve_identity_consistency" ||
     primaryAction.id === "open_first_queue_item" ||
     blockers.length > 0
   ) {
@@ -302,6 +354,7 @@ function titleFor(
   blockers: string[],
 ) {
   if (primaryAction.id === "resolve_passport_conflicts") return "Есть конфликт паспорта";
+  if (primaryAction.id === "resolve_identity_consistency") return "Есть конфликт источников";
   if (primaryAction.id === "apply_passport_fields") return "Паспорт готов к применению";
   if (primaryAction.id === "wait_passport_extraction") return "Паспорт распознается";
   if (primaryAction.id === "manual_passport_entry") return "Паспорт заполнить вручную";
@@ -331,6 +384,7 @@ function summaryFor(
 function nextActions({
   blockers,
   fileCounts,
+  identityReport,
   primaryAction,
   role,
   submission,
@@ -338,12 +392,16 @@ function nextActions({
 }: {
   blockers: string[];
   fileCounts: ReturnType<typeof mediaCounts>;
+  identityReport: IdentityConsistencyReport;
   primaryAction: SubmissionNextStepAction;
   role: Role;
   submission: Submission;
   surface: "agent" | "review" | "export";
 }) {
   if (primaryAction.kind === "passport_review") return [primaryAction.label];
+  if (primaryAction.id === "resolve_identity_consistency") {
+    return [primaryAction.label, ...identityReport.nextActions].slice(0, 3);
+  }
   if (primaryAction.kind === "wait") return [primaryAction.label];
   if (surface === "export") {
     return submission.status === "exported"
@@ -421,7 +479,11 @@ function agentReadinessActions(
   return ["Сверьте текущий статус и продолжите работу в доступном действии."];
 }
 
-function readinessBlockers(submission: Submission, role: Role): string[] {
+function readinessBlockers(
+  submission: Submission,
+  role: Role,
+  identityReport: IdentityConsistencyReport,
+): string[] {
   const blockers: string[] = [];
   const blockerTotal = blockerCount(submission);
   const unresolvedTotal = unresolvedOpenIssueCount(submission);
@@ -442,6 +504,15 @@ function readinessBlockers(submission: Submission, role: Role): string[] {
   }
   if (role === "agent" && fixedTotal && submission.status === "corrections_received") {
     blockers.push(`${fixedTotal} исправлений ждут закрытия администратором`);
+  }
+  if (identityReport.status === "blocked") {
+    blockers.push(
+      `${identityReport.totals.blocked} критичных расхождения анкеты, паспорта и PDF`,
+    );
+  } else if (identityReport.status === "needs_review") {
+    blockers.push(
+      `${identityReport.totals.needsReview} предупреждений согласованности данных`,
+    );
   }
   if (submission.completeness.questionnaire < 100) {
     blockers.push(`Анкета заполнена на ${submission.completeness.questionnaire}%`);

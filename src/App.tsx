@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchBar, StateTabs } from "./shared/ui/primitives";
@@ -119,6 +119,7 @@ import {
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
 import { CANONICAL_CITIES } from "./modules/submissions/types";
+import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import type {
   City,
   DrawerTab,
@@ -193,8 +194,8 @@ type AgentQuestionnaireFocus = {
 
 const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v2";
-const localDevTestAgentCredentials = { email: "111@1.ru", password: "1111" };
-const localDevTestAdminCredentials = { email: "222@2.ru", password: "2222" };
+const localDevTestAgentCredentials = { email: "1@1.ru", password: "11" };
+const localDevTestAdminCredentials = { email: "2@2.ru", password: "22" };
 const fallbackAdminEmails = [localDevTestAdminCredentials.email];
 const fallbackAgentEmails = [localDevTestAgentCredentials.email];
 
@@ -469,6 +470,8 @@ function MainApp() {
   const [agentQuestionnaireOpen, setAgentQuestionnaireOpen] = useState(false);
   const [agentQuestionnaireFocus, setAgentQuestionnaireFocus] =
     useState<AgentQuestionnaireFocus | undefined>(undefined);
+  const [pendingWorkspaceTarget, setPendingWorkspaceTarget] =
+    useState<WorkspaceTarget | null>(null);
   const [dirty, setDirty] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [createCloseFocusToken, setCreateCloseFocusToken] = useState(0);
@@ -1282,11 +1285,16 @@ function MainApp() {
     setDirty(false);
   }
 
-  function openSubmission(submission: Submission, tab = defaultDrawerTab(submission)) {
+  function openSubmission(
+    submission: Submission,
+    tab = defaultDrawerTab(submission),
+    target?: WorkspaceTarget,
+  ) {
     rememberReturnFocus();
     setSubmissionActionError(null);
     setSelectedSubmissionId(submission.id);
     setActiveDrawerTab(tab);
+    setPendingWorkspaceTarget(target ?? null);
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
   }
@@ -1404,6 +1412,7 @@ function MainApp() {
       return;
     }
     setSubmissionActionError(null);
+    setPendingWorkspaceTarget(null);
     setDrawerMode("closed");
   }, [dirty]);
 
@@ -3207,6 +3216,8 @@ function MainApp() {
           <AdminReviewDrawer
             actionError={activeSubmissionActionError}
             activeTab={activeDrawerTab}
+            focusTarget={pendingWorkspaceTarget ?? undefined}
+            onClearFocusTarget={() => setPendingWorkspaceTarget(null)}
             onAction={updateSubmission}
             onAddIssue={addAdminIssue}
             onClose={closeDrawer}
@@ -3219,6 +3230,8 @@ function MainApp() {
         <FigmaSubmissionDrawer
           actionError={activeSubmissionActionError}
           activeTab={activeDrawerTab}
+          focusTarget={pendingWorkspaceTarget ?? undefined}
+          onClearFocusTarget={() => setPendingWorkspaceTarget(null)}
           onAction={updateSubmission}
           onClose={closeDrawer}
           onMarkIssueFixed={markActiveIssueFixed}
@@ -3293,6 +3306,7 @@ function MainApp() {
           onConfirm={() => {
             setConfirmClose(false);
             setDirty(false);
+            setPendingWorkspaceTarget(null);
             setDrawerMode("closed");
           }}
         />
@@ -3806,30 +3820,19 @@ function WorkspaceAccessGate({
     <main className="access-shell" aria-label="Вход в рабочий кабинет">
       <div className="access-layout">
         <section className="access-brand-panel" aria-label="VisaFlow">
-          <div className="access-brand-markline">
-            <div className="access-brand-copy">
-              <p
-                className="access-kicker vf-brand-wordmark vf-brand-wordmark--hero"
-                aria-label="VisaFlow 19"
-              >
-                <span
-                  className="vf-brand-capital vf-brand-capital--hero"
-                  aria-hidden="true"
-                >
-                  <img className="vf-brand-capital-image" src={visaOpsLogo} alt="" />
-                </span>
-                <span className="vf-brand-tail" aria-hidden="true">
-                  isaFlow
-                </span>
-                <span className="vf-brand-comma-version" aria-hidden="true">
-                  19
-                </span>
-              </p>
+          <div className="access-brand-lockup">
+            <img className="access-brand-logo" src={visaOpsLogo} alt="" />
+            <div className="access-brand-name">
+              <span>VisaFlow</span>
+              <small>V-19</small>
             </div>
           </div>
           <div className="access-brand-message">
-            <p className="access-brand-title">Операционный вход в платформу</p>
-            <p className="access-brand-text">Кабинет для испанских подач.</p>
+            <div className="access-brand-cues" aria-label="Рабочие зоны">
+              <span>Подачи</span>
+              <span>Проверка</span>
+              <span>Выгрузка</span>
+            </div>
           </div>
         </section>
 
@@ -3923,7 +3926,8 @@ function WorkspaceAccessGate({
                 ) : null}
 
                 <Button className="access-submit" type="submit" disabled={busy}>
-                  {busy ? "Входим..." : "Войти"}
+                  <span>{busy ? "Входим..." : "Войти в кабинет"}</span>
+                  <ArrowRight aria-hidden="true" size={17} strokeWidth={2} />
                 </Button>
               </form>
 
@@ -3933,17 +3937,14 @@ function WorkspaceAccessGate({
                   type="button"
                   onClick={openAccessRequest}
                 >
-                  Подать заявку на доступ
+                  Запросить доступ
                 </button>
-                <span className="access-secondary-divider" aria-hidden="true">
-                  ·
-                </span>
                 <button
                   className="access-secondary-link"
                   type="button"
                   onClick={openPasswordReset}
                 >
-                  Забыли пароль?
+                  Восстановить пароль
                 </button>
               </div>
             </>

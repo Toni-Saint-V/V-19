@@ -9,7 +9,8 @@ import {
   type AccessRequestRegistrationInput,
 } from "../../src/shared/authRegistration";
 
-const localDevPassword = "local-dev-password";
+const localDevAdminPassword = "22";
+const localDevAgentPassword = "11";
 
 function registrationInput(
   email: string,
@@ -52,19 +53,19 @@ describe("admin-approved local/dev auth registration", () => {
 
   test("seeds approved local demo agent and admin for e2e mode", async () => {
     await expect(
-      authRepository.loginApprovedUser("agent@visaflow.local", localDevPassword),
+      authRepository.loginApprovedUser("1@1.ru", localDevAgentPassword),
     ).resolves.toMatchObject({
       approvalStatus: "approved",
-      email: "agent@visaflow.local",
+      email: "1@1.ru",
       ownerAgentId: "local-agent-tony",
       role: "agent",
       status: "active",
     });
     await expect(
-      authRepository.loginApprovedUser("admin@visaflow.local", localDevPassword),
+      authRepository.loginApprovedUser("2@2.ru", localDevAdminPassword),
     ).resolves.toMatchObject({
       approvalStatus: "approved",
-      email: "admin@visaflow.local",
+      email: "2@2.ru",
       role: "admin",
       status: "active",
     });
@@ -183,8 +184,8 @@ describe("admin-approved local/dev auth registration", () => {
       registrationInput("agent-approved@example.com"),
     );
     const adminSession = await authRepository.loginApprovedUser(
-      "admin@visaflow.local",
-      localDevPassword,
+      "2@2.ru",
+      localDevAdminPassword,
     );
 
     await expect(accessRequestRepository.listPendingAccessRequests()).resolves.toEqual(
@@ -213,8 +214,8 @@ describe("admin-approved local/dev auth registration", () => {
       registrationInput("approved-login@example.com"),
     );
     const adminSession = await authRepository.loginApprovedUser(
-      "admin@visaflow.local",
-      localDevPassword,
+      "2@2.ru",
+      localDevAdminPassword,
     );
     await accessRequestRepository.approveAccessRequest(request.id, adminSession.userId);
     await authRepository.logout();
@@ -239,8 +240,8 @@ describe("admin-approved local/dev auth registration", () => {
       registrationInput("reject-me@example.com"),
     );
     const adminSession = await authRepository.loginApprovedUser(
-      "admin@visaflow.local",
-      localDevPassword,
+      "2@2.ru",
+      localDevAdminPassword,
     );
     const rejected = await accessRequestRepository.rejectAccessRequest(
       request.id,
@@ -273,8 +274,8 @@ describe("admin-approved local/dev auth registration", () => {
       }),
     );
     const adminSession = await authRepository.loginApprovedUser(
-      "admin@visaflow.local",
-      localDevPassword,
+      "2@2.ru",
+      localDevAdminPassword,
     );
     await accessRequestRepository.rejectAccessRequest(
       request.id,
@@ -320,8 +321,8 @@ describe("admin-approved local/dev auth registration", () => {
       registrationInput("disabled@example.com"),
     );
     const adminSession = await authRepository.loginApprovedUser(
-      "admin@visaflow.local",
-      localDevPassword,
+      "2@2.ru",
+      localDevAdminPassword,
     );
     const user = await accessRequestRepository.approveAccessRequest(
       request.id,
@@ -343,8 +344,8 @@ describe("admin-approved local/dev auth registration", () => {
       registrationInput("needs-admin@example.com"),
     );
     const adminSession = await authRepository.loginApprovedUser(
-      "admin@visaflow.local",
-      localDevPassword,
+      "2@2.ru",
+      localDevAdminPassword,
     );
 
     expect(adminSession.role).toBe("admin");
@@ -375,10 +376,10 @@ describe("admin-approved local/dev auth registration", () => {
 
   test("uses typed AuthAccessError for denied paths", async () => {
     await expect(
-      authRepository.loginApprovedUser("unknown@example.com", localDevPassword),
+      authRepository.loginApprovedUser("unknown@example.com", localDevAgentPassword),
     ).rejects.toBeInstanceOf(AuthAccessError);
     await expect(
-      authRepository.loginApprovedUser("agent@visaflow.local", "bad-password"),
+      authRepository.loginApprovedUser("1@1.ru", "bad-password"),
     ).rejects.toMatchObject({
       code: "INVALID_PASSWORD",
     });

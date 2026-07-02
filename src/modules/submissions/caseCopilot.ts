@@ -1,5 +1,10 @@
 import { exportSummary } from "./exportRules";
 import {
+  buildIdentityConsistencyReport,
+  firstActionableIdentityFinding,
+  type IdentityConsistencyReport,
+} from "./identityConsistency";
+import {
   buildPassportExtractionBrief,
   type PassportExtractionBrief,
 } from "./passportExtractionBrief";
@@ -30,6 +35,7 @@ export type CaseCopilotStatus =
 export type CaseCopilotOwner = Role | "system";
 
 export type CaseCopilotHighlightKind =
+  | "identity"
   | "passport"
   | "questionnaire"
   | "files"
@@ -40,6 +46,7 @@ export type CaseCopilotHighlightSource =
   | "status"
   | "ocr"
   | "manual_review"
+  | "identity"
   | "files"
   | "questionnaire"
   | "issues"
@@ -88,10 +95,12 @@ export function buildCaseCopilotBrief({
 }): CaseCopilotBrief {
   const nextStepBrief = buildSubmissionNextStepBrief({ role, submission, surface });
   const passportBrief = buildPassportExtractionBrief(submission);
+  const identityReport = buildIdentityConsistencyReport(submission);
   const exportPlan = exportSummary([submission]);
   const actionLockedByLifecycleWait = isAgentLifecycleWait(role, surface, submission);
   const highlights = compactHighlights([
     passportHighlight(submission, passportBrief, actionLockedByLifecycleWait),
+    identityHighlight(identityReport, role),
     questionnaireHighlight(submission, surface),
     filesHighlight(submission, surface),
     issuesHighlight(submission, role),
@@ -100,6 +109,7 @@ export function buildCaseCopilotBrief({
   const status = caseStatusFor({
     nextStepBrief,
     passportBrief,
+    identityReport,
     submission,
     surface,
   });
@@ -121,11 +131,13 @@ export function buildCaseCopilotBrief({
 function caseStatusFor({
   nextStepBrief,
   passportBrief,
+  identityReport,
   submission,
   surface,
 }: {
   nextStepBrief: SubmissionNextStepBrief;
   passportBrief: PassportExtractionBrief;
+  identityReport: IdentityConsistencyReport;
   submission: Submission;
   surface: "agent" | "review" | "export";
 }): CaseCopilotStatus {
@@ -135,6 +147,8 @@ function caseStatusFor({
   }
   if (passportBrief.status === "extracting") return "waiting";
   if (surface === "export") return exportSummary([submission]).ready ? "ready" : "blocked";
+  if (identityReport.status === "blocked") return "blocked";
+  if (identityReport.status === "needs_review") return "needs_review";
   if (
     passportBrief.metrics.conflicts > 0 ||
     passportBrief.metrics.safeFieldsToApply > 0 ||
@@ -270,6 +284,28 @@ function passportHighlight(
     summary: passportFilesMissing(submission)
       ? "Скан паспорта еще не загружен для части заявителей."
       : "Паспорт сверяется вручную без OCR.",
+  };
+}
+
+function identityHighlight(
+  report: IdentityConsistencyReport,
+  role: Role,
+): CaseCopilotHighlight | null {
+  if (report.status === "clear") return null;
+
+  const firstFinding = firstActionableIdentityFinding(report);
+  return {
+    detail: report.findings
+      .slice(0, 4)
+      .map((finding) => `${finding.applicantName}: ${finding.label} — ${finding.message}`)
+      .join("; "),
+    kind: "identity",
+    label: "Личность",
+    owner: role,
+    source: "identity",
+    status: report.status === "blocked" ? "blocked" : "needs_review",
+    summary: report.operatorSummary,
+    target: firstFinding?.target,
   };
 }
 
@@ -485,6 +521,9 @@ function reasonFor(
 
   if (status === "complete") return `${whyNow}пакет завершен.`;
   if (status === "waiting") return waitingReason(nextStepBrief.primaryAction);
+  if (nextStepBrief.primaryAction.id === "resolve_identity_consistency") {
+    return `${whyNow}сначала сверить личность по анкете, паспорту и PDF.`;
+  }
   if (nextStepBrief.primaryAction.kind === "passport_review") {
     return `${whyNow}сначала сверить паспорт.`;
   }
@@ -518,6 +557,8 @@ function actionPriorityTopic(
     return "замечания";
   }
 
+  if (action.id === "resolve_identity_consistency") return "личность";
+
   if (action.kind !== "navigate_target") return null;
 
   if (action.target?.tab === "questionnaire") {
@@ -535,6 +576,7 @@ function priorityHighlight(highlights: CaseCopilotHighlight[]) {
   const statusOrder: CaseCopilotStatus[] = ["blocked", "needs_review", "waiting"];
   const kindOrder: CaseCopilotHighlightKind[] = [
     "issues",
+    "identity",
     "passport",
     "files",
     "questionnaire",
@@ -643,6 +685,7 @@ function sourceLabel(source: CaseCopilotHighlightSource) {
   if (source === "status") return "статус";
   if (source === "ocr") return "OCR";
   if (source === "manual_review") return "ручная сверка";
+  if (source === "identity") return "согласованность личности";
   if (source === "issues") return "замечания";
   if (source === "export") return "выгрузка";
   return source === "files" ? "файлы" : "анкета";

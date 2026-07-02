@@ -104,9 +104,14 @@ type NormalizedAccessRequestInput = Omit<AccessRequestRegistrationInput, "passwo
 
 const localDevAuthStorageKey = "visaflow.auth.localDev.v1";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const localDevSeedPassword = "local-dev-password";
+const localDevAgentPassword = "11";
+const localDevAdminPassword = "22";
 const seededAgentOwnerId = "local-agent-tony";
 const seededSecondAgentOwnerId = "local-agent-alex";
+
+function localDevPasswordForRole(role: Role) {
+  return role === "admin" ? localDevAdminPassword : localDevAgentPassword;
+}
 
 function approvedSeed(
   id: string,
@@ -116,6 +121,7 @@ function approvedSeed(
   companyName: string,
   city: string,
   phone: string,
+  password: string,
   ownerAgentId?: string,
 ): User {
   return {
@@ -126,7 +132,7 @@ function approvedSeed(
     email,
     fullName,
     id,
-    localDevPasswordVerifier: createLocalDevPasswordVerifier(email, localDevSeedPassword),
+    localDevPasswordVerifier: createLocalDevPasswordVerifier(email, password),
     ownerAgentId,
     phone,
     role,
@@ -137,12 +143,13 @@ function approvedSeed(
 const localDevApprovedUsers: User[] = [
   approvedSeed(
     "admin-local-1",
-    "admin@visaflow.local",
+    "2@2.ru",
     "admin",
     "Local Admin",
     "VisaFlow Ops",
     "Москва",
     "+7 000 000-00-00",
+    localDevAdminPassword,
   ),
   approvedSeed(
     "admin-demo-ops",
@@ -152,15 +159,17 @@ const localDevApprovedUsers: User[] = [
     "VisaFlow Ops",
     "Москва",
     "+7 000 000-00-01",
+    localDevAdminPassword,
   ),
   approvedSeed(
     "agent-local-1",
-    "agent@visaflow.local",
+    "1@1.ru",
     "agent",
     "Татьяна Николаева",
     "Visa Center Spb",
     "Санкт-Петербург",
     "+7 000 000-00-02",
+    localDevAgentPassword,
     seededAgentOwnerId,
   ),
   approvedSeed(
@@ -171,6 +180,7 @@ const localDevApprovedUsers: User[] = [
     "Mira Travel",
     "Казань",
     "+7 000 000-00-03",
+    localDevAgentPassword,
     seededSecondAgentOwnerId,
   ),
 ];
@@ -307,7 +317,10 @@ function readLocalDevState(): LocalDevAuthState {
             fullName: user.fullName ?? user.email,
             localDevPasswordVerifier:
               user.localDevPasswordVerifier ??
-              createLocalDevPasswordVerifier(user.email, localDevSeedPassword),
+              createLocalDevPasswordVerifier(
+                user.email,
+                localDevPasswordForRole(user.role === "admin" ? "admin" : "agent"),
+              ),
             role: user.role === "admin" ? "admin" : "agent",
             status: user.status ?? "active",
           }))

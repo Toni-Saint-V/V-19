@@ -5,6 +5,7 @@ import {
   V19IndividualProfileCard,
   V19LongListCell,
   V19UnifiedToolbar,
+  type V19AiTriageSummary,
   type V19MemberStatusTone,
   type V19VisualTone,
 } from "../../../shared/ui/v19-design-system";
@@ -15,9 +16,19 @@ import type {
   AgentActionSummary,
 } from "../agentActions";
 import { formatSubmissionListTitle } from "../listFormatters";
+import {
+  adminTriageRadarItem,
+  buildAdminTriageRadar,
+  type AdminTriageRadarItem,
+} from "../adminTriageRadar";
+import {
+  AdminTriageRadarPanel,
+  type AdminTriageBandFilter,
+} from "../components/AdminTriageRadarPanel";
 import { applicantCountLabel, tripDates } from "../selectors";
 import { statusLabelFor } from "../status";
 import type { City, DrawerTab, Submission } from "../types";
+import type { WorkspaceTarget } from "../workspaceModel";
 
 type VisualStatus = Submission["status"];
 
@@ -62,7 +73,11 @@ type VisualMember = {
   statusTone: V19MemberStatusTone;
 };
 
-type VisualOpenHandler = (submission: Submission, tab?: DrawerTab) => void;
+type VisualOpenHandler = (
+  submission: Submission,
+  tab?: DrawerTab,
+  target?: WorkspaceTarget,
+) => void;
 
 const emptySummary: AgentActionSummary = {
   completed: 0,
@@ -71,6 +86,34 @@ const emptySummary: AgentActionSummary = {
   today: 0,
   week: 0,
 };
+
+function visualTriageSummary(
+  triage: AdminTriageRadarItem,
+): V19AiTriageSummary {
+  return {
+    bandLabel: visualTriageBandLabel(triage.band),
+    identityLabel: visualIdentityStatusLabel(triage.identityStatus),
+    nextAction: triage.nextAction,
+    score: Math.max(0, triage.score),
+    tone: triage.band,
+  };
+}
+
+function visualTriageBandLabel(band: AdminTriageRadarItem["band"]) {
+  if (band === "critical") return "critical";
+  if (band === "attention") return "attention";
+  if (band === "ready") return "ready";
+  if (band === "done") return "done";
+  return "waiting";
+}
+
+function visualIdentityStatusLabel(
+  status: AdminTriageRadarItem["identityStatus"],
+) {
+  if (status === "blocked") return "Личность: конфликт";
+  if (status === "needs_review") return "Личность: сверка";
+  return "Личность: чисто";
+}
 
 export function FigmaActionQueueVisual({
   completedActions,
@@ -90,6 +133,8 @@ export function FigmaActionQueueVisual({
   const [viewMode, setViewMode] = useState<"columns" | "list">("list");
   const [category, setCategory] = useState<VisualActionCategory>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
+  const [triageBandFilter, setTriageBandFilter] =
+    useState<AdminTriageBandFilter>("all");
   const allItems = useMemo(
     () => [...openActions, ...completedActions].map(toVisualActionRow),
     [completedActions, openActions],
@@ -112,14 +157,32 @@ export function FigmaActionQueueVisual({
     }),
     [allItems],
   );
+  const triageSource = useMemo(() => {
+    const byId = new Map<string, Submission>();
+    for (const item of allItems) byId.set(item.submission.id, item.submission);
+    return [...byId.values()];
+  }, [allItems]);
+  const triageRadar = useMemo(
+    () => buildAdminTriageRadar(triageSource),
+    [triageSource],
+  );
+  const triageBySubmissionId = useMemo(
+    () => new Map(triageRadar.items.map((item) => [item.submissionId, item])),
+    [triageRadar],
+  );
   const visibleItems = useMemo(
     () =>
-      allItems.filter(
-        (item) =>
+      allItems.filter((item) => {
+        const triage =
+          triageBySubmissionId.get(item.submission.id) ??
+          adminTriageRadarItem(item.submission);
+        return (
           visualCategoryMatches(item, category) &&
-          (cityFilter === "all" || item.city === cityFilter),
-      ),
-    [allItems, category, cityFilter],
+          (cityFilter === "all" || item.city === cityFilter) &&
+          (triageBandFilter === "all" || triage.band === triageBandFilter)
+        );
+      }),
+    [allItems, category, cityFilter, triageBandFilter, triageBySubmissionId],
   );
   const columns: VisualColumn[] = [
     {
@@ -154,6 +217,18 @@ export function FigmaActionQueueVisual({
     }))
     .filter((column) => column.items.length > 0);
   const readyCount = allItems.filter((item) => isReadyVisualStatus(item.status)).length;
+
+  function triageForItem(item: VisualActionRow): AdminTriageRadarItem {
+    return (
+      triageBySubmissionId.get(item.submission.id) ??
+      adminTriageRadarItem(item.submission)
+    );
+  }
+
+  function openVisualItem(item: VisualActionRow) {
+    const target = triageForItem(item).target;
+    onOpen(item.submission, target?.tab ?? item.tab, target);
+  }
 
   return (
     <section className="vf-figma-screen vf-figma-actions-screen" aria-label="Мои действия">
@@ -214,6 +289,12 @@ export function FigmaActionQueueVisual({
         </div>
       </div>
 
+      <AdminTriageRadarPanel
+        activeBand={triageBandFilter}
+        radar={triageRadar}
+        onBand={setTriageBandFilter}
+      />
+
       <div
         className={`vf-figma-view-stage is-${viewMode}`}
         data-agent-action-open-count={summary.open}
@@ -253,9 +334,10 @@ export function FigmaActionQueueVisual({
                 statusLabel={item.statusLabel}
                 statusTone={visualToneForStatus(item.status)}
                 title={item.title}
+                triage={visualTriageSummary(triageForItem(item))}
                 type={item.type}
                 updated={item.updated}
-                onOpen={() => onOpen(item.submission, item.tab)}
+                onOpen={() => openVisualItem(item)}
               />
             ))}
           </div>
@@ -287,7 +369,7 @@ export function FigmaActionQueueVisual({
                           title={item.title}
                           tone={tone}
                           type={item.type}
-                          onOpen={() => onOpen(item.submission, item.tab)}
+                          onOpen={() => openVisualItem(item)}
                         />
                       );
                     })}

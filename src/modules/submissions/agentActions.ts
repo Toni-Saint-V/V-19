@@ -246,7 +246,13 @@ export function searchAgentActions(actions: AgentActionItem[], query: string) {
 }
 
 export function buildAgentActionTasks(actions: AgentActionItem[]): AgentActionTask[] {
-  return actions.map(toAgentActionTask);
+  const seenIds = new Map<string, number>();
+
+  return actions.map((action) => {
+    const duplicateIndex = seenIds.get(action.id) ?? 0;
+    seenIds.set(action.id, duplicateIndex + 1);
+    return toAgentActionTask(action, duplicateIndex);
+  });
 }
 
 export function summarizeAgentActionTasks(
@@ -262,7 +268,10 @@ export function summarizeAgentActionTasks(
   };
 }
 
-function toAgentActionTask(action: AgentActionItem): AgentActionTask {
+function toAgentActionTask(
+  action: AgentActionItem,
+  duplicateIndex = 0,
+): AgentActionTask {
   const submission = action.submission;
   const status = actionTaskStatus(action);
   const nextAction = actionNextAction(action);
@@ -275,7 +284,7 @@ function toAgentActionTask(action: AgentActionItem): AgentActionTask {
     action,
     applicantName: action.title,
     destination: `${submission.country} · ${submission.city}`,
-    id: action.id,
+    id: duplicateIndex === 0 ? action.id : `${action.id}-${duplicateIndex + 1}`,
     nextAction,
     priority: actionPriority(action, status),
     problem,

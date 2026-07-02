@@ -19,6 +19,11 @@ import {
   type ExportSummary,
 } from "../exportRules";
 import { formatSubmissionListTitle } from "../listFormatters";
+import {
+  adminTriageRadarItem,
+  buildAdminTriageRadar,
+  type AdminTriageRadarItem,
+} from "../adminTriageRadar";
 import { buildAgentHandoffPackage } from "../operationalWorkflow";
 import { applicantCountLabel, counts, tripDates } from "../selectors";
 import {
@@ -43,8 +48,13 @@ import {
 import { EmptyState } from "../components/Primitives";
 import {
   AgentActionsCommandCockpit,
+  type AgentActionsSummaryFilter,
 } from "../components/AgentActionsCommandCockpit";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
+import {
+  AdminTriageRadarPanel,
+  type AdminTriageBandFilter,
+} from "../components/AdminTriageRadarPanel";
 import {
   CollectionToolbarTools,
   compactActiveFilters,
@@ -121,7 +131,12 @@ function transitionUiState(update: () => void) {
 }
 
 type InboxEvent = OperationalInboxEvent;
-type ActionStatusFilter = "all" | "error" | "ready" | "urgent";
+type ActionStatusFilter =
+  | "action_required"
+  | "all"
+  | "blocked"
+  | "error"
+  | "ready";
 type CanonicalMediaType = "passport_scan" | "selfie" | "selfie_2";
 type CanonicalMediaRow = {
   status: string;
@@ -264,6 +279,8 @@ export function AgentActionsScreen({
   totalActionCount?: number;
 }) {
   const [statusFilter, setStatusFilter] = useState<ActionStatusFilter>("all");
+  const [summaryFilter, setSummaryFilter] =
+    useState<AgentActionsSummaryFilter | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [sortOldest, setSortOldest] = useState(false);
 
@@ -272,17 +289,18 @@ export function AgentActionsScreen({
     [completedActions, openActions],
   );
   const taskSummary = useMemo(() => summarizeAgentActionTasks(allTasks), [allTasks]);
-  const urgentCount = allTasks.filter((task) => task.priority.level === "urgent").length;
   const sourceActionCount = totalActionCount ?? allTasks.length;
-  const filteredTasks = allTasks.filter((task) => {
-    if (statusFilter === "all") return true;
-    if (statusFilter === "urgent") return task.priority.level === "urgent";
-    return task.status === statusFilter;
-  });
+  const filteredTasks = summaryFilter
+    ? filterAgentActionSummaryTasks(allTasks, summaryFilter)
+    : statusFilter === "all"
+      ? allTasks
+      : allTasks.filter((task) => task.status === statusFilter);
   const visibleTasks = sortOldest ? [...filteredTasks].reverse() : filteredTasks;
   const selectedTask =
     visibleTasks.find((task) => task.id === selectedTaskId) ?? visibleTasks[0];
-  const actionGroupLabel = actionStatusFilterLabel(statusFilter);
+  const actionGroupLabel = summaryFilter
+    ? actionSummaryFilterLabel(summaryFilter)
+    : actionStatusFilterLabel(statusFilter);
   const noSearchResults = hasSearchQuery && sourceActionCount > 0 && allTasks.length === 0;
   const emptyState = noSearchResults
     ? {
@@ -290,8 +308,17 @@ export function AgentActionsScreen({
         body: "Попробуйте другой ID, имя или город.",
         title: "Ничего не найдено по запросу.",
       }
-    : actionFilterEmptyState(statusFilter);
+    : summaryFilter
+      ? actionSummaryFilterEmptyState(summaryFilter)
+      : actionFilterEmptyState(statusFilter);
   const activeFilters = compactActiveFilters([
+    summaryFilter
+      ? {
+          id: "summary",
+          label: actionSummaryFilterLabel(summaryFilter),
+          onRemove: () => transitionUiState(() => setSummaryFilter(null)),
+        }
+      : null,
     sortOldest
       ? {
           id: "sort",
@@ -302,17 +329,9 @@ export function AgentActionsScreen({
   ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
+      setSummaryFilter(null);
       setSortOldest(false);
     });
-  const toolbarToolButtons = (
-    <ToolbarIconButton
-      label={sortOldest ? "Сортировка: старые сверху" : "Сортировка: важные сверху"}
-      icon="sort"
-      pressed={sortOldest}
-      onClick={() => transitionUiState(() => setSortOldest((value) => !value))}
-    />
-  );
-  const toolbarTools = <CollectionToolbarTools desktopTools={toolbarToolButtons} />;
 
   function openTask(task: AgentActionTask) {
     openTaskTab(task, task.nextAction.tab);
@@ -357,26 +376,25 @@ export function AgentActionsScreen({
           className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
           mobileCityControl={cityControl}
           onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-          onTabChange={(nextFilter) => transitionUiState(() => setStatusFilter(nextFilter))}
-          search={searchControl}
-          summary={
-            <OperationalSummaryStrip
-              items={[
-                { count: taskSummary.errors, label: "Блокеры" },
-                { count: urgentCount, label: "Срочно" },
-                { count: taskSummary.ready, label: "Готово" },
-                { count: taskSummary.all, label: "Всего" },
-              ]}
-            />
+          onTabChange={(nextFilter) =>
+            transitionUiState(() => {
+              setSummaryFilter(null);
+              setStatusFilter(nextFilter);
+            })
           }
+          search={searchControl}
           tabs={[
             { count: taskSummary.all, id: "all", label: "Все" },
-            { count: taskSummary.errors, id: "error", label: "Блокеры" },
-            { count: urgentCount, id: "urgent", label: "Срочно" },
+            { count: taskSummary.errors, id: "error", label: "Ошибки" },
+            {
+              count: taskSummary.actionRequired,
+              id: "action_required",
+              label: "Требуют действия",
+            },
             { count: taskSummary.ready, id: "ready", label: "Готово" },
+            { count: taskSummary.blocked, id: "blocked", label: "Заблокировано" },
           ]}
           tabsAriaLabel="Рабочее состояние действий"
-          tools={toolbarTools}
           value={statusFilter}
         />
 
@@ -385,10 +403,18 @@ export function AgentActionsScreen({
           emptyState={emptyState}
           errorMessage={errorMessage}
           loading={loading}
+          activeSummaryFilter={summaryFilter}
           selectedTask={selectedTask}
+          summary={taskSummary}
+          summaryTasks={allTasks}
           tasks={visibleTasks}
           onEmptyAction={() =>
             transitionUiState(() => {
+              if (summaryFilter) {
+                setSummaryFilter(null);
+                return;
+              }
+
               if (noSearchResults) {
                 onClearSearch?.();
                 return;
@@ -407,6 +433,12 @@ export function AgentActionsScreen({
           onOpenSecondary={openFullSubmission}
           onOpenTab={openTaskTab}
           onSelectTask={(task) => setSelectedTaskId(task.id)}
+          onSummaryFilterChange={(filter) =>
+            transitionUiState(() => {
+              setStatusFilter("all");
+              setSummaryFilter((current) => (current === filter ? null : filter));
+            })
+          }
         />
       </section>
     </div>
@@ -414,10 +446,79 @@ export function AgentActionsScreen({
 }
 
 function actionStatusFilterLabel(status: ActionStatusFilter) {
-  if (status === "error") return "Блокеры";
-  if (status === "urgent") return "Срочные";
+  if (status === "error") return "Ошибки";
+  if (status === "action_required") return "Требуют действия";
   if (status === "ready") return "Готово";
+  if (status === "blocked") return "Заблокировано";
   return "Все действия";
+}
+
+function actionSummaryFilterLabel(filter: AgentActionsSummaryFilter) {
+  if (filter === "in_work") return "В работе";
+  if (filter === "in_review") return "На проверке";
+  if (filter === "in_correction") return "На исправлении";
+  return "Готово";
+}
+
+function filterAgentActionSummaryTasks(
+  tasks: AgentActionTask[],
+  filter: AgentActionsSummaryFilter,
+) {
+  if (filter === "in_work") {
+    return tasks.filter((task) =>
+      ["draft", "in_progress"].includes(task.submission.status),
+    );
+  }
+
+  if (filter === "in_review") {
+    return tasks.filter((task) =>
+      ["corrections_received", "submitted_for_review"].includes(
+        task.submission.status,
+      ),
+    );
+  }
+
+  if (filter === "in_correction") {
+    return tasks.filter((task) =>
+      ["requires_action", "returned"].includes(task.submission.status),
+    );
+  }
+
+  return tasks.filter((task) =>
+    ["exported", "ready_for_export"].includes(task.submission.status),
+  );
+}
+
+function actionSummaryFilterEmptyState(filter: AgentActionsSummaryFilter) {
+  if (filter === "in_work") {
+    return {
+      action: "Показать все",
+      body: "Нет подач, которые агент ещё заполняет.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+
+  if (filter === "in_review") {
+    return {
+      action: "Показать все",
+      body: "Нет подач, отправленных админу.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+
+  if (filter === "in_correction") {
+    return {
+      action: "Показать все",
+      body: "Нет подач, где админ вернул замечания.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+
+  return {
+    action: "Показать все",
+    body: "Нет принятых или выгруженных подач.",
+    title: "Нет действий, требующих внимания",
+  };
 }
 
 function actionFilterEmptyState(status: ActionStatusFilter) {
@@ -428,17 +529,24 @@ function actionFilterEmptyState(status: ActionStatusFilter) {
       title: "Нет действий, требующих внимания",
     };
   }
-  if (status === "urgent") {
-    return {
-      action: "Показать все",
-      body: "Нет срочных задач для агента.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
   if (status === "ready") {
     return {
       action: "Показать все",
       body: "Нет подач, готовых к передаче дальше.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+  if (status === "action_required") {
+    return {
+      action: "Показать все",
+      body: "Нет задач, которые ждут действия агента.",
+      title: "Нет действий, требующих внимания",
+    };
+  }
+  if (status === "blocked") {
+    return {
+      action: "Показать все",
+      body: "Нет заблокированных подач.",
       title: "Нет действий, требующих внимания",
     };
   }
@@ -1633,7 +1741,21 @@ function sortSubmissionsForOperations(
   submissions: Submission[],
   mode: SubmissionSortMode,
 ) {
-  if (mode === "priority") return submissions;
+  if (mode === "priority") {
+    const order = new Map(
+      buildAdminTriageRadar(submissions).items.map((item, index) => [
+        item.submissionId,
+        index,
+      ]),
+    );
+
+    return [...submissions].sort(
+      (left, right) =>
+        (order.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(right.id) ?? Number.MAX_SAFE_INTEGER) ||
+        left.id.localeCompare(right.id),
+    );
+  }
 
   return [...submissions].sort((left, right) => {
     if (mode === "trip") {
@@ -1689,7 +1811,7 @@ export function AdminReviewScreen({
   error?: string;
   filterControl?: ReactNode;
   loading?: boolean;
-  onOpen: (submission: Submission, tab?: DrawerTab) => void;
+  onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   onRetryError?: () => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: AdminWorkTab) => void;
@@ -1703,6 +1825,8 @@ export function AdminReviewScreen({
   const [blockersOnly, setBlockersOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
   const allQueue = reviewSource.filter(matchesReviewTab("all"));
+  const [triageBandFilter, setTriageBandFilter] =
+    useState<AdminTriageBandFilter>("all");
   const reviewQueue = reviewSource.filter(matchesReviewTab("review"));
   const correctionsQueue = reviewSource.filter(matchesReviewTab("corrections"));
   const readyQueue = reviewSource.filter(matchesReviewTab("ready"));
@@ -1719,9 +1843,28 @@ export function AdminReviewScreen({
         : reviewList,
     [blockersOnly, reviewList],
   );
+  const triageRadar = useMemo(
+    () => buildAdminTriageRadar(filteredReviewList),
+    [filteredReviewList],
+  );
+  const triageBySubmissionId = useMemo(
+    () => new Map(triageRadar.items.map((item) => [item.submissionId, item])),
+    [triageRadar],
+  );
+  const triageFilteredReviewList = useMemo(
+    () =>
+      triageBandFilter === "all"
+        ? filteredReviewList
+        : filteredReviewList.filter(
+            (submission) =>
+              (triageBySubmissionId.get(submission.id) ?? adminTriageRadarItem(submission))
+                .band === triageBandFilter,
+          ),
+    [filteredReviewList, triageBandFilter, triageBySubmissionId],
+  );
   const visibleReviewList = useMemo(
-    () => sortSubmissionsForOperations(filteredReviewList, sortMode),
-    [filteredReviewList, sortMode],
+    () => sortSubmissionsForOperations(triageFilteredReviewList, sortMode),
+    [triageFilteredReviewList, sortMode],
   );
   const visibleSelectedSubmission =
     visibleSubmission &&
@@ -1754,11 +1897,19 @@ export function AdminReviewScreen({
             label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
             onRemove: () => transitionUiState(() => setSortMode("priority")),
           },
+      triageBandFilter === "all"
+        ? null
+        : {
+            id: "triage",
+            label: `Радар: ${adminTriageBandFilterLabel(triageBandFilter)}`,
+            onRemove: () => transitionUiState(() => setTriageBandFilter("all")),
+          },
     ]);
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setBlockersOnly(false);
       setSortMode("priority");
+      setTriageBandFilter("all");
     });
 
   const toolbarTools = (
@@ -1866,6 +2017,14 @@ export function AdminReviewScreen({
           <span>{adminWorkNoteCopy(reviewTab)}</span>
         </div>
 
+        {!permissionDenied && !loading && !error ? (
+          <AdminTriageRadarPanel
+            activeBand={triageBandFilter}
+            radar={triageRadar}
+            onBand={(band) => transitionUiState(() => setTriageBandFilter(band))}
+          />
+        ) : null}
+
         {permissionDenied ? (
           renderBlockedState(
             "Нет доступа к проверке",
@@ -1885,18 +2044,30 @@ export function AdminReviewScreen({
         ) : visibleReviewList.length ? (
           <>
             <div className="v17-admin-work-list" aria-label="Очередь проверки">
-              {visibleReviewList.map((submission) => (
-                <AdminWorkRow
-                  selected={visibleSelectedSubmission?.id === submission.id}
-                  key={submission.id}
-                  submission={submission}
-                  onSelect={() => onSelect(submission)}
-                  onOpen={() => {
-                    onSelect(submission);
-                    onOpen(submission, adminWorkDrawerTabFor(submission));
-                  }}
-                />
-              ))}
+              {visibleReviewList.map((submission) => {
+                const triage =
+                  triageBySubmissionId.get(submission.id) ??
+                  adminTriageRadarItem(submission);
+                const target = triage.target;
+                const tab = drawerTabForScreenTarget(
+                  target,
+                  adminWorkDrawerTabFor(submission),
+                );
+
+                return (
+                  <AdminWorkRow
+                    selected={visibleSelectedSubmission?.id === submission.id}
+                    key={submission.id}
+                    submission={submission}
+                    triage={triage}
+                    onSelect={() => onSelect(submission)}
+                    onOpen={() => {
+                      onSelect(submission);
+                      onOpen(submission, tab, target);
+                    }}
+                  />
+                );
+              })}
             </div>
           </>
         ) : (
@@ -1907,6 +2078,31 @@ export function AdminReviewScreen({
             onShow={() => onTab(reviewTab === "review" ? "corrections" : "review")}
           />
         )}
+        {actionSubmission ? (
+          <div className="v17-admin-primary-action">
+            <span>
+              {adminReviewPriorityLine(
+                actionSubmission,
+                triageBySubmissionId.get(actionSubmission.id) ??
+                  adminTriageRadarItem(actionSubmission),
+              )}
+            </span>
+            <Button
+              aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
+              disabled={!canAddIssue}
+              variant="secondary"
+              onClick={() => {
+                onSelect(actionSubmission);
+                onOpen(actionSubmission, "issues");
+              }}
+            >
+              Вернуть с замечанием
+            </Button>
+            {!canAddIssue ? (
+              <em id="admin-return-disabled-note">{addIssueReason}</em>
+            ) : null}
+          </div>
+        ) : null}
       </CardComponent>
       {actionSubmission ? (
         <AdminReviewContextPanel
@@ -1921,13 +2117,6 @@ export function AdminReviewScreen({
       ) : null}
     </div>
   );
-}
-
-function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
-  if (reviewTab === "all") return "Все пакеты с видимым статусом, причиной и владельцем";
-  if (reviewTab === "corrections") return "Сначала исправления, затем новые проверки";
-  if (reviewTab === "ready") return "Принятые пакеты уходят в безопасную выгрузку";
-  return "Очередь отсортирована по времени ожидания";
 }
 
 function AdminReviewContextPanel({
@@ -2098,6 +2287,42 @@ function canonicalMediaChecklist(submission: Submission) {
   });
 }
 
+function adminReviewPriorityLine(
+  submission: Submission,
+  triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
+) {
+  const reason = triage.reasons[0] ?? statusLabels[submission.status];
+
+  if (triage.band === "critical") return `${triage.score} · критично: ${reason}`;
+  if (triage.band === "attention") return `${triage.score} · внимание: ${reason}`;
+  if (triage.band === "ready") return `${triage.score} · готово: ${reason}`;
+  if (triage.band === "waiting") return `ждёт: ${triage.nextAction}`;
+  if (triage.band === "done") return "завершено";
+
+  return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
+}
+
+function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
+  if (reviewTab === "corrections") return "Радар поднимает исправления, где есть риск повторного возврата";
+  if (reviewTab === "ready") return "Принятые пакеты уходят в безопасную выгрузку";
+  return "Очередь отсортирована по риску, блокерам и готовности к действию";
+}
+
+function adminTriageBandFilterLabel(band: AdminTriageBandFilter) {
+  if (band === "all") return "все";
+  if (band === "critical") return "critical";
+  if (band === "attention") return "attention";
+  if (band === "ready") return "ready";
+  if (band === "waiting") return "waiting";
+  return "done";
+}
+
+function adminIdentityStatusLabel(status: AdminTriageRadarItem["identityStatus"]) {
+  if (status === "blocked") return "есть риск";
+  if (status === "needs_review") return "проверить";
+  return "чисто";
+}
+
 function AdminWorkLoadingState() {
   return (
     <div
@@ -2159,11 +2384,13 @@ function AdminWorkRow({
   onSelect,
   selected,
   submission,
+  triage,
 }: {
   onOpen: () => void;
   onSelect: () => void;
   selected: boolean;
   submission: Submission;
+  triage: AdminTriageRadarItem;
 }) {
   const facts = adminReviewFacts(submission);
   const presentation = adminWorkPresentation(submission);
@@ -2217,11 +2444,22 @@ function AdminWorkRow({
             <span className="mono">{submission.id}</span> ·{" "}
             {applicantCountLabel(submission.applicants.length)}
           </em>
+          <small className={`v17-admin-identity-signal is-${triage.identityStatus}`}>
+            Личность: {adminIdentityStatusLabel(triage.identityStatus)}
+          </small>
+          <small className="v17-admin-mobile-meta">
+            {submission.city} · {applicantCountLabel(submission.applicants.length)} · ждет
+            с {submission.updatedAt}
+          </small>
         </span>
         <span className="v17-admin-route-cell">
           <em>Подача</em>
           <strong>{submission.city}</strong>
           <small>{tripDates(submission)}</small>
+        </span>
+        <span className="v17-admin-readiness-cell">
+          <em>Готовность</em>
+          <strong>{submission.completeness.total}%</strong>
         </span>
         <span className="v19-admin-review-reason">
           <em>Причина</em>
@@ -2237,8 +2475,13 @@ function AdminWorkRow({
         <i aria-hidden="true" />
         {facts.status}
       </span>
+      <span className={`v17-admin-triage-pill tone-${triage.band}`}>
+        <strong>{Math.max(0, triage.score)}</strong>
+        <em>{adminTriageBandFilterLabel(triage.band)}</em>
+      </span>
       <Button className="v17-admin-row-action" variant="secondary" onClick={onOpen}>
-        {adminWorkActionLabel(submission, facts.ctaLabel)}
+        <span>{adminWorkActionLabel(submission, facts.ctaLabel, triage)}</span>
+        <small className="v17-admin-triage-reason">{triage.reasons[0]}</small>
       </Button>
     </article>
   );
@@ -2252,7 +2495,14 @@ function isCompactAdminViewport() {
   );
 }
 
-function adminWorkActionLabel(submission: Submission, fallback: string) {
+function adminWorkActionLabel(
+  submission: Submission,
+  fallback: string,
+  triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
+) {
+  if (triage.band === "critical" || triage.band === "attention" || triage.band === "ready") {
+    return triage.nextAction;
+  }
   if (submission.status === "submitted_for_review") return "Проверить";
   return fallback;
 }
