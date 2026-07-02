@@ -9,6 +9,7 @@ import {
   type PassportExtractionAuditEvent,
   type PassportExtractionAuditStore,
   type PassportExtractionClientRequest,
+  type PassportExtractionConfidence,
   type PassportExtractionContractResult,
   type PassportExtractionProvider,
   type PassportExtractionRequest,
@@ -102,12 +103,21 @@ function resultOrResponse<T>(
 
 function passportExtractionResultMetadata(
   request: PassportExtractionRequest,
-  result: { source: string; status: string },
+  result: {
+    confidence?: PassportExtractionConfidence;
+    fields?: unknown[];
+    needsManualReview?: boolean;
+    source: string;
+    status: string;
+  },
 ) {
   return {
+    confidence: result.confidence ?? "low",
     document_fingerprint: passportDocumentFingerprint(request),
-    provider: result.source,
-    result_status: result.status,
+    field_count: Array.isArray(result.fields) ? result.fields.length : 0,
+    needs_manual_review: result.needsManualReview !== false,
+    source: result.source,
+    status: result.status,
   };
 }
 
@@ -227,7 +237,7 @@ export async function handlePassportExtractionRequest(
         options.now?.(),
         {
           document_fingerprint: passportDocumentFingerprint(extractionRequest),
-          failure_kind: "provider_failed",
+          safe_error_class: "provider_failed",
         },
       ),
     );
