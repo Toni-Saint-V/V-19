@@ -123,6 +123,9 @@ Do not run `supabase/seed.sql` against sandbox or production.
 - The edge handler records safe audit events for invoked, denied, quota-limited, quota-failed, provider-failed, and rejected helper calls.
 - The model provider is behind `AiHelperProvider`; provider keys must remain in Supabase function secrets and provider failures return safe `502` errors.
 - Model/provider keys must stay server-side in Supabase function secrets and must not use a `VITE_` prefix.
+- Local model execution is server-side only: `AI_HELPER_PROVIDER_MODE=local_litellm` posts sanitized helper context to a LiteLLM OpenAI-compatible gateway such as a local Ollama-backed runtime. Browser code still calls only `ai-helper`.
+- Provider input is rebuilt from aggregate facts, issue codes, readiness states, and anonymized applicant labels before execution. Raw names, contacts, passports, addresses, free text, storage paths, images, OCR/MRZ text, and document payloads must not reach the provider.
+- Local/demo can use `AI_HELPER_ALLOW_STUB_PROVIDER=true` for `edge-stub` fallback. Staging/production fail closed when provider config is missing or invalid; paid cloud fallback is not part of this contract.
 - The helper may summarize, explain, and draft text only.
 - Deterministic validation remains the source of truth for blockers, submit guards, media state, and export eligibility.
 - Human operators make final media/submission decisions.

@@ -1,4 +1,5 @@
 import {
+  buildAiHelperProviderRequest,
   buildAiHelperAuditEvent,
   buildSafeAiHelperStubResult,
   evaluateAiHelperAccess,
@@ -10,8 +11,11 @@ import {
   type AiHelperAuditStore,
   type AiHelperProvider,
   type AiHelperQuotaStore,
-  type AiHelperRequest,
 } from "./ai-helper-contract.ts";
+import {
+  createAiHelperLocalProvider,
+  type AiHelperLocalProviderEnv,
+} from "./ai-helper-local-provider.ts";
 
 export const aiHelperCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +26,7 @@ export interface AiHelperHandlerOptions {
   auditStore?: AiHelperAuditStore;
   quotaStore?: AiHelperQuotaStore;
   provider?: AiHelperProvider;
+  providerMaxInputChars?: number;
   now?: () => string;
   requestIdFactory?: () => string;
 }
@@ -63,7 +68,7 @@ type AiHelperContractResponse = { ok: true } | { ok: false; response: Response }
 function providerFor(options: AiHelperHandlerOptions): AiHelperProvider {
   return (
     options.provider ?? {
-      generate: (request: AiHelperRequest) =>
+      generate: (request) =>
         Promise.resolve(buildSafeAiHelperStubResult(request.intent, "edge-stub")),
     }
   );
@@ -166,7 +171,9 @@ export async function handleAiHelperRequest(
 
   let result;
   try {
-    result = await providerFor(options).generate(helperRequest);
+    result = await providerFor(options).generate(
+      buildAiHelperProviderRequest(helperRequest, options.providerMaxInputChars),
+    );
   } catch {
     const reason = "AI helper provider failed.";
     const audit = await recordAudit(
@@ -210,7 +217,7 @@ export async function handleAiHelperRequest(
   return jsonResponse(validated.data);
 }
 
-interface SupabaseRestAiHelperEnv {
+interface SupabaseRestAiHelperEnv extends AiHelperLocalProviderEnv {
   SUPABASE_URL?: string;
   SUPABASE_FUNCTION_ADMIN_KEY?: string;
   AI_HELPER_AUDIT_TABLE?: string;
@@ -234,6 +241,16 @@ function authHeaders(adminKey: string): Record<string, string> {
 function parseQuotaRow(value: unknown): SupabaseRpcQuotaRow {
   const row = Array.isArray(value) ? value[0] : value;
   return typeof row === "object" && row !== null ? row : {};
+}
+
+function positiveIntegerFromEnv(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 export function createSupabaseRestAiHelperDependencies(
@@ -271,6 +288,9 @@ export function createSupabaseRestAiHelperDependencies(
         }
       },
     },
+    providerMaxInputChars: positiveIntegerFromEnv(
+      env.AI_HELPER_LITELLM_MAX_INPUT_CHARS,
+    ),
     quotaStore: quotaRpc
       ? {
           async consume(helperRequest) {
@@ -304,5 +324,6 @@ export function createSupabaseRestAiHelperDependencies(
           },
         }
       : undefined,
+    provider: createAiHelperLocalProvider(env, fetchFn),
   };
 }

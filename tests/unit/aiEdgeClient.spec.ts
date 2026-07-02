@@ -62,6 +62,9 @@ describe("AI edge client contract", () => {
         actor,
       },
     });
+    expect(JSON.stringify(mocks.invoke.mock.calls)).not.toMatch(
+      /AI_HELPER|LITELLM|OLLAMA|qwen2\.5|provider/i,
+    );
   });
 
   test("rejects unsafe edge output before UI consumption", async () => {
