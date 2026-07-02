@@ -164,7 +164,7 @@ export function AgentActionsCommandCockpit({
           aria-label="Очередь действий"
           data-testid="agent-action-queue"
         >
-          <PanelHeader label="Очередь" title={actionGroupLabel} />
+          <PanelEyebrow label="Очередь" />
           <div className="v19-actions-queue-list">
             {tasks.map((task) => (
               <ActionTaskCard
@@ -337,6 +337,14 @@ function PanelHeader({ label, title }: { label: string; title: string }) {
     <div className="v19-actions-panel-header">
       <p>{label}</p>
       <h3>{title}</h3>
+    </div>
+  );
+}
+
+function PanelEyebrow({ label }: { label: string }) {
+  return (
+    <div className="v19-actions-panel-header">
+      <p>{label}</p>
     </div>
   );
 }
