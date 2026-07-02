@@ -60,8 +60,10 @@ export interface PassportExtractionOrientation {
 
 export interface PassportExtractionResult {
   applicantIndex?: number;
+  confidence: PassportExtractionConfidence;
   fields: PassportExtractionField[];
   guardrails: string[];
+  needsManualReview: boolean;
   orientation?: PassportExtractionOrientation;
   source: "edge-provider" | "edge-stub" | "local-ocr";
   status: "extracted" | "unavailable";
@@ -80,7 +82,6 @@ export interface PassportExtractionAuditEvent {
   metadata?: Record<string, boolean | number | string | null>;
   reason: string;
   requestId?: string;
-  storagePath?: string;
 }
 
 export type PassportExtractionContractResult<T> =
@@ -245,6 +246,13 @@ export function parsePassportExtractionResult(
       status: 502,
     };
   }
+  if (value.needsManualReview === false) {
+    return {
+      ok: false,
+      safeMessage: "Passport extraction manual review is required.",
+      status: 502,
+    };
+  }
 
   const fields: PassportExtractionField[] = [];
   for (const field of value.fields) {
@@ -262,7 +270,7 @@ export function parsePassportExtractionResult(
       (field.confidence !== "low" &&
         field.confidence !== "medium" &&
         field.confidence !== "high") ||
-      typeof field.needsManualReview !== "boolean"
+      field.needsManualReview !== true
     ) {
       return {
         ok: false,
@@ -309,8 +317,10 @@ export function parsePassportExtractionResult(
         Number.isInteger(value.applicantIndex)
           ? value.applicantIndex
           : undefined,
+      confidence: validatedConfidence(value.confidence, value.status),
       fields: fields.filter((field) => field.value),
       guardrails: validatedGuardrails(value.guardrails),
+      needsManualReview: true,
       orientation,
       source: value.source,
       status: value.status,
@@ -327,13 +337,23 @@ export function safeUnavailablePassportExtractionResult(
 ): PassportExtractionResult {
   return {
     applicantIndex,
+    confidence: "low",
     fields: [],
     guardrails: [...passportExtractionGuardrails],
+    needsManualReview: true,
     source: "edge-stub",
     status: "unavailable",
     summary:
       "Данные не удалось распознать автоматически. Требуется ручная проверка. Проверьте данные вручную.",
   };
+}
+
+function validatedConfidence(
+  value: unknown,
+  status: unknown,
+): PassportExtractionConfidence {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return status === "extracted" ? "medium" : "low";
 }
 
 export function passportExtractionAuditEvent(
