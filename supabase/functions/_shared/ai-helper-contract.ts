@@ -4,10 +4,6 @@ export const aiHelperIntents = [
   "admin_review",
   "correction_draft",
   "export_guard",
-  "questionnaire_review",
-  "issue_draft_assistant",
-  "agent_next_action",
-  "export_readiness_explanation",
 ] as const;
 
 export type AiHelperIntent = (typeof aiHelperIntents)[number];
@@ -127,12 +123,13 @@ const forbiddenOutputPatterns = [
   /вероятност\w*\s+виз/i,
 ];
 
-const adminOnlyAiHelperIntents = [
-  "admin_review",
-  "export_guard",
-  "issue_draft_assistant",
-  "export_readiness_explanation",
-] as const satisfies readonly AiHelperIntent[];
+const aiHelperIntentRolePolicy: Record<AiHelperIntent, readonly AiHelperRole[]> = {
+  readiness_summary: ["agent", "admin"],
+  text_intake_review: ["agent", "admin"],
+  admin_review: ["admin"],
+  correction_draft: ["agent", "admin"],
+  export_guard: ["admin"],
+};
 
 const sanitizedFactKeys = new Set([
   "submissionId",
@@ -226,8 +223,8 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
-function isAdminOnlyAiHelperIntent(intent: AiHelperIntent): boolean {
-  return (adminOnlyAiHelperIntents as readonly string[]).includes(intent);
+function isRoleAllowedForIntent(intent: AiHelperIntent, role: AiHelperRole): boolean {
+  return aiHelperIntentRolePolicy[intent].includes(role);
 }
 
 function isSensitiveKey(key: string): boolean {
@@ -572,10 +569,7 @@ export function evaluateAiHelperAccess(
     return { ok: false, status: 403, safeMessage: "AI helper access is disabled." };
   }
 
-  if (
-    request.actor.role !== "admin" &&
-    isAdminOnlyAiHelperIntent(request.intent)
-  ) {
+  if (!isRoleAllowedForIntent(request.intent, request.actor.role)) {
     return {
       ok: false,
       status: 403,
@@ -667,6 +661,14 @@ export function parseAiHelperResult(
       value.source !== "edge-provider")
   ) {
     return { ok: false, status: 502, safeMessage: "AI helper result is incomplete." };
+  }
+
+  if (value.source === "edge-provider" && value.textReview !== undefined) {
+    return {
+      ok: false,
+      status: 502,
+      safeMessage: "AI helper result is invalid.",
+    };
   }
 
   const result: AiHelperResult = {

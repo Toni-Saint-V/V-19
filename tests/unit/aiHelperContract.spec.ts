@@ -36,9 +36,11 @@ async function json(response: Response): Promise<Record<string, unknown>> {
 function helperRequest(
   intent = "text_intake_review",
   actor: AiHelperActor = agentActor,
+  bearerToken?: string,
 ): Request {
   return new Request("https://edge.local/ai-helper", {
     method: "POST",
+    headers: bearerToken ? { authorization: `Bearer ${bearerToken}` } : undefined,
     body: JSON.stringify({
       intent,
       context: {
@@ -99,6 +101,13 @@ function durableOptions(
     quotaStore: {
       consume: () => Promise.resolve({ remaining: 4 }),
     },
+    authorizer: {
+      authorize: ({ request }) =>
+        Promise.resolve({
+          ok: true,
+          actor: request.actor,
+        }),
+    },
     provider: {
       generate: (request) =>
         Promise.resolve(buildSafeAiHelperStubResult(request.intent, "edge-stub")),
@@ -138,10 +147,8 @@ describe("AI helper shared contract", () => {
     expect(
       parseAiHelperRequest({ intent: "agent_next_action", actor: agentActor }),
     ).toMatchObject({
-      ok: true,
-      data: {
-        intent: "agent_next_action",
-      },
+      ok: false,
+      status: 400,
     });
   });
 
@@ -168,12 +175,8 @@ describe("AI helper shared contract", () => {
       }),
     ).toMatchObject({ ok: true });
     expect(
-      evaluateAiHelperAccess({
-        intent: "issue_draft_assistant",
-        context: {},
-        actor: agentActor,
-      }),
-    ).toMatchObject({ ok: false, status: 403 });
+      parseAiHelperRequest({ intent: "issue_draft_assistant", actor: agentActor }),
+    ).toMatchObject({ ok: false, status: 400 });
   });
 
   test("builds a sanitized provider request without raw context or actor identity", () => {
@@ -305,6 +308,16 @@ describe("AI helper shared contract", () => {
         source: "edge-provider",
       },
     });
+    expect(
+      parseAiHelperResult({
+        ...buildSafeAiHelperStubResult("text_intake_review", "edge-provider"),
+        textReview: { status: "clear" },
+      }),
+    ).toMatchObject({
+      ok: false,
+      status: 502,
+      safeMessage: "AI helper result is invalid.",
+    });
   });
 
   test("fails closed when durable audit is not configured", async () => {
@@ -338,6 +351,15 @@ describe("AI helper shared contract", () => {
         actorId: "admin-1",
         actorRole: "admin",
         requestId: "server-request-1",
+        reason: "provider_attempt",
+        createdAt: "2026-06-14T12:00:00.000Z",
+      },
+      {
+        event: "ai_helper_invoked",
+        intent: "admin_review",
+        actorId: "admin-1",
+        actorRole: "admin",
+        requestId: "server-request-1",
         reason: "edge-stub",
         createdAt: "2026-06-14T12:00:00.000Z",
       },
@@ -349,11 +371,77 @@ describe("AI helper shared contract", () => {
     expect(options.auditEvents[0]?.requestId).not.toBe("client-reused-id");
   });
 
+  test("fails closed without server-side authorization before quota or provider execution", async () => {
+    const provider = { generate: vi.fn() };
+    const quotaStore = { consume: vi.fn(() => Promise.resolve({ remaining: 4 })) };
+    const options = durableOptions({
+      authorizer: undefined,
+      provider,
+      quotaStore,
+    });
+
+    const response = await handleAiHelperRequest(
+      helperRequest("text_intake_review", agentActor),
+      options,
+    );
+
+    expect(response.status).toBe(503);
+    expect(await json(response)).toEqual({
+      error: "AI helper authorization is not configured.",
+    });
+    expect(options.auditEvents).toEqual([
+      expect.objectContaining({
+        actorId: undefined,
+        event: "ai_helper_denied",
+        intent: "text_intake_review",
+        reason: "AI helper authorization is not configured.",
+      }),
+    ]);
+    expect(quotaStore.consume).not.toHaveBeenCalled();
+    expect(provider.generate).not.toHaveBeenCalled();
+  });
+
+  test("uses the server-authorized actor instead of forged request actor", async () => {
+    const provider = { generate: vi.fn() };
+    const quotaStore = { consume: vi.fn(() => Promise.resolve({ remaining: 4 })) };
+    const options = durableOptions({
+      authorizer: {
+        authorize: () =>
+          Promise.resolve({
+            ok: true,
+            actor: { ...agentActor, id: "agent-real" },
+          }),
+      },
+      provider,
+      quotaStore,
+    });
+
+    const response = await handleAiHelperRequest(
+      helperRequest("admin_review", adminActor),
+      options,
+    );
+
+    expect(response.status).toBe(403);
+    expect(await json(response)).toEqual({
+      error: "Admin AI helper access is required.",
+    });
+    expect(options.auditEvents.at(-1)).toMatchObject({
+      actorId: "agent-real",
+      actorRole: "agent",
+      event: "ai_helper_denied",
+      intent: "admin_review",
+    });
+    expect(quotaStore.consume).not.toHaveBeenCalled();
+    expect(provider.generate).not.toHaveBeenCalled();
+  });
+
   test("passes only sanitized provider input after audit and quota gates", async () => {
     const providerRequests: AiHelperProviderRequest[] = [];
+    const auditEventsBeforeProvider: AiHelperAuditEvent[][] = [];
     const options = durableOptions({
       provider: {
         generate: (request) => {
+          auditEventsBeforeProvider.push([...options.auditEvents]);
           providerRequests.push(request);
 
           return Promise.resolve(
@@ -371,6 +459,12 @@ describe("AI helper shared contract", () => {
 
     expect(response.status).toBe(200);
     expect(providerRequests).toHaveLength(1);
+    expect(auditEventsBeforeProvider[0]).toEqual([
+      expect.objectContaining({
+        event: "ai_helper_invoked",
+        reason: "provider_attempt",
+      }),
+    ]);
     expect(providerRequests[0]).toMatchObject({
       intent: "text_intake_review",
       actorRole: "agent",
@@ -523,10 +617,22 @@ describe("AI helper shared contract", () => {
   test("builds Supabase REST dependencies that write audit rows and consume quota RPC", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (url) => {
       const textUrl = String(url);
-      if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
-        return Response.json({ remaining: 3, reset_at: "2026-06-14T13:00:00.000Z" });
+      if (textUrl.endsWith("/auth/v1/user")) {
+        return Response.json({ id: "agent-real" });
       }
-      return new Response(null, { status: 201 });
+      if (textUrl.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-real", role: "agent" }]);
+      }
+      if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
+        return Response.json({
+          remaining: 3,
+          reset_at: "2026-06-14T13:00:00.000Z",
+        });
+      }
+      if (textUrl.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
     });
     const dependencies = createSupabaseRestAiHelperDependencies(
       {
@@ -534,29 +640,58 @@ describe("AI helper shared contract", () => {
         SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
         AI_HELPER_AUDIT_TABLE: "ai_helper_audit_events",
         AI_HELPER_QUOTA_RPC: "consume_ai_helper_quota",
+        AI_HELPER_RUNTIME_ENV: "local",
+        AI_HELPER_PROVIDER_MODE: "stub",
+        AI_HELPER_ALLOW_STUB_PROVIDER: "true",
       },
       fetchMock as typeof fetch,
     );
 
-    const response = await handleAiHelperRequest(helperRequest(), {
-      ...dependencies,
-      requestIdFactory: () => "server-request-1",
-    });
+    const response = await handleAiHelperRequest(
+      helperRequest(undefined, adminActor, "user-token"),
+      {
+        ...dependencies,
+        requestIdFactory: () => "server-request-1",
+      },
+    );
 
     expect(response.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
     expect(String(fetchMock.mock.calls[0][0])).toBe(
+      "https://project.supabase.co/auth/v1/user",
+    );
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      headers: expect.objectContaining({
+        authorization: "Bearer user-token",
+      }),
+    });
+    expect(String(fetchMock.mock.calls[1][0])).toBe(
+      "https://project.supabase.co/rest/v1/profiles?select=id,role&id=eq.agent-real&limit=1",
+    );
+    expect(String(fetchMock.mock.calls[2][0])).toBe(
       "https://project.supabase.co/rest/v1/rpc/consume_ai_helper_quota",
     );
-    expect(String(fetchMock.mock.calls[1][0])).toBe(
+    expect(String(fetchMock.mock.calls[3][0])).toBe(
       "https://project.supabase.co/rest/v1/ai_helper_audit_events",
     );
-    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+    expect(String(fetchMock.mock.calls[4][0])).toBe(
+      "https://project.supabase.co/rest/v1/ai_helper_audit_events",
+    );
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({
+      body: expect.stringContaining("server-request-1"),
+    });
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({
+      body: expect.stringContaining("agent-real"),
+    });
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({
+      body: expect.stringContaining('"p_actor_role":"agent"'),
+    });
+    expect(fetchMock.mock.calls[3][1]).toMatchObject({
       method: "POST",
       body: expect.not.stringContaining("private@example.com"),
     });
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({
-      body: expect.stringContaining("server-request-1"),
+    expect(fetchMock.mock.calls[3][1]).toMatchObject({
+      body: expect.stringContaining("provider_attempt"),
     });
   });
 
@@ -564,11 +699,23 @@ describe("AI helper shared contract", () => {
     const localFetchMock = vi.fn<typeof fetch>(async (url) => {
       const textUrl = String(url);
 
+      if (textUrl.endsWith("/auth/v1/user")) {
+        return Response.json({ id: "agent-1" });
+      }
+
+      if (textUrl.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+
       if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
         return Response.json({ remaining: 3 });
       }
 
-      return new Response(null, { status: 201 });
+      if (textUrl.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+
+      return new Response(null, { status: 404 });
     });
     const localDependencies = createSupabaseRestAiHelperDependencies(
       {
@@ -582,23 +729,38 @@ describe("AI helper shared contract", () => {
       localFetchMock as typeof fetch,
     );
 
-    const localResponse = await handleAiHelperRequest(helperRequest(), {
-      ...localDependencies,
-      requestIdFactory: () => "server-request-1",
-    });
+    const localResponse = await handleAiHelperRequest(
+      helperRequest(undefined, agentActor, "user-token"),
+      {
+        ...localDependencies,
+        requestIdFactory: () => "server-request-1",
+      },
+    );
 
     expect(localResponse.status).toBe(200);
     expect(await json(localResponse)).toMatchObject({ source: "edge-stub" });
-    expect(localFetchMock).toHaveBeenCalledTimes(2);
+    expect(localFetchMock).toHaveBeenCalledTimes(5);
 
     const productionFetchMock = vi.fn<typeof fetch>(async (url) => {
       const textUrl = String(url);
+
+      if (textUrl.endsWith("/auth/v1/user")) {
+        return Response.json({ id: "agent-1" });
+      }
+
+      if (textUrl.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
 
       if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
         return Response.json({ remaining: 3 });
       }
 
-      return new Response(null, { status: 201 });
+      if (textUrl.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+
+      return new Response(null, { status: 404 });
     });
     const productionDependencies = createSupabaseRestAiHelperDependencies(
       {
@@ -611,17 +773,70 @@ describe("AI helper shared contract", () => {
       productionFetchMock as typeof fetch,
     );
 
-    const productionResponse = await handleAiHelperRequest(helperRequest(), {
-      ...productionDependencies,
-      requestIdFactory: () => "server-request-1",
-    });
+    const productionResponse = await handleAiHelperRequest(
+      helperRequest(undefined, agentActor, "user-token"),
+      {
+        ...productionDependencies,
+        requestIdFactory: () => "server-request-1",
+      },
+    );
 
     expect(productionResponse.status).toBe(502);
     expect(await json(productionResponse)).toEqual({
       error: "AI helper provider failed.",
     });
-    expect(productionFetchMock).toHaveBeenCalledTimes(2);
-    expect(productionFetchMock.mock.calls[1][1]).toMatchObject({
+    expect(productionFetchMock).toHaveBeenCalledTimes(5);
+    expect(productionFetchMock.mock.calls[4][1]).toMatchObject({
+      body: expect.stringContaining("ai_helper_provider_failed"),
+    });
+  });
+
+  test("fails closed when AI provider mode or runtime env is missing", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (url) => {
+      const textUrl = String(url);
+
+      if (textUrl.endsWith("/auth/v1/user")) {
+        return Response.json({ id: "agent-1" });
+      }
+
+      if (textUrl.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+
+      if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
+        return Response.json({ remaining: 3 });
+      }
+
+      if (textUrl.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+
+      return new Response(null, { status: 404 });
+    });
+    const dependencies = createSupabaseRestAiHelperDependencies(
+      {
+        SUPABASE_URL: "https://project.supabase.co",
+        SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+        AI_HELPER_QUOTA_RPC: "consume_ai_helper_quota",
+        AI_HELPER_ALLOW_STUB_PROVIDER: "true",
+      },
+      fetchMock as typeof fetch,
+    );
+
+    const response = await handleAiHelperRequest(
+      helperRequest(undefined, agentActor, "user-token"),
+      {
+        ...dependencies,
+        requestIdFactory: () => "server-request-1",
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await json(response)).toEqual({
+      error: "AI helper provider failed.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock.mock.calls[4][1]).toMatchObject({
       body: expect.stringContaining("ai_helper_provider_failed"),
     });
   });
@@ -629,6 +844,14 @@ describe("AI helper shared contract", () => {
   test("calls LiteLLM with sanitized context and server-only provider config", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (url) => {
       const textUrl = String(url);
+
+      if (textUrl.endsWith("/auth/v1/user")) {
+        return Response.json({ id: "agent-1" });
+      }
+
+      if (textUrl.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
 
       if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
         return Response.json({ remaining: 3 });
@@ -654,7 +877,11 @@ describe("AI helper shared contract", () => {
         });
       }
 
-      return new Response(null, { status: 201 });
+      if (textUrl.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+
+      return new Response(null, { status: 404 });
     });
     const dependencies = createSupabaseRestAiHelperDependencies(
       {
@@ -671,10 +898,13 @@ describe("AI helper shared contract", () => {
       fetchMock as typeof fetch,
     );
 
-    const response = await handleAiHelperRequest(helperRequest(), {
-      ...dependencies,
-      requestIdFactory: () => "server-request-1",
-    });
+    const response = await handleAiHelperRequest(
+      helperRequest(undefined, agentActor, "user-token"),
+      {
+        ...dependencies,
+        requestIdFactory: () => "server-request-1",
+      },
+    );
     const providerCall = fetchMock.mock.calls.find(([url]) =>
       String(url).includes("/v1/chat/completions"),
     );
@@ -715,6 +945,73 @@ describe("AI helper shared contract", () => {
     expect(serializedBody).not.toContain("+79990000000");
     expect(serializedBody).not.toContain("72 1190482");
     expect(serializedBody).not.toContain("submission-media");
-    expect(serializedBody).not.toContain("raw applicant context must not be audited");
+    expect(serializedBody).not.toContain(
+      "raw applicant context must not be audited",
+    );
+  });
+
+  test("rejects malformed LiteLLM output instead of normalizing it into success", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (url) => {
+      const textUrl = String(url);
+
+      if (textUrl.endsWith("/auth/v1/user")) {
+        return Response.json({ id: "agent-1" });
+      }
+
+      if (textUrl.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+
+      if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
+        return Response.json({ remaining: 3 });
+      }
+
+      if (textUrl.includes("/v1/chat/completions")) {
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content: "{}",
+              },
+            },
+          ],
+        });
+      }
+
+      if (textUrl.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+
+      return new Response(null, { status: 404 });
+    });
+    const dependencies = createSupabaseRestAiHelperDependencies(
+      {
+        SUPABASE_URL: "https://project.supabase.co",
+        SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+        AI_HELPER_QUOTA_RPC: "consume_ai_helper_quota",
+        AI_HELPER_RUNTIME_ENV: "local",
+        AI_HELPER_PROVIDER_MODE: "local_litellm",
+        AI_HELPER_LITELLM_BASE_URL: "http://127.0.0.1:4000",
+        AI_HELPER_LITELLM_MODEL_GENERAL: "qwen2.5:7b",
+      },
+      fetchMock as typeof fetch,
+    );
+
+    const response = await handleAiHelperRequest(
+      helperRequest(undefined, agentActor, "user-token"),
+      {
+        ...dependencies,
+        requestIdFactory: () => "server-request-1",
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expect(await json(response)).toEqual({
+      error: "AI helper provider failed.",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(fetchMock.mock.calls[5][1]).toMatchObject({
+      body: expect.stringContaining("ai_helper_provider_failed"),
+    });
   });
 });
