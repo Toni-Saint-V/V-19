@@ -75,7 +75,7 @@ export function OperationalSidebar({
               19
             </span>
           </strong>
-          <em>Workspace</em>
+          <em>Рабочая область</em>
         </div>
         {onMobileClose ? (
           <Button

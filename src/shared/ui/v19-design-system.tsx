@@ -483,6 +483,7 @@ export function V19SubmissionCollectionRow({
   kind = "family",
   meta,
   onOpen,
+  operationalDetails = [],
   searchText,
   selected = false,
   statusClassName,
@@ -507,6 +508,7 @@ export function V19SubmissionCollectionRow({
   kind?: "family" | "single";
   meta?: ReactNode;
   onOpen: () => void;
+  operationalDetails?: Array<{ label: string; value: string }>;
   searchText?: string;
   selected?: boolean;
   statusClassName: string;
@@ -532,6 +534,7 @@ export function V19SubmissionCollectionRow({
       : displayRouteLabel,
     fileDetail ? `Файлы: ${fileDetail}` : null,
     completeness ? `Готовность: ${completeness}` : null,
+    ...operationalDetails.map((detail) => `${detail.label}: ${detail.value}`),
   ].filter(Boolean);
 
   return (
@@ -608,6 +611,16 @@ export function V19SubmissionCollectionRow({
           {fileDetail ? <em>{fileDetail}</em> : null}
         </span>
       ) : null}
+      {operationalDetails.length ? (
+        <span className="v19-submission-operational-lines">
+          {operationalDetails.map((detail) => (
+            <span key={`${detail.label}-${detail.value}`}>
+              <strong>{detail.label}</strong>
+              <em>{detail.value}</em>
+            </span>
+          ))}
+        </span>
+      ) : null}
       <span className="v19-submission-progress-ring-cell">
         <V19CircularProgress value={completeness} />
       </span>
@@ -632,6 +645,16 @@ export function V19SubmissionCollectionRow({
           </V19SvgIcon>
         </span>
       </span>
+      {operationalDetails.length ? (
+        <span className="v19-mobile-summary-details">
+          {operationalDetails.map((detail) => (
+            <span key={`mobile-${detail.label}-${detail.value}`}>
+              <strong>{detail.label}</strong>
+              <em>{detail.value}</em>
+            </span>
+          ))}
+        </span>
+      ) : null}
     </button>
   );
 }

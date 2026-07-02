@@ -37,8 +37,8 @@ test.describe("V-19 pilot admin review click flow", () => {
       heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
-    await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Мои подачи" })).toHaveCount(0);
+    await expect(page.locator(".ops-nav").getByRole("button", { name: "Входящие" })).toBeVisible();
+    await expect(page.locator(".ops-nav").getByRole("button", { name: "Мои подачи" })).toHaveCount(0);
 
     await clickWorkspaceButton(page, /Проверка|Работа/);
     await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
@@ -77,6 +77,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
+    await page.getByRole("tab", { name: /Исправления получены/ }).click();
     await openAdminSubmission(page, "Петровы", "Семья Петровых");
     await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
     await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();

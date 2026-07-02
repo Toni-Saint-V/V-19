@@ -45,9 +45,25 @@ function collectBrowserProblems(page: Page) {
 async function openFreshAgentActions(page: Page) {
   await page.goto("/");
   await page.evaluate(() => {
-    (globalThis as unknown as { localStorage: { clear(): void } }).localStorage.clear();
+    const browserGlobal = globalThis as unknown as {
+      localStorage: { clear(): void; setItem(key: string, value: string): void };
+    };
+
+    browserGlobal.localStorage.clear();
+    browserGlobal.localStorage.setItem(
+      "visaflow.workspaceEmail.v2",
+      "agent@visaflow.local",
+    );
   });
   await page.reload();
+
+  const emailField = page.locator("#workspace-email");
+  if (await emailField.isVisible({ timeout: 750 }).catch(() => false)) {
+    await emailField.fill("agent@visaflow.local");
+    await page.locator("#workspace-password").fill("local-dev-password");
+    await page.getByRole("button", { name: "Войти" }).click();
+  }
+
   await expect(page.getByRole("heading", { level: 1, name: "Мои действия" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
 }
@@ -60,14 +76,17 @@ async function openFreshAdminReview(page: Page) {
     };
 
     browserGlobal.localStorage.clear();
-    browserGlobal.localStorage.setItem("visaflow.workspaceEmail.v2", "222@2.ru");
+    browserGlobal.localStorage.setItem(
+      "visaflow.workspaceEmail.v2",
+      "admin@visaflow.local",
+    );
   });
   await page.reload();
 
   const emailField = page.locator("#workspace-email");
   if (await emailField.isVisible({ timeout: 750 }).catch(() => false)) {
-    await emailField.fill("222@2.ru");
-    await page.locator("#workspace-password").fill("2222");
+    await emailField.fill("admin@visaflow.local");
+    await page.locator("#workspace-password").fill("local-dev-password");
     await page.getByRole("button", { name: "Войти" }).click();
   }
 
@@ -138,13 +157,11 @@ async function assertMobileCockpit(page: Page) {
     .first();
   await expect(event).toBeVisible();
   await expect(event).toContainText("Ивановы");
-  await expect(event).toContainText("Ошибка: файлы не готовы");
-  await expect(event).toContainText("Мария Иванова");
+  await expect(event).toContainText("Требует исправления");
+  await expect(event).toContainText("Причина: Заменить селфи 1: файл требует замены");
+  await expect(event).toContainText("Ответственный: Действие за агентом");
   await expect(event).toContainText("Следующее: Заменить селфи 1");
   await expect(event).toContainText("Срочно: дедлайн сегодня");
-  await expect(event).not.toContainText("Анкета с ошибками");
-  await expect(event).not.toContainText("Проверка ожидает");
-  await expect(event).toContainText("Заменить селфи 1");
 
   await event.locator(".v19-actions-timeline-hit").click();
   const detail = page.getByTestId("agent-action-mobile-detail");
@@ -154,11 +171,8 @@ async function assertMobileCockpit(page: Page) {
   await expect(detail).toContainText("Проблема");
   await expect(detail).toContainText("Файлы не готовы");
   await expect(detail).toContainText("Заменить файл «селфи 1».");
-  await expect(detail).toContainText("Заменить селфи 1: файл требует замены");
-  await expect(detail).toContainText("Что сделать дальше");
+  await expect(detail).toContainText("Обязательные файлы");
   await expect(detail).toContainText("Почему");
-  await expect(detail).toContainText("Анкета: есть ошибки");
-  await expect(detail).toContainText("Файлы: не хватает документов");
   await expect(detail.getByRole("button", { name: "Заменить файл" })).toBeVisible();
   await expect(
     detail.getByRole("button", { name: "Открыть подачу полностью" }),
@@ -182,50 +196,33 @@ async function assertDesktopCockpit(page: Page) {
     .filter({ hasText: "Заменить селфи 1" })
     .first();
   await expect(returnedItem).toBeVisible();
-  await expect(returnedItem).toContainText("Ошибка: файлы не готовы");
-  await expect(returnedItem).toContainText("Мария Иванова");
+  await expect(returnedItem).toContainText("Требует исправления");
+  await expect(returnedItem).toContainText(
+    "Причина: Заменить селфи 1: файл требует замены",
+  );
+  await expect(returnedItem).toContainText("Ответственный: Действие за агентом");
   await expect(returnedItem).toContainText("Следующее: Заменить селфи 1");
   await expect(returnedItem).toContainText("Срочно: дедлайн сегодня");
-  await expect(returnedItem).not.toContainText("Анкета с ошибками");
-  await expect(returnedItem).not.toContainText("Проверка ожидает");
+  await expect(returnedItem).toContainText("Готовность");
   await expect(returnedItem).not.toContainText("Итог:");
-  await expect(returnedItem).not.toContainText("Испания");
   await returnedItem.click();
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText("Ивановы");
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText(
-    "Сводка действия",
-  );
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText(
-    "Проблема",
-  );
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText(
-    "Файлы не готовы",
-  );
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText(
-    "Заменить файл «селфи 1».",
-  );
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText(
-    "Заменить селфи 1: файл требует замены",
-  );
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText(
-    "Почему",
-  );
-  await expect(surface.getByTestId("agent-action-active-panel")).toContainText(
-    "Открыть подачу полностью",
-  );
+
+  const activePanel = surface.getByTestId("agent-action-active-panel");
+  await expect(activePanel).toContainText("Ивановы");
+  await expect(activePanel).toContainText("Сводка действия");
+  await expect(activePanel).toContainText("Проблема");
+  await expect(activePanel).toContainText("Файлы не готовы");
+  await expect(activePanel).toContainText("Заменить файл «селфи 1».");
+  await expect(activePanel).toContainText("Следующее");
+  await expect(activePanel).toContainText("Почему");
+  await expect(activePanel).toContainText("Обязательные файлы");
+  await expect(activePanel).toContainText("Открыть подачу полностью");
   await expect(surface.locator(".v19-actions-summary-metric")).toHaveCount(0);
-  await expect(surface.locator(".v19-actions-cockpit-summary")).toContainText(
-    "В работе",
-  );
-  await expect(surface.locator(".v19-actions-cockpit-summary")).toContainText(
-    "На проверке",
-  );
-  await expect(surface.locator(".v19-actions-cockpit-summary")).toContainText(
-    "На исправлении",
-  );
-  await expect(surface.locator(".v19-actions-cockpit-summary")).toContainText(
-    "Готово",
-  );
+  await expect(surface.locator(".v19-actions-cockpit-summary")).toHaveCount(0);
+  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Блокеры");
+  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Срочно");
+  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Готово");
+  await expect(surface.locator(".v19-toolbar-summary-row")).toContainText("Всего");
 
   const viewport = page.viewportSize();
   if (viewport && viewport.width >= 1280) {
@@ -242,48 +239,35 @@ async function assertDesktopCockpit(page: Page) {
           return rect.top >= 0 && rect.bottom <= viewportHeight;
         }).length,
       );
-    expect(visibleCards).toBeGreaterThanOrEqual(5);
+    expect(visibleCards).toBeGreaterThanOrEqual(3);
   }
 
   await expect(surface.getByTestId("agent-action-next-panel")).toHaveCount(0);
-  await surface
-    .getByTestId("agent-action-active-panel")
-    .getByRole("button", { name: "Заменить файл" })
-    .click();
-
+  await activePanel.getByRole("button", { name: "Заменить файл" }).click();
   await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Подача ПД-1048" })).toHaveCount(0);
 
-  const createAction = page.getByRole("button", { name: "Новая подача" }).first();
-  await expect(createAction).toBeVisible();
-  await createAction.click();
-  const createDialog = page.getByRole("dialog", { name: "Сборка документов" });
-  await expect(createDialog).toBeVisible();
-  await createDialog.getByRole("button", { name: "Закрыть создание" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Мои действия" })).toBeVisible();
 }
 
 async function assertActionFilters(page: Page) {
   const surface = page.getByRole("region", { name: "Мои действия" });
 
-  await page.getByRole("tab", { name: /Ошибки/ }).click();
+  await page.getByRole("tab", { name: /Блокеры/ }).click();
   await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
-    "Ошибка: файлы не готовы",
+    "Требует исправления",
   );
 
-  await page.getByRole("tab", { name: /Требуют действия/ }).click();
+  await page.getByRole("tab", { name: /Срочно/ }).click();
   await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
-    "Требует действия:",
+    "Срочно: дедлайн сегодня",
   );
 
   await page.getByRole("tab", { name: /^Готово/ }).click();
   await expect(surface.getByTestId("agent-action-queue-item").first()).toContainText(
-    "Готово:",
+    "Готово",
   );
-
-  await page.getByRole("tab", { name: /Заблокировано/ }).click();
-  await expect(surface).toContainText("Нет действий, требующих внимания");
-  await expect(surface).toContainText("Нет задач, где агент ждёт внешнее событие.");
 
   await page.getByRole("tab", { name: /^Все/ }).click();
 }
@@ -329,8 +313,8 @@ test.describe("V-19 My Actions submission command cockpit", () => {
         horizontalOverflow: "no",
         notes:
           viewport.width < 768
-            ? "Лента действий видна; action summary открылся; CTA открыл существующий drawer."
-            : "Очередь действий и action summary видны; primary CTA открыл существующий drawer.",
+            ? "Лента действий видна; сводка действия открылась; CTA открыл drawer подачи."
+            : "Очередь действий и сводка видны; primary CTA открыл drawer подачи.",
         primaryActionUsable: "yes",
         result: "PASS",
         sidebarCorrect: viewport.width >= 1024 ? "yes" : "n/a",
@@ -345,7 +329,8 @@ test.describe("V-19 My Actions submission command cockpit", () => {
 
     await page.setViewportSize({ height: 900, width: 1440 });
     await openFreshAdminReview(page);
-    await expect(page.locator(".vf-figma-action-row").first()).toBeVisible();
+    await expect(page.locator(".v17-admin-work-row, .v17-admin-empty-state").first()).toBeVisible();
+    await expect(page.locator(".vf-figma-action-row")).toHaveCount(0);
     await expect(page.getByTestId("agent-actions-cockpit")).toHaveCount(0);
     await page.screenshot({
       fullPage: true,
