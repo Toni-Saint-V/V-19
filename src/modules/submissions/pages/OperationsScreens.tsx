@@ -3,7 +3,10 @@ import { flushSync } from "react-dom";
 import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
 import {
   V19EntityTypeSwitch,
+  V19FamilyProfileCard,
+  V19IndividualProfileCard,
   type V19EntityViewMode,
+  type V19MemberStatusTone,
 } from "../../../shared/ui/v19-design-system";
 import {
   buildAgentActionTasks,
@@ -1107,6 +1110,7 @@ export function AgentSubmissionsScreen({
   summary: ReturnType<typeof counts>;
 }) {
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
+  const [entityMode, setEntityMode] = useState<V19EntityViewMode>("all");
   const hasContextRail = visibleSubmission != null && totalSubmissionCount > 0;
   const railDisclosure = useRailDisclosure({
     defaultOpen: defaultContextRailOpen(),
@@ -1118,6 +1122,14 @@ export function AgentSubmissionsScreen({
     () => sortSubmissionsForOperations(agentList, sortMode),
     [agentList, sortMode],
   );
+  const familySubmissions = orderedApplicants.filter(
+    (submission) => submission.type === "family",
+  );
+  const singleSubmissions = orderedApplicants.filter(
+    (submission) => submission.type === "single",
+  );
+  const entityCounts = submissionTypeCounts(orderedApplicants);
+  const profileSubmissions = filterByEntityMode(orderedApplicants, entityMode);
   const agentSortModes: SubmissionSortMode[] = ["priority", "updated", "trip"];
   const agentTabs: Array<{ count: number; id: AgentTab; label: string }> = [
     { count: tabCounts.all, id: "all", label: "Все" },
@@ -1145,7 +1157,7 @@ export function AgentSubmissionsScreen({
     resetHorizontalScroll();
     const frameId = window.requestAnimationFrame(resetHorizontalScroll);
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeTab, orderedApplicants.length, searchQuery, sortMode]);
+  }, [activeTab, entityMode, orderedApplicants.length, searchQuery, sortMode]);
   const hasCityFilter = cityFilter !== "Все города";
   const hasActiveFilters =
     activeTab !== "all" || hasSearchQuery || hasCityFilter || sortMode !== "priority";
@@ -1172,6 +1184,7 @@ export function AgentSubmissionsScreen({
   const resetActiveFilters = () =>
     transitionUiState(() => {
       setSortMode("priority");
+      setEntityMode("all");
       onClearFilters?.();
     });
   function closePanel() {
@@ -1274,6 +1287,85 @@ export function AgentSubmissionsScreen({
     );
   }
 
+  function renderSubmissionSection({
+    emptyText,
+    items,
+    title,
+  }: {
+    emptyText: string;
+    items: Submission[];
+    title: string;
+  }) {
+    return (
+      <section className="v19-submission-type-section" aria-label={title}>
+        <div className="v19-submission-type-label">
+          <strong>{title}</strong>
+          <span>{items.length}</span>
+        </div>
+        {items.length ? (
+          items.map(renderSubmissionRow)
+        ) : (
+          <div className="v19-submission-type-empty" role="status">
+            {emptyText}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  function renderSubmissionProfileCard(submission: Submission) {
+    const footerLabel = [
+      safeSubmissionCity(submission.city),
+      safeTripDates(submission),
+    ].filter(Boolean).join(" · ");
+    const packageLabel = submissionFileStateLabel(submission);
+
+    if (submission.type === "family") {
+      return (
+        <V19FamilyProfileCard
+          ariaLabel={`Открыть семейную подачу: ${formatSubmissionListTitle(
+            submission,
+          )}, ${safeSubmissionId(submission.id)}`}
+          dataSubmissionId={submission.id}
+          footerLabel={footerLabel}
+          key={submission.id}
+          members={submission.applicants.map((applicant) => ({
+            initials: applicantInitials(applicant.fullName),
+            name: applicant.fullName,
+            role: applicantRoleLabel(applicant.role ?? "main"),
+            statusTone: applicantVisualStatus(submission, applicant),
+          }))}
+          packageLabel={packageLabel}
+          title={formatSubmissionListTitle(submission)}
+          totalLabel={`${applicantCountLabel(submission.applicants.length)} · ${statusLabelFor(
+            submission.status,
+          )}`}
+          onMemberOpen={() => openSubmissionFromCard(submission)}
+          onOpen={() => openSubmissionFromCard(submission)}
+        />
+      );
+    }
+
+    const applicant = submission.applicants[0];
+
+    return (
+      <V19IndividualProfileCard
+        ariaLabel={`Открыть заявителя: ${
+          applicant?.fullName ?? formatSubmissionListTitle(submission)
+        }, ${safeSubmissionId(submission.id)}`}
+        dataSubmissionId={submission.id}
+        footerLabel={footerLabel}
+        initials={applicantInitials(applicant?.fullName ?? submission.title)}
+        key={submission.id}
+        packageLabel={packageLabel}
+        statusLabel={statusLabelFor(submission.status)}
+        statusTone={applicant ? applicantVisualStatus(submission, applicant) : "progress"}
+        title={applicant?.fullName ?? formatSubmissionListTitle(submission)}
+        onOpen={() => openSubmissionFromCard(submission)}
+      />
+    );
+  }
+
   const railSubmission = visibleSubmission;
 
   return (
@@ -1316,6 +1408,11 @@ export function AgentSubmissionsScreen({
             tools={toolbarTools}
             value={activeTab}
           />
+          <V19EntityTypeSwitch
+            counts={entityCounts}
+            value={entityMode}
+            onChange={(mode) => transitionUiState(() => setEntityMode(mode))}
+          />
 
           {loading ? (
             <AgentSubmissionsLoadingState />
@@ -1347,12 +1444,42 @@ export function AgentSubmissionsScreen({
                 </Button>
               ) : null}
             </div>
-          ) : (
+          ) : entityMode === "all" ? (
             <div
               className="v19-collection-list v19-submission-grouped-list"
               aria-label="Список подач"
             >
-              {orderedApplicants.map(renderSubmissionRow)}
+              {renderSubmissionSection({
+                emptyText:
+                  "Семейных подач нет. По текущему фильтру ничего не найдено.",
+                items: familySubmissions,
+                title: "Семейные подачи",
+              })}
+              {renderSubmissionSection({
+                emptyText:
+                  "Индивидуальных подач нет. По текущему фильтру ничего не найдено.",
+                items: singleSubmissions,
+                title: "Индивидуальные подачи",
+              })}
+            </div>
+          ) : (
+            <div
+              className={`v19-submission-profile-stage is-${entityMode}`}
+              aria-label={
+                entityMode === "family" ? "Семейные карточки" : "Одиночные карточки"
+              }
+            >
+              {profileSubmissions.length ? (
+                <div className="v19-submission-profile-grid">
+                  {profileSubmissions.map(renderSubmissionProfileCard)}
+                </div>
+              ) : (
+                <div className="v19-submission-type-empty" role="status">
+                  {entityMode === "family"
+                    ? "Семейных подач нет."
+                    : "Индивидуальных подач нет."}
+                </div>
+              )}
             </div>
           )}
         </CardComponent>
@@ -1405,6 +1532,51 @@ export function AgentSubmissionsScreen({
       ) : null}
     </>
   );
+}
+
+function applicantInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function applicantRoleLabel(role: NonNullable<Submission["applicants"][number]["role"]>) {
+  if (role === "main") return "Основной";
+  if (role === "spouse") return "Супруга";
+  if (role === "child") return "Ребенок";
+  return role;
+}
+
+function applicantVisualStatus(
+  submission: Submission,
+  applicant: Submission["applicants"][number],
+): V19MemberStatusTone {
+  const applicantFiles = submission.files.filter(
+    (file) => file.applicantId === applicant.id,
+  );
+
+  if (
+    applicant.questionnaireStatus === "needs_fix" ||
+    applicantFiles.some(
+      (file) => file.status === "missing" || file.status === "needs_replacement",
+    )
+  ) {
+    return "issue";
+  }
+
+  if (
+    applicant.questionnaireStatus === "empty" ||
+    applicant.questionnaireStatus === "partial" ||
+    applicantFiles.some(
+      (file) => file.status === "uploaded" || file.status === "pending_review",
+    )
+  ) {
+    return "progress";
+  }
+
+  return "ready";
 }
 
 function AgentSubmissionsLoadingState() {

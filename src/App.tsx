@@ -692,15 +692,6 @@ function MainApp() {
     role === "agent"
       ? [
           {
-            active: surface === "agent-inbox" && agentInboxMode === "events",
-            count: agentInboxUnreadCount,
-            icon: "В",
-            id: "agent-inbox",
-            label: "Входящие",
-            meta: "События",
-            onClick: showAgentInbox,
-          },
-          {
             active: surface === "agent-actions",
             count: agentActions.summary.open,
             icon: "М",
@@ -1204,17 +1195,6 @@ function MainApp() {
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
       const nextSubmission = firstAgentActionSubmission();
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentInbox() {
-    requestSettingsLeave(() => {
-      setSurface("agent-inbox");
-      setAgentInboxMode("events");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission = searchedAgentQueue[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
