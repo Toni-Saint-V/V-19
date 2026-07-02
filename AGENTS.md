@@ -9,6 +9,24 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Before repo edits, inspect branch/status, relevant files, and current diff when risk or dirty work matters.
 - Do not expand scope silently.
 
+## Codex Skill Context Budget
+- Default preset for ordinary repo work:
+  - `$codex-logic`
+  - `$codex-scope-lock`
+  - `$codex-verdict-gate`
+  - `$verification-before-completion`
+  - `$systematic-debugging`
+- Do not load all skills or plugins by default. Prefer 5-9 total skills for a task, including guardrails.
+- Do not include UI/browser skills for backend or security tasks.
+- Do not include backend/security skills for pure UI polish unless the task actually needs them.
+- Do not include plugins unless the task explicitly needs their capability.
+- If Codex shows the 2% skills context warning, stop before implementation and reduce the active skills/plugins.
+- Task-specific presets:
+  - UI tasks only: `$codex-ui`, `$premium-design-ux-review`, `$premium-ui-polisher`, `$mobile-first-ui-convergence`, `$adaptive-layout-contract`, `$interaction-system-builder`, `$qa-browser-debug`.
+  - Security/backend tasks only: `$security-review`, `$bank-grade-review`, `$typescript-development`, `$spec-driven-development`.
+  - Release/observability tasks only: `$release-observability`, `$verification-before-completion`.
+  - Export/report tasks only: `$data-reports-exports`.
+
 ## Source Truth
 - Stack: React 19, Vite 8, strict TypeScript, custom CSS/UI, Supabase JS, Vitest, Playwright.
 - Routing: local application state only. Do not add React Router or another routing framework without an explicit product need.
@@ -50,7 +68,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Title plus hamburger must use the same tokenized topbar control system as the toolbar: one shared surface, project font, dark gray menu button, `40px` control, `10px` radius.
 - Mobile cell contract: agent/review list surfaces have exactly two reusable mobile cell variants. Variant A: top line ID, main name/title, people count badge on the right only for family rows, route line with city dot dates, divider, then a dark-gray action button aligned right at about one quarter width. Variant B: same shell but bottom action/status text is inline muted/semantic instead of a right button. The extra applicant/family card grid form belongs only to `Выгрузка` and must use the same baseline colors/tokens.
 - Radius/motion tokens: controls `10px`, segmented `11px`, rows/cards `15px`, panels `16-18px`, transitions `140-180ms`, reduced-motion safe.
-- For UI/component replacement or polish, use at least four relevant UI skills, keep changes screen-scoped, capture fresh desktop/mobile runtime proof, write full `premium-design-ux-review`, and fix all Critical/High/Medium findings before the next screen.
+- For UI/component replacement or polish, use the UI task preset only when the current task is UI-scoped, keep changes screen-scoped, capture fresh desktop/mobile runtime proof, write `premium-design-ux-review` when used, and fix all Critical/High/Medium findings before the next screen.
 
 ## Verification
 - Use targeted proof first: file inspection, focused scripts/tests, typecheck/build when relevant, browser/runtime proof for UI, screenshots under `docs/qa/`.
