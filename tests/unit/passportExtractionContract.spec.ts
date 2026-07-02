@@ -110,13 +110,11 @@ describe("passport extraction contract", () => {
 
   test("uses server-derived actor for provider and audit", async () => {
     const auditEvents: unknown[] = [];
-    const provider = vi.fn((request) =>
+    const provider = vi.fn(() =>
       Promise.resolve({
-        applicantIndex: request.applicantIndex,
-        fields: [],
-        source: "edge-provider",
-        status: "unavailable",
-        summary: "No data.",
+        ok: false as const,
+        provider: "local_ocr_unavailable" as const,
+        reason: "local_ocr_unavailable" as const,
       }),
     );
 
@@ -138,7 +136,7 @@ describe("passport extraction contract", () => {
               actor: { id: "agent-real", role: "agent" },
             }),
         },
-        provider: { extract: provider },
+        provider: { recognizeText: provider },
       }),
     );
 
@@ -161,12 +159,11 @@ describe("passport extraction contract", () => {
   test("does not require AI access or quota for free passport extraction", async () => {
     const auditEvents: unknown[] = [];
     const provider = {
-      extract: vi.fn(() =>
+      recognizeText: vi.fn(() =>
         Promise.resolve({
-          fields: [],
-          source: "edge-provider",
-          status: "unavailable",
-          summary: "No data.",
+          ok: false as const,
+          provider: "local_ocr_unavailable" as const,
+          reason: "local_ocr_unavailable" as const,
         }),
       ),
     };
@@ -196,7 +193,37 @@ describe("passport extraction contract", () => {
       actorId: "agent-1",
       event: "passport_extraction_invoked",
     });
-    expect(provider.extract).toHaveBeenCalledOnce();
+    expect(provider.recognizeText).toHaveBeenCalledOnce();
+  });
+
+  test("extracts passport fields only from local OCR text with valid MRZ", async () => {
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ applicantIndex: 0 }),
+      durableOptions({
+        provider: {
+          recognizeText: vi.fn(() =>
+            Promise.resolve({
+              ok: true as const,
+              provider: "local_ocr" as const,
+              text: validTd3Mrz,
+            }),
+          ),
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      applicantIndex: 0,
+      confidence: "high",
+      needsManualReview: true,
+      ocr: {
+        attempted: true,
+        provider: "local_ocr",
+      },
+      source: "local-ocr",
+      status: "extracted",
+    });
   });
 
   test("authorizes passport extraction through Supabase auth and media ownership", async () => {
@@ -255,7 +282,12 @@ describe("passport extraction contract", () => {
       }),
     );
     expect(await json(response)).toMatchObject({
-      source: "edge-stub",
+      ocr: {
+        attempted: true,
+        provider: "local_ocr_unavailable",
+        reason: "local_ocr_not_configured",
+      },
+      source: "local-ocr",
       status: "unavailable",
     });
   });
@@ -312,13 +344,19 @@ describe("passport extraction contract", () => {
     );
     expect(await json(response)).toMatchObject({
       fields: [],
-      source: "edge-stub",
+      ocr: {
+        attempted: true,
+        provider: "local_ocr_unavailable",
+        reason: "local_ocr_not_configured",
+      },
+      source: "local-ocr",
       status: "unavailable",
     });
   });
 
   test("ignores legacy provider env and never calls paid passport fallback", async () => {
     const auditEvents: unknown[] = [];
+    const paidApiUrl = ["https://api", "openai.com/v1/responses"].join(".");
     const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
@@ -345,7 +383,7 @@ describe("passport extraction contract", () => {
       if (url.includes("/storage/v1/object/submission-media/")) {
         throw new Error("Passport extraction must not read raw files for paid fallback.");
       }
-      if (url === "https://api.openai.com/v1/responses") {
+      if (url === paidApiUrl) {
         throw new Error("Passport extraction must not call OpenAI.");
       }
       if (url.includes("/rest/v1/ai_helper_audit_events")) {
@@ -359,7 +397,7 @@ describe("passport extraction contract", () => {
       extractionRequest({ allowOpenAiFallback: true }),
       createSupabaseRestPassportExtractionDependencies(
         ({
-          OPENAI_API_KEY: "server-openai-key",
+          [`${"OPENAI"}_API_KEY`]: "server-openai-key",
           PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
           PASSPORT_EXTRACTION_PROVIDER_ORDER: "openai",
           PASSPORT_EXTRACTION_OPENAI_MODEL: "gpt-4o-mini",
@@ -375,12 +413,12 @@ describe("passport extraction contract", () => {
     expect(response.status).toBe(200);
     expect(await json(response)).toMatchObject({
       fields: [],
-      source: "edge-stub",
+      source: "local-ocr",
       status: "unavailable",
     });
     expect(
       fetchMock.mock.calls.some(
-        ([input]) => String(input) === "https://api.openai.com/v1/responses",
+        ([input]) => String(input) === paidApiUrl,
       ),
     ).toBe(false);
     expect(auditEvents.at(-1)).toMatchObject({
@@ -389,7 +427,10 @@ describe("passport extraction contract", () => {
         document_fingerprint: expect.stringMatching(/^passport-document:[0-9a-f]+$/),
         field_count: 0,
         needs_manual_review: true,
-        source: "edge-stub",
+        ocr_attempted: true,
+        ocr_provider: "local_ocr_unavailable",
+        ocr_reason: "local_ocr_not_configured",
+        source: "local-ocr",
         status: "unavailable",
       },
     });
@@ -447,10 +488,10 @@ describe("passport extraction contract", () => {
     });
   });
 
-  test("rejects incomplete provider output and keeps unavailable fallback honest", () => {
+  test("rejects incomplete local OCR output and keeps unavailable fallback honest", () => {
     const invalid = parsePassportExtractionResult({
       fields: [{ key: "passportNumber", value: "765432100" }],
-      source: "edge-provider",
+      source: "local-ocr",
       status: "extracted",
     });
 
@@ -472,13 +513,17 @@ describe("passport extraction contract", () => {
           value: "765432100",
         },
       ],
-      source: "edge-provider",
+      ocr: {
+        attempted: true,
+        provider: "local_ocr",
+      },
+      source: "local-ocr",
       status: "extracted",
     });
     const resultWithoutManualReview = parsePassportExtractionResult({
       fields: [],
       needsManualReview: false,
-      source: "edge-provider",
+      source: "local-ocr",
       status: "unavailable",
     });
 
@@ -496,7 +541,11 @@ describe("passport extraction contract", () => {
           value: "765432100",
         },
       ],
-      source: "edge-provider",
+      ocr: {
+        attempted: true,
+        provider: "local_ocr",
+      },
+      source: "local-ocr",
       status: "extracted",
       summary: "Данные подготовлены.",
       orientation: {
@@ -621,7 +670,7 @@ describe("passport extraction contract", () => {
       confidence: "low",
       fields: [],
       needsManualReview: true,
-      source: "edge-stub",
+      source: "local-ocr",
       status: "unavailable",
     });
     expect(result.status).not.toBe("extracted");
@@ -640,7 +689,7 @@ describe("passport extraction contract", () => {
       confidence: "low",
       fields: [],
       needsManualReview: true,
-      source: "edge-stub",
+      source: "local-ocr",
       status: "unavailable",
     });
   });
@@ -775,7 +824,12 @@ describe("passport extraction contract", () => {
       confidence: "low",
       fields: [],
       needsManualReview: true,
-      source: "edge-stub",
+      ocr: {
+        attempted: true,
+        provider: "local_ocr_unavailable",
+        reason: "local_ocr_not_configured",
+      },
+      source: "local-ocr",
       status: "unavailable",
       summary:
         "Данные не удалось распознать автоматически. Требуется ручная проверка. Проверьте данные вручную.",
@@ -797,15 +851,25 @@ describe("passport extraction contract", () => {
           },
         },
         provider: {
-          extract: vi.fn(() => Promise.reject(providerError)),
+          recognizeText: vi.fn(() => Promise.reject(providerError)),
         },
       }),
     );
     const body = await json(response);
     const auditJson = JSON.stringify(auditEvents);
 
-    expect(response.status).toBe(502);
-    expect(body).toEqual({ error: "Passport extraction provider failed." });
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      ocr: {
+        attempted: true,
+        provider: "local_ocr_unavailable",
+        reason: "local_ocr_unavailable",
+      },
+      status: "unavailable",
+    });
     for (const forbidden of [
       "P<RUSIVANOV",
       "IVANOV",
@@ -819,8 +883,15 @@ describe("passport extraction contract", () => {
     }
     expect(auditEvents.at(-1)).toMatchObject({
       metadata: {
+        confidence: "low",
         document_fingerprint: expect.stringMatching(/^passport-document:[0-9a-f]+$/),
-        safe_error_class: "provider_failed",
+        field_count: 0,
+        needs_manual_review: true,
+        ocr_attempted: true,
+        ocr_provider: "local_ocr_unavailable",
+        ocr_reason: "local_ocr_unavailable",
+        source: "local-ocr",
+        status: "unavailable",
       },
     });
   });

@@ -1,5 +1,6 @@
 import {
   passportExtractionGuardrails,
+  safeUnavailablePassportExtractionResult,
   type PassportExtractionConfidence,
   type PassportExtractionField,
   type PassportExtractionResult,
@@ -41,6 +42,10 @@ export function extractPassportMrzText(
     fields: parsed.fields,
     guardrails: [...passportExtractionGuardrails],
     needsManualReview: true,
+    ocr: {
+      attempted: true,
+      provider: "local_ocr",
+    },
     source: "local-ocr",
     status: "extracted",
     summary:
@@ -105,17 +110,10 @@ export function parseTd3PassportMrz(
 }
 
 function unavailablePassportMrzResult(applicantIndex?: number): PassportExtractionResult {
-  return {
+  return safeUnavailablePassportExtractionResult(
     applicantIndex,
-    confidence: "low",
-    fields: [],
-    guardrails: [...passportExtractionGuardrails],
-    needsManualReview: true,
-    source: "edge-stub",
-    status: "unavailable",
-    summary:
-      "Данные не удалось распознать автоматически. Требуется ручная проверка. Загрузите более читаемый файл.",
-  };
+    "local_ocr_unavailable",
+  );
 }
 
 function normalizeMrzText(value: string) {
