@@ -32,7 +32,6 @@ export interface PassportDocumentRef {
 
 export interface PassportExtractionRequest {
   actor: PassportExtractionActor;
-  allowOpenAiFallback?: boolean;
   document: PassportDocumentRef;
   applicantIndex?: number;
   requestId?: string;
@@ -40,7 +39,6 @@ export interface PassportExtractionRequest {
 }
 
 export interface PassportExtractionClientRequest {
-  allowOpenAiFallback?: boolean;
   document: PassportDocumentRef;
   applicantIndex?: number;
   requestId?: string;
@@ -64,9 +62,8 @@ export interface PassportExtractionResult {
   applicantIndex?: number;
   fields: PassportExtractionField[];
   guardrails: string[];
-  openAiAttempted?: boolean;
   orientation?: PassportExtractionOrientation;
-  source: "edge-provider" | "edge-stub" | "local-ocr" | "openai-vision";
+  source: "edge-provider" | "edge-stub" | "local-ocr";
   status: "extracted" | "unavailable";
   summary: string;
 }
@@ -167,10 +164,6 @@ export function parsePassportExtractionRequest(
         mimeType: document.mimeType as PassportDocumentRef["mimeType"],
         sizeBytes: document.sizeBytes,
       },
-      allowOpenAiFallback:
-        typeof value.allowOpenAiFallback === "boolean"
-          ? value.allowOpenAiFallback
-          : undefined,
       requestId: typeof value.requestId === "string" ? value.requestId : undefined,
       submissionId:
         typeof value.submissionId === "string" ? value.submissionId : undefined,
@@ -244,8 +237,7 @@ export function parsePassportExtractionResult(
   if (
     value.source !== "edge-provider" &&
     value.source !== "edge-stub" &&
-    value.source !== "local-ocr" &&
-    value.source !== "openai-vision"
+    value.source !== "local-ocr"
   ) {
     return {
       ok: false,
@@ -319,10 +311,6 @@ export function parsePassportExtractionResult(
           : undefined,
       fields: fields.filter((field) => field.value),
       guardrails: validatedGuardrails(value.guardrails),
-      openAiAttempted:
-        typeof value.openAiAttempted === "boolean"
-          ? value.openAiAttempted
-          : value.source === "openai-vision",
       orientation,
       source: value.source,
       status: value.status,
@@ -344,7 +332,7 @@ export function safeUnavailablePassportExtractionResult(
     source: "edge-stub",
     status: "unavailable",
     summary:
-      "Распознавание паспорта недоступно. Заполните данные вручную и проверьте документ.",
+      "Данные не удалось распознать автоматически. Требуется ручная проверка. Проверьте данные вручную.",
   };
 }
 
@@ -361,16 +349,10 @@ export function passportExtractionAuditEvent(
     createdAt,
     event,
     metadata: {
-      fallback_allowed:
-        typeof request?.allowOpenAiFallback === "boolean"
-          ? request.allowOpenAiFallback
-          : null,
-      storage_path: request?.document?.path ?? null,
       ...metadata,
     },
     reason,
     requestId: request?.requestId,
-    storagePath: request?.document?.path,
   };
 }
 
