@@ -197,7 +197,7 @@ describe("AI helper shared contract", () => {
         applicants: [
           {
             name: "Artem Sokolov",
-            role: "Applicant",
+            role: "main",
             email: "artem@example.com",
             passport: "72 1190482",
             fields: 65,
@@ -228,7 +228,6 @@ describe("AI helper shared contract", () => {
       context: {
         redaction: "raw_context_removed",
         facts: {
-          submissionId: "VF-PII",
           status: "draft",
           fields: 65,
         },
@@ -240,7 +239,7 @@ describe("AI helper shared contract", () => {
         applicants: [
           expect.objectContaining({
             label: "applicant_1",
-            role: "Applicant",
+            role: "main",
             fieldCompletion: 65,
             mediaUploaded: 1,
             mediaRequired: 4,
@@ -250,6 +249,7 @@ describe("AI helper shared contract", () => {
     });
     expect(serialized).not.toContain("agent-1");
     expect(serialized).not.toContain("client-request-1");
+    expect(serialized).not.toContain("VF-PII");
     expect(serialized).not.toContain("private@example.com");
     expect(serialized).not.toContain("+79990000000");
     expect(serialized).not.toContain("72 1190482");
@@ -257,6 +257,168 @@ describe("AI helper shared contract", () => {
     expect(serialized).not.toContain("raw questionnaire paragraph");
     expect(serialized).not.toContain("submission-media");
     expect(serialized).not.toContain("Upload passport scan");
+  });
+
+  test("drops non-allowlisted provider signals that could smuggle PII tokens", () => {
+    const parsed = parseAiHelperRequest({
+      intent: "text_intake_review",
+      actor: agentActor,
+      context: {
+        status: "Sokolov",
+        state: "Petrov",
+        severity: "Ivanov",
+        code: "Smirnov",
+        issueCode: "Kozlov",
+        type: "family",
+        countryCode: "ES",
+        priority: 721190482,
+        fields: 88,
+        mediaAccepted: 721190482,
+        canExport: false,
+        applicants: [
+          {
+            role: "Volkova",
+            status: "Mikhailova",
+            fields: 88,
+            findings: [
+              {
+                code: "Fedorov",
+                issueCode: "Morozov",
+                severity: "Semenov",
+              },
+            ],
+          },
+        ],
+        issues: [
+          {
+            code: "Pavlov",
+            issueCode: "Egorov",
+            severity: "Nikolaev",
+            status: "Vasilev",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const providerRequest = buildAiHelperProviderRequest(parsed.data);
+    const serialized = JSON.stringify(providerRequest);
+
+    expect(providerRequest.context).toMatchObject({
+      facts: {
+        type: "family",
+        countryCode: "ES",
+        fields: 88,
+        canExport: false,
+      },
+      issueCodes: [],
+      readinessStates: [],
+      applicants: [
+        expect.objectContaining({
+          label: "applicant_1",
+          fieldCompletion: 88,
+          issueCodes: [],
+        }),
+      ],
+    });
+    expect(providerRequest.context.applicants[0]).not.toHaveProperty("role");
+    expect(providerRequest.context.applicants[0]).not.toHaveProperty(
+      "readinessState",
+    );
+    for (const unsafeToken of [
+      "Sokolov",
+      "Petrov",
+      "Ivanov",
+      "Smirnov",
+      "Kozlov",
+      "Volkova",
+      "Mikhailova",
+      "Fedorov",
+      "Morozov",
+      "Semenov",
+      "Pavlov",
+      "Egorov",
+      "Nikolaev",
+      "Vasilev",
+      "721190482",
+    ]) {
+      expect(serialized).not.toContain(unsafeToken);
+    }
+    expect(providerRequest.context.facts).not.toHaveProperty("priority");
+    expect(providerRequest.context.facts).not.toHaveProperty("mediaAccepted");
+  });
+
+  test("keeps only known provider enum signals and issue codes", () => {
+    const parsed = parseAiHelperRequest({
+      intent: "text_intake_review",
+      actor: agentActor,
+      context: {
+        type: "single",
+        status: "ready_for_export",
+        state: "ready",
+        severity: "blocking",
+        code: "invalid_email",
+        issueCode: "missing_media",
+        country: "Испания",
+        countryCode: "ES",
+        submissionCity: "Москва",
+        fields: 92,
+        applicants: [
+          {
+            role: "spouse",
+            status: "complete",
+            fields: 92,
+            findings: [{ code: "weak_phone", severity: "warning" }],
+          },
+        ],
+        issues: [
+          {
+            code: "blocking_issue_open",
+            severity: "blocker",
+            status: "open",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const providerRequest = buildAiHelperProviderRequest(parsed.data);
+
+    expect(providerRequest.context).toMatchObject({
+      facts: {
+        type: "single",
+        status: "ready_for_export",
+        country: "Испания",
+        countryCode: "ES",
+        submissionCity: "Москва",
+        fields: 92,
+      },
+      issueCodes: expect.arrayContaining([
+        "invalid_email",
+        "missing_media",
+        "weak_phone",
+        "blocking_issue_open",
+      ]),
+      readinessStates: expect.arrayContaining([
+        "status:ready_for_export",
+        "state:ready",
+        "severity:blocking",
+        "status:open",
+        "severity:blocker",
+      ]),
+      applicants: [
+        expect.objectContaining({
+          label: "applicant_1",
+          role: "spouse",
+          readinessState: "status:complete",
+          issueCodes: ["weak_phone"],
+        }),
+      ],
+    });
   });
 
   test("exposes a fail-closed rate limit boundary", () => {
@@ -471,7 +633,6 @@ describe("AI helper shared contract", () => {
       context: {
         redaction: "raw_context_removed",
         facts: {
-          submissionId: "VF-1",
           status: "draft",
           fields: 70,
         },
@@ -480,6 +641,7 @@ describe("AI helper shared contract", () => {
     });
     expect(serialized).not.toContain("agent-1");
     expect(serialized).not.toContain("client-reused-id");
+    expect(serialized).not.toContain("VF-1");
     expect(serialized).not.toContain("private@example.com");
     expect(serialized).not.toContain("+79990000000");
     expect(serialized).not.toContain("72 1190482");

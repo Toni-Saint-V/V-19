@@ -162,6 +162,141 @@ const sanitizedFactKeys = new Set([
   "canExport",
 ]);
 
+const knownSubmissionTypes = new Set(["single", "family"]);
+
+const knownCountryCodes = new Set(["ES"]);
+
+const knownCountryLabels = new Set(["Испания"]);
+
+const knownCities = new Set(["Москва", "Санкт-Петербург", "Казань"]);
+
+const knownApplicantRoles = new Set(["main", "spouse", "child"]);
+
+const knownSeverityValues = new Set([
+  "blocking",
+  "blocker",
+  "warning",
+  "info",
+  "note",
+]);
+
+const knownStateValues = new Set([
+  "draft",
+  "in_progress",
+  "submitted_for_review",
+  "returned",
+  "corrections_received",
+  "ready_for_export",
+  "exported",
+  "requires_action",
+  "filling",
+  "ready_for_review",
+  "waiting_review",
+  "in_review",
+  "accepted",
+  "ready_for_excel",
+  "attention_required",
+  "sent_to_appointment",
+  "appointment_scheduled",
+  "completed",
+  "open",
+  "fixed_by_agent",
+  "closed_by_admin",
+  "empty",
+  "partial",
+  "complete",
+  "needs_fix",
+  "confirmed",
+  "needs_review",
+  "missing",
+  "uploaded",
+  "needs_replacement",
+  "pending_review",
+  "idle",
+  "checking",
+  "ready",
+  "failed",
+  "unavailable",
+  "not_ready",
+  "file_generated",
+  "file_downloaded",
+  "marked_exported",
+  "clear",
+  "needs_correction",
+]);
+
+const knownIssueCodes = new Set([
+  "missing_required_text",
+  "missing_conditional_text",
+  "placeholder_text",
+  "invalid_email",
+  "weak_phone",
+  "invalid_date_format",
+  "invalid_birth_date",
+  "birth_date_in_future",
+  "passport_expired_before_travel",
+  "passport_issued_after_expiry",
+  "date_order_inconsistent",
+  "duration_dates_mismatch",
+  "non_numeric_duration",
+  "weak_passport_number",
+  "passport_number_unexpected_format",
+  "passport_validity_too_short_after_departure",
+  "passport_validity_period_unexpected",
+  "latin_text_expected",
+  "family_trip_mismatch",
+  "residence_submission_city_mismatch",
+  "home_address_incomplete",
+  "host_country_unexpected",
+  "spanish_host_postal_invalid",
+  "spanish_host_phone_unexpected",
+  "appointment_after_travel_date",
+  "minor_occupation_age_mismatch",
+  "employer_contact_matches_applicant",
+  "employer_address_matches_home",
+  "submission_applicant_country_mismatch",
+  "submission_applicant_city_mismatch",
+  "trip_dates_not_machine_readable",
+  "travel_date_outside_trip_dates",
+  "duplicate_passport",
+  "shared_contact_requires_review",
+  "name_too_short",
+  "family_role_unconfirmed",
+  "missing_media",
+  "missing_passport_scan",
+  "missing_selfie",
+  "missing_selfie_2",
+  "media_needs_replacement",
+  "questionnaire_incomplete",
+  "blocking_issue_open",
+  "acceptance_blocked",
+  "export_not_ready",
+]);
+
+const safeNumericFactKeys = new Set([
+  "fields",
+  "fieldCompletion",
+  "media",
+  "mediaRequired",
+  "mediaAccepted",
+  "mediaUploaded",
+  "applicantCount",
+  "peopleCount",
+  "openIssueCount",
+  "blockingIssueCount",
+  "warningIssueCount",
+  "exportableCount",
+  "readyCount",
+]);
+
+const safeBooleanFactKeys = new Set([
+  "requiresAction",
+  "canSubmit",
+  "canExport",
+]);
+
+const maxSafeAggregateNumber = 10000;
+
 const countArrayKeys = new Map([
   ["applicants", "applicantCount"],
   ["issues", "issueCount"],
@@ -207,8 +342,6 @@ const sensitiveValuePatterns = [
   /storage\/v1/i,
 ];
 
-const safeSignalPattern = /^[\p{L}\p{N}_.:-]{1,80}$/u;
-
 export function isAiHelperIntent(value: unknown): value is AiHelperIntent {
   return (
     typeof value === "string" && (aiHelperIntents as readonly string[]).includes(value)
@@ -235,38 +368,93 @@ function isSensitiveString(value: string): boolean {
   return sensitiveValuePatterns.some((pattern) => pattern.test(value));
 }
 
-function sanitizeSignalString(value: string): string | null {
+function valueFromAllowlist(
+  value: string,
+  allowlist: ReadonlySet<string>,
+): string | null {
   const trimmed = value.trim();
 
-  if (
-    !trimmed ||
-    !safeSignalPattern.test(trimmed) ||
-    isSensitiveString(trimmed)
-  ) {
+  if (!trimmed || isSensitiveString(trimmed) || !allowlist.has(trimmed)) {
     return null;
   }
 
   return trimmed;
 }
 
-function safeSanitizedValue(value: unknown): AiHelperSanitizedValue | null {
-  if (typeof value === "boolean") {
-    return value;
+function allowlistedSignalForKey(key: string, value: string): string | null {
+  if (key === "code" || key === "issueCode" || key === "reasonCode") {
+    return valueFromAllowlist(value, knownIssueCodes);
   }
 
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
+  if (key === "role" || key === "applicantRole") {
+    return valueFromAllowlist(value, knownApplicantRoles);
   }
 
-  if (typeof value === "string") {
-    return sanitizeSignalString(value);
+  if (key === "severity") {
+    return valueFromAllowlist(value, knownSeverityValues);
+  }
+
+  if (key === "status" || key === "state" || key === "readinessState") {
+    return valueFromAllowlist(value, knownStateValues);
+  }
+
+  if (key === "type" || key === "submissionType") {
+    return valueFromAllowlist(value, knownSubmissionTypes);
+  }
+
+  if (key === "countryCode") {
+    return valueFromAllowlist(value, knownCountryCodes);
+  }
+
+  if (key === "country" || key === "countryLabel") {
+    return valueFromAllowlist(value, knownCountryLabels);
+  }
+
+  if (
+    key === "destinationCity" ||
+    key === "consulateCity" ||
+    key === "submissionCity"
+  ) {
+    return valueFromAllowlist(value, knownCities);
   }
 
   return null;
 }
 
-function addUnique(target: string[], value: string, limit: number): void {
-  const safeValue = sanitizeSignalString(value);
+function safeSanitizedValue(
+  key: string,
+  value: unknown,
+): AiHelperSanitizedValue | null {
+  if (typeof value === "boolean") {
+    return safeBooleanFactKeys.has(key) ? value : null;
+  }
+
+  if (typeof value === "number" && isSafeAggregateNumber(value)) {
+    return safeNumericFactKeys.has(key) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    return allowlistedSignalForKey(key, value);
+  }
+
+  return null;
+}
+
+function isSafeAggregateNumber(value: number): boolean {
+  return (
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= maxSafeAggregateNumber
+  );
+}
+
+function addUniqueAllowlisted(
+  target: string[],
+  key: string,
+  value: string,
+  limit: number,
+): void {
+  const safeValue = allowlistedSignalForKey(key, value);
 
   if (safeValue && !target.includes(safeValue) && target.length < limit) {
     target.push(safeValue);
@@ -281,8 +469,7 @@ function addCount(
 ): void {
   if (
     Object.keys(target).length < limit &&
-    Number.isFinite(value) &&
-    value >= 0
+    isSafeAggregateNumber(value)
   ) {
     target[key] = value;
   }
@@ -298,7 +485,7 @@ function addFact(
     return;
   }
 
-  const safeValue = safeSanitizedValue(value);
+  const safeValue = safeSanitizedValue(key, value);
 
   if (safeValue !== null) {
     target[key] = safeValue;
@@ -319,7 +506,7 @@ function sanitizeApplicant(
   };
 
   if (typeof value.role === "string") {
-    const role = sanitizeSignalString(value.role);
+    const role = allowlistedSignalForKey("role", value.role);
 
     if (role) {
       applicant.role = role;
@@ -330,7 +517,7 @@ function sanitizeApplicant(
     const state = value[key];
 
     if (typeof state === "string") {
-      const readinessState = sanitizeSignalString(state);
+      const readinessState = allowlistedSignalForKey(key, state);
 
       if (readinessState) {
         applicant.readinessState = `${key}:${readinessState}`;
@@ -349,7 +536,7 @@ function sanitizeApplicant(
   ] as const) {
     const numberValue = value[sourceKey];
 
-    if (typeof numberValue === "number" && Number.isFinite(numberValue)) {
+    if (typeof numberValue === "number" && isSafeAggregateNumber(numberValue)) {
       applicant[targetKey] = numberValue;
     }
   }
@@ -414,7 +601,7 @@ function collectSafeSignals(
 
         if (sanitizedApplicant) {
           for (const issueCode of sanitizedApplicant.issueCodes) {
-            addUnique(context.issueCodes, issueCode, 80);
+            addUniqueAllowlisted(context.issueCodes, "code", issueCode, 80);
           }
 
           context.applicants.push(sanitizedApplicant);
@@ -432,7 +619,7 @@ function collectSafeSignals(
       continue;
     }
 
-    if (sanitizedFactKeys.has(key)) {
+    if (depth === 0 && sanitizedFactKeys.has(key)) {
       addFact(context.facts, key, item, 50);
     }
 
@@ -440,7 +627,7 @@ function collectSafeSignals(
       (key === "code" || key === "issueCode" || key === "reasonCode") &&
       typeof item === "string"
     ) {
-      addUnique(context.issueCodes, item, 80);
+      addUniqueAllowlisted(context.issueCodes, key, item, 80);
     }
 
     if (
@@ -450,7 +637,15 @@ function collectSafeSignals(
         key === "severity") &&
       typeof item === "string"
     ) {
-      addUnique(context.readinessStates, `${key}:${item}`, 80);
+      const readinessState = allowlistedSignalForKey(key, item);
+
+      if (
+        readinessState &&
+        !context.readinessStates.includes(`${key}:${readinessState}`) &&
+        context.readinessStates.length < 80
+      ) {
+        context.readinessStates.push(`${key}:${readinessState}`);
+      }
     }
 
     if (isRecord(item) || Array.isArray(item)) {
