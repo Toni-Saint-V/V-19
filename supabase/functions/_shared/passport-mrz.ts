@@ -52,10 +52,12 @@ export function parseTd3PassportMrz(
   text: string,
 ): { confidence: PassportExtractionConfidence; fields: PassportExtractionField[] } | null {
   const lines = normalizeMrzText(text);
-  const line1Index = lines.findIndex((line) => /^P<[A-Z]{3}/.test(line));
+  const line1Index = lines.findIndex((line) =>
+    /^P<[A-Z]{3}[A-Z0-9<]{39}$/.test(line),
+  );
   if (line1Index < 0) return null;
 
-  const line1 = (lines[line1Index] ?? "").slice(0, 44).padEnd(44, "<");
+  const line1 = lines[line1Index] ?? "";
   const line2Raw =
     lines
       .slice(line1Index + 1)
