@@ -1,3 +1,8 @@
+> Deprecated archive: this v17 standalone prototype package is historical
+> reference only. It is not current runtime source truth, production readiness
+> evidence, or implementation precedence. Use
+> `../docs/release/canonical-domain-contract.md` and the root `README.md`.
+
 # VisaFlow V-19 — Codex Implementation Specification v17
 
 **Status:** implementation-ready  

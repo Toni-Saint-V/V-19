@@ -8,8 +8,8 @@
     "projectId": "oevvaowoklqttqkraxho",
     "activationTarget": "sandbox",
     "evidenceArtifact": "docs/qa/release-ai-gate-20260627T200633.md",
-    "browserKeyAuditEvidenceArtifact": "docs/qa/supabase-browser-key-audit-20260701.md",
-    "browserKeyAuditScreenshot": "docs/qa/supabase-browser-key-audit-desktop.png"
+    "browserKeyAuditEvidenceArtifact": "docs/qa/release-ai-gate-browser-key-audit-unverified-20260627T200633.md",
+    "browserKeyAuditScreenshot": ""
   },
   "productionTarget": {
     "projectId": "tsymifccglpepvbmrcgh",
@@ -80,14 +80,14 @@
     "expectedPostApplyMigrationListRecorded": true
   },
   "smokeAccountDiscovery": {
-    "checked": true,
-    "checkedAt": "2026-06-30T23:07:48Z",
+    "checked": false,
+    "checkedAt": "",
     "projectId": "tsymifccglpepvbmrcgh",
     "authUserCount": 21,
     "confirmedAuthUserCount": 21,
     "profileCount": 21,
     "orphanAuthUsersWithoutProfileCount": 0,
-    "evidenceArtifact": "docs/qa/supabase-production-smoke-discovery-20260701.md"
+    "evidenceArtifact": ""
   },
   "smokeAccounts": {
     "agent": {
@@ -180,26 +180,26 @@
     "backendTargetSupabase": true,
     "activationTargetProduction": true,
     "releaseEnabled": false,
-    "transactionalPersistenceTested": true,
+    "transactionalPersistenceTested": false,
     "migrationApproved": true,
-    "migrationsApplied": true,
-    "rlsPolicyTestsPassed": true,
-    "storagePolicyTestsPassed": true,
-    "edgeFunctionDryRunsPassed": true,
-    "browserQaPassed": true,
-    "browserKeyAudited": true,
+    "migrationsApplied": false,
+    "rlsPolicyTestsPassed": false,
+    "storagePolicyTestsPassed": false,
+    "edgeFunctionDryRunsPassed": false,
+    "browserQaPassed": false,
+    "browserKeyAudited": false,
     "productionApproved": false,
     "publicConfigRecorded": true,
-    "productionMigrationEvidenceArtifact": "docs/qa/supabase-production-migration-evidence-20260701.md",
-    "productionWorkflowEvidenceArtifact": "docs/qa/supabase-production-workflow-smoke-20260701.md"
+    "productionMigrationEvidenceArtifact": "",
+    "productionWorkflowEvidenceArtifact": ""
   },
   "authSecurity": {
-    "securityAdvisorsChecked": true,
+    "securityAdvisorsChecked": false,
     "projectId": "tsymifccglpepvbmrcgh",
-    "checkedAt": "2026-06-30T22:30:02Z",
-    "planEligibilityChecked": true,
+    "checkedAt": "",
+    "planEligibilityChecked": false,
     "organizationPlan": "free",
-    "planEligibilityEvidence": "docs/qa/supabase-production-security-advisors-20260701.md",
+    "planEligibilityEvidence": "",
     "leakedPasswordProtectionPlanEligible": false,
     "leakedPasswordProtectionEnabled": false,
     "noBlockingSecurityAdvisorWarnings": false,
@@ -218,21 +218,21 @@
       "source": "Supabase _get_advisors(type=security)",
       "warningCount": 1
     },
-    "evidenceArtifact": "docs/qa/supabase-production-security-advisors-20260701.md"
+    "evidenceArtifact": ""
   },
   "postActivationChecks": {
     "agentSignInWorks": true,
     "adminSignInWorks": true,
-    "agentCanCreateDraft": true,
-    "agentCanUploadRequiredMedia": true,
-    "incompleteWaitingReviewRejected": true,
-    "validWaitingReviewReachesQueue": true,
-    "adminCanAcceptOrReturnCase": true,
-    "postHandoffAgentMutationBlocked": true,
-    "privateMediaSignedUrlScoped": true,
-    "logsAndErrorRateChecked": true,
-    "logsEvidenceArtifact": "docs/qa/supabase-production-logs-20260701.md",
-    "workflowEvidenceArtifact": "docs/qa/supabase-production-workflow-smoke-20260701.md"
+    "agentCanCreateDraft": false,
+    "agentCanUploadRequiredMedia": false,
+    "incompleteWaitingReviewRejected": false,
+    "validWaitingReviewReachesQueue": false,
+    "adminCanAcceptOrReturnCase": false,
+    "postHandoffAgentMutationBlocked": false,
+    "privateMediaSignedUrlScoped": false,
+    "logsAndErrorRateChecked": false,
+    "logsEvidenceArtifact": "",
+    "workflowEvidenceArtifact": ""
   },
   "goNoGo": {
     "decision": "NO_GO",

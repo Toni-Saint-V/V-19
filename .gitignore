@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.cache/
 .playwright-mcp/
 .vercel/
 supabase/.temp/
@@ -11,7 +12,22 @@ install-all-codex-plugins.zsh
 playwright-report/
 test-results/
 coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
 .DS_Store
 *.local
 *.local.json
 .vercel
+
+# Local Codex/research/runtime artifacts.
+/research_*/
+/research_*.zip
+/codex-agent-system-visaflow.zip
+/v19-*.png
+/docs/*.zip
+/docs/passport.jpeg
+/docs/References/passport.jpeg

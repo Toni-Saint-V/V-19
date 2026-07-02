@@ -10,9 +10,10 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Do not expand scope silently.
 
 ## Source Truth
-- Stack: React 19, Vite 7, strict TypeScript, custom CSS/UI, Supabase JS, Vitest, Playwright.
+- Stack: React 19, Vite 8, strict TypeScript, custom CSS/UI, Supabase JS, Vitest, Playwright.
 - Routing: local application state only. Do not add React Router or another routing framework without an explicit product need.
-- Durable logic lives mainly in `src/lib/workflow.ts`, `src/types/domain.ts`, `src/services/`, `src/lib/supabase`, and `supabase/`.
+- Durable submission logic lives mainly in `src/modules/submissions`, `src/services/`, `src/lib/supabase`, and `supabase/`. Legacy `src/lib/workflow.ts` and `src/types/domain.ts` are compatibility surfaces unless the canonical contract explicitly says otherwise.
+- Canonical product/domain contract: `docs/release/canonical-domain-contract.md`.
 - Before edits, inspect branch/status, relevant files, and current diff when risk or dirty work matters.
 - Preserve unrelated dirty work. Do not use destructive git unless explicitly requested.
 

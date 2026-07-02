@@ -1,11 +1,11 @@
-# Canonical Domain Contract — Package 1
+# Canonical Domain Contract — VisaFlow V-19
 
 **File:** `docs/release/canonical-domain-contract.md`  
 **Product:** VisaFlow V-19  
-**Package:** 1 — Canonical Domain Contract  
+**Package:** V-19 canonical product/domain contract
 **Status:** normative release contract  
-**Scope:** domain lifecycle, canonical statuses, media/questionnaire requirements, issue lifecycle, role/action permissions, legacy mappings, fail-closed behavior.  
-**Out of scope:** implementation code, roadmap, UI, responsive behavior, new product features, audit repetition.
+**Scope:** submission-first product model, agent/admin roles, canonical statuses, media/questionnaire requirements, issue lifecycle, role/action permissions, export readiness, AI boundary, demo/production boundary, legacy mappings, fail-closed behavior, forbidden product drift.
+**Out of scope:** implementation code, roadmap, UI redesign, responsive behavior, new product features, audit repetition.
 
 ---
 
@@ -53,13 +53,99 @@ These files may remain only as compatibility, archive, or adapter surfaces. They
 
 ### 1.3 Release truth rule
 
-Package 1 has one release truth:
+V-19 has one release truth:
 
 - canonical domain/application files under `src/modules/submissions`;
 - canonical release contract: this file;
 - legacy stack: adapter/archive only.
 
 No legacy value may be written back into canonical state unless it is explicitly normalized by this contract.
+
+### 1.4 Submission-first product model
+
+`Submission` is the only top-level operational object. Applicants, family
+members, questionnaire sections, media/files, issues, history events, review
+state, and export state are contextual children of a submission.
+
+V-19 supports only:
+
+- submission types: `single`, `family`;
+- primary country metadata: Spain / `ES`;
+- operational roles: `agent`, `admin`.
+
+Do not introduce parallel top-level CRM, People, Families, Groups, analytics,
+board, saved-filter, legal-promise, or multi-country primary surfaces.
+
+### 1.5 Agent and admin role boundary
+
+Agents own intake, questionnaire completion, required media upload/replacement,
+fixing returned issues, and resubmitting corrections.
+
+Admins own review, issue creation, issue closure, acceptance for export,
+export readiness validation, and export completion.
+
+The system may perform deterministic validation and export bookkeeping only
+through explicit domain/application commands. Unknown actors and unknown roles
+fail closed.
+
+### 1.6 Issue lifecycle
+
+The only canonical issue lifecycle is:
+
+```text
+open -> fixed_by_agent -> closed_by_admin
+```
+
+An admin-created issue starts as `open`. An agent may mark the issue fixed only
+after correcting the referenced field/file/workspace target. An admin must
+close the issue after review. Acceptance and export are blocked while any
+blocking issue is `open` or `fixed_by_agent`.
+
+### 1.7 Export readiness
+
+Export readiness is fail-closed. A submission can be exported only when:
+
+- status is `ready_for_export`;
+- every applicant has complete questionnaire and canonical required media;
+- blocking issues are closed;
+- city/trip/export package identity rules pass;
+- the export row model used by preview and workbook generation is the same.
+
+Excel is the active export artifact. ZIP/package export, appointment submission,
+or production delivery claims require a later approved contract.
+
+### 1.8 AI, OCR, and PDF boundary
+
+AI, OCR, and PDF extraction surfaces are advisory helper surfaces. They may
+prepare summaries, evidence labels, conflict hints, and manual-review targets.
+They must not:
+
+- make canonical status, readiness, permission, issue, or export decisions;
+- call OpenAI/LLM providers from React render;
+- apply OCR/PDF values to questionnaire fields automatically;
+- hide evidence or collapse conflicts into silent mutations;
+- claim official verification, production OCR, or legal correctness.
+
+All discrepancies must remain visible for manual review, field opening, or
+admin remarks.
+
+### 1.9 Demo and production boundary
+
+Local demo and e2e helpers are not production proof. Demo auth, seed users,
+role switching, local bypass flags, mocked OCR, and local media adapters may
+run only in local/demo contexts.
+
+Supabase production remains inactive unless every activation gate passes:
+
+- `VITE_SUPABASE_BACKEND_TARGET=supabase`;
+- explicit activation target;
+- release switch enabled;
+- migration/RLS/Storage/Edge/browser-key/browser-QA evidence recorded;
+- owner production approval recorded.
+
+Unsafe or incomplete production configuration must fail closed to local/demo or
+blocked state. Closed-pilot or dummy-only proof must not be reported as
+production readiness.
 
 ---
 
