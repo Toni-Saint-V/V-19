@@ -390,34 +390,24 @@ describe("passport extraction state", () => {
     });
   });
 
-  test("stores the OpenAI fallback fingerprint when provider was attempted", () => {
+  test("does not store provider fingerprints for safe unavailable extraction", () => {
     const draft = draftSubmission();
     const file = passportFile(draft);
-    const ready = finishPassportExtraction(
-      draft,
-      file,
-      {
-        fields: [
-          {
-            confidence: "high",
-            key: "passportNumber",
-            needsManualReview: true,
-            value: "765432100",
-          },
-        ],
-        guardrails: [],
-        openAiAttempted: true,
-        source: "openai-vision",
-        status: "extracted",
-        summary: "OpenAI fallback извлек паспортные поля.",
-      },
-      "passport-fingerprint-1",
-    );
+    const ready = finishPassportExtraction(draft, file, {
+      fields: [],
+      guardrails: [],
+      source: "edge-stub",
+      status: "unavailable",
+      summary: "Данные не удалось распознать автоматически. Требуется ручная проверка.",
+    });
 
     expect(ready.applicants[0]?.passportExtraction).toMatchObject({
-      openaiAttemptedForFingerprint: "passport-fingerprint-1",
-      status: "ready",
+      extractedFields: [],
+      status: "unavailable",
     });
+    expect(
+      ready.applicants[0]?.passportExtraction?.openaiAttemptedForFingerprint,
+    ).toBeUndefined();
   });
 
   test("stores automatic orientation correction from local OCR", () => {
