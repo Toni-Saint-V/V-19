@@ -1,7 +1,6 @@
 import {
   buildAiHelperProviderRequest,
   buildAiHelperAuditEvent,
-  buildSafeAiHelperStubResult,
   evaluateAiHelperAccess,
   evaluateAiHelperRateLimit,
   parseAiHelperRequest,
@@ -93,8 +92,8 @@ function bearerTokenFor(request: Request): string | undefined {
 function providerFor(options: AiHelperHandlerOptions): AiHelperProvider {
   return (
     options.provider ?? {
-      generate: (request) =>
-        Promise.resolve(buildSafeAiHelperStubResult(request.intent, "edge-stub")),
+      generate: () =>
+        Promise.reject(new Error("AI helper provider is not configured.")),
     }
   );
 }
