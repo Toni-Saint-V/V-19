@@ -5,7 +5,9 @@ import {
   reviewTextIntake,
   type BlsApplicantTextFields,
   type BlsTextQuestionnaireInput,
+  type TextIntakeReviewFinding,
 } from "../../src/services/textIntakeReviewer";
+import { uniqueTextReviewFindings } from "../../src/services/textIntakeReviewResult";
 import {
   buildBlsTextReviewPositiveExample,
   buildBlsTextReviewTrainingCorpus,
@@ -94,6 +96,25 @@ const completeApplicant: Applicant = {
   hotelAddress: "Gran Via 1",
 };
 
+function finding(
+  overrides: Partial<TextIntakeReviewFinding>,
+): TextIntakeReviewFinding {
+  return {
+    id: "applicant-1:email:invalid_email",
+    code: "invalid_email",
+    severity: "blocking",
+    scope: "field",
+    applicantId: "applicant-1",
+    applicantName: "Artem Sokolov",
+    fieldKey: "email",
+    fieldLabel: "Email",
+    problem: "Email format is invalid.",
+    reason: "Email must contain a valid address.",
+    requiredAction: "Enter a valid email address.",
+    ...overrides,
+  };
+}
+
 function submission(applicants: Applicant[] = [completeApplicant]): Submission {
   return {
     id: "VF-TEXT",
@@ -118,6 +139,34 @@ function submission(applicants: Applicant[] = [completeApplicant]): Submission {
 }
 
 describe("text intake reviewer", () => {
+  test("normalizes same-applicant blocking findings with contact before passport expiry", () => {
+    const findings = uniqueTextReviewFindings([
+      finding({
+        id: "applicant-1:passportExpiresAt:passport_expired_before_travel",
+        code: "passport_expired_before_travel",
+        fieldKey: "passportExpiresAt",
+        fieldLabel: "Срок действия паспорта",
+        problem: "Passport expires before the case travel date.",
+        reason: "Passport expiry must cover the trip.",
+        requiredAction: "Enter a passport expiry date after travel.",
+      }),
+      finding({
+        id: "applicant-1:email:invalid_email",
+        code: "invalid_email",
+        fieldKey: "email",
+        fieldLabel: "Email",
+        problem: "Email format is invalid.",
+        reason: "Email must contain a valid address.",
+        requiredAction: "Enter a valid email address.",
+      }),
+    ]);
+
+    expect(findings.map((reviewFinding) => reviewFinding.code)).toEqual([
+      "invalid_email",
+      "passport_expired_before_travel",
+    ]);
+  });
+
   test("reviews a complete single-applicant BLS questionnaire without findings", () => {
     const result = reviewBlsTextQuestionnaire({
       appointment,

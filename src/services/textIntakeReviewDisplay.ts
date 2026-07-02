@@ -2,6 +2,9 @@ import type {
   TextIntakeReviewFinding,
   TextIntakeReviewResult,
 } from "./textIntakeReviewer";
+import { sortTextReviewFindings } from "./textIntakeReviewResult";
+
+export { sortTextReviewFindings };
 
 export interface TextIntakeReviewDisplay {
   review: TextIntakeReviewResult;
@@ -21,38 +24,6 @@ function relatedApplicantSuffix(finding: TextIntakeReviewFinding): string {
     .map((name) => name.trim())
     .filter(Boolean);
   return names.length ? ` для: ${names.join(", ")}.` : ".";
-}
-
-function findingSeverityRank(finding: TextIntakeReviewFinding): number {
-  if (finding.severity === "blocking") return 0;
-  if (finding.severity === "warning") return 1;
-  return 2;
-}
-
-function findingScopeRank(finding: TextIntakeReviewFinding): number {
-  if (finding.scope === "field") return 0;
-  if (finding.scope === "applicant") return 1;
-  return 2;
-}
-
-export function sortTextReviewFindings(
-  findings: TextIntakeReviewFinding[],
-): TextIntakeReviewFinding[] {
-  return [...findings].sort((left, right) => {
-    const severityDelta = findingSeverityRank(left) - findingSeverityRank(right);
-    if (severityDelta) return severityDelta;
-
-    const scopeDelta = findingScopeRank(left) - findingScopeRank(right);
-    if (scopeDelta) return scopeDelta;
-
-    return [left.applicantName ?? "", left.fieldLabel ?? "", left.code, left.id]
-      .join("|")
-      .localeCompare(
-        [right.applicantName ?? "", right.fieldLabel ?? "", right.code, right.id].join(
-          "|",
-        ),
-      );
-  });
 }
 
 function localizedTextReviewProblem(finding: TextIntakeReviewFinding): string {
