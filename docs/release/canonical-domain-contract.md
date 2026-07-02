@@ -180,6 +180,11 @@ The following values are not canonical Package 1 statuses and must not be emitte
 - `completed`
 
 They are legacy input values only and must be normalized at the boundary.
+`requires_action` may remain in `src/modules/submissions/types.ts` only as a
+compatibility-only `LegacyRuntimeSubmissionStatus` for legacy presentation and
+adapter surfaces. It is not canonical release state; canonical commands,
+persistence, export readiness, and production decisions must normalize it to
+`returned` or reject it through the domain contract guards.
 
 ---
 

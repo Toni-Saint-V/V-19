@@ -34,7 +34,13 @@ export const V19_FIXED_COUNTRY = {
   label: "Испания",
 } as const satisfies { code: SpainCountryCode; label: Submission["country"] };
 
-export type SubmissionStatus = CanonicalSubmissionStatus | "requires_action";
+export type LegacyRuntimeSubmissionStatus = "requires_action";
+
+// Compatibility-only legacy presentation state. Canonical commands, persistence,
+// and release logic must normalize or reject it through domainContract guards.
+export type SubmissionStatus =
+  | CanonicalSubmissionStatus
+  | LegacyRuntimeSubmissionStatus;
 
 export type ApplicantRole = "main" | "spouse" | "child";
 
