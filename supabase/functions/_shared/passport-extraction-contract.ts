@@ -17,6 +17,12 @@ export const passportExtractionFields = [
 export type PassportExtractionFieldKey = (typeof passportExtractionFields)[number];
 export type PassportExtractionConfidence = "low" | "medium" | "high";
 export type PassportExtractionRole = "agent" | "admin";
+export type PassportExtractionOcrProvider =
+  | "local_ocr"
+  | "local_ocr_unavailable";
+export type PassportExtractionOcrReason =
+  | "local_ocr_not_configured"
+  | "local_ocr_unavailable";
 
 export interface PassportExtractionActor {
   id: string;
@@ -58,14 +64,21 @@ export interface PassportExtractionOrientation {
   rotation: 0 | 90 | 180 | 270;
 }
 
+export interface PassportExtractionOcrAttempt {
+  attempted: true;
+  provider: PassportExtractionOcrProvider;
+  reason?: PassportExtractionOcrReason;
+}
+
 export interface PassportExtractionResult {
   applicantIndex?: number;
   confidence: PassportExtractionConfidence;
   fields: PassportExtractionField[];
   guardrails: string[];
   needsManualReview: boolean;
+  ocr?: PassportExtractionOcrAttempt;
   orientation?: PassportExtractionOrientation;
-  source: "edge-provider" | "edge-stub" | "local-ocr";
+  source: "local-ocr";
   status: "extracted" | "unavailable";
   summary: string;
 }
@@ -92,8 +105,18 @@ export interface PassportExtractionAuditStore {
   record(event: PassportExtractionAuditEvent): Promise<void>;
 }
 
+export type PassportExtractionProviderResult =
+  | { ok: true; provider: "local_ocr"; text: string }
+  | {
+      ok: false;
+      provider: "local_ocr_unavailable";
+      reason: PassportExtractionOcrReason;
+    };
+
 export interface PassportExtractionProvider {
-  extract(request: PassportExtractionRequest): Promise<unknown>;
+  recognizeText(
+    request: PassportExtractionRequest,
+  ): Promise<PassportExtractionProviderResult>;
 }
 
 export interface PassportDocumentPathParts {
@@ -235,11 +258,7 @@ export function parsePassportExtractionResult(
       status: 502,
     };
   }
-  if (
-    value.source !== "edge-provider" &&
-    value.source !== "edge-stub" &&
-    value.source !== "local-ocr"
-  ) {
+  if (value.source !== "local-ocr") {
     return {
       ok: false,
       safeMessage: "Passport extraction source is invalid.",
@@ -309,6 +328,15 @@ export function parsePassportExtractionResult(
     };
   }
 
+  const ocr = validatedOcrAttempt(value.ocr);
+  if (!ocr) {
+    return {
+      ok: false,
+      safeMessage: "Passport extraction OCR attempt is invalid.",
+      status: 502,
+    };
+  }
+
   return {
     ok: true,
     data: {
@@ -321,6 +349,7 @@ export function parsePassportExtractionResult(
       fields: fields.filter((field) => field.value),
       guardrails: validatedGuardrails(value.guardrails),
       needsManualReview: true,
+      ocr,
       orientation,
       source: value.source,
       status: value.status,
@@ -334,6 +363,7 @@ export function parsePassportExtractionResult(
 
 export function safeUnavailablePassportExtractionResult(
   applicantIndex?: number,
+  reason: PassportExtractionOcrReason = "local_ocr_not_configured",
 ): PassportExtractionResult {
   return {
     applicantIndex,
@@ -341,7 +371,12 @@ export function safeUnavailablePassportExtractionResult(
     fields: [],
     guardrails: [...passportExtractionGuardrails],
     needsManualReview: true,
-    source: "edge-stub",
+    ocr: {
+      attempted: true,
+      provider: "local_ocr_unavailable",
+      reason,
+    },
+    source: "local-ocr",
     status: "unavailable",
     summary:
       "Данные не удалось распознать автоматически. Требуется ручная проверка. Проверьте данные вручную.",
@@ -352,6 +387,7 @@ function validatedConfidence(
   value: unknown,
   status: unknown,
 ): PassportExtractionConfidence {
+  if (status === "unavailable") return "low";
   if (value === "low" || value === "medium" || value === "high") return value;
   return status === "extracted" ? "medium" : "low";
 }
@@ -385,4 +421,26 @@ function validatedGuardrails(value: unknown) {
     .filter(Boolean);
 
   return [...new Set([...passportExtractionGuardrails, ...providerGuardrails])];
+}
+
+function validatedOcrAttempt(value: unknown): PassportExtractionOcrAttempt | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    value.attempted !== true ||
+    (value.provider !== "local_ocr" && value.provider !== "local_ocr_unavailable")
+  ) {
+    return undefined;
+  }
+  if (
+    value.reason !== undefined &&
+    value.reason !== "local_ocr_not_configured" &&
+    value.reason !== "local_ocr_unavailable"
+  ) {
+    return undefined;
+  }
+  return {
+    attempted: true,
+    provider: value.provider as PassportExtractionOcrProvider,
+    reason: value.reason as PassportExtractionOcrReason | undefined,
+  };
 }

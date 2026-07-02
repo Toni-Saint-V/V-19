@@ -14,6 +14,7 @@ import {
   type PassportExtractionProvider,
   type PassportExtractionRequest,
 } from "./passport-extraction-contract.ts";
+import { extractPassportWithLocalOcr } from "./passport-local-ocr.ts";
 
 export const passportExtractionCorsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -107,6 +108,11 @@ function passportExtractionResultMetadata(
     confidence?: PassportExtractionConfidence;
     fields?: unknown[];
     needsManualReview?: boolean;
+    ocr?: {
+      attempted?: boolean;
+      provider?: string;
+      reason?: string;
+    };
     source: string;
     status: string;
   },
@@ -116,6 +122,9 @@ function passportExtractionResultMetadata(
     document_fingerprint: passportDocumentFingerprint(request),
     field_count: Array.isArray(result.fields) ? result.fields.length : 0,
     needs_manual_review: result.needsManualReview !== false,
+    ocr_attempted: result.ocr?.attempted === true,
+    ocr_provider: result.ocr?.provider ?? null,
+    ocr_reason: result.ocr?.reason ?? null,
     source: result.source,
     status: result.status,
   };
@@ -206,43 +215,17 @@ export async function handlePassportExtractionRequest(
     return jsonResponse({ error: access.safeMessage }, access.status);
   }
 
-  if (!options.provider) {
-    const unavailable = safeUnavailablePassportExtractionResult(
-      extractionRequest.applicantIndex,
-    );
-    const audit = await recordAudit(
-      options.auditStore,
-      passportExtractionAuditEvent(
-        "passport_extraction_invoked",
-        unavailable.source,
-        extractionRequest,
-        options.now?.(),
-        passportExtractionResultMetadata(extractionRequest, unavailable),
-      ),
-    );
-    if (!audit.ok) return audit.response;
-    return jsonResponse(unavailable);
-  }
-
   let providerResult: unknown;
   try {
-    providerResult = await options.provider.extract(extractionRequest);
-  } catch {
-    const audit = await recordAudit(
-      options.auditStore,
-      passportExtractionAuditEvent(
-        "passport_extraction_provider_failed",
-        "provider_failed",
-        extractionRequest,
-        options.now?.(),
-        {
-          document_fingerprint: passportDocumentFingerprint(extractionRequest),
-          safe_error_class: "provider_failed",
-        },
-      ),
+    providerResult = await extractPassportWithLocalOcr(
+      extractionRequest,
+      options.provider,
     );
-    if (!audit.ok) return audit.response;
-    return jsonResponse({ error: "Passport extraction provider failed." }, 502);
+  } catch {
+    providerResult = safeUnavailablePassportExtractionResult(
+      extractionRequest.applicantIndex,
+      "local_ocr_unavailable",
+    );
   }
 
   const validated = parsePassportExtractionResult(providerResult);
