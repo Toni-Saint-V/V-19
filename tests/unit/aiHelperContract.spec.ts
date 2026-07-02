@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import {
+  buildAiHelperProviderRequest,
   buildSafeAiHelperStubResult,
   type AiHelperRequest,
   evaluateAiHelperAccess,
@@ -8,6 +9,7 @@ import {
   parseAiHelperResult,
   type AiHelperAuditEvent,
   type AiHelperActor,
+  type AiHelperProviderRequest,
 } from "../../supabase/functions/_shared/ai-helper-contract";
 import {
   createSupabaseRestAiHelperDependencies,
@@ -41,8 +43,38 @@ function helperRequest(
       intent,
       context: {
         submissionId: "VF-1",
+        status: "draft",
+        fields: 70,
         applicantEmail: "private@example.com",
+        applicantPhone: "+79990000000",
+        passportNumber: "72 1190482",
+        storagePath: "submission-media/private/passport.png",
         freeText: "raw applicant context must not be audited",
+        applicants: [
+          {
+            name: "Private Applicant",
+            role: "Applicant",
+            email: "applicant@example.com",
+            passport: "72 1190482",
+            fields: 70,
+            media: 2,
+            mediaRequired: 4,
+            findings: [
+              {
+                code: "invalid_email",
+                text: "Raw finding text must not reach provider",
+                status: "open",
+              },
+            ],
+          },
+        ],
+        issues: [
+          {
+            code: "missing_media",
+            severity: "blocking",
+            text: "Upload private passport scan",
+          },
+        ],
       },
       actor,
       requestId: "client-reused-id",
@@ -103,6 +135,14 @@ describe("AI helper shared contract", () => {
       ok: false,
       status: 400,
     });
+    expect(
+      parseAiHelperRequest({ intent: "agent_next_action", actor: agentActor }),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        intent: "agent_next_action",
+      },
+    });
   });
 
   test("denies disabled users and admin-only helper intents", () => {
@@ -127,6 +167,93 @@ describe("AI helper shared contract", () => {
         actor: adminActor,
       }),
     ).toMatchObject({ ok: true });
+    expect(
+      evaluateAiHelperAccess({
+        intent: "issue_draft_assistant",
+        context: {},
+        actor: agentActor,
+      }),
+    ).toMatchObject({ ok: false, status: 403 });
+  });
+
+  test("builds a sanitized provider request without raw context or actor identity", () => {
+    const parsed = parseAiHelperRequest({
+      intent: "text_intake_review",
+      actor: agentActor,
+      requestId: "client-request-1",
+      context: {
+        submissionId: "VF-PII",
+        status: "draft",
+        fields: 65,
+        applicantEmail: "private@example.com",
+        phone: "+79990000000",
+        passport: "72 1190482",
+        address: "Moscow Test Street 1",
+        freeText: "raw questionnaire paragraph",
+        storagePath: "submission-media/private/passport.png",
+        applicants: [
+          {
+            name: "Artem Sokolov",
+            role: "Applicant",
+            email: "artem@example.com",
+            passport: "72 1190482",
+            fields: 65,
+            media: 1,
+            mediaRequired: 4,
+            findings: [{ code: "invalid_email", text: "Private finding text" }],
+          },
+        ],
+        issues: [
+          {
+            code: "missing_media",
+            severity: "blocking",
+            text: "Upload passport scan",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const providerRequest = buildAiHelperProviderRequest(parsed.data);
+    const serialized = JSON.stringify(providerRequest);
+
+    expect(providerRequest).toMatchObject({
+      intent: "text_intake_review",
+      actorRole: "agent",
+      context: {
+        redaction: "raw_context_removed",
+        facts: {
+          submissionId: "VF-PII",
+          status: "draft",
+          fields: 65,
+        },
+        issueCodes: expect.arrayContaining(["invalid_email", "missing_media"]),
+        readinessStates: expect.arrayContaining([
+          "status:draft",
+          "severity:blocking",
+        ]),
+        applicants: [
+          expect.objectContaining({
+            label: "applicant_1",
+            role: "Applicant",
+            fieldCompletion: 65,
+            mediaUploaded: 1,
+            mediaRequired: 4,
+          }),
+        ],
+      },
+    });
+    expect(serialized).not.toContain("agent-1");
+    expect(serialized).not.toContain("client-request-1");
+    expect(serialized).not.toContain("private@example.com");
+    expect(serialized).not.toContain("+79990000000");
+    expect(serialized).not.toContain("72 1190482");
+    expect(serialized).not.toContain("Moscow Test Street");
+    expect(serialized).not.toContain("raw questionnaire paragraph");
+    expect(serialized).not.toContain("submission-media");
+    expect(serialized).not.toContain("Upload passport scan");
   });
 
   test("exposes a fail-closed rate limit boundary", () => {
@@ -220,6 +347,51 @@ describe("AI helper shared contract", () => {
       "raw applicant context must not be audited",
     );
     expect(options.auditEvents[0]?.requestId).not.toBe("client-reused-id");
+  });
+
+  test("passes only sanitized provider input after audit and quota gates", async () => {
+    const providerRequests: AiHelperProviderRequest[] = [];
+    const options = durableOptions({
+      provider: {
+        generate: (request) => {
+          providerRequests.push(request);
+
+          return Promise.resolve(
+            buildSafeAiHelperStubResult(request.intent, "edge-stub"),
+          );
+        },
+      },
+    });
+
+    const response = await handleAiHelperRequest(
+      helperRequest("text_intake_review", agentActor),
+      options,
+    );
+    const serialized = JSON.stringify(providerRequests);
+
+    expect(response.status).toBe(200);
+    expect(providerRequests).toHaveLength(1);
+    expect(providerRequests[0]).toMatchObject({
+      intent: "text_intake_review",
+      actorRole: "agent",
+      context: {
+        redaction: "raw_context_removed",
+        facts: {
+          submissionId: "VF-1",
+          status: "draft",
+          fields: 70,
+        },
+        issueCodes: expect.arrayContaining(["invalid_email", "missing_media"]),
+      },
+    });
+    expect(serialized).not.toContain("agent-1");
+    expect(serialized).not.toContain("client-reused-id");
+    expect(serialized).not.toContain("private@example.com");
+    expect(serialized).not.toContain("+79990000000");
+    expect(serialized).not.toContain("72 1190482");
+    expect(serialized).not.toContain("submission-media");
+    expect(serialized).not.toContain("raw applicant context must not be audited");
+    expect(serialized).not.toContain("Raw finding text must not reach provider");
   });
 
   test("does not trust client request ids for quota idempotency", async () => {
@@ -386,5 +558,163 @@ describe("AI helper shared contract", () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({
       body: expect.stringContaining("server-request-1"),
     });
+  });
+
+  test("allows local/demo edge stubs but fails closed in production without provider config", async () => {
+    const localFetchMock = vi.fn<typeof fetch>(async (url) => {
+      const textUrl = String(url);
+
+      if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
+        return Response.json({ remaining: 3 });
+      }
+
+      return new Response(null, { status: 201 });
+    });
+    const localDependencies = createSupabaseRestAiHelperDependencies(
+      {
+        SUPABASE_URL: "https://project.supabase.co",
+        SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+        AI_HELPER_QUOTA_RPC: "consume_ai_helper_quota",
+        AI_HELPER_RUNTIME_ENV: "demo",
+        AI_HELPER_PROVIDER_MODE: "local_litellm",
+        AI_HELPER_ALLOW_STUB_PROVIDER: "true",
+      },
+      localFetchMock as typeof fetch,
+    );
+
+    const localResponse = await handleAiHelperRequest(helperRequest(), {
+      ...localDependencies,
+      requestIdFactory: () => "server-request-1",
+    });
+
+    expect(localResponse.status).toBe(200);
+    expect(await json(localResponse)).toMatchObject({ source: "edge-stub" });
+    expect(localFetchMock).toHaveBeenCalledTimes(2);
+
+    const productionFetchMock = vi.fn<typeof fetch>(async (url) => {
+      const textUrl = String(url);
+
+      if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
+        return Response.json({ remaining: 3 });
+      }
+
+      return new Response(null, { status: 201 });
+    });
+    const productionDependencies = createSupabaseRestAiHelperDependencies(
+      {
+        SUPABASE_URL: "https://project.supabase.co",
+        SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+        AI_HELPER_QUOTA_RPC: "consume_ai_helper_quota",
+        AI_HELPER_RUNTIME_ENV: "production",
+        AI_HELPER_PROVIDER_MODE: "local_litellm",
+      },
+      productionFetchMock as typeof fetch,
+    );
+
+    const productionResponse = await handleAiHelperRequest(helperRequest(), {
+      ...productionDependencies,
+      requestIdFactory: () => "server-request-1",
+    });
+
+    expect(productionResponse.status).toBe(502);
+    expect(await json(productionResponse)).toEqual({
+      error: "AI helper provider failed.",
+    });
+    expect(productionFetchMock).toHaveBeenCalledTimes(2);
+    expect(productionFetchMock.mock.calls[1][1]).toMatchObject({
+      body: expect.stringContaining("ai_helper_provider_failed"),
+    });
+  });
+
+  test("calls LiteLLM with sanitized context and server-only provider config", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (url) => {
+      const textUrl = String(url);
+
+      if (textUrl.includes("/rpc/consume_ai_helper_quota")) {
+        return Response.json({ remaining: 3 });
+      }
+
+      if (textUrl.includes("/v1/chat/completions")) {
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  title: "Local helper draft",
+                  summary: "Review deterministic blockers before continuing.",
+                  suggestions: ["Check missing media in the application."],
+                  blockers: [],
+                  guardrails: ["Human operator reviews the draft."],
+                  operatorSummary: ["Draft generated from sanitized facts."],
+                  agentFollowUpDrafts: [],
+                }),
+              },
+            },
+          ],
+        });
+      }
+
+      return new Response(null, { status: 201 });
+    });
+    const dependencies = createSupabaseRestAiHelperDependencies(
+      {
+        SUPABASE_URL: "https://project.supabase.co",
+        SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+        AI_HELPER_QUOTA_RPC: "consume_ai_helper_quota",
+        AI_HELPER_RUNTIME_ENV: "local",
+        AI_HELPER_PROVIDER_MODE: "local_litellm",
+        AI_HELPER_LITELLM_BASE_URL: "http://127.0.0.1:4000/",
+        AI_HELPER_LITELLM_API_KEY: "local-token",
+        AI_HELPER_LITELLM_MODEL_GENERAL: "qwen2.5:7b",
+        AI_HELPER_LITELLM_MAX_INPUT_CHARS: "900",
+      },
+      fetchMock as typeof fetch,
+    );
+
+    const response = await handleAiHelperRequest(helperRequest(), {
+      ...dependencies,
+      requestIdFactory: () => "server-request-1",
+    });
+    const providerCall = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes("/v1/chat/completions"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      intent: "text_intake_review",
+      source: "edge-provider",
+      title: "Local helper draft",
+    });
+    expect(providerCall).toBeDefined();
+    if (!providerCall) return;
+
+    expect(String(providerCall[0])).toBe(
+      "http://127.0.0.1:4000/v1/chat/completions",
+    );
+    expect(providerCall[1]).toMatchObject({
+      method: "POST",
+      headers: expect.objectContaining({
+        authorization: "Bearer local-token",
+      }),
+    });
+
+    const body = JSON.parse(String(providerCall[1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    const serializedBody = JSON.stringify(body);
+
+    expect(body).toMatchObject({
+      model: "qwen2.5:7b",
+      temperature: 0,
+      max_tokens: 700,
+      response_format: { type: "json_object" },
+    });
+    expect(serializedBody).toContain("sanitizedContext");
+    expect(serializedBody).not.toContain("private@example.com");
+    expect(serializedBody).not.toContain("+79990000000");
+    expect(serializedBody).not.toContain("72 1190482");
+    expect(serializedBody).not.toContain("submission-media");
+    expect(serializedBody).not.toContain("raw applicant context must not be audited");
   });
 });
