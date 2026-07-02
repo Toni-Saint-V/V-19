@@ -1,5 +1,9 @@
 # Package Evidence Gate
 
+> Historical package evidence record only. This document must be read as dated
+> context and must not override `docs/release/canonical-domain-contract.md`,
+> current source, or fresh verifier output.
+
 **File:** `docs/release/package-evidence-gate.md`
 **Product:** VisaFlow V-19
 **Branch:** `pkg/05-release-evidence-gate`

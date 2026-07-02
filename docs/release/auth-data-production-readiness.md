@@ -1,5 +1,10 @@
 # Auth/Data Production Readiness Packet
 
+> Historical fail-closed packet. This document records the 2026-06-27 lane
+> state and remains useful for boundaries, but current target/evidence details
+> live in `docs/release/supabase-production-readiness.json`. If the two differ,
+> use the JSON packet plus fresh verifier output.
+
 Status: `NO_GO` until owner approval and live evidence are recorded.
 Recorded: 2026-06-27
 Run id: `20260627T200633`

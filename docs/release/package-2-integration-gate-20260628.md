@@ -1,5 +1,10 @@
 # Package 2 Integration Gate
 
+> Historical branch evidence record only. This document is not current runtime
+> source truth and does not approve production activation. Use
+> `docs/release/canonical-domain-contract.md` and current verifier output for
+> current readiness decisions.
+
 Status: branch-ready before owner pre-merge checks; not production readiness approval.
 Recorded: 2026-06-28.
 Branch: `codex/v19-package2-integration-20260628`.

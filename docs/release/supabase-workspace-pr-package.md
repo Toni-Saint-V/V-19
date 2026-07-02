@@ -1,5 +1,11 @@
 # Supabase Workspace PR Package
 
+> Historical evidence record only. This document is not current runtime source
+> truth and does not approve production activation. Use
+> `docs/release/canonical-domain-contract.md`,
+> `docs/release/supabase-production-readiness.json`, and the current verifier
+> scripts for current readiness decisions.
+
 Status: Ready for PR review.
 
 Not ready for production activation until the production approval checklist is completed.

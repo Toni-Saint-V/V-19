@@ -3,6 +3,7 @@ import {
   canShowLocalDemoRoleSwitch,
   canUseLocalDemoSeedAutoLogin,
   isExplicitLocalDemoAuthBypassEnabled,
+  isLocalDemoAuthBypassRuntimeSafe,
 } from "../../src/shared/pilotAccessGate";
 
 describe("pilot access gate policy", () => {
@@ -22,6 +23,41 @@ describe("pilot access gate policy", () => {
         VITE_E2E_LOCAL_DEMO_AUTH_BYPASS: "true",
       }),
     ).toBe(true);
+  });
+
+  test("blocks local demo bypass in production-like runtime even when flags are set", () => {
+    expect(
+      canUseLocalDemoSeedAutoLogin({
+        MODE: "production",
+        VITE_LOCAL_DEMO_AUTH_BYPASS: "true",
+      }),
+    ).toBe(false);
+    expect(
+      canUseLocalDemoSeedAutoLogin({
+        PROD: true,
+        VITE_E2E_LOCAL_DEMO_AUTH_BYPASS: "true",
+      }),
+    ).toBe(false);
+    expect(
+      canUseLocalDemoSeedAutoLogin({
+        VITE_SUPABASE_ACTIVATION_TARGET: "production",
+        VITE_LOCAL_DEMO_AUTH_BYPASS: "true",
+      }),
+    ).toBe(false);
+  });
+
+  test("blocks local demo bypass when Supabase backend is selected", () => {
+    expect(
+      isLocalDemoAuthBypassRuntimeSafe({
+        VITE_SUPABASE_BACKEND_TARGET: "supabase",
+      }),
+    ).toBe(false);
+    expect(
+      isExplicitLocalDemoAuthBypassEnabled({
+        VITE_SUPABASE_BACKEND_TARGET: "supabase",
+        VITE_LOCAL_DEMO_AUTH_BYPASS: "true",
+      }),
+    ).toBe(false);
   });
 
   test("hides the role switch outside explicit local or e2e demo mode", () => {
