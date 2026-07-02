@@ -9,6 +9,7 @@ import {
   handlePassportExtractionRequest,
   type PassportExtractionHandlerOptions,
 } from "../../supabase/functions/_shared/passport-extraction-handler";
+import { extractPassportMrzText } from "../../supabase/functions/_shared/passport-mrz";
 
 async function json(response: Response): Promise<Record<string, unknown>> {
   return (await response.json()) as Record<string, unknown>;
@@ -50,6 +51,11 @@ function durableOptions(
     ...overrides,
   };
 }
+
+const validTd3Mrz = [
+  "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+  "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
+].join("\n");
 
 describe("passport extraction contract", () => {
   test("accepts only private passport-scan document references and ignores forged actor", () => {
@@ -379,9 +385,12 @@ describe("passport extraction contract", () => {
     ).toBe(false);
     expect(auditEvents.at(-1)).toMatchObject({
       metadata: {
+        confidence: "low",
         document_fingerprint: expect.stringMatching(/^passport-document:[0-9a-f]+$/),
-        provider: "edge-stub",
-        result_status: "unavailable",
+        field_count: 0,
+        needs_manual_review: true,
+        source: "edge-stub",
+        status: "unavailable",
       },
     });
     expect(JSON.stringify(auditEvents)).not.toContain(
@@ -453,6 +462,30 @@ describe("passport extraction contract", () => {
     expect(fallback.summary).toContain("Требуется ручная проверка");
   });
 
+  test("rejects extracted provider output that does not require manual review", () => {
+    const fieldWithoutManualReview = parsePassportExtractionResult({
+      fields: [
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: false,
+          value: "765432100",
+        },
+      ],
+      source: "edge-provider",
+      status: "extracted",
+    });
+    const resultWithoutManualReview = parsePassportExtractionResult({
+      fields: [],
+      needsManualReview: false,
+      source: "edge-provider",
+      status: "unavailable",
+    });
+
+    expect(fieldWithoutManualReview.ok).toBe(false);
+    expect(resultWithoutManualReview.ok).toBe(false);
+  });
+
   test("normalizes valid extracted fields as manual-review data", () => {
     const parsed = parsePassportExtractionResult({
       fields: [
@@ -486,5 +519,309 @@ describe("passport extraction contract", () => {
       });
       expect(parsed.data.guardrails.join(" ")).toContain("проверить вручную");
     }
+  });
+
+  test("parses valid TD3 MRZ text into manual-review passport fields", () => {
+    const result = extractPassportMrzText(validTd3Mrz, 0);
+
+    expect(result).toMatchObject({
+      applicantIndex: 0,
+      confidence: "high",
+      needsManualReview: true,
+      source: "local-ocr",
+      status: "extracted",
+      summary: expect.stringContaining("Требуется ручная проверка"),
+    });
+    expect(result.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          confidence: "high",
+          key: "surname",
+          needsManualReview: true,
+          value: "IVANOV",
+        }),
+        expect.objectContaining({
+          key: "firstName",
+          needsManualReview: true,
+          value: "IVAN",
+        }),
+        expect.objectContaining({
+          key: "passportNumber",
+          value: "123456789",
+        }),
+        expect.objectContaining({
+          key: "birthDate",
+          value: "20.08.1990",
+        }),
+        expect.objectContaining({
+          key: "passportExpiresAt",
+          value: "26.02.2026",
+        }),
+        expect.objectContaining({
+          key: "citizenship",
+          value: "Russian Federation",
+        }),
+        expect.objectContaining({
+          key: "passportIssueCountry",
+          value: "Russian Federation",
+        }),
+        expect.objectContaining({
+          key: "gender",
+          value: "Male - Мужской",
+        }),
+        expect.objectContaining({
+          key: "passportType",
+          value: "Ordinary Passport",
+        }),
+      ]),
+    );
+  });
+
+  test("uses the current-year pivot for TD3 birth-date century inference", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS3001019M2602268<<<<<<<<<<<<<<08",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "high",
+      needsManualReview: true,
+      source: "local-ocr",
+      status: "extracted",
+    });
+    expect(result.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "birthDate",
+          value: "01.01.1930",
+        }),
+      ]),
+    );
+    expect(result.fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "birthDate",
+          value: "01.01.2030",
+        }),
+      ]),
+    );
+  });
+
+  test("rejects truncated TD3 MRZ line one even when line two is otherwise valid", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN",
+        "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      source: "edge-stub",
+      status: "unavailable",
+    });
+    expect(result.status).not.toBe("extracted");
+    expect(result.confidence).not.toBe("high");
+  });
+
+  test("rejects TD3 MRZ with invalid document-number check digit", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567890RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      source: "edge-stub",
+      status: "unavailable",
+    });
+  });
+
+  test("rejects TD3 MRZ with invalid birth-date check digit", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS9008200M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      status: "unavailable",
+    });
+  });
+
+  test("rejects TD3 MRZ with invalid expiry-date check digit", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS9008205M2602260<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      status: "unavailable",
+    });
+  });
+
+  test("validates clean 44-character composite check digit", () => {
+    const invalidComposite = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS9008205M2602268<<<<<<<<<<<<<<01",
+      ].join("\n"),
+    );
+    const noisyTail = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00RB",
+      ].join("\n"),
+    );
+
+    expect(invalidComposite).toMatchObject({
+      confidence: "low",
+      fields: [],
+      status: "unavailable",
+    });
+    expect(noisyTail).toMatchObject({
+      confidence: "medium",
+      needsManualReview: true,
+      source: "local-ocr",
+      status: "extracted",
+    });
+  });
+
+  test("normalizes OCR digit substitutions only in MRZ-critical numeric regions", () => {
+    const normalized = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "I234567897RUS9OO82O5M26O2268<<<<<<<<<<<<<<OO",
+      ].join("\n"),
+    );
+    const countryCodeNoise = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RU59008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(normalized).toMatchObject({
+      confidence: "high",
+      needsManualReview: true,
+      status: "extracted",
+    });
+    expect(normalized.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "firstName", value: "IVAN" }),
+        expect.objectContaining({ key: "passportNumber", value: "123456789" }),
+        expect.objectContaining({ key: "birthDate", value: "20.08.1990" }),
+        expect.objectContaining({ key: "passportExpiresAt", value: "26.02.2026" }),
+      ]),
+    );
+    expect(countryCodeNoise).toMatchObject({
+      confidence: "low",
+      fields: [],
+      status: "unavailable",
+    });
+  });
+
+  test("does not produce trusted extraction for malformed or partial MRZ text", () => {
+    for (const text of [
+      "",
+      "P<RUSIVANOV<<IVAN",
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS9008205M2602268",
+      ].join("\n"),
+    ]) {
+      expect(extractPassportMrzText(text)).toMatchObject({
+        confidence: "low",
+        fields: [],
+        needsManualReview: true,
+        status: "unavailable",
+      });
+    }
+  });
+
+  test("keeps unsupported PDF-only server input unavailable and manual-review only", async () => {
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({
+        applicantIndex: 0,
+        document: {
+          bucket: "submission-media",
+          mimeType: "application/pdf",
+          path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.pdf",
+          sizeBytes: 2048,
+        },
+      }),
+      durableOptions(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      source: "edge-stub",
+      status: "unavailable",
+      summary:
+        "Данные не удалось распознать автоматически. Требуется ручная проверка. Проверьте данные вручную.",
+    });
+  });
+
+  test("does not expose raw MRZ or passport PII in audit metadata or thrown errors", async () => {
+    const auditEvents: unknown[] = [];
+    const providerError = new Error(
+      "MRZ P<RUSIVANOV<<IVAN 123456789 20.08.1990 VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+    );
+    const response = await handlePassportExtractionRequest(
+      extractionRequest(),
+      durableOptions({
+        auditStore: {
+          record: (event) => {
+            auditEvents.push(event);
+            return Promise.resolve();
+          },
+        },
+        provider: {
+          extract: vi.fn(() => Promise.reject(providerError)),
+        },
+      }),
+    );
+    const body = await json(response);
+    const auditJson = JSON.stringify(auditEvents);
+
+    expect(response.status).toBe(502);
+    expect(body).toEqual({ error: "Passport extraction provider failed." });
+    for (const forbidden of [
+      "P<RUSIVANOV",
+      "IVANOV",
+      "IVAN",
+      "123456789",
+      "20.08.1990",
+      "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+    ]) {
+      expect(JSON.stringify(body)).not.toContain(forbidden);
+      expect(auditJson).not.toContain(forbidden);
+    }
+    expect(auditEvents.at(-1)).toMatchObject({
+      metadata: {
+        document_fingerprint: expect.stringMatching(/^passport-document:[0-9a-f]+$/),
+        safe_error_class: "provider_failed",
+      },
+    });
   });
 });
