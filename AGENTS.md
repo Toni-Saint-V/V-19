@@ -17,6 +17,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
   - `$verification-before-completion`
   - `$systematic-debugging`
 - Do not load all skills or plugins by default. Prefer 5-9 total skills for a task, including guardrails.
+- Use exactly one preset per task. A task-specific preset replaces the default preset unless the user names an extra guardrail or the risk clearly requires one.
 - Do not include UI/browser skills for backend or security tasks.
 - Do not include backend/security skills for pure UI polish unless the task actually needs them.
 - Do not include plugins unless the task explicitly needs their capability.
@@ -68,7 +69,7 @@ This repository is the local VisaFlow V-19 product checkout. Move the product wi
 - Title plus hamburger must use the same tokenized topbar control system as the toolbar: one shared surface, project font, dark gray menu button, `40px` control, `10px` radius.
 - Mobile cell contract: agent/review list surfaces have exactly two reusable mobile cell variants. Variant A: top line ID, main name/title, people count badge on the right only for family rows, route line with city dot dates, divider, then a dark-gray action button aligned right at about one quarter width. Variant B: same shell but bottom action/status text is inline muted/semantic instead of a right button. The extra applicant/family card grid form belongs only to `Выгрузка` and must use the same baseline colors/tokens.
 - Radius/motion tokens: controls `10px`, segmented `11px`, rows/cards `15px`, panels `16-18px`, transitions `140-180ms`, reduced-motion safe.
-- For UI/component replacement or polish, use the UI task preset only when the current task is UI-scoped, keep changes screen-scoped, capture fresh desktop/mobile runtime proof, write `premium-design-ux-review` when used, and fix all Critical/High/Medium findings before the next screen.
+- For UI/component replacement or polish, use the UI task preset as the selected preset only when the current task is UI-scoped, keep changes screen-scoped, capture fresh desktop/mobile runtime proof, write `premium-design-ux-review`, and fix all Critical/High/Medium findings before the next screen.
 
 ## Verification
 - Use targeted proof first: file inspection, focused scripts/tests, typecheck/build when relevant, browser/runtime proof for UI, screenshots under `docs/qa/`.
