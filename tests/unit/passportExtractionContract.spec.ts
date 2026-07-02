@@ -53,7 +53,7 @@ function durableOptions(
 }
 
 const validTd3Mrz = [
-  "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+  "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
   "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
 ].join("\n");
 
@@ -580,7 +580,7 @@ describe("passport extraction contract", () => {
   test("uses the current-year pivot for TD3 birth-date century inference", () => {
     const result = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567897RUS3001019M2602268<<<<<<<<<<<<<<08",
       ].join("\n"),
     );
@@ -609,10 +609,29 @@ describe("passport extraction contract", () => {
     );
   });
 
+  test("rejects truncated TD3 MRZ line one even when line two is otherwise valid", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN",
+        "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      source: "edge-stub",
+      status: "unavailable",
+    });
+    expect(result.status).not.toBe("extracted");
+    expect(result.confidence).not.toBe("high");
+  });
+
   test("rejects TD3 MRZ with invalid document-number check digit", () => {
     const result = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567890RUS9008205M2602268<<<<<<<<<<<<<<00",
       ].join("\n"),
     );
@@ -629,7 +648,7 @@ describe("passport extraction contract", () => {
   test("rejects TD3 MRZ with invalid birth-date check digit", () => {
     const result = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567897RUS9008200M2602268<<<<<<<<<<<<<<00",
       ].join("\n"),
     );
@@ -645,7 +664,7 @@ describe("passport extraction contract", () => {
   test("rejects TD3 MRZ with invalid expiry-date check digit", () => {
     const result = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567897RUS9008205M2602260<<<<<<<<<<<<<<00",
       ].join("\n"),
     );
@@ -661,13 +680,13 @@ describe("passport extraction contract", () => {
   test("validates clean 44-character composite check digit", () => {
     const invalidComposite = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567897RUS9008205M2602268<<<<<<<<<<<<<<01",
       ].join("\n"),
     );
     const noisyTail = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00RB",
       ].join("\n"),
     );
@@ -688,13 +707,13 @@ describe("passport extraction contract", () => {
   test("normalizes OCR digit substitutions only in MRZ-critical numeric regions", () => {
     const normalized = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "I234567897RUS9OO82O5M26O2268<<<<<<<<<<<<<<OO",
       ].join("\n"),
     );
     const countryCodeNoise = extractPassportMrzText(
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567897RU59008205M2602268<<<<<<<<<<<<<<00",
       ].join("\n"),
     );
@@ -724,7 +743,7 @@ describe("passport extraction contract", () => {
       "",
       "P<RUSIVANOV<<IVAN",
       [
-        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
         "1234567897RUS9008205M2602268",
       ].join("\n"),
     ]) {
