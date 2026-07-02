@@ -103,8 +103,8 @@ describe("passport extraction brief", () => {
     const brief = buildPassportExtractionBrief(ready);
 
     expect(brief.nextStep).toEqual({
-      action: "manual_entry",
-      label: "Заполните паспортные данные вручную",
+      action: "verify_review",
+      label: "Проверить срок действия паспорта",
     });
   });
 

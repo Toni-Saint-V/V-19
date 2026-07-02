@@ -67,6 +67,7 @@ const blockedByPendingReview: SubmissionAction[] = [
   "submit_corrections",
 ];
 const manualEntryLabel = "Заполните паспортные данные вручную";
+const expiredPassportReviewLabel = "Проверить срок действия паспорта";
 const guardrails = [
   "Распознавание паспорта не является официальной проверкой.",
   "Перед отправкой нужно вручную проверить распознанные поля.",
@@ -235,8 +236,8 @@ function nextStep(
   }
   if (hasExpiryBlocker) {
     return {
-      action: "manual_entry",
-      label: manualEntryLabel,
+      action: "verify_review",
+      label: expiredPassportReviewLabel,
     };
   }
   if (metrics.safeFieldsToApply > 0) {
