@@ -533,6 +533,30 @@ describe("AI helper shared contract", () => {
     expect(options.auditEvents[0]?.requestId).not.toBe("client-reused-id");
   });
 
+  test("fails closed without an explicit provider after audit and quota gates", async () => {
+    const options = durableOptions({ provider: undefined });
+
+    const response = await handleAiHelperRequest(
+      helperRequest("text_intake_review", agentActor),
+      options,
+    );
+
+    expect(response.status).toBe(502);
+    expect(await json(response)).toEqual({
+      error: "AI helper provider failed.",
+    });
+    expect(options.auditEvents).toEqual([
+      expect.objectContaining({
+        event: "ai_helper_invoked",
+        reason: "provider_attempt",
+      }),
+      expect.objectContaining({
+        event: "ai_helper_provider_failed",
+        reason: "AI helper provider failed.",
+      }),
+    ]);
+  });
+
   test("fails closed without server-side authorization before quota or provider execution", async () => {
     const provider = { generate: vi.fn() };
     const quotaStore = { consume: vi.fn(() => Promise.resolve({ remaining: 4 })) };
