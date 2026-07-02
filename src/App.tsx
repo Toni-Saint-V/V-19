@@ -13,7 +13,6 @@ import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchBar, StateTabs } from "./shared/ui/primitives";
 import {
-  adminActionQueue,
   agentActionQueue,
   searchAgentActions,
 } from "./modules/submissions/agentActions";
@@ -112,6 +111,7 @@ import { ConfirmationDialog } from "./modules/submissions/components/Primitives"
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
 import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSubmissionDrawer";
 import {
+  AdminReviewScreen,
   AgentActionsScreen,
   AgentInboxScreen,
   AgentSubmissionsScreen,
@@ -173,11 +173,6 @@ import { buildReturnedPdfAgentHandoffGate } from "./modules/submissions/operatio
 import { publishReturnedPdfAgentHandoff } from "./modules/submissions/returnedPdfHandoffPersistence";
 import type { AppProfile } from "./types/session";
 
-const FigmaActionQueueVisual = lazy(() =>
-  import("./modules/submissions/pages/FigmaVisualScreens").then((module) => ({
-    default: module.FigmaActionQueueVisual,
-  })),
-);
 const CreateSubmissionDrawer = lazy(() =>
   import("./modules/submissions/components/CreateSubmissionDrawer").then((module) => ({
     default: module.CreateSubmissionDrawer,
@@ -421,8 +416,7 @@ function localAgentOwnerIdForSession(session: LocalAuthSession | null) {
   return defaultLocalAgentOwnerId;
 }
 
-function reviewTabForAdminWork(tab: AdminWorkTab): ReviewTab | null {
-  if (tab === "events") return null;
+function reviewTabForAdminWork(tab: AdminWorkTab): ReviewTab {
   return tab;
 }
 
@@ -531,8 +525,7 @@ function MainApp() {
     ? submissionActionErrorForSubmission(submissionActionError, activeSubmission, role)
     : "";
   const summary = counts(visibleSubmissionsForRole);
-  const isFigmaVisualSurface =
-    surface === "agent-actions" || surface === "admin-review";
+  const isFigmaVisualSurface = surface === "agent-actions";
   const searchedAgentQueue = useMemo(
     () =>
       searchSubmissions(
@@ -600,18 +593,6 @@ function MainApp() {
     () => searchSubmissions(adminReviewSource, query, visualSurfaceCityFilter),
     [adminReviewSource, query, visualSurfaceCityFilter],
   );
-  const adminActions = useMemo(
-    () => adminActionQueue(searchedReviewQueue),
-    [searchedReviewQueue],
-  );
-  const searchedOpenAdminActions = useMemo(
-    () => searchAgentActions(adminActions.open, query),
-    [adminActions.open, query],
-  );
-  const searchedCompletedAdminActions = useMemo(
-    () => searchAgentActions(adminActions.completed, query),
-    [adminActions.completed, query],
-  );
   const adminWorkSubmissionCount = useMemo(
     () =>
       searchedReviewQueue.filter(
@@ -626,9 +607,7 @@ function MainApp() {
   );
   const reviewFilterTab = reviewTabForAdminWork(reviewTab);
   const reviewList = highestPriorityFirst(
-    reviewFilterTab
-      ? searchedReviewQueue.filter(matchesReviewTab(reviewFilterTab))
-      : [],
+    searchedReviewQueue.filter(matchesReviewTab(reviewFilterTab)),
   );
   const visibleAgentSubmission =
     agentList.find((submission) => submission.id === selectedSubmissionId) ??
@@ -676,7 +655,7 @@ function MainApp() {
   const workspaceSurfaceTitle =
     surface === "admin-review" ? "Проверка" : surfaceTitle(surface);
   const workspaceSurfaceDescription =
-    surface === "admin-review" ? "Проверка и события" : surfaceDescription(surface);
+    surface === "admin-review" ? "Проверка пакетов" : surfaceDescription(surface);
   const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
   const localAuthHasWorkspaceAccess =
     localAuthSession?.status === "active" &&
@@ -1198,11 +1177,9 @@ function MainApp() {
     const nextReviewFilterTab = reviewTabForAdminWork(tab);
 
     return (
-      (nextReviewFilterTab
-        ? highestPriorityFirst(
-            searchedReviewQueue.filter(matchesReviewTab(nextReviewFilterTab)),
-          )[0]
-        : searchedReviewQueue[0]) ?? searchedReviewQueue[0]
+      highestPriorityFirst(
+        searchedReviewQueue.filter(matchesReviewTab(nextReviewFilterTab)),
+      )[0] ?? searchedReviewQueue[0]
     );
   }
 
@@ -2488,6 +2465,13 @@ function MainApp() {
     );
   }
 
+  function chooseExportPackage(id: string) {
+    if (exportBusy) return;
+
+    selectedExportIdsRef.current = [id];
+    setSelectedExportIds([id]);
+  }
+
   async function generateExport() {
     if (!exportPlan.canGenerate || exportBusy) return;
 
@@ -3329,16 +3313,25 @@ function MainApp() {
             searchControl={agentActionsSearchControl}
           />
         ) : surface === "admin-review" ? (
-          <Suspense fallback={null}>
-            <FigmaActionQueueVisual
-              completedActions={searchedCompletedAdminActions}
-              onOpen={openSubmission}
-              onSearch={setQuery}
-              openActions={searchedOpenAdminActions}
-              query={query}
-              summary={adminActions.summary}
-            />
-          </Suspense>
+          <AdminReviewScreen
+            error={remoteSaveState === "error" ? remoteSaveError : ""}
+            filterControl={adminFilterControl}
+            loading={remoteSaveState === "loading"}
+            onOpen={openSubmission}
+            onRetryError={
+              remoteSaveState === "error"
+                ? () => void retryRemoteWorkspaceSave()
+                : undefined
+            }
+            onSelect={selectSubmission}
+            onTab={showReviewTab}
+            permissionDenied={role !== "admin"}
+            reviewList={reviewList}
+            reviewSource={searchedReviewQueue}
+            reviewTab={reviewTab}
+            searchControl={searchControl}
+            visibleSubmission={activeSubmission ?? null}
+          />
         ) : surface === "agent-inbox" ? (
           <>
             <div className="v19-inbox-mode-tabs">
@@ -3422,6 +3415,7 @@ function MainApp() {
             historyList={historyList}
             onDownload={downloadExport}
             onGenerate={generateExport}
+            onChoosePackage={chooseExportPackage}
             onMarkExported={markExported}
             onOpen={openSubmission}
             onTab={setExportTab}

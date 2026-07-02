@@ -130,12 +130,14 @@ test.describe("V-19 export click and section matrix", () => {
     await expect(page.locator("#export-action-hint")).toContainText(
       "Нельзя смешивать разные города",
     );
-    await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toBeDisabled();
-    await expect(
-      page.getByRole("button", { name: "Сформировать Excel" }),
-    ).toHaveAttribute("aria-describedby", "export-action-hint");
+    const generateButton = page.getByRole("button", { name: "Сформировать Excel" });
+    await expect(generateButton).toBeDisabled();
+    const disabledReasonId = await generateButton.getAttribute("aria-describedby");
+
+    expect(disabledReasonId, "generate disabled reason id").toBeTruthy();
+    await expect(page.locator(`[id="${disabledReasonId}"]`)).toContainText(
+      "Нельзя смешивать разные города",
+    );
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/export-click-section-matrix-20260629/export-desktop-blocked.png",
@@ -158,20 +160,20 @@ test.describe("V-19 export click and section matrix", () => {
     ).toBeVisible();
     await expectNoHorizontalOverflow(page, "mobile export");
 
-    const bulkSelect = page.getByRole("checkbox", {
-      name: "Выбрать все совместимые",
-    });
-    await expect(bulkSelect).toBeVisible();
-    await bulkSelect.check();
-    await expect(
-      page.locator(".export-contract-row").first().getByRole("checkbox"),
-    ).toBeChecked();
-    await page
-      .locator(".export-contract-row")
-      .first()
-      .getByRole("button", { name: "Смотреть пакет" })
-      .click();
-    await expect(page.getByLabel("Контекст выгрузки")).toBeVisible();
+    await expect(page.getByText(/1 \/ 4\s+Выбрать пакет/)).toBeVisible();
+    const olgaPackage = page
+      .locator(".v19-export-mobile-package")
+      .filter({ hasText: "Ольга Фролова" });
+
+    await expect(olgaPackage).toBeVisible();
+    await olgaPackage.getByRole("button", { name: "Выбрать пакет" }).click();
+    await expect(page.getByText(/2 \/ 4\s+Проверить условия/)).toBeVisible();
+    await expect(page.getByText("Пакет экспортируем")).toBeVisible();
+
+    const continueButton = page.getByRole("button", { name: "Продолжить" });
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
+    await expect(page.getByText(/3 \/ 4\s+Предпросмотр строк/)).toBeVisible();
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/export-click-section-matrix-20260629/export-mobile-390.png",

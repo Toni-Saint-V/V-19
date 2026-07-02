@@ -2292,7 +2292,7 @@
   min-height: 0;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1199px) {
   .v19-submission-drawer-frame {
     inset: var(--vf-ref-size-48px) 0 0 !important;
     width: 100vw !important;
@@ -19136,7 +19136,7 @@ p {
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1199px) {
   .v17-admin-work-screen .v19-collection-panel {
     padding: var(--vf-ref-size-16px);
   }
@@ -19409,7 +19409,7 @@ p {
   }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1199px) {
   .v17-admin-work-screen .v17-admin-work-toolbar {
     grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
@@ -32215,5 +32215,713 @@ p {
     max-width: calc(100vw - var(--v19-space-lg)) !important;
     padding: var(--v19-space-lg) var(--v19-space-md) !important;
     border-radius: var(--v19-radius-panel) !important;
+  }
+}
+
+/* Track C admin screens repair: late cascade owner for Review and Export. */
+.ops-shell.surface-admin-review .workspace > .v19-admin-review-screen,
+.ops-shell.surface-export .workspace > .export-grid.magic-export-stage {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.ops-shell.surface-admin-review .v19-admin-review-screen:not(.is-panel-closed) {
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(var(--vf-ref-size-360px), var(--vf-ref-size-420px)) !important;
+}
+
+.ops-shell.surface-admin-review .v19-admin-review-screen > .v19-collection-panel {
+  grid-column: 1 !important;
+  min-width: 0 !important;
+}
+
+.ops-shell.surface-admin-review .v19-admin-review-screen > .v19-admin-review-context {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+}
+
+.ops-shell.surface-admin-review
+  .v19-admin-review-screen:not(.is-panel-closed)
+  .v19-collection-toolbar {
+  width: 100% !important;
+}
+
+.ops-shell.surface-admin-review
+  .v19-admin-review-screen:not(.is-panel-closed)
+  .v19-toolbar-control-stack
+  .search {
+  margin-right: 0 !important;
+}
+
+@media (min-width: 1200px) {
+  .ops-shell.surface-admin-review
+    .v19-admin-review-screen:not(.is-panel-closed)
+    .v19-collection-toolbar {
+    grid-template-rows: var(--v19-control-height) var(--v19-control-height) !important;
+    row-gap: var(--v19-space-sm) !important;
+  }
+
+  .ops-shell.surface-admin-review
+    .v19-admin-review-screen:not(.is-panel-closed)
+    .v19-toolbar-primary-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    min-height: var(--v19-control-height) !important;
+    height: var(--v19-control-height) !important;
+  }
+
+  .ops-shell.surface-admin-review
+    .v19-admin-review-screen:not(.is-panel-closed)
+    .v19-toolbar-secondary-row {
+    min-height: var(--v19-control-height) !important;
+    height: var(--v19-control-height) !important;
+  }
+
+  .ops-shell.surface-admin-review
+    .v19-admin-review-screen:not(.is-panel-closed)
+    .v19-toolbar-control-stack
+    .search {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+
+  .ops-shell.surface-admin-review
+    .v19-admin-review-screen:not(.is-panel-closed)
+    .v19-toolbar-tools {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: center !important;
+  }
+}
+
+.ops-shell.surface-admin-review .v19-collection-panel.has-summary-strip {
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+  gap: var(--v19-space-sm) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.v19-admin-review-summary-strip {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: var(--v19-space-sm) !important;
+  min-width: 0 !important;
+}
+
+.v19-admin-review-summary-strip span {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: baseline !important;
+  gap: var(--v19-space-xs) !important;
+  min-height: var(--vf-ref-size-52px) !important;
+  padding: 0 var(--v19-space-md) !important;
+  border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  border-radius: var(--v19-radius-card) !important;
+  background: var(--v19-panel) !important;
+}
+
+.v19-admin-review-summary-strip strong {
+  color: var(--v19-fg) !important;
+  font-size: var(--vf-ref-size-22px) !important;
+  font-weight: var(--vf-ref-font-weight-720) !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.v19-admin-review-summary-strip em {
+  min-width: 0 !important;
+  color: var(--v19-fg-muted) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  font-style: normal !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-admin-review .v17-admin-work-note {
+  display: none !important;
+  min-height: var(--vf-ref-size-36px) !important;
+  padding: 0 var(--v19-space-md) !important;
+  border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  border-radius: var(--v19-radius-button) !important;
+  background: var(--v19-control) !important;
+}
+
+.ops-shell.surface-admin-review .v17-admin-work-list {
+  display: grid !important;
+  align-content: start !important;
+  gap: var(--v19-space-sm) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.ops-shell.surface-admin-review .v17-admin-work-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(var(--vf-ref-size-112px), auto) var(--vf-ref-size-136px) !important;
+  align-items: stretch !important;
+  gap: var(--v19-space-sm) !important;
+  min-width: 0 !important;
+  min-height: var(--vf-ref-size-96px) !important;
+  padding: var(--v19-space-sm) !important;
+  border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  border-radius: var(--v19-radius-card) !important;
+  background: var(--v19-panel) !important;
+}
+
+.ops-shell.surface-admin-review .v17-admin-work-row.is-selected {
+  border-color: var(--v19-line-strong) !important;
+  background: var(--v19-selected) !important;
+}
+
+.v19-admin-review-row-main {
+  display: grid !important;
+  grid-template-columns:
+    var(--vf-ref-size-32px)
+    minmax(var(--vf-ref-size-180px), 1.05fr)
+    minmax(var(--vf-ref-size-132px), 0.72fr)
+    minmax(var(--vf-ref-size-180px), 1fr)
+    minmax(var(--vf-ref-size-156px), 0.82fr) !important;
+  align-items: center !important;
+  gap: var(--v19-space-sm) !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  color: inherit !important;
+  background: transparent !important;
+  text-align: left !important;
+}
+
+.v19-admin-review-row-main:focus-visible,
+.ops-shell.surface-admin-review .v17-admin-row-action:focus-visible {
+  outline: var(--vf-ref-size-2px) solid var(--v19-focus-ring) !important;
+  outline-offset: var(--vf-ref-size-2px) !important;
+}
+
+.v19-admin-review-row-main :is(strong, small, em),
+.v19-admin-review-context :is(strong, small, em, dd, span),
+.v19-export-mobile-flow :is(strong, small, em, span, p) {
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.v19-admin-review-reason,
+.v19-admin-review-owner,
+.v17-admin-route-cell,
+.v17-admin-identity {
+  display: grid !important;
+  gap: var(--vf-ref-size-3px) !important;
+  min-width: 0 !important;
+}
+
+.v19-admin-review-reason em,
+.v19-admin-review-owner em,
+.v17-admin-route-cell em {
+  color: var(--v19-fg-muted) !important;
+  font-size: var(--vf-ref-size-11px) !important;
+  font-style: normal !important;
+}
+
+.v19-admin-review-context-body,
+.v19-admin-review-facts,
+.v19-admin-review-checklist,
+.v19-admin-review-issues {
+  display: grid !important;
+  gap: var(--v19-space-sm) !important;
+  min-width: 0 !important;
+}
+
+.v19-admin-review-facts {
+  margin: 0 !important;
+}
+
+.v19-admin-review-facts div,
+.v19-admin-review-check,
+.v19-admin-review-issues article {
+  display: grid !important;
+  gap: var(--vf-ref-size-3px) !important;
+  padding: var(--v19-space-sm) !important;
+  border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+  border-radius: var(--v19-radius-button) !important;
+  background: var(--v19-control) !important;
+}
+
+.v19-admin-review-facts dt,
+.v19-admin-review-check em,
+.v19-admin-review-issues span,
+.v19-admin-review-issues em {
+  color: var(--v19-fg-muted) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  font-style: normal !important;
+}
+
+.v19-admin-review-check {
+  grid-template-columns: var(--vf-ref-size-24px) minmax(0, 1fr) !important;
+  align-items: center !important;
+}
+
+.v19-admin-review-check em {
+  grid-column: 2 !important;
+}
+
+.v19-admin-review-check.is-ok span {
+  color: var(--vf-green, var(--v19-success)) !important;
+}
+
+.v19-admin-review-check.is-blocked span {
+  color: var(--vf-red, var(--v19-danger)) !important;
+}
+
+.v19-admin-review-check.is-pending span {
+  color: var(--vf-amber, var(--v19-warning)) !important;
+}
+
+.ops-shell.surface-export .v19-context-panel-body :is(.v17-blocker-callout, .magic-export-preview) {
+  display: grid !important;
+}
+
+.ops-shell.surface-export .magic-export-queue {
+  overflow-x: hidden !important;
+}
+
+.ops-shell.surface-export .data-table tbody tr.export-contract-row {
+  min-height: var(--vf-ref-size-96px) !important;
+}
+
+.ops-shell.surface-export .data-table tbody tr.export-contract-row td {
+  padding-top: var(--v19-space-sm) !important;
+  padding-bottom: var(--v19-space-sm) !important;
+}
+
+.ops-shell.surface-export .data-table .export-row-main {
+  gap: var(--vf-ref-size-4px) !important;
+  white-space: normal !important;
+}
+
+.ops-shell.surface-export .v19-export-mobile-flow {
+  display: none !important;
+}
+
+.ops-shell.surface-export .export-contract-row.is-blocked {
+  opacity: 0.92 !important;
+}
+
+.ops-shell.surface-export .export-contract-row.is-blocked .checkbox {
+  cursor: not-allowed !important;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    ) {
+    --v19-sidebar-width: var(--vf-ref-size-80px) !important;
+    grid-template-columns: var(--v19-sidebar-width) minmax(0, 1fr) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    .ops-sidebar {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    display: flex !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    .workspace {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    .v19-topbar-menu {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1199px) {
+  .ops-shell.surface-admin-review .workspace,
+  .ops-shell.surface-export .workspace {
+    overflow-x: hidden !important;
+  }
+
+  .ops-shell.surface-admin-review .v19-admin-review-screen {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: var(--v19-space-sm) !important;
+  }
+
+  .ops-shell.surface-admin-review .v19-admin-review-context {
+    display: none !important;
+  }
+
+  .ops-shell.surface-admin-review .v19-collection-panel.has-summary-strip {
+    grid-template-rows: auto auto minmax(0, 1fr) !important;
+    gap: var(--v19-space-sm) !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-note {
+    display: none !important;
+  }
+
+  .v19-admin-review-summary-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .v19-admin-review-summary-strip span {
+    min-height: var(--vf-ref-size-40px) !important;
+    padding: 0 var(--v19-space-sm) !important;
+  }
+
+  .v19-admin-review-summary-strip strong {
+    font-size: var(--vf-ref-size-18px) !important;
+  }
+
+  .v19-admin-review-summary-strip em {
+    font-size: var(--vf-ref-size-10px) !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-work-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    min-height: var(--vf-ref-size-144px) !important;
+    gap: var(--v19-space-sm) !important;
+    padding: var(--v19-space-md) !important;
+  }
+
+  .v19-admin-review-row-main {
+    grid-template-columns: var(--vf-ref-size-28px) minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto auto !important;
+  }
+
+  .v19-admin-review-row-main .v17-admin-route-cell,
+  .v19-admin-review-row-main .v19-admin-review-reason,
+  .v19-admin-review-row-main .v19-admin-review-owner {
+    grid-column: 2 !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-stage {
+    justify-self: start !important;
+  }
+
+  .ops-shell.surface-admin-review .v17-admin-row-action {
+    justify-self: end !important;
+    width: min(var(--vf-ref-size-132px), 42vw) !important;
+    min-height: var(--v19-control-height-touch) !important;
+  }
+
+  .ops-shell.surface-export .v17-export-context-rail,
+  .ops-shell.surface-export .v19-export-desktop-content {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .magic-export-queue {
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    gap: var(--v19-space-sm) !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.surface-export .workspace > .export-grid.magic-export-stage,
+  .ops-shell.surface-export .export-grid.magic-export-stage {
+    grid-template-columns: minmax(0, 1fr) !important;
+    justify-items: stretch !important;
+    width: 100% !important;
+  }
+
+  .ops-shell.surface-export .v17-export-intro {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .v19-export-toolbar,
+  .ops-shell.surface-export .v19-entity-switchbar {
+    display: none !important;
+  }
+
+  .ops-shell.surface-export .v19-export-mobile-flow {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: var(--v19-space-sm) !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .v19-export-mobile-step-head {
+    display: grid !important;
+    gap: var(--vf-ref-size-6px) !important;
+    min-height: var(--vf-ref-size-48px) !important;
+    padding: var(--v19-space-sm) var(--v19-space-md) !important;
+    border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+    border-radius: var(--v19-radius-button) !important;
+    background: var(--v19-control) !important;
+  }
+
+  .v19-export-mobile-step-head span {
+    display: flex !important;
+    gap: var(--vf-ref-size-6px) !important;
+  }
+
+  .v19-export-mobile-step-head i {
+    width: var(--vf-ref-size-8px) !important;
+    height: var(--vf-ref-size-8px) !important;
+    border-radius: var(--v19-radius-pill) !important;
+    background: var(--v19-line-strong) !important;
+  }
+
+  .v19-export-mobile-step-head i.is-complete {
+    background: var(--v19-accent) !important;
+  }
+
+  .v19-export-mobile-step-body {
+    display: grid !important;
+    align-content: start !important;
+    gap: var(--v19-space-sm) !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding-bottom: max(var(--v19-space-lg), env(safe-area-inset-bottom)) !important;
+  }
+
+  .v19-export-mobile-package,
+  .v19-export-mobile-preview-row,
+  .v19-export-mobile-summary,
+  .v19-export-mobile-checks {
+    display: grid !important;
+    gap: var(--vf-ref-size-6px) !important;
+    min-width: 0 !important;
+    padding: var(--v19-space-md) !important;
+    border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+    border-radius: var(--v19-radius-card) !important;
+    background: var(--v19-panel) !important;
+  }
+
+  .v19-export-mobile-package {
+    gap: var(--vf-ref-size-2px) !important;
+    padding: var(--v19-space-sm) !important;
+  }
+
+  .v19-export-mobile-package :is(strong, span) {
+    line-height: var(--vf-ref-line-height-1neg-16) !important;
+  }
+
+  .v19-export-mobile-package.is-selected {
+    border-color: var(--v19-line-strong) !important;
+    background: var(--v19-selected) !important;
+  }
+
+  .v19-export-mobile-package.is-blocked {
+    border-color: var(--vf-red-soft-border, var(--v19-line-strong)) !important;
+  }
+
+  .v19-export-mobile-package .mp-button,
+  .v19-export-mobile-step-footer .mp-button {
+    min-height: var(--v19-control-height-touch) !important;
+  }
+
+  .v19-export-mobile-step-footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    display: grid !important;
+    gap: var(--v19-space-sm) !important;
+    padding: var(--v19-space-sm) 0 max(var(--v19-space-sm), env(safe-area-inset-bottom)) !important;
+    background: var(--v19-panel) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .ops-shell.role-admin.surface-admin-review
+    .workspace
+    > .v19-admin-review-screen,
+  .ops-shell.role-admin.surface-admin-review
+    .workspace
+    > .v19-admin-review-screen:not(.is-panel-closed) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-screen
+    > .v19-collection-panel {
+    grid-column: 1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-admin-review-context {
+    display: none !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-collection-toolbar {
+    grid-template-rows: var(--v19-control-height-touch) var(--vf-ref-size-38px) !important;
+    gap: var(--v19-space-sm) !important;
+    min-height: 0 !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-toolbar-city-slot,
+  .ops-shell.role-admin.surface-admin-review .v19-toolbar-tools {
+    display: none !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-toolbar-primary-row {
+    min-height: var(--v19-control-height-touch) !important;
+    height: var(--v19-control-height-touch) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-toolbar-secondary-row {
+    min-height: var(--vf-ref-size-38px) !important;
+    height: var(--vf-ref-size-38px) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v17-admin-work-list
+    > .v17-admin-work-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    width: 100% !important;
+    min-height: var(--vf-ref-size-148px) !important;
+    height: auto !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v17-admin-work-row
+    > .v19-admin-review-row-main {
+    grid-template-columns: var(--vf-ref-size-28px) minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    gap: var(--vf-ref-size-6px) var(--v19-space-sm) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-row-main
+    .v17-admin-identity {
+    grid-column: 2 !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-row-main
+    .v17-admin-route-cell {
+    display: flex !important;
+    grid-column: 2 !important;
+    gap: var(--vf-ref-size-5px) !important;
+    align-items: center !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-row-main
+    .v17-admin-route-cell
+    em {
+    display: none !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-row-main
+    .v19-admin-review-reason,
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-row-main
+    .v19-admin-review-owner {
+    grid-column: 1 / -1 !important;
+    grid-template-columns: var(--vf-ref-size-64px) minmax(0, 1fr) !important;
+    align-items: baseline !important;
+    gap: var(--v19-space-sm) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-row-main
+    .v19-admin-review-owner
+    small {
+    grid-column: 2 !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-row-main
+    :is(.v19-admin-review-reason strong, .v19-admin-review-owner strong, .v19-admin-review-owner small) {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v17-admin-work-row > .v17-admin-stage {
+    justify-self: start !important;
+    align-self: center !important;
+    min-height: var(--vf-ref-size-28px) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v17-admin-work-row > .v17-admin-row-action {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    justify-self: end !important;
+    width: min(var(--vf-ref-size-132px), 42vw) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v17-admin-work-row.v19-admin-review-card {
+    grid-template-columns: minmax(0, 1fr) var(--vf-ref-size-112px) !important;
+    grid-template-rows: auto var(--v19-control-height-touch) !important;
+    min-height: var(--vf-ref-size-156px) !important;
+    padding: var(--vf-ref-size-8px) !important;
+    gap: var(--vf-ref-size-5px) var(--v19-space-sm) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    > .v19-admin-review-row-main {
+    grid-template-rows: auto auto auto auto !important;
+    gap: var(--vf-ref-size-3px) var(--v19-space-sm) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    :is(.v19-admin-review-reason, .v19-admin-review-owner) {
+    gap: var(--vf-ref-size-6px) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    :is(.v19-admin-review-reason em, .v19-admin-review-owner em, .v17-admin-route-cell small, .v19-admin-review-owner small) {
+    font-size: var(--vf-ref-size-10px) !important;
+    line-height: var(--vf-ref-line-height-1neg-15) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    :is(.v17-admin-identity strong, .v19-admin-review-reason strong, .v19-admin-review-owner strong) {
+    font-size: var(--vf-ref-size-12px) !important;
+    line-height: var(--vf-ref-line-height-1neg-16) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    > .v17-admin-stage {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    > .v17-admin-row-action {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
   }
 }
