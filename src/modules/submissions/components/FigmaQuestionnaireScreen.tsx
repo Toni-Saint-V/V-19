@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
@@ -86,6 +86,7 @@ type QuestionnaireFormData = {
   maritalStatus: string;
   passportExpiry: string;
   passportIssued: string;
+  passportIssuePlace: string;
   passportNumber: string;
   passportType: string;
   paymentSponsor: string;
@@ -259,6 +260,151 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
   }));
 }
 
+function applicantNameParts(name: string | undefined) {
+  const [surname = "", ...givenParts] = (name ?? "").trim().split(/\s+/);
+
+  return {
+    firstName: givenParts.join(" ").toUpperCase(),
+    surname: surname.toUpperCase(),
+  };
+}
+
+function fallbackQuestionnaireFormData(
+  applicantName: string | undefined,
+): QuestionnaireFormData {
+  const nameParts = applicantNameParts(applicantName);
+
+  return {
+    birthCountry: "USSR",
+    birthPlace: "MOSCOW",
+    citizenship: "RUSSIAN FEDERATION",
+    contactAddress: "LENINSKY PROSPECT 10-24",
+    contactEmail: "petrov@example.com",
+    contactPhone: "+7 921 555-44-33",
+    currentJob: "TECHNICAL DIRECTOR",
+    dob: "12.05.1985",
+    employerAddress: "MOSCOW, TVERSKAYA 7",
+    employerName: "OOO VECTOR",
+    firstEntryCountry: "SPAIN",
+    firstName: nameParts.firstName || "IVAN",
+    hotelAddress: "BARCELONA, CARRER DE MALLORCA 401",
+    hotelName: "HOTEL DIAGONAL",
+    maritalStatus: "Женат / Замужем (Married)",
+    passportExpiry: "18.09.2032",
+    passportIssued: "18.09.2022",
+    passportIssuePlace: "FMS 770-001",
+    passportNumber: "751234567",
+    passportType: "Обычный паспорт (Ordinary passport)",
+    paymentSponsor: "Сам заявитель",
+    paymentType: "Кредитная карта",
+    sex: "Мужской (Male)",
+    stayPurpose: "Туризм",
+    stayRoute: "MADRID - BARCELONA",
+    surname: nameParts.surname || "PETROV",
+    travelEnd: "31.07.2026",
+    travelStart: "22.07.2026",
+  };
+}
+
+function submissionFieldValue(
+  applicant: Submission["applicants"][number] | undefined,
+  fieldId: string,
+  fallback: string,
+) {
+  const value = applicant?.sections
+    .flatMap((section) => section.fields)
+    .find((field) => field.id === fieldId)
+    ?.value.trim();
+
+  return value || fallback;
+}
+
+function questionnaireFormDataFromSubmission(
+  submission: Submission,
+  applicantId: string,
+): QuestionnaireFormData {
+  const applicant =
+    submission.applicants.find((candidate) => candidate.id === applicantId) ??
+    submission.applicants[0];
+  const fallback = fallbackQuestionnaireFormData(applicant?.fullName);
+
+  return {
+    ...fallback,
+    birthCountry: submissionFieldValue(applicant, "birth-country", fallback.birthCountry),
+    birthPlace: submissionFieldValue(applicant, "birth-place", fallback.birthPlace),
+    citizenship: submissionFieldValue(applicant, "nationality", fallback.citizenship),
+    contactAddress: submissionFieldValue(
+      applicant,
+      "home-address",
+      fallback.contactAddress,
+    ),
+    contactEmail: submissionFieldValue(applicant, "email", fallback.contactEmail),
+    contactPhone: submissionFieldValue(
+      applicant,
+      "contact-number",
+      fallback.contactPhone,
+    ),
+    currentJob: submissionFieldValue(
+      applicant,
+      "occupation-specify",
+      submissionFieldValue(applicant, "occupation", fallback.currentJob),
+    ),
+    dob: submissionFieldValue(applicant, "birth-date", fallback.dob),
+    employerAddress: submissionFieldValue(
+      applicant,
+      "employer-address",
+      fallback.employerAddress,
+    ),
+    employerName: submissionFieldValue(
+      applicant,
+      "employer-name",
+      fallback.employerName,
+    ),
+    firstEntryCountry: submissionFieldValue(
+      applicant,
+      "first-entry-country",
+      fallback.firstEntryCountry,
+    ),
+    firstName: submissionFieldValue(applicant, "first-name", fallback.firstName),
+    hotelAddress: submissionFieldValue(applicant, "hotel-address", fallback.hotelAddress),
+    hotelName: submissionFieldValue(applicant, "hotel-name", fallback.hotelName),
+    maritalStatus: submissionFieldValue(
+      applicant,
+      "marital-status",
+      fallback.maritalStatus,
+    ),
+    passportExpiry: submissionFieldValue(
+      applicant,
+      "passport-expiry-date",
+      fallback.passportExpiry,
+    ),
+    passportIssued: submissionFieldValue(
+      applicant,
+      "passport-issue-date",
+      fallback.passportIssued,
+    ),
+    passportIssuePlace: submissionFieldValue(
+      applicant,
+      "passport-issue-place",
+      fallback.passportIssuePlace,
+    ),
+    passportNumber: submissionFieldValue(applicant, "passport-no", fallback.passportNumber),
+    passportType: submissionFieldValue(applicant, "passport-type", fallback.passportType),
+    paymentSponsor: submissionFieldValue(
+      applicant,
+      "cost-covered-by",
+      fallback.paymentSponsor,
+    ),
+    paymentType: submissionFieldValue(applicant, "means-of-support", fallback.paymentType),
+    sex: submissionFieldValue(applicant, "gender", fallback.sex),
+    stayPurpose: submissionFieldValue(applicant, "purpose", fallback.stayPurpose),
+    stayRoute: submissionFieldValue(applicant, "route", fallback.stayRoute),
+    surname: submissionFieldValue(applicant, "surname", fallback.surname),
+    travelEnd: submissionFieldValue(applicant, "departure-date", fallback.travelEnd),
+    travelStart: submissionFieldValue(applicant, "arrival-date", fallback.travelStart),
+  };
+}
+
 const focusableQuestionnaireFields: FocusableQuestionnaireField[] = [
   {
     fieldId: "passport-type",
@@ -314,6 +460,7 @@ function sameFieldLabel(left?: string, right?: string) {
 
 function focusableFieldFor(field?: string) {
   return focusableQuestionnaireFields.find((target) =>
+    sameFieldLabel(target.fieldId, field) ||
     target.labels.some((label) => sameFieldLabel(label, field)),
   );
 }
@@ -337,43 +484,29 @@ export function FigmaQuestionnaireScreen({
   onComplete,
   submission,
 }: FigmaQuestionnaireScreenProps) {
-  const applicants = applicantTabs(submission);
+  const applicants = useMemo(() => applicantTabs(submission), [submission]);
   const initialFieldTarget = focusableFieldFor(initialFocus?.field);
+  const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
   const [activeApplicant, setActiveApplicant] = useState(
-    initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1",
+    initialApplicantId,
   );
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
-  const [formData, setFormData] = useState<QuestionnaireFormData>({
-    birthCountry: "USSR",
-    birthPlace: "MOSCOW",
-    citizenship: "RUSSIAN FEDERATION",
-    contactAddress: "LENINSKY PROSPECT 10-24",
-    contactEmail: "petrov@example.com",
-    contactPhone: "+7 921 555-44-33",
-    currentJob: "TECHNICAL DIRECTOR",
-    dob: "12.05.1985",
-    employerAddress: "MOSCOW, TVERSKAYA 7",
-    employerName: "OOO VECTOR",
-    firstEntryCountry: "SPAIN",
-    firstName: applicants[0]?.name.split(" ")[1]?.toUpperCase() || "IVAN",
-    hotelAddress: "BARCELONA, CARRER DE MALLORCA 401",
-    hotelName: "HOTEL DIAGONAL",
-    maritalStatus: "Женат / Замужем (Married)",
-    passportExpiry: "18.09.2032",
-    passportIssued: "18.09.2022",
-    passportNumber: "751234567",
-    passportType: "Обычный паспорт (Ordinary passport)",
-    paymentSponsor: "Сам заявитель",
-    paymentType: "Кредитная карта",
-    sex: "Мужской (Male)",
-    stayPurpose: "Туризм",
-    stayRoute: "MADRID - BARCELONA",
-    surname: applicants[0]?.name.split(" ")[0]?.toUpperCase() || "PETROV",
-    travelEnd: "31.07.2026",
-    travelStart: "22.07.2026",
-  });
+  const sourceFormData = useMemo(
+    () => questionnaireFormDataFromSubmission(submission, activeApplicant),
+    [activeApplicant, submission],
+  );
+  const [formData, setFormData] = useState<QuestionnaireFormData>(() => sourceFormData);
+
+  useEffect(() => {
+    if (applicants.some((applicant) => applicant.id === activeApplicant)) return;
+    setActiveApplicant(applicants[0]?.id ?? "app-1");
+  }, [activeApplicant, applicants]);
+
+  useEffect(() => {
+    setFormData(sourceFormData);
+  }, [sourceFormData]);
 
   const sections: Array<SectionTab & { id: SectionId }> = [
     { id: "personal", meta: "11 полей", status: "issue", title: "Личные данные" },
@@ -504,7 +637,14 @@ export function FigmaQuestionnaireScreen({
             value={formData.passportExpiry}
             onChange={(value) => updateField("passportExpiry", value)}
           />
-          <FormField excelMap="Cell: C6" fullWidth label="Кем выдан" number="16" value="FMS 770-001" />
+          <FormField
+            excelMap="Cell: C6"
+            fullWidth
+            label="Кем выдан"
+            number="16"
+            value={formData.passportIssuePlace}
+            onChange={(value) => updateField("passportIssuePlace", value)}
+          />
         </>
       );
     }

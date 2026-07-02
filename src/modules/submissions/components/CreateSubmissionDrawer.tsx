@@ -1,4 +1,4 @@
-import { type ChangeEvent, type DragEvent, useEffect, useRef, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { invokePassportExtraction } from "../passportExtractionService";
 import {
-  CANONICAL_CITIES,
   type City,
   type PassportExtractedField,
   type PassportExtractedFieldKey,
@@ -299,12 +298,10 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
 }
 
 export function CreateSubmissionDrawer({
-  city,
   familyCount,
   focusCloseToken = 0,
   onClose,
   onCreate,
-  onCity,
   onFamilyCount,
   onPassportFilesSelected,
   onType,
@@ -327,7 +324,6 @@ export function CreateSubmissionDrawer({
   const applicantCount = type === "family" ? familyCount : 1;
   const passportFileInputRef = useRef<HTMLInputElement | null>(null);
   const headerCloseButtonRef = useRef<HTMLButtonElement | null>(null);
-  const passportCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const uploadBatchRef = useRef(0);
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [passportFileError, setPassportFileError] = useState("");
@@ -350,7 +346,6 @@ export function CreateSubmissionDrawer({
     applicantCount,
     type,
   );
-  const primaryActionAvailable = passportReady;
   const passportReadinessSummary = passportReady
     ? "Все паспорта приняты. Данные проверит оператор."
     : type === "family"
@@ -372,13 +367,6 @@ export function CreateSubmissionDrawer({
     }
     setActiveApplicantIndex(0);
     setPassportUploads((current) => prunePassportUploads(current, nextApplicantCount));
-  }
-
-  function handleCityChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextCity = event.currentTarget.value;
-    const cityOption = CANONICAL_CITIES.find((candidate) => candidate === nextCity);
-    if (!cityOption) return;
-    onCity(cityOption);
   }
 
   function updatePreliminaryIntake<Key extends keyof PreliminaryIntakeDraft>(
@@ -549,7 +537,6 @@ export function CreateSubmissionDrawer({
     window.setTimeout(() => {
       const candidates = [
         headerCloseButtonRef.current,
-        passportCloseButtonRef.current,
       ].filter((element): element is HTMLButtonElement => Boolean(element));
       const visibleCandidate =
         candidates.find((element) => element.offsetParent !== null) ?? candidates[0];
@@ -618,30 +605,6 @@ export function CreateSubmissionDrawer({
           {createStep === "passport" ? (
             <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
               <div className="flex flex-col gap-6">
-                <div className="create-passport-topbar">
-                  <button
-                    ref={passportCloseButtonRef}
-                    className="create-passport-back"
-                    type="button"
-                    aria-label="Закрыть создание"
-                    onClick={onClose}
-                  >
-                    <ArrowLeft className="w-[18px] h-[18px]" />
-                  </button>
-                  <div className="min-w-0">
-                    <h2>Паспорт</h2>
-                    <span>{type === "family" ? `${applicantCount} заявителя` : "1 заявитель"}</span>
-                  </div>
-                  <button
-                    disabled={!primaryActionAvailable}
-                    className="create-passport-next"
-                    type="button"
-                    onClick={handlePrimaryAction}
-                  >
-                    Дальше
-                  </button>
-                </div>
-
                 <section
                   className="rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
                   aria-label="Тип подачи"
@@ -676,29 +639,6 @@ export function CreateSubmissionDrawer({
                       </button>
                     ))}
                   </div>
-                </section>
-
-                <section className="rounded-[14px] border border-[#202124] bg-[#121214] p-3.5">
-                  <label
-                    className="grid gap-2 text-[12px] text-white/60"
-                    htmlFor="create-submission-city"
-                  >
-                    <span className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
-                      Город подачи
-                    </span>
-                    <select
-                      className="h-10 rounded-[8px] border border-[#242529] bg-[#161617] px-3 text-[13px] font-medium text-white/80 outline-none transition-colors hover:border-white/12 focus:border-white/24"
-                      id="create-submission-city"
-                      value={city}
-                      onChange={handleCityChange}
-                    >
-                      {CANONICAL_CITIES.map((candidate) => (
-                        <option key={candidate} value={candidate}>
-                          {candidate}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                 </section>
 
                 {type === "family" ? (
@@ -1158,6 +1098,16 @@ export function CreateSubmissionDrawer({
               onClick={() => onCreate(passportUploads, preliminaryIntake)}
             >
               Сохранить черновик
+            </button>
+            <button
+              disabled={!passportReady}
+              className={`create-passport-next v19-create-footer-action v19-create-footer-action--primary ${
+                passportReady ? "is-enabled" : "is-disabled"
+              }`}
+              type="button"
+              onClick={handlePrimaryAction}
+            >
+              Продолжить
             </button>
           </div>
         </footer>

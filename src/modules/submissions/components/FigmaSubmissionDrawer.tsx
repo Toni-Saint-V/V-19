@@ -1,6 +1,7 @@
 import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -30,6 +31,14 @@ import {
   type V19DrawerTab,
 } from "../../../shared/ui/v19-design-system";
 import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
+import { AiHelperSurfacePanel } from "./AiHelperSurfacePanel";
+import { AiReadinessQueuePanel } from "./AiReadinessQueuePanel";
+import {
+  targetElementId,
+  tabForTarget,
+  type WorkspaceTarget,
+} from "../workspaceModel";
+import type { SubmissionNextStepAction } from "../submissionNextStepEngine";
 import type {
   DrawerTab,
   Role,
@@ -103,6 +112,8 @@ type FigmaSubmissionDetail = {
 type FigmaSubmissionDrawerProps = {
   activeTab: DrawerTab;
   actionError?: string;
+  focusTarget?: WorkspaceTarget;
+  onClearFocusTarget?: () => void;
   onAction: (action: SubmissionAction) => void;
   onClose: () => void;
   onMarkIssueFixed?: (issueId: string) => void;
@@ -289,16 +300,29 @@ function documentPackageItems(submission: Submission) {
 
 const OverviewTab = ({
   data,
+  onPrimaryAction,
+  role,
   submission,
+  surface,
 }: {
   data: FigmaSubmissionDetail;
+  onPrimaryAction: (action: SubmissionNextStepAction) => void;
+  role: Role;
   submission: Submission;
+  surface: "agent" | "review" | "export";
 }) => {
   const documentItems = documentPackageItems(submission);
   const readyFilesCount = submission.files.filter(isFileReady).length;
 
   return (
     <div className="space-y-6">
+      <AiHelperSurfacePanel
+        role={role}
+        submission={submission}
+        surface={surface}
+        onPrimaryAction={onPrimaryAction}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
           <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-5">
@@ -579,6 +603,11 @@ const FilesTab = ({
 
                     return (
                       <div
+                        id={targetElementId({
+                          applicantId: file.applicantId,
+                          fileType: file.type,
+                          tab: "files",
+                        })}
                         className="v19-drawer-file-item"
                         key={file.id}
                       >
@@ -639,16 +668,19 @@ const IssuesTab = ({
   data,
   onMarkIssueFixed,
   onOpenQuestionnaire,
+  onOpenTarget,
   role,
   submission,
 }: {
   data: FigmaSubmissionDetail;
   onMarkIssueFixed?: (issueId: string) => void;
   onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
+  onOpenTarget: (target: WorkspaceTarget) => void;
   role: Role;
   submission: Submission;
 }) => (
   <div className="space-y-6">
+    <AiReadinessQueuePanel submission={submission} onOpenTarget={onOpenTarget} />
     <h3 className="text-[16px] font-semibold text-white">Замечания</h3>
     {data.issuesCount > 0 ? (
       <div className="space-y-3">
@@ -661,6 +693,7 @@ const IssuesTab = ({
 
             return (
             <div
+              id={targetElementId({ issueId: issue.id, tab: "issues" })}
               key={issue.id}
               className="relative p-4 bg-white/[0.02] border border-orange-500/15 rounded-xl hover:bg-orange-500/[0.03] transition-colors"
             >
@@ -797,9 +830,24 @@ function initialTab(tab: DrawerTab): TabId {
   return "overview";
 }
 
+function tabIdForWorkspaceTarget(target: WorkspaceTarget): TabId {
+  return initialTab(tabForTarget(target));
+}
+
+function questionnaireFocusFromTarget(target: WorkspaceTarget): QuestionnaireFocusTarget | undefined {
+  if (target.tab !== "questionnaire") return undefined;
+  return {
+    applicantId: target.applicantId,
+    field: target.field,
+    section: target.section,
+  };
+}
+
 export function FigmaSubmissionDrawer({
   activeTab,
   actionError = "",
+  focusTarget,
+  onClearFocusTarget,
   onAction,
   onClose,
   onMarkIssueFixed,
@@ -816,6 +864,30 @@ export function FigmaSubmissionDrawer({
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
   const data = useMemo(() => buildDetail(submission), [submission]);
   const primaryAction = getPrimaryAction(submission, role, surface);
+  const pendingTargetRef = useRef<WorkspaceTarget | null>(null);
+
+  const openWorkspaceTarget = useCallback((target: WorkspaceTarget) => {
+    pendingTargetRef.current = target;
+
+    if (target.tab === "questionnaire") {
+      setTab("questionnaire");
+      if (role === "agent") onOpenQuestionnaireWorkspace(questionnaireFocusFromTarget(target));
+      return;
+    }
+
+    setTab(tabIdForWorkspaceTarget(target));
+  }, [onOpenQuestionnaireWorkspace, role]);
+
+  function handleAiPrimaryAction(action: SubmissionNextStepAction) {
+    if (action.disabled) return;
+
+    if (action.target) {
+      openWorkspaceTarget(action.target);
+      return;
+    }
+
+    if (action.submissionAction) onAction(action.submissionAction);
+  }
 
   useEffect(() => {
     previouslyFocusedElementRef.current =
@@ -831,6 +903,30 @@ export function FigmaSubmissionDrawer({
     const timer = window.setTimeout(() => setStatus("success"), 260);
     return () => window.clearTimeout(timer);
   }, [activeTab, submission.id]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    openWorkspaceTarget(focusTarget);
+  }, [focusTarget, openWorkspaceTarget, submission.id]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+    const target = pendingTargetRef.current;
+    if (!target) return;
+
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(targetElementId(target));
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.classList.add("is-ai-focus");
+        window.setTimeout(() => element.classList.remove("is-ai-focus"), 1800);
+      }
+      pendingTargetRef.current = null;
+      onClearFocusTarget?.();
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [onClearFocusTarget, status, tab, submission.id]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1014,7 +1110,13 @@ export function FigmaSubmissionDrawer({
                   transition={{ duration: 0.2 }}
                 >
                   {tab === "overview" ? (
-                    <OverviewTab data={data} submission={submission} />
+                    <OverviewTab
+                      data={data}
+                      role={role}
+                      submission={submission}
+                      surface={surface}
+                      onPrimaryAction={handleAiPrimaryAction}
+                    />
                   ) : null}
                   {tab === "questionnaire" ? (
                     <QuestionnaireTab
@@ -1032,6 +1134,7 @@ export function FigmaSubmissionDrawer({
                       data={data}
                       onMarkIssueFixed={onMarkIssueFixed}
                       onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
+                      onOpenTarget={openWorkspaceTarget}
                       role={role}
                       submission={submission}
                     />

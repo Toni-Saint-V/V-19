@@ -866,8 +866,8 @@ describe("V-19 submission actions", () => {
         review: "Проверка ожидает",
       },
       status: "error",
-      statusLabel: "Ошибка",
-      statusLine: "Ошибка: файлы не готовы",
+      statusLabel: "Требует исправления",
+      statusLine: "Требует исправления: файлы не готовы",
     });
     expect(fileErrorTask?.importanceText).toBe("Без этого подачу нельзя продолжить.");
     expect(fileErrorTask?.reason).toContain("файл требует замены");

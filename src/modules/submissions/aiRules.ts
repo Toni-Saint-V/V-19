@@ -1,4 +1,5 @@
 import { fileTypeLabels } from "./status";
+import { buildIdentityConsistencyReport, type IdentityConsistencyFinding } from "./identityConsistency";
 import {
   passportGateIssues,
   type PassportGateIssue,
@@ -10,6 +11,7 @@ export function generateAiSuggestions(submission: Submission): AiSuggestion[] {
     ...questionnaireSuggestions(submission),
     ...fileSuggestions(submission),
     ...passportGuardSuggestions(submission),
+    ...identityConsistencySuggestions(submission),
   ];
 
   return suggestions.filter((suggestion) => !hasMatchingIssue(submission, suggestion));
@@ -90,6 +92,47 @@ function passportGuardSuggestions(submission: Submission): AiSuggestion[] {
     status: "suggested" as const,
     createdAt: "сейчас",
   }));
+}
+
+function identityConsistencySuggestions(submission: Submission): AiSuggestion[] {
+  const report = buildIdentityConsistencyReport(submission);
+
+  return report.findings
+    .filter((finding) => finding.severity !== "info")
+    .map((finding) => ({
+      id: suggestionId(
+        submission.id,
+        finding.applicantId,
+        "identity",
+        `${finding.code}-${finding.field}`,
+      ),
+      type: "field" as const,
+      target: {
+        applicantId: finding.applicantId,
+        applicantName: finding.applicantName,
+        section: "Анкета",
+        field: finding.label,
+      },
+      title: identitySuggestionTitle(finding),
+      reason: finding.message,
+      confidence: "high" as const,
+      severity: finding.severity === "critical" ? ("blocker" as const) : ("warning" as const),
+      status: "suggested" as const,
+      createdAt: "сейчас",
+    }));
+}
+
+function identitySuggestionTitle(finding: IdentityConsistencyFinding) {
+  if (finding.code === "identity_source_mismatch") {
+    return `Сверить источник истины: ${finding.label}`;
+  }
+  if (finding.code === "identity_questionnaire_missing_from_source") {
+    return `Заполнить из подтверждённого источника: ${finding.label}`;
+  }
+  if (finding.code === "passport_ocr_unverified") {
+    return "Подтвердить распознанные паспортные данные";
+  }
+  return `Проверить PDF анкеты: ${finding.label}`;
 }
 
 function passportGateFieldLabel(issue: PassportGateIssue) {

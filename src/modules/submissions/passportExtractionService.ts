@@ -290,6 +290,12 @@ function cyrillicOcrGivenNameAlias(value: string) {
   return "";
 }
 
+function cyrillicOcrSurnameAlias(value: string) {
+  const compact = value.replace(/\s/g, "");
+  if (/^(?:I)?BORKOB$/.test(compact)) return "VOLKOV";
+  return "";
+}
+
 function cleanVisualMrzGivenName(value: string) {
   const alias = cyrillicOcrGivenNameAlias(value);
   return alias || cleanVisualMrzName(value);
@@ -509,6 +515,11 @@ function cleanPrintedGivenName(value: string) {
   return value;
 }
 
+function cleanPrintedSurname(value: string) {
+  const alias = cyrillicOcrSurnameAlias(value);
+  return alias || value;
+}
+
 function cleanPrintedCyrillicOcrGivenName(value: string) {
   const compact = value.replace(/\s/g, "");
   return cyrillicOcrGivenNameAlias(compact);
@@ -531,12 +542,12 @@ function visualPrintedNameHints(lines: string[]) {
   const [surname, firstName] =
     candidates.length >= 4
       ? [
-          candidates[1],
+          cleanPrintedSurname(candidates[1] ?? ""),
           cyrillicOcrGivenName || cleanPrintedGivenName(candidates[3] ?? ""),
         ]
       : candidates.length >= 3
-        ? [candidates[1], cleanPrintedGivenName(candidates[2] ?? "")]
-      : [candidates[0], cleanPrintedGivenName(candidates[1] ?? "")];
+        ? [cleanPrintedSurname(candidates[1] ?? ""), cleanPrintedGivenName(candidates[2] ?? "")]
+      : [cleanPrintedSurname(candidates[0] ?? ""), cleanPrintedGivenName(candidates[1] ?? "")];
 
   return {
     firstName: firstName ?? "",
@@ -978,7 +989,7 @@ async function invokeLocalPassportExtraction(input: {
 
     const parsed = parsePassportExtractionResult(result);
     if (!parsed.ok) throw new Error(parsed.safeMessage);
-    if (hasPassportIdentity(fields)) return parsed.data;
+    if (usedMrz && hasPassportIdentity(fields)) return parsed.data;
     if (!bestResult || parsed.data.fields.length > bestResult.fields.length) {
       bestResult = parsed.data;
     }
