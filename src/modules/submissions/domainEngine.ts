@@ -527,7 +527,9 @@ function ensureNotTerminal(submission: Submission): CommandResult<Submission> | 
 
 function acceptanceBlockingIssues(submission: Submission) {
   return submission.issues.filter(
-    (issue) => issue.status === "open" || isFixedIssueStatus(issue.status),
+    (issue) =>
+      issue.severity === "blocker" &&
+      (issue.status === "open" || isFixedIssueStatus(issue.status)),
   );
 }
 

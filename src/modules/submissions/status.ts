@@ -275,7 +275,9 @@ export function isFixedIssueStatus(status: Issue["status"]) {
 
 export function acceptanceBlockingIssueCount(submission: Submission) {
   return submission.issues.filter(
-    (issue) => issue.status === "open" || isFixedIssueStatus(issue.status),
+    (issue) =>
+      issue.severity === "blocker" &&
+      (issue.status === "open" || isFixedIssueStatus(issue.status)),
   ).length;
 }
 
@@ -451,7 +453,7 @@ export function canPerformAction(
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
-  if (action === "close_issues_accept" && openIssueCount(submission) > 0) {
+  if (action === "close_issues_accept" && blockerCount(submission) > 0) {
     return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
