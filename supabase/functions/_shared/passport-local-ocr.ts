@@ -365,41 +365,122 @@ export function normalizeLocalOcrTextToMrzCandidateText(text: string): string {
     .replace(/[«»]/g, "<")
     .replace(/\r/g, "\n")
     .split(/\n+/)
-    .map((line) => line.replace(/[^A-Z0-9<]/g, "").trim())
+    .map(normalizeMrzCandidateLine)
     .filter(Boolean);
 
   const td3Candidate = td3CandidateLines(lines);
   if (td3Candidate) return td3Candidate.join("\n");
 
-  return lines.filter(isMrzCandidateLine).slice(0, 4).join("\n");
+  return "";
 }
 
 function td3CandidateLines(lines: string[]): [string, string] | undefined {
   for (let index = 0; index < lines.length - 1; index += 1) {
-    const line1 = lines[index] ?? "";
-    const line2 = lines[index + 1] ?? "";
-    if (isTd3Line1Candidate(line1) && isTd3Line2Candidate(line2)) {
-      return [line1.slice(0, 44), line2.slice(0, 44)];
+    for (
+      let line1End = index;
+      line1End < Math.min(lines.length - 1, index + 4);
+      line1End += 1
+    ) {
+      const line1 = td3Line1Candidate(lines.slice(index, line1End + 1).join(""));
+      if (!line1) continue;
+
+      const line2 = td3Line2Candidate(
+        lines.slice(line1End + 1, Math.min(lines.length, line1End + 5)).join(""),
+      );
+      if (line2) return [line1, line2];
+    }
+  }
+
+  const compactedText = lines.join("");
+  for (let index = 0; index <= compactedText.length - 84; index += 1) {
+    if (compactedText.slice(index, index + 2) !== "P<") continue;
+
+    for (let line1Length = 44; line1Length >= 40; line1Length -= 1) {
+      const line1 = td3Line1Candidate(compactedText.slice(index, index + line1Length));
+      const line2 = td3Line2Candidate(
+        compactedText.slice(index + line1Length, index + line1Length + 44),
+      );
+      if (line1 && line2) {
+        return [line1, line2];
+      }
     }
   }
   return undefined;
 }
 
-function isTd3Line1Candidate(line: string) {
-  return line.length >= 44 && /^P<[A-Z0-9<]{42}/.test(line);
+function normalizeMrzCandidateLine(line: string) {
+  return line.replace(/[^A-Z0-9<]/g, "").trim();
 }
 
-function isTd3Line2Candidate(line: string) {
-  return (
-    line.length >= 44 &&
-    /^[A-Z0-9<]{44}/.test(line) &&
-    /\d/.test(line.slice(0, 10)) &&
-    /^[A-Z0-9<]{3}$/.test(line.slice(10, 13))
-  );
+function td3Line1Candidate(line: string): string | undefined {
+  const candidate = line.slice(0, 44);
+  if (
+    candidate.length < 40 ||
+    candidate.length > 44 ||
+    !/^P<[A-Z0-9<]+$/.test(candidate) ||
+    !candidate.includes("<<")
+  ) {
+    return undefined;
+  }
+
+  const normalized =
+    `${candidate.slice(0, 2)}${normalizeMrzCountryCode(candidate.slice(2, 5))}${candidate.slice(5)}`.padEnd(
+      44,
+      "<",
+    );
+  return /^P<[A-Z]{3}[A-Z0-9<]{39}$/.test(normalized) ? normalized : undefined;
 }
 
-function isMrzCandidateLine(line: string) {
-  return line.length >= 20 && line.length <= 60 && line.includes("<");
+function td3Line2Candidate(line: string): string | undefined {
+  const candidate = normalizeTd3Line2Candidate(line.slice(0, 44));
+  return candidate.length === 44 &&
+    /^[A-Z0-9<]{44}$/.test(candidate) &&
+    /\d/.test(candidate.slice(0, 10)) &&
+    /^[A-Z]{3}$/.test(candidate.slice(10, 13))
+    ? candidate
+    : undefined;
+}
+
+function normalizeTd3Line2Candidate(line: string) {
+  return line
+    .split("")
+    .map((character, index) => {
+      if (index >= 10 && index <= 12) return normalizeMrzLetter(character);
+      if (
+        index === 9 ||
+        (index >= 13 && index <= 19) ||
+        (index >= 21 && index <= 27) ||
+        index === 42 ||
+        index === 43
+      ) {
+        return normalizeMrzDigit(character);
+      }
+      return character;
+    })
+    .join("");
+}
+
+function normalizeMrzCountryCode(value: string) {
+  return value
+    .split("")
+    .map((character) => normalizeMrzLetter(character))
+    .join("");
+}
+
+function normalizeMrzDigit(character: string) {
+  if (character === "O") return "0";
+  if (character === "I") return "1";
+  if (character === "B") return "8";
+  if (character === "S") return "5";
+  return character;
+}
+
+function normalizeMrzLetter(character: string) {
+  if (character === "0") return "O";
+  if (character === "1") return "I";
+  if (character === "8") return "B";
+  if (character === "5") return "S";
+  return character;
 }
 
 export async function extractPassportWithLocalOcr(

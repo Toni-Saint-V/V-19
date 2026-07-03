@@ -63,6 +63,15 @@ const validTd3Mrz = [
   "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
 ].join("\n");
 
+const validTd3Dob1930Mrz = [
+  "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+  "1234567897RUS3001019M2602268<<<<<<<<<<<<<<08",
+].join("\n");
+
+function spacedMrzLine(line: string) {
+  return line.split("").join(" ");
+}
+
 interface FakeLocalCommandOutput {
   code: number;
   stderr: Uint8Array;
@@ -1271,7 +1280,48 @@ describe("passport extraction contract", () => {
     }
   });
 
+  test("keeps normalized local OCR candidates unavailable when MRZ checks fail", async () => {
+    const [line1 = "", line2 = ""] = validTd3Dob1930Mrz.split("\n");
+    const materializer = tempPassportMaterializer();
+    const invalidCheckDigitLine2 = `${line2.slice(0, 43)}9`;
+
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: new Uint8Array(),
+        stdout: encoder.encode([line1.slice(0, -2), invalidCheckDigitLine2].join("\n")),
+        success: true,
+      },
+      async () => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({ applicantIndex: 0 }),
+          durableOptions({
+            provider: createLocalPassportOcrProvider(
+              {
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              },
+              { materializer },
+            ),
+          }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await json(response)).toMatchObject({
+          fields: [],
+          needsManualReview: true,
+          ocr: {
+            reason: "local_ocr_no_mrz",
+          },
+          status: "unavailable",
+        });
+        expect(materializer.materialize).toHaveBeenCalledOnce();
+      },
+    );
+  });
+
   test("extracts valid local CLI TD3 only through the existing MRZ parser", async () => {
+    const [line1 = ""] = validTd3Dob1930Mrz.split("\n");
     const materializer = tempPassportMaterializer();
     await withFakeDenoCommand(
       {
@@ -1280,8 +1330,8 @@ describe("passport extraction contract", () => {
         stdout: encoder.encode(
           [
             "visible OCR text before MRZ",
-            "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
-            "1234567897RUS3001019M2602268<<<<<<<<<<<<<<08",
+            line1.slice(0, -2),
+            "1234567897RUS3OO1O19M26O2268<<<<<<<<<<<<<<O8",
             "visible OCR text after MRZ",
           ].join("\n"),
         ),
@@ -1562,7 +1612,23 @@ describe("passport extraction contract", () => {
     );
   });
 
-  test("normalizes local OCR output to MRZ candidate characters only", () => {
+  test("normalizes spaced local OCR TD3 text to two candidate lines", () => {
+    const [line1 = "", line2 = ""] = validTd3Mrz.split("\n");
+    const candidateText = normalizeLocalOcrTextToMrzCandidateText(
+      [
+        "ignore this line",
+        spacedMrzLine(line1),
+        spacedMrzLine(line2),
+        "residence line hidden",
+      ].join("\n"),
+    );
+
+    expect(candidateText).toBe(validTd3Mrz);
+    expect(candidateText).toMatch(/^[A-Z0-9<\n]+$/);
+    expect(candidateText).not.toContain("residence");
+  });
+
+  test("normalizes noisy local OCR output to TD3 candidate characters only", () => {
     const candidateText = normalizeLocalOcrTextToMrzCandidateText(
       [
         "ignore this line",
@@ -1575,6 +1641,40 @@ describe("passport extraction contract", () => {
     expect(candidateText).toBe(validTd3Mrz);
     expect(candidateText).toMatch(/^[A-Z0-9<\n]+$/);
     expect(candidateText).not.toContain("residence");
+  });
+
+  test("pads short TD3 line one filler without bypassing the existing parser", () => {
+    const [line1 = "", line2 = ""] = validTd3Dob1930Mrz.split("\n");
+    const candidateText = normalizeLocalOcrTextToMrzCandidateText(
+      [line1.slice(0, -2), line2].join("\n"),
+    );
+    const parsed = extractPassportMrzText(candidateText);
+
+    expect(candidateText).toBe(validTd3Dob1930Mrz);
+    expect(parsed).toMatchObject({
+      confidence: "high",
+      needsManualReview: true,
+      status: "extracted",
+    });
+    expect(parsed.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "birthDate", value: "01.01.1930" }),
+      ]),
+    );
+  });
+
+  test("reconstructs joined TD3 output with short line one before parser validation", () => {
+    const [line1 = "", line2 = ""] = validTd3Dob1930Mrz.split("\n");
+    const candidateText = normalizeLocalOcrTextToMrzCandidateText(
+      `noise before ${line1.slice(0, -2)}${line2} noise after`,
+    );
+
+    expect(candidateText).toBe(validTd3Dob1930Mrz);
+    expect(extractPassportMrzText(candidateText)).toMatchObject({
+      confidence: "high",
+      needsManualReview: true,
+      status: "extracted",
+    });
   });
 
   test("keeps server local OCR source free of cloud and browser OCR paths", () => {
