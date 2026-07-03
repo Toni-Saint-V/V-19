@@ -55,58 +55,65 @@ export function extractPassportMrzText(
 
 export function parseTd3PassportMrz(
   text: string,
-): { confidence: PassportExtractionConfidence; fields: PassportExtractionField[] } | null {
+): {
+  confidence: PassportExtractionConfidence;
+  fields: PassportExtractionField[];
+} | null {
   const lines = normalizeMrzText(text);
-  const line1Index = lines.findIndex((line) =>
-    /^P<[A-Z]{3}[A-Z0-9<]{39}$/.test(line),
-  );
-  if (line1Index < 0) return null;
+  const line1Pattern = /^P<[A-Z]{3}[A-Z0-9<]{39}$/;
 
-  const line1 = lines[line1Index] ?? "";
-  const line2Raw =
-    lines
-      .slice(line1Index + 1)
-      .find((line) => line.length >= 44 && /^[A-Z0-9<]+$/.test(line)) ?? "";
-  if (!line2Raw) return null;
+  for (let line1Index = 0; line1Index < lines.length; line1Index += 1) {
+    const line1 = lines[line1Index] ?? "";
+    if (!line1Pattern.test(line1)) continue;
 
-  const line2Candidate = td3Line2Candidates(line2Raw).find((candidate) =>
-    hasValidTd3Line2(candidate),
-  );
-  if (!line2Candidate) return null;
+    const nextLine1Index = lines.findIndex(
+      (line, index) => index > line1Index && line1Pattern.test(line),
+    );
+    const line2SearchEnd = nextLine1Index === -1 ? lines.length : nextLine1Index;
+    const line2Rows = lines
+      .slice(line1Index + 1, line2SearchEnd)
+      .filter((line) => line.length >= 44 && /^[A-Z0-9<]+$/.test(line));
+    const line2Candidate = line2Rows
+      .flatMap((line) => td3Line2Candidates(line))
+      .find((candidate) => hasValidTd3Line2(candidate));
+    if (!line2Candidate) continue;
 
-  const line2 = line2Candidate.line;
-  const surname = cleanMrzName(line1.slice(5).split("<<")[0] ?? "");
-  const firstName = cleanMrzName(line1.slice(5).split("<<").slice(1).join("<"));
-  if (!surname || !firstName) return null;
+    const line2 = line2Candidate.line;
+    const surname = cleanMrzName(line1.slice(5).split("<<")[0] ?? "");
+    const firstName = cleanMrzName(line1.slice(5).split("<<").slice(1).join("<"));
+    if (!surname || !firstName) continue;
 
-  const issuingCountryCode = line1.slice(2, 5).replace(/</g, "");
-  const citizenshipCode = line2.slice(10, 13).replace(/</g, "");
-  const birthDate = parseMrzDate(line2.slice(13, 19), "birth");
-  const expiryDate = parseMrzDate(line2.slice(21, 27), "expiry");
-  if (!birthDate || !expiryDate) return null;
+    const issuingCountryCode = line1.slice(2, 5).replace(/</g, "");
+    const citizenshipCode = line2.slice(10, 13).replace(/</g, "");
+    const birthDate = parseMrzDate(line2.slice(13, 19), "birth");
+    const expiryDate = parseMrzDate(line2.slice(21, 27), "expiry");
+    if (!birthDate || !expiryDate) continue;
 
-  const confidence: PassportExtractionConfidence =
-    line2Candidate.compositeCheckValidated ? "high" : "medium";
-  const gender = line2.slice(20, 21);
-  const passportNumber = line2.slice(0, 9).replace(/</g, "").trim();
+    const confidence: PassportExtractionConfidence =
+      line2Candidate.compositeCheckValidated ? "high" : "medium";
+    const gender = line2.slice(20, 21);
+    const passportNumber = line2.slice(0, 9).replace(/</g, "").trim();
 
-  const fields = [
-    mrzField("surname", surname, confidence),
-    mrzField("firstName", firstName, confidence),
-    mrzField("passportNumber", passportNumber, confidence),
-    mrzField("birthDate", birthDate, confidence),
-    mrzField("passportExpiresAt", expiryDate, confidence),
-    mrzField("citizenship", countryLabel(citizenshipCode), confidence),
-    mrzField(
-      "gender",
-      gender === "M" ? "Male - Мужской" : gender === "F" ? "Female - Женский" : "",
-      confidence,
-    ),
-    mrzField("passportType", "Ordinary Passport", confidence),
-    mrzField("passportIssueCountry", countryLabel(issuingCountryCode), confidence),
-  ].filter((field): field is PassportExtractionField => Boolean(field));
+    const fields = [
+      mrzField("surname", surname, confidence),
+      mrzField("firstName", firstName, confidence),
+      mrzField("passportNumber", passportNumber, confidence),
+      mrzField("birthDate", birthDate, confidence),
+      mrzField("passportExpiresAt", expiryDate, confidence),
+      mrzField("citizenship", countryLabel(citizenshipCode), confidence),
+      mrzField(
+        "gender",
+        gender === "M" ? "Male - Мужской" : gender === "F" ? "Female - Женский" : "",
+        confidence,
+      ),
+      mrzField("passportType", "Ordinary Passport", confidence),
+      mrzField("passportIssueCountry", countryLabel(issuingCountryCode), confidence),
+    ].filter((field): field is PassportExtractionField => Boolean(field));
 
-  return fields.length ? { confidence, fields } : null;
+    if (fields.length) return { confidence, fields };
+  }
+
+  return null;
 }
 
 function unavailablePassportMrzResult(applicantIndex?: number): PassportExtractionResult {

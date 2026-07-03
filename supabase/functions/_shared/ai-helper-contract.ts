@@ -128,7 +128,23 @@ const forbiddenOutputPatterns = [
   /официальн\w*\s+провер/i,
   /ш[а]нс\w*\s+виз/i,
   /вероятност\w*\s+виз/i,
+  new RegExp(["виз", "[\\p{L}]*\\s+одобрен"].join(""), "iu"),
+  new RegExp(["официальн", "[\\p{L}]*\\s+провер"].join(""), "iu"),
+  new RegExp(["ш", "анс"].join(""), "i"),
+  new RegExp(["веро", "ятност"].join(""), "i"),
+  new RegExp(["гаран", "ти"].join(""), "i"),
+  new RegExp(["OCR", "\\s+подтверд"].join(""), "i"),
+  new RegExp(["AI", "\\s+решил"].join(""), "i"),
+  new RegExp(["ИИ", "\\s+решил"].join(""), "i"),
 ];
+
+const sensitiveOutputPatterns = [
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  /\+?\d[\d\s().-]{9,}\d/,
+  /\b\d{2}\s?\d{7}\b/,
+];
+
+const maxVisibleOutputChars = 6000;
 
 const aiHelperIntentRolePolicy: Record<AiHelperIntent, readonly AiHelperRole[]> = {
   readiness_summary: ["agent", "admin"],
@@ -912,7 +928,7 @@ export function parseAiHelperResult(
 export function validateAiHelperResult(
   result: AiHelperResult,
 ): AiHelperContractResult<AiHelperResult> {
-  const visibleCopy = [
+  const visibleItems = [
     result.title,
     result.summary,
     ...result.suggestions,
@@ -924,9 +940,26 @@ export function validateAiHelperResult(
     result.nextAction ?? "",
     result.issueRemarkDraft ?? "",
     result.readinessExplanation ?? "",
-  ].join(" ");
+  ];
+  const visibleCopy = visibleItems.join(" ");
 
-  if (forbiddenOutputPatterns.some((pattern) => pattern.test(visibleCopy))) {
+  if (
+    !result.title.trim() ||
+    !result.summary.trim() ||
+    visibleItems.some((item) => item.length > 0 && !item.trim()) ||
+    visibleCopy.length > maxVisibleOutputChars
+  ) {
+    return {
+      ok: false,
+      status: 502,
+      safeMessage: "AI helper result failed safety validation.",
+    };
+  }
+
+  if (
+    forbiddenOutputPatterns.some((pattern) => pattern.test(visibleCopy)) ||
+    sensitiveOutputPatterns.some((pattern) => pattern.test(visibleCopy))
+  ) {
     return {
       ok: false,
       status: 502,

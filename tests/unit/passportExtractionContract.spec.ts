@@ -221,6 +221,21 @@ describe("passport extraction contract", () => {
     });
 
     expect(unsafeNestedPath.ok).toBe(false);
+
+    const unsupportedMime = parsePassportExtractionRequest({
+      document: {
+        bucket: "submission-media",
+        mimeType: "image/gif",
+        path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.gif",
+        sizeBytes: 1024,
+      },
+    });
+
+    expect(unsupportedMime).toMatchObject({
+      ok: false,
+      safeMessage: "Passport document reference is unsafe.",
+      status: 400,
+    });
   });
 
   test("fails closed without server-side authorization", async () => {
@@ -860,6 +875,35 @@ describe("passport extraction contract", () => {
     );
   });
 
+  test("accepts only the valid TD3 candidate when OCR returns invalid and valid MRZ blocks", () => {
+    const invalidLine2 = "1234567890RUS9008205M2602268<<<<<<<<<<<<<<00";
+    const result = extractPassportMrzText(
+      [
+        "OCR page header",
+        "P<RUSINVALID<<CANDIDATE<<<<<<<<<<<<<<<<<<<<<",
+        invalidLine2,
+        "middle page noise",
+        ...validTd3Dob1930Mrz.split("\n"),
+        "OCR page footer",
+      ].join("\n"),
+    );
+
+    expect(result).toMatchObject({
+      confidence: "high",
+      needsManualReview: true,
+      source: "local-ocr",
+      status: "extracted",
+    });
+    expect(result.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "firstName", value: "IVAN" }),
+        expect.objectContaining({ key: "passportNumber", value: "123456789" }),
+        expect.objectContaining({ key: "birthDate", value: "01.01.1930" }),
+      ]),
+    );
+    expect(JSON.stringify(result.fields)).not.toContain("CANDIDATE");
+  });
+
   test("rejects truncated TD3 MRZ line one even when line two is otherwise valid", () => {
     const result = extractPassportMrzText(
       ["P<RUSIVANOV<<IVAN", "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00"].join("\n"),
@@ -1233,6 +1277,92 @@ describe("passport extraction contract", () => {
         );
       },
     );
+  });
+
+  test("cleans up the temp passport file after failed local OCR parsing", async () => {
+    const cleanup = vi.fn(() => Promise.resolve());
+    const materializer = {
+      materialize: vi.fn(() =>
+        Promise.resolve({
+          cleanup,
+          ok: true as const,
+          path: "/tmp/visaflow-passport-ocr-failure.jpg",
+        }),
+      ),
+    };
+
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: new Uint8Array(),
+        stdout: encoder.encode("no usable mrz candidate in this OCR output"),
+        success: true,
+      },
+      async ({ calls }) => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({ applicantIndex: 0 }),
+          durableOptions({
+            provider: createLocalPassportOcrProvider(
+              {
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              },
+              { materializer },
+            ),
+          }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await json(response)).toMatchObject({
+          fields: [],
+          ocr: {
+            provider: "local_ocr_unavailable",
+            reason: "local_ocr_no_mrz",
+          },
+          status: "unavailable",
+        });
+        expect(calls[0]?.options.args[0]).toBe(
+          "/tmp/visaflow-passport-ocr-failure.jpg",
+        );
+        expect(calls[0]?.options.args).not.toContain(
+          "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+        );
+        expect(cleanup).toHaveBeenCalledOnce();
+      },
+      { tempPath: "/tmp/visaflow-passport-ocr-failure.jpg" },
+    );
+  });
+
+  test("keeps local OCR timeout unavailable without leaking provider diagnostics", async () => {
+    const auditEvents: unknown[] = [];
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ applicantIndex: 0 }),
+      durableOptions({
+        auditStore: {
+          record: (event) => {
+            auditEvents.push(event);
+            return Promise.resolve();
+          },
+        },
+        provider: {
+          recognizeText: vi.fn(() =>
+            Promise.resolve({
+              ok: false as const,
+              provider: "local_ocr_unavailable" as const,
+              reason: "local_ocr_timeout" as const,
+            }),
+          ),
+        },
+      }),
+    );
+    const safeOutput = JSON.stringify([await json(response), auditEvents]);
+
+    expect(response.status).toBe(200);
+    expect(safeOutput).toContain("local_ocr_timeout");
+    expect(safeOutput).not.toContain("stdout");
+    expect(safeOutput).not.toContain("stderr");
+    expect(safeOutput).not.toContain("P<RUS");
+    expect(safeOutput).not.toContain("72 1190482");
   });
 
   test("keeps OCR noise and partial TD3 unavailable for manual review", async () => {
