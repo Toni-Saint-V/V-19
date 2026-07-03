@@ -15,6 +15,8 @@ Deno.serve((request) =>
     request,
     createSupabaseRestPassportExtractionDependencies({
       PASSPORT_EXTRACTION_AUDIT_TABLE: Deno.env.get("PASSPORT_EXTRACTION_AUDIT_TABLE"),
+      PASSPORT_OCR_COMMAND: Deno.env.get("PASSPORT_OCR_COMMAND"),
+      PASSPORT_OCR_PROVIDER: Deno.env.get("PASSPORT_OCR_PROVIDER"),
       SUPABASE_FUNCTION_ADMIN_KEY: Deno.env.get("SUPABASE_FUNCTION_ADMIN_KEY"),
       SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
     }),

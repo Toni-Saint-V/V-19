@@ -14,7 +14,10 @@ import {
   type PassportExtractionProvider,
   type PassportExtractionRequest,
 } from "./passport-extraction-contract.ts";
-import { extractPassportWithLocalOcr } from "./passport-local-ocr.ts";
+import {
+  createLocalPassportOcrProvider,
+  extractPassportWithLocalOcr,
+} from "./passport-local-ocr.ts";
 
 export const passportExtractionCorsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -259,6 +262,8 @@ export async function handlePassportExtractionRequest(
 
 interface SupabaseRestPassportExtractionEnv {
   PASSPORT_EXTRACTION_AUDIT_TABLE?: string;
+  PASSPORT_OCR_COMMAND?: string;
+  PASSPORT_OCR_PROVIDER?: string;
   SUPABASE_FUNCTION_ADMIN_KEY?: string;
   SUPABASE_URL?: string;
 }
@@ -458,6 +463,10 @@ export function createSupabaseRestPassportExtractionDependencies(
         };
       },
     },
+    provider: createLocalPassportOcrProvider({
+      PASSPORT_OCR_COMMAND: env.PASSPORT_OCR_COMMAND,
+      PASSPORT_OCR_PROVIDER: env.PASSPORT_OCR_PROVIDER,
+    }),
     auditStore: {
       async record(event) {
         const response = await fetchFn(`${supabaseUrl}/rest/v1/${auditTable}`, {
