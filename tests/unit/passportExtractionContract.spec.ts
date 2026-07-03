@@ -81,14 +81,24 @@ interface FakeLocalCommandCall {
   options: FakeLocalCommandOptions;
 }
 
+interface FakeLocalRuntimeState {
+  calls: FakeLocalCommandCall[];
+  removals: string[];
+  writes: Array<{ bytes: Uint8Array; path: string }>;
+}
+
 const encoder = new TextEncoder();
 
 async function withFakeDenoCommand(
   output: FakeLocalCommandOutput,
-  run: (calls: FakeLocalCommandCall[]) => Promise<void>,
+  run: (state: FakeLocalRuntimeState) => Promise<void>,
+  options: { tempPath?: string } = {},
 ) {
   const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Deno");
   const calls: FakeLocalCommandCall[] = [];
+  const removals: string[] = [];
+  const writes: Array<{ bytes: Uint8Array; path: string }> = [];
+  const tempPath = options.tempPath ?? "/tmp/visaflow-passport-ocr.jpg";
 
   class FakeCommand {
     constructor(command: string, options: FakeLocalCommandOptions) {
@@ -107,11 +117,20 @@ async function withFakeDenoCommand(
     configurable: true,
     value: {
       Command: FakeCommand,
+      makeTempFile: vi.fn(() => Promise.resolve(tempPath)),
+      remove: vi.fn((path: string) => {
+        removals.push(path);
+        return Promise.resolve();
+      }),
+      writeFile: vi.fn((path: string, bytes: Uint8Array) => {
+        writes.push({ bytes, path });
+        return Promise.resolve();
+      }),
     },
   });
 
   try {
-    await run(calls);
+    await run({ calls, removals, writes });
   } finally {
     if (previousDescriptor) {
       Object.defineProperty(globalThis, "Deno", previousDescriptor);
@@ -119,6 +138,40 @@ async function withFakeDenoCommand(
       delete (globalThis as { Deno?: unknown }).Deno;
     }
   }
+}
+
+async function withFakeDenoRuntime(
+  runtime: Record<string, unknown>,
+  run: () => Promise<void>,
+) {
+  const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Deno");
+
+  Object.defineProperty(globalThis, "Deno", {
+    configurable: true,
+    value: runtime,
+  });
+
+  try {
+    await run();
+  } finally {
+    if (previousDescriptor) {
+      Object.defineProperty(globalThis, "Deno", previousDescriptor);
+    } else {
+      delete (globalThis as { Deno?: unknown }).Deno;
+    }
+  }
+}
+
+function tempPassportMaterializer(path = "/tmp/visaflow-passport-ocr.jpg") {
+  return {
+    materialize: vi.fn(() =>
+      Promise.resolve({
+        ok: true as const,
+        path,
+        cleanup: vi.fn(() => Promise.resolve()),
+      }),
+    ),
+  };
 }
 
 describe("passport extraction contract", () => {
@@ -305,6 +358,8 @@ describe("passport extraction contract", () => {
         return Response.json([
           {
             applicant_id: "applicant-1",
+            mime_type: "image/jpeg",
+            size_bytes: 1024,
             storage_bucket: "submission-media",
             storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
             submission_id: "VF-1",
@@ -371,6 +426,8 @@ describe("passport extraction contract", () => {
         return Response.json([
           {
             applicant_id: "applicant-1",
+            mime_type: "image/jpeg",
+            size_bytes: 1024,
             storage_bucket: "submission-media",
             storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
             submission_id: "VF-1",
@@ -431,6 +488,8 @@ describe("passport extraction contract", () => {
         return Response.json([
           {
             applicant_id: "applicant-1",
+            mime_type: "image/jpeg",
+            size_bytes: 1024,
             storage_bucket: "submission-media",
             storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
             submission_id: "VF-1",
@@ -445,7 +504,9 @@ describe("passport extraction contract", () => {
         throw new Error("Passport extraction must not reserve paid provider attempts.");
       }
       if (url.includes("/storage/v1/object/submission-media/")) {
-        throw new Error("Passport extraction must not read raw files for paid fallback.");
+        throw new Error(
+          "Passport extraction must not read raw files for paid fallback.",
+        );
       }
       if (url === paidApiUrl) {
         throw new Error("Passport extraction must not call OpenAI.");
@@ -460,14 +521,14 @@ describe("passport extraction contract", () => {
     const response = await handlePassportExtractionRequest(
       extractionRequest({ allowOpenAiFallback: true }),
       createSupabaseRestPassportExtractionDependencies(
-        ({
+        {
           [`${"OPENAI"}_API_KEY`]: "server-openai-key",
           PASSPORT_EXTRACTION_PROVIDER_ENABLED: "true",
           PASSPORT_EXTRACTION_PROVIDER_ORDER: "openai",
           PASSPORT_EXTRACTION_OPENAI_MODEL: "gpt-4o-mini",
           SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
           SUPABASE_URL: "https://project.supabase.co",
-        } as unknown) as Parameters<
+        } as unknown as Parameters<
           typeof createSupabaseRestPassportExtractionDependencies
         >[0],
         fetchMock as unknown as typeof fetch,
@@ -480,11 +541,9 @@ describe("passport extraction contract", () => {
       source: "local-ocr",
       status: "unavailable",
     });
-    expect(
-      fetchMock.mock.calls.some(
-        ([input]) => String(input) === paidApiUrl,
-      ),
-    ).toBe(false);
+    expect(fetchMock.mock.calls.some(([input]) => String(input) === paidApiUrl)).toBe(
+      false,
+    );
     expect(auditEvents.at(-1)).toMatchObject({
       metadata: {
         confidence: "low",
@@ -519,6 +578,8 @@ describe("passport extraction contract", () => {
         return Response.json([
           {
             applicant_id: "applicant-1",
+            mime_type: "image/jpeg",
+            size_bytes: 1024,
             storage_bucket: "submission-media",
             storage_path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
             submission_id: "VF-1",
@@ -550,6 +611,74 @@ describe("passport extraction contract", () => {
     expect(await json(response)).toEqual({
       error: "Passport extraction is not allowed for this submission.",
     });
+  });
+
+  test("denies Supabase extraction when caller forges registered media metadata", async () => {
+    const storagePath = "VF-1/applicant-1/passport_scan/v19abc_passport_scan.pdf";
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            mime_type: "application/pdf",
+            size_bytes: 4096,
+            storage_bucket: "submission-media",
+            storage_path: storagePath,
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/storage/v1/object/submission-media/")) {
+        throw new Error("Forged metadata must not trigger storage download.");
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: new Uint8Array(),
+        stdout: encoder.encode(validTd3Mrz),
+        success: true,
+      },
+      async ({ calls, writes }) => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({
+            document: {
+              bucket: "submission-media",
+              mimeType: "image/jpeg",
+              path: storagePath,
+              sizeBytes: 1024,
+            },
+          }),
+          createSupabaseRestPassportExtractionDependencies(
+            {
+              PASSPORT_OCR_COMMAND: "tesseract",
+              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+              SUPABASE_URL: "https://project.supabase.co",
+            },
+            fetchMock as unknown as typeof fetch,
+          ),
+        );
+
+        expect(response.status).toBe(403);
+        expect(await json(response)).toMatchObject({
+          error: "Passport document is not registered for extraction.",
+        });
+        expect(calls).toEqual([]);
+        expect(writes).toEqual([]);
+      },
+    );
   });
 
   test("rejects incomplete local OCR output and keeps unavailable fallback honest", () => {
@@ -724,10 +853,7 @@ describe("passport extraction contract", () => {
 
   test("rejects truncated TD3 MRZ line one even when line two is otherwise valid", () => {
     const result = extractPassportMrzText(
-      [
-        "P<RUSIVANOV<<IVAN",
-        "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
-      ].join("\n"),
+      ["P<RUSIVANOV<<IVAN", "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00"].join("\n"),
     );
 
     expect(result).toMatchObject({
@@ -943,10 +1069,95 @@ describe("passport extraction contract", () => {
       ocr: {
         attempted: true,
         provider: "local_ocr_unavailable",
-        reason: "local_ocr_unavailable",
+        reason: "local_ocr_command_not_allowed",
       },
       status: "unavailable",
     });
+  });
+
+  test("skips configured local CLI OCR for PDF before materialization or command", async () => {
+    const materializer = tempPassportMaterializer();
+
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: new Uint8Array(),
+        stdout: encoder.encode(validTd3Mrz),
+        success: true,
+      },
+      async ({ calls }) => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({
+            applicantIndex: 0,
+            document: {
+              bucket: "submission-media",
+              mimeType: "application/pdf",
+              path: "VF-1/applicant-1/passport_scan/v19abc_passport_scan.pdf",
+              sizeBytes: 2048,
+            },
+          }),
+          durableOptions({
+            provider: createLocalPassportOcrProvider(
+              {
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              },
+              { materializer },
+            ),
+          }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await json(response)).toMatchObject({
+          fields: [],
+          needsManualReview: true,
+          ocr: {
+            reason: "local_ocr_unsupported_mime",
+          },
+          status: "unavailable",
+        });
+        expect(calls).toEqual([]);
+        expect(materializer.materialize).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  test("fails closed before materialization when local command runtime is unavailable", async () => {
+    const materializer = tempPassportMaterializer();
+
+    await withFakeDenoRuntime(
+      {
+        makeTempFile: vi.fn(() => Promise.resolve("/tmp/visaflow-passport-ocr.jpg")),
+        remove: vi.fn(() => Promise.resolve()),
+        writeFile: vi.fn(() => Promise.resolve()),
+      },
+      async () => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({ applicantIndex: 0 }),
+          durableOptions({
+            provider: createLocalPassportOcrProvider(
+              {
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              },
+              { materializer },
+            ),
+          }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await json(response)).toMatchObject({
+          fields: [],
+          needsManualReview: true,
+          ocr: {
+            provider: "local_ocr_unavailable",
+            reason: "local_ocr_runtime_unavailable",
+          },
+          status: "unavailable",
+        });
+        expect(materializer.materialize).not.toHaveBeenCalled();
+      },
+    );
   });
 
   test("fails closed when local CLI OCR command fails without exposing command output", async () => {
@@ -955,6 +1166,7 @@ describe("passport extraction contract", () => {
       "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
     ].join("\n");
     const auditEvents: unknown[] = [];
+    const materializer = tempPassportMaterializer();
 
     await withFakeDenoCommand(
       {
@@ -963,7 +1175,7 @@ describe("passport extraction contract", () => {
         stdout: encoder.encode(`stdout ${sensitiveMrzFixture}`),
         success: false,
       },
-      async (calls) => {
+      async ({ calls }) => {
         const response = await handlePassportExtractionRequest(
           extractionRequest({ applicantIndex: 0 }),
           durableOptions({
@@ -973,10 +1185,13 @@ describe("passport extraction contract", () => {
                 return Promise.resolve();
               },
             },
-            provider: createLocalPassportOcrProvider({
-              PASSPORT_OCR_COMMAND: "tesseract",
-              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
-            }),
+            provider: createLocalPassportOcrProvider(
+              {
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              },
+              { materializer },
+            ),
           }),
         );
         const body = await json(response);
@@ -987,12 +1202,7 @@ describe("passport extraction contract", () => {
           {
             command: "tesseract",
             options: {
-              args: [
-                "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
-                "stdout",
-                "--psm",
-                "6",
-              ],
+              args: ["/tmp/visaflow-passport-ocr.jpg", "stdout", "--psm", "6"],
               stderr: "piped",
               stdout: "piped",
             },
@@ -1002,12 +1212,16 @@ describe("passport extraction contract", () => {
           fields: [],
           ocr: {
             provider: "local_ocr_unavailable",
-            reason: "local_ocr_unavailable",
+            reason: "local_ocr_command_failed",
           },
           status: "unavailable",
         });
+        expect(materializer.materialize).toHaveBeenCalledOnce();
         expect(safeOutput).not.toContain("P<RUSIVANOV");
         expect(safeOutput).not.toContain("123456789");
+        expect(safeOutput).not.toContain(
+          "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+        );
       },
     );
   });
@@ -1020,6 +1234,7 @@ describe("passport extraction contract", () => {
         "1234567897RUS9008205M2602268",
       ].join("\n"),
     ]) {
+      const materializer = tempPassportMaterializer();
       await withFakeDenoCommand(
         {
           code: 0,
@@ -1031,10 +1246,13 @@ describe("passport extraction contract", () => {
           const response = await handlePassportExtractionRequest(
             extractionRequest({ applicantIndex: 0 }),
             durableOptions({
-              provider: createLocalPassportOcrProvider({
-                PASSPORT_OCR_COMMAND: "tesseract",
-                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
-              }),
+              provider: createLocalPassportOcrProvider(
+                {
+                  PASSPORT_OCR_COMMAND: "tesseract",
+                  PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+                },
+                { materializer },
+              ),
             }),
           );
 
@@ -1042,14 +1260,19 @@ describe("passport extraction contract", () => {
           expect(await json(response)).toMatchObject({
             fields: [],
             needsManualReview: true,
+            ocr: {
+              reason: "local_ocr_no_mrz",
+            },
             status: "unavailable",
           });
+          expect(materializer.materialize).toHaveBeenCalledOnce();
         },
       );
     }
   });
 
   test("extracts valid local CLI TD3 only through the existing MRZ parser", async () => {
+    const materializer = tempPassportMaterializer();
     await withFakeDenoCommand(
       {
         code: 0,
@@ -1068,10 +1291,13 @@ describe("passport extraction contract", () => {
         const response = await handlePassportExtractionRequest(
           extractionRequest({ applicantIndex: 0 }),
           durableOptions({
-            provider: createLocalPassportOcrProvider({
-              PASSPORT_OCR_COMMAND: "tesseract",
-              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
-            }),
+            provider: createLocalPassportOcrProvider(
+              {
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              },
+              { materializer },
+            ),
           }),
         );
         const body = await json(response);
@@ -1101,11 +1327,13 @@ describe("passport extraction contract", () => {
             }),
           ]),
         );
+        expect(materializer.materialize).toHaveBeenCalledOnce();
       },
     );
   });
 
   test("does not convert arbitrary local OCR text into extracted fields", async () => {
+    const materializer = tempPassportMaterializer();
     await withFakeDenoCommand(
       {
         code: 0,
@@ -1121,10 +1349,13 @@ describe("passport extraction contract", () => {
         const response = await handlePassportExtractionRequest(
           extractionRequest({ applicantIndex: 0 }),
           durableOptions({
-            provider: createLocalPassportOcrProvider({
-              PASSPORT_OCR_COMMAND: "tesseract",
-              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
-            }),
+            provider: createLocalPassportOcrProvider(
+              {
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              },
+              { materializer },
+            ),
           }),
         );
         const body = await json(response);
@@ -1133,9 +1364,200 @@ describe("passport extraction contract", () => {
         expect(body).toMatchObject({
           fields: [],
           needsManualReview: true,
+          ocr: {
+            reason: "local_ocr_no_mrz",
+          },
           status: "unavailable",
         });
+        expect(materializer.materialize).toHaveBeenCalledOnce();
         expect(JSON.stringify(body)).not.toContain("765432100");
+      },
+    );
+  });
+
+  test("downloads private storage object to temp file before local CLI OCR", async () => {
+    const auditEvents: unknown[] = [];
+    const storageBytes = encoder.encode("fake image bytes");
+    const storagePath = "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg";
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            mime_type: "image/jpeg",
+            size_bytes: 1024,
+            storage_bucket: "submission-media",
+            storage_path: storagePath,
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/storage/v1/object/submission-media/")) {
+        return new Response(storageBytes, { status: 200 });
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        auditEvents.push(JSON.parse(String(init?.body)));
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: new Uint8Array(),
+        stdout: encoder.encode(
+          [
+            "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+            "1234567897RUS3001019M2602268<<<<<<<<<<<<<<08",
+          ].join("\n"),
+        ),
+        success: true,
+      },
+      async ({ calls, removals, writes }) => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({ applicantIndex: 0 }),
+          createSupabaseRestPassportExtractionDependencies(
+            {
+              PASSPORT_OCR_COMMAND: "tesseract",
+              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+              SUPABASE_URL: "https://project.supabase.co",
+            },
+            fetchMock as unknown as typeof fetch,
+          ),
+        );
+        const body = await json(response);
+        const safeOutput = JSON.stringify([body, auditEvents, calls]);
+
+        expect(response.status).toBe(200);
+        expect(fetchMock).toHaveBeenCalledWith(
+          `https://project.supabase.co/storage/v1/object/submission-media/${storagePath}`,
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              authorization: "Bearer server-only",
+            }),
+            method: "GET",
+          }),
+        );
+        expect(writes).toHaveLength(1);
+        expect(writes[0]?.path).toBe("/tmp/visaflow-passport-ocr.jpg");
+        expect(Array.from(writes[0]?.bytes ?? [])).toEqual(Array.from(storageBytes));
+        expect(calls).toEqual([
+          {
+            command: "tesseract",
+            options: {
+              args: ["/tmp/visaflow-passport-ocr.jpg", "stdout", "--psm", "6"],
+              stderr: "piped",
+              stdout: "piped",
+            },
+          },
+        ]);
+        expect(removals).toEqual(["/tmp/visaflow-passport-ocr.jpg"]);
+        expect(body).toMatchObject({
+          ocr: {
+            provider: "local_ocr",
+          },
+          status: "extracted",
+        });
+        expect(body.fields).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              key: "birthDate",
+              value: "01.01.1930",
+            }),
+          ]),
+        );
+        expect(safeOutput).not.toContain(storagePath);
+        expect(safeOutput).not.toContain("P<RUSIVANOV");
+      },
+    );
+  });
+
+  test("fails closed when private storage object exceeds declared size", async () => {
+    const storageBytes = encoder.encode("oversized fake image bytes");
+    const storagePath = "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg";
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.endsWith("/auth/v1/user")) return Response.json({ id: "agent-1" });
+      if (url.includes("/rest/v1/profiles")) {
+        return Response.json([{ id: "agent-1", role: "agent" }]);
+      }
+      if (url.includes("/rest/v1/media_assets")) {
+        return Response.json([
+          {
+            applicant_id: "applicant-1",
+            mime_type: "image/jpeg",
+            size_bytes: 4,
+            storage_bucket: "submission-media",
+            storage_path: storagePath,
+            submission_id: "VF-1",
+            type: "passport_scan",
+          },
+        ]);
+      }
+      if (url.includes("/rest/v1/submissions")) {
+        return Response.json([{ agent_id: "agent-1" }]);
+      }
+      if (url.includes("/storage/v1/object/submission-media/")) {
+        return new Response(storageBytes, { status: 200 });
+      }
+      if (url.includes("/rest/v1/ai_helper_audit_events")) {
+        return new Response(null, { status: 201 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: new Uint8Array(),
+        stdout: encoder.encode(validTd3Mrz),
+        success: true,
+      },
+      async ({ calls, removals, writes }) => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({
+            document: {
+              bucket: "submission-media",
+              mimeType: "image/jpeg",
+              path: storagePath,
+              sizeBytes: 4,
+            },
+          }),
+          createSupabaseRestPassportExtractionDependencies(
+            {
+              PASSPORT_OCR_COMMAND: "tesseract",
+              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              SUPABASE_FUNCTION_ADMIN_KEY: "server-only",
+              SUPABASE_URL: "https://project.supabase.co",
+            },
+            fetchMock as unknown as typeof fetch,
+          ),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await json(response)).toMatchObject({
+          fields: [],
+          needsManualReview: true,
+          ocr: {
+            provider: "local_ocr_unavailable",
+            reason: "local_ocr_input_too_large",
+          },
+          status: "unavailable",
+        });
+        expect(writes).toEqual([]);
+        expect(calls).toEqual([]);
+        expect(removals).toEqual([]);
       },
     );
   });

@@ -17,12 +17,18 @@ export const passportExtractionFields = [
 export type PassportExtractionFieldKey = (typeof passportExtractionFields)[number];
 export type PassportExtractionConfidence = "low" | "medium" | "high";
 export type PassportExtractionRole = "agent" | "admin";
-export type PassportExtractionOcrProvider =
-  | "local_ocr"
-  | "local_ocr_unavailable";
+export type PassportExtractionOcrProvider = "local_ocr" | "local_ocr_unavailable";
 export type PassportExtractionOcrReason =
   | "local_ocr_not_configured"
-  | "local_ocr_unavailable";
+  | "local_ocr_unavailable"
+  | "local_ocr_command_failed"
+  | "local_ocr_command_not_allowed"
+  | "local_ocr_document_unavailable"
+  | "local_ocr_input_too_large"
+  | "local_ocr_no_mrz"
+  | "local_ocr_runtime_unavailable"
+  | "local_ocr_timeout"
+  | "local_ocr_unsupported_mime";
 
 export interface PassportExtractionActor {
   id: string;
@@ -434,7 +440,15 @@ function validatedOcrAttempt(value: unknown): PassportExtractionOcrAttempt | und
   if (
     value.reason !== undefined &&
     value.reason !== "local_ocr_not_configured" &&
-    value.reason !== "local_ocr_unavailable"
+    value.reason !== "local_ocr_unavailable" &&
+    value.reason !== "local_ocr_command_failed" &&
+    value.reason !== "local_ocr_command_not_allowed" &&
+    value.reason !== "local_ocr_document_unavailable" &&
+    value.reason !== "local_ocr_input_too_large" &&
+    value.reason !== "local_ocr_no_mrz" &&
+    value.reason !== "local_ocr_runtime_unavailable" &&
+    value.reason !== "local_ocr_timeout" &&
+    value.reason !== "local_ocr_unsupported_mime"
   ) {
     return undefined;
   }

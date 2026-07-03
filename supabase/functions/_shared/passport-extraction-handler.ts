@@ -16,6 +16,7 @@ import {
 } from "./passport-extraction-contract.ts";
 import {
   createLocalPassportOcrProvider,
+  createSupabaseStorageLocalPassportOcrMaterializer,
   extractPassportWithLocalOcr,
 } from "./passport-local-ocr.ts";
 
@@ -278,6 +279,8 @@ interface AuthenticatedUser {
 
 interface SupabaseMediaAssetResponse {
   applicant_id?: unknown;
+  mime_type?: unknown;
+  size_bytes?: unknown;
   storage_bucket?: unknown;
   storage_path?: unknown;
   submission_id?: unknown;
@@ -330,12 +333,14 @@ function opaqueFingerprint(value: string) {
 }
 
 function passportDocumentFingerprint(request: PassportExtractionRequest) {
-  return `passport-document:${opaqueFingerprint([
-    request.document.bucket,
-    request.document.path,
-    request.document.mimeType,
-    request.document.sizeBytes,
-  ].join("|"))}`;
+  return `passport-document:${opaqueFingerprint(
+    [
+      request.document.bucket,
+      request.document.path,
+      request.document.mimeType,
+      request.document.sizeBytes,
+    ].join("|"),
+  )}`;
 }
 
 async function authenticatedUser(
@@ -416,13 +421,15 @@ export function createSupabaseRestPassportExtractionDependencies(
 
         const media = await readFirstRestRow<SupabaseMediaAssetResponse>(
           fetchFn,
-          `${supabaseUrl}/rest/v1/media_assets?select=submission_id,applicant_id,type,storage_bucket,storage_path&storage_bucket=${restEq("submission-media")}&storage_path=${restEq(request.document.path)}&type=${restEq("passport_scan")}&limit=1`,
+          `${supabaseUrl}/rest/v1/media_assets?select=submission_id,applicant_id,type,storage_bucket,storage_path,mime_type,size_bytes&storage_bucket=${restEq("submission-media")}&storage_path=${restEq(request.document.path)}&type=${restEq("passport_scan")}&limit=1`,
           adminKey,
         );
         if (
           !media ||
           media.submission_id !== pathParts.data.submissionId ||
           media.applicant_id !== pathParts.data.applicantId ||
+          media.mime_type !== request.document.mimeType ||
+          media.size_bytes !== request.document.sizeBytes ||
           media.storage_bucket !== "submission-media" ||
           media.storage_path !== request.document.path ||
           media.type !== "passport_scan"
@@ -463,10 +470,19 @@ export function createSupabaseRestPassportExtractionDependencies(
         };
       },
     },
-    provider: createLocalPassportOcrProvider({
-      PASSPORT_OCR_COMMAND: env.PASSPORT_OCR_COMMAND,
-      PASSPORT_OCR_PROVIDER: env.PASSPORT_OCR_PROVIDER,
-    }),
+    provider: createLocalPassportOcrProvider(
+      {
+        PASSPORT_OCR_COMMAND: env.PASSPORT_OCR_COMMAND,
+        PASSPORT_OCR_PROVIDER: env.PASSPORT_OCR_PROVIDER,
+      },
+      {
+        materializer: createSupabaseStorageLocalPassportOcrMaterializer({
+          adminKey,
+          fetchFn,
+          supabaseUrl,
+        }),
+      },
+    ),
     auditStore: {
       async record(event) {
         const response = await fetchFn(`${supabaseUrl}/rest/v1/${auditTable}`, {
