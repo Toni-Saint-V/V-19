@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import {
   parsePassportExtractionRequest,
@@ -9,6 +11,10 @@ import {
   handlePassportExtractionRequest,
   type PassportExtractionHandlerOptions,
 } from "../../supabase/functions/_shared/passport-extraction-handler";
+import {
+  createLocalPassportOcrProvider,
+  normalizeLocalOcrTextToMrzCandidateText,
+} from "../../supabase/functions/_shared/passport-local-ocr";
 import { extractPassportMrzText } from "../../supabase/functions/_shared/passport-mrz";
 
 async function json(response: Response): Promise<Record<string, unknown>> {
@@ -56,6 +62,64 @@ const validTd3Mrz = [
   "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
   "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
 ].join("\n");
+
+interface FakeLocalCommandOutput {
+  code: number;
+  stderr: Uint8Array;
+  stdout: Uint8Array;
+  success: boolean;
+}
+
+interface FakeLocalCommandOptions {
+  args: string[];
+  stderr: "piped";
+  stdout: "piped";
+}
+
+interface FakeLocalCommandCall {
+  command: string;
+  options: FakeLocalCommandOptions;
+}
+
+const encoder = new TextEncoder();
+
+async function withFakeDenoCommand(
+  output: FakeLocalCommandOutput,
+  run: (calls: FakeLocalCommandCall[]) => Promise<void>,
+) {
+  const previousDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Deno");
+  const calls: FakeLocalCommandCall[] = [];
+
+  class FakeCommand {
+    constructor(command: string, options: FakeLocalCommandOptions) {
+      calls.push({ command, options });
+    }
+
+    spawn() {
+      return {
+        kill: vi.fn(),
+        output: () => Promise.resolve(output),
+      };
+    }
+  }
+
+  Object.defineProperty(globalThis, "Deno", {
+    configurable: true,
+    value: {
+      Command: FakeCommand,
+    },
+  });
+
+  try {
+    await run(calls);
+  } finally {
+    if (previousDescriptor) {
+      Object.defineProperty(globalThis, "Deno", previousDescriptor);
+    } else {
+      delete (globalThis as { Deno?: unknown }).Deno;
+    }
+  }
+}
 
 describe("passport extraction contract", () => {
   test("accepts only private passport-scan document references and ignores forged actor", () => {
@@ -834,6 +898,298 @@ describe("passport extraction contract", () => {
       summary:
         "Данные не удалось распознать автоматически. Требуется ручная проверка. Проверьте данные вручную.",
     });
+  });
+
+  test("keeps local CLI OCR disabled unless the exact env provider is configured", async () => {
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ applicantIndex: 0 }),
+      durableOptions({
+        provider: createLocalPassportOcrProvider({
+          PASSPORT_OCR_COMMAND: "tesseract",
+          PASSPORT_OCR_PROVIDER: "disabled",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      confidence: "low",
+      fields: [],
+      needsManualReview: true,
+      ocr: {
+        attempted: true,
+        provider: "local_ocr_unavailable",
+        reason: "local_ocr_not_configured",
+      },
+      source: "local-ocr",
+      status: "unavailable",
+    });
+  });
+
+  test("fails closed when local CLI OCR is configured without the exact command", async () => {
+    const response = await handlePassportExtractionRequest(
+      extractionRequest({ applicantIndex: 0 }),
+      durableOptions({
+        provider: createLocalPassportOcrProvider({
+          PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({
+      fields: [],
+      needsManualReview: true,
+      ocr: {
+        attempted: true,
+        provider: "local_ocr_unavailable",
+        reason: "local_ocr_unavailable",
+      },
+      status: "unavailable",
+    });
+  });
+
+  test("fails closed when local CLI OCR command fails without exposing command output", async () => {
+    const sensitiveMrzFixture = [
+      "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+      "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
+    ].join("\n");
+    const auditEvents: unknown[] = [];
+
+    await withFakeDenoCommand(
+      {
+        code: 1,
+        stderr: encoder.encode(`stderr ${sensitiveMrzFixture}`),
+        stdout: encoder.encode(`stdout ${sensitiveMrzFixture}`),
+        success: false,
+      },
+      async (calls) => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({ applicantIndex: 0 }),
+          durableOptions({
+            auditStore: {
+              record: (event) => {
+                auditEvents.push(event);
+                return Promise.resolve();
+              },
+            },
+            provider: createLocalPassportOcrProvider({
+              PASSPORT_OCR_COMMAND: "tesseract",
+              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+            }),
+          }),
+        );
+        const body = await json(response);
+        const safeOutput = JSON.stringify([body, auditEvents]);
+
+        expect(response.status).toBe(200);
+        expect(calls).toEqual([
+          {
+            command: "tesseract",
+            options: {
+              args: [
+                "VF-1/applicant-1/passport_scan/v19abc_passport_scan.jpg",
+                "stdout",
+                "--psm",
+                "6",
+              ],
+              stderr: "piped",
+              stdout: "piped",
+            },
+          },
+        ]);
+        expect(body).toMatchObject({
+          fields: [],
+          ocr: {
+            provider: "local_ocr_unavailable",
+            reason: "local_ocr_unavailable",
+          },
+          status: "unavailable",
+        });
+        expect(safeOutput).not.toContain("P<RUSIVANOV");
+        expect(safeOutput).not.toContain("123456789");
+      },
+    );
+  });
+
+  test("keeps OCR noise and partial TD3 unavailable for manual review", async () => {
+    for (const stdout of [
+      "passport number 765432100\nname IVAN IVANOV\nnot mrz",
+      [
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+        "1234567897RUS9008205M2602268",
+      ].join("\n"),
+    ]) {
+      await withFakeDenoCommand(
+        {
+          code: 0,
+          stderr: new Uint8Array(),
+          stdout: encoder.encode(stdout),
+          success: true,
+        },
+        async () => {
+          const response = await handlePassportExtractionRequest(
+            extractionRequest({ applicantIndex: 0 }),
+            durableOptions({
+              provider: createLocalPassportOcrProvider({
+                PASSPORT_OCR_COMMAND: "tesseract",
+                PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+              }),
+            }),
+          );
+
+          expect(response.status).toBe(200);
+          expect(await json(response)).toMatchObject({
+            fields: [],
+            needsManualReview: true,
+            status: "unavailable",
+          });
+        },
+      );
+    }
+  });
+
+  test("extracts valid local CLI TD3 only through the existing MRZ parser", async () => {
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: encoder.encode("ignored provider diagnostics"),
+        stdout: encoder.encode(
+          [
+            "visible OCR text before MRZ",
+            "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<",
+            "1234567897RUS3001019M2602268<<<<<<<<<<<<<<08",
+            "visible OCR text after MRZ",
+          ].join("\n"),
+        ),
+        success: true,
+      },
+      async () => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({ applicantIndex: 0 }),
+          durableOptions({
+            provider: createLocalPassportOcrProvider({
+              PASSPORT_OCR_COMMAND: "tesseract",
+              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+            }),
+          }),
+        );
+        const body = await json(response);
+
+        expect(response.status).toBe(200);
+        expect(body).toMatchObject({
+          confidence: "high",
+          needsManualReview: true,
+          ocr: {
+            attempted: true,
+            provider: "local_ocr",
+          },
+          source: "local-ocr",
+          status: "extracted",
+        });
+        expect(body.fields).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              key: "passportNumber",
+              needsManualReview: true,
+              value: "123456789",
+            }),
+            expect.objectContaining({
+              key: "birthDate",
+              needsManualReview: true,
+              value: "01.01.1930",
+            }),
+          ]),
+        );
+      },
+    );
+  });
+
+  test("does not convert arbitrary local OCR text into extracted fields", async () => {
+    await withFakeDenoCommand(
+      {
+        code: 0,
+        stderr: new Uint8Array(),
+        stdout: encoder.encode(
+          JSON.stringify({
+            fields: [{ key: "passportNumber", value: "765432100" }],
+          }),
+        ),
+        success: true,
+      },
+      async () => {
+        const response = await handlePassportExtractionRequest(
+          extractionRequest({ applicantIndex: 0 }),
+          durableOptions({
+            provider: createLocalPassportOcrProvider({
+              PASSPORT_OCR_COMMAND: "tesseract",
+              PASSPORT_OCR_PROVIDER: "local_tesseract_cli",
+            }),
+          }),
+        );
+        const body = await json(response);
+
+        expect(response.status).toBe(200);
+        expect(body).toMatchObject({
+          fields: [],
+          needsManualReview: true,
+          status: "unavailable",
+        });
+        expect(JSON.stringify(body)).not.toContain("765432100");
+      },
+    );
+  });
+
+  test("normalizes local OCR output to MRZ candidate characters only", () => {
+    const candidateText = normalizeLocalOcrTextToMrzCandidateText(
+      [
+        "ignore this line",
+        "P<RUSIVANOV<<IVAN<<<<<<<<<<<<<<<<<<<<<<<<<<<***",
+        "1234567897 RUS 9008205 M 2602268 <<<<<<<<<<<<<<00",
+        "residence line hidden",
+      ].join("\n"),
+    );
+
+    expect(candidateText).toBe(validTd3Mrz);
+    expect(candidateText).toMatch(/^[A-Z0-9<\n]+$/);
+    expect(candidateText).not.toContain("residence");
+  });
+
+  test("keeps server local OCR source free of cloud and browser OCR paths", () => {
+    const localOcrSource = readFileSync(
+      join(process.cwd(), "supabase/functions/_shared/passport-local-ocr.ts"),
+      "utf8",
+    );
+    const cloudProviderTerms = [
+      ["OPENAI", "_API_KEY"],
+      ["https://api.", "openai.com"],
+      ["api.", "anthropic"],
+      ["generative", "language"],
+      ["vision.", "googleapis"],
+      ["tex", "tract"],
+      ["computervision.", "azure"],
+      ["new ", "OpenAI"],
+      ["Anthropic", "("],
+      ["@ai", "-sdk"],
+      ["generate", "Text"],
+      ["stream", "Text"],
+      ["chat.", "completions"],
+      ["responses.", "create"],
+      ["AWS", "_ACCESS_KEY"],
+      ["AZURE", "_"],
+    ].map((parts) => parts.join(""));
+    const browserOcrTerms = [
+      ["tesseract", ".js"],
+      ["create", "Worker"],
+      ["Tesseract.", "recognize"],
+      ["window", "."],
+      ["document", "."],
+      ["navigator", "."],
+    ].map((parts) => parts.join(""));
+
+    for (const forbidden of [...cloudProviderTerms, ...browserOcrTerms]) {
+      expect(localOcrSource).not.toContain(forbidden);
+    }
   });
 
   test("does not expose raw MRZ or passport PII in audit metadata or thrown errors", async () => {
