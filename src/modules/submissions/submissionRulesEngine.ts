@@ -1,4 +1,5 @@
 export const appointmentReadinessRuleIds = [
+  "APPT_NO_APPLICANTS",
   "APPT_PASSPORT_MISSING",
   "APPT_PASSPORT_MRZ_UNREADABLE",
   "APPT_PASSPORT_EXPIRED",
@@ -20,6 +21,7 @@ export const appointmentReadinessRuleIds = [
   "APPT_DUPLICATE_PASSPORT_ACTIVE_SUBMISSION",
   "APPT_DUPLICATE_ACTIVE_APPOINTMENT",
   "APPT_CONTACT_MISSING",
+  "APPT_AGENT_MISSING",
   "APPT_APPLICANT_NAME_MISSING",
   "APPT_DOB_MISSING",
   "APPT_NATIONALITY_MISSING",
@@ -63,6 +65,7 @@ export type AppointmentReadinessBlock = "appointment_readiness" | "none";
 
 export type AppointmentReadinessInput = {
   actorRole?: "agent" | "admin";
+  agentId?: string;
   applicants: AppointmentReadinessApplicantInput[];
   applicationDate?: string;
   appointmentCenter?: string;
@@ -106,6 +109,7 @@ export type AppointmentReadinessApplicantInput = {
   nationalityPresent?: boolean;
   passportExpiryDate?: string;
   passportIdentityFieldsReadable?: boolean;
+  passportMrzConfidence?: "low" | "medium" | "high";
   passportMrzReadable?: boolean;
   selfieQualityStatus?: "accepted" | "bad" | "needs_replacement" | "pending_review";
   selfiesLookDuplicated?: boolean;
@@ -175,7 +179,25 @@ const defaultSupportedVisaTypes = [
 ];
 const defaultRequiredContactFields = ["phone", "email"] as const;
 
-const ruleDefinitions = {
+const appointmentBlockingRuleIds = new Set<AppointmentReadinessRuleId>([
+  "APPT_NO_APPLICANTS",
+  "APPT_PASSPORT_MISSING",
+  "APPT_SELFIE_1_MISSING",
+  "APPT_SELFIE_2_MISSING",
+  "APPT_FAMILY_MEMBER_MISSING_PASSPORT",
+  "APPT_FAMILY_MEMBER_MISSING_SELFIES",
+]);
+
+const ruleDefinitions: Record<AppointmentReadinessRuleId, RuleDefinition> = {
+  APPT_NO_APPLICANTS: {
+    adminMessageRu: "В подаче нет заявителей; подготовка записи невозможна.",
+    agentMessageRu: "Добавьте хотя бы одного заявителя.",
+    category: "appointment",
+    nextActionRu: "Добавить заявителя в подачу.",
+    severity: "blocker",
+    target: "submission",
+    titleRu: "Нет заявителей",
+  },
   APPT_PASSPORT_MISSING: {
     adminMessageRu: "Скан паспорта отсутствует; подготовка записи заблокирована.",
     agentMessageRu: "Загрузите скан паспорта для заявителя.",
@@ -372,6 +394,15 @@ const ruleDefinitions = {
     target: "contact",
     titleRu: "Контактные данные не заполнены",
   },
+  APPT_AGENT_MISSING: {
+    adminMessageRu: "Ответственный агент не указан; нужна маршрутизация подачи.",
+    agentMessageRu: "Укажите ответственного агента для подачи.",
+    category: "system",
+    nextActionRu: "Назначить ответственного агента.",
+    severity: "warning",
+    target: "submission",
+    titleRu: "Ответственный агент не указан",
+  },
   APPT_APPLICANT_NAME_MISSING: {
     adminMessageRu: "ФИО отсутствует; запись заблокирована.",
     agentMessageRu: "Заполните ФИО заявителя по паспорту.",
@@ -456,7 +487,7 @@ const ruleDefinitions = {
     target: "family",
     titleRu: "Количество участников требует проверки",
   },
-} as const satisfies Record<AppointmentReadinessRuleId, RuleDefinition>;
+};
 
 export function evaluateAppointmentReadiness(
   input: AppointmentReadinessInput,
@@ -465,6 +496,10 @@ export function evaluateAppointmentReadiness(
   const tripDates = parsedTripDates(input.trip);
   const evaluationDate = parseDateOnly(input.now ?? input.applicationDate);
   const applicationDate = parseDateOnly(input.applicationDate ?? input.now);
+
+  if (input.applicants.length === 0) {
+    findings.push(finding("APPT_NO_APPLICANTS"));
+  }
 
   for (const [index, applicant] of input.applicants.entries()) {
     evaluateApplicantRules(findings, input, applicant, index, {
@@ -516,7 +551,8 @@ function evaluateApplicantRules(
     findings.push(finding("APPT_PASSPORT_MISSING", applicant, applicantRef));
   } else if (
     applicant.passportMrzReadable !== true ||
-    applicant.passportIdentityFieldsReadable !== true
+    applicant.passportIdentityFieldsReadable !== true ||
+    applicant.passportMrzConfidence === "low"
   ) {
     findings.push(finding("APPT_PASSPORT_MRZ_UNREADABLE", applicant, applicantRef));
   }
@@ -640,6 +676,10 @@ function evaluateSubmissionRules(
     findings.push(finding("APPT_CONSULAR_JURISDICTION_MISMATCH"));
   }
 
+  if ("agentId" in input && isBlank(input.agentId)) {
+    findings.push(finding("APPT_AGENT_MISSING"));
+  }
+
   if (input.duplicatePassportActiveSubmission === true) {
     findings.push(finding("APPT_DUPLICATE_PASSPORT_ACTIVE_SUBMISSION"));
   }
@@ -719,17 +759,22 @@ function finding(
   const prefix = applicantRef ? `${applicantRef}: ` : "";
   const overridePolicy =
     "overridePolicy" in definition ? definition.overridePolicy : undefined;
+  const severity = appointmentBlockingRuleIds.has(ruleId)
+    ? "blocker"
+    : definition.severity === "info"
+      ? "info"
+      : "warning";
 
   return {
     applicantId: applicant?.applicantId,
-    blocks: definition.severity === "blocker" ? "appointment_readiness" : "none",
+    blocks: severity === "blocker" ? "appointment_readiness" : "none",
     category: definition.category,
     messageRu: `${prefix}${definition.agentMessageRu}`,
     overridePolicy,
     ruleId,
     safeForAdmin: true,
     safeForAgent: true,
-    severity: definition.severity,
+    severity,
     target: definition.target,
     titleRu: definition.titleRu,
   };

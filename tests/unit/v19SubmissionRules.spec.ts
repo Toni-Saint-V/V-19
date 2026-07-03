@@ -578,6 +578,82 @@ describe("V-19 export rules", () => {
     expect(blockers).not.toContain("Нельзя смешивать одинарные и семейные подачи");
   });
 
+  it("warns but allows same-city export batches across multiple agents", () => {
+    const submissions = [
+      readyClone({ id: "ПД-1056", agentId: defaultLocalAgentOwnerId }),
+      readyClone({ id: "ПД-ДРУГОЙ-АГЕНТ", agentId: alternateLocalAgentOwnerId }),
+    ];
+    const summary = exportSummary(submissions);
+
+    expect(summary).toMatchObject({
+      canGenerate: true,
+      ready: true,
+      rowCount: 2,
+    });
+    expect(summary.blockers).toEqual([]);
+    expect(summary.warnings.map((warning) => warning.reason)).toContain(
+      "В пакете подачи разных агентов. Excel доступен, PDF останется у своих агентов.",
+    );
+    expect(summary.rows.map((row) => row.ownerAgentId)).toEqual([
+      defaultLocalAgentOwnerId,
+      alternateLocalAgentOwnerId,
+    ]);
+  });
+
+  it("blocks export only for open or fixed blocker issues", () => {
+    const baseIssue = routeIssueInput(readyClone({ id: "ПД-ISSUE" }));
+    const nonBlockingIssueSubmissions = (["warning", "info"] as const).map(
+      (severity) =>
+        readyClone({
+          id: `ПД-${severity.toUpperCase()}`,
+          issues: [
+            {
+              ...baseIssue,
+              createdAt: "сейчас",
+              createdBy: "admin" as const,
+              id: `${severity}-issue`,
+              severity,
+              status: "open" as const,
+              target: {
+                applicantId: readyClone({}).applicants[0]?.id ?? "",
+                applicantName: readyClone({}).applicants[0]?.fullName ?? "",
+                field: "Маршрут поездки",
+                section: "Анкета",
+              },
+            },
+          ],
+        }),
+    );
+    const blockerIssueSubmission = readyClone({
+      id: "ПД-BLOCKER",
+      issues: [
+        {
+          ...baseIssue,
+          createdAt: "сейчас",
+          createdBy: "admin" as const,
+          id: "blocker-issue",
+          status: "fixed_by_agent" as const,
+          target: {
+            applicantId: readyClone({}).applicants[0]?.id ?? "",
+            applicantName: readyClone({}).applicants[0]?.fullName ?? "",
+            field: "Маршрут поездки",
+            section: "Анкета",
+          },
+        },
+      ],
+    });
+
+    for (const submission of nonBlockingIssueSubmissions) {
+      expect(exportSummary([submission])).toMatchObject({
+        canGenerate: true,
+        ready: true,
+      });
+    }
+    expect(exportSummary([blockerIssueSubmission]).blockers.map((blocker) => blocker.reason)).toContain(
+      "В выборке есть блокирующие замечания, не закрытые администратором",
+    );
+  });
+
   it("allows one city export batch to mix family and single submissions", () => {
     const submissions = [
       readyClone({ id: "ПД-1056" }),

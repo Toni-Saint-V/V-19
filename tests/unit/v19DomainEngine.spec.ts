@@ -258,7 +258,7 @@ describe("V-19 domain engine", () => {
     ).toBe("closed_by_admin");
   });
 
-  it("blocks acceptance for any open issue, not only blockers", () => {
+  it("blocks acceptance for open blockers", () => {
     const submitted = {
       ...completeInProgressSubmission(),
       issues: [
@@ -290,6 +290,34 @@ describe("V-19 domain engine", () => {
       ok: false,
       reason: "Есть незакрытые замечания",
     });
+  });
+
+  it("does not block acceptance for open warning or info issues", () => {
+    const base = completeInProgressSubmission();
+    const openNonBlockingIssues = (["warning", "info"] as const).map((severity) => ({
+      ...firstIssueInput(base),
+      createdAt: "сейчас",
+      createdBy: "admin" as const,
+      id: `${severity}-issue`,
+      severity,
+      status: "open" as const,
+      target: {
+        applicantId: base.applicants[0]?.id ?? "",
+        applicantName: base.applicants[0]?.fullName ?? "",
+        field: "Маршрут поездки",
+        section: "Анкета",
+      },
+    }));
+    const submitted = {
+      ...base,
+      issues: openNonBlockingIssues,
+      status: "submitted_for_review" as const,
+    };
+
+    expect(canPerformAction(submitted, "accept", "admin")).toEqual({ ok: true });
+    expect(unwrap(acceptSubmission(submitted, "admin")).status).toBe(
+      "ready_for_export",
+    );
   });
 
   it("treats exported as terminal for mutation commands", () => {

@@ -275,7 +275,9 @@ export function isFixedIssueStatus(status: Issue["status"]) {
 
 export function acceptanceBlockingIssueCount(submission: Submission) {
   return submission.issues.filter(
-    (issue) => issue.status === "open" || isFixedIssueStatus(issue.status),
+    (issue) =>
+      issue.severity === "blocker" &&
+      (issue.status === "open" || isFixedIssueStatus(issue.status)),
   ).length;
 }
 

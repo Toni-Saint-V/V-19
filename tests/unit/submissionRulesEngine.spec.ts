@@ -77,6 +77,10 @@ function blockerIds(input: AppointmentReadinessInput) {
   return evaluateAppointmentReadiness(input).blockers.map((finding) => finding.ruleId);
 }
 
+function warningIds(input: AppointmentReadinessInput) {
+  return evaluateAppointmentReadiness(input).warnings.map((finding) => finding.ruleId);
+}
+
 function expectBlocker(
   input: AppointmentReadinessInput,
   ruleId: AppointmentReadinessRuleId,
@@ -89,6 +93,10 @@ function expectBlocker(
 }
 
 describe("appointment readiness rules engine", () => {
+  test("no applicants blocks appointment readiness", () => {
+    expectBlocker(readyInput({ applicants: [] }), "APPT_NO_APPLICANTS");
+  });
+
   test("fully ready single applicant returns ready and can book", () => {
     const result = evaluateAppointmentReadiness(readyInput());
 
@@ -98,6 +106,7 @@ describe("appointment readiness rules engine", () => {
       canBookAppointment: true,
       blockers: [],
       infos: [],
+      warnings: [],
     });
     expect(result.evaluatedRuleIds).toEqual([...appointmentReadinessRuleIds]);
   });
@@ -109,30 +118,59 @@ describe("appointment readiness rules engine", () => {
     );
   });
 
-  test("passport scan with unreadable MRZ blocks appointment readiness", () => {
-    expectBlocker(
-      readyInput({ applicants: [readyApplicant({ passportMrzReadable: false })] }),
+  test("passport scan with unreadable, partial, or low-confidence MRZ warns only", () => {
+    const result = evaluateAppointmentReadiness(
+      readyInput({
+        applicants: [
+          readyApplicant({
+            passportIdentityFieldsReadable: false,
+            passportMrzConfidence: "low",
+            passportMrzReadable: false,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.canBookAppointment).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_PASSPORT_MRZ_UNREADABLE",
     );
   });
 
-  test("expired passport blocks appointment readiness", () => {
-    expectBlocker(
+  test("expired passport warns without blocking appointment readiness", () => {
+    const result = evaluateAppointmentReadiness(
       readyInput({ applicants: [readyApplicant({ passportExpiryDate: "2026-01-31" })] }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_PASSPORT_EXPIRED",
     );
   });
 
-  test("passport validity shorter than 3 months after departure blocks", () => {
-    expectBlocker(
+  test("passport validity shorter than 3 months after departure warns only", () => {
+    const result = evaluateAppointmentReadiness(
       readyInput({ applicants: [readyApplicant({ passportExpiryDate: "2026-11-14" })] }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_PASSPORT_VALIDITY_TOO_SHORT",
     );
   });
 
-  test("declared blank pages fewer than 2 blocks", () => {
-    expectBlocker(
+  test("declared blank pages fewer than 2 warns only", () => {
+    const result = evaluateAppointmentReadiness(
       readyInput({ applicants: [readyApplicant({ declaredBlankPages: 1 })] }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_PASSPORT_NO_BLANK_PAGES_DECLARED",
     );
   });
@@ -168,11 +206,16 @@ describe("appointment readiness rules engine", () => {
     expect(ids).toContain("APPT_SELFIE_2_MISSING");
   });
 
-  test("bad selfie quality blocks appointment readiness", () => {
-    expectBlocker(
+  test("bad selfie quality warns without blocking when both selfie slots are present", () => {
+    const result = evaluateAppointmentReadiness(
       readyInput({
         applicants: [readyApplicant({ selfieQualityStatus: "bad" })],
       }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_SELFIE_BAD_QUALITY",
     );
   });
@@ -189,83 +232,100 @@ describe("appointment readiness rules engine", () => {
     );
   });
 
-  test("missing trip dates block appointment readiness", () => {
-    expectBlocker(
-      readyInput({ trip: { entryDate: "", exitDate: "" } }),
+  test("missing trip dates warn without blocking appointment readiness", () => {
+    expect(warningIds(readyInput({ trip: { entryDate: "", exitDate: "" } }))).toContain(
       "APPT_TRIP_DATES_MISSING",
     );
+    expect(evaluateAppointmentReadiness(readyInput({ trip: { entryDate: "", exitDate: "" } })).ready).toBe(true);
   });
 
-  test("exit before entry blocks appointment readiness", () => {
-    expectBlocker(
+  test("exit before entry warns without blocking appointment readiness", () => {
+    const result = evaluateAppointmentReadiness(
       readyInput({
         trip: { entryDate: "2026-08-15", exitDate: "2026-08-01" },
       }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_TRIP_DATE_INVALID_RANGE",
     );
   });
 
-  test("application more than 6 months before trip blocks", () => {
-    expectBlocker(
-      readyInput({ applicationDate: "2026-01-31", now: "2026-01-31" }),
-      "APPT_TOO_EARLY_FOR_APPLICATION",
-    );
+  test("application more than 6 months before trip warns only", () => {
+    expect(
+      warningIds(readyInput({ applicationDate: "2026-01-31", now: "2026-01-31" })),
+    ).toContain("APPT_TOO_EARLY_FOR_APPLICATION");
   });
 
-  test("application less than 15 days before trip blocks with admin override policy", () => {
+  test("application less than 15 days before trip warns with admin override policy", () => {
     const result = evaluateAppointmentReadiness(
       readyInput({ applicationDate: "2026-07-20", now: "2026-07-20" }),
     );
-    const finding = result.blockers.find(
+    const finding = result.warnings.find(
       (item) => item.ruleId === "APPT_TOO_LATE_FOR_APPLICATION",
     );
 
     expect(finding).toBeDefined();
     expect(finding?.overridePolicy).toContain("администратор");
-    expect(result.ready).toBe(false);
+    expect(result.ready).toBe(true);
   });
 
-  test("missing visa type blocks appointment readiness", () => {
-    expectBlocker(readyInput({ visaType: "" }), "APPT_VISA_TYPE_MISSING");
+  test("missing visa type warns without blocking appointment readiness", () => {
+    expect(warningIds(readyInput({ visaType: "" }))).toContain(
+      "APPT_VISA_TYPE_MISSING",
+    );
+    expect(evaluateAppointmentReadiness(readyInput({ visaType: "" })).ready).toBe(true);
   });
 
-  test("unsupported visa type blocks appointment readiness", () => {
-    expectBlocker(
+  test("unsupported visa type warns without blocking appointment readiness", () => {
+    const result = evaluateAppointmentReadiness(
       readyInput({ supportedVisaTypes: ["tourism"], visaType: "medical" }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_UNSUPPORTED_VISA_TYPE",
     );
   });
 
-  test("missing jurisdiction data blocks appointment readiness", () => {
-    expectBlocker(
-      readyInput({ appointmentCenter: "" }),
-      "APPT_CONSULAR_JURISDICTION_MISSING",
+  test("missing city, center, jurisdiction, or agent warns without blocking", () => {
+    const result = evaluateAppointmentReadiness(
+      readyInput({ agentId: "", appointmentCenter: "", city: "" }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.blockers).toEqual([]);
+    expect(result.warnings.map((finding) => finding.ruleId)).toEqual(
+      expect.arrayContaining([
+        "APPT_CONSULAR_JURISDICTION_MISSING",
+        "APPT_AGENT_MISSING",
+      ]),
     );
   });
 
-  test("jurisdiction mismatch blocks appointment readiness", () => {
-    expectBlocker(
-      readyInput({ jurisdictionMatches: false }),
+  test("jurisdiction mismatch warns without blocking appointment readiness", () => {
+    expect(warningIds(readyInput({ jurisdictionMatches: false }))).toContain(
       "APPT_CONSULAR_JURISDICTION_MISMATCH",
     );
+    expect(evaluateAppointmentReadiness(readyInput({ jurisdictionMatches: false })).ready).toBe(true);
   });
 
-  test("duplicate active submission blocks appointment readiness", () => {
-    expectBlocker(
-      readyInput({ duplicatePassportActiveSubmission: true }),
-      "APPT_DUPLICATE_PASSPORT_ACTIVE_SUBMISSION",
-    );
+  test("duplicate active submission warns without blocking appointment readiness", () => {
+    expect(
+      warningIds(readyInput({ duplicatePassportActiveSubmission: true })),
+    ).toContain("APPT_DUPLICATE_PASSPORT_ACTIVE_SUBMISSION");
   });
 
-  test("duplicate active appointment blocks appointment readiness", () => {
-    expectBlocker(
-      readyInput({ duplicateActiveAppointment: true }),
+  test("duplicate active appointment warns without blocking appointment readiness", () => {
+    expect(warningIds(readyInput({ duplicateActiveAppointment: true }))).toContain(
       "APPT_DUPLICATE_ACTIVE_APPOINTMENT",
     );
   });
 
-  test("missing contact blocks appointment readiness", () => {
-    expectBlocker(
+  test("missing contact warns without blocking appointment readiness", () => {
+    const result = evaluateAppointmentReadiness(
       readyInput({
         applicants: [
           readyApplicant({
@@ -274,12 +334,16 @@ describe("appointment readiness rules engine", () => {
           }),
         ],
       }),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_CONTACT_MISSING",
     );
   });
 
-  test("missing identity basics emit name, dob, and nationality blockers", () => {
-    const ids = blockerIds(
+  test("missing identity basics emit name, dob, and nationality warnings", () => {
+    const ids = warningIds(
       readyInput({
         applicants: [
           readyApplicant({
@@ -296,18 +360,22 @@ describe("appointment readiness rules engine", () => {
     expect(ids).toContain("APPT_NATIONALITY_MISSING");
   });
 
-  test("family members in different cities block appointment readiness", () => {
-    expectBlocker(
+  test("family members in different cities warn without blocking appointment readiness", () => {
+    const result = evaluateAppointmentReadiness(
       familyInput([
         readyApplicant({ applicantId: "applicant-1", city: "Москва" }),
         readyApplicant({ applicantId: "applicant-2", city: "Казань" }),
       ]),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_FAMILY_DIFFERENT_CITIES",
     );
   });
 
-  test("family members with different trip dates block appointment readiness", () => {
-    expectBlocker(
+  test("family members with different trip dates warn without blocking", () => {
+    const result = evaluateAppointmentReadiness(
       familyInput([
         readyApplicant({
           applicantId: "applicant-1",
@@ -318,16 +386,24 @@ describe("appointment readiness rules engine", () => {
           tripDates: { entryDate: "2026-08-01", exitDate: "2026-08-16" },
         }),
       ]),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_FAMILY_DIFFERENT_TRIP_DATES",
     );
   });
 
-  test("family members with different visa types block appointment readiness", () => {
-    expectBlocker(
+  test("family members with different visa types warn without blocking", () => {
+    const result = evaluateAppointmentReadiness(
       familyInput([
         readyApplicant({ applicantId: "applicant-1", visaType: "tourism" }),
         readyApplicant({ applicantId: "applicant-2", visaType: "business" }),
       ]),
+    );
+
+    expect(result.ready).toBe(true);
+    expect(result.warnings.map((finding) => finding.ruleId)).toContain(
       "APPT_FAMILY_DIFFERENT_VISA_TYPES",
     );
   });
@@ -459,7 +535,7 @@ describe("appointment readiness rules engine", () => {
 
     expect(clean.evaluatedRuleIds).toEqual([...appointmentReadinessRuleIds]);
     expect(blocked.evaluatedRuleIds).toEqual([...appointmentReadinessRuleIds]);
-    expect(new Set(clean.evaluatedRuleIds).size).toBe(30);
+    expect(new Set(clean.evaluatedRuleIds).size).toBe(32);
   });
 });
 
