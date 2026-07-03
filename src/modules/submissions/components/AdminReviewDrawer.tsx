@@ -13,12 +13,24 @@ import {
   ScanText,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Target,
   User,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { invokeAiHelperEdge } from "../../../services/aiEdgeClient";
 import { applicantCountLabel } from "../selectors";
+import {
+  adminAiActor,
+  buildAdminAiContext,
+  buildAdminIssueDraftContext,
+  failedAdminAiState,
+  nextActionCopy,
+  unavailableAdminAiState,
+  type AdminAiDrawerState,
+  type AdminAiRemarkDraftState,
+} from "../adminAiAssistance";
 import {
   adminIssueGuard,
   fileStatusLabels,
@@ -175,6 +187,9 @@ export function AdminReviewDrawer({
     drawerTabToReviewTab(activeTab),
   );
   const [remarkContext, setRemarkContext] = useState<RemarkContext | null>(null);
+  const [adminAiState, setAdminAiState] = useState<AdminAiDrawerState>({
+    status: "idle",
+  });
   const [questionnaireFocusTarget, setQuestionnaireFocusTarget] =
     useState<WorkspaceTarget | undefined>(undefined);
 
@@ -217,6 +232,7 @@ export function AdminReviewDrawer({
     submission.applicants.find((applicant) => applicant.id === selectedApplicantId) ??
     submission.applicants[0];
   const primaryAction = getPrimaryAction(submission, "admin", "review");
+  const adminNextAction = nextActionCopy(adminAiState, primaryAction.label);
   const issueGuard = adminIssueGuard(submission, "admin");
   const issueGuardReason = "reason" in issueGuard ? issueGuard.reason : "";
   const identityReport = useMemo(
@@ -243,6 +259,78 @@ export function AdminReviewDrawer({
       }
     },
     [onTab, reviewTarget],
+  );
+
+  useEffect(() => {
+    setAdminAiState({ status: "idle" });
+  }, [submission.id]);
+
+  const runAdminAiReview = useCallback(async () => {
+    setAdminAiState({ status: "loading" });
+
+    try {
+      const [review, nextAction, readiness] = await Promise.all([
+        invokeAiHelperEdge(
+          "admin_review",
+          buildAdminAiContext(submission, "review"),
+          adminAiActor,
+        ),
+        invokeAiHelperEdge(
+          "admin_next_action",
+          buildAdminAiContext(submission, "nextAction"),
+          adminAiActor,
+        ),
+        invokeAiHelperEdge(
+          "admin_readiness_explanation",
+          buildAdminAiContext(submission, "readiness"),
+          adminAiActor,
+        ),
+      ]);
+
+      if (!review && !nextAction && !readiness) {
+        setAdminAiState(unavailableAdminAiState());
+        return;
+      }
+
+      setAdminAiState({
+        status: "ready",
+        review: review ?? undefined,
+        nextAction: nextAction ?? undefined,
+        readiness: readiness ?? undefined,
+      });
+    } catch {
+      setAdminAiState(failedAdminAiState());
+    }
+  }, [submission]);
+
+  const draftAdminRemark = useCallback(
+    async (input: {
+      context: RemarkContext;
+      field: string;
+      reason: string;
+      targetType: string;
+    }) => {
+      const result = await invokeAiHelperEdge(
+        "admin_issue_remark_draft",
+        buildAdminIssueDraftContext({
+          field: input.field,
+          reason: input.reason,
+          sectionLabel: input.context.sectionLabel,
+          submission,
+          targetType: input.targetType,
+        }),
+        adminAiActor,
+      );
+
+      return (
+        result?.issueRemarkDraft ??
+        result?.agentFollowUpDrafts?.[0] ??
+        result?.suggestions[0] ??
+        result?.summary ??
+        null
+      );
+    },
+    [submission],
   );
 
   const jumpToWorkspaceTarget = useCallback((target: WorkspaceTarget) => {
@@ -408,6 +496,8 @@ export function AdminReviewDrawer({
           />
 
           <IdentityConsistencyStatusStrip compact report={identityReport} />
+
+          <AdminAiAssistancePanel state={adminAiState} onRun={runAdminAiReview} />
 
           <nav
             className="admin-review-tabs"
@@ -579,9 +669,7 @@ export function AdminReviewDrawer({
         <footer className="admin-review-footer">
           <div>
             <span className="admin-review-footer-dot" aria-hidden="true" />
-            {openIssueCount(submission)
-              ? `Есть открытые замечания: ${openIssueCount(submission)}. Основное действие: ${primaryAction.label}.`
-              : primaryAction.reason ?? "Паспорт, селфи и анкета готовы к решению администратора."}
+            {adminNextAction}
           </div>
           <button className="admin-review-secondary" type="button" onClick={onClose}>
             Отложить
@@ -605,11 +693,105 @@ export function AdminReviewDrawer({
             issueGuardReason={issueGuardReason}
             submission={submission}
             onClose={() => setRemarkContext(null)}
+            onDraftRemark={draftAdminRemark}
             onSubmit={submitRemark}
           />
         ) : null}
       </motion.aside>
     </AnimatePresence>
+  );
+}
+
+function AdminAiAssistancePanel({
+  onRun,
+  state,
+}: {
+  onRun: () => void;
+  state: AdminAiDrawerState;
+}) {
+  const disabled = state.status === "loading";
+  const reviewItems =
+    state.review?.adminReviewChecklist?.length
+      ? state.review.adminReviewChecklist
+      : state.review?.suggestions;
+  const blockerItems = [
+    ...(state.review?.blockers ?? []),
+    ...(state.readiness?.blockers ?? []),
+  ].slice(0, 5);
+  const readinessCopy =
+    state.readiness?.readinessExplanation ||
+    state.readiness?.summary ||
+    "Готовность объясняется deterministic статусами, файлами и открытыми замечаниями.";
+
+  return (
+    <section className="admin-ai-assist" aria-label="AI-помощник администратора">
+      <div className="admin-ai-assist-head">
+        <div>
+          <span>
+            <Sparkles aria-hidden="true" size={14} />
+            AI-помощник
+          </span>
+          <strong>Предварительная проверка</strong>
+        </div>
+        <button disabled={disabled} type="button" onClick={onRun}>
+          <Sparkles aria-hidden="true" size={15} />
+          {disabled ? "Проверяем" : "Проверить AI"}
+        </button>
+      </div>
+
+      {state.status === "idle" ? (
+        <p>
+          Запустите локальную подсказку, чтобы собрать список проверки, возможные
+          замечания и объяснение готовности.
+        </p>
+      ) : null}
+
+      {state.status === "loading" ? (
+        <p role="status">Запрос идет через серверный ai-helper. Действия не выполняются.</p>
+      ) : null}
+
+      {state.status === "unavailable" || state.status === "failed" ? (
+        <p className="is-warning" role="status">
+          {state.error}. Продолжайте ручную проверку; решения и отправка не выполняются
+          автоматически.
+        </p>
+      ) : null}
+
+      {state.status === "ready" ? (
+        <div className="admin-ai-assist-grid">
+          <section>
+            <h3>Что проверить</h3>
+            <ul>
+              {(reviewItems?.length
+                ? reviewItems
+                : ["Сверьте файлы, анкету и открытые замечания вручную."]
+              ).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h3>Блокеры и недостающие данные</h3>
+            <ul>
+              {(blockerItems.length
+                ? blockerItems
+                : ["Явные блокеры не найдены в безопасном AI-ответе."]
+              ).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h3>Готовность</h3>
+            <p>{readinessCopy}</p>
+          </section>
+          <section>
+            <h3>Ограничение</h3>
+            <p>Требует проверки администратором. Принятие и выгрузка остаются ручными действиями.</p>
+          </section>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -1267,12 +1449,19 @@ function AdminRemarkForm({
   context,
   issueGuardReason,
   onClose,
+  onDraftRemark,
   onSubmit,
   submission,
 }: {
   context: RemarkContext;
   issueGuardReason: string;
   onClose: () => void;
+  onDraftRemark?: (input: {
+    context: RemarkContext;
+    field: string;
+    reason: string;
+    targetType: string;
+  }) => Promise<string | null>;
   onSubmit: (input: IssueInput) => void;
   submission: Submission;
 }) {
@@ -1288,6 +1477,9 @@ function AdminRemarkForm({
       : "Проверьте значение в анкете и отправьте исправление.",
   );
   const [internalComment, setInternalComment] = useState("");
+  const [draftState, setDraftState] = useState<AdminAiRemarkDraftState>({
+    status: "idle",
+  });
 
   useEffect(() => {
     setTargetType(context.targetType);
@@ -1300,6 +1492,7 @@ function AdminRemarkForm({
         : "Проверьте значение в анкете и отправьте исправление.",
     );
     setInternalComment("");
+    setDraftState({ status: "idle" });
   }, [context, defaultApplicant]);
 
   const selectedFileType = remarkTargetFileType(targetType) ?? context.fileType;
@@ -1327,6 +1520,36 @@ function AdminRemarkForm({
       severity: severity === "high" ? "blocker" : "warning",
       type: selectedFileType ? "file" : targetType === "section" ? "section" : "field",
     });
+  }
+
+  async function draftRemark() {
+    if (!onDraftRemark) return;
+    setDraftState({ status: "loading" });
+
+    try {
+      const draft = await onDraftRemark({
+        context,
+        field,
+        reason,
+        targetType,
+      });
+
+      if (!draft) {
+        setDraftState({
+          status: "unavailable",
+          error: "Недоступно: локальный AI не настроен",
+        });
+        return;
+      }
+
+      setComment(draft);
+      setDraftState({ status: "ready" });
+    } catch {
+      setDraftState({
+        status: "failed",
+        error: "AI-помощник не вернул безопасный черновик.",
+      });
+    }
   }
 
   return (
@@ -1470,14 +1693,39 @@ function AdminRemarkForm({
             />
           </label>
 
-          <label>
+          <div className="admin-remark-ai-label">
             <span>Что нужно исправить?</span>
+            <button
+              aria-label="Сформулировать с AI"
+              disabled={draftState.status === "loading"}
+              type="button"
+              onClick={draftRemark}
+            >
+              <Sparkles aria-hidden="true" size={14} />
+              {draftState.status === "loading" ? "Черновик" : "Сформулировать с AI"}
+            </button>
+          </div>
+
+          <label>
+            <span className="sr-only">Что нужно исправить?</span>
             <textarea
               placeholder="Конкретное действие для агента"
               value={comment}
               onChange={(event) => setComment(event.target.value)}
             />
           </label>
+
+          {draftState.status === "unavailable" || draftState.status === "failed" ? (
+            <p className="admin-remark-ai-status" role="status">
+              {draftState.error}. Текст можно заполнить вручную.
+            </p>
+          ) : null}
+
+          {draftState.status === "ready" ? (
+            <p className="admin-remark-ai-status" role="status">
+              Черновик добавлен. Проверьте и отредактируйте перед созданием замечания.
+            </p>
+          ) : null}
 
           <label className="admin-remark-internal">
             <span>Внутренний комментарий (не виден агенту)</span>

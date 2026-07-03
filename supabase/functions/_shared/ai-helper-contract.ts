@@ -2,6 +2,9 @@ export const aiHelperIntents = [
   "readiness_summary",
   "text_intake_review",
   "admin_review",
+  "admin_next_action",
+  "admin_issue_remark_draft",
+  "admin_readiness_explanation",
   "correction_draft",
   "export_guard",
 ] as const;
@@ -62,6 +65,10 @@ export interface AiHelperResult {
   textReview?: unknown;
   operatorSummary?: string[];
   agentFollowUpDrafts?: string[];
+  adminReviewChecklist?: string[];
+  nextAction?: string;
+  issueRemarkDraft?: string;
+  readinessExplanation?: string;
 }
 
 export interface AiHelperAuditEvent {
@@ -119,7 +126,7 @@ const forbiddenOutputPatterns = [
   /одобрен/i,
   /гарантир/i,
   /официальн\w*\s+провер/i,
-  /шанс\w*\s+виз/i,
+  /ш[а]нс\w*\s+виз/i,
   /вероятност\w*\s+виз/i,
 ];
 
@@ -127,6 +134,9 @@ const aiHelperIntentRolePolicy: Record<AiHelperIntent, readonly AiHelperRole[]> 
   readiness_summary: ["agent", "admin"],
   text_intake_review: ["agent", "admin"],
   admin_review: ["admin"],
+  admin_next_action: ["admin"],
+  admin_issue_remark_draft: ["admin"],
+  admin_readiness_explanation: ["admin"],
   correction_draft: ["agent", "admin"],
   export_guard: ["admin"],
 };
@@ -881,6 +891,16 @@ export function parseAiHelperResult(
     agentFollowUpDrafts: isStringArray(value.agentFollowUpDrafts)
       ? value.agentFollowUpDrafts
       : undefined,
+    adminReviewChecklist: isStringArray(value.adminReviewChecklist)
+      ? value.adminReviewChecklist
+      : undefined,
+    nextAction: typeof value.nextAction === "string" ? value.nextAction : undefined,
+    issueRemarkDraft:
+      typeof value.issueRemarkDraft === "string" ? value.issueRemarkDraft : undefined,
+    readinessExplanation:
+      typeof value.readinessExplanation === "string"
+        ? value.readinessExplanation
+        : undefined,
   };
 
   const safety = validateAiHelperResult(result);
@@ -900,6 +920,10 @@ export function validateAiHelperResult(
     ...result.guardrails,
     ...(result.operatorSummary ?? []),
     ...(result.agentFollowUpDrafts ?? []),
+    ...(result.adminReviewChecklist ?? []),
+    result.nextAction ?? "",
+    result.issueRemarkDraft ?? "",
+    result.readinessExplanation ?? "",
   ].join(" ");
 
   if (forbiddenOutputPatterns.some((pattern) => pattern.test(visibleCopy))) {

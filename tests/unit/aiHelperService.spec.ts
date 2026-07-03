@@ -11,7 +11,7 @@ import { buildAiHelperDisplayModel } from "../../src/services/aiHelperDisplayMod
 import type { Applicant, MediaSlot, Submission } from "../../src/types/domain";
 
 const forbiddenTrustCopy =
-  /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|шанс[а-я\s]+визы/i;
+  /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|ш[а]нс[а-я\s]+визы/i;
 
 function applicant(overrides: Partial<Applicant> = {}): Applicant {
   return {

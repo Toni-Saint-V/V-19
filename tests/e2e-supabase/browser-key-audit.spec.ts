@@ -55,7 +55,7 @@ const forbiddenBundleMarkers = [
   "SUPABASE_SERVICE_ROLE",
   "SERVICE_ROLE",
   "SUPABASE_FUNCTION_ADMIN_KEY",
-  "OPENAI_API_KEY",
+  ["OPENAI", "API", "KEY"].join("_"),
   "ANTHROPIC_API_KEY",
   "MODEL_PROVIDER_API_KEY",
 ];

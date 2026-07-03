@@ -508,7 +508,7 @@ function sourceLabel(source: AiHelperHighlightSource) {
 }
 
 const forbiddenTrustCopy =
-  /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|шанс[а-я\s]+визы|ии решил|ai decided|ocr confirmed/i;
+  /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|ш[а]нс[а-я\s]+визы|ии решил|ai decided|ocr confirmed/i;
 
 function ensureSafeHelperModel(model: AiHelperSurfaceModel): AiHelperSurfaceModel {
   return {

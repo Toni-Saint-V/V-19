@@ -195,6 +195,20 @@ function normalizeProviderResult(
     source: "edge-provider",
     operatorSummary: optionalStringArrayField(value.operatorSummary),
     agentFollowUpDrafts: optionalStringArrayField(value.agentFollowUpDrafts),
+    adminReviewChecklist: optionalStringArrayField(value.adminReviewChecklist),
+    nextAction:
+      typeof value.nextAction === "string" && value.nextAction.trim()
+        ? value.nextAction
+        : undefined,
+    issueRemarkDraft:
+      typeof value.issueRemarkDraft === "string" && value.issueRemarkDraft.trim()
+        ? value.issueRemarkDraft
+        : undefined,
+    readinessExplanation:
+      typeof value.readinessExplanation === "string" &&
+      value.readinessExplanation.trim()
+        ? value.readinessExplanation
+        : undefined,
   };
 }
 
@@ -202,6 +216,7 @@ function systemPrompt(): string {
   return [
     "You are a VisaFlow helper running behind a server-side governance gateway.",
     "Return only valid JSON with keys: title, summary, suggestions, blockers, guardrails, operatorSummary, agentFollowUpDrafts.",
+    "For admin intents you may also return adminReviewChecklist, nextAction, issueRemarkDraft, readinessExplanation.",
     "Use only the sanitized context. Do not infer identity, outcome likelihood, authority validation, guarantees, OCR, MRZ, passport data, contacts, addresses, document paths, or image content.",
     "Keep every field concise. Deterministic checks remain the source of truth.",
   ].join(" ");
