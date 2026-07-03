@@ -369,7 +369,7 @@ describe("text intake reviewer", () => {
       ...(helperWithFindings.agentFollowUpDrafts ?? []),
     ].join(" ");
     expect(visibleHelperCopy).not.toMatch(
-      /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|шанс[а-я\s]+визы/i,
+      /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|ш[а]нс[а-я\s]+визы/i,
     );
     expect(visibleHelperCopy).not.toMatch(
       /Email format is invalid|Enter a valid email address|Passport expires before the case travel date/i,

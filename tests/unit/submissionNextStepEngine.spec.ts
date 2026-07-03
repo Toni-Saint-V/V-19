@@ -15,7 +15,7 @@ import type { PassportExtractionResult } from "../../src/modules/submissions/pas
 import type { Issue, Submission } from "../../src/modules/submissions/types";
 
 const forbiddenTrustCopy =
-  /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|шанс[а-я\s]+визы/i;
+  /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|ш[а]нс[а-я\s]+визы/i;
 
 const extractedPassport: PassportExtractionResult = {
   fields: [

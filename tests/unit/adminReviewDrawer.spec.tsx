@@ -1,11 +1,24 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { AdminReviewDrawer } from "../../src/modules/submissions/components/AdminReviewDrawer";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import type { DrawerTab, IssueInput, Submission } from "../../src/modules/submissions/types";
 
+const aiMocks = vi.hoisted(() => ({
+  invokeAiHelperEdge: vi.fn(),
+}));
+
+vi.mock("../../src/services/aiEdgeClient", () => ({
+  invokeAiHelperEdge: aiMocks.invokeAiHelperEdge,
+}));
+
 afterEach(() => {
   cleanup();
+});
+
+beforeEach(() => {
+  aiMocks.invokeAiHelperEdge.mockReset();
+  aiMocks.invokeAiHelperEdge.mockResolvedValue(null);
 });
 
 Object.defineProperty(HTMLElement.prototype, "scrollTo", {
@@ -22,24 +35,26 @@ function adminReviewSubmission(): Submission {
 function renderDrawer({
   activeTab = "overview",
   onAddIssue = vi.fn(),
+  onAction = vi.fn(),
 }: {
   activeTab?: DrawerTab;
+  onAction?: () => void;
   onAddIssue?: (input: IssueInput) => void;
 } = {}) {
   return {
+    onAction,
     onAddIssue,
     ...render(
       <AdminReviewDrawer
         activeTab={activeTab}
-        issueComposerRequest={null}
+        actionError=""
+        focusTarget={undefined}
         submission={adminReviewSubmission()}
-        onAcceptAiSuggestion={() => undefined}
-        onAction={() => undefined}
+        onAction={onAction}
         onAddIssue={onAddIssue}
         onClose={() => undefined}
-        onDismissAiSuggestion={() => undefined}
-        onIssueComposerConsumed={() => undefined}
-        onRunAiReview={() => undefined}
+        onClearFocusTarget={() => undefined}
+        onReviewFileAccept={() => undefined}
         onTab={() => undefined}
       />,
     ),
@@ -90,5 +105,95 @@ describe("AdminReviewDrawer", () => {
         type: "file",
       }),
     );
+  });
+
+  test("runs admin drawer AI through the edge helper and fails closed when unavailable", async () => {
+    const onAction = vi.fn();
+    renderDrawer({ onAction });
+
+    fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
+
+    await waitFor(() =>
+      expect(screen.getAllByText(/локальный AI не настроен/).length).toBeGreaterThan(0),
+    );
+    expect(aiMocks.invokeAiHelperEdge).toHaveBeenCalledTimes(3);
+    expect(aiMocks.invokeAiHelperEdge.mock.calls.map((call) => call[0])).toEqual([
+      "admin_review",
+      "admin_next_action",
+      "admin_readiness_explanation",
+    ]);
+    expect(JSON.stringify(aiMocks.invokeAiHelperEdge.mock.calls)).not.toContain(
+      "Нина Волкова",
+    );
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  test("renders safe admin AI review output without autonomous accept or export", async () => {
+    const onAction = vi.fn();
+    aiMocks.invokeAiHelperEdge
+      .mockResolvedValueOnce({
+        intent: "admin_review",
+        title: "Предварительная проверка",
+        summary: "Проверьте комплект вручную.",
+        suggestions: ["Проверьте паспорт и селфи."],
+        blockers: ["Есть открытое замечание."],
+        guardrails: ["Подсказка не является решением."],
+        source: "edge-provider",
+        adminReviewChecklist: ["Сверить анкету с файлами."],
+      })
+      .mockResolvedValueOnce({
+        intent: "admin_next_action",
+        title: "Следующее действие",
+        summary: "Верните точечное замечание.",
+        suggestions: ["Добавьте одно точное замечание и проверьте текст."],
+        blockers: [],
+        guardrails: ["Администратор подтверждает вручную."],
+        source: "edge-provider",
+        nextAction: "Добавьте одно точное замечание и проверьте текст.",
+      })
+      .mockResolvedValueOnce({
+        intent: "admin_readiness_explanation",
+        title: "Готовность",
+        summary: "Пакет не готов из-за открытого замечания.",
+        suggestions: ["Закройте замечание после проверки."],
+        blockers: ["Открытое замечание блокирует движение дальше."],
+        guardrails: ["Действия остаются ручными."],
+        source: "edge-provider",
+        readinessExplanation: "Пакет не готов из-за открытого замечания.",
+      });
+    renderDrawer({ onAction });
+
+    fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
+
+    await screen.findByText("Сверить анкету с файлами.");
+    expect(screen.getByText("Пакет не готов из-за открытого замечания.")).toBeVisible();
+    expect(screen.getByText(/Принятие и выгрузка остаются ручными/)).toBeVisible();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  test("drafts an agent-facing remark for admin review without sending it", async () => {
+    const onAddIssue = vi.fn();
+    aiMocks.invokeAiHelperEdge.mockResolvedValue({
+      intent: "admin_issue_remark_draft",
+      title: "Черновик замечания",
+      summary: "Уточните маршрут поездки и приложите корректные данные.",
+      suggestions: ["Проверьте текст перед отправкой агенту."],
+      blockers: [],
+      guardrails: ["Администратор проверяет текст вручную."],
+      source: "edge-provider",
+      issueRemarkDraft: "Уточните маршрут поездки и приложите корректные данные.",
+    });
+    renderDrawer({ activeTab: "issues", onAddIssue });
+
+    fireEvent.click(screen.getByRole("button", { name: "Добавить замечание" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сформулировать с AI" }));
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("Конкретное действие для агента")).toHaveValue(
+        "Уточните маршрут поездки и приложите корректные данные.",
+      ),
+    );
+    expect(onAddIssue).not.toHaveBeenCalled();
+    expect(screen.getByText(/Проверьте и отредактируйте/)).toBeInTheDocument();
   });
 });

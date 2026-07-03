@@ -179,6 +179,30 @@ describe("AI helper shared contract", () => {
     ).toMatchObject({ ok: false, status: 400 });
   });
 
+  test("keeps Task 7 admin AI intents admin-only", () => {
+    for (const intent of [
+      "admin_review",
+      "admin_next_action",
+      "admin_issue_remark_draft",
+      "admin_readiness_explanation",
+    ] as const) {
+      expect(
+        evaluateAiHelperAccess({
+          intent,
+          context: {},
+          actor: adminActor,
+        }),
+      ).toMatchObject({ ok: true });
+      expect(
+        evaluateAiHelperAccess({
+          intent,
+          context: {},
+          actor: agentActor,
+        }),
+      ).toMatchObject({ ok: false, status: 403 });
+    }
+  });
+
   test("builds a sanitized provider request without raw context or actor identity", () => {
     const parsed = parseAiHelperRequest({
       intent: "text_intake_review",
@@ -479,6 +503,60 @@ describe("AI helper shared contract", () => {
       ok: false,
       status: 502,
       safeMessage: "AI helper result is invalid.",
+    });
+  });
+
+  test("validates Task 7 structured admin output fields", () => {
+    expect(
+      parseAiHelperResult({
+        ...buildSafeAiHelperStubResult("admin_next_action", "edge-provider"),
+        nextAction: "Проверьте открытые замечания и выберите действие вручную.",
+      }),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        intent: "admin_next_action",
+        nextAction: "Проверьте открытые замечания и выберите действие вручную.",
+      },
+    });
+    expect(
+      parseAiHelperResult({
+        ...buildSafeAiHelperStubResult("admin_issue_remark_draft", "edge-provider"),
+        issueRemarkDraft: "Уточните данные и отправьте исправление на повторную проверку.",
+      }),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        issueRemarkDraft:
+          "Уточните данные и отправьте исправление на повторную проверку.",
+      },
+    });
+    expect(
+      parseAiHelperResult({
+        ...buildSafeAiHelperStubResult(
+          "admin_readiness_explanation",
+          "edge-provider",
+        ),
+        readinessExplanation:
+          "Пакет не готов: есть открытые замечания и недостающие данные.",
+      }),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        readinessExplanation:
+          "Пакет не готов: есть открытые замечания и недостающие данные.",
+      },
+    });
+    expect(
+      parseAiHelperResult({
+        ...buildSafeAiHelperStubResult("admin_review", "edge-provider"),
+        adminReviewChecklist: ["Сверьте анкету, файлы и открытые замечания."],
+      }),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        adminReviewChecklist: ["Сверьте анкету, файлы и открытые замечания."],
+      },
     });
   });
 
