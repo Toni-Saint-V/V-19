@@ -45,7 +45,7 @@ async function logout(page: Page) {
         parsed.session = null;
         localStorage.setItem("visaflow.auth.localDev.v1", JSON.stringify(parsed));
       }
-      localStorage.setItem("visaflow.workspaceEmail.v1", "signed-out@example.invalid");
+      localStorage.setItem("visaflow.workspaceEmail.v2", "signed-out@example.invalid");
     });
     await page.reload();
   }
@@ -78,10 +78,10 @@ test.describe("V-19 registration admin approval", () => {
     ).toBeVisible();
 
     await logout(page);
-    await login(page, "admin@visaflow.local", "local-dev-password");
+    await login(page, "2@2.ru", "22");
     await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
     await clickWorkspaceButton(page, /^Настройки$/);
-    await page.getByRole("button", { name: "Входящие заявки" }).click();
+    await page.getByRole("button", { name: "Заявки на доступ" }).click();
     const queue = page.getByTestId("admin-access-queue");
     await expect(queue).toBeVisible();
     await expect(queue.getByText(userEmail)).toBeVisible();
@@ -102,10 +102,10 @@ test.describe("V-19 registration admin approval", () => {
     ).toBeVisible();
 
     await logout(page);
-    await login(page, "admin@visaflow.local", "local-dev-password");
+    await login(page, "2@2.ru", "22");
     await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
     await clickWorkspaceButton(page, /^Настройки$/);
-    await page.getByRole("button", { name: "Входящие заявки" }).click();
+    await page.getByRole("button", { name: "Заявки на доступ" }).click();
     await expect(queue.getByText(secondAgentEmail)).toBeVisible();
     await queue
       .filter({ hasText: secondAgentEmail })

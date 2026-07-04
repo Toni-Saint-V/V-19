@@ -43,6 +43,7 @@ const scopedDiffPaths = [
   "docs/qa/release-ai-gate-browser-key-audit-unverified-20260627T200633.md",
   "docs/qa/supabase-browser-key-audit-20260701.md",
   "docs/qa/supabase-production-browser-key-audit-20260701.md",
+  "docs/qa/supabase-production-blockers-20260704.md",
   "docs/qa/supabase-production-backup-discovery-20260701.md",
   "docs/qa/supabase-production-edge-functions-20260701.md",
   "docs/qa/supabase-production-env-evidence-20260701.md",
@@ -63,16 +64,16 @@ function pass(label) {
   passes.push(label);
 }
 
-function formatBlocker(label, detail) {
-  return detail ? `${label}: ${detail}` : label;
+function formatBlocker(blocker) {
+  return blocker.detail ? `${blocker.label}: ${blocker.detail}` : blocker.label;
 }
 
 function block(label, detail) {
-  integrityBlockers.push(formatBlocker(label, detail));
+  integrityBlockers.push({ label, detail });
 }
 
 function activationBlock(label, detail) {
-  activationBlockers.push(formatBlocker(label, detail));
+  activationBlockers.push({ label, detail });
 }
 
 function readText(path, label) {
@@ -285,6 +286,87 @@ function verifyBrowserKeyAuditEvidence(sandbox) {
 function requireSnippet(content, snippet, label) {
   if (content.includes(snippet)) pass(label);
   else block(label, "missing");
+}
+
+const blockerActions = [
+  {
+    match: /Sandbox browser key audit/,
+    owner: "Codex browser QA operator",
+    command: "npm run test:e2e:supabase",
+    artifact: "docs/qa/supabase-production-browser-key-audit-20260701.md",
+  },
+  {
+    match: /smoke account|auth user count|profile count|orphan auth user|Agent smoke|Other-agent smoke|Admin smoke|Production has no auth users/,
+    owner: "Supabase production operator",
+    command: "npm run supabase:pilot-cohort -- --check --required-size 20",
+    artifact: "docs/qa/supabase-production-smoke-discovery-20260701.md and docs/qa/supabase-production-pilot-cohort-20260701.md",
+  },
+  {
+    match: /Backup|Restore|RPO\/RTO|rollback communication/i,
+    owner: "Supabase project owner",
+    command: "npm run verify:production-readiness",
+    artifact: "docs/qa/supabase-production-backup-discovery-20260701.md",
+  },
+  {
+    match: /Pre-activation|verify:supabase-release evidence|test:supabase-live|test:e2e:supabase|verify:full|Final diff/,
+    owner: "Codex release operator",
+    command: "npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet",
+    artifact: "docs/qa/supabase-production-preactivation-20260704.md",
+  },
+  {
+    match: /Production release switch|Production env|Production approval|Browser QA|Browser key audit|public config/i,
+    owner: "Rollout owner",
+    command: "npm run verify:production-readiness",
+    artifact: "docs/qa/supabase-production-env-evidence-20260701.md and docs/qa/supabase-production-owner-approval-20260701.md",
+  },
+  {
+    match: /Edge Function/i,
+    owner: "Supabase production operator",
+    command: "npm run verify:production-readiness",
+    artifact: "docs/qa/supabase-production-edge-functions-20260701.md",
+  },
+  {
+    match: /migration|Transactional persistence|RLS policy|Storage policy|workflow|Post-activation|waiting_review|Admin can accept|media|handoff/i,
+    owner: "Supabase production operator",
+    command: "npm run supabase:production-workflow-smoke",
+    artifact: "docs/qa/supabase-production-migration-evidence-20260701.md and docs/qa/supabase-production-workflow-smoke-20260701.md",
+  },
+  {
+    match: /security advisor|leaked password|Auth security|plan eligibility|advisor/i,
+    owner: "Supabase project owner",
+    command: "npm run verify:production-readiness",
+    artifact: "docs/qa/supabase-production-security-advisors-20260701.md",
+  },
+  {
+    match: /Logs and error rate/,
+    owner: "Supabase production operator",
+    command: "npm run verify:production-readiness",
+    artifact: "docs/qa/supabase-production-logs-20260701.md",
+  },
+  {
+    match: /Go \/ No-Go/,
+    owner: "Rollout owner",
+    command: "npm run verify:production-readiness",
+    artifact: "docs/qa/supabase-production-blockers-20260704.md",
+  },
+];
+
+function blockerAction(label) {
+  return (
+    blockerActions.find((action) => action.match.test(label)) ?? {
+      owner: "Rollout owner",
+      command: "npm run verify:production-readiness",
+      artifact: "docs/qa/supabase-production-blockers-20260704.md",
+    }
+  );
+}
+
+function printBlocker(blocker) {
+  const action = blockerAction(blocker.label);
+  console.error(`- ${formatBlocker(blocker)}`);
+  console.error(`  owner: ${action.owner}`);
+  console.error(`  verification command: ${action.command}`);
+  console.error(`  expected artifact: ${action.artifact}`);
 }
 
 function verifyNoCommittedSecrets(content) {
@@ -802,8 +884,8 @@ function verifyProductionWorkflowEvidence(packet, env, post) {
     env.storagePolicyTestsPassed,
     post.agentCanCreateDraft,
     post.agentCanUploadRequiredMedia,
-    post.incompleteWaitingReviewRejected,
-    post.validWaitingReviewReachesQueue,
+    post.incompleteSubmittedForReviewRejected,
+    post.validSubmittedForReviewReachesQueue,
     post.adminCanAcceptOrReturnCase,
     post.postHandoffAgentMutationBlocked,
     post.privateMediaSignedUrlScoped,
@@ -835,6 +917,21 @@ function verifyProductionWorkflowEvidence(packet, env, post) {
     evidence,
     "No email, password, service-role key, signed URL, or personal identifier is recorded",
     "Production workflow smoke records no-secret boundary",
+  );
+  requireSnippet(
+    evidence,
+    "incomplete submitted_for_review is rejected",
+    "Production workflow smoke rejects incomplete submitted_for_review",
+  );
+  requireSnippet(
+    evidence,
+    "valid submitted_for_review reaches admin queue",
+    "Production workflow smoke proves submitted_for_review queue handoff",
+  );
+  requireSnippet(
+    evidence,
+    "admin can move package to ready_for_export",
+    "Production workflow smoke proves ready_for_export acceptance",
   );
 }
 
@@ -1138,8 +1235,14 @@ function verifyPacket(packet, rawContent) {
     ["adminSignInWorks", "Post-activation admin sign-in works"],
     ["agentCanCreateDraft", "Post-activation agent can create draft"],
     ["agentCanUploadRequiredMedia", "Post-activation agent can upload media"],
-    ["incompleteWaitingReviewRejected", "Incomplete waiting_review is rejected"],
-    ["validWaitingReviewReachesQueue", "Valid waiting_review reaches queue"],
+    [
+      "incompleteSubmittedForReviewRejected",
+      "Incomplete submitted_for_review is rejected",
+    ],
+    [
+      "validSubmittedForReviewReachesQueue",
+      "Valid submitted_for_review reaches queue",
+    ],
     ["adminCanAcceptOrReturnCase", "Admin can accept or return case"],
     ["postHandoffAgentMutationBlocked", "Post-handoff agent mutation is blocked"],
     ["privateMediaSignedUrlScoped", "Private media signed URL is scoped"],
@@ -1156,6 +1259,34 @@ function verifyPacket(packet, rawContent) {
     pass("Go / No-Go decision is GO");
   } else {
     activationBlock("Go / No-Go decision is GO", packet.goNoGo?.decision ?? "missing");
+    requireExistingProjectFile(
+      packet.goNoGo?.blockerEvidenceArtifact,
+      "Go / No-Go blocker evidence artifact exists",
+    );
+    if (present(packet.goNoGo?.blockerEvidenceArtifact)) {
+      const evidence = readText(
+        resolve(repoRoot, packet.goNoGo.blockerEvidenceArtifact),
+        "Go / No-Go blocker evidence artifact exists",
+      );
+      if (evidence) {
+        requireSnippet(
+          evidence,
+          packet.productionTarget?.projectId ?? "",
+          "Go / No-Go blocker evidence records production project id",
+        );
+        requireSnippet(evidence, "Owner:", "Go / No-Go blocker evidence records owners");
+        requireSnippet(
+          evidence,
+          "Verification command:",
+          "Go / No-Go blocker evidence records verification commands",
+        );
+        requireSnippet(
+          evidence,
+          "Expected artifact:",
+          "Go / No-Go blocker evidence records expected artifacts",
+        );
+      }
+    }
   }
 }
 
@@ -1181,11 +1312,11 @@ if (blockers.length) {
   console.error(`BLOCKED Production readiness has ${blockers.length} blocker(s):`);
   if (integrityBlockers.length) {
     console.error(`Integrity blockers (${integrityBlockers.length}):`);
-    for (const blocker of integrityBlockers) console.error(`- ${blocker}`);
+    for (const blocker of integrityBlockers) printBlocker(blocker);
   }
   if (activationBlockers.length) {
     console.error(`Activation blockers (${activationBlockers.length}):`);
-    for (const blocker of activationBlockers) console.error(`- ${blocker}`);
+    for (const blocker of activationBlockers) printBlocker(blocker);
   }
 
   if (

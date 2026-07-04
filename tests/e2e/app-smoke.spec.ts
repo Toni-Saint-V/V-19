@@ -281,6 +281,10 @@ function returnedIvanovsAction(page: Page) {
   return submissionCardById(page, "ПД-1048");
 }
 
+async function openReturnedIvanovsSubmission(page: Page) {
+  await openAgentSubmission(page, "Ивановы", "Семья Ивановых");
+}
+
 async function expectReturnedIvanovsDecisionFrame(page: Page) {
   const card = submissionCardById(page, "ПД-1048");
 
@@ -296,6 +300,9 @@ function escapeRegex(value: string) {
 }
 
 async function openDrawerTab(page: Page, labels: string[]) {
+  const drawerScope = drawer(page);
+  await expect(drawerScope).toBeVisible();
+
   const drawerTabIds: Record<string, string> = {
     Анкета: "questionnaire",
     Данные: "questionnaire",
@@ -310,24 +317,38 @@ async function openDrawerTab(page: Page, labels: string[]) {
     const tabId = drawerTabIds[label];
     if (!tabId) continue;
 
-    const tabById = drawer(page).locator(`[data-drawer-tab="${tabId}"]`).first();
-    if (await isVisible(tabById)) {
+    const tabById = drawerScope
+      .locator(`[data-drawer-tab="${tabId}"], #drawer-tab-${tabId}`)
+      .first();
+    if ((await tabById.count()) > 0) {
+      await expect(tabById).toBeVisible();
       await tabById.click();
       return;
     }
   }
 
   const name = new RegExp(`^(${labels.map(escapeRegex).join("|")})([\\s,]|$)`);
-  const roleTab = drawer(page).getByRole("tab", { name }).first();
+  const roleTab = drawerScope.getByRole("tab", { name }).first();
 
-  if (await isVisible(roleTab)) {
+  if ((await roleTab.count()) > 0) {
+    await expect(roleTab).toBeVisible();
     await roleTab.click();
     return;
   }
 
-  const buttonTab = drawer(page).getByRole("button", { name }).first();
-  await expect(buttonTab).toBeVisible();
-  await buttonTab.click();
+  const textTab = drawerScope.getByText(name).first();
+  if ((await textTab.count()) > 0) {
+    await expect(textTab).toBeVisible();
+    await textTab.click();
+    return;
+  }
+
+  const controlTab = drawerScope
+    .locator('button, [role="tab"], [data-drawer-tab]')
+    .filter({ hasText: name })
+    .first();
+  await expect(controlTab).toBeVisible();
+  await controlTab.click();
 }
 
 async function openQuestionnaireTab(page: Page) {
@@ -1102,10 +1123,7 @@ test.describe("V-19 operations workspace", () => {
     await closeDrawer(page);
 
     await clickWorkspaceButton(page, /Мои подачи/);
-    await returnedIvanovsAction(page).click();
-    await expect(
-      drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
-    ).toBeVisible();
+    await openReturnedIvanovsSubmission(page);
     await openDrawerTab(page, ["Замечания"]);
     await expect(drawer(page).getByRole("heading", { name: "Селфи 1" })).toBeVisible();
     await expect(drawer(page).getByText("Скан паспорта")).toBeVisible();
@@ -1138,12 +1156,15 @@ test.describe("V-19 operations workspace", () => {
   test("drawer tabs and close flow work from keyboard", async ({ page }) => {
     await clickWorkspaceButton(page, /Мои подачи/);
     const trigger = returnedIvanovsAction(page);
-    await trigger.click();
+    await openReturnedIvanovsSubmission(page);
 
-    await expect(drawer(page).getByRole("button", { name: /Замечания/ })).toBeVisible();
+    await openDrawerTab(page, ["Замечания"]);
+    await expect(drawer(page).locator('[data-drawer-tab="issues"]').first()).toBeVisible();
 
     await openQuestionnaireTab(page);
-    await expect(drawer(page).getByRole("button", { name: /Анкета/ })).toBeVisible();
+    await expect(
+      drawer(page).locator('[data-drawer-tab="questionnaire"]').first(),
+    ).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -1248,13 +1269,8 @@ test.describe("V-19 operations workspace", () => {
 
   test("agent sees returned issues without admin issue actions", async ({ page }) => {
     await clickWorkspaceButton(page, /Мои подачи/);
-    await returnedIvanovsAction(page).click();
-    await expect(
-      drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
-    ).toBeVisible();
-    await drawer(page)
-      .getByRole("button", { name: /Замечания/ })
-      .click();
+    await openReturnedIvanovsSubmission(page);
+    await openDrawerTab(page, ["Замечания"]);
     await expect(
       drawer(page)
         .getByText(/Нужна правка|замечан/i)
@@ -1661,9 +1677,7 @@ test.describe("V-19 operations workspace", () => {
       await expect(
         drawer(page).getByRole("button", { name: "Отправить исправления" }),
       ).toBeDisabled();
-      await drawer(page)
-        .getByRole("button", { name: /Замечания/ })
-        .click();
+      await openDrawerTab(page, ["Замечания"]);
       await expect(
         drawer(page)
           .getByText(/уточнение|исправ/i)

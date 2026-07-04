@@ -44,7 +44,7 @@ async function startFresh(page: Page, workspaceEmail: string) {
   await page.goto("/");
   await page.evaluate((email) => {
     localStorage.clear();
-    localStorage.setItem("visaflow.workspaceEmail.v1", email);
+    localStorage.setItem("visaflow.workspaceEmail.v2", email);
   }, workspaceEmail);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
@@ -107,9 +107,9 @@ async function logoutThroughUi(page: Page) {
 }
 
 async function approveAccessRequests(page: Page, emails: string[]) {
-  await login(page, "admin@visaflow.local", "local-dev-password");
+  await login(page, "2@2.ru", "22");
   await clickWorkspaceButton(page, /Настройки/);
-  await page.getByRole("button", { name: "Входящие заявки" }).click();
+  await page.getByRole("button", { name: "Заявки на доступ" }).click();
   const queue = page.getByTestId("admin-access-queue");
   await expect(queue).toBeVisible();
 
@@ -486,7 +486,7 @@ test.describe("V-19 real UI registration to city Excel export", () => {
       await logoutThroughUi(page);
     }
 
-    await login(page, "admin@visaflow.local", "local-dev-password");
+    await login(page, "2@2.ru", "22");
     await returnWithIssue(page, submissionIds.get(families[0].title) ?? "", families[0].title);
     await logoutThroughUi(page);
 
@@ -494,7 +494,7 @@ test.describe("V-19 real UI registration to city Excel export", () => {
     await fixReturnedSubmission(page, submissionIds.get(families[0].title) ?? "");
     await logoutThroughUi(page);
 
-    await login(page, "admin@visaflow.local", "local-dev-password");
+    await login(page, "2@2.ru", "22");
     await acceptSubmission(
       page,
       submissionIds.get(families[0].title) ?? "",

@@ -41,5 +41,5 @@ runtime source truth and must not be used to claim production readiness:
 - `export-artifact-scope.md`
 
 The archived standalone v17 package under `VisaFlow_V19_v17_release_package/`
-is deprecated in place. Its legacy design, source precedence, and navigation
-notes must not override the current canonical contract.
+is deprecated in place. Its archived sample, design notes, source precedence,
+and navigation notes must not override the current canonical contract.

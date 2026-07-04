@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "scope": "supabase-production-activation",
   "status": "NO_GO",
-  "recordedAt": "2026-06-27",
+  "recordedAt": "2026-07-04",
   "runId": "20260627T200633",
   "sandboxReference": {
     "projectId": "oevvaowoklqttqkraxho",
@@ -75,8 +75,8 @@
     ],
     "targetHistoryChecked": true,
     "targetHistoryCompatible": true,
-    "ownerApprovedExactMigrationContract": true,
-    "migrationApplyOperator": "Codex via Supabase SQL executor",
+    "ownerApprovedExactMigrationContract": false,
+    "migrationApplyOperator": "BLOCKED - owner-approved migration operator is not recorded",
     "expectedPostApplyMigrationListRecorded": true
   },
   "smokeAccountDiscovery": {
@@ -113,75 +113,102 @@
     "restorePathConfirmed": false,
     "restoreEvidenceRecorded": false,
     "rpoRtoAcceptedByOwner": false,
-    "rollbackCommunicationOwner": "User; see docs/qa/supabase-production-owner-approval-20260701.md"
+    "rollbackCommunicationOwner": "User; see docs/qa/supabase-production-owner-approval-20260701.md",
+    "evidenceArtifact": "docs/qa/supabase-production-backup-discovery-20260701.md",
+    "restoreEvidenceArtifact": "docs/qa/supabase-production-backup-discovery-20260701.md",
+    "rpoRtoEvidenceArtifact": "docs/qa/supabase-production-backup-discovery-20260701.md"
   },
   "preActivationVerification": {
     "readinessContractVersion": "2026-06-16-production-readiness-v2",
-    "readinessVerifierSha256": "dc9608e0cfdffecc3bde6feb764b3344c3cb4e4a7b7195f8ff08b905f7330c70",
-    "checkedAt": "2026-07-01T02:19:23.673Z",
-    "gitHead": "91306670",
-    "scopedDiffSha256": "581af18ba90d4491e613b2804cebbe545c404db6c811b0e8fc7e041baec7bc92",
+    "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
+    "checkedAt": "2026-07-04T13:22:13.357Z",
+    "gitHead": "0af85db9",
+    "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
     "verificationScope": "Supabase production readiness scoped backend/security packet; volatile preActivationVerification fields excluded from scoped hash",
+    "verifyAuthDataReadinessPassed": true,
+    "verifyAuthDataReadiness": {
+      "checkedAt": "2026-07-04T13:22:13.357Z",
+      "exitCode": 0,
+      "gitHead": "0af85db9",
+      "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
+      "readinessContractVersion": "2026-06-16-production-readiness-v2",
+      "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
+      "command": "npm run verify:auth-data-readiness",
+      "result": "Auth/data readiness verification passed: 142 checks."
+    },
     "verifySupabaseReleasePassed": true,
     "verifySupabaseRelease": {
-      "checkedAt": "2026-07-01T02:19:23.673Z",
+      "checkedAt": "2026-07-04T13:22:13.357Z",
       "exitCode": 0,
-      "gitHead": "91306670",
-      "scopedDiffSha256": "581af18ba90d4491e613b2804cebbe545c404db6c811b0e8fc7e041baec7bc92",
+      "gitHead": "0af85db9",
+      "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "dc9608e0cfdffecc3bde6feb764b3344c3cb4e4a7b7195f8ff08b905f7330c70",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260701.md",
+      "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
       "command": "npm run verify:supabase-release",
-      "result": "Supabase release verification passed: 168 checks."
+      "result": "Supabase release verification passed: 174 checks."
     },
-    "testSupabaseLivePassed": true,
+    "verifyProductionPacketPassed": true,
+    "verifyProductionPacket": {
+      "checkedAt": "2026-07-04T13:22:13.357Z",
+      "exitCode": 0,
+      "gitHead": "0af85db9",
+      "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
+      "readinessContractVersion": "2026-06-16-production-readiness-v2",
+      "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
+      "command": "npm run verify:production-packet",
+      "result": "Production readiness gate is fail-closed as expected with activation blockers only."
+    },
+    "testSupabaseLivePassed": false,
     "testSupabaseLive": {
-      "checkedAt": "2026-07-01T02:19:23.673Z",
-      "exitCode": 0,
-      "gitHead": "91306670",
-      "scopedDiffSha256": "581af18ba90d4491e613b2804cebbe545c404db6c811b0e8fc7e041baec7bc92",
+      "checkedAt": "",
+      "exitCode": null,
+      "gitHead": "",
+      "scopedDiffSha256": "",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "dc9608e0cfdffecc3bde6feb764b3344c3cb4e4a7b7195f8ff08b905f7330c70",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260701.md",
+      "readinessVerifierSha256": "",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
       "command": "npm run test:supabase-live",
-      "result": "Supabase live smoke passed: 1 passed, 1 skipped."
+      "result": "Not run - production/live Supabase env and owner-approved access are not available in this worktree."
     },
-    "testE2eSupabasePassed": true,
-    "verifyFullPassed": true,
+    "testE2eSupabasePassed": false,
+    "verifyFullPassed": false,
     "verifyFull": {
-      "checkedAt": "2026-07-01T02:19:23.673Z",
-      "exitCode": 0,
-      "gitHead": "91306670",
-      "scopedDiffSha256": "581af18ba90d4491e613b2804cebbe545c404db6c811b0e8fc7e041baec7bc92",
+      "checkedAt": "2026-07-04T13:26:00Z",
+      "exitCode": 1,
+      "gitHead": "",
+      "scopedDiffSha256": "",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "dc9608e0cfdffecc3bde6feb764b3344c3cb4e4a7b7195f8ff08b905f7330c70",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260701.md",
+      "readinessVerifierSha256": "",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
       "command": "npm run verify:full",
-      "result": "verify:full passed; production packet remained fail-closed as expected under --expect-blocked."
+      "result": "Failed - local verify chain reached build successfully, then verify:performance blocked on pre-existing bundle/CSS budget limits also reproduced on clean origin/main baseline."
     },
-    "verifyFullCheckedAt": "2026-07-01T02:19:23.673Z",
+    "verifyFullCheckedAt": "2026-07-04T13:26:00Z",
     "verifyFullReadinessContractVersion": "2026-06-16-production-readiness-v2",
-    "verifyFullReadinessVerifierSha256": "dc9608e0cfdffecc3bde6feb764b3344c3cb4e4a7b7195f8ff08b905f7330c70",
+    "verifyFullReadinessVerifierSha256": "",
     "finalDiffReviewed": false,
-    "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260701.md",
     "testE2eSupabase": {
-      "checkedAt": "2026-07-01T02:19:23.673Z",
-      "exitCode": 0,
-      "gitHead": "91306670",
-      "scopedDiffSha256": "581af18ba90d4491e613b2804cebbe545c404db6c811b0e8fc7e041baec7bc92",
+      "checkedAt": "",
+      "exitCode": null,
+      "gitHead": "",
+      "scopedDiffSha256": "",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "dc9608e0cfdffecc3bde6feb764b3344c3cb4e4a7b7195f8ff08b905f7330c70",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260701.md",
+      "readinessVerifierSha256": "",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
       "command": "npm run test:e2e:supabase",
-      "result": "Supabase browser E2E passed: 5 passed."
-    }
+      "result": "Not run - production/live Supabase env and owner-approved access are not available in this worktree."
+    },
+    "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md"
   },
   "productionEnvEvidence": {
     "backendTargetSupabase": true,
     "activationTargetProduction": true,
     "releaseEnabled": false,
     "transactionalPersistenceTested": false,
-    "migrationApproved": true,
+    "migrationApproved": false,
     "migrationsApplied": false,
     "rlsPolicyTestsPassed": false,
     "storagePolicyTestsPassed": false,
@@ -194,12 +221,12 @@
     "productionWorkflowEvidenceArtifact": ""
   },
   "authSecurity": {
-    "securityAdvisorsChecked": false,
+    "securityAdvisorsChecked": true,
     "projectId": "tsymifccglpepvbmrcgh",
-    "checkedAt": "",
-    "planEligibilityChecked": false,
+    "checkedAt": "2026-06-30T22:30:02Z",
+    "planEligibilityChecked": true,
     "organizationPlan": "free",
-    "planEligibilityEvidence": "",
+    "planEligibilityEvidence": "docs/qa/supabase-production-security-advisors-20260701.md",
     "leakedPasswordProtectionPlanEligible": false,
     "leakedPasswordProtectionEnabled": false,
     "noBlockingSecurityAdvisorWarnings": false,
@@ -218,15 +245,15 @@
       "source": "Supabase _get_advisors(type=security)",
       "warningCount": 1
     },
-    "evidenceArtifact": ""
+    "evidenceArtifact": "docs/qa/supabase-production-security-advisors-20260701.md"
   },
   "postActivationChecks": {
     "agentSignInWorks": false,
     "adminSignInWorks": false,
     "agentCanCreateDraft": false,
     "agentCanUploadRequiredMedia": false,
-    "incompleteWaitingReviewRejected": false,
-    "validWaitingReviewReachesQueue": false,
+    "incompleteSubmittedForReviewRejected": false,
+    "validSubmittedForReviewReachesQueue": false,
     "adminCanAcceptOrReturnCase": false,
     "postHandoffAgentMutationBlocked": false,
     "privateMediaSignedUrlScoped": false,
@@ -236,6 +263,8 @@
   },
   "goNoGo": {
     "decision": "NO_GO",
-    "reason": "Owner approval, production target evidence, live Supabase proof, Edge dry-runs, browser QA, backup/restore evidence, and final diff review are not recorded."
+    "reason": "Production activation remains blocked by owner approval, exact migration contract approval, leaked-password protection eligibility/enablement, live Supabase proof, Edge dry-runs, browser QA, backup/restore proof, RPO/RTO acceptance, post-activation workflow smoke, logs/error-rate evidence, and final diff review.",
+    "blockerEvidenceArtifact": "docs/qa/supabase-production-blockers-20260704.md",
+    "verificationCommand": "npm run verify:production-readiness"
   }
 }

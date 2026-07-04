@@ -70,6 +70,31 @@ Confirm production auth/profile consistency before activation.
 Do not auto-create production profiles from Codex. Any profile repair requires
 owner approval, an actor list, a rollback note, and a dry-run report.
 
+## Backup, Restore, And RPO/RTO Gate
+
+Before production activation, record backup and restore evidence in
+`docs/qa/supabase-production-backup-discovery-20260701.md`.
+
+Required closure evidence:
+
+- latest restorable backup timestamp for the production project;
+- owner-approved restore target that is not the production project;
+- restore drill or Supabase-supported recovery proof;
+- accepted RPO/RTO;
+- backup owner and rollback communication owner.
+
+Do not treat `walg_enabled=true` alone as restore proof. Production remains
+`NO_GO` until the restore path and RPO/RTO are recorded.
+
+## Owner Approval Stop Gate
+
+Owner approval evidence lives in
+`docs/qa/supabase-production-owner-approval-20260701.md`.
+
+Do not set `VITE_SUPABASE_PRODUCTION_APPROVED=true`, apply production
+migrations, or accept Security Advisor/leaked-password risk from Codex without
+dated owner approval.
+
 ## Rollback Boundary
 
 Rollback is limited to migration-level remediation, disabling production
