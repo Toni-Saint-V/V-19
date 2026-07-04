@@ -9,6 +9,7 @@ export function OperationalSideMenu({
   items,
   mobileOpen,
   mobileTitle,
+  sidebarId,
   createAction,
   onChooseRole,
   onCloseMobile,
@@ -34,6 +35,7 @@ export function OperationalSideMenu({
   sessionDisplayName: string;
   sessionInitials: string;
   sessionRoleLabel: string;
+  sidebarId?: string;
   showAdminZoneSwitch: boolean;
   showRoleSwitcher: boolean;
 }) {
@@ -127,6 +129,7 @@ export function OperationalSideMenu({
       <OperationalSidebar
         createAction={sidebarCreateAction}
         footer={footer}
+        id={sidebarId}
         items={navItems}
         mobileTitle={mobileTitle}
         onMobileClose={onCloseMobile}
@@ -136,6 +139,7 @@ export function OperationalSideMenu({
           className="ops-mobile-menu-backdrop"
           type="button"
           aria-label="Закрыть меню"
+          aria-controls={sidebarId}
           onClick={onCloseMobile}
         />
       ) : null}
