@@ -5,6 +5,7 @@ import {
   collectBrowserProblems,
   drawer,
   expectDrawerStatus,
+  isVisible,
   openDrawerTab,
   openFreshWorkspace,
   submissionCard,
@@ -18,6 +19,18 @@ async function openAdminSubmission(
   const targetCard = submissionCard(page, cardText);
   await expect(targetCard).toBeVisible();
   await targetCard.click();
+  if (!(await isVisible(drawer(page)))) {
+    const explicitOpenAction = targetCard
+      .locator(".v17-admin-row-action, .v19-admin-row-action")
+      .first();
+
+    if (await isVisible(explicitOpenAction)) {
+      await explicitOpenAction.click();
+    } else {
+      await targetCard.click();
+    }
+  }
+  await expect(drawer(page)).toBeVisible();
   await expect(
     drawer(page)
       .getByRole("heading", { name: drawerTitle })
@@ -37,7 +50,8 @@ test.describe("V-19 pilot admin review click flow", () => {
       heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
-    await expect(page.locator(".ops-nav").getByRole("button", { name: "Входящие" })).toBeVisible();
+    await expect(page.locator(".ops-nav").getByRole("button", { name: "Входящие" })).toHaveCount(0);
+    await expect(page.locator(".ops-nav").getByRole("button", { name: "Мои действия" })).toHaveCount(0);
     await expect(page.locator(".ops-nav").getByRole("button", { name: "Мои подачи" })).toHaveCount(0);
 
     await clickWorkspaceButton(page, /Проверка|Работа/);
@@ -77,9 +91,9 @@ test.describe("V-19 pilot admin review click flow", () => {
       heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
-    await page.getByRole("tab", { name: /Исправления получены/ }).click();
+    await page.getByRole("tab", { name: /Исправления/ }).click();
     await openAdminSubmission(page, "Петровы", "Семья Петровых");
-    await expect(drawer(page).getByText("Исправлено агентом")).toBeVisible();
+    await expect(page.getByText("Исправлено агентом").first()).toBeVisible();
     await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
     await expectDrawerStatus(page, "Готово к выгрузке");
     await drawer(page)

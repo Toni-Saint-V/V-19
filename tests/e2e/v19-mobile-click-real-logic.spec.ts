@@ -212,19 +212,19 @@ test.describe("V-19 mobile click real logic", () => {
 
     await page.setViewportSize({ height: 844, width: 390 });
     await openFreshWorkspace(page, { heading: "Мои действия" });
-    await expectNoHorizontalOverflow(page, "390 agent inbox");
+    await expectNoHorizontalOverflow(page, "390 agent actions");
     await expectMobileTabbarCompact(page);
-    await expectNoFixedLayerOverControls(page, "390 agent inbox");
+    await expectNoFixedLayerOverControls(page, "390 agent actions");
 
     const lastEventAction = page
       .getByRole("button", { name: /^Открыть подачу:/ })
       .last();
-    await expectCenterHitTarget(lastEventAction, "390 inbox last event action");
+    await expectCenterHitTarget(lastEventAction, "390 actions last row action");
     await lastEventAction.click();
     await expect(drawer(page)).toBeVisible();
     await expectCenterHitTarget(
       drawerCloseButton(page),
-      "390 drawer close from inbox event",
+      "390 drawer close from action row",
     );
     await drawerCloseButton(page).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -350,7 +350,7 @@ test.describe("V-19 mobile click real logic", () => {
       await page.setViewportSize({ height: viewport.height, width: viewport.width });
 
       await openFreshWorkspace(page, { heading: "Мои действия" });
-      await expectNoHorizontalOverflow(page, `${viewport.label} agent inbox`);
+      await expectNoHorizontalOverflow(page, `${viewport.label} agent actions`);
       await clickOperationalNav(page, /Настройки/);
       await expect(
         page.getByRole("heading", { level: 1, name: "Настройки" }),

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openFreshWorkspace } from "./v19-pilot-helpers";
 
 function collectBrowserProblems(page: Page) {
   const problems: string[] = [];
@@ -12,29 +13,6 @@ function collectBrowserProblems(page: Page) {
   });
 
   return problems;
-}
-
-async function openFreshWorkspace(
-  page: Page,
-  options: { heading?: string; workspaceEmail?: string } = {},
-) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    (globalThis as unknown as { localStorage: { clear(): void } }).localStorage.clear();
-  });
-  if (options.workspaceEmail) {
-    await page.evaluate((workspaceEmail) => {
-      (
-        globalThis as unknown as {
-          localStorage: { setItem(key: string, value: string): void };
-        }
-      ).localStorage.setItem("visaflow.workspaceEmail.v1", workspaceEmail);
-    }, options.workspaceEmail);
-  }
-  await page.reload();
-  await expect(
-    page.getByRole("heading", { level: 1, name: options.heading ?? "Мои действия" }),
-  ).toBeVisible();
 }
 
 async function saveScreenshot(page: Page, name: string) {

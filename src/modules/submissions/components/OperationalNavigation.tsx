@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import {
   ClipboardCheck,
   FileSpreadsheet,
-  Inbox,
   ListChecks,
   Settings,
   UsersRound,
@@ -142,7 +141,6 @@ export function OperationalSidebar({
 }
 
 const operationalIconMap: Array<[needle: string, Icon: LucideIcon]> = [
-  ["inbox", Inbox],
   ["actions", ListChecks],
   ["submissions", UsersRound],
   ["review", ClipboardCheck],

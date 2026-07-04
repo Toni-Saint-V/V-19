@@ -134,7 +134,7 @@ export type AgentActionTaskSummary = {
   ready: number;
 };
 
-export type OperationalInboxEvent = {
+export type OperationalWorkEvent = {
   action: string;
   badge: string;
   context: string;
@@ -178,8 +178,8 @@ export function adminActionQueue(submissions: Submission[]) {
   };
 }
 
-export function adminInboxEvents(submissions: Submission[]): OperationalInboxEvent[] {
-  return submissions.flatMap((submission): OperationalInboxEvent[] => {
+export function adminWorkEvents(submissions: Submission[]): OperationalWorkEvent[] {
+  return submissions.flatMap((submission): OperationalWorkEvent[] => {
     if (submission.status === "corrections_received") {
       const fixed = fixedIssueCount(submission);
       return [

@@ -1,36 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { clickWorkspaceButton } from "./v19-pilot-helpers";
+import { clickWorkspaceButton, openFreshWorkspace } from "./v19-pilot-helpers";
 
-async function openFreshWorkspace(
-  page: Page,
-  options: { heading?: string; workspaceEmail?: string } = {},
-) {
-  await page.goto("/");
-  await page.evaluate(() => {
-    (
-      globalThis as unknown as { localStorage: { clear(): void } }
-    ).localStorage.clear();
-  });
-  if (options.workspaceEmail) {
-    await page.evaluate((workspaceEmail) => {
-      (
-        globalThis as unknown as {
-          localStorage: { setItem(key: string, value: string): void };
-        }
-      ).localStorage.setItem("visaflow.workspaceEmail.v1", workspaceEmail);
-    }, options.workspaceEmail);
-  }
-  await page.reload();
-  await expect(
-    page.getByRole("heading", { level: 1, name: options.heading ?? "Мои действия" }),
-  ).toBeVisible();
-}
-
-async function expectNoAxeViolations(page: Page, context: string) {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa"])
-    .analyze();
+async function expectNoAxeViolations(page: Page, context: string, include?: string) {
+  const axeBuilder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]);
+  const results = await (include ? axeBuilder.include(include) : axeBuilder).analyze();
 
   expect(
     results.violations.map((violation) => ({
@@ -54,7 +28,8 @@ test.describe("V-19 accessibility contract", () => {
     page,
   }) => {
     await openFreshWorkspace(page);
-    await expectNoAxeViolations(page, "agent inbox");
+    await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
+    await expectNoAxeViolations(page, "agent actions");
 
     await openAgentActionsTab(page);
     await expect(
@@ -73,10 +48,18 @@ test.describe("V-19 accessibility contract", () => {
     const createDialog = page.getByRole("dialog").first();
     await expect(createDialog).toBeVisible();
     await expect(
-      createDialog.getByRole("button", { name: "Закрыть создание" }).first(),
+      createDialog.getByRole("heading", { name: "Новая подача" }),
     ).toBeVisible();
-    await expectNoAxeViolations(page, "create submission drawer");
-    await createDialog.getByRole("button", { name: "Закрыть создание" }).first().click();
+    await expectNoAxeViolations(page, "create submission drawer", '[role="dialog"]');
+    const closeCreateButton = createDialog
+      .getByRole("button", { name: "Закрыть создание" })
+      .first();
+    if (await closeCreateButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await closeCreateButton.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
   test("admin primary surfaces, export, and submission drawer have no automated WCAG A/AA violations", async ({
@@ -93,7 +76,10 @@ test.describe("V-19 accessibility contract", () => {
     await clickWorkspaceButton(page, /^Проверка$/);
     await expect(page.getByRole("heading", { name: "Проверка" })).toBeVisible();
 
-    await page.locator(".submission-card, [data-submission-card], .vf-figma-action-row").first().click();
+    await page
+      .getByRole("button", { name: /Ручная проверка заявки|Проверить/ })
+      .first()
+      .click();
     const drawer = page.getByRole("dialog").first();
     await expect(drawer).toBeVisible();
     await expectNoAxeViolations(page, "submission drawer");

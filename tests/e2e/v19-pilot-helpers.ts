@@ -20,6 +20,9 @@ export async function openFreshWorkspace(
   page: Page,
   options: { heading?: string; workspaceEmail?: string } = {},
 ) {
+  const workspaceEmail = normalizeLocalDemoWorkspaceEmail(options.workspaceEmail);
+  const workspacePassword = localDemoPasswordForEmail(workspaceEmail);
+
   await page.goto("/");
   await page.evaluate((workspaceEmail) => {
     const browserGlobal = globalThis as unknown as {
@@ -33,16 +36,16 @@ export async function openFreshWorkspace(
     if (workspaceEmail) {
       browserGlobal.localStorage.setItem("visaflow.workspaceEmail.v2", workspaceEmail);
     }
-  }, options.workspaceEmail ?? "");
+  }, workspaceEmail);
   await page.reload();
 
   const emailField = page.locator("#workspace-email");
   if (await isVisible(emailField)) {
     try {
-      await emailField.fill(options.workspaceEmail ?? "agent@visaflow.local", {
+      await emailField.fill(workspaceEmail, {
         timeout: 2_000,
       });
-      await page.locator("#workspace-password").fill("local-dev-password", {
+      await page.locator("#workspace-password").fill(workspacePassword, {
         timeout: 2_000,
       });
       await page.getByRole("button", { name: "Войти" }).click();
@@ -56,11 +59,21 @@ export async function openFreshWorkspace(
     }
   }
 
-  if (options.heading) {
-    await expect(
-      page.getByRole("heading", { level: 1, name: options.heading }),
-    ).toBeVisible();
-  }
+  const expectedHeading =
+    options.heading ?? (workspaceEmail === "2@2.ru" ? "Проверка" : "Мои действия");
+  await expect(
+    page.getByRole("heading", { level: 1, name: expectedHeading }),
+  ).toBeVisible();
+}
+
+function normalizeLocalDemoWorkspaceEmail(email?: string) {
+  if (email === "admin@visaflow.local") return "2@2.ru";
+  if (email === "agent@visaflow.local" || !email) return "1@1.ru";
+  return email;
+}
+
+function localDemoPasswordForEmail(email: string) {
+  return email === "2@2.ru" ? "22" : "11";
 }
 
 export async function loginThroughAccessGate(
