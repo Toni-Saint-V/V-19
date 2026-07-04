@@ -1,18 +1,19 @@
 import { useState } from "react";
 
 import { agentOwnerDisplayName } from "../ownership";
-import type { AgentOwnerId, City } from "../types";
+import type { AgentOwnerId } from "../types";
 
 export type AgentFilterValue = AgentOwnerId | "Все агенты";
+export type CityFilterValue = string | "Все города";
 
 export function CityFilterMenu({
   onChange,
   options,
   value,
 }: {
-  onChange: (city: City | "Все города") => void;
-  options: Array<City | "Все города">;
-  value: City | "Все города";
+  onChange: (city: CityFilterValue) => void;
+  options: CityFilterValue[];
+  value: CityFilterValue;
 }) {
   const [open, setOpen] = useState(false);
 
