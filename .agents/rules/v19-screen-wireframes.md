@@ -10,6 +10,11 @@ paths:
 
 Use this rule before implementing or approving any V-19 design-system screen. It fixes the intended frame, spacing, and layout behavior for the current screen-by-screen migration.
 
+Tracked screenshot files were removed from the repository during cleanup. Any
+`.agents/reference-screens/*.png` or `docs/qa/*.png` names below are historical
+labels only, not required local files. Use the textual wireframes here plus
+fresh runtime screenshots captured for the current task.
+
 ## Agent Execution Protocol
 
 For every implementation task using this rule, the agent must follow this order:
@@ -38,7 +43,9 @@ Changing files outside the requested screen/shared component dependency path mus
 - Mobile shell: safe margin `20px`, major section gap `16px`, compact internal gap `10-12px`, card padding `18-22px`, card radius `16-20px`, pill radius `999px`.
 - Dark surface stack: app canvas -> shell -> panel -> row/card -> control. Use existing `--vf-*` tokens; do not copy orange/espresso secondary-reference palette.
 - Empty lower canvas is allowed only when the populated stage is intentionally bounded and balanced. It is not allowed when the screen looks unfinished.
-- Every screen needs fresh desktop and mobile screenshots before `premium-design-ux-review` approval.
+- Every screen needs fresh desktop and mobile runtime screenshots before
+  `premium-design-ux-review` approval. Keep those captures task-scoped and do
+  not commit screenshot artifacts unless explicitly requested.
 
 ## Desktop App Shell
 
