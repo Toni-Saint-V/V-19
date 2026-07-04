@@ -10,7 +10,7 @@ import {
 } from "../../src/modules/submissions/aiSuggestions";
 import {
   adminActionQueue,
-  adminInboxEvents,
+  adminWorkEvents,
   agentActionQueue,
   buildAgentActionTasks,
 } from "../../src/modules/submissions/agentActions";
@@ -906,9 +906,9 @@ describe("V-19 submission actions", () => {
     expect(exportReadyTask?.reason).toContain("агентских прав на выгрузку нет");
   });
 
-  it("derives admin inbox and action queues from review and export states", () => {
+  it("derives admin work events and action queues from review and export states", () => {
     const queue = adminActionQueue(initialSubmissions);
-    const inbox = adminInboxEvents(initialSubmissions);
+    const workEvents = adminWorkEvents(initialSubmissions);
 
     expect(queue.summary.open).toBe(queue.open.length);
     expect(queue.summary.completed).toBe(queue.completed.length);
@@ -927,10 +927,10 @@ describe("V-19 submission actions", () => {
     });
     expect(queue.open.some((action) => action.cta === "Добавить")).toBe(false);
     expect(queue.open.some((action) => action.cta === "Исправить")).toBe(false);
-    expect(inbox.map((event) => event.badge)).toEqual(
+    expect(workEvents.map((event) => event.badge)).toEqual(
       expect.arrayContaining(["Проверка", "Исправления", "К выгрузке"]),
     );
-    expect(inbox.every((event) => event.id.startsWith("admin-work-"))).toBe(true);
+    expect(workEvents.every((event) => event.id.startsWith("admin-work-"))).toBe(true);
   });
 
   it("derives submit corrections only after all targeted file replacements are uploaded", () => {

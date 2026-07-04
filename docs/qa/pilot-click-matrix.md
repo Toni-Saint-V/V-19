@@ -33,9 +33,9 @@ Important boundary: this matrix documents current local/demo click logic. It is 
 | Click | Expected state | Actual state | Covered by test | Severity if broken |
 | --- | --- | --- | --- | --- |
 | Open local/demo workspace with unknown stored email | Access gate shows blocked local/dev email state | `WorkspaceAccessGate` renders when requested email cannot bootstrap | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
-| Submit approved `agent@visaflow.local` email | Agent workspace opens on `Входящие` | Local approved agent is seeded by local/dev auth adapter | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
-| Open `Входящие` | Inbox heading and events are visible | Agent inbox is default local/demo surface | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
-| Click `Мои действия` tab | Same workspace heading, actions region visible | Actions mode is nested under inbox tabs | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
+| Submit approved `agent@visaflow.local` email | Agent workspace opens on `Мои действия` | Local approved agent is seeded by local/dev auth adapter | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
+| Open `Мои действия` | Action queue heading and rows are visible | Agent actions are the default local/demo surface | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
+| Check absent `Входящие` nav | No standalone inbox screen is exposed | Events and returned-work actions are consolidated into `Мои действия` | yes - `app-smoke`, `v19-accessibility.spec.ts` | P1 |
 | Click `Мои подачи` nav | Submissions cockpit opens | Operational nav calls `showAgentTab("action")` | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
 | Click status filter `В работе` | In-progress submissions visible, returned submissions hidden | Desktop tab path exists | yes - `v19-pilot-agent-flow.spec.ts` | P1 |
 | Click status filter `Готово` | Ready/exported agent-visible submissions visible, returned hidden | Desktop tab path exists | yes - `v19-pilot-agent-flow.spec.ts` | P1 |

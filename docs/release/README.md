@@ -23,6 +23,8 @@ evidence records. When documents conflict, use this order:
 - `supabase-production-readiness.json` is the current production readiness
   evidence packet and remains `NO_GO` until all evidence and owner approval are
   recorded.
+- `v19-10-user-rollout-readiness-plan.md` is the active plan for moving from
+  merged development main to a controlled 10-user rollout.
 - `auth-data-production-readiness.md` is a historical fail-closed auth/data
   packet. It must not override `supabase-production-readiness.json` when target
   details differ.
@@ -39,5 +41,5 @@ runtime source truth and must not be used to claim production readiness:
 - `export-artifact-scope.md`
 
 The archived standalone v17 package under `VisaFlow_V19_v17_release_package/`
-is deprecated in place. Its prototype, source precedence, and navigation notes
-must not override the current canonical contract.
+is deprecated in place. Its legacy design, source precedence, and navigation
+notes must not override the current canonical contract.

@@ -6,14 +6,14 @@ Scope: pilot UI clickability and layout on desktop, tablet, and mobile.
 
 | Breakpoint | Surfaces | Click / layout contract | Evidence |
 | --- | --- | --- | --- |
-| 390 mobile | Agent inbox, agent submissions, submission drawer, admin review, admin drawer, export | Cards are full width, no horizontal overflow, 4-item agent tabbar stays one row, fixed tabbar/create dock do not cover controls, mobile filters close with Escape, drawer actions are reachable, export ready rows become usable cards | `tests/e2e/v19-mobile-click-real-logic.spec.ts` mobile project |
-| 768 tablet | Agent inbox/submissions, admin review/export | No horizontal overflow, nav/menu actions remain targetable, fixed context layers do not cover visible controls | `tests/e2e/v19-mobile-click-real-logic.spec.ts` chromium matrix |
-| 1024 tablet/desktop boundary | Agent inbox/submissions, admin review/export | Boundary layout keeps controls clickable with no fixed-layer cover and no overflow | `tests/e2e/v19-mobile-click-real-logic.spec.ts` chromium matrix |
-| 1440 desktop | Agent inbox/submissions, admin review/export | Desktop layout keeps table/card controls targetable and horizontally contained | `tests/e2e/v19-mobile-click-real-logic.spec.ts` chromium matrix |
+| 390 mobile | Agent actions, agent submissions, submission drawer, admin review, admin drawer, export | Cards are full width, no horizontal overflow, agent nav stays compact, fixed create/filter layers do not cover controls, mobile filters close with Escape, drawer actions are reachable, export ready rows become usable cards | `tests/e2e/v19-mobile-click-real-logic.spec.ts` mobile project |
+| 768 tablet | Agent actions/submissions, admin review/export | No horizontal overflow, nav/menu actions remain targetable, fixed context layers do not cover visible controls | `tests/e2e/v19-mobile-click-real-logic.spec.ts` chromium matrix |
+| 1024 tablet/desktop boundary | Agent actions/submissions, admin review/export | Boundary layout keeps controls clickable with no fixed-layer cover and no overflow | `tests/e2e/v19-mobile-click-real-logic.spec.ts` chromium matrix |
+| 1440 desktop | Agent actions/submissions, admin review/export | Desktop layout keeps table/card controls targetable and horizontally contained | `tests/e2e/v19-mobile-click-real-logic.spec.ts` chromium matrix |
 
 ## Controls Covered
 
-- Agent inbox event actions: repeated `Открыть` buttons now have row-specific accessible names.
+- Agent action row actions: repeated `Открыть` buttons now have row-specific accessible names.
 - Agent mobile tabbar: one-row 4-tab layout at 390px; it is hidden while drawers are open.
 - Agent submissions filter sheet: bottom sheet is above the tabbar/create dock and closes by backdrop, close button, or Escape.
 - Agent submission cards: row click opens the requested `data-submission-id`, including `ПД-1048`.

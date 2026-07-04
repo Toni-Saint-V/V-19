@@ -94,10 +94,10 @@ Screens are projections of the same state:
 
 | Surface | Role | Projection |
 |---|---|---|
-| `Входящие` | agent | inbox events + action queue from owned submissions |
+| `Мои действия` | agent | derived action queue from owned submissions, blocking issues, files, questionnaire, and review/export state |
 | `Мои подачи` | agent | owned submissions grouped by operational need |
 | Submission drawer | agent/admin | selected submission detail, role-safe commands |
-| `Работа` | admin | submitted/corrections queues and review events |
+| `Проверка` | admin | submitted/corrections/export-ready review queues and admin work tabs |
 | `Выгрузка` | admin | export-ready/history submissions and workbook plan |
 | PDF panel | admin first, agent visibility only if implemented | post-export PDF review/handoff state |
 

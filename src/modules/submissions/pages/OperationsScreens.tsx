@@ -13,7 +13,6 @@ import {
   summarizeAgentActionTasks,
   type AgentActionItem,
   type AgentActionTask,
-  type OperationalInboxEvent,
 } from "../agentActions";
 import {
   buildExportMappingAudit,
@@ -62,13 +61,10 @@ import {
   CollectionToolbarTools,
   compactActiveFilters,
 } from "../components/CollectionComposition";
-import { RailCard, useRailDisclosure } from "../components/RightRailPrimitives";
+import { useRailDisclosure } from "../components/RightRailPrimitives";
 import {
-  CollectionGroupLabel,
-  CollectionRow,
   ContextPanel,
   CollectionToolbar,
-  ContextRail,
   MobileFilterSheet,
   PanelActionFooter,
   SubmissionCollectionRow,
@@ -133,7 +129,6 @@ function transitionUiState(update: () => void) {
   }
 }
 
-type InboxEvent = OperationalInboxEvent;
 type ActionStatusFilter =
   | "action_required"
   | "all"
@@ -360,16 +355,16 @@ export function AgentActionsScreen({
   }
 
   return (
-    <div className="v19-screen-grid v19-inbox-screen v19-actions-screen is-panel-closed">
+    <div className="v19-screen-grid v19-work-screen v19-actions-screen is-panel-closed">
       <section
         className={
           activeFilters.length
             ? "v19-actions-cockpit-shell has-active-filters"
             : "v19-actions-cockpit-shell"
         }
-        aria-labelledby="agent-inbox-actions-title"
+        aria-labelledby="agent-actions-title"
       >
-        <h2 id="agent-inbox-actions-title" className="sr-only">
+        <h2 id="agent-actions-title" className="sr-only">
           Мои действия
         </h2>
 
@@ -559,492 +554,6 @@ function actionFilterEmptyState(status: ActionStatusFilter) {
     body: "Новые задачи появятся после изменений в подачах.",
     title: "Нет действий. Всё обработано.",
   };
-}
-
-export function AgentInboxScreen({
-  cityControl,
-  contextRailEnabled,
-  inboxEvents,
-  onOpen,
-  searchControl,
-  submissions,
-  summary,
-}: {
-  cityControl?: ReactNode;
-  contextRailEnabled?: boolean;
-  inboxEvents?: InboxEvent[];
-  onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
-  searchControl: ReactNode;
-  submissions: Submission[];
-  summary: ReturnType<typeof counts>;
-}) {
-  const [activeTab, setActiveTab] = useState<"unread" | "all">("unread");
-  const [actionOnly, setActionOnly] = useState(false);
-  const [comfortableView, setComfortableView] = useState(true);
-  const [informationalOnly, setInformationalOnly] = useState(false);
-  const hasContextRail = contextRailEnabled ?? cityControl != null;
-  const railDisclosure = useRailDisclosure({
-    defaultOpen: defaultContextRailOpen(),
-    enabled: hasContextRail,
-    transition: transitionUiState,
-  });
-  const panelOpen = railDisclosure.open;
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const events = useMemo(
-    () => inboxEvents ?? buildAgentInboxEvents(submissions),
-    [inboxEvents, submissions],
-  );
-  const visibleEvents = useMemo(() => {
-    const tabEvents =
-      activeTab === "unread"
-        ? [
-            ...events.filter((event) => !event.read),
-            ...events.filter((event) => event.read).slice(0, 1),
-          ]
-        : events;
-    const filteredEvents = actionOnly
-      ? tabEvents.filter((event) => event.needsAction)
-      : informationalOnly
-        ? tabEvents.filter((event) => !event.needsAction)
-        : tabEvents;
-
-    return sortOrder === "oldest" ? [...filteredEvents].reverse() : filteredEvents;
-  }, [actionOnly, activeTab, events, informationalOnly, sortOrder]);
-  const unreadCount = events.filter((event) => !event.read).length;
-  const unreadActionCount = events.filter(
-    (event) => !event.read && event.needsAction,
-  ).length;
-  const actionEventCount = events.length
-    ? unreadActionCount
-    : Math.min(summary.requiresAction, unreadCount);
-  const informationalEventCount = Math.max(unreadCount - actionEventCount, 0);
-  const selectedEvent =
-    visibleEvents.find((event) => event.id === selectedEventId) ?? visibleEvents[0];
-  const railEvents = events.filter((event) => !event.read).slice(0, 3);
-  const railPeerEvents = (railEvents.length ? railEvents : events)
-    .filter((event) => event.id !== selectedEvent?.id)
-    .slice(0, 2);
-  const eventGroups = [
-    {
-      events: visibleEvents.filter((event) => !event.time.startsWith("вчера")),
-      label: "Сегодня",
-    },
-    {
-      events: visibleEvents.filter((event) => event.time.startsWith("вчера")),
-      label: "Ранее",
-    },
-  ].filter((group) => group.events.length);
-  const activeFilters = compactActiveFilters([
-      actionOnly
-        ? {
-            id: "action",
-            label: "Требуют действия",
-            onRemove: () => transitionUiState(() => setActionOnly(false)),
-          }
-        : null,
-      informationalOnly
-        ? {
-            id: "info",
-            label: "Информационные",
-            onRemove: () => transitionUiState(() => setInformationalOnly(false)),
-          }
-        : null,
-      sortOrder === "oldest"
-        ? {
-            id: "sort",
-            label: "Старые сверху",
-            onRemove: () => transitionUiState(() => setSortOrder("newest")),
-          }
-        : null,
-      comfortableView
-        ? null
-        : {
-            id: "density",
-            label: "Компактный вид",
-            onRemove: () => transitionUiState(() => setComfortableView(true)),
-          },
-    ]);
-  const resetActiveFilters = () =>
-    transitionUiState(() => {
-      setActionOnly(false);
-      setInformationalOnly(false);
-      setSortOrder("newest");
-      setComfortableView(true);
-    });
-  function closePanel() {
-    railDisclosure.close();
-  }
-
-  function togglePanel() {
-    railDisclosure.toggle();
-  }
-
-  const panelToggleTool = (
-    <ToolbarIconButton
-      label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-      icon="panel"
-      pressed={panelOpen}
-      onClick={togglePanel}
-    />
-  );
-  const mobilePanelToggleTool = hasContextRail ? (
-    <div className="v19-mobile-context-tool">
-      <ToolbarIconButton
-        label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-        icon="panel"
-        pressed={panelOpen}
-        onClick={togglePanel}
-      />
-    </div>
-  ) : null;
-  const toolbarToolButtons = (
-    <>
-      <ToolbarIconButton
-        label={actionOnly ? "Фильтр: только требующие действия" : "Фильтр: все события"}
-        icon="filter"
-        pressed={actionOnly}
-        onClick={() =>
-          transitionUiState(() => {
-            setInformationalOnly(false);
-            setActionOnly((value) => !value);
-          })
-        }
-      />
-      <ToolbarIconButton
-        label={
-          sortOrder === "newest"
-            ? "Сортировка: новые сверху"
-            : "Сортировка: старые сверху"
-        }
-        icon="sort"
-        pressed={sortOrder === "oldest"}
-        onClick={() =>
-          transitionUiState(() =>
-            setSortOrder((value) => (value === "newest" ? "oldest" : "newest")),
-          )
-        }
-      />
-      {hasContextRail ? panelToggleTool : null}
-    </>
-  );
-  const toolbarTools = (
-    <CollectionToolbarTools
-      desktopTools={toolbarToolButtons}
-      mobileContextTool={mobilePanelToggleTool}
-    />
-  );
-
-  function openEventDrawer(event: InboxEvent) {
-    const target = targetForSubmissionTab(event.submission, event.tab);
-
-    setSelectedEventId(event.id);
-    onOpen(event.submission, drawerTabForScreenTarget(target, event.tab), target);
-  }
-
-  function openPanelNextEvent(event: InboxEvent) {
-    openEventDrawer(event);
-  }
-
-  return (
-    <>
-      <div
-        className={`v19-screen-grid v19-inbox-screen ${
-          panelOpen ? "" : "is-panel-closed"
-        } ${comfortableView ? "is-comfortable" : "is-compact"}`}
-      >
-        <CardComponent
-          as="section"
-          className={
-            activeFilters.length
-              ? "v19-collection-panel has-active-filters"
-              : "v19-collection-panel"
-          }
-          aria-labelledby="agent-inbox-title"
-        >
-          <h2 id="agent-inbox-title" className="sr-only">
-            Входящие
-          </h2>
-
-          <CollectionToolbar
-            activeFilters={activeFilters}
-            ariaLabel="Инструменты входящих"
-            className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
-            mobileCityControl={cityControl}
-            onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-            onTabChange={(nextTab) =>
-              transitionUiState(() => {
-                setActiveTab(nextTab);
-                setInformationalOnly(false);
-              })
-            }
-            search={searchControl}
-            tabs={[
-              { count: unreadCount, id: "unread", label: "Непрочитанные" },
-              { id: "all", label: "Все" },
-            ]}
-            tabsAriaLabel="Состояние входящих"
-            tools={toolbarTools}
-            value={activeTab}
-          />
-
-          {visibleEvents.length ? (
-            <div className="v19-event-list" aria-label="Список входящих событий">
-              {eventGroups.map((group) => (
-                <div className="v19-event-group" key={group.label}>
-                  <CollectionGroupLabel>{group.label}</CollectionGroupLabel>
-                  {group.events.map((event) => (
-                    <CollectionRow
-                      action={event.action}
-                      badge={event.badge}
-                      family={event.submission.type === "family"}
-                      key={event.id}
-                      meta={<InboxEventMeta event={event} />}
-                      onAction={() => openEventDrawer(event)}
-                      passport={inboxPassportNumber(event.submission)}
-                      read={event.read}
-                      title={event.title}
-                      tone={event.tone}
-                      trip={tripDates(event.submission)}
-                    />
-                  ))}
-                </div>
-              ))}
-              {visibleEvents.length <= 1 ? (
-                <div
-                  className="v19-inbox-list-cue"
-                  aria-label="Состояние очереди входящих"
-                >
-                  <strong>
-                    {unreadCount} непрочитанных · {actionEventCount} требуют реакции
-                  </strong>
-                  <span>
-                    Новые события появятся здесь после комментариев, возвратов и
-                    проверок.
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div
-              className="v19-empty-state"
-              key={`inbox-empty-${activeTab}-${actionOnly}`}
-            >
-              <h3>Новых событий нет</h3>
-              <p>Здесь появятся изменения, которые требуют вашего внимания.</p>
-              <Button variant="secondary" onClick={() => setActiveTab("all")}>
-                Показать все
-              </Button>
-            </div>
-          )}
-        </CardComponent>
-      </div>
-
-      {hasContextRail && panelOpen ? (
-        <button className="v19-context-backdrop" type="button" onClick={closePanel}>
-          <span className="sr-only">Закрыть контекст</span>
-        </button>
-      ) : null}
-
-      {hasContextRail && panelOpen ? (
-        <ContextRail
-          className="v19-inbox-summary"
-          footer={
-            selectedEvent ? (
-              <PanelActionFooter
-                primary={{
-                  label: selectedEvent.action,
-                  onClick: () => openPanelNextEvent(selectedEvent),
-                }}
-                status={`Следующее: ${selectedEvent.action}`}
-              />
-            ) : undefined
-          }
-          label="Фокус входящего"
-          title={selectedEvent ? selectedEvent.badge : "Входящие"}
-          onClose={closePanel}
-        >
-          <RailCard className="v19-inbox-overview-card">
-            <h3>Очередь входящих</h3>
-            <div className="v19-inbox-summary-line">
-              <span>
-                <strong>{unreadCount}</strong>
-                <em>Непрочитанных</em>
-              </span>
-              <span>
-                <strong>{actionEventCount}</strong>
-                <em>Требуют реакции</em>
-              </span>
-              <span>
-                <strong>{informationalEventCount}</strong>
-                <em>Инфо</em>
-              </span>
-            </div>
-          </RailCard>
-
-          {selectedEvent ? (
-            <RailCard className="v19-inbox-next-card">
-              <p className="v19-rail-label">Текущее событие</p>
-              <h3>{selectedEvent.title}</h3>
-              <p>
-                {inboxEventSourceLabel(selectedEvent)} · {selectedEvent.context} ·{" "}
-                {selectedEvent.time}
-              </p>
-            </RailCard>
-          ) : null}
-
-          {railPeerEvents.length ? (
-            <RailCard>
-              <h3>Ещё в очереди</h3>
-              <div className="v19-rail-status-list">
-                {railPeerEvents.map((event) => (
-                  <button
-                    className="v19-rail-news-item"
-                    key={event.id}
-                    type="button"
-                    onClick={() => openPanelNextEvent(event)}
-                  >
-                    <span
-                      className={`v19-rail-issue-dot tone-${event.tone === "danger" ? "danger" : event.tone === "amber" ? "warning" : "success"}`}
-                      aria-hidden="true"
-                    />
-                    <span>
-                      <strong>{inboxRailNewsTitle(event)}</strong>
-                      <small>
-                        {inboxEventSourceLabel(event)} · {event.time}
-                      </small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </RailCard>
-          ) : null}
-        </ContextRail>
-      ) : null}
-    </>
-  );
-}
-
-function inboxRailNewsTitle(event: InboxEvent) {
-  if (event.badge === "Возвращено") return "Возврат на исправление";
-  if (event.badge === "Файл") return "Комментарий к файлу";
-  if (event.badge === "Принято") return "Подача принята";
-  return event.title;
-}
-
-function InboxEventMeta({ event }: { event: InboxEvent }) {
-  return (
-    <span className="v19-inbox-event-meta">
-      <span>{event.context}</span>
-    </span>
-  );
-}
-
-function inboxEventSourceLabel(event: InboxEvent) {
-  if (event.badge === "Возвращено") return "Администратор";
-  if (event.badge === "Файл") return "Файл";
-  if (event.badge === "Принято") return "Проверка";
-  if (event.badge === "Черновик") return "Система";
-  return event.submission.title;
-}
-
-function buildAgentInboxEvents(submissions: Submission[]): InboxEvent[] {
-  const fallback = submissions[0];
-  if (!fallback) return [];
-  const returned =
-    submissions.find((submission) =>
-      ["returned", "requires_action"].includes(submission.status),
-    ) ?? fallback;
-  const fileIssue =
-    submissions.find((submission) =>
-      submission.files.some((file) => file.status === "needs_replacement"),
-    ) ?? returned;
-  const replacementFile = fileIssue.files.find(
-    (file) => file.status === "needs_replacement",
-  );
-  const replacementApplicant = fileIssue.applicants.find(
-    (applicant) => applicant.id === replacementFile?.applicantId,
-  );
-  const accepted =
-    submissions.find((submission) => submission.status === "ready_for_export") ??
-    submissions[2] ??
-    returned;
-  const draft =
-    submissions.find((submission) => submission.status === "draft") ??
-    submissions[3] ??
-    fallback;
-
-  return [
-    {
-      action: "Открыть",
-      badge: "Возвращено",
-      context: "2 блокера",
-      id: `agent-inbox-reference-returned-${returned.id}`,
-      needsAction: true,
-      read: false,
-      submission: returned,
-      tab: "issues",
-      time: "12 мин назад",
-      title: inboxSubmissionLeadName(returned),
-      tone: "danger",
-    },
-    {
-      action: "Открыть",
-      badge: "Файл",
-      context: "Файл",
-      id: `agent-inbox-reference-file-${fileIssue.id}`,
-      needsAction: true,
-      read: false,
-      submission: fileIssue,
-      tab: "files",
-      time: "34 мин назад",
-      title: replacementApplicant?.fullName ?? inboxSubmissionLeadName(fileIssue),
-      tone: "amber",
-    },
-    {
-      action: "Открыть",
-      badge: "Принято",
-      context: "Принято",
-      id: `agent-inbox-reference-accepted-${accepted.id}`,
-      needsAction: false,
-      read: false,
-      submission: accepted,
-      tab: "overview",
-      time: "1 ч назад",
-      title: inboxSubmissionLeadName(accepted),
-      tone: "teal",
-    },
-    {
-      action: "Открыть",
-      badge: "Черновик",
-      context: "Черновик",
-      id: `agent-inbox-reference-draft-${draft.id}`,
-      needsAction: false,
-      read: true,
-      submission: draft,
-      tab: "overview",
-      time: "вчера, 18:42",
-      title: inboxSubmissionLeadName(draft),
-      tone: "muted",
-    },
-  ];
-}
-
-function inboxSubmissionLeadName(submission: Submission) {
-  return submission.applicants[0]?.fullName ?? submission.title;
-}
-
-function inboxPassportNumber(submission: Submission) {
-  const applicant = submission.applicants[0];
-  const extractedPassport = applicant?.passportExtraction?.extractedFields
-    .find((field) => field.key === "passportNumber")
-    ?.value.trim();
-  const questionnairePassport = applicant?.sections
-    .flatMap((section) => section.fields)
-    .find((field) => field.id === "passport-no")
-    ?.value.trim();
-
-  return extractedPassport || questionnairePassport || "—";
 }
 
 function submissionTypeCounts(submissions: Submission[]): Record<V19EntityViewMode, number> {
@@ -1524,6 +1033,11 @@ export function AgentSubmissionsScreen({
           nextActionLabel={submissionNextActionLabel(railSubmission)}
           onClose={closePanel}
           onOpenTab={(tab) => {
+            if (tab === "issues" || tab === "overview") {
+              onOpen(railSubmission, tab);
+              return;
+            }
+
             const target = targetForSubmissionTab(railSubmission, tab);
 
             onOpen(railSubmission, drawerTabForScreenTarget(target, tab), target);

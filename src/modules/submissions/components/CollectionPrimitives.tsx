@@ -431,7 +431,9 @@ export function ContextPanel({
       aria-label={label}
     >
       {header}
-      <div className="v19-context-panel-body">{children}</div>
+      <div className="v19-context-panel-body" tabIndex={0}>
+        {children}
+      </div>
       {footer ? <div className="v19-context-panel-footer">{footer}</div> : null}
     </CardComponent>
   );

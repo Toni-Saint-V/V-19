@@ -11,7 +11,7 @@ import {
 import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
-import { Button, SearchBar, StateTabs } from "./shared/ui/primitives";
+import { Button, SearchBar } from "./shared/ui/primitives";
 import {
   agentActionQueue,
   searchAgentActions,
@@ -113,7 +113,6 @@ import { FigmaSubmissionDrawer } from "./modules/submissions/components/FigmaSub
 import {
   AdminReviewScreen,
   AgentActionsScreen,
-  AgentInboxScreen,
   AgentSubmissionsScreen,
   ExportScreen,
   type AdminWorkTab,
@@ -205,7 +204,6 @@ type WorkspaceSettings = {
   drawerHints: boolean;
 };
 
-type AgentInboxMode = "actions" | "events";
 const defaultWorkspaceSettings: WorkspaceSettings = {
   compactLists: true,
   digest: "instant",
@@ -479,7 +477,6 @@ function MainApp() {
   const [cityFilter, setCityFilter] = useState<City | "Все города">("Все города");
   const [agentFilter, setAgentFilter] = useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [agentInboxMode, setAgentInboxMode] = useState<AgentInboxMode>("events");
   const [agentTab, setAgentTab] = useState<AgentTab>("all");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
@@ -643,7 +640,6 @@ function MainApp() {
   });
   const isV19CollectionSurface =
     surface === "agent-actions" ||
-    surface === "agent-inbox" ||
     surface === "agent-submissions" ||
     surface === "admin-review" ||
     surface === "export";
@@ -651,7 +647,6 @@ function MainApp() {
     surface === "admin-review" ? "Проверка" : surfaceTitle(surface);
   const workspaceSurfaceDescription =
     surface === "admin-review" ? "Проверка пакетов" : surfaceDescription(surface);
-  const agentInboxUnreadCount = Math.min(3, searchedAgentQueue.length);
   const localAuthHasWorkspaceAccess =
     localAuthSession?.status === "active" &&
     localAuthSession.approvalStatus === "approved";
@@ -718,15 +713,6 @@ function MainApp() {
           },
         ]
       : [
-          {
-            active: surface === "admin-review" && reviewTab === "corrections",
-            count: searchedReviewQueue.filter(matchesReviewTab("corrections")).length,
-            icon: "Д",
-            id: "admin-actions",
-            label: "Мои действия",
-            meta: "Исправления",
-            onClick: () => showReviewTab("corrections"),
-          },
           {
             active: surface === "admin-review" && reviewTab === "review",
             count: searchedReviewQueue.filter(matchesReviewTab("review")).length,
@@ -1044,7 +1030,7 @@ function MainApp() {
     const visibleList =
       surface === "admin-review"
         ? reviewList
-        : surface === "agent-submissions" || surface === "agent-inbox"
+        : surface === "agent-submissions"
           ? agentList
           : [];
 
@@ -1151,7 +1137,6 @@ function MainApp() {
       setDirty(false);
       if (nextRole === "agent") {
         setSurface("agent-actions");
-        setAgentInboxMode("actions");
         setAgentTab("all");
         setSelectedSubmissionId(
           firstSubmissionForRole(submissions, "agent", defaultLocalAgentOwnerId)?.id ??
@@ -1190,7 +1175,6 @@ function MainApp() {
   function showAgentActions() {
     requestSettingsLeave(() => {
       setSurface("agent-actions");
-      setAgentInboxMode("actions");
       setAgentTab("action");
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
@@ -3028,14 +3012,6 @@ function MainApp() {
       />
     </div>
   );
-  const inboxSearchControl = (
-    <SearchBar
-      label="Поиск по входящим"
-      placeholder="Поиск"
-      value={query}
-      onChange={setQuery}
-    />
-  );
   const agentActionsSearchControl = (
     <SearchBar
       label="Поиск по действиям"
@@ -3121,9 +3097,7 @@ function MainApp() {
         {primaryTopbarActionLabel}
       </Button>
     </div>
-  ) : isFigmaVisualSurface ? null : surface === "agent-inbox" ? (
-    <div className="v19-topbar-city-filter">{cityFilterControl}</div>
-  ) : !isV19CollectionSurface || isSupabaseMode ? (
+  ) : isFigmaVisualSurface ? null : !isV19CollectionSurface || isSupabaseMode ? (
     <div className="topbar-actions">
       {!isV19CollectionSurface && surface !== "settings" ? (
         <span className="service-logo vf-brand-wordmark" aria-label="VisaFlow 19">
@@ -3347,56 +3321,6 @@ function MainApp() {
             searchControl={searchControl}
             visibleSubmission={activeSubmission ?? null}
           />
-        ) : surface === "agent-inbox" ? (
-          <>
-            <div className="v19-inbox-mode-tabs">
-              <StateTabs<AgentInboxMode>
-                ariaLabel="Раздел входящих"
-                tabs={[
-                  { count: agentInboxUnreadCount, id: "events", label: "Входящие" },
-                  {
-                    count: agentActions.summary.open,
-                    id: "actions",
-                    label: "Мои действия",
-                  },
-                ]}
-                value={agentInboxMode}
-                onValueChange={(nextMode) => {
-                  setAgentInboxMode(nextMode);
-                  if (nextMode === "actions") {
-                    const nextSubmission = firstAgentActionSubmission();
-                    if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-                  }
-                }}
-              />
-            </div>
-            {agentInboxMode === "events" ? (
-              <AgentInboxScreen
-                contextRailEnabled
-                onOpen={openSubmission}
-                searchControl={inboxSearchControl}
-                submissions={searchedAgentQueue}
-                summary={summary}
-              />
-            ) : (
-              <AgentActionsScreen
-                completedActions={searchedCompletedAgentActions}
-                errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
-                hasSearchQuery={query.trim().length > 0}
-                loading={remoteSaveState === "loading"}
-                onClearSearch={() => setQuery("")}
-                onOpen={openSubmission}
-                onRetryError={
-                  remoteSaveState === "error"
-                    ? () => void retryRemoteWorkspaceSave()
-                    : undefined
-                }
-                openActions={searchedOpenAgentActions}
-                searchControl={agentActionsSearchControl}
-                totalActionCount={agentActions.open.length + agentActions.completed.length}
-              />
-            )}
-          </>
         ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
             activeTab={agentTab}

@@ -18,7 +18,7 @@ test.describe("V-19 pilot mobile clicks", () => {
 
     await page.setViewportSize({ height: 844, width: 390 });
     await openFreshWorkspace(page, { heading: "Мои действия" });
-    await expectNoHorizontalOverflow(page, "mobile inbox");
+    await expectNoHorizontalOverflow(page, "mobile actions");
 
     await clickWorkspaceButton(page, /Мои подачи/);
     await expect(page.getByRole("heading", { level: 1, name: "Мои подачи" })).toBeVisible();

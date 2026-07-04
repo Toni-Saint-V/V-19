@@ -5,7 +5,6 @@ import { parse } from "postcss";
 const root = process.cwd();
 const visualLockPath = path.join(root, "docs", "VISAFLOW_VISUAL_LOCK.md");
 const expectedReferences = [
-  "docs/qa/v19-agent-inbox-reference-2026-06-20.png",
   "docs/qa/v19-agent-actions-reference-2026-06-20.png",
   "docs/qa/v19-agent-submissions-reference-2026-06-20.png",
 ];
@@ -56,10 +55,10 @@ function verifyVisualLock() {
     "The reference set is closed",
     "This system is a constraint system, not an open UI kit.",
     "### Developer Decision Gate",
-    "Anything outside these three files is not an agent visual/layout source",
+    "Anything outside these two files is not an agent visual/layout source",
     "Do not read files outside the closed reference set",
     "prefer the reference screens for visual/layout decisions",
-    "No fourth archetype exists in the agent system.",
+    "No separate event-only archetype exists in the agent system.",
     "### Agent Definition Of Done",
   ];
 

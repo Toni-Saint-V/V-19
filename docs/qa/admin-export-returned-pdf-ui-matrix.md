@@ -7,8 +7,8 @@ Scope: `codex/ui-admin-export-pdf-real-logic-20260629-045831`
 | Surface | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
 | Admin review cards | Cards render real `Submission` rows from `reviewList` / `reviewSource`. | Pass | `AdminReviewScreen` keeps row actions bound to `onSelect` / `onOpen` with real submission ids. |
-| Admin tabs/counts | Counts come from filtered `reviewSource` and inbox events. | Pass | `tabCounts` derives from `reviewSource.filter(matchesReviewTab(...))`. |
-| Admin blockers filter | "Only blockers" filters current visible review/event data. | Pass | `blockersOnly` filters `reviewList` and `inboxEvents`. |
+| Admin tabs/counts | Counts come from filtered `reviewSource` and work events. | Pass | `tabCounts` derives from `reviewSource.filter(matchesReviewTab(...))`. |
+| Admin blockers filter | "Only blockers" filters current visible review/work-event data. | Pass | `blockersOnly` filters `reviewList` and `workEvents`. |
 | Admin sorting | Sort control cycles priority, updated date, created date, trip date. | Pass | `sortSubmissionsForOperations(...)` in `OperationsScreens.tsx`. |
 | Search by id/name/city/status | Existing global `searchSubmissions(...)` covers id, title, city, status, applicant names. | Pass | `src/modules/submissions/selectors.ts`. |
 | Search by agent | Agent display-name search requires `selectors.ts` / search ownership change. | Blocked by boundary | `selectors.ts` is outside allowed files; `App.tsx` was limited to export/pdf handler wiring. |
