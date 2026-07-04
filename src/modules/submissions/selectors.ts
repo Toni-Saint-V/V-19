@@ -72,7 +72,8 @@ export function searchSubmissions(
 ) {
   const normalized = query.trim().toLowerCase();
   return submissions.filter((submission) => {
-    const matchesCity = city === "Все города" || submission.city === city;
+    const matchesCity =
+      city === "Все города" || questionnaireCityForSubmission(submission) === city;
     if (!matchesCity) return false;
     if (!normalized) return true;
     return submissionSearchText(submission).includes(normalized);
@@ -88,6 +89,7 @@ export function filterSubmissionsByAgentOwner(
 }
 
 export function submissionSearchText(submission: Submission): string {
+  const questionnaireCity = questionnaireCityForSubmission(submission);
   const applicantText = submission.applicants.flatMap((applicant) => [
     applicant.fullName,
     applicant.id,
@@ -102,6 +104,7 @@ export function submissionSearchText(submission: Submission): string {
     submission.title,
     submission.listTitle ?? "",
     submission.city,
+    questionnaireCity,
     submission.status,
     submission.type,
     submission.tripDateFrom,
@@ -111,6 +114,16 @@ export function submissionSearchText(submission: Submission): string {
   ]
     .join(" ")
     .toLowerCase();
+}
+
+export function questionnaireCityForSubmission(submission: Submission): string {
+  const questionnaireCity = submission.applicants
+    .flatMap((applicant) => applicant.sections)
+    .flatMap((section) => section.fields)
+    .find((field) => field.id === "appointment-city")
+    ?.value.trim();
+
+  return questionnaireCity || submission.city;
 }
 
 export function highestPriorityFirst(submissions: Submission[]) {

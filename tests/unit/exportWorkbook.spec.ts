@@ -597,6 +597,15 @@ describe("V-19 export workbook contract", () => {
     ).toEqual(["ПД-1056"]);
   });
 
+  test("city search uses questionnaire appointment city before submission city", () => {
+    const submission = withQuestionnaireFieldValues(readySubmission(), {
+      "appointment-city": "Казань",
+    });
+
+    expect(searchSubmissions([submission], "", "Казань")).toEqual([submission]);
+    expect(searchSubmissions([submission], "", "Москва")).toEqual([]);
+  });
+
   test("filename builder sanitizes and prefixes passport numbers for active applicant documents", () => {
     const submission = withQuestionnaireFieldValues(readySubmission(), {
       "first-name": "ANATOLII",

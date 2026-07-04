@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { FigmaQuestionnaireScreen } from "../../src/modules/submissions/components/FigmaQuestionnaireScreen";
 import {
@@ -76,5 +76,33 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(result.container.querySelector("[data-field-focused='true']")).toHaveTextContent(
       "Действителен до",
     );
+  });
+
+  test("shows questionnaire answer options from the submission field model", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Запись/ }));
+    const cityField = result.container.querySelector("[data-field-label='Город подачи']");
+    const cityTrigger = cityField?.querySelector("button");
+    if (!cityTrigger) throw new Error("expected city dropdown trigger");
+
+    fireEvent.click(cityTrigger);
+
+    expect(screen.getByRole("button", { name: "Екатеринбург" })).toBeInTheDocument();
   });
 });
