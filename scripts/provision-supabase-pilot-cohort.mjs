@@ -48,7 +48,11 @@ if (writeTemplate) {
 }
 
 const desiredUsers = desiredPilotUsers(cohort);
-const preflight = validatePreflight({ desiredUsers, needAdminKey: checkOnly || provision });
+const preflight = validatePreflight({
+  desiredUsers,
+  needAdminKey: provision,
+  needPublishableKey: provision || verifySignIn,
+});
 
 if (checkOnly || preflight.some((item) => !item.ok)) {
   printReport(preflight, desiredUsers);
@@ -162,7 +166,7 @@ function desiredPilotUsers(rawCohort) {
     .filter((user) => user.email || user.password || user.displayName);
 }
 
-function validatePreflight({ desiredUsers, needAdminKey }) {
+function validatePreflight({ desiredUsers, needAdminKey, needPublishableKey }) {
   const checks = [];
   const add = (ok, label, detail = "") => checks.push({ ok, label, detail });
   const uniqueEmails = new Set(desiredUsers.map((user) => user.email).filter(Boolean));
@@ -170,8 +174,18 @@ function validatePreflight({ desiredUsers, needAdminKey }) {
   add(Boolean(projectRef), "production project ref is recorded");
   add(projectRef !== sandboxProjectRef, "target is not sandbox");
   add(Boolean(projectUrl), "production project URL is recorded");
-  add(Boolean(publishableKey), "publishable key is available for sign-in verification");
-  add(!needAdminKey || Boolean(adminKey), "admin API key is available locally");
+  add(
+    !needPublishableKey || Boolean(publishableKey),
+    needPublishableKey
+      ? "publishable key is available for sign-in verification"
+      : "publishable key is not required for local cohort check",
+  );
+  add(
+    !needAdminKey || Boolean(adminKey),
+    needAdminKey
+      ? "admin API key is available locally"
+      : "admin API key is not required for local cohort check",
+  );
   add(desiredUsers.length >= requiredPilotSize, `pilot cohort has at least ${requiredPilotSize} users`);
   add(
     desiredUsers.every((user) => user.email.includes("@")),

@@ -11,6 +11,16 @@ const evidencePath = resolve(repoRoot, "docs/qa/supabase-production-workflow-smo
 const productionProjectId = "tsymifccglpepvbmrcgh";
 const sandboxProjectId = "oevvaowoklqttqkraxho";
 const bucket = "submission-media";
+const cockpitSnapshotKey = "v19CockpitSnapshot";
+const canonicalRequiredMediaSlots = ["passport_scan", "selfie", "selfie_2"];
+// Production DB enum is still legacy; this smoke proves canonical state in the cockpit snapshot.
+const storageStatusByCanonicalStatus = {
+  draft: "draft",
+  submitted_for_review: "waiting_review",
+  returned: "returned",
+  corrections_received: "waiting_review",
+  ready_for_export: "accepted",
+};
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
 const runId = `VF-PROD-WORKFLOW-${stamp}`;
 const correctionId = randomUUID();
@@ -54,7 +64,7 @@ async function main() {
     await cleanup(adminService);
 
     await save(agent.client, draftPayload(agent.userId, runId));
-    await expectStatus(adminService, runId, "draft");
+    await expectCanonicalStatus(adminService, runId, "draft");
     pass("agent can create draft through save_submission_draft");
 
     await uploadPrivateMedia(agent.client);
@@ -63,17 +73,19 @@ async function main() {
     pass("agent can upload private media and signed URLs are owner-scoped");
 
     await expectRejected(
-      save(agent.client, incompleteWaitingReviewPayload(agent.userId, `${runId}-incomplete`)),
-      "incomplete waiting_review is rejected",
+      save(
+        agent.client,
+        incompleteSubmittedForReviewPayload(agent.userId, `${runId}-incomplete`),
+      ),
+      "incomplete submitted_for_review is rejected",
     );
 
-    await save(agent.client, validReviewPayload(agent.userId, runId, "ready_for_review"));
-    await save(agent.client, validReviewPayload(agent.userId, runId, "waiting_review"));
-    await expectStatus(adminService, runId, "waiting_review");
-    pass("valid waiting_review reaches admin queue");
+    await save(agent.client, validSubmittedForReviewPayload(agent.userId, runId));
+    await expectCanonicalStatus(adminService, runId, "submitted_for_review");
+    pass("valid submitted_for_review reaches admin queue");
 
     await save(adminUser.client, returnedPayload(agent.userId, adminUser.userId, runId));
-    await expectStatus(adminService, runId, "returned");
+    await expectCanonicalStatus(adminService, runId, "returned");
     pass("admin can return case with blocking correction");
 
     await expectRejected(
@@ -93,12 +105,12 @@ async function main() {
       payload: fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
     });
     if (handoff.error) throw new Error(handoff.error.message);
-    await expectStatus(adminService, runId, "waiting_review");
+    await expectCanonicalStatus(adminService, runId, "corrections_received");
     pass("assigned agent can hand off fixed corrections");
 
-    await save(adminUser.client, acceptedPayload(agent.userId, adminUser.userId, runId));
-    await expectStatus(adminService, runId, "accepted");
-    pass("admin can accept case");
+    await save(adminUser.client, readyForExportPayload(agent.userId, adminUser.userId, runId));
+    await expectCanonicalStatus(adminService, runId, "ready_for_export");
+    pass("admin can move package to ready_for_export");
 
     await expectRejected(
       save(agent.client, draftPayload(agent.userId, runId)),
@@ -206,14 +218,27 @@ async function createScopedSignedUrl(client, shouldPass) {
   }
 }
 
-async function expectStatus(client, id, status) {
+async function expectCanonicalStatus(client, id, canonicalStatus) {
   const { data, error } = await client
     .from("submissions")
-    .select("status")
+    .select("status,family_intelligence")
     .eq("id", id)
     .single();
   if (error) throw new Error(`status read failed: ${error.message}`);
-  if (data.status !== status) throw new Error(`expected ${id}=${status}, got ${data.status}`);
+  const storageStatus = storageStatusForCanonicalStatus(canonicalStatus);
+  if (data.status !== storageStatus) {
+    throw new Error(
+      `expected ${id} storage status ${storageStatus} for ${canonicalStatus}, got ${data.status}`,
+    );
+  }
+
+  const snapshotStatus =
+    data.family_intelligence?.[cockpitSnapshotKey]?.submission?.status;
+  if (snapshotStatus !== canonicalStatus) {
+    throw new Error(
+      `expected ${id} canonical status ${canonicalStatus}, got ${snapshotStatus ?? "missing"}`,
+    );
+  }
 }
 
 async function cleanup(client) {
@@ -234,39 +259,42 @@ function draftPayload(agentId, id) {
   return basePayload(agentId, id, "draft", { complete: true, media: [] });
 }
 
-function incompleteWaitingReviewPayload(agentId, id) {
-  return basePayload(agentId, id, "waiting_review", { complete: false, media: [] });
+function incompleteSubmittedForReviewPayload(agentId, id) {
+  return basePayload(agentId, id, "submitted_for_review", {
+    complete: false,
+    media: [],
+  });
 }
 
-function validReviewPayload(agentId, id, status) {
-  return basePayload(agentId, id, status, {
+function validSubmittedForReviewPayload(agentId, id) {
+  return basePayload(agentId, id, "submitted_for_review", {
     complete: true,
-    media: ["photo_white", "selfie", "video"],
+    media: canonicalRequiredMediaSlots,
   });
 }
 
 function returnedPayload(agentId, adminId, id) {
   const payload = basePayload(agentId, id, "returned", {
     complete: true,
-    media: ["photo_white", "selfie", "video"],
+    media: canonicalRequiredMediaSlots,
   });
   payload.corrections = [correction(adminId, "open", null)];
   return payload;
 }
 
 function fixedCorrectionPayload(agentId, adminId, id) {
-  const payload = basePayload(agentId, id, "waiting_review", {
+  const payload = basePayload(agentId, id, "corrections_received", {
     complete: true,
-    media: ["photo_white", "selfie", "video"],
+    media: canonicalRequiredMediaSlots,
   });
   payload.corrections = [correction(adminId, "fixed", new Date().toISOString())];
   return payload;
 }
 
-function acceptedPayload(agentId, adminId, id) {
-  const payload = basePayload(agentId, id, "accepted", {
+function readyForExportPayload(agentId, adminId, id) {
+  const payload = basePayload(agentId, id, "ready_for_export", {
     complete: true,
-    media: ["photo_white", "selfie", "video"],
+    media: canonicalRequiredMediaSlots,
     reviewStatus: "accepted",
   });
   payload.submission.accepted_at = new Date().toISOString();
@@ -295,12 +323,7 @@ function basePayload(agentId, id, status, options) {
   const now = new Date().toISOString();
   const complete = options.complete === true;
   const applicantId = applicantIdFor(id);
-  const cockpitStatus =
-    status === "waiting_review"
-      ? "submitted_for_review"
-      : status === "accepted"
-        ? "ready_for_export"
-        : status;
+  const storageStatus = storageStatusForCanonicalStatus(status);
   return {
     submission: {
       id,
@@ -310,7 +333,7 @@ function basePayload(agentId, id, status, options) {
       country: "Испания",
       city: "Москва",
       travel_date: complete ? "2026-07-10 - 2026-07-18" : "не указано",
-      status,
+      status: storageStatus,
       priority: "Средний",
       readiness_percent: complete ? 100 : 0,
       family_intelligence: {
@@ -325,7 +348,7 @@ function basePayload(agentId, id, status, options) {
             city: "Москва",
             tripDateFrom: complete ? "2026-07-10" : "не указано",
             tripDateTo: complete ? "2026-07-18" : "не указано",
-            status: cockpitStatus,
+            status,
             applicants: [
               {
                 id: applicantId,
@@ -347,7 +370,7 @@ function basePayload(agentId, id, status, options) {
             },
             aiSuggestions: [],
             aiReviewState: "idle",
-            exportState: status === "accepted" ? "ready" : "not_ready",
+            exportState: status === "ready_for_export" ? "ready" : "not_ready",
             createdAt: now,
             updatedAt: now,
             history: [],
@@ -355,7 +378,7 @@ function basePayload(agentId, id, status, options) {
         },
       },
       appointment_status: "not_started",
-      submitted_at: status === "waiting_review" ? now : null,
+      submitted_at: storageStatus === "waiting_review" ? now : null,
       review_started_at: null,
       accepted_at: null,
       exported_at: null,
@@ -399,8 +422,8 @@ function mediaRows(id, slots, reviewStatus = "not_reviewed") {
   const now = new Date().toISOString();
   const applicantId = applicantIdFor(id);
   return slots.map((slot) => {
-    const ext = slot === "video" ? "mp4" : "jpg";
-    const mime = slot === "video" ? "video/mp4" : "image/jpeg";
+    const ext = "jpg";
+    const mime = "image/jpeg";
     const generatedFileName = `v19smoke_${slot}.${ext}`;
     const storagePath = `${id}/${applicantId}/${slot}/${generatedFileName}`;
     cleanupPaths.add(storagePath);
@@ -408,12 +431,12 @@ function mediaRows(id, slots, reviewStatus = "not_reviewed") {
       cockpit: {
         id: `${id}-${slot}`,
         applicantId,
-        type: slot === "photo_white" ? "photo" : slot,
+        type: slot,
         status: reviewStatus === "accepted" ? "accepted" : "pending_review",
         generatedFileName,
         mimeType: mime,
         originalFileName: `${slot}.${ext}`,
-        sizeBytes: slot === "video" ? 4096 : 2048,
+        sizeBytes: 2048,
         storageBucket: bucket,
         storagePath,
         uploadedAtIso: now,
@@ -432,7 +455,7 @@ function mediaRows(id, slots, reviewStatus = "not_reviewed") {
         storage_bucket: bucket,
         storage_path: storagePath,
         mime_type: mime,
-        size_bytes: slot === "video" ? 4096 : 2048,
+        size_bytes: 2048,
         upload_status: "uploaded",
         review_status: reviewStatus,
         uploaded_at: now,
@@ -445,6 +468,12 @@ function mediaRows(id, slots, reviewStatus = "not_reviewed") {
 
 function applicantIdFor(id) {
   return `${id}-applicant`;
+}
+
+function storageStatusForCanonicalStatus(status) {
+  const storageStatus = storageStatusByCanonicalStatus[status];
+  if (!storageStatus) throw new Error(`Unsupported canonical smoke status: ${status}`);
+  return storageStatus;
 }
 
 async function writeEvidenceAndReadiness() {
@@ -462,8 +491,8 @@ async function writeEvidenceAndReadiness() {
     ...packet.postActivationChecks,
     agentCanCreateDraft: true,
     agentCanUploadRequiredMedia: true,
-    incompleteWaitingReviewRejected: true,
-    validWaitingReviewReachesQueue: true,
+    incompleteSubmittedForReviewRejected: true,
+    validSubmittedForReviewReachesQueue: true,
     adminCanAcceptOrReturnCase: true,
     postHandoffAgentMutationBlocked: true,
     privateMediaSignedUrlScoped: true,

@@ -1,0 +1,1762 @@
+{
+  "baseURL": "http://127.0.0.1:5174/",
+  "generatedAt": "2026-07-04T14:10:43.238Z",
+  "runs": [
+    {
+      "role": "agent",
+      "viewportName": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "errors": [],
+      "steps": [
+        {
+          "step": "login",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "nav:agent-inbox",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-inbox is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "nav:agent-actions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "agent:open-card",
+          "ok": true,
+          "selector": "button:has-text(\"Открыть\")"
+        },
+        {
+          "step": "agent:drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "agent:drawer-tabs-present",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:questionnaire",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:files",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:issues",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "nav:agent-submissions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "agent:create-drawer",
+          "ok": true,
+          "selector": ".v19-topbar-cta"
+        },
+        {
+          "step": "agent:create-drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "nav:agent-settings",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent"
+        }
+      ],
+      "metrics": [
+        {
+          "label": "v4-desktop-agent-initial",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-agent-inbox",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-inbox is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": [
+            {
+              "tag": "label",
+              "className": "mp-searchbar search panel-search v19-toolbar-search",
+              "left": -115,
+              "right": 481,
+              "width": 596,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "icon search-icon",
+              "left": -102,
+              "right": -84,
+              "width": 18,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "svg",
+              "className": "[object SVGAnimatedString]",
+              "left": -102,
+              "right": -84,
+              "width": 18,
+              "overflowX": "hidden"
+            },
+            {
+              "tag": "circle",
+              "className": "[object SVGAnimatedString]",
+              "left": -99,
+              "right": -89,
+              "width": 10,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "path",
+              "className": "[object SVGAnimatedString]",
+              "left": -90,
+              "right": -86,
+              "width": 4,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "sr-only",
+              "left": -116,
+              "right": -115,
+              "width": 1,
+              "overflowX": "hidden"
+            },
+            {
+              "tag": "input",
+              "className": "",
+              "left": -115,
+              "right": 481,
+              "width": 596,
+              "overflowX": "clip"
+            }
+          ]
+        },
+        {
+          "label": "v4-desktop-agent-actions",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-agent-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent has-open-drawer",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-agent-submissions",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-agent-create-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-agent-settings",
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "viewportName": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "errors": [],
+      "steps": [
+        {
+          "step": "login",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-inbox",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-actions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-review",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "admin:open-card",
+          "ok": true,
+          "selector": ".v17-admin-row-action"
+        },
+        {
+          "step": "admin:drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "admin:drawer-tabs-present",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:questionnaire",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:files",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:issues",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "nav:admin-export",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "admin:export-actions-visible",
+          "ok": true,
+          "actions": [
+            {
+              "text": "Выгрузка4",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Ольга ФроловаSUB-1101Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Семья ВолковыхSUB-1102Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Никита МорозовSUB-1103Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Дмитрий ОрловПД-1056Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Скачать Excel",
+              "disabled": true,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Отметить выгружено",
+              "disabled": true,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Сформировать Excel",
+              "disabled": false,
+              "ariaDisabled": null
+            }
+          ]
+        },
+        {
+          "step": "nav:admin-settings",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin"
+        }
+      ],
+      "metrics": [
+        {
+          "label": "v4-desktop-admin-initial",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-admin-inbox",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-admin-actions",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-admin-review",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-admin-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin has-open-drawer",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        },
+        {
+          "label": "v4-desktop-admin-export",
+          "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": [
+            {
+              "tag": "div",
+              "className": "sheet-head",
+              "left": 1102,
+              "right": 2022,
+              "width": 920,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "div",
+              "className": "excel-head",
+              "left": 1102,
+              "right": 2022,
+              "width": 920,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1370,
+              "right": 1482,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1482,
+              "right": 1594,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1594,
+              "right": 1706,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1706,
+              "right": 1818,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1818,
+              "right": 1930,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1930,
+              "right": 2042,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 2042,
+              "right": 2154,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "div",
+              "className": "excel-row ",
+              "left": 1102,
+              "right": 2022,
+              "width": 920,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1370,
+              "right": 1482,
+              "width": 112,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": 1482,
+              "right": 1594,
+              "width": 112,
+              "overflowX": "visible"
+            }
+          ]
+        },
+        {
+          "label": "v4-desktop-admin-settings",
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "scrollWidth": 1440,
+          "clientWidth": 1440,
+          "bodyScrollWidth": 1440,
+          "pageOverflow": false,
+          "topbarRatio": 0.071,
+          "overflow": []
+        }
+      ]
+    },
+    {
+      "role": "agent",
+      "viewportName": "tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "errors": [],
+      "steps": [
+        {
+          "step": "login",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "nav:agent-inbox",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-inbox is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "nav:agent-actions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "agent:open-card",
+          "ok": true,
+          "selector": "button:has-text(\"Открыть\")"
+        },
+        {
+          "step": "agent:drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "agent:drawer-tabs-present",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:questionnaire",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:files",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:issues",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "nav:agent-submissions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "agent:create-drawer",
+          "ok": true,
+          "selector": ".v19-topbar-cta"
+        },
+        {
+          "step": "agent:create-drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "nav:agent-settings",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent"
+        }
+      ],
+      "metrics": [
+        {
+          "label": "v4-tablet-agent-initial",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.063,
+          "overflow": [
+            {
+              "tag": "section",
+              "className": "workspace",
+              "left": 8,
+              "right": 776,
+              "width": 768,
+              "overflowX": "hidden"
+            }
+          ]
+        },
+        {
+          "label": "v4-tablet-agent-inbox",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-inbox is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.063,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-agent-actions",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.063,
+          "overflow": [
+            {
+              "tag": "section",
+              "className": "workspace",
+              "left": 8,
+              "right": 776,
+              "width": 768,
+              "overflowX": "hidden"
+            }
+          ]
+        },
+        {
+          "label": "v4-tablet-agent-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent has-open-drawer",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.063,
+          "overflow": [
+            {
+              "tag": "section",
+              "className": "workspace",
+              "left": 8,
+              "right": 776,
+              "width": 768,
+              "overflowX": "hidden"
+            }
+          ]
+        },
+        {
+          "label": "v4-tablet-agent-submissions",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-agent-create-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-agent-settings",
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "viewportName": "tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "errors": [],
+      "steps": [
+        {
+          "step": "login",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-inbox",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-actions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-review",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "admin:open-card",
+          "ok": true,
+          "selector": ".v17-admin-row-action"
+        },
+        {
+          "step": "admin:drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "admin:drawer-tabs-present",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:questionnaire",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:files",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:issues",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "nav:admin-export",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "admin:export-actions-visible",
+          "ok": true,
+          "actions": [
+            {
+              "text": "Выгрузка4",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Ольга ФроловаSUB-1101Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Семья ВолковыхSUB-1102Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Никита МорозовSUB-1103Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Дмитрий ОрловПД-1056Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            }
+          ]
+        },
+        {
+          "step": "nav:admin-settings",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin"
+        }
+      ],
+      "metrics": [
+        {
+          "label": "v4-tablet-admin-initial",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-admin-inbox",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-admin-actions",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-admin-review",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-admin-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin has-open-drawer",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-admin-export",
+          "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.063,
+          "overflow": []
+        },
+        {
+          "label": "v4-tablet-admin-settings",
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin",
+          "viewport": {
+            "width": 768,
+            "height": 1024
+          },
+          "scrollWidth": 768,
+          "clientWidth": 768,
+          "bodyScrollWidth": 768,
+          "pageOverflow": false,
+          "topbarRatio": 0.057,
+          "overflow": []
+        }
+      ]
+    },
+    {
+      "role": "agent",
+      "viewportName": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "steps": [
+        {
+          "step": "login",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "nav:agent-inbox",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-inbox is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "nav:agent-actions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "agent:open-card",
+          "ok": true,
+          "selector": "article button:has-text(\"Открыть\")"
+        },
+        {
+          "step": "agent:drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "agent:drawer-tabs-present",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:questionnaire",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:files",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "agent:drawer-tab:issues",
+          "ok": true,
+          "tabs": [
+            "Обзор",
+            "Анкета",
+            "Файлы",
+            "Замечания2",
+            "История"
+          ]
+        },
+        {
+          "step": "nav:agent-submissions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent"
+        },
+        {
+          "step": "agent:create-drawer",
+          "ok": true,
+          "selector": ".v19-topbar-cta"
+        },
+        {
+          "step": "agent:create-drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "nav:agent-settings",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent"
+        }
+      ],
+      "metrics": [
+        {
+          "label": "v4-mobile-agent-initial",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.066,
+          "overflow": [
+            {
+              "tag": "div",
+              "className": "v19-segmented-control tabs v19-status-tabs v19-state-tabs",
+              "left": 22,
+              "right": 560,
+              "width": 538,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 293,
+              "right": 422,
+              "width": 129,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 404,
+              "right": 417,
+              "width": 13,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 426,
+              "right": 556,
+              "width": 129,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 508,
+              "right": 514,
+              "width": 6,
+              "overflowX": "visible"
+            }
+          ]
+        },
+        {
+          "label": "v4-mobile-agent-inbox",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-inbox is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.076,
+          "overflow": []
+        },
+        {
+          "label": "v4-mobile-agent-actions",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.066,
+          "overflow": [
+            {
+              "tag": "div",
+              "className": "v19-segmented-control tabs v19-status-tabs v19-state-tabs",
+              "left": 22,
+              "right": 560,
+              "width": 538,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 293,
+              "right": 422,
+              "width": 129,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 404,
+              "right": 417,
+              "width": 13,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 426,
+              "right": 556,
+              "width": 129,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 508,
+              "right": 514,
+              "width": 6,
+              "overflowX": "visible"
+            }
+          ]
+        },
+        {
+          "label": "v4-mobile-agent-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent has-open-drawer",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.066,
+          "overflow": [
+            {
+              "tag": "div",
+              "className": "v19-segmented-control tabs v19-status-tabs v19-state-tabs",
+              "left": 22,
+              "right": 560,
+              "width": 538,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 293,
+              "right": 422,
+              "width": 129,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 404,
+              "right": 417,
+              "width": 13,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 426,
+              "right": 556,
+              "width": 129,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 508,
+              "right": 514,
+              "width": 6,
+              "overflowX": "visible"
+            }
+          ]
+        },
+        {
+          "label": "v4-mobile-agent-submissions",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.066,
+          "overflow": [
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 324,
+              "right": 429,
+              "width": 105,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 412,
+              "right": 419,
+              "width": 6,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 433,
+              "right": 504,
+              "width": 71,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 487,
+              "right": 494,
+              "width": 6,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "div",
+              "className": "v19-entity-switch",
+              "left": 25,
+              "right": 433,
+              "width": 408,
+              "overflowX": "auto"
+            },
+            {
+              "tag": "button",
+              "className": "",
+              "left": 277,
+              "right": 428,
+              "width": 151,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "em",
+              "className": "",
+              "left": 395,
+              "right": 417,
+              "width": 22,
+              "overflowX": "visible"
+            }
+          ]
+        },
+        {
+          "label": "v4-mobile-agent-create-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent has-open-drawer",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.066,
+          "overflow": [
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 324,
+              "right": 429,
+              "width": 105,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 412,
+              "right": 419,
+              "width": 6,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "button",
+              "className": "tab",
+              "left": 433,
+              "right": 504,
+              "width": 71,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "tab-count v19-tab-count",
+              "left": 487,
+              "right": 494,
+              "width": 6,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "div",
+              "className": "v19-entity-switch",
+              "left": 25,
+              "right": 433,
+              "width": 408,
+              "overflowX": "auto"
+            },
+            {
+              "tag": "button",
+              "className": "",
+              "left": 277,
+              "right": 428,
+              "width": 151,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "em",
+              "className": "",
+              "left": 395,
+              "right": 417,
+              "width": 22,
+              "overflowX": "visible"
+            }
+          ]
+        },
+        {
+          "label": "v4-mobile-agent-settings",
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.069,
+          "overflow": []
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "viewportName": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "steps": [
+        {
+          "step": "login",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-inbox",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-actions",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "nav:admin-review",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "admin:open-card",
+          "ok": true,
+          "selector": ".v17-admin-row-action"
+        },
+        {
+          "step": "admin:drawer-visible",
+          "ok": true
+        },
+        {
+          "step": "admin:drawer-tabs-present",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:questionnaire",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:files",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "admin:drawer-tab:issues",
+          "ok": true,
+          "tabs": [
+            "Паспорт",
+            "Селфи",
+            "Анкета51",
+            "Замечания0"
+          ]
+        },
+        {
+          "step": "nav:admin-export",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin"
+        },
+        {
+          "step": "admin:export-actions-visible",
+          "ok": true,
+          "actions": [
+            {
+              "text": "Выгрузка4",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Ольга ФроловаSUB-1101Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Семья ВолковыхSUB-1102Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Никита МорозовSUB-1103Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            },
+            {
+              "text": "Дмитрий ОрловПД-1056Владелец: Admin export · Дальше: сформировать ExcelПричина: Готово",
+              "disabled": false,
+              "ariaDisabled": null
+            }
+          ]
+        },
+        {
+          "step": "nav:admin-settings",
+          "ok": true,
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin"
+        }
+      ],
+      "metrics": [
+        {
+          "label": "v4-mobile-admin-initial",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.069,
+          "overflow": []
+        },
+        {
+          "label": "v4-mobile-admin-inbox",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.069,
+          "overflow": []
+        },
+        {
+          "label": "v4-mobile-admin-actions",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.069,
+          "overflow": []
+        },
+        {
+          "label": "v4-mobile-admin-review",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.069,
+          "overflow": []
+        },
+        {
+          "label": "v4-mobile-admin-drawer",
+          "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin has-open-drawer",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.069,
+          "overflow": [
+            {
+              "tag": "button",
+              "className": "",
+              "left": -75,
+              "right": 18,
+              "width": 93,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "svg",
+              "className": "[object SVGAnimatedString]",
+              "left": -66,
+              "right": -50,
+              "width": 16,
+              "overflowX": "hidden"
+            },
+            {
+              "tag": "path",
+              "className": "[object SVGAnimatedString]",
+              "left": -64,
+              "right": -61,
+              "width": 3,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "path",
+              "className": "[object SVGAnimatedString]",
+              "left": -55,
+              "right": -52,
+              "width": 3,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "path",
+              "className": "[object SVGAnimatedString]",
+              "left": -55,
+              "right": -52,
+              "width": 3,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "path",
+              "className": "[object SVGAnimatedString]",
+              "left": -64,
+              "right": -61,
+              "width": 3,
+              "overflowX": "visible"
+            },
+            {
+              "tag": "span",
+              "className": "",
+              "left": -43,
+              "right": 9,
+              "width": 52,
+              "overflowX": "visible"
+            }
+          ]
+        },
+        {
+          "label": "v4-mobile-admin-export",
+          "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.076,
+          "overflow": [
+            {
+              "tag": "section",
+              "className": "workspace",
+              "left": 8,
+              "right": 398,
+              "width": 390,
+              "overflowX": "hidden"
+            }
+          ]
+        },
+        {
+          "label": "v4-mobile-admin-settings",
+          "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "scrollWidth": 390,
+          "clientWidth": 390,
+          "bodyScrollWidth": 390,
+          "pageOverflow": false,
+          "topbarRatio": 0.069,
+          "overflow": []
+        }
+      ]
+    }
+  ]
+}

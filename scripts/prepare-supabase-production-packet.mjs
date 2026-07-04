@@ -218,14 +218,17 @@ const authSecurity = {
   organization,
   projectName,
   productionNotSandboxConfirmed: targetLooksProduction,
-  authSecurityAdvisorsChecked: false,
+  securityAdvisorsChecked: false,
+  checkedAt: "",
   performanceAdvisorsChecked: false,
   planEligibilityChecked: false,
   organizationPlan: "",
+  planEligibilityEvidence: "",
   leakedPasswordProtectionPlanEligible: false,
   leakedPasswordProtectionEnabled: false,
   noBlockingSecurityAdvisorWarnings: false,
   openWarnings: [],
+  evidenceArtifact: "",
   notes: "",
 };
 
@@ -243,6 +246,9 @@ const backupRestore = {
   restoreEvidenceRecorded: false,
   rpoRtoAcceptedByOwner: false,
   rollbackCommunicationOwner: "",
+  evidenceArtifact: "",
+  restoreEvidenceArtifact: "",
+  rpoRtoEvidenceArtifact: "",
   rollbackNotes: "",
 };
 

@@ -33,7 +33,7 @@ const adminSections: SettingsSectionId[] = [
 ];
 
 const sectionLabels: Record<SettingsSectionId, string> = {
-  "access-requests": "Входящие заявки",
+  "access-requests": "Заявки на доступ",
   "export-defaults": "Выгрузка",
   interface: "Интерфейс",
   notifications: "Уведомления",
@@ -407,7 +407,7 @@ function AccessRequestsSection({
     >
       <div className="settings-access-head">
         <div>
-          <h2 id="settings-title">Входящие заявки</h2>
+          <h2 id="settings-title">Заявки на доступ</h2>
           <p>Администратор одобряет доступ агента до входа в рабочий кабинет.</p>
         </div>
         <span aria-label={`Новых заявок: ${requests.length}`}>{requests.length}</span>

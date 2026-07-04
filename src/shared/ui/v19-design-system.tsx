@@ -830,15 +830,17 @@ export function V19DrawerHeader<T extends string>({
       </div>
 
       <div className="v19-figma-drawer-tabs-scroll" ref={tabsRef}>
-        <div className="v19-figma-drawer-tabs">
+        <div className="v19-figma-drawer-tabs" role="tablist" aria-label="Разделы подачи">
           {tabs.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
+                aria-selected={isActive}
                 className={`v19-figma-drawer-tab ${isActive ? "is-active" : ""}`}
                 data-drawer-tab={item.id}
                 key={item.id}
                 onClick={() => onTab(item.id)}
+                role="tab"
                 type="button"
               >
                 <span>{item.label}</span>

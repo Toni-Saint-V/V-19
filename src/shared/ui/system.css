@@ -34040,3 +34040,103 @@ select,
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* Final Admin Review compact rail contract: hidden rail must not reserve a grid track. */
+@media (max-width: 1199px) {
+  .ops-shell.role-admin.surface-admin-review
+    .workspace
+    > .v19-admin-review-screen,
+  .ops-shell.role-admin.surface-admin-review
+    .workspace
+    > .v19-admin-review-screen:not(.is-panel-closed) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    justify-items: stretch !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .v19-admin-review-screen
+    > .v19-collection-panel {
+    grid-column: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    justify-self: stretch !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-admin-review-context {
+    display: none !important;
+  }
+}
+
+/* Final Admin Review compact content contract: rows and radar must not clip on touch viewports. */
+@media (max-width: 1023px) {
+  .ops-shell.role-admin.surface-admin-review
+    article.v17-admin-work-row.v19-admin-review-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    > .v19-admin-review-row-main {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    > .v17-admin-stage {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    justify-self: start !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    article.v19-admin-review-card
+    > .v17-admin-row-action {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+    justify-self: end !important;
+    width: min(var(--vf-ref-size-180px), 54vw) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ops-shell.role-admin.surface-admin-review .v19-collection-toolbar {
+    grid-template-rows: auto auto !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-toolbar-secondary-row {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-state-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v19-state-tabs button {
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: center !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v17-admin-ai-radar-cards {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .v17-admin-ai-radar-card {
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}

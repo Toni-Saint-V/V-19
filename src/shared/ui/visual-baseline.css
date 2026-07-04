@@ -19,6 +19,7 @@
   --v19b-color-primary-deep: #25214f;
   --v19b-color-primary-deep-hover: #302b68;
   --v19b-color-primary-deep-border: #4740a0;
+  --v19b-color-text-strong: #ffffff;
   --v19b-color-text: rgb(255 255 255 / 0.94);
   --v19b-color-text-muted: #b2b6bf;
   --v19b-color-text-faint: #a8adb7;
@@ -3077,6 +3078,77 @@ body,
 .ops-shell.surface-agent-actions .v19-actions-canonical-media p {
   margin: var(--v19b-size-0);
   color: var(--v19b-color-text-muted);
+}
+
+.ops-shell.surface-agent-actions
+  :is(
+    .v19-signal-button small,
+    .v19-actions-panel-header p,
+    .v19-actions-queue-facts,
+    .v19-actions-active-head p,
+    .v19-actions-task-problem p,
+    .v19-actions-work-structure > p,
+    .v19-actions-blockers-head p,
+    .v19-actions-blocker-list small
+  ) {
+  color: var(--v19b-color-text-muted) !important;
+}
+
+.ops-shell.surface-agent-actions .v19-actions-readiness-line.state-pending strong {
+  color: var(--v19b-color-text-muted) !important;
+}
+
+.ops-shell.surface-admin-review
+  :is(
+    .v19-admin-review-facts dt,
+    .v19-admin-review-check em,
+    .v17-admin-triage-reason
+  ) {
+  color: var(--v19b-color-text) !important;
+}
+
+.ops-shell.surface-admin-review
+  :is(
+    .v17-admin-ai-radar-card span,
+    .v17-admin-ai-radar-card small,
+    .v17-admin-identity > em,
+    .v17-admin-identity > em .mono,
+    .v17-admin-readiness-cell > em,
+    .v19-admin-review-reason > em
+  ) {
+  color: var(--v19b-color-text-muted) !important;
+}
+
+.ops-shell.surface-export .topbar-heading > p {
+  color: var(--v19b-color-text-muted) !important;
+}
+
+.ops-sidebar-create {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+}
+
+.ops-sidebar-create > strong {
+  padding: var(--v19b-size-2) var(--v19b-size-4) !important;
+  border-radius: var(--v19b-size-6) !important;
+  color: var(--v19b-color-text-strong) !important;
+  background: var(--v19b-color-app) !important;
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 760px) {
+  .create-submission-drawer.is-passport-step > header.v19-create-drawer-header {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    min-height: var(--v19b-size-56) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-12) !important;
+  }
+
+  .create-submission-drawer.is-passport-step .v19-create-drawer-close {
+    display: flex !important;
+  }
 }
 
 .ops-shell.surface-agent-actions .v19-actions-canonical-media > div {

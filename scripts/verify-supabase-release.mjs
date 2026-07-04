@@ -22,6 +22,10 @@ const productionApprovalChecklistPath = resolve(
 );
 const supabaseReadmePath = resolve(repoRoot, "supabase/README.md");
 const liveSmokePath = resolve(repoRoot, "tests/integration/supabase-live.spec.ts");
+const productionWorkflowSmokePath = resolve(
+  repoRoot,
+  "scripts/verify-supabase-production-workflow.mjs",
+);
 const packagePath = resolve(repoRoot, "package.json");
 const smokeEnvPath = resolve(repoRoot, ".env.supabase-smoke.local");
 const allowedSandboxProjectId = "oevvaowoklqttqkraxho";
@@ -473,6 +477,10 @@ function verifyAiHelperSecurityHardening() {
 
 function verifySmokeGuard() {
   const liveSmoke = readProjectFile(liveSmokePath, "Supabase live smoke exists");
+  const productionWorkflowSmoke = readProjectFile(
+    productionWorkflowSmokePath,
+    "Supabase production workflow smoke exists",
+  );
 
   expectContains(
     liveSmoke,
@@ -594,7 +602,47 @@ function verifySmokeGuard() {
   expectContains(
     liveSmoke,
     "waiting_review",
-    "Live smoke proves the positive waiting_review transition",
+    "Live smoke proves the positive waiting_review storage transition",
+  );
+  expectContains(
+    liveSmoke,
+    "passport_scan",
+    "Live smoke uses canonical passport_scan media",
+  );
+  expectContains(
+    liveSmoke,
+    "selfie_2",
+    "Live smoke uses canonical selfie_2 media",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "submitted_for_review",
+    "Production workflow smoke proves canonical submitted_for_review",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "ready_for_export",
+    "Production workflow smoke proves canonical ready_for_export",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "passport_scan",
+    "Production workflow smoke uses canonical passport_scan media",
+  );
+  expectContains(
+    productionWorkflowSmoke,
+    "selfie_2",
+    "Production workflow smoke uses canonical selfie_2 media",
+  );
+  expectNotContains(
+    productionWorkflowSmoke,
+    "photo_white",
+    "Production workflow smoke does not use legacy photo_white media",
+  );
+  expectNotContains(
+    productionWorkflowSmoke,
+    '"video"',
+    "Production workflow smoke does not use legacy video media slot",
   );
 
   const smokeEnv = parseEnvFile(smokeEnvPath);

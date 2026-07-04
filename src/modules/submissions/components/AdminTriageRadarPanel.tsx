@@ -68,7 +68,7 @@ export function AdminTriageRadarPanel({
         <strong>Приоритизация по риску</strong>
         <em>{radar.summaries.join(" · ")}</em>
       </div>
-      <div className="v17-admin-ai-radar-cards" role="group" aria-label="Фильтр AI-радара">
+      <div className="v17-admin-ai-radar-cards" role="group" aria-label="Фильтры AI-радара">
         {cards.map((card) => (
           <button
             aria-pressed={activeBand === card.band}

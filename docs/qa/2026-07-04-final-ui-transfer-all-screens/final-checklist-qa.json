@@ -1,0 +1,88 @@
+{
+  "baseURL": "http://127.0.0.1:5174/",
+  "generatedAt": "2026-07-04T14:41:43.071Z",
+  "checks": [
+    {
+      "name": "agent desktop navigation, action card, drawer tabs, required media",
+      "ok": false,
+      "ms": 4030,
+      "error": "Error: Drawer tab not found: /Анкета/\n    at openDrawerTab ([stdin]:88:9)\n    at async [stdin]:176:7\n    at async run ([stdin]:151:21)\n    at async [stdin]:161:5"
+    },
+    {
+      "name": "agent create drawer desktop tablet mobile",
+      "ok": true,
+      "ms": 8866,
+      "details": [
+        {
+          "viewport": "desktop",
+          "visible": true
+        },
+        {
+          "viewport": "tablet",
+          "visible": true
+        },
+        {
+          "viewport": "mobile",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "agent submit gate incomplete then complete",
+      "ok": true,
+      "ms": 40549,
+      "details": {
+        "id": "ПД-1104",
+        "beforeDisabled": true,
+        "afterDisabled": false,
+        "submittedText": "ПД-1104\n·\nиндивидуальная\nпроверка\nНовая подача\nОбзор\nАнкета\nФайлы\nЗамечания\nИстория\n\nПомощник по подаче\n\nПакет на ручной проверке\n\nГотовность 100%. Файлы: 3/3.\n\nОжидание\nДождитесь ручной проверки администратора\nСЛЕДУЮЩИЕ ДЕЙСТВИЯ\nДождитесь ручной проверки администратора\nПОЧЕМУ СЕЙЧАС\nАдминистратор владеет следующим шагом; агенту не нужно выполнять редактируемое действие. Заявка уже отправлена на проверку.\nСИГНАЛЫ\nАнкета: 100% заполнено. Источник: анкета.\nФайлы: Проверить: Скан паспорта, Селфи 1, Селфи 2. Источник: файлы.\nГРАНИЦЫ ПОДСКАЗКИ\nПодсказка не является решением.\nДетерминированные проверки остаются источником истины.\nФайлы остаются частью ручной проверки.\nМАРШРУТ И ПОДАЧА\n22.07.2026 – 31.07.2026\nДаты поездки\nМосква (VFS Global)\nВизовый центр подачи\nПАКЕТ ДОКУМЕНТОВ\n3/3\nСкан паспорта"
+      }
+    },
+    {
+      "name": "agent mobile menu and mobile drawer path",
+      "ok": false,
+      "ms": 5149,
+      "error": "Error: Drawer tab not found: /Файлы|Паспорт|Селфи/\n    at openDrawerTab ([stdin]:88:9)\n    at async [stdin]:233:7\n    at async run ([stdin]:151:21)\n    at async [stdin]:217:5"
+    },
+    {
+      "name": "admin navigation review drawer tabs and media slots",
+      "ok": false,
+      "ms": 33849,
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[role=\"dialog\"]:visible').first() to be visible\u001b[22m\n\n    at [stdin]:249:26\n    at async run ([stdin]:151:21)\n    at async [stdin]:241:5"
+    },
+    {
+      "name": "admin add issue return and accept blocked with open issue",
+      "ok": false,
+      "ms": 31918,
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[role=\"dialog\"]:visible').first() to be visible\u001b[22m\n\n    at [stdin]:267:15\n    at async run ([stdin]:151:21)\n    at async [stdin]:262:5"
+    },
+    {
+      "name": "admin accept clean review and export-ready visibility",
+      "ok": false,
+      "ms": 31905,
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[role=\"dialog\"]:visible').first() to be visible\u001b[22m\n\n    at [stdin]:288:15\n    at async run ([stdin]:151:21)\n    at async [stdin]:283:5"
+    },
+    {
+      "name": "admin export preview download mark-exported flow",
+      "ok": true,
+      "ms": 3838,
+      "details": {
+        "preGenerationDisabled": [
+          "Скачать Excel",
+          "Отметить выгружено"
+        ],
+        "generated": true,
+        "downloaded": true,
+        "markedExported": true,
+        "nonReadyRule": "export queue exposes ready/exportable submissions only"
+      }
+    },
+    {
+      "name": "admin mobile menu review blocker and overflow",
+      "ok": false,
+      "ms": 34045,
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[role=\"dialog\"]:visible').first() to be visible\u001b[22m\n\n    at [stdin]:346:28\n    at async run ([stdin]:151:21)\n    at async [stdin]:331:5"
+    }
+  ],
+  "failures": 6
+}

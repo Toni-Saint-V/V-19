@@ -10,13 +10,17 @@ Bring V-19 from locally verified product flow to a controlled 10-user pilot with
 
 ## Current Readiness
 
-Ready to merge as development main:
+Ready to merge as development main after the all-thread integration branch
+passes its own verification:
 
 - Agent top-level IA is locked to `Мои действия`, `Мои подачи`, `Настройки`.
 - Admin top-level IA is locked to `Проверка`, `Выгрузка`, `Настройки`.
 - `Входящие` is removed as a standalone work screen.
 - UI screen/model handoff schema exists.
-- Local unit, build, browser UI proof, app smoke, security, auth/data, and Supabase release gates pass.
+- Previous closeout verification passed at `b83c5915`; the all-thread merge
+  adds reference, QA, and production packet changes and must rerun its own
+  local unit, build, browser smoke, security, auth/data, and Supabase release
+  gates before it is treated as current.
 
 Not ready for 10-user rollout:
 
@@ -45,11 +49,17 @@ Required:
 - Exclude generated Playwright screenshot churn unless deliberately kept as evidence.
 - Keep the obsolete `docs/qa/v19-agent-inbox-reference-2026-06-20.png` deleted because `Входящие` is no longer a reference screen.
 - Record remaining blockers in the final merge report.
+- Keep `docs/release/v19-thread-merge-ledger-20260704.md` current when a
+  thread change is integrated, reconciled, or deliberately excluded.
 
 Evidence:
 
 - `git diff --cached --stat`
 - `git diff --check`
+- `npm run typecheck`
+- `npm run lint`
+- `npm test`
+- `npm run build`
 - Commit hash on `main`
 
 ## Phase 2 - Performance Gate Closure

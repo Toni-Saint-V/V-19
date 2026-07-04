@@ -46,7 +46,7 @@ test.describe("V-19 UX state proof", () => {
 
     const problems = collectBrowserProblems(page);
 
-    await openFreshWorkspace(page);
+    await openFreshWorkspace(page, { heading: "Мои действия" });
     await clickOperationalNav(page, /^Мои подачи/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
     await page.getByLabel("Поиск по подачам").fill("нет-такой-подачи-ux-proof");
@@ -71,7 +71,7 @@ test.describe("V-19 UX state proof", () => {
 
     await openFreshWorkspace(page, {
       heading: "Проверка",
-      workspaceEmail: "admin@visaflow.local",
+      workspaceEmail: "2@2.ru",
     });
     await clickOperationalNav(page, /^Выгрузка/);
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();

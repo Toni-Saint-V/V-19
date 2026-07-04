@@ -50,6 +50,21 @@ Backup owner:
 - Auth leaked password protection is enabled.
 - Production auth/profile discovery has no orphan auth users.
 
+## Backup, Restore, And RPO/RTO Gates
+
+- Backup owner is named in `docs/qa/supabase-production-owner-approval-20260701.md`.
+- Latest restorable production backup timestamp is recorded in `docs/qa/supabase-production-backup-discovery-20260701.md`.
+- Restore path is confirmed against an owner-approved non-production restore target.
+- Restore drill evidence is recorded without secrets or personal identifiers.
+- RPO/RTO is accepted by the owner.
+- Rollback communication owner is named.
+
+## Owner Approval Evidence
+
+- `docs/qa/supabase-production-owner-approval-20260701.md` is updated from `BLOCKED` to dated approvals.
+- Final owner approval is not inferred from local verifier output.
+- `VITE_SUPABASE_PRODUCTION_APPROVED=true` is set only after all activation evidence is recorded.
+
 ## Production Activation
 
 Production activation requires owner approval and:
