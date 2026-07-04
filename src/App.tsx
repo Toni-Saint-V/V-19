@@ -11,7 +11,7 @@ import {
 import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
-import { Button, SearchBar } from "./shared/ui/primitives";
+import { Button, SearchInput } from "./shared/ui/primitives";
 import {
   agentActionQueue,
   searchAgentActions,
@@ -44,6 +44,7 @@ import {
   filterSubmissionsByAgentOwner,
   highestPriorityFirst,
   ownedSubmissions,
+  questionnaireCityForSubmission,
   readyForExport,
   reviewQueue,
   searchSubmissions,
@@ -104,8 +105,13 @@ import {
   AgentFilterMenu,
   CityFilterMenu,
   type AgentFilterValue,
+  type CityFilterValue,
 } from "./modules/submissions/components/OperationalFilters";
-import { AppShell, PageHeader } from "./modules/submissions/components/AppShell";
+import {
+  AppShell,
+  PageHeader,
+  PageHeaderMenuButton,
+} from "./modules/submissions/components/AppShell";
 import { OperationalSideMenu } from "./modules/submissions/components/OperationalSideMenu";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
@@ -117,7 +123,6 @@ import {
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
-import { CANONICAL_CITIES } from "./modules/submissions/types";
 import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import type {
   City,
@@ -191,7 +196,8 @@ type AgentQuestionnaireFocus = {
   section?: string;
 };
 
-const cities: Array<City | "Все города"> = ["Все города", ...CANONICAL_CITIES];
+const V19_COLLECTION_SEARCH_PLACEHOLDER = "Поиск: подача / город / паспорт";
+const V19_OPERATIONAL_SIDEBAR_ID = "v19-operational-sidebar";
 const workspaceEmailStorageKey = "visaflow.workspaceEmail.v2";
 const localDevTestAgentCredentials = { email: "1@1.ru", password: "11" };
 const localDevTestAdminCredentials = { email: "2@2.ru", password: "22" };
@@ -474,7 +480,7 @@ function MainApp() {
   const [confirmClose, setConfirmClose] = useState(false);
   const [createCloseFocusToken, setCreateCloseFocusToken] = useState(0);
   const [query, setQuery] = useState("");
-  const [cityFilter, setCityFilter] = useState<City | "Все города">("Все города");
+  const [cityFilter, setCityFilter] = useState<CityFilterValue>("Все города");
   const [agentFilter, setAgentFilter] = useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [agentTab, setAgentTab] = useState<AgentTab>("all");
@@ -535,7 +541,7 @@ function MainApp() {
       ),
     [cityFilter, currentAgentOwnerId, query, submissions],
   );
-  const visualSurfaceCityFilter: City | "Все города" = isFigmaVisualSurface
+  const visualSurfaceCityFilter: CityFilterValue = isFigmaVisualSurface
     ? "Все города"
     : cityFilter;
   const totalAgentSubmissionCount = useMemo(
@@ -581,6 +587,17 @@ function MainApp() {
     );
     return ["Все агенты", ...owners];
   }, [submissions]);
+  const cityFilterOptions = useMemo<CityFilterValue[]>(() => {
+    const questionnaireCities = Array.from(
+      new Set(
+        submissions
+          .map((submission) => questionnaireCityForSubmission(submission).trim())
+          .filter(Boolean),
+      ),
+    ).sort((left, right) => left.localeCompare(right, "ru-RU"));
+
+    return ["Все города", ...questionnaireCities];
+  }, [submissions]);
   const adminReviewSource = useMemo(
     () =>
       filterSubmissionsByAgentOwner(
@@ -590,8 +607,8 @@ function MainApp() {
     [agentFilter, role, submissions],
   );
   const searchedReviewQueue = useMemo(
-    () => searchSubmissions(adminReviewSource, query, visualSurfaceCityFilter),
-    [adminReviewSource, query, visualSurfaceCityFilter],
+    () => searchSubmissions(adminReviewSource, query, cityFilter),
+    [adminReviewSource, cityFilter, query],
   );
   const agentList = highestPriorityFirst(
     searchedAgentQueue.filter(matchesAgentTab(agentTab)),
@@ -2992,15 +3009,19 @@ function MainApp() {
   }
 
   const searchControl = (
-    <SearchBar
+    <SearchInput
       label="Поиск в текущем списке"
-      placeholder="Подача, город или ID"
+      placeholder={V19_COLLECTION_SEARCH_PLACEHOLDER}
       value={query}
       onChange={setQuery}
     />
   );
   const cityFilterControl = (
-    <CityFilterMenu options={cities} value={cityFilter} onChange={setCityFilter} />
+    <CityFilterMenu
+      options={cityFilterOptions}
+      value={cityFilter}
+      onChange={setCityFilter}
+    />
   );
   const adminFilterControl = (
     <div className="v19-admin-filter-controls">
@@ -3013,17 +3034,17 @@ function MainApp() {
     </div>
   );
   const agentActionsSearchControl = (
-    <SearchBar
+    <SearchInput
       label="Поиск по действиям"
-      placeholder="Поиск"
+      placeholder={V19_COLLECTION_SEARCH_PLACEHOLDER}
       value={query}
       onChange={setQuery}
     />
   );
   const agentSubmissionsSearchControl = (
-    <SearchBar
+    <SearchInput
       label="Поиск по подачам"
-      placeholder="Поиск по подачам"
+      placeholder={V19_COLLECTION_SEARCH_PLACEHOLDER}
       value={query}
       onChange={setQuery}
     />
@@ -3076,6 +3097,7 @@ function MainApp() {
       sessionDisplayName={sessionDisplayName}
       sessionInitials={sessionInitials}
       sessionRoleLabel={sessionRoleLabel}
+      sidebarId={V19_OPERATIONAL_SIDEBAR_ID}
       showAdminZoneSwitch={role === "agent" && isFigmaVisualSurface}
       showRoleSwitcher={showRoleSwitcher}
     />
@@ -3133,19 +3155,15 @@ function MainApp() {
       actions={pageHeaderActions}
       description={pageHeaderDescription}
       menuButton={
-        <button
-          className="v19-topbar-menu"
-          type="button"
-          aria-label={mobileNavOpen ? "Закрыть меню" : "Меню"}
-          aria-expanded={mobileNavOpen}
+        <PageHeaderMenuButton
+          controls={V19_OPERATIONAL_SIDEBAR_ID}
           disabled={drawerMode !== "closed"}
+          open={mobileNavOpen}
           onClick={() => {
             if (drawerMode !== "closed") return;
             setMobileNavOpen((open) => !open);
           }}
-        >
-          <span aria-hidden="true" />
-        </button>
+        />
       }
       title={workspaceSurfaceTitle}
     />

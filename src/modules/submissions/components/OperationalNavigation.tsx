@@ -5,11 +5,12 @@ import {
   ListChecks,
   Settings,
   UsersRound,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import visaOpsLogo from "../../../assets/visaflow-logo.png";
 import { cn } from "../../../shared/ui/cn";
-import { Button, NavCount } from "../../../shared/ui/primitives";
+import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
 
@@ -29,6 +30,7 @@ export type OperationalNavItem = {
 export function OperationalSidebar({
   createAction,
   footer,
+  id,
   items,
   onMobileClose,
   mobileTitle,
@@ -39,12 +41,14 @@ export function OperationalSidebar({
     onClick: () => void;
   };
   footer: ReactNode;
+  id?: string;
   items: OperationalNavItem[];
   onMobileClose?: () => void;
   mobileTitle?: string;
 }) {
   return (
     <aside
+      id={id}
       className={cn("ops-sidebar opsu-sidebar")}
       aria-label="Операционный центр"
     >
@@ -77,16 +81,12 @@ export function OperationalSidebar({
           <em>Рабочая область</em>
         </div>
         {onMobileClose ? (
-          <Button
-            aria-label="Закрыть меню"
+          <IconButton
             className="ops-mobile-close opsu-mobile-close"
-            variant="ghost"
+            icon={<X aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />}
+            label="Закрыть меню"
             onClick={onMobileClose}
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </Button>
+          />
         ) : null}
       </div>
       <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
@@ -121,10 +121,10 @@ export function OperationalSidebar({
         ))}
       </nav>
       {createAction ? (
-        <button
+        <Button
           className="ops-sidebar-create opsu-sidebar-create"
-          type="button"
           aria-label={createAction.label}
+          variant="plain"
           onClick={createAction.onClick}
         >
           <span aria-hidden="true">
@@ -133,7 +133,7 @@ export function OperationalSidebar({
             </svg>
           </span>
           <strong>{createAction.label}</strong>
-        </button>
+        </Button>
       ) : null}
       <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
     </aside>

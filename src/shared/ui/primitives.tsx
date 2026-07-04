@@ -23,9 +23,9 @@ function mergeAriaIds(
   return merged || undefined;
 }
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "icon" | "plain";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "icon" | "plain";
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   danger?: boolean;
   loading?: boolean;
   ref?: Ref<HTMLButtonElement>;
@@ -77,7 +77,7 @@ export function Button({
   );
 }
 
-interface IconButtonProps extends Omit<
+export interface IconButtonProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "children"
 > {
@@ -117,7 +117,7 @@ export function IconButton({
   );
 }
 
-interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
+export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   children: ReactNode;
   tone?: "danger" | "amber" | "blue" | "teal" | "muted" | "default";
 }
@@ -133,7 +133,7 @@ export function Badge({ children, className, tone = "default", ...props }: Badge
   );
 }
 
-interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
+export interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
   label: string;
   tone?: BadgeProps["tone"];
 }
@@ -144,16 +144,12 @@ export function StatusBadge({
   tone = "default",
   ...props
 }: StatusBadgeProps) {
-  return (
-    <Badge {...props} className={className} tone={tone}>
-      {label}
-    </Badge>
-  );
+  return <StatusPill {...props} className={className} label={label} tone={tone} />;
 }
 
-type CardElement = "article" | "aside" | "div" | "section";
+export type CardElement = "article" | "aside" | "div" | "section";
 
-interface CardComponentProps extends HTMLAttributes<HTMLElement> {
+export interface CardComponentProps extends HTMLAttributes<HTMLElement> {
   as?: CardElement;
   ref?: Ref<HTMLElement>;
 }
@@ -179,7 +175,7 @@ export interface SelectOption {
   value: string;
 }
 
-interface SelectProps extends Omit<
+export interface SelectProps extends Omit<
   SelectHTMLAttributes<HTMLSelectElement>,
   "className"
 > {
@@ -248,7 +244,7 @@ export function Select({
   );
 }
 
-interface SearchBarProps {
+export interface SearchBarProps {
   className?: string;
   label: string;
   onChange: (value: string) => void;
@@ -316,7 +312,7 @@ export function SearchBar({
   );
 }
 
-interface SegmentedTabsProps<T extends string> {
+export interface SegmentedTabsProps<T extends string> {
   ariaLabel: string;
   className?: string;
   onValueChange: (value: T) => void;
@@ -394,7 +390,7 @@ export function SegmentedTabs<T extends string>({
   );
 }
 
-interface StateTabsProps<T extends string> {
+export interface StateTabsProps<T extends string> {
   ariaLabel: string;
   className?: string;
   onValueChange: (value: T) => void;
@@ -402,7 +398,7 @@ interface StateTabsProps<T extends string> {
   value: T;
 }
 
-interface SegmentedControlProps<T extends string> {
+export interface SegmentedControlProps<T extends string> {
   ariaLabel: string;
   className?: string;
   onValueChange: (value: T) => void;
@@ -511,7 +507,7 @@ export function NavCount({ children, label }: { children: ReactNode; label?: str
   );
 }
 
-interface DrawerTabsProps<T extends string> {
+export interface DrawerTabsProps<T extends string> {
   ariaLabel: string;
   autoFocusOnValueChange?: boolean;
   className?: string;
@@ -602,7 +598,7 @@ export function DrawerTabs<T extends string>({
   );
 }
 
-interface TextInputFieldProps extends Omit<
+export interface TextInputFieldProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>,
   "className"
 > {
@@ -658,7 +654,73 @@ export function TextInputField({
   );
 }
 
-interface SheetFrameProps extends HTMLAttributes<HTMLDivElement> {
+export type SearchInputProps = SearchBarProps;
+
+export function SearchInput({ className, ...props }: SearchInputProps) {
+  return <SearchBar {...props} className={cn("mp-search-input", className)} />;
+}
+
+export type StatusPillProps = Omit<BadgeProps, "children"> & {
+  children?: ReactNode;
+  label?: ReactNode;
+};
+
+export function StatusPill({
+  children,
+  className,
+  label,
+  ...props
+}: StatusPillProps) {
+  return (
+    <Badge {...props} className={cn("mp-status-pill", className)}>
+      {label ?? children}
+    </Badge>
+  );
+}
+
+export type SurfaceCardProps = CardComponentProps;
+
+export function SurfaceCard({ className, ...props }: SurfaceCardProps) {
+  return <CardComponent {...props} className={cn("mp-surface-card", className)} />;
+}
+
+export type FieldProps = TextInputFieldProps;
+
+export function Field({ containerClassName, ...props }: FieldProps) {
+  return (
+    <TextInputField
+      {...props}
+      containerClassName={cn("mp-field-owner", containerClassName)}
+    />
+  );
+}
+
+export interface AlertBoxProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
+  title?: ReactNode;
+  tone?: "danger" | "info" | "muted" | "success" | "warning";
+}
+
+export function AlertBox({
+  children,
+  className,
+  role,
+  title,
+  tone = "info",
+  ...props
+}: AlertBoxProps) {
+  return (
+    <div
+      {...props}
+      className={cn("mp-alert", `tone-${tone}`, className)}
+      role={role ?? (tone === "danger" ? "alert" : "status")}
+    >
+      {title ? <strong className="mp-alert-title">{title}</strong> : null}
+      {children}
+    </div>
+  );
+}
+
+export interface SheetFrameProps extends HTMLAttributes<HTMLDivElement> {
   labelledBy?: string;
   modal?: boolean;
   ref?: Ref<HTMLDivElement>;
@@ -687,7 +749,7 @@ export function SheetFrame({
   );
 }
 
-interface BottomSheetProps {
+export interface BottomSheetProps {
   ariaLabel?: string;
   children: ReactNode;
   className?: string;

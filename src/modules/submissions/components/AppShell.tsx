@@ -1,6 +1,8 @@
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Menu, X } from "lucide-react";
 
 import { cn } from "../../../shared/ui/cn";
+import { IconButton } from "../../../shared/ui/primitives";
 
 type AppShellProps = {
   children: ReactNode;
@@ -74,5 +76,34 @@ export function PageHeader({
       </div>
       {actions}
     </header>
+  );
+}
+
+type PageHeaderMenuButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+> & {
+  controls: string;
+  open: boolean;
+};
+
+export function PageHeaderMenuButton({
+  className,
+  controls,
+  open,
+  ...props
+}: PageHeaderMenuButtonProps) {
+  const label = open ? "Закрыть меню" : "Меню";
+  const Icon = open ? X : Menu;
+
+  return (
+    <IconButton
+      {...props}
+      aria-controls={controls}
+      aria-expanded={open}
+      className={cn("v19-topbar-menu", className)}
+      icon={<Icon aria-hidden="true" focusable="false" size={18} strokeWidth={1.9} />}
+      label={label}
+    />
   );
 }

@@ -104,20 +104,9 @@ export function CollectionToolbar<T extends string>({
           tools != null && "has-toolbar-tools",
           className,
         )}
+        role="region"
         aria-label={ariaLabel}
       >
-        <div className="v19-toolbar-primary-row">
-          <ToolbarControlStack filters={filters} search={search} />
-          {tools}
-        </div>
-        {summary ? (
-          <div className="v19-toolbar-summary-row" role="status" aria-live="polite">
-            {summary}
-          </div>
-        ) : null}
-        {filterTabs ? (
-          <div className="v19-toolbar-filter-row">{filterTabs}</div>
-        ) : null}
         <div className="v19-toolbar-secondary-row">
           <StatusTabs
             ariaLabel={tabsAriaLabel ?? "Состояние списка"}
@@ -134,6 +123,18 @@ export function CollectionToolbar<T extends string>({
             </div>
           ) : null}
         </div>
+        <div className="v19-toolbar-primary-row">
+          <ToolbarControlStack filters={filters} search={search} />
+          {tools}
+        </div>
+        {summary ? (
+          <div className="v19-toolbar-summary-row" role="status" aria-live="polite">
+            {summary}
+          </div>
+        ) : null}
+        {filterTabs ? (
+          <div className="v19-toolbar-filter-row">{filterTabs}</div>
+        ) : null}
       </div>
 
       {activeFilters.length ? (
@@ -172,27 +173,24 @@ function ActiveFiltersRow({
           <span className="filter-chip" key={chip.id}>
             {chip.label}
             {chip.onRemove ? (
-              <button
-                aria-label={`Удалить фильтр ${chip.label}`}
-                type="button"
+              <IconButton
+                className="v19-active-filter-remove"
+                icon={
+                  <SvgIcon>
+                    <path d="m6 6 12 12M18 6 6 18" />
+                  </SvgIcon>
+                }
+                label={`Удалить фильтр ${chip.label}`}
                 onClick={chip.onRemove}
-              >
-                <svg className="icon sm" aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="m6 6 12 12M18 6 6 18" />
-                </svg>
-              </button>
+              />
             ) : null}
           </span>
         );
       })}
       {onClear ? (
-        <button
-          className="btn ghost small v19-active-filters-reset"
-          type="button"
-          onClick={onClear}
-        >
+        <Button className="v19-active-filters-reset" variant="ghost" onClick={onClear}>
           Сбросить
-        </button>
+        </Button>
       ) : null}
     </div>
   );
