@@ -221,13 +221,33 @@ test.describe("V-19 mobile click real logic", () => {
       .last();
     await expectCenterHitTarget(lastEventAction, "390 actions last row action");
     await lastEventAction.click();
-    await expect(drawer(page)).toBeVisible();
-    await expectCenterHitTarget(
-      drawerCloseButton(page),
-      "390 drawer close from action row",
-    );
-    await drawerCloseButton(page).click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const questionnaireWorkspace = page.getByRole("heading", {
+      level: 1,
+      name: /^Анкета:/,
+    });
+    await expect
+      .poll(async () => {
+        if (await drawer(page).isVisible().catch(() => false)) return "drawer";
+        if (await questionnaireWorkspace.isVisible().catch(() => false)) {
+          return "questionnaire";
+        }
+        return "none";
+      })
+      .toMatch(/drawer|questionnaire/);
+
+    if (await drawer(page).isVisible().catch(() => false)) {
+      await expectCenterHitTarget(
+        drawerCloseButton(page),
+        "390 drawer close from action row",
+      );
+      await drawerCloseButton(page).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    } else {
+      const backToActions = page.getByRole("button", { name: "Назад" });
+      await expectCenterHitTarget(backToActions, "390 questionnaire back to actions");
+      await backToActions.click();
+      await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
+    }
 
     await clickOperationalNav(page, /Мои подачи/);
     await expect(

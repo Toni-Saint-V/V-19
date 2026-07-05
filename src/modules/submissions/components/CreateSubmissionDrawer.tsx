@@ -1,5 +1,5 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -8,9 +8,11 @@ import {
   ScanLine,
   Search,
   UploadCloud,
+  X,
 } from "lucide-react";
 import { invokePassportExtraction } from "../passportExtractionService";
 import {
+  CANONICAL_CITIES,
   type City,
   type PassportExtractedField,
   type PassportExtractedFieldKey,
@@ -298,10 +300,12 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
 }
 
 export function CreateSubmissionDrawer({
+  city,
   familyCount,
   focusCloseToken = 0,
   onClose,
   onCreate,
+  onCity,
   onFamilyCount,
   onPassportFilesSelected,
   onType,
@@ -333,6 +337,7 @@ export function CreateSubmissionDrawer({
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
     emptyPreliminaryIntakeDraft,
   );
+  const prefersReducedMotion = useReducedMotion();
   const safeActiveApplicantIndex = boundedApplicantIndex(
     activeApplicantIndex,
     applicantCount,
@@ -557,12 +562,20 @@ export function CreateSubmissionDrawer({
       className={`vf-figma-surface create-submission-drawer ${
         createStep === "passport" ? "is-passport-step" : "is-questionnaire-step"
       } v19-create-drawer-shell`}
-      exit={{ opacity: 0, y: 20 }}
-      initial={{ opacity: 1, y: 0 }}
+      exit={
+        prefersReducedMotion
+          ? { opacity: 0, y: 0 }
+          : { opacity: 0, y: 18 }
+      }
+      initial={
+        prefersReducedMotion
+          ? { opacity: 1, y: 0 }
+          : { opacity: 0, y: 18 }
+      }
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-title"
-      transition={{ damping: 25, stiffness: 250, type: "spring" }}
+      transition={{ duration: prefersReducedMotion ? 0.01 : 0.22 }}
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
         event.stopPropagation();
@@ -577,20 +590,33 @@ export function CreateSubmissionDrawer({
           aria-label="Закрыть создание"
           onClick={onClose}
         >
-          <ArrowLeft className="w-[18px] h-[18px]" />
+          <ArrowLeft className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
         </button>
 
-        <div className="flex-1 min-w-0 flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-[var(--v19b-size-11)] text-white/40 uppercase tracking-[var(--v19b-tracking-wider)] font-medium">
+            Новый пакет
+          </div>
           <h1
             id="create-title"
-            className="text-[15px] font-medium tracking-wide text-white m-0 truncate"
+            className="text-[var(--v19b-size-19)] lg:text-[var(--v19b-size-21)] font-semibold tracking-tight text-white m-0 mt-1 leading-none truncate"
           >
-            Сборка документов
+            Загрузка и первичная сборка
           </h1>
-          <span className="px-2 py-0.5 rounded-[4px] bg-white/5 border border-white/5 text-[10px] uppercase tracking-wider text-white/60 font-mono">
-            Шаг&nbsp; {createStep === "passport" ? "1" : "2"}/2
-          </span>
         </div>
+
+        <span className="px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-white/5 border border-white/5 text-[var(--v19b-size-10)] uppercase tracking-wider text-white/60 font-mono">
+          Шаг&nbsp; {createStep === "passport" ? "1" : "2"}/2
+        </span>
+
+        <button
+          className="v19-create-drawer-close"
+          type="button"
+          aria-label="Закрыть создание"
+          onClick={onClose}
+        >
+          <X className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+        </button>
       </header>
 
       <h2 className="sr-only">Новая подача</h2>
@@ -601,24 +627,24 @@ export function CreateSubmissionDrawer({
       ) : null}
 
       <div className="flex-1 overflow-y-auto p-6 lg:p-10">
-        <div className="max-w-[1140px] mx-auto h-full">
+        <div className="create-submission-passport-shell mx-auto h-full">
           {createStep === "passport" ? (
             <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
               <div className="flex flex-col gap-6">
                 <section
-                  className="rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
+                  className="rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                   aria-label="Тип подачи"
                 >
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
+                      <p className="text-[var(--v19b-size-10)] uppercase tracking-[var(--v19b-tracking-wider)] text-white/60 font-medium">
                         Заявитель / Семья
                       </p>
-                      <h3 className="text-[13px] text-white/80 font-medium mt-1">
+                      <h3 className="text-[var(--v19b-size-13)] text-white/80 font-medium mt-1">
                         Структура подачи
                       </h3>
                     </div>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-white/50">
+                    <span className="text-[var(--v19b-size-11)] font-mono px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-strong)] text-white/50">
                       {applicantCount} чел.
                     </span>
                   </div>
@@ -626,10 +652,10 @@ export function CreateSubmissionDrawer({
                     {submissionTypeOptions.map((option) => (
                       <button
                         key={option.value}
-                        className={`h-10 rounded-[8px] border text-[13px] font-medium transition-colors ${
+                        className={`h-10 rounded-[var(--v19b-size-8)] border text-[var(--v19b-size-13)] font-medium transition-colors ${
                           type === option.value
                             ? "border-white/18 bg-white/10 text-white"
-                            : "border-[#242529] bg-[#161617] text-white/45 hover:text-white/75 hover:border-white/12"
+                            : "border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-white/45 hover:text-white/75 hover:border-white/12"
                         }`}
                         type="button"
                         aria-pressed={type === option.value}
@@ -639,24 +665,42 @@ export function CreateSubmissionDrawer({
                       </button>
                     ))}
                   </div>
+                  <label
+                    className="mt-3 grid gap-1.5 text-left text-[var(--v19b-size-12)] text-white/58"
+                    htmlFor="create-submission-city"
+                  >
+                    Город подачи
+                    <select
+                      id="create-submission-city"
+                      className="h-10 rounded-[var(--v19b-size-8)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] px-3 text-[var(--v19b-size-13)] font-medium text-white/78 outline-none transition-colors hover:border-white/12 focus:border-white/24"
+                      value={city}
+                      onChange={(event) => onCity(event.currentTarget.value as City)}
+                    >
+                      {CANONICAL_CITIES.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </section>
 
                 {type === "family" ? (
                   <section
-                    className="lg:hidden rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
+                    className="lg:hidden rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                     aria-label="Заявители семьи и общие ответы"
                   >
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <div>
-                        <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
+                        <p className="text-[var(--v19b-size-10)] uppercase tracking-[var(--v19b-tracking-wider)] text-white/60 font-medium">
                           Семья
                         </p>
-                        <h3 className="text-[13px] text-white/80 font-medium mt-1">
+                        <h3 className="text-[var(--v19b-size-13)] text-white/80 font-medium mt-1">
                           Заявители и общие ответы
                         </h3>
                       </div>
                       <button
-                        className="h-8 px-3 rounded-[7px] border border-[#242529] bg-[#161617] text-[12px] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="h-8 px-3 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-[var(--v19b-size-12)] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         aria-label="Добавить заявителя в семью"
                         type="button"
                         disabled={applicantCount >= maxFamilyApplicants}
@@ -666,7 +710,7 @@ export function CreateSubmissionDrawer({
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
+                    <div className="create-submission-family-grid">
                       {Array.from({ length: applicantCount }, (_, index) => {
                         const upload = passportUploads.find(
                           (candidate) => candidate.applicantIndex === index,
@@ -677,23 +721,23 @@ export function CreateSubmissionDrawer({
                         return (
                           <button
                             key={index}
-                            className={`flex items-start justify-between gap-3 rounded-[10px] border px-3 py-2 text-left transition-colors ${
+                            className={`flex items-start justify-between gap-3 rounded-[var(--v19b-radius-control)] border px-3 py-2 text-left transition-colors ${
                               safeActiveApplicantIndex === index
                                 ? "border-white/16 bg-white/8"
-                                : "border-[#202124] bg-[#151517] hover:border-white/10"
+                                : "border-[var(--v19b-color-border)] bg-[var(--v19b-color-panel)] hover:border-white/10"
                             }`}
                             type="button"
                             aria-pressed={safeActiveApplicantIndex === index}
                             onClick={() => setActiveApplicantIndex(index)}
                           >
                             <span className="min-w-0">
-                              <strong className="block truncate text-[13px] text-white/78 font-medium">
+                              <strong className="block truncate text-[var(--v19b-size-13)] text-white/78 font-medium">
                                 {applicantLabel(index, type)}
                               </strong>
-                              <em className="block truncate text-[11px] not-italic text-white/60 mt-0.5">
+                              <em className="block truncate text-[var(--v19b-size-11)] not-italic text-white/60 mt-0.5">
                                 {upload?.fileName ?? "Паспорт не загружен"}
                               </em>
-                              <span className="mt-1 block truncate text-[10px] text-white/38">
+                              <span className="mt-1 block truncate text-[var(--v19b-size-10)] text-white/38">
                                 {readinessLabel}
                               </span>
                             </span>
@@ -706,20 +750,20 @@ export function CreateSubmissionDrawer({
                       })}
                     </div>
 
-                    <div className="mt-3 grid gap-2 border-t border-[#202124] pt-3">
+                    <div className="mt-3 grid gap-2 border-t border-[var(--v19b-color-border)] pt-3">
                       {firstStepFamilyQuestions.map((question) => (
                         <div
                           key={question.key}
-                          className="grid gap-2 rounded-[10px] bg-[#151517] px-3 py-2"
+                          className="grid gap-2 rounded-[var(--v19b-radius-control)] bg-[var(--v19b-color-panel)] px-3 py-2"
                         >
-                          <span className="text-[12px] leading-snug text-white/58">
+                          <span className="text-[var(--v19b-size-12)] leading-snug text-white/58">
                             {question.label}
                           </span>
-                          <span className="grid grid-cols-2 rounded-[7px] border border-[#242529] bg-[#101012] p-0.5">
+                          <span className="grid grid-cols-2 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-app)] p-0.5">
                             {[true, false].map((value) => (
                               <button
                                 key={String(value)}
-                                className={`h-8 rounded-[6px] px-2 text-[12px] font-medium transition-colors ${
+                                className={`h-8 rounded-[var(--v19b-size-6)] px-2 text-[var(--v19b-size-12)] font-medium transition-colors ${
                                   preliminaryIntake[question.key] === value
                                     ? "bg-white/12 text-white"
                                     : "text-white/38 hover:text-white/75"
@@ -756,32 +800,32 @@ export function CreateSubmissionDrawer({
                 />
 
                 <div
-                  className={`flex-1 min-h-[360px] rounded-[16px] transition-all duration-300 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden ${
+                  className={`create-submission-passport-upload-zone flex-1 rounded-[var(--v19b-radius-panel)] transition-all duration-300 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden ${
                     isDragging
-                      ? "border border-white/20 bg-[#161617] shadow-[0_0_40px_rgba(255,255,255,0.03)] scale-[1.01]"
-                      : "border border-[#202124] bg-[#121214] hover:border-white/10 hover:bg-[#141416]"
+                      ? "border border-white/20 bg-[var(--v19b-color-panel)] shadow-[var(--v19b-shadow-panel)] scale-[1.01]"
+                      : "border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] hover:border-white/10 hover:bg-[var(--v19b-color-page)]"
                   }`}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
-                  <div className="absolute inset-4 rounded-[12px] border border-dashed border-white/5 pointer-events-none" />
-                  <div className="w-14 h-14 rounded-full bg-[#18181b] border border-[#2a2a2e] flex items-center justify-center mb-5 shadow-inner relative z-10">
+                  <div className="absolute inset-4 rounded-[var(--v19b-radius-row)] border border-dashed border-white/5 pointer-events-none" />
+                  <div className="w-14 h-14 rounded-full bg-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-selected)] flex items-center justify-center mb-5 shadow-inner relative z-10">
                     <UploadCloud className="w-6 h-6 text-white/40" />
                   </div>
                   <h3
                     id="passport-intake-title"
-                    className="text-[15px] font-medium text-white/80 mb-1.5 relative z-10"
+                    className="text-[var(--v19b-size-15)] font-medium text-white/80 mb-1.5 relative z-10"
                   >
                     Перетащите файлы
                   </h3>
-                  <p className="text-[12px] text-white/60 max-w-[240px] mb-8 font-light relative z-10 leading-relaxed">
+                  <p className="text-[var(--v19b-size-12)] text-white/60 max-w-[var(--v19b-size-240)] mb-8 font-light relative z-10 leading-relaxed">
                     JPEG, PNG.
                     <br />
                     Разворот загранпаспорта с MRZ.
                   </p>
                   {passportFileError ? (
-                    <p className="mb-4 text-[12px] text-red-400 relative z-10" role="alert">
+                    <p className="mb-4 text-[var(--v19b-size-12)] text-red-400 relative z-10" role="alert">
                       {passportFileError}
                     </p>
                   ) : null}
@@ -806,22 +850,22 @@ export function CreateSubmissionDrawer({
                 </div>
               </div>
 
-              <div className="hidden lg:flex flex-col h-full max-h-[800px] border-l border-[#202124] pl-10">
+              <div className="hidden lg:flex flex-col h-full max-h-[var(--v19b-size-800)] border-l border-[var(--v19b-color-border)] pl-10">
                 <section
-                  className="mb-5 rounded-[14px] border border-[#202124] bg-[#121214] p-3.5"
+                  className="mb-5 rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
                   aria-label="Заявители и общие семейные ответы"
                 >
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.18em] text-white/60 font-medium">
+                      <p className="text-[var(--v19b-size-10)] uppercase tracking-[var(--v19b-tracking-wider)] text-white/60 font-medium">
                         {type === "family" ? "Семья" : "Заявитель"}
                       </p>
-                      <h3 className="text-[13px] text-white/80 font-medium mt-1">
+                      <h3 className="text-[var(--v19b-size-13)] text-white/80 font-medium mt-1">
                         {type === "family" ? "Заявители в семье" : "Один заявитель"}
                       </h3>
                     </div>
                     <button
-                      className="h-8 px-3 rounded-[7px] border border-[#242529] bg-[#161617] text-[12px] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="h-8 px-3 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-[var(--v19b-size-12)] text-white/55 hover:text-white/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       type="button"
                       aria-label="Добавить заявителя в семью"
                       disabled={applicantCount >= maxFamilyApplicants}
@@ -842,23 +886,23 @@ export function CreateSubmissionDrawer({
                       return (
                         <button
                           key={index}
-                          className={`flex items-center justify-between gap-3 rounded-[10px] border px-3 py-2 text-left transition-colors ${
+                          className={`flex items-center justify-between gap-3 rounded-[var(--v19b-radius-control)] border px-3 py-2 text-left transition-colors ${
                             safeActiveApplicantIndex === index
                               ? "border-white/16 bg-white/8"
-                              : "border-[#202124] bg-[#151517] hover:border-white/10"
+                              : "border-[var(--v19b-color-border)] bg-[var(--v19b-color-panel)] hover:border-white/10"
                           }`}
                           type="button"
                           aria-pressed={safeActiveApplicantIndex === index}
                           onClick={() => setActiveApplicantIndex(index)}
                         >
                           <span className="min-w-0">
-                            <strong className="block truncate text-[13px] text-white/78 font-medium">
+                            <strong className="block truncate text-[var(--v19b-size-13)] text-white/78 font-medium">
                               {applicantLabel(index, type)}
                             </strong>
-                            <em className="block truncate text-[11px] not-italic text-white/60 mt-0.5">
+                            <em className="block truncate text-[var(--v19b-size-11)] not-italic text-white/60 mt-0.5">
                               {upload?.fileName ?? "Паспорт не загружен"}
                             </em>
-                            <small className="mt-1 block truncate text-[10px] text-white/38">
+                            <small className="mt-1 block truncate text-[var(--v19b-size-10)] text-white/38">
                               {readinessLabel}
                             </small>
                           </span>
@@ -872,20 +916,20 @@ export function CreateSubmissionDrawer({
                   </div>
 
                   {type === "family" ? (
-                    <div className="mt-4 grid gap-2 border-t border-[#202124] pt-3">
+                    <div className="mt-4 grid gap-2 border-t border-[var(--v19b-color-border)] pt-3">
                       {firstStepFamilyQuestions.map((question) => (
                         <div
                           key={question.key}
-                          className="flex items-center justify-between gap-3 rounded-[10px] bg-[#151517] px-3 py-2"
+                          className="flex items-center justify-between gap-3 rounded-[var(--v19b-radius-control)] bg-[var(--v19b-color-panel)] px-3 py-2"
                         >
-                          <span className="text-[12px] leading-snug text-white/58">
+                          <span className="text-[var(--v19b-size-12)] leading-snug text-white/58">
                             {question.label}
                           </span>
-                          <span className="flex shrink-0 rounded-[7px] border border-[#242529] bg-[#101012] p-0.5">
+                          <span className="flex shrink-0 rounded-[var(--v19b-size-7)] border border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-app)] p-0.5">
                             {[true, false].map((value) => (
                               <button
                                 key={String(value)}
-                                className={`h-7 min-w-10 rounded-[6px] px-2 text-[12px] font-medium transition-colors ${
+                                className={`h-7 min-w-10 rounded-[var(--v19b-size-6)] px-2 text-[var(--v19b-size-12)] font-medium transition-colors ${
                                   preliminaryIntake[question.key] === value
                                     ? "bg-white/12 text-white"
                                     : "text-white/38 hover:text-white/75"
@@ -907,15 +951,15 @@ export function CreateSubmissionDrawer({
                 </section>
 
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-[13px] uppercase tracking-widest font-medium text-white/60">
+                  <h3 className="text-[var(--v19b-size-13)] uppercase tracking-widest font-medium text-white/60">
                     Очередь обработки
                   </h3>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-[4px] bg-[#1a1a1d] border border-[#242529] text-white/50">
+                  <span className="text-[var(--v19b-size-11)] font-mono px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-strong)] text-white/50">
                     {passportUploads.length} ITEMS
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[#2a2a2e]">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[var(--v19b-color-border-selected)]">
                   {passportUploads.length ? (
                     <AnimatePresence>
                       {passportUploads.map((upload) => {
@@ -929,15 +973,15 @@ export function CreateSubmissionDrawer({
                             key={upload.id}
                             layout
                             animate={{ opacity: 1, y: 0 }}
-                            className={`v19-passport-queue-card is-${tone} p-3.5 rounded-[12px] bg-[#141416] border border-[#202124] relative overflow-hidden group hover:border-[#2a2a2e] transition-colors`}
+                            className={`v19-passport-queue-card is-${tone} p-3.5 rounded-[var(--v19b-radius-row)] bg-[var(--v19b-color-page)] border border-[var(--v19b-color-border)] relative overflow-hidden group hover:border-[var(--v19b-color-border-selected)] transition-colors`}
                             exit={{ opacity: 0, scale: 0.95 }}
                             initial={{ opacity: 0, y: 10 }}
                           >
                             {isProcessing ? (
-                              <div className="absolute bottom-0 left-0 h-[1px] bg-white/20 w-full animate-pulse" />
+                              <div className="absolute bottom-0 left-0 h-[var(--v19b-size-1)] bg-white/20 w-full animate-pulse" />
                             ) : null}
                             <div className="flex items-start gap-3">
-                              <div className="w-9 h-9 shrink-0 rounded-[8px] bg-[#1a1a1d] border border-[#242529] flex items-center justify-center mt-0.5">
+                              <div className="w-9 h-9 shrink-0 rounded-[var(--v19b-size-8)] bg-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-strong)] flex items-center justify-center mt-0.5">
                                 {upload.file?.type.startsWith("image/") ? (
                                   <ImageIcon className="w-4 h-4 text-white/30" />
                                 ) : (
@@ -946,12 +990,12 @@ export function CreateSubmissionDrawer({
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2">
-                                  <div className="text-[13.5px] font-medium text-white/80 truncate tracking-tight">
+                                  <div className="text-[var(--v19b-size-13-5)] font-medium text-white/80 truncate tracking-tight">
                                     {upload.fileName}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[11px] font-mono text-white/30">
+                                  <span className="text-[var(--v19b-size-11)] font-mono text-white/30">
                                     {formatFileSize(upload.file?.size)}
                                   </span>
                                   <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
@@ -982,11 +1026,11 @@ export function CreateSubmissionDrawer({
                       })}
                     </AnimatePresence>
                   ) : (
-                    <div className="h-full min-h-[240px] flex flex-col items-center justify-center text-center px-4">
-                      <div className="w-10 h-10 rounded-full bg-[#161617] border border-[#202124] flex items-center justify-center mb-3">
+                    <div className="h-full min-h-[var(--v19b-size-240)] flex flex-col items-center justify-center text-center px-4">
+                      <div className="w-10 h-10 rounded-full bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border)] flex items-center justify-center mb-3">
                         <Search className="w-4 h-4 text-white/20" />
                       </div>
-                      <p className="text-[12px] text-white/60 font-light">
+                      <p className="text-[var(--v19b-size-12)] text-white/60 font-light">
                         Локальная очередь пуста.
                       </p>
                     </div>
@@ -1084,7 +1128,7 @@ export function CreateSubmissionDrawer({
 
       {createStep === "passport" ? (
         <footer className="v19-create-drawer-footer">
-          <span className="text-[12px] text-white/60">
+          <span className="text-[var(--v19b-size-12)] text-white/60">
             {type === "family" ? `${applicantCount} заявителя. ` : ""}
             {passportReadinessSummary}
           </span>
@@ -1114,8 +1158,8 @@ export function CreateSubmissionDrawer({
       ) : null}
 
       {createStep === "questionnaire" ? (
-        <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[#202124] bg-[#0e0e10]/90 backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-[12px] text-white/60">
+        <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[var(--v19b-color-border)] bg-[var(--v19b-color-deep-drawer-90)] backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-[var(--v19b-size-12)] text-white/60">
             Создайте черновик, чтобы загрузить обязательные файлы.
           </span>
           <div className="flex gap-3">

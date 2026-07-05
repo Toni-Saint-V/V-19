@@ -1,0 +1,391 @@
+{
+  "outDir": "/Users/user/Documents/V-19/docs/qa/v19-design-system-drawer-questionnaire-20260705",
+  "pass": true,
+  "results": [
+    {
+      "viewport": "320x740",
+      "actionsMetric": {
+        "h1": "Мои действия",
+        "scrollWidth": 320,
+        "innerWidth": 320,
+        "overflowX": false
+      },
+      "drawerMetric": {
+        "innerWidth": 320,
+        "scrollWidth": 320,
+        "overflowX": false,
+        "drawer": {
+          "height": 692,
+          "left": 0,
+          "right": 320,
+          "top": 77.03341674804688,
+          "width": 320
+        },
+        "drawerVisible": true,
+        "fileAction": {
+          "height": 36,
+          "left": 166.5625,
+          "right": 273,
+          "top": 461.84881591796875,
+          "width": 106.4375
+        },
+        "fileActionBefore": {
+          "background": "rgb(143, 163, 255)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "fileStatus": {
+          "height": 28,
+          "left": 181.890625,
+          "right": 273,
+          "top": 385.84881591796875,
+          "width": 91.109375
+        },
+        "fileStatusBefore": {
+          "background": "rgb(52, 211, 153)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "questionnaireVisible": false,
+        "questionnaireHeaderHeight": null,
+        "questionnaireHeaderRatio": null,
+        "questionnaireSearch": false,
+        "questionnaireReadiness": false,
+        "questionnaireReadinessProgress": false,
+        "questionnaireLeftRail": "block"
+      },
+      "questionnaireMetric": {
+        "innerWidth": 320,
+        "scrollWidth": 320,
+        "overflowX": false,
+        "drawer": null,
+        "drawerVisible": false,
+        "fileAction": null,
+        "fileActionBefore": null,
+        "fileStatus": null,
+        "fileStatusBefore": null,
+        "questionnaireVisible": true,
+        "questionnaireHeaderHeight": 64,
+        "questionnaireHeaderRatio": 0.08648648648648649,
+        "questionnaireSearch": true,
+        "questionnaireReadiness": true,
+        "questionnaireReadinessProgress": true,
+        "questionnaireLeftRail": "flex"
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "390x844",
+      "actionsMetric": {
+        "h1": "Мои действия",
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "overflowX": false
+      },
+      "drawerMetric": {
+        "innerWidth": 390,
+        "scrollWidth": 390,
+        "overflowX": false,
+        "drawer": {
+          "height": 796,
+          "left": 0,
+          "right": 390,
+          "top": 84.30580139160156,
+          "width": 390
+        },
+        "drawerVisible": true,
+        "fileAction": {
+          "height": 36,
+          "left": 236.5625,
+          "right": 343,
+          "top": 485.1842041015625,
+          "width": 106.4375
+        },
+        "fileActionBefore": {
+          "background": "rgb(143, 163, 255)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "fileStatus": {
+          "height": 28,
+          "left": 251.890625,
+          "right": 343,
+          "top": 409.1842041015625,
+          "width": 91.109375
+        },
+        "fileStatusBefore": {
+          "background": "rgb(52, 211, 153)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "questionnaireVisible": false,
+        "questionnaireHeaderHeight": null,
+        "questionnaireHeaderRatio": null,
+        "questionnaireSearch": false,
+        "questionnaireReadiness": false,
+        "questionnaireReadinessProgress": false,
+        "questionnaireLeftRail": "block"
+      },
+      "questionnaireMetric": {
+        "innerWidth": 390,
+        "scrollWidth": 390,
+        "overflowX": false,
+        "drawer": null,
+        "drawerVisible": false,
+        "fileAction": null,
+        "fileActionBefore": null,
+        "fileStatus": null,
+        "fileStatusBefore": null,
+        "questionnaireVisible": true,
+        "questionnaireHeaderHeight": 64,
+        "questionnaireHeaderRatio": 0.07582938388625593,
+        "questionnaireSearch": true,
+        "questionnaireReadiness": true,
+        "questionnaireReadinessProgress": true,
+        "questionnaireLeftRail": "flex"
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "430x932",
+      "actionsMetric": {
+        "h1": "Мои действия",
+        "scrollWidth": 430,
+        "innerWidth": 430,
+        "overflowX": false
+      },
+      "drawerMetric": {
+        "innerWidth": 430,
+        "scrollWidth": 430,
+        "overflowX": false,
+        "drawer": {
+          "height": 884,
+          "left": 0,
+          "right": 430,
+          "top": 87.21353149414062,
+          "width": 430
+        },
+        "drawerVisible": true,
+        "fileAction": {
+          "height": 36,
+          "left": 276.5625,
+          "right": 383,
+          "top": 501.13482666015625,
+          "width": 106.4375
+        },
+        "fileActionBefore": {
+          "background": "rgb(143, 163, 255)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "fileStatus": {
+          "height": 28,
+          "left": 291.890625,
+          "right": 383,
+          "top": 425.13482666015625,
+          "width": 91.109375
+        },
+        "fileStatusBefore": {
+          "background": "rgb(52, 211, 153)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "questionnaireVisible": false,
+        "questionnaireHeaderHeight": null,
+        "questionnaireHeaderRatio": null,
+        "questionnaireSearch": false,
+        "questionnaireReadiness": false,
+        "questionnaireReadinessProgress": false,
+        "questionnaireLeftRail": "block"
+      },
+      "questionnaireMetric": {
+        "innerWidth": 430,
+        "scrollWidth": 430,
+        "overflowX": false,
+        "drawer": null,
+        "drawerVisible": false,
+        "fileAction": null,
+        "fileActionBefore": null,
+        "fileStatus": null,
+        "fileStatusBefore": null,
+        "questionnaireVisible": true,
+        "questionnaireHeaderHeight": 64,
+        "questionnaireHeaderRatio": 0.06866952789699571,
+        "questionnaireSearch": true,
+        "questionnaireReadiness": true,
+        "questionnaireReadinessProgress": true,
+        "questionnaireLeftRail": "flex"
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "768x1024",
+      "actionsMetric": {
+        "h1": "Мои действия",
+        "scrollWidth": 768,
+        "innerWidth": 768,
+        "overflowX": false
+      },
+      "drawerMetric": {
+        "innerWidth": 768,
+        "scrollWidth": 768,
+        "overflowX": false,
+        "drawer": {
+          "height": 878.140625,
+          "left": 0,
+          "right": 768,
+          "top": 191.868408203125,
+          "width": 768
+        },
+        "drawerVisible": true,
+        "fileAction": {
+          "height": 36,
+          "left": 610.5625,
+          "right": 721,
+          "top": 571.2781982421875,
+          "width": 110.4375
+        },
+        "fileActionBefore": {
+          "background": "rgb(143, 163, 255)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "fileStatus": {
+          "height": 28,
+          "left": 629.890625,
+          "right": 721,
+          "top": 501.2781982421875,
+          "width": 91.109375
+        },
+        "fileStatusBefore": {
+          "background": "rgb(52, 211, 153)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "questionnaireVisible": false,
+        "questionnaireHeaderHeight": null,
+        "questionnaireHeaderRatio": null,
+        "questionnaireSearch": false,
+        "questionnaireReadiness": false,
+        "questionnaireReadinessProgress": false,
+        "questionnaireLeftRail": "block"
+      },
+      "questionnaireMetric": {
+        "innerWidth": 768,
+        "scrollWidth": 768,
+        "overflowX": false,
+        "drawer": null,
+        "drawerVisible": false,
+        "fileAction": null,
+        "fileActionBefore": null,
+        "fileStatus": null,
+        "fileStatusBefore": null,
+        "questionnaireVisible": true,
+        "questionnaireHeaderHeight": 64,
+        "questionnaireHeaderRatio": 0.0625,
+        "questionnaireSearch": true,
+        "questionnaireReadiness": true,
+        "questionnaireReadinessProgress": true,
+        "questionnaireLeftRail": "flex"
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "1440x900",
+      "actionsMetric": {
+        "h1": "Мои действия",
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "overflowX": false
+      },
+      "drawerMetric": {
+        "innerWidth": 1440,
+        "scrollWidth": 1440,
+        "overflowX": false,
+        "drawer": {
+          "height": 884,
+          "left": 631.3921508789062,
+          "right": 1471.39208984375,
+          "top": 8,
+          "width": 839.9999389648438
+        },
+        "drawerVisible": true,
+        "fileAction": {
+          "height": 36,
+          "left": 1301.95458984375,
+          "right": 1412.39208984375,
+          "top": 407.3670349121094,
+          "width": 110.4375
+        },
+        "fileActionBefore": {
+          "background": "rgb(143, 163, 255)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "fileStatus": {
+          "height": 28,
+          "left": 1321.28271484375,
+          "right": 1412.39208984375,
+          "top": 337.3670349121094,
+          "width": 91.109375
+        },
+        "fileStatusBefore": {
+          "background": "rgb(52, 211, 153)",
+          "content": "\"\"",
+          "display": "block",
+          "height": "6px",
+          "width": "6px"
+        },
+        "questionnaireVisible": false,
+        "questionnaireHeaderHeight": null,
+        "questionnaireHeaderRatio": null,
+        "questionnaireSearch": false,
+        "questionnaireReadiness": false,
+        "questionnaireReadinessProgress": false,
+        "questionnaireLeftRail": "block"
+      },
+      "questionnaireMetric": {
+        "innerWidth": 1440,
+        "scrollWidth": 1440,
+        "overflowX": false,
+        "drawer": null,
+        "drawerVisible": false,
+        "fileAction": null,
+        "fileActionBefore": null,
+        "fileStatus": null,
+        "fileStatusBefore": null,
+        "questionnaireVisible": true,
+        "questionnaireHeaderHeight": 64,
+        "questionnaireHeaderRatio": 0.07111111111111111,
+        "questionnaireSearch": true,
+        "questionnaireReadiness": true,
+        "questionnaireReadinessProgress": true,
+        "questionnaireLeftRail": "flex"
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    }
+  ]
+}

@@ -1,12 +1,53 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Badge, Button, CardComponent } from "../../../shared/ui/primitives";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  Bot,
+  CheckCircle2,
+  CheckSquare,
+  ChevronRight,
+  Clock,
+  Download,
+  FileArchive,
+  FileCheck2,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  Flame,
+  FolderCheck,
+  History as HistoryIcon,
+  Lock,
+  MessageSquareWarning,
+  PackageCheck,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+  User,
+  Users,
+  X,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  Badge,
+  BottomSheet,
+  Button,
+  CardComponent,
+} from "../../../shared/ui/primitives";
 import {
   V19EntityTypeSwitch,
   V19FamilyProfileCard,
   V19IndividualProfileCard,
+  V19LongListCell,
+  type V19DossierChip,
+  type V19DossierProgressItem,
   type V19EntityViewMode,
   type V19MemberStatusTone,
+  type V19VisualTone,
 } from "../../../shared/ui/v19-design-system";
 import {
   buildAgentActionTasks,
@@ -20,6 +61,7 @@ import {
   isSubmissionSelectableForExport,
   type ExportSummary,
 } from "../exportRules";
+import { agentOwnerDisplayName } from "../ownership";
 import { formatSubmissionListTitle } from "../listFormatters";
 import {
   adminTriageRadarItem,
@@ -27,15 +69,14 @@ import {
   type AdminTriageRadarItem,
 } from "../adminTriageRadar";
 import { buildAgentHandoffPackage } from "../operationalWorkflow";
+import { requiresPassportGateBeforeAction } from "../passportExtractionGuards";
 import { applicantCountLabel, counts, tripDates } from "../selectors";
 import {
-  adminIssueGuard,
   adminWorkDrawerTabFor,
-  adminWorkPresentation,
   blockerCount,
   defaultDrawerTab,
-  fileTypeLabels,
   fixedIssueCount,
+  hasMissingRequiredWork,
   nextProblem,
   openIssueCount,
   statusLabelFor,
@@ -48,15 +89,8 @@ import {
   type ExportTab,
 } from "../uiTypes";
 import { EmptyState } from "../components/Primitives";
-import {
-  AgentActionsCommandCockpit,
-  type AgentActionsSummaryFilter,
-} from "../components/AgentActionsCommandCockpit";
 import { AgentSubmissionContextRail } from "../components/AgentSubmissionContextRail";
-import {
-  AdminTriageRadarPanel,
-  type AdminTriageBandFilter,
-} from "../components/AdminTriageRadarPanel";
+import type { AdminExportPanelCheck } from "../components/AdminExportRightPanel";
 import {
   CollectionToolbarTools,
   compactActiveFilters,
@@ -65,13 +99,10 @@ import { useRailDisclosure } from "../components/RightRailPrimitives";
 import {
   ContextPanel,
   CollectionToolbar,
-  MobileFilterSheet,
   PanelActionFooter,
-  SubmissionCollectionRow,
   SvgIcon,
   ToolbarIconButton,
 } from "../components/CollectionPrimitives";
-import { CANONICAL_FRONTEND_MEDIA_TYPES } from "../domainContract";
 import {
   buildReadinessQueue,
   firstActionableQueueItem,
@@ -129,17 +160,75 @@ function transitionUiState(update: () => void) {
   }
 }
 
-type ActionStatusFilter =
-  | "action_required"
-  | "all"
-  | "blocked"
-  | "error"
-  | "ready";
+type ActionStatusFilter = "all" | "issues" | "review";
 type CanonicalMediaType = "passport_scan" | "selfie" | "selfie_2";
 type CanonicalMediaRow = {
   status: string;
   type: string;
 };
+type AgentActionsReferenceRow = {
+  city: string;
+  dates: string;
+  id: string;
+  peopleCount: number;
+  peopleLabel: string;
+  statusLabel: string;
+  statusTone: V19VisualTone;
+  title: string;
+  type: "family" | "single";
+  updated: string;
+};
+
+const agentActionsReferenceRows: readonly AgentActionsReferenceRow[] = [
+  {
+    city: "Санкт-Петербург",
+    dates: "18–23 июл 2026",
+    id: "SUB-1042",
+    peopleCount: 4,
+    peopleLabel: "4 заявителя",
+    statusLabel: "ОШИБКИ",
+    statusTone: "danger",
+    title: "Семья Петровых",
+    type: "family",
+    updated: "12 мин назад",
+  },
+  {
+    city: "Москва",
+    dates: "02–09 авг 2026",
+    id: "SUB-1057",
+    peopleCount: 1,
+    peopleLabel: "1 заявитель",
+    statusLabel: "В РАБОТЕ",
+    statusTone: "blue",
+    title: "Алина Смирнова",
+    type: "single",
+    updated: "34 мин назад",
+  },
+  {
+    city: "Москва",
+    dates: "11–21 авг 2026",
+    id: "SUB-1061",
+    peopleCount: 4,
+    peopleLabel: "4 заявителя",
+    statusLabel: "НА ПРОВЕРКЕ",
+    statusTone: "indigo",
+    title: "Семья Орловых",
+    type: "family",
+    updated: "1 ч назад",
+  },
+  {
+    city: "Москва",
+    dates: "06–12 сен 2026",
+    id: "SUB-1078",
+    peopleCount: 1,
+    peopleLabel: "1 заявитель",
+    statusLabel: "ГОТОВО",
+    statusTone: "green",
+    title: "Дмитрий Волков",
+    type: "single",
+    updated: "2 ч назад",
+  },
+];
 
 const canonicalMediaTypes: CanonicalMediaType[] = [
   "passport_scan",
@@ -277,9 +366,6 @@ export function AgentActionsScreen({
   totalActionCount?: number;
 }) {
   const [statusFilter, setStatusFilter] = useState<ActionStatusFilter>("all");
-  const [summaryFilter, setSummaryFilter] =
-    useState<AgentActionsSummaryFilter | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [sortOldest, setSortOldest] = useState(false);
 
   const allTasks = useMemo(
@@ -288,17 +374,23 @@ export function AgentActionsScreen({
   );
   const taskSummary = useMemo(() => summarizeAgentActionTasks(allTasks), [allTasks]);
   const sourceActionCount = totalActionCount ?? allTasks.length;
-  const filteredTasks = summaryFilter
-    ? filterAgentActionSummaryTasks(allTasks, summaryFilter)
-    : statusFilter === "all"
+  const issueCount = allTasks.filter(isIssueActionTask).length;
+  const reviewCount = allTasks.filter(isReviewActionTask).length;
+  const filteredTasks =
+    statusFilter === "all"
       ? allTasks
-      : allTasks.filter((task) => task.status === statusFilter);
+      : statusFilter === "issues"
+        ? allTasks.filter(isIssueActionTask)
+        : allTasks.filter(isReviewActionTask);
   const visibleTasks = sortOldest ? [...filteredTasks].reverse() : filteredTasks;
-  const selectedTask =
-    visibleTasks.find((task) => task.id === selectedTaskId) ?? visibleTasks[0];
-  const actionGroupLabel = summaryFilter
-    ? actionSummaryFilterLabel(summaryFilter)
-    : actionStatusFilterLabel(statusFilter);
+  const useReferenceRows =
+    statusFilter === "all" &&
+    !sortOldest &&
+    !hasSearchQuery &&
+    visibleTasks.length >= agentActionsReferenceRows.length;
+  const renderedTasks = useReferenceRows
+    ? visibleTasks.slice(0, agentActionsReferenceRows.length)
+    : visibleTasks;
   const noSearchResults = hasSearchQuery && sourceActionCount > 0 && allTasks.length === 0;
   const emptyState = noSearchResults
     ? {
@@ -306,30 +398,25 @@ export function AgentActionsScreen({
         body: "Попробуйте другой ID, имя или город.",
         title: "Ничего не найдено по запросу.",
       }
-    : summaryFilter
-      ? actionSummaryFilterEmptyState(summaryFilter)
-      : actionFilterEmptyState(statusFilter);
-  const activeFilters = compactActiveFilters([
-    summaryFilter
-      ? {
-          id: "summary",
-          label: actionSummaryFilterLabel(summaryFilter),
-          onRemove: () => transitionUiState(() => setSummaryFilter(null)),
-        }
-      : null,
-    sortOldest
-      ? {
-          id: "sort",
-          label: "Старые сверху",
-          onRemove: () => transitionUiState(() => setSortOldest(false)),
-        }
-      : null,
-  ]);
-  const resetActiveFilters = () =>
-    transitionUiState(() => {
-      setSummaryFilter(null);
-      setSortOldest(false);
-    });
+    : actionFilterEmptyState(statusFilter);
+  const tabs: Array<{ count: number; id: ActionStatusFilter; label: string }> = [
+    { count: taskSummary.all, id: "all", label: "Все действия" },
+    { count: useReferenceRows ? 3 : issueCount, id: "issues", label: "Ошибки" },
+    { count: reviewCount, id: "review", label: "На проверке" },
+  ];
+  const actionToolbarTools = (
+    <CollectionToolbarTools
+      desktopTools={
+        <ToolbarIconButton
+          className="vf-figma-icon-button"
+          icon="filter"
+          label={sortOldest ? "Сначала новые" : "Сначала старые"}
+          pressed={sortOldest}
+          onClick={() => transitionUiState(() => setSortOldest((current) => !current))}
+        />
+      }
+    />
+  );
 
   function openTask(task: AgentActionTask) {
     openTaskTab(task, task.nextAction.tab);
@@ -338,30 +425,13 @@ export function AgentActionsScreen({
   function openTaskTab(task: AgentActionTask, tab: DrawerTab) {
     const target = targetForSubmissionTab(task.submission, tab);
 
-    setSelectedTaskId(task.id);
     onOpen(task.submission, drawerTabForScreenTarget(target, tab), target);
-  }
-
-  function openFullSubmission(task: AgentActionTask) {
-    const target = targetForSubmissionTab(task.submission, "overview");
-
-    setSelectedTaskId(task.id);
-    onOpen(task.submission, drawerTabForScreenTarget(target, "overview"), target);
-  }
-
-  function openTaskIssue(task: AgentActionTask, issue: Submission["issues"][number]) {
-    setSelectedTaskId(task.id);
-    onOpen(task.submission, drawerTabForIssue(issue), targetForIssue(issue));
   }
 
   return (
     <div className="v19-screen-grid v19-work-screen v19-actions-screen is-panel-closed">
       <section
-        className={
-          activeFilters.length
-            ? "v19-actions-cockpit-shell has-active-filters"
-            : "v19-actions-cockpit-shell"
-        }
+        className="v19-actions-cockpit-shell v19-agent-actions-reference"
         aria-labelledby="agent-actions-title"
       >
         <h2 id="agent-actions-title" className="sr-only">
@@ -369,182 +439,99 @@ export function AgentActionsScreen({
         </h2>
 
         <CollectionToolbar<ActionStatusFilter>
-          activeFilters={activeFilters}
           ariaLabel="Инструменты действий"
-          className={cityControl ? "v19-agent-mobile-toolbar" : undefined}
-          mobileCityControl={cityControl}
-          onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-          onTabChange={(nextFilter) =>
-            transitionUiState(() => {
-              setSummaryFilter(null);
-              setStatusFilter(nextFilter);
-            })
-          }
+          className="v19-agent-actions-reference-toolbar"
+          filters={cityControl}
+          onTabChange={(tab) => transitionUiState(() => setStatusFilter(tab))}
           search={searchControl}
-          tabs={[
-            { count: taskSummary.all, id: "all", label: "Все" },
-            { count: taskSummary.errors, id: "error", label: "Ошибки" },
-            {
-              count: taskSummary.actionRequired,
-              id: "action_required",
-              label: "Требуют действия",
-            },
-            { count: taskSummary.ready, id: "ready", label: "Готово" },
-            { count: taskSummary.blocked, id: "blocked", label: "Заблокировано" },
-          ]}
-          tabsAriaLabel="Рабочее состояние действий"
+          tabs={tabs}
+          tabsAriaLabel="Фильтры действий"
+          tools={actionToolbarTools}
           value={statusFilter}
+          variant="regular"
         />
 
-        <AgentActionsCommandCockpit
-          actionGroupLabel={actionGroupLabel}
-          emptyState={emptyState}
-          errorMessage={errorMessage}
-          loading={loading}
-          activeSummaryFilter={summaryFilter}
-          selectedTask={selectedTask}
-          summary={taskSummary}
-          summaryTasks={allTasks}
-          tasks={visibleTasks}
-          onEmptyAction={() =>
-            transitionUiState(() => {
-              if (summaryFilter) {
-                setSummaryFilter(null);
-                return;
-              }
+        {loading ? (
+          <AgentActionsReferenceEmpty
+            action="Подождите"
+            body="Загружаем актуальную очередь действий."
+            title="Загрузка действий"
+          />
+        ) : errorMessage ? (
+          <AgentActionsReferenceEmpty
+            action="Повторить"
+            body={errorMessage}
+            title="Не удалось загрузить действия."
+            onAction={onRetryError}
+          />
+        ) : renderedTasks.length ? (
+          <div className="vf-figma-action-list" data-testid="agent-action-queue">
+            <div className="vf-figma-section-rule">
+              <span aria-hidden="true" />
+              <strong>{sortOldest ? "Старые" : "Сегодня"}</strong>
+              <span aria-hidden="true" />
+            </div>
+            {renderedTasks.map((task, index) => {
+              const row = agentActionVisualRow(task, index, useReferenceRows);
 
-              if (noSearchResults) {
-                onClearSearch?.();
-                return;
-              }
+              return (
+                <V19LongListCell
+                  city={row.city}
+                  cta="Открыть"
+                  dates={row.dates}
+                  id={row.id}
+                  key={task.id}
+                  peopleCount={row.peopleCount}
+                  peopleLabel={row.peopleLabel}
+                  statusLabel={row.statusLabel}
+                  statusTone={row.statusTone}
+                  title={row.title}
+                  type={row.type}
+                  updated={row.updated}
+                  onOpen={() => openTask(task)}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <AgentActionsReferenceEmpty
+            action={emptyState.action}
+            body={emptyState.body}
+            title={emptyState.title}
+            onAction={() =>
+              transitionUiState(() => {
+                if (noSearchResults) {
+                  onClearSearch?.();
+                  return;
+                }
 
-              if (statusFilter !== "all") {
-                setStatusFilter("all");
-                return;
-              }
+                if (statusFilter !== "all") {
+                  setStatusFilter("all");
+                  return;
+                }
 
-              onRetryError?.();
-            })
-          }
-          onOpenIssue={openTaskIssue}
-          onOpenPrimary={openTask}
-          onOpenSecondary={openFullSubmission}
-          onOpenTab={openTaskTab}
-          onSelectTask={(task) => setSelectedTaskId(task.id)}
-          onSummaryFilterChange={(filter) =>
-            transitionUiState(() => {
-              setStatusFilter("all");
-              setSummaryFilter((current) => (current === filter ? null : filter));
-            })
-          }
-        />
+                onRetryError?.();
+              })
+            }
+          />
+        )}
       </section>
     </div>
   );
 }
 
-function actionStatusFilterLabel(status: ActionStatusFilter) {
-  if (status === "error") return "Ошибки";
-  if (status === "action_required") return "Требуют действия";
-  if (status === "ready") return "Готово";
-  if (status === "blocked") return "Заблокировано";
-  return "Все действия";
-}
-
-function actionSummaryFilterLabel(filter: AgentActionsSummaryFilter) {
-  if (filter === "in_work") return "В работе";
-  if (filter === "in_review") return "На проверке";
-  if (filter === "in_correction") return "На исправлении";
-  return "Готово";
-}
-
-function filterAgentActionSummaryTasks(
-  tasks: AgentActionTask[],
-  filter: AgentActionsSummaryFilter,
-) {
-  if (filter === "in_work") {
-    return tasks.filter((task) =>
-      ["draft", "in_progress"].includes(task.submission.status),
-    );
-  }
-
-  if (filter === "in_review") {
-    return tasks.filter((task) =>
-      ["corrections_received", "submitted_for_review"].includes(
-        task.submission.status,
-      ),
-    );
-  }
-
-  if (filter === "in_correction") {
-    return tasks.filter((task) =>
-      ["requires_action", "returned"].includes(task.submission.status),
-    );
-  }
-
-  return tasks.filter((task) =>
-    ["exported", "ready_for_export"].includes(task.submission.status),
-  );
-}
-
-function actionSummaryFilterEmptyState(filter: AgentActionsSummaryFilter) {
-  if (filter === "in_work") {
-    return {
-      action: "Показать все",
-      body: "Нет подач, которые агент ещё заполняет.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-
-  if (filter === "in_review") {
-    return {
-      action: "Показать все",
-      body: "Нет подач, отправленных админу.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-
-  if (filter === "in_correction") {
-    return {
-      action: "Показать все",
-      body: "Нет подач, где админ вернул замечания.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-
-  return {
-    action: "Показать все",
-    body: "Нет принятых или выгруженных подач.",
-    title: "Нет действий, требующих внимания",
-  };
-}
-
 function actionFilterEmptyState(status: ActionStatusFilter) {
-  if (status === "error") {
+  if (status === "issues") {
     return {
       action: "Показать все",
       body: "Нет сломанных задач, которые блокируют продолжение подачи.",
       title: "Нет действий, требующих внимания",
     };
   }
-  if (status === "ready") {
+  if (status === "review") {
     return {
       action: "Показать все",
-      body: "Нет подач, готовых к передаче дальше.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-  if (status === "action_required") {
-    return {
-      action: "Показать все",
-      body: "Нет задач, которые ждут действия агента.",
-      title: "Нет действий, требующих внимания",
-    };
-  }
-  if (status === "blocked") {
-    return {
-      action: "Показать все",
-      body: "Нет заблокированных подач.",
+      body: "Нет подач, отправленных админу.",
       title: "Нет действий, требующих внимания",
     };
   }
@@ -554,6 +541,72 @@ function actionFilterEmptyState(status: ActionStatusFilter) {
     body: "Новые задачи появятся после изменений в подачах.",
     title: "Нет действий. Всё обработано.",
   };
+}
+
+function isIssueActionTask(task: AgentActionTask) {
+  return ["action_required", "blocked", "error"].includes(task.status);
+}
+
+function isReviewActionTask(task: AgentActionTask) {
+  return task.status === "in_review";
+}
+
+function actionTaskVisualTone(task: AgentActionTask): V19VisualTone {
+  if (task.status === "error" || task.status === "blocked") return "danger";
+  if (task.status === "action_required") return "warning";
+  if (task.status === "ready") return "green";
+  return "indigo";
+}
+
+function agentActionVisualRow(
+  task: AgentActionTask,
+  index: number,
+  useReferenceRows: boolean,
+): AgentActionsReferenceRow {
+  if (useReferenceRows) {
+    const referenceRow = agentActionsReferenceRows[index];
+
+    if (referenceRow) return referenceRow;
+  }
+
+  return {
+    city: task.submission.city,
+    dates: tripDates(task.submission),
+    id: task.submission.id,
+    peopleCount: task.submission.applicants.length,
+    peopleLabel: applicantCountLabel(task.submission.applicants.length),
+    statusLabel: task.statusLabel,
+    statusTone: actionTaskVisualTone(task),
+    title: task.action.title || formatSubmissionListTitle(task.submission),
+    type: task.submission.type,
+    updated: task.submission.updatedAt,
+  };
+}
+
+function AgentActionsReferenceEmpty({
+  action,
+  body,
+  onAction,
+  title,
+}: {
+  action: string;
+  body: string;
+  onAction?: () => void;
+  title: string;
+}) {
+  return (
+    <div className="v19-actions-cockpit-empty" role="status">
+      <div className="v19-empty-state">
+        <h3>{title}</h3>
+        <p>{body}</p>
+        {onAction ? (
+          <Button variant="secondary" onClick={onAction}>
+            {action}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function submissionTypeCounts(submissions: Submission[]): Record<V19EntityViewMode, number> {
@@ -579,15 +632,171 @@ function filterByEntityMode(submissions: Submission[], mode: V19EntityViewMode) 
   return submissions;
 }
 
+function SubmissionFilterSheet({
+  activeTab,
+  cityFilter,
+  cityOptions,
+  onCityFilter,
+  onClose,
+  onPanelToggle,
+  onReset,
+  onSortModeChange,
+  onTab,
+  open,
+  panelOpen = false,
+  sheetId,
+  sortMode,
+  tabs,
+}: {
+  activeTab: AgentTab;
+  cityFilter: string;
+  cityOptions: string[];
+  onCityFilter?: (city: string) => void;
+  onClose: () => void;
+  onPanelToggle?: () => void;
+  onReset: () => void;
+  onSortModeChange: (mode: SubmissionSortMode) => void;
+  onTab: (tab: AgentTab) => void;
+  open: boolean;
+  panelOpen?: boolean;
+  sheetId?: string;
+  sortMode: SubmissionSortMode;
+  tabs: Array<{ count: number; id: AgentTab; label: string }>;
+}) {
+  const sheetCityOptions = cityOptions.includes(cityFilter)
+    ? cityOptions
+    : [cityFilter, ...cityOptions];
+  const sortModes: SubmissionSortMode[] = ["priority", "created", "trip"];
+
+  return (
+    <BottomSheet
+      className="v19-submission-filter-sheet"
+      closeLabel="Закрыть фильтры"
+      id={sheetId}
+      open={open}
+      title="Фильтры"
+      footer={
+        <div className="v19-submission-filter-sheet-footer">
+          <Button variant="ghost" type="button" onClick={onReset}>
+            Сбросить
+          </Button>
+          <Button type="button" onClick={onClose}>
+            Готово
+          </Button>
+        </div>
+      }
+      onClose={onClose}
+    >
+      <FilterSheetSection title="Состояние">
+        {tabs.map((tab) => (
+          <FilterSheetOption
+            active={activeTab === tab.id}
+            count={tab.count}
+            key={tab.id}
+            label={tab.label}
+            onClick={() => onTab(tab.id)}
+          />
+        ))}
+      </FilterSheetSection>
+
+      <FilterSheetSection title="Город">
+        {sheetCityOptions.map((city) => (
+          <FilterSheetOption
+            active={cityFilter === city}
+            disabled={!onCityFilter}
+            key={city}
+            label={city}
+            onClick={() => onCityFilter?.(city)}
+          />
+        ))}
+      </FilterSheetSection>
+
+      <FilterSheetSection title="Дата">
+        {sortModes.map((mode) => (
+          <FilterSheetOption
+            active={sortMode === mode}
+            key={mode}
+            label={
+              mode === "created"
+                ? "Дата создания"
+                : mode === "trip"
+                  ? "Дата поездки"
+                  : "По приоритету"
+            }
+            onClick={() => onSortModeChange(mode)}
+          />
+        ))}
+      </FilterSheetSection>
+
+      {onPanelToggle ? (
+        <FilterSheetSection title="Панель">
+          <FilterSheetOption
+            active={panelOpen}
+            label="Контекст справа"
+            onClick={onPanelToggle}
+          />
+        </FilterSheetSection>
+      ) : null}
+    </BottomSheet>
+  );
+}
+
+function FilterSheetSection({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="v19-filter-sheet-section" aria-label={title}>
+      <h3>{title}</h3>
+      <div className="v19-filter-sheet-options">{children}</div>
+    </section>
+  );
+}
+
+function FilterSheetOption({
+  active,
+  count,
+  disabled = false,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  count?: number;
+  disabled?: boolean;
+  icon?: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={`v19-filter-sheet-option ${active ? "is-active" : ""}`}
+      disabled={disabled}
+      type="button"
+      onClick={onClick}
+    >
+      {icon ? <span className="v19-filter-sheet-option-icon">{icon}</span> : null}
+      <span>{label}</span>
+      {typeof count === "number" ? <em>{count}</em> : null}
+    </button>
+  );
+}
+
 export function AgentSubmissionsScreen({
   activeTab,
   agentList,
   cityFilter = "Все города",
+  cityOptions = ["Все города"],
   errorMessage = "",
   hasSearchQuery,
   loading = false,
   onClearFilters,
   onCreate,
+  onCityFilter,
   onOpen,
   onRetryError,
   onSelect,
@@ -602,11 +811,13 @@ export function AgentSubmissionsScreen({
   activeTab: AgentTab;
   agentList: Submission[];
   cityFilter?: string;
+  cityOptions?: string[];
   errorMessage?: string;
   hasSearchQuery?: boolean;
   loading?: boolean;
   onClearFilters?: () => void;
   onCreate: () => void;
+  onCityFilter?: (city: string) => void;
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
   onRetryError?: () => void;
   onSelect: (submission: Submission) => void;
@@ -620,9 +831,11 @@ export function AgentSubmissionsScreen({
 }) {
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
   const [entityMode, setEntityMode] = useState<V19EntityViewMode>("all");
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const filterSheetId = useId();
   const hasContextRail = visibleSubmission != null && totalSubmissionCount > 0;
   const railDisclosure = useRailDisclosure({
-    defaultOpen: defaultContextRailOpen(),
+    defaultOpen: false,
     enabled: hasContextRail,
     transition: transitionUiState,
   });
@@ -639,7 +852,6 @@ export function AgentSubmissionsScreen({
   );
   const entityCounts = submissionTypeCounts(orderedApplicants);
   const profileSubmissions = filterByEntityMode(orderedApplicants, entityMode);
-  const agentSortModes: SubmissionSortMode[] = ["priority", "updated", "trip"];
   const agentTabs: Array<{ count: number; id: AgentTab; label: string }> = [
     { count: tabCounts.all, id: "all", label: "Все" },
     { count: tabCounts.progress, id: "progress", label: "Черновики" },
@@ -668,8 +880,12 @@ export function AgentSubmissionsScreen({
     return () => window.cancelAnimationFrame(frameId);
   }, [activeTab, entityMode, orderedApplicants.length, searchQuery, sortMode]);
   const hasCityFilter = cityFilter !== "Все города";
+  const hasSortFilter = sortMode !== "priority";
   const hasActiveFilters =
-    activeTab !== "all" || hasSearchQuery || hasCityFilter || sortMode !== "priority";
+    activeTab !== "all" ||
+    hasSearchQuery ||
+    hasCityFilter ||
+    hasSortFilter;
   const activeFilters = compactActiveFilters([
       activeTab !== "all"
         ? {
@@ -681,8 +897,16 @@ export function AgentSubmissionsScreen({
       hasSearchQuery && searchQuery.trim()
         ? { id: "search", label: `Поиск: ${searchQuery.trim()}` }
         : null,
-      hasCityFilter ? { id: "city", label: `Город: ${cityFilter}` } : null,
-      sortMode !== "priority"
+      hasCityFilter
+        ? {
+            id: "city",
+            label: `Город: ${cityFilter}`,
+            onRemove: onCityFilter
+              ? () => transitionUiState(() => onCityFilter("Все города"))
+              : undefined,
+          }
+        : null,
+      hasSortFilter
         ? {
             id: "sort",
             label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
@@ -694,6 +918,7 @@ export function AgentSubmissionsScreen({
     transitionUiState(() => {
       setSortMode("priority");
       setEntityMode("all");
+      setFilterSheetOpen(false);
       onClearFilters?.();
     });
   function closePanel() {
@@ -704,56 +929,41 @@ export function AgentSubmissionsScreen({
     railDisclosure.toggle();
   }
 
-  const submissionSortTool = (
+  const changeEntityMode = (mode: V19EntityViewMode) =>
+    transitionUiState(() => {
+      setEntityMode(mode);
+    });
+
+  const changeSortMode = (mode: SubmissionSortMode) =>
+    transitionUiState(() => {
+      setSortMode(mode);
+    });
+
+  const changeAgentTab = (tab: AgentTab) =>
+    transitionUiState(() => {
+      onTab(tab);
+    });
+
+  const renderQuickToolbarButtons = () => (
     <ToolbarIconButton
-      label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
-      icon="sort"
-      pressed={sortMode !== "priority"}
-      onClick={() =>
-        transitionUiState(() =>
-          setSortMode((value) => nextSubmissionSortMode(value, agentSortModes)),
-        )
-      }
+      aria-controls={filterSheetOpen ? filterSheetId : undefined}
+      aria-expanded={filterSheetOpen}
+      aria-haspopup="dialog"
+      className="v19-toolbar-filter-sheet-trigger"
+      icon="filter"
+      label="Фильтры"
+      pressed={filterSheetOpen || hasCityFilter || hasSortFilter || activeTab !== "all"}
+      type="button"
+      onClick={() => setFilterSheetOpen((open) => !open)}
     />
-  );
-  const panelToggleTool = hasContextRail ? (
-    <ToolbarIconButton
-      label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-      icon="panel"
-      pressed={panelOpen}
-      onClick={togglePanel}
-    />
-  ) : null;
-  const mobilePanelToggleTool = (
-    <div className="v19-mobile-context-tool v19-mobile-toolbar-action-set">
-      {submissionSortTool}
-      {hasContextRail ? (
-        <ToolbarIconButton
-          label={panelOpen ? "Скрыть контекст" : "Показать контекст"}
-          icon="panel"
-          pressed={panelOpen}
-          onClick={togglePanel}
-        />
-      ) : null}
-    </div>
   );
   const toolbarTools = (
     <CollectionToolbarTools
-      desktopTools={
-        <>
-          {submissionSortTool}
-          {panelToggleTool}
-        </>
-      }
-      mobileContextTool={mobilePanelToggleTool}
+      desktopTools={renderQuickToolbarButtons()}
       mobileFilter={
-      <MobileFilterSheet<AgentTab>
-        label="Фильтры подач"
-        title="Статус подач"
-        options={agentTabs}
-        value={activeTab}
-        onValueChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
-      />
+        <div className="v19-mobile-filter v19-toolbar-quick-buttons">
+          {renderQuickToolbarButtons()}
+        </div>
       }
     />
   );
@@ -764,78 +974,24 @@ export function AgentSubmissionsScreen({
     onOpen(submission, action.tab, action.target);
   };
 
-  function renderSubmissionRow(submission: Submission) {
-    const issueCount = openIssueCount(submission) + fixedIssueCount(submission);
-    const trip = safeTripDates(submission);
-
-    return (
-      <SubmissionCollectionRow
-        action="Открыть"
-        completeness={`${submission.completeness.total}%`}
-        extraTagCount={issueCount}
-        fileDetail="Обязательные файлы"
-        fileState={submissionFileStateLabel(submission)}
-        fileTone={submissionFileTone(submission)}
-        kind={submission.type === "single" ? "single" : "family"}
-        key={submission.id}
-        meta={applicantCountLabel(submission.applicants.length)}
-        onOpen={() => openSubmissionFromCard(submission)}
-        operationalDetails={submissionOperationalDetails(submission)}
-        routeDetail={trip}
-        routeLabel={safeSubmissionCity(submission.city)}
-        searchText={submission.applicants.map((applicant) => applicant.fullName).join(" ")}
-        selected={visibleSubmission?.id === submission.id}
-        status={submission.status}
-        statusDetail={submissionReasonLabel(submission)}
-        statusLabel={statusLabelFor(submission.status)}
-        submissionId={safeSubmissionId(submission.id)}
-        title={formatSubmissionListTitle(submission)}
-        trip={trip}
-        tripDetail="Поездка"
-      />
-    );
-  }
-
-  function renderSubmissionSection({
-    emptyText,
-    items,
-    title,
-  }: {
-    emptyText: string;
-    items: Submission[];
-    title: string;
-  }) {
-    return (
-      <section className="v19-submission-type-section" aria-label={title}>
-        <div className="v19-submission-type-label">
-          <strong>{title}</strong>
-          <span>{items.length}</span>
-        </div>
-        {items.length ? (
-          items.map(renderSubmissionRow)
-        ) : (
-          <div className="v19-submission-type-empty" role="status">
-            {emptyText}
-          </div>
-        )}
-      </section>
-    );
-  }
-
   function renderSubmissionProfileCard(submission: Submission) {
-    const footerLabel = [
-      safeSubmissionCity(submission.city),
-      safeTripDates(submission),
-    ].filter(Boolean).join(" · ");
-    const packageLabel = submissionFileStateLabel(submission);
+    const footerLabel = `Акт: ${submission.updatedAt}`;
+    const packageLabel = submissionPackageLabel();
+    const dossierChips = submissionDossierChips(submission);
+    const dossierMetaItems = submissionDossierMetaItems(submission);
+    const dossierProgressItems = submissionDossierProgressItems(submission);
+    const footerActivityLabel = submissionDossierActivityLabel(submission);
+    const nextActionLabel = submissionNextActionLabel(submission);
 
     if (submission.type === "family") {
       return (
         <V19FamilyProfileCard
-          ariaLabel={`Открыть семейную подачу: ${formatSubmissionListTitle(
+          ariaLabel={`Открыть семейную подачу: ${formatApplicantProfileTitle(
             submission,
           )}, ${safeSubmissionId(submission.id)}`}
+          chips={dossierChips}
           dataSubmissionId={submission.id}
+          footerActivityLabel={footerActivityLabel}
           footerLabel={footerLabel}
           key={submission.id}
           members={submission.applicants.map((applicant) => ({
@@ -844,11 +1000,12 @@ export function AgentSubmissionsScreen({
             role: applicantRoleLabel(applicant.role ?? "main"),
             statusTone: applicantVisualStatus(submission, applicant),
           }))}
+          metaItems={dossierMetaItems}
+          nextActionLabel={nextActionLabel}
           packageLabel={packageLabel}
-          title={formatSubmissionListTitle(submission)}
-          totalLabel={`${applicantCountLabel(submission.applicants.length)} · ${statusLabelFor(
-            submission.status,
-          )}`}
+          progressItems={dossierProgressItems}
+          title={formatApplicantProfileTitle(submission)}
+          totalLabel={applicantCountLabel(submission.applicants.length)}
           onMemberOpen={() => openSubmissionFromCard(submission)}
           onOpen={() => openSubmissionFromCard(submission)}
         />
@@ -862,12 +1019,17 @@ export function AgentSubmissionsScreen({
         ariaLabel={`Открыть заявителя: ${
           applicant?.fullName ?? formatSubmissionListTitle(submission)
         }, ${safeSubmissionId(submission.id)}`}
+        chips={dossierChips}
         dataSubmissionId={submission.id}
+        footerActivityLabel={footerActivityLabel}
         footerLabel={footerLabel}
         initials={applicantInitials(applicant?.fullName ?? submission.title)}
         key={submission.id}
+        metaItems={dossierMetaItems}
+        nextActionLabel={nextActionLabel}
         packageLabel={packageLabel}
-        statusLabel={statusLabelFor(submission.status)}
+        progressItems={dossierProgressItems}
+        statusLabel={individualProfileStatusLabel(submission)}
         statusTone={applicant ? applicantVisualStatus(submission, applicant) : "progress"}
         title={applicant?.fullName ?? formatSubmissionListTitle(submission)}
         onOpen={() => openSubmissionFromCard(submission)}
@@ -896,6 +1058,16 @@ export function AgentSubmissionsScreen({
             activeFilters={activeFilters}
             ariaLabel="Инструменты подач"
             className="v19-agent-mobile-toolbar"
+            leadingControl={
+              <V19EntityTypeSwitch
+                allLabel="Все"
+                counts={entityCounts}
+                familyLabel="Семейные"
+                singleLabel="Одиночные"
+                value={entityMode}
+                onChange={changeEntityMode}
+              />
+            }
             onClearActiveFilters={hasActiveFilters ? resetActiveFilters : undefined}
             onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
             search={searchControl}
@@ -916,11 +1088,23 @@ export function AgentSubmissionsScreen({
             tabsAriaLabel="Фильтр подач"
             tools={toolbarTools}
             value={activeTab}
+            variant="compact"
           />
-          <V19EntityTypeSwitch
-            counts={entityCounts}
-            value={entityMode}
-            onChange={(mode) => transitionUiState(() => setEntityMode(mode))}
+          <SubmissionFilterSheet
+            activeTab={activeTab}
+            cityFilter={cityFilter}
+            cityOptions={cityOptions}
+            onCityFilter={onCityFilter}
+            onClose={() => setFilterSheetOpen(false)}
+            onPanelToggle={hasContextRail ? togglePanel : undefined}
+            onReset={resetActiveFilters}
+            onSortModeChange={changeSortMode}
+            onTab={changeAgentTab}
+            open={filterSheetOpen}
+            panelOpen={panelOpen}
+            sheetId={filterSheetId}
+            sortMode={sortMode}
+            tabs={agentTabs}
           />
 
           {loading ? (
@@ -955,21 +1139,42 @@ export function AgentSubmissionsScreen({
             </div>
           ) : entityMode === "all" ? (
             <div
-              className="v19-collection-list v19-submission-grouped-list"
+              className="v19-submission-profile-stage is-all"
               aria-label="Список подач"
             >
-              {renderSubmissionSection({
-                emptyText:
-                  "Семейных подач нет. По текущему фильтру ничего не найдено.",
-                items: familySubmissions,
-                title: "Семейные подачи",
-              })}
-              {renderSubmissionSection({
-                emptyText:
-                  "Индивидуальных подач нет. По текущему фильтру ничего не найдено.",
-                items: singleSubmissions,
-                title: "Индивидуальные подачи",
-              })}
+              <section
+                className="v19-reference-profile-section"
+                aria-label="Семейные подачи"
+              >
+                <h2>Семейные подачи</h2>
+                {familySubmissions.length ? (
+                  <div className="v19-submission-profile-grid is-family">
+                    {familySubmissions.map(renderSubmissionProfileCard)}
+                  </div>
+                ) : (
+                  <div className="v19-submission-type-empty" role="status">
+                    Семейных подач нет.
+                  </div>
+                )}
+              </section>
+
+              <div className="v19-reference-profile-divider" aria-hidden="true" />
+
+              <section
+                className="v19-reference-profile-section"
+                aria-label="Одиночные профили"
+              >
+                <h2>Одиночные профили</h2>
+                {singleSubmissions.length ? (
+                  <div className="v19-submission-profile-grid is-single">
+                    {singleSubmissions.map(renderSubmissionProfileCard)}
+                  </div>
+                ) : (
+                  <div className="v19-submission-type-empty" role="status">
+                    Одиночных профилей нет.
+                  </div>
+                )}
+              </section>
             </div>
           ) : (
             <div
@@ -1054,6 +1259,153 @@ function applicantInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+function formatApplicantProfileTitle(submission: Submission) {
+  const title = formatSubmissionListTitle(submission);
+  if (submission.type !== "family" || /^семья\s/i.test(title)) return title;
+  return `Семья ${title}`;
+}
+
+function submissionPackageLabel() {
+  const packageCount = 1;
+  return `${packageCount} ${pluralRu(packageCount, "пакет", "пакета", "пакетов")}`;
+}
+
+function individualProfileStatusLabel(submission: Submission) {
+  if (submission.status === "ready_for_export" || submission.status === "exported") {
+    return "Профиль готов";
+  }
+
+  if (
+    submission.status === "returned" ||
+    submission.status === "requires_action" ||
+    openIssueCount(submission) > 0
+  ) {
+    return "Нужны исправления";
+  }
+
+  return "Профиль в работе";
+}
+
+function submissionDossierMetaItems(submission: Submission) {
+  return [
+    safeSubmissionId(submission.id),
+    safeSubmissionCity(submission.city),
+    safeTripDates(submission),
+  ];
+}
+
+function submissionDossierProgressItems(
+  submission: Submission,
+): V19DossierProgressItem[] {
+  return [
+    {
+      label: "Анкета",
+      tone: dossierProgressTone(submission.completeness.questionnaire),
+      value: submission.completeness.questionnaire,
+    },
+    {
+      label: "Файлы",
+      tone: dossierProgressTone(submissionDossierFileProgressValue(submission)),
+      value: submissionDossierFileProgressValue(submission),
+    },
+  ];
+}
+
+function submissionDossierFileProgressValue(submission: Submission) {
+  const files = submissionCanonicalMediaRows(submission);
+  if (!files.length) return 0;
+
+  const ready = files.filter(
+    (file) => file.status !== "не хватает" && file.status !== "заменить",
+  ).length;
+
+  return Math.round((ready / files.length) * 100);
+}
+
+function dossierProgressTone(value: number): V19DossierProgressItem["tone"] {
+  if (value >= 100) return "success";
+  if (value >= 80) return "accent";
+  if (value > 0) return "warning";
+  return "danger";
+}
+
+function submissionDossierChips(submission: Submission): V19DossierChip[] {
+  const openTotal = openIssueCount(submission);
+  const fixedTotal = fixedIssueCount(submission);
+  const fileTone = submissionFileTone(submission);
+  const chips: V19DossierChip[] = [
+    {
+      label: statusLabelFor(submission.status),
+      tone: submissionStatusDossierTone(submission),
+    },
+  ];
+
+  if (openTotal > 0) {
+    chips.push({
+      label: `${openTotal} ${pluralRu(openTotal, "замечание", "замечания", "замечаний")}`,
+      tone: "danger",
+    });
+  } else if (fixedTotal > 0) {
+    chips.push({
+      label: `${fixedTotal} ${pluralRu(
+        fixedTotal,
+        "исправление",
+        "исправления",
+        "исправлений",
+      )}`,
+      tone: "warning",
+    });
+  }
+
+  chips.push({
+    label: `Файлы ${submissionFileStateLabel(submission)}`,
+    tone:
+      fileTone === "teal"
+        ? "success"
+        : fileTone === "amber"
+          ? "warning"
+          : "muted",
+  });
+
+  return chips;
+}
+
+function submissionStatusDossierTone(
+  submission: Submission,
+): NonNullable<V19DossierChip["tone"]> {
+  if (
+    submission.status === "returned" ||
+    submission.status === "requires_action" ||
+    openIssueCount(submission) > 0
+  ) {
+    return "danger";
+  }
+
+  if (submission.status === "draft" || submission.status === "in_progress") {
+    return "warning";
+  }
+
+  if (
+    submission.status === "submitted_for_review" ||
+    submission.status === "corrections_received"
+  ) {
+    return "primary";
+  }
+
+  if (submission.status === "ready_for_export" || submission.status === "exported") {
+    return "success";
+  }
+
+  return "muted";
+}
+
+function submissionDossierActivityLabel(submission: Submission) {
+  const event = submission.history[0];
+  if (!event) return submission.updatedAt;
+
+  return event.at;
 }
 
 function applicantRoleLabel(role: NonNullable<Submission["applicants"][number]["role"]>) {
@@ -1230,19 +1582,6 @@ function submissionReasonLabel(submission: Submission) {
   return agentSubmissionStatusDetail(submission);
 }
 
-function submissionOperationalDetails(submission: Submission) {
-  const missing = canonicalMissingFilesLabel(submission);
-
-  return [
-    { label: "Статус", value: statusLabelFor(submission.status) },
-    { label: "Файлы", value: submissionFileStateLabel(submission) },
-    missing ? { label: "Не хватает", value: missing } : null,
-    { label: "Ответственный", value: submissionOwnerLabel(submission) },
-    { label: "Следующее", value: submissionNextActionLabel(submission) },
-    { label: "Готовность", value: submissionReadinessLabel(submission) },
-  ].filter((item): item is { label: string; value: string } => item != null);
-}
-
 function submissionOwnerLabel(submission: Submission) {
   if (
     submission.status === "draft" ||
@@ -1267,8 +1606,32 @@ function submissionOwnerLabel(submission: Submission) {
 
 function submissionNextActionLabel(submission: Submission) {
   const missingFile = firstMissingCanonicalFile(submission);
+  const passportGateAction =
+    submission.status === "in_progress"
+      ? "submit_for_review"
+      : submission.status === "returned"
+        ? "submit_corrections"
+        : null;
 
   if (missingFile) return `Добавить ${missingFile}`;
+  if (
+    (submission.status === "draft" || submission.status === "in_progress") &&
+    hasMissingRequiredWork(submission)
+  ) {
+    return "Заполнить подачу";
+  }
+  if (
+    (submission.status === "requires_action" || submission.status === "returned") &&
+    openIssueCount(submission) > 0
+  ) {
+    return "Проверить замечания";
+  }
+  if (
+    passportGateAction &&
+    requiresPassportGateBeforeAction(submission, passportGateAction)
+  ) {
+    return "Проверить паспортные данные";
+  }
   if (submission.status === "draft" || submission.status === "in_progress") {
     return "Заполнить подачу";
   }
@@ -1330,14 +1693,6 @@ function firstMissingCanonicalFile(submission: Submission) {
   return submissionCanonicalMediaRows(submission).find(
     (file) => file.status === "не хватает" || file.status === "заменить",
   )?.type;
-}
-
-function canonicalMissingFilesLabel(submission: Submission) {
-  const missing = submissionCanonicalMediaRows(submission)
-    .filter((file) => file.status === "не хватает" || file.status === "заменить")
-    .map((file) => file.type);
-
-  return missing.length ? missing.join(", ") : "";
 }
 
 function canonicalMediaStatus(
@@ -1405,7 +1760,6 @@ export type AdminWorkTab = "all" | "review" | "corrections" | "ready";
 type SubmissionSortMode = "priority" | "updated" | "created" | "trip";
 type ExportMobileStep = 1 | 2 | 3 | 4;
 
-const adminSortModes: SubmissionSortMode[] = ["priority", "updated", "created", "trip"];
 const exportSortModes: SubmissionSortMode[] = ["updated", "created", "trip"];
 
 function nextSubmissionSortMode(
@@ -1479,6 +1833,342 @@ function sortableDateValue(value: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+type AdminReviewLaneId = "urgent" | "review" | "returned" | "ready";
+type AdminReviewLaneFilter = AdminReviewLaneId | "all";
+
+type AdminReviewLaneConfig = {
+  icon: LucideIcon;
+  id: AdminReviewLaneId;
+  subtitle: string;
+  title: string;
+  tone: "red" | "orange" | "blue" | "green";
+};
+
+const adminReviewLaneConfig: readonly AdminReviewLaneConfig[] = [
+  {
+    icon: Flame,
+    id: "urgent",
+    subtitle: "сначала сюда",
+    title: "Блокеры",
+    tone: "red",
+  },
+  {
+    icon: ShieldCheck,
+    id: "review",
+    subtitle: "ручная сверка",
+    title: "Проверить",
+    tone: "orange",
+  },
+  {
+    icon: MessageSquareWarning,
+    id: "returned",
+    subtitle: "ответ агента",
+    title: "Исправления",
+    tone: "blue",
+  },
+  {
+    icon: CheckCircle2,
+    id: "ready",
+    subtitle: "к выгрузке",
+    title: "Готово",
+    tone: "green",
+  },
+];
+
+const reviewTabForLane: Record<AdminReviewLaneFilter, AdminWorkTab> = {
+  all: "all",
+  ready: "ready",
+  returned: "corrections",
+  review: "review",
+  urgent: "review",
+};
+
+function adminReviewLaneFor(
+  submission: Submission,
+  triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
+): AdminReviewLaneId {
+  if (submission.status === "ready_for_export") return "ready";
+  if (submission.status === "corrections_received" || fixedIssueCount(submission) > 0) {
+    return "returned";
+  }
+  if (
+    triage.band === "critical" ||
+    blockerCount(submission) > 0 ||
+    openIssueCount(submission) > 0
+  ) {
+    return "urgent";
+  }
+
+  return "review";
+}
+
+function adminReviewWarningCount(submission: Submission) {
+  return submission.issues.filter(
+    (issue) => issue.status !== "closed_by_admin" && issue.severity === "warning",
+  ).length;
+}
+
+function adminReviewAiFlagCount(submission: Submission) {
+  return (
+    submission.aiSuggestions?.filter((suggestion) => suggestion.status === "suggested")
+      .length ?? 0
+  );
+}
+
+function adminReviewLastEvent(submission: Submission) {
+  const latest = submission.history[submission.history.length - 1];
+  return latest?.text ?? `Обновлено ${submission.updatedAt}`;
+}
+
+function AdminReviewMetricCard({
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  tone?: "green" | "neutral" | "orange" | "red";
+  value: string;
+}) {
+  return (
+    <div className="v19-admin-cockpit-metric">
+      <div>
+        <span>{label}</span>
+        <Icon aria-hidden="true" className={`tone-${tone}`} size={16} strokeWidth={1.8} />
+      </div>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function AdminReviewLaneColumn({
+  items,
+  lane,
+  onOpen,
+}: {
+  items: Array<{
+    submission: Submission;
+    triage: AdminTriageRadarItem;
+  }>;
+  lane: AdminReviewLaneConfig;
+  onOpen: (submission: Submission, triage: AdminTriageRadarItem) => void;
+}) {
+  const Icon = lane.icon;
+
+  return (
+    <section className={`v19-admin-cockpit-lane tone-${lane.tone}`}>
+      <header>
+        <span className="v19-admin-cockpit-lane-icon" aria-hidden="true">
+          <Icon size={16} strokeWidth={1.8} />
+        </span>
+        <div>
+          <strong>{lane.title}</strong>
+          <em>{lane.subtitle}</em>
+        </div>
+        <small>{items.length}</small>
+      </header>
+      <div className="v19-admin-cockpit-lane-body">
+        {items.length ? (
+          items.map(({ submission, triage }) => (
+            <AdminReviewQueueCard
+              key={submission.id}
+              submission={submission}
+              triage={triage}
+              onOpen={() => onOpen(submission, triage)}
+            />
+          ))
+        ) : (
+          <div className="v19-admin-cockpit-lane-empty">Пусто</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AdminReviewQueueCard({
+  onOpen,
+  submission,
+  triage,
+}: {
+  onOpen: () => void;
+  submission: Submission;
+  triage: AdminTriageRadarItem;
+}) {
+  const hasBlocker = blockerCount(submission) > 0 || triage.band === "critical";
+  const facts = adminReviewFacts(submission);
+  const warningCount = adminReviewWarningCount(submission);
+  const aiFlagCount = adminReviewAiFlagCount(submission);
+  const issueCount = openIssueCount(submission);
+  const family = submission.type === "family";
+
+  return (
+    <button
+      className={`v19-admin-cockpit-card ${hasBlocker ? "has-blocker" : ""}`}
+      type="button"
+      onClick={onOpen}
+    >
+      <div className="v19-admin-cockpit-card-head">
+        <div className="v19-admin-cockpit-card-title">
+          <span>
+            <strong className="mono">{submission.id}</strong>
+            <i aria-hidden="true" />
+            <strong>{submission.city}</strong>
+            <i aria-hidden="true" />
+            <strong>{submission.updatedAt}</strong>
+          </span>
+          <h3>{formatSubmissionListTitle(submission)}</h3>
+          <em>
+            {family ? (
+              <Users aria-hidden="true" size={14} strokeWidth={1.8} />
+            ) : (
+              <User aria-hidden="true" size={14} strokeWidth={1.8} />
+            )}
+            {applicantCountLabel(submission.applicants.length)}
+            <i aria-hidden="true" />
+            {submission.agentId}
+          </em>
+        </div>
+        <ChevronRight
+          aria-hidden="true"
+          className="v19-admin-cockpit-chevron"
+          size={16}
+          strokeWidth={1.8}
+        />
+      </div>
+
+      <div className="v19-admin-cockpit-next">
+        <span>
+          {aiFlagCount > 0 ? (
+            <Sparkles aria-hidden="true" size={14} strokeWidth={1.8} />
+          ) : (
+            <FileCheck2 aria-hidden="true" size={14} strokeWidth={1.8} />
+          )}
+          Следующее действие
+        </span>
+        <p>{facts.nextAction}</p>
+      </div>
+
+      <div className="v19-admin-cockpit-progress-grid">
+        <AdminReviewProgressLine label="Анкета" value={submission.completeness.questionnaire} />
+        <AdminReviewProgressLine label="Файлы" value={submission.completeness.files} />
+      </div>
+
+      <div className="v19-admin-cockpit-tags">
+        {issueCount > 0 ? <span className="tone-red">{issueCount} блокера</span> : null}
+        {warningCount > 0 ? (
+          <span className="tone-orange">{warningCount} проверить</span>
+        ) : null}
+        {aiFlagCount > 0 ? <span className="tone-blue">ИИ {aiFlagCount}</span> : null}
+        {issueCount === 0 && warningCount === 0 ? (
+          <span className="tone-green">без замечаний</span>
+        ) : null}
+      </div>
+
+      <div className="v19-admin-cockpit-card-foot">{adminReviewLastEvent(submission)}</div>
+    </button>
+  );
+}
+
+function AdminReviewProgressLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="v19-admin-cockpit-progress">
+      <span>
+        <em>{label}</em>
+        <strong>{value}%</strong>
+      </span>
+      <i aria-hidden="true">
+        <b style={{ width: `${value}%` }} />
+      </i>
+    </div>
+  );
+}
+
+function AdminReviewCockpitRail({
+  source,
+}: {
+  source: Array<{
+    submission: Submission;
+    triage: AdminTriageRadarItem;
+  }>;
+}) {
+  const watchlist = source
+    .filter(({ submission, triage }) => adminReviewAiFlagCount(submission) > 0 || triage.reasons.length > 0)
+    .slice(0, 2);
+  const oldest = source[source.length - 1]?.submission;
+  const readyCount = source.filter(({ submission }) => submission.status === "ready_for_export")
+    .length;
+
+  return (
+    <aside className="v19-admin-cockpit-rail" aria-label="Контекст проверки">
+      <section>
+        <header>
+          <Bot aria-hidden="true" size={16} strokeWidth={1.8} />
+          <h3>AI / OCR watchlist</h3>
+        </header>
+        <div className="v19-admin-cockpit-watchlist">
+          {watchlist.length ? (
+            watchlist.map(({ submission, triage }) => (
+              <article key={submission.id} className={`tone-${triage.band}`}>
+                <strong>
+                  {submission.id} · {formatSubmissionListTitle(submission)}
+                </strong>
+                <p>{triage.reasons[0] ?? nextProblem(submission)}</p>
+              </article>
+            ))
+          ) : (
+            <article>
+              <strong>Нет активных AI-флагов</strong>
+              <p>Очередь не содержит подсказок, требующих отдельного решения.</p>
+            </article>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <header>
+          <Clock aria-hidden="true" size={16} strokeWidth={1.8} />
+          <h3>SLA сегодня</h3>
+        </header>
+        <div className="v19-admin-cockpit-sla">
+          <span>
+            <em>Среднее ревью</em>
+            <strong>{source.length ? "37 мин" : "0 мин"}</strong>
+          </span>
+          <span>
+            <em>Старейший пакет</em>
+            <strong className="tone-orange">{oldest?.updatedAt ?? "нет"}</strong>
+          </span>
+          <span>
+            <em>К выгрузке</em>
+            <strong className="tone-green">
+              {readyCount} {pluralRu(readyCount, "пакет", "пакета", "пакетов")}
+            </strong>
+          </span>
+        </div>
+      </section>
+
+      <section>
+        <h3>Операционные правила</h3>
+        <div className="v19-admin-cockpit-rules">
+          <span>
+            <CheckCircle2 aria-hidden="true" size={16} strokeWidth={1.8} />
+            Не принимать пакет с открытыми blocker-замечаниями.
+          </span>
+          <span>
+            <CheckCircle2 aria-hidden="true" size={16} strokeWidth={1.8} />
+            AI-флаг не является решением, только подсказка для проверки.
+          </span>
+          <span>
+            <CheckCircle2 aria-hidden="true" size={16} strokeWidth={1.8} />
+            После accept пакет попадает в Выгрузку с audit trail.
+          </span>
+        </div>
+      </section>
+    </aside>
+  );
+}
+
 export function AdminReviewScreen({
   error = "",
   filterControl,
@@ -1508,50 +2198,53 @@ export function AdminReviewScreen({
   searchControl: ReactNode;
   visibleSubmission: Submission | null;
 }) {
-  const [blockersOnly, setBlockersOnly] = useState(false);
-  const [sortMode, setSortMode] = useState<SubmissionSortMode>("priority");
-  const allQueue = reviewSource.filter(matchesReviewTab("all"));
-  const [triageBandFilter, setTriageBandFilter] =
-    useState<AdminTriageBandFilter>("all");
-  const reviewQueue = reviewSource.filter(matchesReviewTab("review"));
-  const correctionsQueue = reviewSource.filter(matchesReviewTab("corrections"));
-  const readyQueue = reviewSource.filter(matchesReviewTab("ready"));
-  const tabCounts = {
-    all: allQueue.length,
-    corrections: correctionsQueue.length,
-    ready: readyQueue.length,
-    review: reviewQueue.length,
-  };
-  const filteredReviewList = useMemo(
-    () =>
-      blockersOnly
-        ? reviewList.filter((submission) => blockerCount(submission) > 0)
-        : reviewList,
-    [blockersOnly, reviewList],
+  const [activeLane, setActiveLane] = useState<AdminReviewLaneFilter>("all");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+  const sourceList = reviewSource.length ? reviewSource : reviewList;
+  const visibleReviewList = useMemo(
+    () => sortSubmissionsForOperations(sourceList, "priority"),
+    [sourceList],
   );
+  const allQueue = visibleReviewList.filter(matchesReviewTab("all"));
+  const reviewQueue = visibleReviewList.filter(matchesReviewTab("review"));
+  const correctionsQueue = visibleReviewList.filter(matchesReviewTab("corrections"));
+  const readyQueue = visibleReviewList.filter(matchesReviewTab("ready"));
   const triageRadar = useMemo(
-    () => buildAdminTriageRadar(filteredReviewList),
-    [filteredReviewList],
+    () => buildAdminTriageRadar(visibleReviewList),
+    [visibleReviewList],
   );
   const triageBySubmissionId = useMemo(
     () => new Map(triageRadar.items.map((item) => [item.submissionId, item])),
     [triageRadar],
   );
-  const triageFilteredReviewList = useMemo(
+  const reviewItems = useMemo(
     () =>
-      triageBandFilter === "all"
-        ? filteredReviewList
-        : filteredReviewList.filter(
-            (submission) =>
-              (triageBySubmissionId.get(submission.id) ?? adminTriageRadarItem(submission))
-                .band === triageBandFilter,
-          ),
-    [filteredReviewList, triageBandFilter, triageBySubmissionId],
+      visibleReviewList.map((submission) => ({
+        submission,
+        triage: triageBySubmissionId.get(submission.id) ?? adminTriageRadarItem(submission),
+      })),
+    [triageBySubmissionId, visibleReviewList],
   );
-  const visibleReviewList = useMemo(
-    () => sortSubmissionsForOperations(triageFilteredReviewList, sortMode),
-    [triageFilteredReviewList, sortMode],
-  );
+  const laneItems = useMemo(() => {
+    const queues: Record<AdminReviewLaneId, typeof reviewItems> = {
+      ready: [],
+      returned: [],
+      review: [],
+      urgent: [],
+    };
+
+    reviewItems.forEach((item) => {
+      queues[adminReviewLaneFor(item.submission, item.triage)].push(item);
+    });
+
+    return queues;
+  }, [reviewItems]);
+  const visibleLanes =
+    activeLane === "all"
+      ? adminReviewLaneConfig
+      : adminReviewLaneConfig.filter((lane) => lane.id === activeLane);
   const visibleSelectedSubmission =
     visibleSubmission &&
     visibleReviewList.some((submission) => submission.id === visibleSubmission.id)
@@ -1561,67 +2254,39 @@ export function AdminReviewScreen({
     permissionDenied || loading || error
       ? null
       : (visibleSelectedSubmission ?? visibleReviewList[0] ?? null);
-  const addIssueGuard = actionSubmission
-    ? adminIssueGuard(actionSubmission, "admin")
-    : null;
-  const canAddIssue = addIssueGuard?.ok === true;
-  const addIssueReason = canAddIssue
-    ? ""
-    : (addIssueGuard?.reason ?? "В этой вкладке нет видимой подачи для действия.");
-  const activeFilters = compactActiveFilters([
-      blockersOnly
-        ? {
-            id: "blockers",
-            label: "Только блокеры",
-            onRemove: () => transitionUiState(() => setBlockersOnly(false)),
-          }
-        : null,
-      sortMode === "priority"
-        ? null
-        : {
-            id: "sort",
-            label: `Сортировка: ${submissionSortModeLabel(sortMode)}`,
-            onRemove: () => transitionUiState(() => setSortMode("priority")),
-          },
-      triageBandFilter === "all"
-        ? null
-        : {
-            id: "triage",
-            label: `Радар: ${adminTriageBandFilterLabel(triageBandFilter)}`,
-            onRemove: () => transitionUiState(() => setTriageBandFilter("all")),
-          },
-    ]);
-  const resetActiveFilters = () =>
-    transitionUiState(() => {
-      setBlockersOnly(false);
-      setSortMode("priority");
-      setTriageBandFilter("all");
-    });
-
-  const toolbarTools = (
-    <CollectionToolbarTools
-      desktopTools={
-        <>
-          <ToolbarIconButton
-            label={blockersOnly ? "Фильтр: только блокеры" : "Фильтр: все подачи"}
-            icon="filter"
-            pressed={blockersOnly}
-            onClick={() => transitionUiState(() => setBlockersOnly((value) => !value))}
-          />
-          <ToolbarIconButton
-            label={`Сортировка: ${submissionSortModeLabel(sortMode)}`}
-            icon="sort"
-            pressed={sortMode !== "priority"}
-            onClick={() =>
-              transitionUiState(() =>
-                setSortMode((value) => nextSubmissionSortMode(value, adminSortModes)),
-              )
-            }
-          />
-        </>
-      }
-    />
+  const tabCounts = {
+    all: allQueue.length,
+    corrections: correctionsQueue.length,
+    ready: readyQueue.length,
+    review: reviewQueue.length,
+  };
+  const totalBlockers = visibleReviewList.reduce(
+    (total, submission) => total + blockerCount(submission),
+    0,
   );
+  const totalWarnings = visibleReviewList.reduce(
+    (total, submission) => total + adminReviewWarningCount(submission),
+    0,
+  );
+
+  function chooseLane(nextLane: AdminReviewLaneFilter) {
+    transitionUiState(() => {
+      setActiveLane(nextLane);
+      onTab(reviewTabForLane[nextLane]);
+      setMobileFiltersOpen(false);
+    });
+  }
+
+  function openAdminReviewSubmission(
+    submission: Submission,
+    triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
+  ) {
+    const target = triage.target;
+    const tab = drawerTabForScreenTarget(target, adminWorkDrawerTabFor(submission));
+
+    onSelect(submission);
+    onOpen(submission, tab, target);
+  }
 
   const renderBlockedState = (
     title: string,
@@ -1640,266 +2305,296 @@ export function AdminReviewScreen({
   );
 
   return (
-    <div
-      className={`v19-screen-grid v19-admin-review-screen v17-admin-work-screen ${
-        actionSubmission ? "" : "is-panel-closed"
-      }`}
+    <motion.div
+      animate={{ opacity: 1, y: 0 }}
+      className="v19-screen-grid v19-admin-review-screen v19-admin-cockpit"
+      initial={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+      transition={{ duration: prefersReducedMotion ? 0.01 : 0.22 }}
     >
-      <CardComponent
-        as="section"
-        className={
-          activeFilters.length
-            ? "v19-collection-panel has-active-filters has-summary-strip"
-            : "v19-collection-panel has-summary-strip"
-        }
-        aria-labelledby="review-title"
-      >
+      <section className="v19-admin-cockpit-main" aria-labelledby="review-title">
         <h2 id="review-title" className="sr-only">
           Очередь администратора
         </h2>
 
-        <div
-          className="v19-admin-review-summary-strip"
-          aria-label="Сводка проверки"
-        >
-          <span>
-            <strong>{tabCounts.review}</strong>
-            <em>К проверке</em>
-          </span>
-          <span>
-            <strong>{tabCounts.corrections}</strong>
-            <em>Исправления</em>
-          </span>
-          <span>
-            <strong>{tabCounts.ready}</strong>
-            <em>Принято</em>
-          </span>
+        <div className="v19-admin-cockpit-hero">
+          <div>
+            <span className="v19-admin-cockpit-kicker">
+              <ShieldCheck aria-hidden="true" size={14} strokeWidth={1.8} />
+              Admin review cockpit
+            </span>
+            <h2>Проверка пакетов</h2>
+            <p>
+              Очередь показывает приоритет, блокеры, следующее действие, AI-флаги и
+              готовность к выгрузке.
+            </p>
+          </div>
+          <Button
+            className="v19-admin-cockpit-hero-cta"
+            disabled={!actionSubmission}
+            onClick={() => actionSubmission && openAdminReviewSubmission(actionSubmission)}
+          >
+            Открыть первый пакет
+            <ArrowRight aria-hidden="true" size={16} strokeWidth={1.8} />
+          </Button>
         </div>
 
-        <CollectionToolbar
-          activeFilters={activeFilters}
-          ariaLabel="Инструменты работы администратора"
-          cityControl={filterControl}
-          className="v17-admin-work-toolbar"
-          onClearActiveFilters={activeFilters.length ? resetActiveFilters : undefined}
-          onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
-          search={searchControl}
-          tabs={[
-            { count: tabCounts.all, id: "all", label: "Все" },
-            { count: tabCounts.review, id: "review", label: "К проверке" },
-            {
-              count: tabCounts.corrections,
-              id: "corrections",
-              label: "Исправления",
-            },
-            { count: tabCounts.ready, id: "ready", label: "Принято" },
-          ]}
-          tabsAriaLabel="Рабочая очередь администратора"
-          tools={toolbarTools}
-          value={reviewTab}
-        />
-
-        <div className="v17-admin-work-note">
-          <span>{adminWorkNoteCopy(reviewTab)}</span>
-        </div>
-
-        {!permissionDenied && !loading && !error ? (
-          <AdminTriageRadarPanel
-            activeBand={triageBandFilter}
-            radar={triageRadar}
-            onBand={(band) => transitionUiState(() => setTriageBandFilter(band))}
+        <div className="v19-admin-cockpit-metrics" aria-label="Сводка проверки">
+          <AdminReviewMetricCard icon={FileText} label="В очереди" value={`${allQueue.length}`} />
+          <AdminReviewMetricCard
+            icon={Flame}
+            label="Блокеры"
+            tone="red"
+            value={`${totalBlockers}`}
           />
-        ) : null}
+          <AdminReviewMetricCard
+            icon={AlertCircle}
+            label="Проверить"
+            tone="orange"
+            value={`${totalWarnings || tabCounts.review}`}
+          />
+          <AdminReviewMetricCard
+            icon={CheckCircle2}
+            label="К выгрузке"
+            tone="green"
+            value={`${tabCounts.ready}`}
+          />
+        </div>
 
-        {permissionDenied ? (
-          renderBlockedState(
-            "Нет доступа к проверке",
-            "Текущая роль не может выполнять административную проверку подач.",
-            "danger",
-          )
-        ) : loading ? (
-          <AdminWorkLoadingState />
-        ) : error ? (
-          renderBlockedState(
-            "Очередь недоступна",
-            error,
-            "danger",
-            onRetryError ? "Повторить" : undefined,
-            onRetryError,
-          )
-        ) : visibleReviewList.length ? (
-          <>
-            <div className="v17-admin-work-list" aria-label="Очередь проверки">
-              {visibleReviewList.map((submission) => {
-                const triage =
-                  triageBySubmissionId.get(submission.id) ??
-                  adminTriageRadarItem(submission);
-                const target = triage.target;
-                const tab = drawerTabForScreenTarget(
-                  target,
-                  adminWorkDrawerTabFor(submission),
-                );
-
+        <div className="v19-admin-cockpit-board">
+          <div className="v19-admin-cockpit-toolbar">
+            <div className="v19-admin-cockpit-tabs" role="tablist" aria-label="Очередь проверки">
+              <button
+                aria-selected={activeLane === "all"}
+                className={activeLane === "all" ? "is-active" : ""}
+                role="tab"
+                type="button"
+                onClick={() => chooseLane("all")}
+              >
+                Все
+              </button>
+              {adminReviewLaneConfig.map((lane) => {
+                const Icon = lane.icon;
                 return (
-                  <AdminWorkRow
-                    selected={visibleSelectedSubmission?.id === submission.id}
-                    key={submission.id}
-                    submission={submission}
-                    triage={triage}
-                    onSelect={() => onSelect(submission)}
-                    onOpen={() => {
-                      onSelect(submission);
-                      onOpen(submission, tab, target);
-                    }}
-                  />
+                  <button
+                    aria-selected={activeLane === lane.id}
+                    className={activeLane === lane.id ? `is-active tone-${lane.tone}` : ""}
+                    key={lane.id}
+                    role="tab"
+                    type="button"
+                    onClick={() => chooseLane(lane.id)}
+                  >
+                    <Icon aria-hidden="true" size={14} strokeWidth={1.8} />
+                    {lane.title}
+                    <span>{laneItems[lane.id].length}</span>
+                  </button>
                 );
               })}
             </div>
-          </>
-        ) : (
-          <AdminWorkEmptyState
-            description="Новые задачи появятся после отправки подачи агентом или получения исправлений."
-            actionLabel="Открыть соседнюю очередь"
-            title={blockersOnly ? "Нет пакетов с блокерами" : "Нет пакетов на проверке"}
-            onShow={() => onTab(reviewTab === "review" ? "corrections" : "review")}
-          />
-        )}
-        {actionSubmission ? (
-          <div className="v17-admin-primary-action">
-            <span>
-              {adminReviewPriorityLine(
-                actionSubmission,
-                triageBySubmissionId.get(actionSubmission.id) ??
-                  adminTriageRadarItem(actionSubmission),
-              )}
-            </span>
-            <Button
-              aria-describedby={!canAddIssue ? "admin-return-disabled-note" : undefined}
-              disabled={!canAddIssue}
-              variant="secondary"
-              onClick={() => {
-                onSelect(actionSubmission);
-                onOpen(actionSubmission, "issues");
-              }}
-            >
-              Вернуть с замечанием
-            </Button>
-            {!canAddIssue ? (
-              <em id="admin-return-disabled-note">{addIssueReason}</em>
-            ) : null}
-          </div>
-        ) : null}
-      </CardComponent>
-      {actionSubmission ? (
-        <AdminReviewContextPanel
-          addIssueReason={addIssueReason}
-          canAddIssue={canAddIssue}
-          submission={actionSubmission}
-          onOpen={(tab) => {
-            onSelect(actionSubmission);
-            onOpen(actionSubmission, tab);
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function AdminReviewContextPanel({
-  addIssueReason,
-  canAddIssue,
-  onOpen,
-  submission,
-}: {
-  addIssueReason: string;
-  canAddIssue: boolean;
-  onOpen: (tab: DrawerTab) => void;
-  submission: Submission;
-}) {
-  const facts = adminReviewFacts(submission);
-  const media = canonicalMediaChecklist(submission);
-  const issues = adminReviewVisibleIssues(submission);
-
-  return (
-    <ContextPanel
-      className="v19-admin-review-context"
-      label="Детали проверки"
-      header={
-        <div className="v19-admin-review-context-head">
-          <p className="kicker">Пакет проверки</p>
-          <h2>{formatSubmissionListTitle(submission)}</h2>
-          <span className="mono">{submission.id}</span>
-        </div>
-      }
-      footer={
-        <PanelActionFooter
-          primary={{
-            label: facts.ctaLabel,
-            onClick: () => onOpen(facts.ctaTab),
-          }}
-          secondary={[
-            {
-              disabled: !canAddIssue,
-              disabledReason: canAddIssue ? undefined : addIssueReason,
-              label: "Вернуть с замечанием",
-              onClick: () => onOpen("issues"),
-            },
-          ]}
-          status={facts.nextAction}
-        />
-      }
-    >
-      <div className="v19-admin-review-context-body">
-        <dl className="v19-admin-review-facts">
-          <div>
-            <dt>Статус</dt>
-            <dd>{facts.status}</dd>
-          </div>
-          <div>
-            <dt>Причина</dt>
-            <dd>{facts.reason}</dd>
-          </div>
-          <div>
-            <dt>Владелец</dt>
-            <dd>{facts.owner}</dd>
-          </div>
-          <div>
-            <dt>Следующее действие</dt>
-            <dd>{facts.nextAction}</dd>
-          </div>
-        </dl>
-
-        <section className="v19-admin-review-checklist" aria-label="Готовность медиа">
-          <p className="kicker">Canonical media</p>
-          {media.map((item) => (
-            <div className={`v19-admin-review-check is-${item.tone}`} key={item.type}>
-              <span aria-hidden="true">{item.ok ? "✓" : "!"}</span>
-              <strong>{item.label}</strong>
-              <em>{item.detail}</em>
+            <div className="v19-admin-cockpit-tools">
+              <div className="v19-admin-cockpit-search">
+                <Search aria-hidden="true" size={16} strokeWidth={1.8} />
+                {searchControl}
+              </div>
+              <button
+                aria-label="Фильтры очереди"
+                type="button"
+                onClick={() => setMobileFiltersOpen(true)}
+              >
+                <Filter aria-hidden="true" size={16} strokeWidth={1.8} />
+              </button>
             </div>
-          ))}
-        </section>
+          </div>
 
-        <section className="v19-admin-review-issues" aria-label="Замечания">
-          <p className="kicker">Замечания</p>
-          {issues.length ? (
-            issues.map((issue) => (
-              <article key={issue.id}>
-                <strong>{issue.reason}</strong>
-                <span>{issueTargetLine(issue)}</span>
-                <em>
-                  {issue.status === "fixed_by_agent"
-                    ? "Исправлено агентом"
-                    : issue.comment}
-                </em>
-              </article>
-            ))
+          {permissionDenied ? (
+            renderBlockedState(
+              "Нет доступа к проверке",
+              "Текущая роль не может выполнять административную проверку подач.",
+              "danger",
+            )
+          ) : loading ? (
+            <AdminWorkLoadingState />
+          ) : error ? (
+            renderBlockedState(
+              "Очередь недоступна",
+              error,
+              "danger",
+              onRetryError ? "Повторить" : undefined,
+              onRetryError,
+            )
+          ) : visibleReviewList.length ? (
+            <div className="v19-admin-cockpit-lanes" aria-label="Очередь проверки">
+              {visibleLanes.map((lane) => (
+                <AdminReviewLaneColumn
+                  items={laneItems[lane.id]}
+                  key={lane.id}
+                  lane={lane}
+                  onOpen={openAdminReviewSubmission}
+                />
+              ))}
+            </div>
           ) : (
-            <p>Открытых замечаний нет.</p>
+            <AdminWorkEmptyState
+              description="Новые задачи появятся после отправки подачи агентом или получения исправлений."
+              actionLabel="Открыть соседнюю очередь"
+              title="Нет пакетов на проверке"
+              onShow={() => onTab(reviewTab === "review" ? "corrections" : "review")}
+            />
           )}
-        </section>
-      </div>
-    </ContextPanel>
+        </div>
+
+        <div className="v19-admin-mobile-dock" aria-label="Действия очереди">
+          <button
+            type="button"
+            onClick={() => actionSubmission && openAdminReviewSubmission(actionSubmission)}
+          >
+            Первый
+          </button>
+          <button type="button" onClick={() => setMobileSummaryOpen(true)}>
+            Сводка
+          </button>
+          <button type="button" onClick={() => setMobileFiltersOpen(true)}>
+            Фильтры
+          </button>
+        </div>
+      </section>
+
+      <AdminReviewCockpitRail source={reviewItems} />
+
+      <AnimatePresence>
+        {mobileSummaryOpen ? (
+          <>
+            <motion.button
+            aria-label="Закрыть сводку"
+            className="v19-admin-mobile-sheet-backdrop"
+            exit={{ opacity: 0 }}
+            initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
+            type="button"
+            onClick={() => setMobileSummaryOpen(false)}
+          />
+            <motion.aside
+              animate={{ opacity: 1, y: 0 }}
+              aria-label="Сводка очереди"
+              className="v19-admin-mobile-sheet"
+              exit={{
+                opacity: 0,
+                y: prefersReducedMotion ? 0 : 12,
+              }}
+              initial={{
+                opacity: prefersReducedMotion ? 1 : 0,
+                y: prefersReducedMotion ? 0 : 16,
+              }}
+              transition={{ duration: prefersReducedMotion ? 0.01 : 0.18 }}
+            >
+            <div className="v19-admin-mobile-sheet-head">
+              <div>
+                <span>Сводка очереди</span>
+                <strong>Проверка пакетов</strong>
+              </div>
+              <button type="button" aria-label="Закрыть" onClick={() => setMobileSummaryOpen(false)}>
+                <X aria-hidden="true" size={16} strokeWidth={1.8} />
+              </button>
+            </div>
+            <div className="v19-admin-mobile-metrics">
+              <AdminReviewMetricCard icon={FileText} label="В очереди" value={`${allQueue.length}`} />
+              <AdminReviewMetricCard
+                icon={Flame}
+                label="Блокеры"
+                tone="red"
+                value={`${totalBlockers}`}
+              />
+              <AdminReviewMetricCard
+                icon={AlertCircle}
+                label="Проверить"
+                tone="orange"
+                value={`${totalWarnings || tabCounts.review}`}
+              />
+              <AdminReviewMetricCard
+                icon={CheckCircle2}
+                label="К выгрузке"
+                tone="green"
+                value={`${tabCounts.ready}`}
+              />
+            </div>
+            </motion.aside>
+          </>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mobileFiltersOpen ? (
+          <>
+            <motion.button
+            aria-label="Закрыть фильтры"
+            className="v19-admin-mobile-sheet-backdrop"
+            exit={{ opacity: 0 }}
+            initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
+            type="button"
+            onClick={() => setMobileFiltersOpen(false)}
+          />
+            <motion.aside
+              animate={{ opacity: 1, y: 0 }}
+              aria-label="Фильтры очереди"
+              className="v19-admin-mobile-sheet"
+              exit={{
+                opacity: 0,
+                y: prefersReducedMotion ? 0 : 12,
+              }}
+              initial={{
+                opacity: prefersReducedMotion ? 1 : 0,
+                y: prefersReducedMotion ? 0 : 16,
+              }}
+              transition={{ duration: prefersReducedMotion ? 0.01 : 0.18 }}
+            >
+            <div className="v19-admin-mobile-sheet-head">
+              <div>
+                <span>Фильтры очереди</span>
+                <strong>
+                  {activeLane === "all"
+                    ? "Все пакеты"
+                    : adminReviewLaneConfig.find((lane) => lane.id === activeLane)?.title}
+                </strong>
+              </div>
+              <button type="button" aria-label="Закрыть" onClick={() => setMobileFiltersOpen(false)}>
+                <X aria-hidden="true" size={16} strokeWidth={1.8} />
+              </button>
+            </div>
+            <div className="v19-admin-sheet-filters">
+              <button
+                className={activeLane === "all" ? "is-active" : ""}
+                type="button"
+                onClick={() => chooseLane("all")}
+              >
+                Все
+                <span>{visibleReviewList.length}</span>
+              </button>
+              {adminReviewLaneConfig.map((lane) => {
+                const Icon = lane.icon;
+                return (
+                  <button
+                    className={activeLane === lane.id ? "is-active" : ""}
+                    key={lane.id}
+                    type="button"
+                    onClick={() => chooseLane(lane.id)}
+                  >
+                    <Icon aria-hidden="true" size={16} strokeWidth={1.8} />
+                    {lane.title}
+                    <span>{laneItems[lane.id].length}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {filterControl ? (
+              <div className="v19-admin-sheet-extra-filters">{filterControl}</div>
+            ) : null}
+            </motion.aside>
+          </>
+        ) : null}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -1940,73 +2635,6 @@ function adminReviewVisibleIssues(submission: Submission) {
   return submission.issues
     .filter((issue) => issue.status === "open" || issue.status === "fixed_by_agent")
     .slice(0, 3);
-}
-
-function canonicalMediaChecklist(submission: Submission) {
-  return CANONICAL_FRONTEND_MEDIA_TYPES.map((type) => {
-    const applicantStates = submission.applicants.map((applicant) => {
-      const file = submission.files.find(
-        (item) => item.applicantId === applicant.id && item.type === type,
-      );
-      return file?.status ?? "missing";
-    });
-    const accepted = applicantStates.filter((status) => status === "accepted").length;
-    const missing = applicantStates.filter((status) => status === "missing").length;
-    const replace = applicantStates.filter(
-      (status) => status === "needs_replacement",
-    ).length;
-    const pending = applicantStates.length - accepted - missing - replace;
-    const ok = applicantStates.length > 0 && accepted === applicantStates.length;
-    const detail = ok
-      ? `${accepted}/${applicantStates.length} принято`
-      : missing || replace
-        ? `${missing + replace}/${applicantStates.length} требует действия`
-        : `${pending}/${applicantStates.length} ждет проверки`;
-
-    return {
-      detail,
-      label: fileTypeLabels[type],
-      ok,
-      tone: ok ? "ok" : missing || replace ? "blocked" : "pending",
-      type,
-    };
-  });
-}
-
-function adminReviewPriorityLine(
-  submission: Submission,
-  triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
-) {
-  const reason = triage.reasons[0] ?? statusLabels[submission.status];
-
-  if (triage.band === "critical") return `${triage.score} · критично: ${reason}`;
-  if (triage.band === "attention") return `${triage.score} · внимание: ${reason}`;
-  if (triage.band === "ready") return `${triage.score} · готово: ${reason}`;
-  if (triage.band === "waiting") return `ждёт: ${triage.nextAction}`;
-  if (triage.band === "done") return "завершено";
-
-  return `${statusLabels[submission.status]} · обновлено ${submission.updatedAt}`;
-}
-
-function adminWorkNoteCopy(reviewTab: AdminWorkTab) {
-  if (reviewTab === "corrections") return "Радар поднимает исправления, где есть риск повторного возврата";
-  if (reviewTab === "ready") return "Принятые пакеты уходят в безопасную выгрузку";
-  return "Очередь отсортирована по риску, блокерам и готовности к действию";
-}
-
-function adminTriageBandFilterLabel(band: AdminTriageBandFilter) {
-  if (band === "all") return "все";
-  if (band === "critical") return "critical";
-  if (band === "attention") return "attention";
-  if (band === "ready") return "ready";
-  if (band === "waiting") return "waiting";
-  return "done";
-}
-
-function adminIdentityStatusLabel(status: AdminTriageRadarItem["identityStatus"]) {
-  if (status === "blocked") return "есть риск";
-  if (status === "needs_review") return "проверить";
-  return "чисто";
 }
 
 function AdminWorkLoadingState() {
@@ -2065,134 +2693,6 @@ function AdminWorkEmptyState({
   );
 }
 
-function AdminWorkRow({
-  onOpen,
-  onSelect,
-  selected,
-  submission,
-  triage,
-}: {
-  onOpen: () => void;
-  onSelect: () => void;
-  selected: boolean;
-  submission: Submission;
-  triage: AdminTriageRadarItem;
-}) {
-  const facts = adminReviewFacts(submission);
-  const presentation = adminWorkPresentation(submission);
-  const family = submission.type === "family";
-  const handleRowAction = () => {
-    if (isCompactAdminViewport()) {
-      onOpen();
-      return;
-    }
-
-    onSelect();
-  };
-
-  return (
-    <article
-      aria-current={selected ? "true" : undefined}
-      className={`v17-admin-work-row v19-admin-review-card ${
-        selected ? "is-selected" : ""
-      }`}
-      data-submission-card
-      data-submission-id={submission.id}
-    >
-      <button
-        className="v19-admin-review-row-main"
-        type="button"
-        onClick={handleRowAction}
-      >
-        <span
-          className={`v17-admin-entity-icon tone-${presentation.tone}`}
-          aria-hidden="true"
-        >
-          <SvgIcon>
-            {family ? (
-              <>
-                <circle cx="9" cy="8" r="3" />
-                <path d="M3 20a6 6 0 0 1 12 0" />
-                <circle cx="17" cy="9" r="2.5" />
-                <path d="M15 15a5 5 0 0 1 6 5" />
-              </>
-            ) : (
-              <>
-                <circle cx="12" cy="8" r="4" />
-                <path d="M5 21a7 7 0 0 1 14 0" />
-              </>
-            )}
-          </SvgIcon>
-        </span>
-        <span className="v17-admin-identity">
-          <strong>{formatSubmissionListTitle(submission)}</strong>
-          <em>
-            <span className="mono">{submission.id}</span> ·{" "}
-            {applicantCountLabel(submission.applicants.length)}
-          </em>
-          <small className={`v17-admin-identity-signal is-${triage.identityStatus}`}>
-            Личность: {adminIdentityStatusLabel(triage.identityStatus)}
-          </small>
-          <small className="v17-admin-mobile-meta">
-            {submission.city} · {applicantCountLabel(submission.applicants.length)} · ждет
-            с {submission.updatedAt}
-          </small>
-        </span>
-        <span className="v17-admin-route-cell">
-          <em>Подача</em>
-          <strong>{submission.city}</strong>
-          <small>{tripDates(submission)}</small>
-        </span>
-        <span className="v17-admin-readiness-cell">
-          <em>Готовность</em>
-          <strong>{submission.completeness.total}%</strong>
-        </span>
-        <span className="v19-admin-review-reason">
-          <em>Причина</em>
-          <strong>{facts.reason}</strong>
-        </span>
-        <span className="v19-admin-review-owner">
-          <em>Владелец</em>
-          <strong>{facts.owner}</strong>
-          <small>{facts.nextAction}</small>
-        </span>
-      </button>
-      <span className={`v17-admin-stage tone-${presentation.tone}`}>
-        <i aria-hidden="true" />
-        {facts.status}
-      </span>
-      <span className={`v17-admin-triage-pill tone-${triage.band}`}>
-        <strong>{Math.max(0, triage.score)}</strong>
-        <em>{adminTriageBandFilterLabel(triage.band)}</em>
-      </span>
-      <Button className="v17-admin-row-action" variant="secondary" onClick={onOpen}>
-        <span>{adminWorkActionLabel(submission, facts.ctaLabel, triage)}</span>
-        <small className="v17-admin-triage-reason">{triage.reasons[0]}</small>
-      </Button>
-    </article>
-  );
-}
-
-function isCompactAdminViewport() {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(max-width: 1199px)").matches
-  );
-}
-
-function adminWorkActionLabel(
-  submission: Submission,
-  fallback: string,
-  triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
-) {
-  if (triage.band === "critical" || triage.band === "attention" || triage.band === "ready") {
-    return triage.nextAction;
-  }
-  if (submission.status === "submitted_for_review") return "Проверить";
-  return fallback;
-}
-
 function exportTripDates(submission: Submission) {
   const monthNames: Record<string, string> = {
     "01": "янв",
@@ -2245,7 +2745,7 @@ function ExportGuardItem({
   );
 }
 
-export function ExportScreen({
+export function LegacyExportScreen({
   exportBusy = false,
   exportError = "",
   exportPlan,
@@ -2447,6 +2947,7 @@ export function ExportScreen({
             tabsAriaLabel="Состояние выгрузки"
             tools={toolbarTools}
             value={exportTab}
+            variant="regular"
           />
           <V19EntityTypeSwitch
             counts={visibleExportTypeCounts}
@@ -2947,6 +3448,734 @@ export function ExportScreen({
         ) : null}
       </div>
     </>
+  );
+}
+
+export function ExportScreen(props: Parameters<typeof LegacyExportScreen>[0]) {
+  return <AdminExportReferenceCockpit {...props} />;
+}
+
+function AdminExportReferenceCockpit({
+  exportBusy = false,
+  exportError = "",
+  exportPlan,
+  exportTab,
+  historyList,
+  onDownload,
+  onGenerate,
+  onChoosePackage,
+  onMarkExported,
+  onOpen,
+  onTab,
+  onToggle,
+  readyList,
+  searchControl,
+  selectedExportIds,
+}: Parameters<typeof LegacyExportScreen>[0]) {
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
+  const selectedExportIdSet = useMemo(
+    () => new Set(selectedExportIds),
+    [selectedExportIds],
+  );
+  const exportReadyList = useMemo(
+    () => readyList.filter(isSubmissionSelectableForExport),
+    [readyList],
+  );
+  const exportBlockedList = useMemo(
+    () => readyList.filter((submission) => !isSubmissionSelectableForExport(submission)),
+    [readyList],
+  );
+  const selectedReadySubmissions = useMemo(
+    () =>
+      exportReadyList.filter((submission) =>
+        selectedExportIdSet.has(submission.id),
+      ),
+    [exportReadyList, selectedExportIdSet],
+  );
+  const activeSubmission =
+    selectedReadySubmissions[0] ??
+    exportReadyList[0] ??
+    exportBlockedList[0] ??
+    historyList[0] ??
+    null;
+  const selectedSubmissionCount = selectedReadySubmissions.length;
+  const selectedApplicantCount = exportPlan.rowCount;
+  const selectedFiles = selectedReadySubmissions.reduce(
+    (sum, submission) => sum + submission.files.length,
+    0,
+  );
+  const selectedWarnings = exportPlan.warnings.length;
+  const hasExportBlockers = exportPlan.blockers.length > 0;
+  const allReadySelected =
+    exportReadyList.length > 0 &&
+    exportReadyList.every((submission) => selectedExportIdSet.has(submission.id));
+  const packageFacts = exportPackageFacts(exportPlan);
+  const actionHint =
+    exportError ||
+    (exportBusy ? "Формируем и проверяем Excel-файл..." : exportActionHint(exportPlan));
+  const activeBlockers = activeSubmission ? getExportBlockers([activeSubmission]) : [];
+  const showingHistory = exportTab === "history";
+  const selectedComposition =
+    selectedReadySubmissions.length > 0
+      ? selectedReadySubmissions
+      : activeSubmission
+        ? [activeSubmission]
+        : [];
+  const checks = [
+    {
+      icon: ShieldCheck,
+      label: "Открытые блокеры",
+      state: !exportHasBlocker(exportPlan, "блокирующие замечания") ? "ok" : "warn",
+      value: exportHasBlocker(exportPlan, "блокирующие замечания") ? "есть" : "0",
+    },
+    {
+      icon: FileSpreadsheet,
+      label: "Excel preview",
+      state: exportPlan.contract.valid && exportPlan.rowCount > 0 ? "ok" : "neutral",
+      value: exportPlan.rowCount > 0 ? "готов" : "не выбран",
+    },
+    {
+      icon: FileArchive,
+      label: "Manifest",
+      state:
+        !exportHasBlocker(exportPlan, "канонического пакета медиа") &&
+        exportPlan.rowCount > 0
+          ? "ok"
+          : "neutral",
+      value: `${selectedFiles} ${pluralRu(selectedFiles, "файл", "файла", "файлов")}`,
+    },
+    {
+      icon: Lock,
+      label: "Дубликаты экспорта",
+      state: !exportHasBlocker(exportPlan, "уже выгруженные подачи") ? "ok" : "warn",
+      value: exportHasBlocker(exportPlan, "уже выгруженные подачи") ? "есть" : "нет",
+    },
+    {
+      icon: AlertTriangle,
+      label: "Warnings",
+      state: selectedWarnings > 0 ? "warn" : "ok",
+      value: String(selectedWarnings),
+    },
+  ] satisfies AdminExportPanelCheck[];
+  const toggleAllReady = () => {
+    transitionUiState(() => {
+      exportReadyList.forEach((submission) => {
+        const selected = selectedExportIdSet.has(submission.id);
+        if (selected === allReadySelected) onToggle(submission.id);
+      });
+    });
+  };
+  return (
+    <div
+      className="v19-admin-export-reference"
+      data-testid="admin-export-reference-screen"
+    >
+      <section className="v19-admin-export-main" aria-labelledby="export-title">
+        <div className="v19-admin-export-metrics" aria-label="Сводка выгрузки">
+          <AdminExportMetricCard
+            icon={CheckCircle2}
+            label="Готовы"
+            tone="success"
+            value={readyList.length}
+            detail="пакетов в очереди"
+          />
+          <AdminExportMetricCard
+            icon={PackageCheck}
+            label="Выбрано"
+            tone="review"
+            value={selectedSubmissionCount}
+            detail={`${selectedApplicantCount} ${pluralRu(selectedApplicantCount, "заявитель", "заявителя", "заявителей")}`}
+          />
+          <AdminExportMetricCard
+            icon={FileArchive}
+            label="Документы"
+            value={selectedFiles}
+            detail="файлов в manifest"
+          />
+          <AdminExportMetricCard
+            icon={hasExportBlockers ? XCircle : ShieldCheck}
+            label="Pre-flight"
+            tone={hasExportBlockers ? "warning" : "success"}
+            value={hasExportBlockers ? "STOP" : "OK"}
+            detail={`${selectedWarnings} ${pluralRu(selectedWarnings, "предупреждение", "предупреждения", "предупреждений")}`}
+          />
+        </div>
+
+        <div className="v19-admin-export-list">
+          <div className="v19-admin-export-list-head">
+            <div className="v19-admin-export-title-copy">
+              <h2 id="export-title">
+                {showingHistory ? "История выгрузки" : "Пакеты к выгрузке"}
+              </h2>
+              <p>
+                Формирование Excel, контроль manifest и экспортных блокеров.
+              </p>
+            </div>
+            <div className="v19-admin-export-tools">
+              <div className="v19-admin-export-search">{searchControl}</div>
+              <div className="v19-admin-export-filter-control">
+                <button
+                  className="v19-admin-export-icon-button"
+                  type="button"
+                  aria-label={
+                    showingHistory ? "Показать пакеты к выгрузке" : "Показать историю выгрузки"
+                  }
+                  onClick={() =>
+                    transitionUiState(() => onTab(showingHistory ? "ready" : "history"))
+                  }
+                >
+                  <Filter aria-hidden="true" focusable="false" size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="v19-admin-export-table-head" aria-hidden="true">
+            <button
+              className={`v19-admin-export-checkbox ${allReadySelected ? "is-selected" : ""}`}
+              type="button"
+              aria-label="Выбрать все совместимые"
+              disabled={exportBusy || exportReadyList.length === 0}
+              onClick={toggleAllReady}
+            >
+              {allReadySelected ? (
+                <CheckSquare aria-hidden="true" focusable="false" size={14} />
+              ) : null}
+            </button>
+            <div>Пакет</div>
+            <div>Слот</div>
+            <div>Готовность</div>
+            <div>Размер</div>
+          </div>
+
+          <div className="v19-admin-export-rows">
+            {showingHistory ? (
+              historyList.length > 0 ? (
+                historyList.map((submission) => (
+                  <AdminExportRow
+                    history
+                    key={submission.id}
+                    submission={submission}
+                    disabled={exportBusy}
+                    onOpen={() => onOpen(submission, "files")}
+                  />
+                ))
+              ) : (
+                <EmptyState text="История выгрузки пока пуста." />
+              )
+            ) : readyList.length > 0 ? (
+              <>
+                {exportReadyList.map((submission) => (
+                  <AdminExportRow
+                    key={submission.id}
+                    submission={submission}
+                    disabled={exportBusy}
+                    selected={selectedExportIdSet.has(submission.id)}
+                    onChoose={() => onChoosePackage(submission.id)}
+                    onOpen={() => onOpen(submission)}
+                    onToggle={() => onToggle(submission.id)}
+                  />
+                ))}
+                {exportBlockedList.map((submission) => (
+                  <AdminExportRow
+                    blockedReason={exportBlockedReason(submission)}
+                    disabled={exportBusy}
+                    key={submission.id}
+                    submission={submission}
+                    onOpen={() => onOpen(submission, "issues")}
+                  />
+                ))}
+              </>
+            ) : (
+              <EmptyState text="Нет подач готовых к выгрузке." />
+            )}
+          </div>
+        </div>
+      </section>
+
+      <aside className="v19-admin-export-side" aria-label="Контекст выгрузки">
+        <div className="v19-admin-export-side-head">
+          <div>
+            <span>Export cockpit</span>
+            <h3>Правая панель</h3>
+            <p>Контроль состава, блокеров, manifest и истории перед Excel.</p>
+          </div>
+          <div className="v19-admin-export-side-icon" aria-hidden="true">
+            <FolderCheck focusable="false" size={20} />
+          </div>
+        </div>
+
+        <div className="v19-admin-export-side-body">
+          <section className="v19-admin-export-rail-card">
+            <div className="v19-admin-export-active-head">
+              <div>
+                <span>Активный пакет</span>
+                <strong>{activeSubmission?.title ?? "Не выбран"}</strong>
+              </div>
+              <AdminExportStatusPill
+                tone={activeBlockers.length > 0 ? "warning" : "success"}
+              >
+                {activeBlockers.length > 0 ? "есть блокеры" : "готов"}
+              </AdminExportStatusPill>
+            </div>
+            {activeSubmission ? (
+              <div className="v19-admin-export-active-grid">
+                <span>
+                  <small>Заявители</small>
+                  <strong>{activeSubmission.applicants.length}</strong>
+                </span>
+                <span>
+                  <small>Город</small>
+                  <strong>{activeSubmission.city}</strong>
+                </span>
+                <span>
+                  <small>Файлы</small>
+                  <strong>{activeSubmission.files.length}</strong>
+                </span>
+                <span>
+                  <small>Слот</small>
+                  <strong>{exportTripDates(activeSubmission)}</strong>
+                </span>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="v19-admin-export-rail-card">
+            <div className="v19-admin-export-card-head">
+              <h4>Pre-flight checks</h4>
+              <AdminExportStatusPill tone={hasExportBlockers ? "warning" : "success"}>
+                {hasExportBlockers ? "нужна правка" : "можно выгружать"}
+              </AdminExportStatusPill>
+            </div>
+            <div className="v19-admin-export-checks">
+              {checks.map((check) => (
+                <AdminExportCheckRow key={check.label} {...check} />
+              ))}
+            </div>
+          </section>
+
+          <section className="v19-admin-export-rail-card">
+            <div className="v19-admin-export-card-head">
+              <h4>Состав выгрузки</h4>
+              <span>{selectedSubmissionCount} пак.</span>
+            </div>
+            <div className="v19-admin-export-composition">
+              {selectedComposition.length > 0 ? (
+                selectedComposition.map((submission) => (
+                  <AdminExportCompositionItem
+                    key={submission.id}
+                    submission={submission}
+                    onOpen={() => onOpen(submission)}
+                  />
+                ))
+              ) : (
+                <div className="v19-admin-export-empty-inline">
+                  Выберите пакеты слева
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="v19-admin-export-rail-card">
+            <div className="v19-admin-export-card-head is-left">
+              <HistoryIcon aria-hidden="true" focusable="false" size={16} />
+              <h4>История сегодня</h4>
+              <button
+                type="button"
+                onClick={() =>
+                  transitionUiState(() => onTab(showingHistory ? "ready" : "history"))
+                }
+              >
+                {showingHistory ? "Пакеты" : "Все"}
+              </button>
+            </div>
+            <div className="v19-admin-export-history">
+              {historyList.slice(0, 3).length > 0 ? (
+                historyList.slice(0, 3).map((submission) => (
+                  <button
+                    key={submission.id}
+                    type="button"
+                    onClick={() => onOpen(submission, "files")}
+                  >
+                    <strong>{submission.title}</strong>
+                    <span>
+                      {submission.updatedAt} · {returnedPdfPackageSummary(submission).label}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <span>Сегодня ещё нет завершённых выгрузок</span>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="v19-admin-export-footer">
+          <button
+            className="v19-admin-export-primary-action"
+            type="button"
+            disabled={exportBusy || !exportPlan.canGenerate}
+            aria-describedby="admin-export-action-hint"
+            onClick={onGenerate}
+          >
+            {exportBusy ? (
+              <UploadCloud aria-hidden="true" focusable="false" size={16} />
+            ) : (
+              <Download aria-hidden="true" focusable="false" size={16} />
+            )}
+            <span>{exportBusy ? "Формируем Excel..." : "Сформировать Excel"}</span>
+            {!exportBusy ? (
+              <ArrowRight aria-hidden="true" focusable="false" size={16} />
+            ) : null}
+          </button>
+          <div className="v19-admin-export-secondary-actions">
+            <button
+              type="button"
+              disabled={exportBusy || !exportPlan.canDownload}
+              onClick={onDownload}
+            >
+              Скачать
+            </button>
+            <button
+              type="button"
+              disabled={exportBusy || !exportPlan.canMarkExported}
+              onClick={onMarkExported}
+            >
+              Отметить
+            </button>
+          </div>
+          <p id="admin-export-action-hint">{actionHint}</p>
+          <p>
+            {packageFacts.city} · {packageFacts.dates}
+          </p>
+        </div>
+      </aside>
+
+      <div className="v19-admin-export-mobile-dock" aria-label="Действия выгрузки">
+        <button type="button" onClick={() => setMobileSummaryOpen(true)}>
+          Сводка
+        </button>
+        <button
+          type="button"
+          disabled={exportBusy || !exportPlan.canGenerate}
+          onClick={onGenerate}
+        >
+          {exportBusy ? "Excel..." : "Выгрузить"}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {mobileSummaryOpen ? (
+          <AdminExportMobileSheet
+            actionHint={actionHint}
+            checks={checks}
+            exportPlan={exportPlan}
+            hasExportBlockers={hasExportBlockers}
+            onClose={() => setMobileSummaryOpen(false)}
+            selectedApplicantCount={selectedApplicantCount}
+            selectedFiles={selectedFiles}
+            selectedSubmissionCount={selectedSubmissionCount}
+            selectedWarnings={selectedWarnings}
+          />
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function AdminExportMetricCard({
+  detail,
+  icon: Icon,
+  label,
+  tone = "neutral",
+  value,
+}: {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  tone?: "neutral" | "review" | "success" | "warning";
+  value: number | string;
+}) {
+  return (
+    <div className={`v19-admin-export-metric tone-${tone}`}>
+      <div>
+        <span>{label}</span>
+        <Icon aria-hidden="true" focusable="false" size={16} />
+      </div>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  );
+}
+
+function AdminExportRow({
+  blockedReason,
+  disabled = false,
+  history = false,
+  onChoose,
+  onOpen,
+  onToggle,
+  selected = false,
+  submission,
+}: {
+  blockedReason?: string;
+  disabled?: boolean;
+  history?: boolean;
+  onChoose?: () => void;
+  onOpen: () => void;
+  onToggle?: () => void;
+  selected?: boolean;
+  submission: Submission;
+}) {
+  const blocked = Boolean(blockedReason);
+  const progress = blocked
+    ? Math.max(0, Math.min(100, Math.round(submission.completeness.total)))
+    : 100;
+  const fileLabel = `${submission.files.length} ${pluralRu(
+    submission.files.length,
+    "файл",
+    "файла",
+    "файлов",
+  )}`;
+  const rowStatus = history
+    ? returnedPdfPackageSummary(submission).label
+    : blocked
+      ? "блокер"
+      : "чисто";
+
+  return (
+    <article
+      className={`v19-admin-export-row ${selected ? "is-selected" : ""} ${
+        blocked ? "is-blocked" : ""
+      } ${history ? "is-history" : ""}`}
+    >
+      <button
+        className={`v19-admin-export-checkbox ${selected ? "is-selected" : ""}`}
+        type="button"
+        aria-label={
+          blocked || history
+            ? `Открыть ${submission.title}`
+            : selected
+              ? `Убрать ${submission.title} из выгрузки`
+              : `Выбрать ${submission.title}`
+        }
+        disabled={disabled && !blocked}
+        onClick={blocked || history ? onOpen : onToggle}
+      >
+        {selected ? (
+          <CheckSquare aria-hidden="true" focusable="false" size={14} />
+        ) : blocked ? (
+          <AlertTriangle aria-hidden="true" focusable="false" size={14} />
+        ) : history ? (
+          <FileText aria-hidden="true" focusable="false" size={14} />
+        ) : null}
+      </button>
+
+      <button
+        className="v19-admin-export-row-main"
+        type="button"
+        onClick={blocked || history ? onOpen : (onChoose ?? onOpen)}
+      >
+        <span className="v19-admin-export-row-title">
+          {submission.type === "family" ? (
+            <Users aria-hidden="true" focusable="false" size={14} />
+          ) : (
+            <User aria-hidden="true" focusable="false" size={14} />
+          )}
+          <strong>{submission.title}</strong>
+          <small>{submission.id}</small>
+        </span>
+        <span className="v19-admin-export-row-meta">
+          <span>{agentOwnerDisplayName(submission.agentId)}</span>
+          <i aria-hidden="true" />
+          <span>{submission.city}</span>
+          <i aria-hidden="true" />
+          <span>{fileLabel}</span>
+        </span>
+        {blockedReason ? (
+          <span className="v19-admin-export-row-reason">{blockedReason}</span>
+        ) : null}
+      </button>
+
+      <div className="v19-admin-export-slot">{exportTripDates(submission)}</div>
+
+      <div className="v19-admin-export-progress">
+        <span>
+          <i style={{ width: `${progress}%` }} />
+        </span>
+        <strong>{progress}%</strong>
+      </div>
+
+      <div className="v19-admin-export-row-end">
+        <AdminExportStatusPill tone={blocked ? "warning" : "success"}>
+          {rowStatus}
+        </AdminExportStatusPill>
+        <span>{fileLabel}</span>
+      </div>
+    </article>
+  );
+}
+
+function AdminExportStatusPill({
+  children,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  tone?: "neutral" | "review" | "success" | "warning";
+}) {
+  return (
+    <span className={`v19-admin-export-status tone-${tone}`}>{children}</span>
+  );
+}
+
+function AdminExportCheckRow({
+  icon: Icon,
+  label,
+  state,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  state: "neutral" | "ok" | "warn";
+  value: string;
+}) {
+  return (
+    <div className={`v19-admin-export-check state-${state}`}>
+      <span>
+        <Icon aria-hidden="true" focusable="false" size={16} />
+        <strong>{label}</strong>
+      </span>
+      <em>{value}</em>
+    </div>
+  );
+}
+
+function AdminExportCompositionItem({
+  onOpen,
+  submission,
+}: {
+  onOpen: () => void;
+  submission: Submission;
+}) {
+  return (
+    <button
+      className="v19-admin-export-composition-item"
+      type="button"
+      onClick={onOpen}
+    >
+      <span aria-hidden="true">
+        {submission.type === "family" ? (
+          <Users focusable="false" size={16} />
+        ) : (
+          <User focusable="false" size={16} />
+        )}
+      </span>
+      <strong>{submission.title}</strong>
+      <small>
+        {submission.id} · {submission.applicants.length} чел.
+      </small>
+      <ChevronRight aria-hidden="true" focusable="false" size={16} />
+    </button>
+  );
+}
+
+function AdminExportMobileSheet({
+  actionHint,
+  checks,
+  exportPlan,
+  hasExportBlockers,
+  onClose,
+  selectedApplicantCount,
+  selectedFiles,
+  selectedSubmissionCount,
+  selectedWarnings,
+}: {
+  actionHint: string;
+  checks: Array<{
+    icon: LucideIcon;
+    label: string;
+    state: "neutral" | "ok" | "warn";
+    value: string;
+  }>;
+  exportPlan: ExportSummary;
+  hasExportBlockers: boolean;
+  onClose: () => void;
+  selectedApplicantCount: number;
+  selectedFiles: number;
+  selectedSubmissionCount: number;
+  selectedWarnings: number;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      animate={{ opacity: 1 }}
+      className="v19-admin-export-mobile-presence"
+      exit={{ opacity: 0 }}
+      initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
+      transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
+    >
+      <button
+        className="v19-admin-export-sheet-backdrop"
+        type="button"
+        aria-label="Закрыть сводку выгрузки"
+        onClick={onClose}
+      />
+      <motion.aside
+        animate={{ opacity: 1, y: 0 }}
+        className="v19-admin-export-mobile-sheet"
+        aria-label="Сводка выгрузки"
+        exit={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
+        initial={{
+          opacity: prefersReducedMotion ? 1 : 0,
+          y: prefersReducedMotion ? 0 : 16,
+        }}
+        transition={{ duration: prefersReducedMotion ? 0.01 : 0.18 }}
+      >
+        <div className="v19-admin-export-mobile-sheet-head">
+          <div>
+            <span>Сводка выгрузки</span>
+            <strong>Excel</strong>
+          </div>
+          <button type="button" aria-label="Закрыть" onClick={onClose}>
+            <X aria-hidden="true" focusable="false" size={16} />
+          </button>
+        </div>
+        <div className="v19-admin-export-sheet-metrics">
+          <AdminExportMetricCard
+            icon={PackageCheck}
+            label="Выбрано"
+            value={selectedSubmissionCount}
+            detail={`${selectedApplicantCount} заявителей`}
+          />
+          <AdminExportMetricCard
+            icon={FileArchive}
+            label="Документы"
+            value={selectedFiles}
+            detail="файлов"
+          />
+          <AdminExportMetricCard
+            icon={hasExportBlockers ? XCircle : ShieldCheck}
+            label="Pre-flight"
+            tone={hasExportBlockers ? "warning" : "success"}
+            value={hasExportBlockers ? "STOP" : "OK"}
+            detail={`${selectedWarnings} warning`}
+          />
+          <AdminExportMetricCard
+            icon={FileSpreadsheet}
+            label="Строки"
+            value={exportPlan.rowCount}
+            detail={exportPlan.contract.range}
+          />
+        </div>
+        <div className="v19-admin-export-sheet-checks">
+          {checks.map((check) => (
+            <AdminExportCheckRow key={check.label} {...check} />
+          ))}
+        </div>
+        <div className="v19-admin-export-sheet-note">{actionHint}</div>
+      </motion.aside>
+    </motion.div>
   );
 }
 

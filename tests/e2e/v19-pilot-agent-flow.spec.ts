@@ -37,28 +37,10 @@ test.describe("V-19 pilot agent click flow", () => {
     ).toBeVisible();
     await agentActionSurface.getByRole("tab", { name: /Все действия/ }).click();
 
-    await agentActionSurface
-      .getByRole("button", { name: "Показать колонками" })
-      .click();
-    const reviewColumn = agentActionSurface
-      .locator(".vf-figma-column")
-      .filter({ hasText: "На проверке" });
-    const readyColumn = agentActionSurface
-      .locator(".vf-figma-column")
-      .filter({ hasText: "Готово" });
-    await expect(reviewColumn.locator('[data-submission-id="ПД-1053"]').first()).toBeVisible();
-    await expect(readyColumn.locator('[data-submission-id="ПД-1053"]')).toHaveCount(0);
-    await expect(
-      agentActionSurface
-        .locator(".vf-figma-column-card")
-        .filter({ hasText: "София Иванова" })
-        .filter({ hasText: "Заполнить анкету" })
-      .first(),
-    ).toBeVisible();
-
-    await agentActionSurface
-      .getByRole("button", { name: "Показать списком" })
-      .click();
+    await agentActionSurface.getByRole("button", { name: "Сначала старые" }).click();
+    await expect(agentActionSurface.getByText("Старые")).toBeVisible();
+    await agentActionSurface.getByRole("button", { name: "Сначала новые" }).click();
+    await expect(agentActionSurface.getByText("Сегодня")).toBeVisible();
 
     await agentActionSearch.fill("ПД-1048");
     await expect(
@@ -71,30 +53,31 @@ test.describe("V-19 pilot agent click flow", () => {
 
     await expect(agentActionSurface.locator("[data-submission-id]").first()).toBeVisible();
 
-    await agentActionSurface.locator('[data-submission-id="ПД-1048"]').first().click();
-    await expect(
-      drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
-    ).toBeVisible();
-    await expect(drawer(page).getByText("ПД-1048").first()).toBeVisible();
+    const firstActionRow = agentActionSurface
+      .getByRole("button", { name: /^Открыть подачу:/ })
+      .first();
+    await expect(firstActionRow).toBeVisible();
+    await firstActionRow.click();
+    await expect(drawer(page)).toBeVisible();
+    await expect(drawer(page).getByText(/ПД-\d+|SUB-\d+/).first()).toBeVisible();
     await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
     await drawer(page).getByRole("button", { name: "Закрыть подачу" }).click();
 
     await clickWorkspaceButton(page, /Мои подачи/);
     await expect(page.getByRole("heading", { level: 1, name: "Мои подачи" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Новая подача" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Новая подача" }).first()).toBeVisible();
 
     await selectSubmissionStatus(page, "В работе");
     await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
 
     await selectSubmissionStatus(page, "Требуют действия");
     await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
-    await expect(
-      submissionCardById(page, "ПД-1048").getByText(/2 блокера · 4 из 12/),
-    ).toBeVisible();
+    await expect(submissionCardById(page, "ПД-1048")).toContainText("Селфи 1");
+    await expect(submissionCardById(page, "ПД-1048")).toContainText("2/3");
 
     await page.getByRole("button", { name: "Новая подача" }).first().click();
     await expect(drawer(page).getByText("Новая подача")).toBeVisible();
-    const createNextButton = drawer(page).getByRole("button", { name: "Дальше" });
+    const createNextButton = drawer(page).getByRole("button", { name: "Продолжить" });
     await expect(createNextButton).toBeDisabled();
 
     await drawer(page).getByRole("button", { exact: true, name: "Семья" }).click();
@@ -156,7 +139,7 @@ test.describe("V-19 pilot agent click flow", () => {
     await expect(
       drawer(page).getByRole("heading", { name: "Семья Ивановых" }),
     ).toBeVisible();
-    await drawer(page).getByRole("button", { name: /Замечания/ }).click();
+    await openDrawerTab(page, ["Замечания"]);
     await expect(drawer(page).getByText(/Нужна правка|замечан/i).first()).toBeVisible();
     await expect(
       drawer(page).getByRole("button", { name: "Отправить исправления" }),

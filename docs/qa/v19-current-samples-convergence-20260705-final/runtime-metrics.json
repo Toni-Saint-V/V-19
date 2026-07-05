@@ -1,0 +1,325 @@
+[
+  {
+    "name": "drawer-files",
+    "viewport": {
+      "width": 320,
+      "height": 740
+    },
+    "overflowX": false,
+    "scrollWidth": 320,
+    "clientWidth": 320,
+    "header": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "20",
+      "height": 111,
+      "width": 318,
+      "top": 79,
+      "left": 1
+    },
+    "headerRatio": 0.15,
+    "drawer": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "50",
+      "height": 692,
+      "width": 320,
+      "top": 48,
+      "left": 0
+    },
+    "bodyTopRatio": 0.257,
+    "meta": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 28,
+      "width": 224,
+      "top": 101,
+      "left": 21
+    },
+    "questionnaire": null,
+    "readiness": null,
+    "contextRail": null,
+    "workspaceShell": null,
+    "fileItems": [
+      {
+        "itemWidth": 252,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      },
+      {
+        "itemWidth": 252,
+        "trailingText": "Заменить",
+        "trailingWidth": 96,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      },
+      {
+        "itemWidth": 252,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "name": "drawer-files",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "overflowX": false,
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "header": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "20",
+      "height": 127,
+      "width": 388,
+      "top": 79,
+      "left": 1
+    },
+    "headerRatio": 0.15,
+    "drawer": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "50",
+      "height": 796,
+      "width": 390,
+      "top": 48,
+      "left": 0
+    },
+    "bodyTopRatio": 0.244,
+    "meta": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 28,
+      "width": 294,
+      "top": 101,
+      "left": 21
+    },
+    "questionnaire": null,
+    "readiness": null,
+    "contextRail": null,
+    "workspaceShell": null,
+    "fileItems": [
+      {
+        "itemWidth": 322,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      },
+      {
+        "itemWidth": 322,
+        "trailingText": "Заменить",
+        "trailingWidth": 96,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      },
+      {
+        "itemWidth": 322,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "name": "drawer-files",
+    "viewport": {
+      "width": 430,
+      "height": 932
+    },
+    "overflowX": false,
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "header": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "20",
+      "height": 140,
+      "width": 428,
+      "top": 79,
+      "left": 1
+    },
+    "headerRatio": 0.15,
+    "drawer": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "50",
+      "height": 884,
+      "width": 430,
+      "top": 48,
+      "left": 0
+    },
+    "bodyTopRatio": 0.235,
+    "meta": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 28,
+      "width": 334,
+      "top": 101,
+      "left": 21
+    },
+    "questionnaire": null,
+    "readiness": null,
+    "contextRail": null,
+    "workspaceShell": null,
+    "fileItems": [
+      {
+        "itemWidth": 362,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      },
+      {
+        "itemWidth": 362,
+        "trailingText": "Заменить",
+        "trailingWidth": 96,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      },
+      {
+        "itemWidth": 362,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingTopInset": 13,
+        "trailingRightInset": 13
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "name": "questionnaire",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "overflowX": false,
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "header": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 64,
+      "width": 390,
+      "top": 0,
+      "left": 0
+    },
+    "headerRatio": 0.076,
+    "drawer": null,
+    "bodyTopRatio": null,
+    "meta": null,
+    "questionnaire": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "900",
+      "height": 796,
+      "width": 390,
+      "top": 0,
+      "left": 0
+    },
+    "readiness": {
+      "display": "none",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 0,
+      "width": 0,
+      "top": 0,
+      "left": 0
+    },
+    "contextRail": {
+      "display": "none",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 0,
+      "width": 0,
+      "top": 0,
+      "left": 0
+    },
+    "workspaceShell": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 1661,
+      "width": 358,
+      "top": 157,
+      "left": 16
+    },
+    "fileItems": [],
+    "consoleErrors": []
+  },
+  {
+    "name": "questionnaire",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "overflowX": false,
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "header": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 64,
+      "width": 1440,
+      "top": 0,
+      "left": 0
+    },
+    "headerRatio": 0.071,
+    "drawer": null,
+    "bodyTopRatio": null,
+    "meta": null,
+    "questionnaire": {
+      "display": "flex",
+      "opacity": "1",
+      "zIndex": "900",
+      "height": 900,
+      "width": 1440,
+      "top": 0,
+      "left": 0
+    },
+    "readiness": {
+      "display": "block",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 174,
+      "width": 306,
+      "top": 186,
+      "left": 117
+    },
+    "contextRail": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 625,
+      "width": 340,
+      "top": 451,
+      "left": 975
+    },
+    "workspaceShell": {
+      "display": "grid",
+      "opacity": "1",
+      "zIndex": "auto",
+      "height": 1009,
+      "width": 1240,
+      "top": 169,
+      "left": 100
+    },
+    "fileItems": [],
+    "consoleErrors": []
+  }
+]

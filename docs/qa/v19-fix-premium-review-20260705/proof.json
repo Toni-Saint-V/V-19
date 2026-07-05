@@ -1,0 +1,259 @@
+{
+  "outDir": "/Users/user/Documents/V-19/docs/qa/v19-fix-premium-review-20260705",
+  "generatedAt": "2026-07-05T10:49:49.571Z",
+  "url": "http://127.0.0.1:5191/",
+  "pass": true,
+  "consoleErrors": [],
+  "pageErrors": [],
+  "results": [
+    {
+      "viewport": {
+        "label": "mobile-390",
+        "width": 390,
+        "height": 844,
+        "isMobile": true
+      },
+      "drawerMetrics": {
+        "footer": {
+          "x": 1,
+          "y": 771,
+          "width": 388,
+          "height": 73,
+          "bottom": 844
+        },
+        "footerStatus": {
+          "x": 15,
+          "y": 778,
+          "width": 360,
+          "height": 14,
+          "bottom": 792
+        },
+        "fileAction": {
+          "x": 236.5625,
+          "y": 439.78125,
+          "width": 106.4375,
+          "height": 36,
+          "bottom": 475.78125
+        },
+        "fileActionBefore": {
+          "content": "\"\"",
+          "display": "block",
+          "width": "6px",
+          "height": "6px",
+          "backgroundColor": "rgb(143, 163, 255)"
+        },
+        "overflow": 0,
+        "footerCompactPass": true
+      },
+      "questionnaireMetrics": {
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 64,
+          "bottom": 64
+        },
+        "headerRatio": 0.07582938388625593,
+        "headerText": "ПД-1048АнкетаАнкета: Семья ИвановыхСохранено только чтоГотово к проверкеГотово",
+        "id": {
+          "x": 64,
+          "y": 17.5,
+          "width": 64.359375,
+          "height": 28,
+          "bottom": 45.5,
+          "text": "ПД-1048"
+        },
+        "title": {
+          "x": 136.359375,
+          "y": 19.5,
+          "width": 55.46875,
+          "height": 24,
+          "bottom": 43.5,
+          "text": "АнкетаАнкета: Семья Ивановых"
+        },
+        "mobileTitleStyle": "inline",
+        "desktopTitleStyle": "none",
+        "firstInput": {
+          "x": 27,
+          "y": 423,
+          "width": 336,
+          "height": 32,
+          "bottom": 455
+        },
+        "visibleInputs": 4,
+        "overflow": 0,
+        "mobileContentPass": true,
+        "identityPass": true
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "pass": true
+    },
+    {
+      "viewport": {
+        "label": "tablet-768",
+        "width": 768,
+        "height": 1024,
+        "isMobile": true
+      },
+      "drawerMetrics": {
+        "footer": {
+          "x": 1,
+          "y": 959,
+          "width": 766,
+          "height": 65,
+          "bottom": 1024
+        },
+        "footerStatus": {
+          "x": 17,
+          "y": 980,
+          "width": 349.171875,
+          "height": 24,
+          "bottom": 1004
+        },
+        "fileAction": {
+          "x": 610.5625,
+          "y": 515.4375,
+          "width": 110.4375,
+          "height": 36,
+          "bottom": 551.4375
+        },
+        "fileActionBefore": {
+          "content": "\"\"",
+          "display": "block",
+          "width": "6px",
+          "height": "6px",
+          "backgroundColor": "rgb(143, 163, 255)"
+        },
+        "overflow": 0,
+        "footerCompactPass": true
+      },
+      "questionnaireMetrics": {
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 768,
+          "height": 64,
+          "bottom": 64
+        },
+        "headerRatio": 0.0625,
+        "headerText": "ПД-1048АнкетаАнкета: Семья ИвановыхСохранено только чтоГотово к проверкеГотово",
+        "id": {
+          "x": 68,
+          "y": 18.5,
+          "width": 66.578125,
+          "height": 26,
+          "bottom": 44.5,
+          "text": "ПД-1048"
+        },
+        "title": {
+          "x": 144.578125,
+          "y": 18,
+          "width": 220.765625,
+          "height": 27,
+          "bottom": 45,
+          "text": "АнкетаАнкета: Семья Ивановых"
+        },
+        "mobileTitleStyle": "none",
+        "desktopTitleStyle": "inline",
+        "firstInput": {
+          "x": 33,
+          "y": 563.734375,
+          "width": 356.578125,
+          "height": 32,
+          "bottom": 595.734375
+        },
+        "visibleInputs": 5,
+        "overflow": 0,
+        "mobileContentPass": true,
+        "identityPass": true
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "pass": true
+    },
+    {
+      "viewport": {
+        "label": "desktop-1440",
+        "width": 1440,
+        "height": 900,
+        "isMobile": false
+      },
+      "drawerMetrics": {
+        "footer": {
+          "x": 593,
+          "y": 818,
+          "width": 838,
+          "height": 73,
+          "bottom": 891
+        },
+        "footerStatus": {
+          "x": 625,
+          "y": 843,
+          "width": 349.171875,
+          "height": 24,
+          "bottom": 867
+        },
+        "fileAction": {
+          "x": 1262.5625,
+          "y": 398.1875,
+          "width": 110.4375,
+          "height": 36,
+          "bottom": 434.1875
+        },
+        "fileActionBefore": {
+          "content": "\"\"",
+          "display": "block",
+          "width": "6px",
+          "height": "6px",
+          "backgroundColor": "rgb(143, 163, 255)"
+        },
+        "overflow": 0,
+        "footerCompactPass": true
+      },
+      "questionnaireMetrics": {
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 64,
+          "bottom": 64
+        },
+        "headerRatio": 0.07111111111111111,
+        "headerText": "ПД-1048АнкетаАнкета: Семья ИвановыхСохранено только чтоГотово к проверкеГотово",
+        "id": {
+          "x": 80,
+          "y": 18.5,
+          "width": 66.578125,
+          "height": 26,
+          "bottom": 44.5,
+          "text": "ПД-1048"
+        },
+        "title": {
+          "x": 156.578125,
+          "y": 18,
+          "width": 220.765625,
+          "height": 27,
+          "bottom": 45,
+          "text": "АнкетаАнкета: Семья Ивановых"
+        },
+        "mobileTitleStyle": "none",
+        "desktopTitleStyle": "inline",
+        "firstInput": {
+          "x": 117,
+          "y": 376.25,
+          "width": 306,
+          "height": 40,
+          "bottom": 416.25
+        },
+        "visibleInputs": 6,
+        "overflow": 0,
+        "mobileContentPass": true,
+        "identityPass": true
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "pass": true
+    }
+  ]
+}

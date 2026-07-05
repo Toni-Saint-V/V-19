@@ -1,0 +1,2092 @@
+{
+  "generatedAt": "2026-07-05T08:16:50.608Z",
+  "failures": [],
+  "mobileFindings": [
+    {
+      "scenario": "admin-review",
+      "viewport": "320x740",
+      "overflowX": false,
+      "headerRatio": 0.076,
+      "primaryStartRatio": 0.099,
+      "primaryVisibleRatio": 0.901,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-320x740.png",
+      "errors": 0
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": "320x740",
+      "overflowX": false,
+      "headerRatio": 0.143,
+      "primaryStartRatio": 0.199,
+      "primaryVisibleRatio": 0.713,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-320x740.png",
+      "errors": 0
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": "320x740",
+      "overflowX": false,
+      "headerRatio": 0.076,
+      "primaryStartRatio": 0.076,
+      "primaryVisibleRatio": 0.796,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-320x740.png",
+      "errors": 0
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": "320x740",
+      "overflowX": false,
+      "headerRatio": 0.15,
+      "primaryStartRatio": 0.314,
+      "primaryVisibleRatio": 0.496,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-320x740.png",
+      "errors": 0
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": "320x740",
+      "overflowX": false,
+      "headerRatio": 0.076,
+      "primaryStartRatio": 0.235,
+      "primaryVisibleRatio": 0.765,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-320x740.png",
+      "errors": 0
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": "375x812",
+      "overflowX": false,
+      "headerRatio": 0.069,
+      "primaryStartRatio": 0.091,
+      "primaryVisibleRatio": 0.909,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-375x812.png",
+      "errors": 0
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": "375x812",
+      "overflowX": false,
+      "headerRatio": 0.122,
+      "primaryStartRatio": 0.172,
+      "primaryVisibleRatio": 0.748,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-375x812.png",
+      "errors": 0
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": "375x812",
+      "overflowX": false,
+      "headerRatio": 0.069,
+      "primaryStartRatio": 0.069,
+      "primaryVisibleRatio": 0.814,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-375x812.png",
+      "errors": 0
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": "375x812",
+      "overflowX": false,
+      "headerRatio": 0.15,
+      "primaryStartRatio": 0.31,
+      "primaryVisibleRatio": 0.515,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-375x812.png",
+      "errors": 0
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": "375x812",
+      "overflowX": false,
+      "headerRatio": 0.069,
+      "primaryStartRatio": 0.214,
+      "primaryVisibleRatio": 0.786,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-375x812.png",
+      "errors": 0
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": "390x844",
+      "overflowX": false,
+      "headerRatio": 0.066,
+      "primaryStartRatio": 0.09,
+      "primaryVisibleRatio": 0.91,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-390x844.png",
+      "errors": 0
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": "390x844",
+      "overflowX": false,
+      "headerRatio": 0.117,
+      "primaryStartRatio": 0.166,
+      "primaryVisibleRatio": 0.757,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-390x844.png",
+      "errors": 0
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": "390x844",
+      "overflowX": false,
+      "headerRatio": 0.066,
+      "primaryStartRatio": 0.066,
+      "primaryVisibleRatio": 0.821,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-390x844.png",
+      "errors": 0
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": "390x844",
+      "overflowX": false,
+      "headerRatio": 0.146,
+      "primaryStartRatio": 0.307,
+      "primaryVisibleRatio": 0.555,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-390x844.png",
+      "errors": 0
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": "390x844",
+      "overflowX": false,
+      "headerRatio": 0.066,
+      "primaryStartRatio": 0.206,
+      "primaryVisibleRatio": 0.794,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-390x844.png",
+      "errors": 0
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": "430x932",
+      "overflowX": false,
+      "headerRatio": 0.06,
+      "primaryStartRatio": 0.087,
+      "primaryVisibleRatio": 0.913,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-430x932.png",
+      "errors": 0
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": "430x932",
+      "overflowX": false,
+      "headerRatio": 0.106,
+      "primaryStartRatio": 0.15,
+      "primaryVisibleRatio": 0.78,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-430x932.png",
+      "errors": 0
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": "430x932",
+      "overflowX": false,
+      "headerRatio": 0.06,
+      "primaryStartRatio": 0.06,
+      "primaryVisibleRatio": 0.838,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-430x932.png",
+      "errors": 0
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": "430x932",
+      "overflowX": false,
+      "headerRatio": 0.132,
+      "primaryStartRatio": 0.291,
+      "primaryVisibleRatio": 0.584,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-430x932.png",
+      "errors": 0
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": "430x932",
+      "overflowX": false,
+      "headerRatio": 0.06,
+      "primaryStartRatio": 0.187,
+      "primaryVisibleRatio": 0.813,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-430x932.png",
+      "errors": 0
+    }
+  ],
+  "results": [
+    {
+      "scenario": "admin-review",
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-320x740.png",
+      "metrics": {
+        "scenario": "admin-review",
+        "viewport": {
+          "width": 320,
+          "height": 740
+        },
+        "scrollWidth": 320,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "headerRatio": 0.076,
+        "drawer": null,
+        "dock": {
+          "top": 684,
+          "bottom": 732,
+          "height": 48,
+          "left": 12,
+          "right": 308,
+          "width": 296
+        },
+        "primary": {
+          "sel": ".v19-admin-cockpit-lanes",
+          "rect": {
+            "top": 73,
+            "bottom": 2350,
+            "height": 2277,
+            "left": 17,
+            "right": 303,
+            "width": 286
+          },
+          "visible": 667
+        },
+        "primaryVisibleRatio": 0.901,
+        "primaryStartRatio": 0.099,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-320x740.png",
+      "metrics": {
+        "scenario": "admin-drawer",
+        "viewport": {
+          "width": 320,
+          "height": 740
+        },
+        "scrollWidth": 320,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "header": {
+          "top": 41,
+          "bottom": 147,
+          "height": 106,
+          "left": 1,
+          "right": 319,
+          "width": 318
+        },
+        "headerRatio": 0.143,
+        "drawer": {
+          "top": 40,
+          "bottom": 740,
+          "height": 700,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "dock": {
+          "top": 684,
+          "bottom": 732,
+          "height": 48,
+          "left": 12,
+          "right": 308,
+          "width": 296
+        },
+        "primary": {
+          "sel": ".admin-review-content",
+          "rect": {
+            "top": 147,
+            "bottom": 675,
+            "height": 528,
+            "left": 1,
+            "right": 319,
+            "width": 318
+          },
+          "visible": 527.8125
+        },
+        "primaryVisibleRatio": 0.713,
+        "primaryStartRatio": 0.199,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-320x740.png",
+      "metrics": {
+        "scenario": "create-drawer",
+        "viewport": {
+          "width": 320,
+          "height": 740
+        },
+        "scrollWidth": 320,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "headerRatio": 0.076,
+        "drawer": {
+          "top": 0,
+          "bottom": 740,
+          "height": 740,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "dock": {
+          "top": 645,
+          "bottom": 740,
+          "height": 95,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "primary": {
+          "sel": ".create-submission-drawer > .flex-1",
+          "rect": {
+            "top": 56,
+            "bottom": 645,
+            "height": 589,
+            "left": 0,
+            "right": 320,
+            "width": 320
+          },
+          "visible": 589
+        },
+        "primaryVisibleRatio": 0.796,
+        "primaryStartRatio": 0.076,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-320x740.png",
+      "metrics": {
+        "scenario": "submission-drawer",
+        "viewport": {
+          "width": 320,
+          "height": 740
+        },
+        "scrollWidth": 320,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "header": {
+          "top": 121,
+          "bottom": 232,
+          "height": 111,
+          "left": 1,
+          "right": 319,
+          "width": 318
+        },
+        "headerRatio": 0.15,
+        "drawer": {
+          "top": 104,
+          "bottom": 740,
+          "height": 636,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "dock": {
+          "top": 599,
+          "bottom": 740,
+          "height": 141,
+          "left": 1,
+          "right": 319,
+          "width": 318
+        },
+        "primary": {
+          "sel": ".v19-submission-drawer-body",
+          "rect": {
+            "top": 232,
+            "bottom": 599,
+            "height": 367,
+            "left": 1,
+            "right": 319,
+            "width": 318
+          },
+          "visible": 367.390625
+        },
+        "primaryVisibleRatio": 0.496,
+        "primaryStartRatio": 0.314,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-320x740.png",
+      "metrics": {
+        "scenario": "agent-actions",
+        "viewport": {
+          "width": 320,
+          "height": 740
+        },
+        "scrollWidth": 320,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 320,
+          "width": 320
+        },
+        "headerRatio": 0.076,
+        "drawer": null,
+        "dock": null,
+        "primary": {
+          "sel": ".vf-figma-action-list",
+          "rect": {
+            "top": 174,
+            "bottom": 942,
+            "height": 768,
+            "left": 16,
+            "right": 304,
+            "width": 288
+          },
+          "visible": 566
+        },
+        "primaryVisibleRatio": 0.765,
+        "primaryStartRatio": 0.235,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-375x812.png",
+      "metrics": {
+        "scenario": "admin-review",
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "scrollWidth": 375,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "headerRatio": 0.069,
+        "drawer": null,
+        "dock": {
+          "top": 756,
+          "bottom": 804,
+          "height": 48,
+          "left": 12,
+          "right": 363,
+          "width": 351
+        },
+        "primary": {
+          "sel": ".v19-admin-cockpit-lanes",
+          "rect": {
+            "top": 74,
+            "bottom": 2177,
+            "height": 2103,
+            "left": 17,
+            "right": 358,
+            "width": 341
+          },
+          "visible": 738.5
+        },
+        "primaryVisibleRatio": 0.909,
+        "primaryStartRatio": 0.091,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-375x812.png",
+      "metrics": {
+        "scenario": "admin-drawer",
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "scrollWidth": 375,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "header": {
+          "top": 41,
+          "bottom": 140,
+          "height": 99,
+          "left": 1,
+          "right": 374,
+          "width": 373
+        },
+        "headerRatio": 0.122,
+        "drawer": {
+          "top": 40,
+          "bottom": 812,
+          "height": 772,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "dock": {
+          "top": 756,
+          "bottom": 804,
+          "height": 48,
+          "left": 12,
+          "right": 363,
+          "width": 351
+        },
+        "primary": {
+          "sel": ".admin-review-content",
+          "rect": {
+            "top": 140,
+            "bottom": 747,
+            "height": 607,
+            "left": 1,
+            "right": 374,
+            "width": 373
+          },
+          "visible": 607
+        },
+        "primaryVisibleRatio": 0.748,
+        "primaryStartRatio": 0.172,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-375x812.png",
+      "metrics": {
+        "scenario": "create-drawer",
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "scrollWidth": 375,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "headerRatio": 0.069,
+        "drawer": {
+          "top": 0,
+          "bottom": 812,
+          "height": 812,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "dock": {
+          "top": 717,
+          "bottom": 812,
+          "height": 95,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "primary": {
+          "sel": ".create-submission-drawer > .flex-1",
+          "rect": {
+            "top": 56,
+            "bottom": 717,
+            "height": 661,
+            "left": 0,
+            "right": 375,
+            "width": 375
+          },
+          "visible": 661
+        },
+        "primaryVisibleRatio": 0.814,
+        "primaryStartRatio": 0.069,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-375x812.png",
+      "metrics": {
+        "scenario": "submission-drawer",
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "scrollWidth": 375,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "header": {
+          "top": 131,
+          "bottom": 252,
+          "height": 122,
+          "left": 1,
+          "right": 374,
+          "width": 373
+        },
+        "headerRatio": 0.15,
+        "drawer": {
+          "top": 114,
+          "bottom": 812,
+          "height": 698,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "dock": {
+          "top": 671,
+          "bottom": 812,
+          "height": 141,
+          "left": 1,
+          "right": 374,
+          "width": 373
+        },
+        "primary": {
+          "sel": ".v19-submission-drawer-body",
+          "rect": {
+            "top": 252,
+            "bottom": 671,
+            "height": 419,
+            "left": 1,
+            "right": 374,
+            "width": 373
+          },
+          "visible": 418.515625
+        },
+        "primaryVisibleRatio": 0.515,
+        "primaryStartRatio": 0.31,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-375x812.png",
+      "metrics": {
+        "scenario": "agent-actions",
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "scrollWidth": 375,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 375,
+          "width": 375
+        },
+        "headerRatio": 0.069,
+        "drawer": null,
+        "dock": null,
+        "primary": {
+          "sel": ".vf-figma-action-list",
+          "rect": {
+            "top": 174,
+            "bottom": 942,
+            "height": 768,
+            "left": 16,
+            "right": 359,
+            "width": 343
+          },
+          "visible": 638
+        },
+        "primaryVisibleRatio": 0.786,
+        "primaryStartRatio": 0.214,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-390x844.png",
+      "metrics": {
+        "scenario": "admin-review",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "scrollWidth": 390,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "headerRatio": 0.066,
+        "drawer": null,
+        "dock": {
+          "top": 788,
+          "bottom": 836,
+          "height": 48,
+          "left": 12,
+          "right": 378,
+          "width": 366
+        },
+        "primary": {
+          "sel": ".v19-admin-cockpit-lanes",
+          "rect": {
+            "top": 76,
+            "bottom": 2166,
+            "height": 2090,
+            "left": 17,
+            "right": 373,
+            "width": 356
+          },
+          "visible": 768.40625
+        },
+        "primaryVisibleRatio": 0.91,
+        "primaryStartRatio": 0.09,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-390x844.png",
+      "metrics": {
+        "scenario": "admin-drawer",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "scrollWidth": 390,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "header": {
+          "top": 41,
+          "bottom": 140,
+          "height": 99,
+          "left": 1,
+          "right": 389,
+          "width": 388
+        },
+        "headerRatio": 0.117,
+        "drawer": {
+          "top": 40,
+          "bottom": 844,
+          "height": 804,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "dock": {
+          "top": 788,
+          "bottom": 836,
+          "height": 48,
+          "left": 12,
+          "right": 378,
+          "width": 366
+        },
+        "primary": {
+          "sel": ".admin-review-content",
+          "rect": {
+            "top": 140,
+            "bottom": 779,
+            "height": 639,
+            "left": 1,
+            "right": 389,
+            "width": 388
+          },
+          "visible": 639
+        },
+        "primaryVisibleRatio": 0.757,
+        "primaryStartRatio": 0.166,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-390x844.png",
+      "metrics": {
+        "scenario": "create-drawer",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "scrollWidth": 390,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "headerRatio": 0.066,
+        "drawer": {
+          "top": 0,
+          "bottom": 844,
+          "height": 844,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "dock": {
+          "top": 749,
+          "bottom": 844,
+          "height": 95,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "primary": {
+          "sel": ".create-submission-drawer > .flex-1",
+          "rect": {
+            "top": 56,
+            "bottom": 749,
+            "height": 693,
+            "left": 0,
+            "right": 390,
+            "width": 390
+          },
+          "visible": 693
+        },
+        "primaryVisibleRatio": 0.821,
+        "primaryStartRatio": 0.066,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-390x844.png",
+      "metrics": {
+        "scenario": "submission-drawer",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "scrollWidth": 390,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "header": {
+          "top": 135,
+          "bottom": 259,
+          "height": 123,
+          "left": 1,
+          "right": 389,
+          "width": 388
+        },
+        "headerRatio": 0.146,
+        "drawer": {
+          "top": 118,
+          "bottom": 844,
+          "height": 726,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "dock": {
+          "top": 727,
+          "bottom": 844,
+          "height": 117,
+          "left": 1,
+          "right": 389,
+          "width": 388
+        },
+        "primary": {
+          "sel": ".v19-submission-drawer-body",
+          "rect": {
+            "top": 259,
+            "bottom": 727,
+            "height": 468,
+            "left": 1,
+            "right": 389,
+            "width": 388
+          },
+          "visible": 468.4375
+        },
+        "primaryVisibleRatio": 0.555,
+        "primaryStartRatio": 0.307,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-390x844.png",
+      "metrics": {
+        "scenario": "agent-actions",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "scrollWidth": 390,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 390,
+          "width": 390
+        },
+        "headerRatio": 0.066,
+        "drawer": null,
+        "dock": null,
+        "primary": {
+          "sel": ".vf-figma-action-list",
+          "rect": {
+            "top": 174,
+            "bottom": 942,
+            "height": 768,
+            "left": 16,
+            "right": 374,
+            "width": 358
+          },
+          "visible": 670
+        },
+        "primaryVisibleRatio": 0.794,
+        "primaryStartRatio": 0.206,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-430x932.png",
+      "metrics": {
+        "scenario": "admin-review",
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "scrollWidth": 430,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "headerRatio": 0.06,
+        "drawer": null,
+        "dock": {
+          "top": 876,
+          "bottom": 924,
+          "height": 48,
+          "left": 12,
+          "right": 418,
+          "width": 406
+        },
+        "primary": {
+          "sel": ".v19-admin-cockpit-lanes",
+          "rect": {
+            "top": 81,
+            "bottom": 2172,
+            "height": 2090,
+            "left": 17,
+            "right": 413,
+            "width": 396
+          },
+          "visible": 850.8125
+        },
+        "primaryVisibleRatio": 0.913,
+        "primaryStartRatio": 0.087,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-430x932.png",
+      "metrics": {
+        "scenario": "admin-drawer",
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "scrollWidth": 430,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "header": {
+          "top": 41,
+          "bottom": 140,
+          "height": 99,
+          "left": 1,
+          "right": 429,
+          "width": 428
+        },
+        "headerRatio": 0.106,
+        "drawer": {
+          "top": 40,
+          "bottom": 932,
+          "height": 892,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "dock": {
+          "top": 876,
+          "bottom": 924,
+          "height": 48,
+          "left": 12,
+          "right": 418,
+          "width": 406
+        },
+        "primary": {
+          "sel": ".admin-review-content",
+          "rect": {
+            "top": 140,
+            "bottom": 867,
+            "height": 727,
+            "left": 1,
+            "right": 429,
+            "width": 428
+          },
+          "visible": 727
+        },
+        "primaryVisibleRatio": 0.78,
+        "primaryStartRatio": 0.15,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-430x932.png",
+      "metrics": {
+        "scenario": "create-drawer",
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "scrollWidth": 430,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "headerRatio": 0.06,
+        "drawer": {
+          "top": 0,
+          "bottom": 932,
+          "height": 932,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "dock": {
+          "top": 837,
+          "bottom": 932,
+          "height": 95,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "primary": {
+          "sel": ".create-submission-drawer > .flex-1",
+          "rect": {
+            "top": 56,
+            "bottom": 837,
+            "height": 781,
+            "left": 0,
+            "right": 430,
+            "width": 430
+          },
+          "visible": 781
+        },
+        "primaryVisibleRatio": 0.838,
+        "primaryStartRatio": 0.06,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-430x932.png",
+      "metrics": {
+        "scenario": "submission-drawer",
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "scrollWidth": 430,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "header": {
+          "top": 147,
+          "bottom": 271,
+          "height": 123,
+          "left": 1,
+          "right": 429,
+          "width": 428
+        },
+        "headerRatio": 0.132,
+        "drawer": {
+          "top": 130,
+          "bottom": 932,
+          "height": 802,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "dock": {
+          "top": 815,
+          "bottom": 932,
+          "height": 117,
+          "left": 1,
+          "right": 429,
+          "width": 428
+        },
+        "primary": {
+          "sel": ".v19-submission-drawer-body",
+          "rect": {
+            "top": 271,
+            "bottom": 815,
+            "height": 544,
+            "left": 1,
+            "right": 429,
+            "width": 428
+          },
+          "visible": 544.125
+        },
+        "primaryVisibleRatio": 0.584,
+        "primaryStartRatio": 0.291,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-430x932.png",
+      "metrics": {
+        "scenario": "agent-actions",
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "scrollWidth": 430,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 0,
+          "right": 430,
+          "width": 430
+        },
+        "headerRatio": 0.06,
+        "drawer": null,
+        "dock": null,
+        "primary": {
+          "sel": ".vf-figma-action-list",
+          "rect": {
+            "top": 174,
+            "bottom": 942,
+            "height": 768,
+            "left": 16,
+            "right": 414,
+            "width": 398
+          },
+          "visible": 758
+        },
+        "primaryVisibleRatio": 0.813,
+        "primaryStartRatio": 0.187,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-768x1024.png",
+      "metrics": {
+        "scenario": "admin-review",
+        "viewport": {
+          "width": 768,
+          "height": 1024
+        },
+        "scrollWidth": 768,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 260,
+          "right": 768,
+          "width": 508
+        },
+        "header": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 260,
+          "right": 768,
+          "width": 508
+        },
+        "headerRatio": 0.055,
+        "drawer": null,
+        "dock": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0
+        },
+        "primary": {
+          "sel": ".v19-admin-cockpit-lanes",
+          "rect": {
+            "top": 742,
+            "bottom": 3122,
+            "height": 2380,
+            "left": 277,
+            "right": 751,
+            "width": 474
+          },
+          "visible": 282
+        },
+        "primaryVisibleRatio": 0.275,
+        "primaryStartRatio": 0.725,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-768x1024.png",
+      "metrics": {
+        "scenario": "admin-drawer",
+        "viewport": {
+          "width": 768,
+          "height": 1024
+        },
+        "scrollWidth": 768,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 56,
+          "height": 56,
+          "left": 260,
+          "right": 768,
+          "width": 508
+        },
+        "header": {
+          "top": 49,
+          "bottom": 168,
+          "height": 119,
+          "left": 1,
+          "right": 767,
+          "width": 766
+        },
+        "headerRatio": 0.116,
+        "drawer": {
+          "top": 48,
+          "bottom": 1024,
+          "height": 976,
+          "left": 0,
+          "right": 768,
+          "width": 768
+        },
+        "dock": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0
+        },
+        "primary": {
+          "sel": ".admin-review-content",
+          "rect": {
+            "top": 168,
+            "bottom": 947,
+            "height": 779,
+            "left": 1,
+            "right": 767,
+            "width": 766
+          },
+          "visible": 778.609375
+        },
+        "primaryVisibleRatio": 0.76,
+        "primaryStartRatio": 0.164,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-768x1024.png",
+      "metrics": {
+        "scenario": "create-drawer",
+        "viewport": {
+          "width": 768,
+          "height": 1024
+        },
+        "scrollWidth": 768,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 768,
+          "width": 480
+        },
+        "header": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 0,
+          "right": 768,
+          "width": 768
+        },
+        "headerRatio": 0.063,
+        "drawer": {
+          "top": 0,
+          "bottom": 1024,
+          "height": 1024,
+          "left": 0,
+          "right": 768,
+          "width": 768
+        },
+        "dock": {
+          "top": 947,
+          "bottom": 1024,
+          "height": 77,
+          "left": 0,
+          "right": 768,
+          "width": 768
+        },
+        "primary": {
+          "sel": ".create-submission-drawer > .flex-1",
+          "rect": {
+            "top": 64,
+            "bottom": 947,
+            "height": 883,
+            "left": 0,
+            "right": 768,
+            "width": 768
+          },
+          "visible": 883
+        },
+        "primaryVisibleRatio": 0.862,
+        "primaryStartRatio": 0.063,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-768x1024.png",
+      "metrics": {
+        "scenario": "submission-drawer",
+        "viewport": {
+          "width": 768,
+          "height": 1024
+        },
+        "scrollWidth": 768,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 768,
+          "width": 480
+        },
+        "header": {
+          "top": 164,
+          "bottom": 293,
+          "height": 129,
+          "left": 1,
+          "right": 767,
+          "width": 766
+        },
+        "headerRatio": 0.126,
+        "drawer": {
+          "top": 146,
+          "bottom": 1024,
+          "height": 878,
+          "left": 0,
+          "right": 768,
+          "width": 768
+        },
+        "dock": {
+          "top": 959,
+          "bottom": 1024,
+          "height": 65,
+          "left": 1,
+          "right": 767,
+          "width": 766
+        },
+        "primary": {
+          "sel": ".v19-submission-drawer-body",
+          "rect": {
+            "top": 293,
+            "bottom": 959,
+            "height": 666,
+            "left": 1,
+            "right": 767,
+            "width": 766
+          },
+          "visible": 665.75
+        },
+        "primaryVisibleRatio": 0.65,
+        "primaryStartRatio": 0.286,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-768x1024.png",
+      "metrics": {
+        "scenario": "agent-actions",
+        "viewport": {
+          "width": 768,
+          "height": 1024
+        },
+        "scrollWidth": 768,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 768,
+          "width": 480
+        },
+        "header": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 768,
+          "width": 480
+        },
+        "headerRatio": 0.063,
+        "drawer": null,
+        "dock": null,
+        "primary": {
+          "sel": ".vf-figma-action-list",
+          "rect": {
+            "top": 190,
+            "bottom": 923,
+            "height": 733,
+            "left": 304,
+            "right": 752,
+            "width": 448
+          },
+          "visible": 732.6875
+        },
+        "primaryVisibleRatio": 0.716,
+        "primaryStartRatio": 0.186,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-review",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-review-1440x900.png",
+      "metrics": {
+        "scenario": "admin-review",
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scrollWidth": 1440,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 260,
+          "right": 1440,
+          "width": 1180
+        },
+        "header": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 260,
+          "right": 1440,
+          "width": 1180
+        },
+        "headerRatio": 0.071,
+        "drawer": null,
+        "dock": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0
+        },
+        "primary": {
+          "sel": ".v19-admin-cockpit-lanes",
+          "rect": {
+            "top": 535,
+            "bottom": 2163,
+            "height": 1628,
+            "left": 285,
+            "right": 1035,
+            "width": 750
+          },
+          "visible": 365
+        },
+        "primaryVisibleRatio": 0.406,
+        "primaryStartRatio": 0.594,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "admin-drawer",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-admin-drawer-1440x900.png",
+      "metrics": {
+        "scenario": "admin-drawer",
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scrollWidth": 1440,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 260,
+          "right": 1440,
+          "width": 1180
+        },
+        "header": {
+          "top": 9,
+          "bottom": 131,
+          "height": 122,
+          "left": 573,
+          "right": 1431,
+          "width": 858
+        },
+        "headerRatio": 0.136,
+        "drawer": {
+          "top": 8,
+          "bottom": 892,
+          "height": 884,
+          "left": 572,
+          "right": 1432,
+          "width": 860
+        },
+        "dock": {
+          "top": 0,
+          "bottom": 0,
+          "height": 0,
+          "left": 0,
+          "right": 0,
+          "width": 0
+        },
+        "primary": {
+          "sel": ".admin-review-content",
+          "rect": {
+            "top": 131,
+            "bottom": 814,
+            "height": 683,
+            "left": 573,
+            "right": 1431,
+            "width": 858
+          },
+          "visible": 682.734375
+        },
+        "primaryVisibleRatio": 0.759,
+        "primaryStartRatio": 0.146,
+        "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "create-drawer",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-create-drawer-1440x900.png",
+      "metrics": {
+        "scenario": "create-drawer",
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scrollWidth": 1440,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 1416,
+          "width": 1128
+        },
+        "header": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 0,
+          "right": 1440,
+          "width": 1440
+        },
+        "headerRatio": 0.071,
+        "drawer": {
+          "top": 0,
+          "bottom": 900,
+          "height": 900,
+          "left": 0,
+          "right": 1440,
+          "width": 1440
+        },
+        "dock": {
+          "top": 823,
+          "bottom": 900,
+          "height": 77,
+          "left": 0,
+          "right": 1440,
+          "width": 1440
+        },
+        "primary": {
+          "sel": ".create-submission-drawer > .flex-1",
+          "rect": {
+            "top": 64,
+            "bottom": 823,
+            "height": 759,
+            "left": 0,
+            "right": 1440,
+            "width": 1440
+          },
+          "visible": 759
+        },
+        "primaryVisibleRatio": 0.843,
+        "primaryStartRatio": 0.071,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "submission-drawer",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-submission-drawer-1440x900.png",
+      "metrics": {
+        "scenario": "submission-drawer",
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scrollWidth": 1440,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 1416,
+          "width": 1128
+        },
+        "header": {
+          "top": 9,
+          "bottom": 162,
+          "height": 153,
+          "left": 593,
+          "right": 1431,
+          "width": 838
+        },
+        "headerRatio": 0.17,
+        "drawer": {
+          "top": 8,
+          "bottom": 892,
+          "height": 884,
+          "left": 592,
+          "right": 1432,
+          "width": 840
+        },
+        "dock": {
+          "top": 818,
+          "bottom": 891,
+          "height": 73,
+          "left": 593,
+          "right": 1431,
+          "width": 838
+        },
+        "primary": {
+          "sel": ".v19-submission-drawer-body",
+          "rect": {
+            "top": 162,
+            "bottom": 818,
+            "height": 656,
+            "left": 593,
+            "right": 1431,
+            "width": 838
+          },
+          "visible": 656
+        },
+        "primaryVisibleRatio": 0.729,
+        "primaryStartRatio": 0.18,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer"
+      },
+      "errors": []
+    },
+    {
+      "scenario": "agent-actions",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "ok": true,
+      "screenshot": "/Users/user/Documents/V-19/docs/qa/v19-drawer-review-transfer-20260705/target-agent-actions-1440x900.png",
+      "metrics": {
+        "scenario": "agent-actions",
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "scrollWidth": 1440,
+        "overflowX": false,
+        "topbar": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 1416,
+          "width": 1128
+        },
+        "header": {
+          "top": 0,
+          "bottom": 64,
+          "height": 64,
+          "left": 288,
+          "right": 1416,
+          "width": 1128
+        },
+        "headerRatio": 0.071,
+        "drawer": null,
+        "dock": null,
+        "primary": {
+          "sel": ".vf-figma-action-list",
+          "rect": {
+            "top": 212,
+            "bottom": 639,
+            "height": 427,
+            "left": 312,
+            "right": 1392,
+            "width": 1080
+          },
+          "visible": 427
+        },
+        "primaryVisibleRatio": 0.474,
+        "primaryStartRatio": 0.236,
+        "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular"
+      },
+      "errors": []
+    }
+  ]
+}

@@ -1,0 +1,327 @@
+[
+  {
+    "label": "mobile390-export",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "overflowX": false,
+    "exportRows": 4,
+    "workspace": false,
+    "doc": null,
+    "compare": null,
+    "firstField": null,
+    "stats": null,
+    "visibleFieldRows": 0,
+    "overlaps": [],
+    "logs": []
+  },
+  {
+    "label": "mobile390-workspace",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "overflowX": false,
+    "exportRows": 0,
+    "workspace": true,
+    "doc": {
+      "x": 0,
+      "y": 52,
+      "w": 420,
+      "h": 287,
+      "bottom": 339
+    },
+    "compare": {
+      "x": 420,
+      "y": 52,
+      "w": 420,
+      "h": 287,
+      "bottom": 339
+    },
+    "firstField": {
+      "x": 436,
+      "y": 175,
+      "w": 388,
+      "h": 88,
+      "bottom": 263
+    },
+    "stats": {
+      "x": 436,
+      "y": 96,
+      "w": 388,
+      "h": 69,
+      "bottom": 165
+    },
+    "visibleFieldRows": 7,
+    "overlaps": [
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-passport-document-zone",
+        "ratio": 0.42
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 1
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.78
+      }
+    ],
+    "logs": []
+  },
+  {
+    "label": "mobile430-export",
+    "viewport": "430x932",
+    "scrollWidth": 430,
+    "overflowX": false,
+    "exportRows": 4,
+    "workspace": false,
+    "doc": null,
+    "compare": null,
+    "firstField": null,
+    "stats": null,
+    "visibleFieldRows": 0,
+    "overlaps": [],
+    "logs": []
+  },
+  {
+    "label": "mobile430-workspace",
+    "viewport": "430x932",
+    "scrollWidth": 430,
+    "overflowX": false,
+    "exportRows": 0,
+    "workspace": true,
+    "doc": {
+      "x": 0,
+      "y": 52,
+      "w": 420,
+      "h": 317,
+      "bottom": 369
+    },
+    "compare": {
+      "x": 420,
+      "y": 52,
+      "w": 420,
+      "h": 317,
+      "bottom": 369
+    },
+    "firstField": {
+      "x": 436,
+      "y": 175,
+      "w": 388,
+      "h": 88,
+      "bottom": 263
+    },
+    "stats": {
+      "x": 436,
+      "y": 96,
+      "w": 388,
+      "h": 69,
+      "bottom": 165
+    },
+    "visibleFieldRows": 7,
+    "overlaps": [
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-passport-document-zone",
+        "ratio": 0.71
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 1
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 1
+      }
+    ],
+    "logs": []
+  },
+  {
+    "label": "tablet768-export",
+    "viewport": "768x1024",
+    "scrollWidth": 768,
+    "overflowX": false,
+    "exportRows": 4,
+    "workspace": false,
+    "doc": null,
+    "compare": null,
+    "firstField": null,
+    "stats": null,
+    "visibleFieldRows": 0,
+    "overlaps": [],
+    "logs": []
+  },
+  {
+    "label": "tablet768-workspace",
+    "viewport": "768x1024",
+    "scrollWidth": 768,
+    "overflowX": false,
+    "exportRows": 0,
+    "workspace": true,
+    "doc": {
+      "x": 0,
+      "y": 52,
+      "w": 420,
+      "h": 348,
+      "bottom": 400
+    },
+    "compare": {
+      "x": 420,
+      "y": 52,
+      "w": 420,
+      "h": 348,
+      "bottom": 400
+    },
+    "firstField": {
+      "x": 436,
+      "y": 175,
+      "w": 388,
+      "h": 88,
+      "bottom": 263
+    },
+    "stats": {
+      "x": 436,
+      "y": 96,
+      "w": 388,
+      "h": 69,
+      "bottom": 165
+    },
+    "visibleFieldRows": 7,
+    "overlaps": [
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.8
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.32
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.41
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.72
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.8
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.24
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.49
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 1
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 1
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.38
+      }
+    ],
+    "logs": []
+  },
+  {
+    "label": "wide645-export",
+    "viewport": "645x670",
+    "scrollWidth": 645,
+    "overflowX": false,
+    "exportRows": 4,
+    "workspace": false,
+    "doc": null,
+    "compare": null,
+    "firstField": null,
+    "stats": null,
+    "visibleFieldRows": 0,
+    "overlaps": [],
+    "logs": []
+  },
+  {
+    "label": "wide645-workspace",
+    "viewport": "645x670",
+    "scrollWidth": 645,
+    "overflowX": false,
+    "exportRows": 0,
+    "workspace": true,
+    "doc": {
+      "x": 0,
+      "y": 52,
+      "w": 420,
+      "h": 228,
+      "bottom": 280
+    },
+    "compare": {
+      "x": 420,
+      "y": 52,
+      "w": 420,
+      "h": 228,
+      "bottom": 280
+    },
+    "firstField": {
+      "x": 436,
+      "y": 175,
+      "w": 388,
+      "h": 88,
+      "bottom": 263
+    },
+    "stats": {
+      "x": 436,
+      "y": 96,
+      "w": 388,
+      "h": 69,
+      "bottom": 165
+    },
+    "visibleFieldRows": 6,
+    "overlaps": [
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.43
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.26
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.48
+      },
+      {
+        "a": "admin-review-field-row is-pending ",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.47
+      },
+      {
+        "a": "admin-passport-compare-zone",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 1
+      }
+    ],
+    "logs": []
+  }
+]

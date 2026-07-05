@@ -28,7 +28,10 @@ import {
 import { buildApplicantDocumentFileName } from "../../src/modules/submissions/filenamePolicy";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { createQuestionnaireSections } from "../../src/modules/submissions/questionnaire";
-import { searchSubmissions } from "../../src/modules/submissions/selectors";
+import {
+  cityFilterValuesForSubmissions,
+  searchSubmissions,
+} from "../../src/modules/submissions/selectors";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type {
   ExportPackageIdentity,
@@ -597,13 +600,24 @@ describe("V-19 export workbook contract", () => {
     ).toEqual(["ПД-1056"]);
   });
 
-  test("city search uses questionnaire appointment city before submission city", () => {
-    const submission = withQuestionnaireFieldValues(readySubmission(), {
-      "appointment-city": "Казань",
-    });
+  test("city search and filter options include submission city and appointment city", () => {
+    const submission: Submission = {
+      ...withQuestionnaireFieldValues(readySubmission(), {
+        "appointment-city": "Казань",
+      }),
+      city: "Санкт-Петербург",
+    };
 
+    expect(searchSubmissions([submission], "", "Санкт-Петербург")).toEqual([
+      submission,
+    ]);
     expect(searchSubmissions([submission], "", "Казань")).toEqual([submission]);
     expect(searchSubmissions([submission], "", "Москва")).toEqual([]);
+    expect(cityFilterValuesForSubmissions([submission])).toEqual([
+      "Все города",
+      "Казань",
+      "Санкт-Петербург",
+    ]);
   });
 
   test("filename builder sanitizes and prefixes passport numbers for active applicant documents", () => {

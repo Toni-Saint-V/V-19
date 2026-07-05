@@ -1,0 +1,1566 @@
+[
+  {
+    "name": "admin-review",
+    "vp": {
+      "width": 390,
+      "height": 844
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/admin-review-390x844.png",
+    "metrics": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "board": {
+        "top": 95,
+        "bottom": 2209,
+        "height": 2114,
+        "left": 16,
+        "right": 374,
+        "width": 358
+      },
+      "lanes": {
+        "top": 96,
+        "bottom": 2208,
+        "height": 2112,
+        "left": 17,
+        "right": 373,
+        "width": 356
+      },
+      "dock": {
+        "top": 776,
+        "bottom": 832,
+        "height": 56,
+        "left": 16,
+        "right": 374,
+        "width": 358
+      },
+      "list": null,
+      "drawer": null,
+      "drawerHeader": null,
+      "drawerTabs": null,
+      "drawerContent": null,
+      "firstList": {
+        "sel": ".v19-admin-cockpit-lanes",
+        "rect": {
+          "top": 96,
+          "bottom": 2208,
+          "height": 2112,
+          "left": 17,
+          "right": 373,
+          "width": 356
+        },
+        "visible": 748.40625
+      },
+      "primaryVisibleRatio": 0.887,
+      "contentStartRatio": 0.114,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Проверка1",
+          "aria": "Проверка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Выгрузка4",
+          "aria": "Выгрузка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-success"
+        },
+        {
+          "text": "Настройки0",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-default"
+        },
+        {
+          "text": "В агентскую зону",
+          "aria": "В агентскую зону",
+          "cls": "mp-button secondary-button vf-figma-agent-zone"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "ПД-1054Москва15.06Петровы2 заявителяlocal-agent-tonyСледующее действиеЗакрыть исправления или вернутьАнкета100%Файлы0%1 проверитьЗамечание ожидает закрытия администратором",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "SUB-1101Москва15.06Ольга Фролова1 заявительlocal-agent-alexСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1102Москва15.06Волковы3 заявителяlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1103Санкт-Петербург15.06Никита Морозов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "ПД-1056Москва15.06Дмитрий Орлов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "Первый",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Сводка",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Фильтры",
+          "aria": null,
+          "cls": ""
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "name": "agent-submissions",
+    "vp": {
+      "width": 390,
+      "height": 844
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/agent-submissions-390x844.png",
+    "metrics": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "board": null,
+      "lanes": null,
+      "dock": null,
+      "list": {
+        "top": 184,
+        "bottom": 948,
+        "height": 764,
+        "left": 16,
+        "right": 374,
+        "width": 358
+      },
+      "drawer": null,
+      "drawerHeader": null,
+      "drawerTabs": null,
+      "drawerContent": null,
+      "firstList": {
+        "sel": ".vf-figma-action-list",
+        "rect": {
+          "top": 184,
+          "bottom": 948,
+          "height": 764,
+          "left": 16,
+          "right": 374,
+          "width": 358
+        },
+        "visible": 660
+      },
+      "primaryVisibleRatio": 0.782,
+      "contentStartRatio": 0.218,
+      "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Мои действия12",
+          "aria": "Мои действия",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Заявители / Семьи",
+          "aria": "Заявители / Семьи",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Настройки",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "В админскую зону",
+          "aria": "В админскую зону",
+          "cls": "mp-button secondary-button vf-figma-admin-zone"
+        },
+        {
+          "text": "ТНТатьяна НиколаеваVisa Center Spb",
+          "aria": "Выйти из рабочей области",
+          "cls": "mp-button ghost-button ops-session"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все действия18",
+          "aria": null,
+          "cls": "tab active is-active"
+        },
+        {
+          "text": "Ошибки3",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "На проверке2",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "",
+          "aria": "Сначала старые",
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        },
+        {
+          "text": "Семья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявителя18–23 июл 2026Даты поездкиОШИБКИОткрыть",
+          "aria": "Открыть подачу: Семья Петровых, SUB-1042",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Алина СмирноваSUB-1057Обновлено: 34 мин назадМосква02–09 авг 20261 заявительМосква1 заявитель02–09 авг 2026Даты поездкиВ РАБОТЕОткрыть",
+          "aria": "Открыть подачу: Алина Смирнова, SUB-1057",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Семья ОрловыхSUB-1061Обновлено: 1 ч назадМосква11–21 авг 20264 заявителяМосква4 заявителя11–21 авг 2026Даты поездкиНА ПРОВЕРКЕОткрыть",
+          "aria": "Открыть подачу: Семья Орловых, SUB-1061",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Дмитрий ВолковSUB-1078Обновлено: 2 ч назадМосква06–12 сен 20261 заявительМосква1 заявитель06–12 сен 2026Даты поездкиГОТОВООткрыть",
+          "aria": "Открыть подачу: Дмитрий Волков, SUB-1078",
+          "cls": "vf-figma-action-row"
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "name": "admin-drawer",
+    "vp": {
+      "width": 390,
+      "height": 844
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/admin-drawer-390x844.png",
+    "metrics": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "board": {
+        "top": 95,
+        "bottom": 2209,
+        "height": 2114,
+        "left": 16,
+        "right": 374,
+        "width": 358
+      },
+      "lanes": {
+        "top": 96,
+        "bottom": 2208,
+        "height": 2112,
+        "left": 17,
+        "right": 373,
+        "width": 356
+      },
+      "dock": {
+        "top": 776,
+        "bottom": 832,
+        "height": 56,
+        "left": 16,
+        "right": 374,
+        "width": 358
+      },
+      "list": null,
+      "drawer": {
+        "top": 48,
+        "bottom": 844,
+        "height": 796,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "drawerHeader": {
+        "top": 49,
+        "bottom": 180,
+        "height": 131,
+        "left": 1,
+        "right": 389,
+        "width": 388
+      },
+      "drawerTabs": {
+        "top": 135,
+        "bottom": 179,
+        "height": 44,
+        "left": 1,
+        "right": 389,
+        "width": 388
+      },
+      "drawerContent": {
+        "top": 180,
+        "bottom": 775,
+        "height": 595,
+        "left": 1,
+        "right": 389,
+        "width": 388
+      },
+      "firstList": {
+        "sel": ".v19-admin-cockpit-lanes",
+        "rect": {
+          "top": 96,
+          "bottom": 2208,
+          "height": 2112,
+          "left": 17,
+          "right": 373,
+          "width": 356
+        },
+        "visible": 748.40625
+      },
+      "primaryVisibleRatio": 0.887,
+      "contentStartRatio": 0.114,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Проверка1",
+          "aria": "Проверка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Выгрузка4",
+          "aria": "Выгрузка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-success"
+        },
+        {
+          "text": "Настройки0",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-default"
+        },
+        {
+          "text": "В агентскую зону",
+          "aria": "В агентскую зону",
+          "cls": "mp-button secondary-button vf-figma-agent-zone"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "ПД-1054Москва15.06Петровы2 заявителяlocal-agent-tonyСледующее действиеЗакрыть исправления или вернутьАнкета100%Файлы0%1 проверитьЗамечание ожидает закрытия администратором",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "SUB-1101Москва15.06Ольга Фролова1 заявительlocal-agent-alexСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1102Москва15.06Волковы3 заявителяlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1103Санкт-Петербург15.06Никита Морозов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "ПД-1056Москва15.06Дмитрий Орлов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "Первый",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Сводка",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Фильтры",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Закрыть проверку",
+          "cls": "admin-review-close"
+        },
+        {
+          "text": "Обзор",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Заявители",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Анкета51",
+          "aria": null,
+          "cls": "is-active"
+        },
+        {
+          "text": "Файлы",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Замечания0",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "История",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "НВНина Волкова",
+          "aria": null,
+          "cls": "is-pending is-active"
+        },
+        {
+          "text": "Сверить с паспортом",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Сверить с паспортом: Тип паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Создать замечание: Тип паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Сверить с паспортом: Номер паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Создать замечание: Номер паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Сверить с паспортом: Место выдачи паспорта",
+          "cls": ""
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "name": "create-drawer",
+    "vp": {
+      "width": 390,
+      "height": 844
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/create-drawer-390x844.png",
+    "metrics": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "board": null,
+      "lanes": null,
+      "dock": null,
+      "list": {
+        "top": 184,
+        "bottom": 948,
+        "height": 764,
+        "left": 16,
+        "right": 374,
+        "width": 358
+      },
+      "drawer": {
+        "top": 0,
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "drawerHeader": {
+        "top": 0,
+        "bottom": 85,
+        "height": 85,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "drawerTabs": null,
+      "drawerContent": {
+        "top": 85,
+        "bottom": 749,
+        "height": 664,
+        "left": 0,
+        "right": 390,
+        "width": 390
+      },
+      "firstList": {
+        "sel": ".vf-figma-action-list",
+        "rect": {
+          "top": 184,
+          "bottom": 948,
+          "height": 764,
+          "left": 16,
+          "right": 374,
+          "width": 358
+        },
+        "visible": 660
+      },
+      "primaryVisibleRatio": 0.782,
+      "contentStartRatio": 0.218,
+      "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Мои действия12",
+          "aria": "Мои действия",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Заявители / Семьи",
+          "aria": "Заявители / Семьи",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Настройки",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "В админскую зону",
+          "aria": "В админскую зону",
+          "cls": "mp-button secondary-button vf-figma-admin-zone"
+        },
+        {
+          "text": "ТНТатьяна НиколаеваVisa Center Spb",
+          "aria": "Выйти из рабочей области",
+          "cls": "mp-button ghost-button ops-session"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все действия18",
+          "aria": null,
+          "cls": "tab active is-active"
+        },
+        {
+          "text": "Ошибки3",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "На проверке2",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "",
+          "aria": "Сначала старые",
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        },
+        {
+          "text": "Семья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявителя18–23 июл 2026Даты поездкиОШИБКИОткрыть",
+          "aria": "Открыть подачу: Семья Петровых, SUB-1042",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Алина СмирноваSUB-1057Обновлено: 34 мин назадМосква02–09 авг 20261 заявительМосква1 заявитель02–09 авг 2026Даты поездкиВ РАБОТЕОткрыть",
+          "aria": "Открыть подачу: Алина Смирнова, SUB-1057",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Семья ОрловыхSUB-1061Обновлено: 1 ч назадМосква11–21 авг 20264 заявителяМосква4 заявителя11–21 авг 2026Даты поездкиНА ПРОВЕРКЕОткрыть",
+          "aria": "Открыть подачу: Семья Орловых, SUB-1061",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Дмитрий ВолковSUB-1078Обновлено: 2 ч назадМосква06–12 сен 20261 заявительМосква1 заявитель06–12 сен 2026Даты поездкиГОТОВООткрыть",
+          "aria": "Открыть подачу: Дмитрий Волков, SUB-1078",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "",
+          "aria": "Закрыть создание",
+          "cls": "v19-create-drawer-close"
+        },
+        {
+          "text": "",
+          "aria": "Закрыть создание",
+          "cls": "v19-create-drawer-close"
+        },
+        {
+          "text": "Заявитель",
+          "aria": null,
+          "cls": "h-10 rounded-[var(--v19b-size-8)] border text-[var(--v19b-size-13)] font-medium transition-colors border-white/18 bg-white/10 text-white"
+        },
+        {
+          "text": "Семья",
+          "aria": null,
+          "cls": "h-10 rounded-[var(--v19b-size-8)] border text-[var(--v19b-size-13)] font-medium transition-colors border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-white/45 hover:text-white/75 hover:border-white/12"
+        },
+        {
+          "text": "Выбрать файлы",
+          "aria": null,
+          "cls": "v19-create-upload-button"
+        },
+        {
+          "text": "Сохранить черновик",
+          "aria": null,
+          "cls": "v19-create-footer-action v19-create-footer-action--secondary is-disabled"
+        },
+        {
+          "text": "Продолжить",
+          "aria": null,
+          "cls": "create-passport-next v19-create-footer-action v19-create-footer-action--primary is-disabled"
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "name": "admin-review",
+    "vp": {
+      "width": 320,
+      "height": 740
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/admin-review-320x740.png",
+    "metrics": {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "scrollWidth": 320,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 740,
+        "height": 740,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "board": {
+        "top": 92,
+        "bottom": 2393,
+        "height": 2301,
+        "left": 16,
+        "right": 304,
+        "width": 288
+      },
+      "lanes": {
+        "top": 93,
+        "bottom": 2392,
+        "height": 2299,
+        "left": 17,
+        "right": 303,
+        "width": 286
+      },
+      "dock": {
+        "top": 672,
+        "bottom": 728,
+        "height": 56,
+        "left": 16,
+        "right": 304,
+        "width": 288
+      },
+      "list": null,
+      "drawer": null,
+      "drawerHeader": null,
+      "drawerTabs": null,
+      "drawerContent": null,
+      "firstList": {
+        "sel": ".v19-admin-cockpit-lanes",
+        "rect": {
+          "top": 93,
+          "bottom": 2392,
+          "height": 2299,
+          "left": 17,
+          "right": 303,
+          "width": 286
+        },
+        "visible": 647
+      },
+      "primaryVisibleRatio": 0.874,
+      "contentStartRatio": 0.126,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Проверка1",
+          "aria": "Проверка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Выгрузка4",
+          "aria": "Выгрузка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-success"
+        },
+        {
+          "text": "Настройки0",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-default"
+        },
+        {
+          "text": "В агентскую зону",
+          "aria": "В агентскую зону",
+          "cls": "mp-button secondary-button vf-figma-agent-zone"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "ПД-1054Москва15.06Петровы2 заявителяlocal-agent-tonyСледующее действиеЗакрыть исправления или вернутьАнкета100%Файлы0%1 проверитьЗамечание ожидает закрытия администратором",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "SUB-1101Москва15.06Ольга Фролова1 заявительlocal-agent-alexСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1102Москва15.06Волковы3 заявителяlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1103Санкт-Петербург15.06Никита Морозов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "ПД-1056Москва15.06Дмитрий Орлов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "Первый",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Сводка",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Фильтры",
+          "aria": null,
+          "cls": ""
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "name": "agent-submissions",
+    "vp": {
+      "width": 320,
+      "height": 740
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/agent-submissions-320x740.png",
+    "metrics": {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "scrollWidth": 320,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 740,
+        "height": 740,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "board": null,
+      "lanes": null,
+      "dock": null,
+      "list": {
+        "top": 184,
+        "bottom": 948,
+        "height": 764,
+        "left": 16,
+        "right": 304,
+        "width": 288
+      },
+      "drawer": null,
+      "drawerHeader": null,
+      "drawerTabs": null,
+      "drawerContent": null,
+      "firstList": {
+        "sel": ".vf-figma-action-list",
+        "rect": {
+          "top": 184,
+          "bottom": 948,
+          "height": 764,
+          "left": 16,
+          "right": 304,
+          "width": 288
+        },
+        "visible": 556
+      },
+      "primaryVisibleRatio": 0.751,
+      "contentStartRatio": 0.249,
+      "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Мои действия12",
+          "aria": "Мои действия",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Заявители / Семьи",
+          "aria": "Заявители / Семьи",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Настройки",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "В админскую зону",
+          "aria": "В админскую зону",
+          "cls": "mp-button secondary-button vf-figma-admin-zone"
+        },
+        {
+          "text": "ТНТатьяна НиколаеваVisa Center Spb",
+          "aria": "Выйти из рабочей области",
+          "cls": "mp-button ghost-button ops-session"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все действия18",
+          "aria": null,
+          "cls": "tab active is-active"
+        },
+        {
+          "text": "Ошибки3",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "На проверке2",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "",
+          "aria": "Сначала старые",
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        },
+        {
+          "text": "Семья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявителя18–23 июл 2026Даты поездкиОШИБКИОткрыть",
+          "aria": "Открыть подачу: Семья Петровых, SUB-1042",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Алина СмирноваSUB-1057Обновлено: 34 мин назадМосква02–09 авг 20261 заявительМосква1 заявитель02–09 авг 2026Даты поездкиВ РАБОТЕОткрыть",
+          "aria": "Открыть подачу: Алина Смирнова, SUB-1057",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Семья ОрловыхSUB-1061Обновлено: 1 ч назадМосква11–21 авг 20264 заявителяМосква4 заявителя11–21 авг 2026Даты поездкиНА ПРОВЕРКЕОткрыть",
+          "aria": "Открыть подачу: Семья Орловых, SUB-1061",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Дмитрий ВолковSUB-1078Обновлено: 2 ч назадМосква06–12 сен 20261 заявительМосква1 заявитель06–12 сен 2026Даты поездкиГОТОВООткрыть",
+          "aria": "Открыть подачу: Дмитрий Волков, SUB-1078",
+          "cls": "vf-figma-action-row"
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "name": "admin-drawer",
+    "vp": {
+      "width": 320,
+      "height": 740
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/admin-drawer-320x740.png",
+    "metrics": {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "scrollWidth": 320,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 740,
+        "height": 740,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "board": {
+        "top": 92,
+        "bottom": 2393,
+        "height": 2301,
+        "left": 16,
+        "right": 304,
+        "width": 288
+      },
+      "lanes": {
+        "top": 93,
+        "bottom": 2392,
+        "height": 2299,
+        "left": 17,
+        "right": 303,
+        "width": 286
+      },
+      "dock": {
+        "top": 672,
+        "bottom": 728,
+        "height": 56,
+        "left": 16,
+        "right": 304,
+        "width": 288
+      },
+      "list": null,
+      "drawer": {
+        "top": 48,
+        "bottom": 740,
+        "height": 692,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "drawerHeader": {
+        "top": 49,
+        "bottom": 215,
+        "height": 166,
+        "left": 1,
+        "right": 319,
+        "width": 318
+      },
+      "drawerTabs": {
+        "top": 170,
+        "bottom": 214,
+        "height": 44,
+        "left": 1,
+        "right": 319,
+        "width": 318
+      },
+      "drawerContent": {
+        "top": 215,
+        "bottom": 671,
+        "height": 456,
+        "left": 1,
+        "right": 319,
+        "width": 318
+      },
+      "firstList": {
+        "sel": ".v19-admin-cockpit-lanes",
+        "rect": {
+          "top": 93,
+          "bottom": 2392,
+          "height": 2299,
+          "left": 17,
+          "right": 303,
+          "width": 286
+        },
+        "visible": 647
+      },
+      "primaryVisibleRatio": 0.874,
+      "contentStartRatio": 0.126,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Проверка1",
+          "aria": "Проверка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Выгрузка4",
+          "aria": "Выгрузка",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-success"
+        },
+        {
+          "text": "Настройки0",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item tone-default"
+        },
+        {
+          "text": "В агентскую зону",
+          "aria": "В агентскую зону",
+          "cls": "mp-button secondary-button vf-figma-agent-zone"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "ПД-1054Москва15.06Петровы2 заявителяlocal-agent-tonyСледующее действиеЗакрыть исправления или вернутьАнкета100%Файлы0%1 проверитьЗамечание ожидает закрытия администратором",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card has-blocker"
+        },
+        {
+          "text": "SUB-1101Москва15.06Ольга Фролова1 заявительlocal-agent-alexСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1102Москва15.06Волковы3 заявителяlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "SUB-1103Санкт-Петербург15.06Никита Морозов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "ПД-1056Москва15.06Дмитрий Орлов1 заявительlocal-agent-tonyСледующее действиеПроверить условия выгрузкиАнкета100%Файлы0%без замечанийПодача готова к Эксель",
+          "aria": null,
+          "cls": "v19-admin-cockpit-card "
+        },
+        {
+          "text": "Первый",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Сводка",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Фильтры",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Закрыть проверку",
+          "cls": "admin-review-close"
+        },
+        {
+          "text": "Обзор",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Заявители",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Анкета51",
+          "aria": null,
+          "cls": "is-active"
+        },
+        {
+          "text": "Файлы",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "Замечания0",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "История",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "НВНина Волкова",
+          "aria": null,
+          "cls": "is-pending is-active"
+        },
+        {
+          "text": "Сверить с паспортом",
+          "aria": null,
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Сверить с паспортом: Тип паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Создать замечание: Тип паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Сверить с паспортом: Номер паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Создать замечание: Номер паспорта",
+          "cls": ""
+        },
+        {
+          "text": "",
+          "aria": "Сверить с паспортом: Место выдачи паспорта",
+          "cls": ""
+        }
+      ]
+    },
+    "errors": []
+  },
+  {
+    "name": "create-drawer",
+    "vp": {
+      "width": 320,
+      "height": 740
+    },
+    "shot": "/Users/user/Documents/V-19/docs/qa/v19-mobile-content-contract-20260705/create-drawer-320x740.png",
+    "metrics": {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "scrollWidth": 320,
+      "overflowX": false,
+      "topbar": {
+        "top": 0,
+        "bottom": 56,
+        "height": 56,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "workspace": {
+        "top": 0,
+        "bottom": 740,
+        "height": 740,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "board": null,
+      "lanes": null,
+      "dock": null,
+      "list": {
+        "top": 184,
+        "bottom": 948,
+        "height": 764,
+        "left": 16,
+        "right": 304,
+        "width": 288
+      },
+      "drawer": {
+        "top": 0,
+        "bottom": 740,
+        "height": 740,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "drawerHeader": {
+        "top": 0,
+        "bottom": 85,
+        "height": 85,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "drawerTabs": null,
+      "drawerContent": {
+        "top": 85,
+        "bottom": 645,
+        "height": 560,
+        "left": 0,
+        "right": 320,
+        "width": 320
+      },
+      "firstList": {
+        "sel": ".vf-figma-action-list",
+        "rect": {
+          "top": 184,
+          "bottom": 948,
+          "height": 764,
+          "left": 16,
+          "right": 304,
+          "width": 288
+        },
+        "visible": 556
+      },
+      "primaryVisibleRatio": 0.751,
+      "contentStartRatio": 0.249,
+      "shellClass": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular has-open-drawer",
+      "visibleButtons": [
+        {
+          "text": "",
+          "aria": "Закрыть меню",
+          "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close"
+        },
+        {
+          "text": "Поиск...⌘K",
+          "aria": "Поиск",
+          "cls": "ops-sidebar-search"
+        },
+        {
+          "text": "Мои действия12",
+          "aria": "Мои действия",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Заявители / Семьи",
+          "aria": "Заявители / Семьи",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Настройки",
+          "aria": "Настройки",
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "В админскую зону",
+          "aria": "В админскую зону",
+          "cls": "mp-button secondary-button vf-figma-admin-zone"
+        },
+        {
+          "text": "ТНТатьяна НиколаеваVisa Center Spb",
+          "aria": "Выйти из рабочей области",
+          "cls": "mp-button ghost-button ops-session"
+        },
+        {
+          "text": "",
+          "aria": "Меню",
+          "cls": "mp-button icon-button v19-topbar-menu"
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все действия18",
+          "aria": null,
+          "cls": "tab active is-active"
+        },
+        {
+          "text": "Ошибки3",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "На проверке2",
+          "aria": null,
+          "cls": "tab"
+        },
+        {
+          "text": "",
+          "aria": "Сначала старые",
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        },
+        {
+          "text": "Семья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявителя18–23 июл 2026Даты поездкиОШИБКИОткрыть",
+          "aria": "Открыть подачу: Семья Петровых, SUB-1042",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Алина СмирноваSUB-1057Обновлено: 34 мин назадМосква02–09 авг 20261 заявительМосква1 заявитель02–09 авг 2026Даты поездкиВ РАБОТЕОткрыть",
+          "aria": "Открыть подачу: Алина Смирнова, SUB-1057",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Семья ОрловыхSUB-1061Обновлено: 1 ч назадМосква11–21 авг 20264 заявителяМосква4 заявителя11–21 авг 2026Даты поездкиНА ПРОВЕРКЕОткрыть",
+          "aria": "Открыть подачу: Семья Орловых, SUB-1061",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "Дмитрий ВолковSUB-1078Обновлено: 2 ч назадМосква06–12 сен 20261 заявительМосква1 заявитель06–12 сен 2026Даты поездкиГОТОВООткрыть",
+          "aria": "Открыть подачу: Дмитрий Волков, SUB-1078",
+          "cls": "vf-figma-action-row"
+        },
+        {
+          "text": "",
+          "aria": "Закрыть создание",
+          "cls": "v19-create-drawer-close"
+        },
+        {
+          "text": "",
+          "aria": "Закрыть создание",
+          "cls": "v19-create-drawer-close"
+        },
+        {
+          "text": "Заявитель",
+          "aria": null,
+          "cls": "h-10 rounded-[var(--v19b-size-8)] border text-[var(--v19b-size-13)] font-medium transition-colors border-white/18 bg-white/10 text-white"
+        },
+        {
+          "text": "Семья",
+          "aria": null,
+          "cls": "h-10 rounded-[var(--v19b-size-8)] border text-[var(--v19b-size-13)] font-medium transition-colors border-[var(--v19b-color-border-strong)] bg-[var(--v19b-color-panel)] text-white/45 hover:text-white/75 hover:border-white/12"
+        },
+        {
+          "text": "Выбрать файлы",
+          "aria": null,
+          "cls": "v19-create-upload-button"
+        },
+        {
+          "text": "Сохранить черновик",
+          "aria": null,
+          "cls": "v19-create-footer-action v19-create-footer-action--secondary is-disabled"
+        },
+        {
+          "text": "Продолжить",
+          "aria": null,
+          "cls": "create-passport-next v19-create-footer-action v19-create-footer-action--primary is-disabled"
+        }
+      ]
+    },
+    "errors": []
+  }
+]

@@ -1,0 +1,1016 @@
+[
+  {
+    "label": "mobile390-review",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "overflowX": false,
+    "headerHeight": 44,
+    "headerRatio": 0.052,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 0,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [
+      {
+        "cls": "ops-sidebar opsu-sidebar is-regular",
+        "text": "Очередь на проверкуVFVisaFlow V-19WorkspaceПоиск...⌘KРаботаПроверка1Вы",
+        "rect": [
+          -280,
+          0
+        ]
+      },
+      {
+        "cls": "ops-brand opsu-brand",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -280,
+          -1
+        ]
+      },
+      {
+        "cls": "ops-brand-logo ops-brand-mark opsu-brand-mark vf-brand-capital vf-bran",
+        "text": "",
+        "rect": [
+          -280,
+          -248
+        ]
+      },
+      {
+        "cls": "ops-brand-copy opsu-brand-copy",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "opsu-wordmark vf-brand-wordmark",
+        "text": "VisaFlow V-19",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "",
+        "text": "Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close",
+        "text": "",
+        "rect": [
+          -41,
+          -1
+        ]
+      },
+      {
+        "cls": "[object SVGAnimatedString]",
+        "text": "",
+        "rect": [
+          -30,
+          -12
+        ]
+      }
+    ],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "mobile390-export",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "overflowX": false,
+    "headerHeight": 44,
+    "headerRatio": 0.052,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 0,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [
+      {
+        "cls": "ops-sidebar opsu-sidebar is-regular",
+        "text": "Очередь на проверкуVFVisaFlow V-19WorkspaceПоиск...⌘KРаботаПроверка1Вы",
+        "rect": [
+          -280,
+          0
+        ]
+      },
+      {
+        "cls": "ops-brand opsu-brand",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -280,
+          -1
+        ]
+      },
+      {
+        "cls": "ops-brand-logo ops-brand-mark opsu-brand-mark vf-brand-capital vf-bran",
+        "text": "",
+        "rect": [
+          -280,
+          -248
+        ]
+      },
+      {
+        "cls": "ops-brand-copy opsu-brand-copy",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "opsu-wordmark vf-brand-wordmark",
+        "text": "VisaFlow V-19",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "",
+        "text": "Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close",
+        "text": "",
+        "rect": [
+          -41,
+          -1
+        ]
+      },
+      {
+        "cls": "[object SVGAnimatedString]",
+        "text": "",
+        "rect": [
+          -30,
+          -12
+        ]
+      }
+    ],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "mobile390-drawer",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "overflowX": false,
+    "headerHeight": 44,
+    "headerRatio": 0.052,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.9,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-card has-blocker",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.83,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.7,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.58,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.9,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.9,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [
+      {
+        "cls": "ops-sidebar opsu-sidebar is-regular",
+        "text": "Очередь на проверкуVFVisaFlow V-19WorkspaceПоиск...⌘KРаботаПроверка1Вы",
+        "rect": [
+          -280,
+          0
+        ]
+      },
+      {
+        "cls": "ops-brand opsu-brand",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -280,
+          -1
+        ]
+      },
+      {
+        "cls": "ops-brand-logo ops-brand-mark opsu-brand-mark vf-brand-capital vf-bran",
+        "text": "",
+        "rect": [
+          -280,
+          -248
+        ]
+      },
+      {
+        "cls": "ops-brand-copy opsu-brand-copy",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "opsu-wordmark vf-brand-wordmark",
+        "text": "VisaFlow V-19",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "",
+        "text": "Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close",
+        "text": "",
+        "rect": [
+          -41,
+          -1
+        ]
+      },
+      {
+        "cls": "[object SVGAnimatedString]",
+        "text": "",
+        "rect": [
+          -30,
+          -12
+        ]
+      }
+    ],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "mobile390-workspace",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "overflowX": false,
+    "headerHeight": 44,
+    "headerRatio": 0.052,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 1,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.9,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-card has-blocker",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.83,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.7,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.58,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.9,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.9,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [
+      {
+        "cls": "ops-sidebar opsu-sidebar is-regular",
+        "text": "Очередь на проверкуVFVisaFlow V-19WorkspaceПоиск...⌘KРаботаПроверка1Вы",
+        "rect": [
+          -280,
+          0
+        ]
+      },
+      {
+        "cls": "ops-brand opsu-brand",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -280,
+          -1
+        ]
+      },
+      {
+        "cls": "ops-brand-logo ops-brand-mark opsu-brand-mark vf-brand-capital vf-bran",
+        "text": "",
+        "rect": [
+          -280,
+          -248
+        ]
+      },
+      {
+        "cls": "ops-brand-copy opsu-brand-copy",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "opsu-wordmark vf-brand-wordmark",
+        "text": "VisaFlow V-19",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "",
+        "text": "Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close",
+        "text": "",
+        "rect": [
+          -41,
+          -1
+        ]
+      },
+      {
+        "cls": "[object SVGAnimatedString]",
+        "text": "",
+        "rect": [
+          -30,
+          -12
+        ]
+      }
+    ],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "mobile390-remark",
+    "viewport": "390x844",
+    "scrollWidth": 390,
+    "overflowX": false,
+    "headerHeight": 44,
+    "headerRatio": 0.052,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 1,
+    "remarks": 1,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.9,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-remark-form",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-card has-blocker",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.83,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-card has-blocker",
+        "b": "admin-remark-form",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.7,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-remark-form",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [
+      {
+        "cls": "ops-sidebar opsu-sidebar is-regular",
+        "text": "Очередь на проверкуVFVisaFlow V-19WorkspaceПоиск...⌘KРаботаПроверка1Вы",
+        "rect": [
+          -280,
+          0
+        ]
+      },
+      {
+        "cls": "ops-brand opsu-brand",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -280,
+          -1
+        ]
+      },
+      {
+        "cls": "ops-brand-logo ops-brand-mark opsu-brand-mark vf-brand-capital vf-bran",
+        "text": "",
+        "rect": [
+          -280,
+          -248
+        ]
+      },
+      {
+        "cls": "ops-brand-copy opsu-brand-copy",
+        "text": "VisaFlow V-19Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "opsu-wordmark vf-brand-wordmark",
+        "text": "VisaFlow V-19",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "",
+        "text": "Workspace",
+        "rect": [
+          -236,
+          -53
+        ]
+      },
+      {
+        "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close",
+        "text": "",
+        "rect": [
+          -41,
+          -1
+        ]
+      },
+      {
+        "cls": "[object SVGAnimatedString]",
+        "text": "",
+        "rect": [
+          -30,
+          -12
+        ]
+      }
+    ],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "tablet768-review",
+    "viewport": "768x1024",
+    "scrollWidth": 768,
+    "overflowX": false,
+    "headerHeight": 56,
+    "headerRatio": 0.055,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 0,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "tablet768-export",
+    "viewport": "768x1024",
+    "scrollWidth": 768,
+    "overflowX": false,
+    "headerHeight": 64,
+    "headerRatio": 0.063,
+    "reviewCards": 0,
+    "exportRows": 4,
+    "drawers": 0,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "tablet768-drawer",
+    "viewport": "768x1024",
+    "scrollWidth": 768,
+    "overflowX": false,
+    "headerHeight": 56,
+    "headerRatio": 0.055,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.41,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-card has-blocker",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.57,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "tablet768-workspace",
+    "viewport": "768x1024",
+    "scrollWidth": 768,
+    "overflowX": false,
+    "headerHeight": 56,
+    "headerRatio": 0.055,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 1,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.41,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.6,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.6,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "tablet768-remark",
+    "viewport": "768x1024",
+    "scrollWidth": 768,
+    "overflowX": false,
+    "headerHeight": 56,
+    "headerRatio": 0.055,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 1,
+    "remarks": 1,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.41,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "admin-remark-form",
+        "ratio": 0.64,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-card has-blocker",
+        "b": "admin-remark-form",
+        "ratio": 0.65,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.61,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-remark-form",
+        "ratio": 0.64,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "desktop1440-review",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "overflowX": false,
+    "headerHeight": 64,
+    "headerRatio": 0.071,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 0,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "v19-admin-cockpit-card ",
+        "ratio": 1,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "desktop1440-export",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "overflowX": false,
+    "headerHeight": 64,
+    "headerRatio": 0.071,
+    "reviewCards": 0,
+    "exportRows": 4,
+    "drawers": 0,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "desktop1440-drawer",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "overflowX": false,
+    "headerHeight": 64,
+    "headerRatio": 0.071,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 0,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "v19-admin-cockpit-card ",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "desktop1440-workspace",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "overflowX": false,
+    "headerHeight": 64,
+    "headerRatio": 0.071,
+    "reviewCards": 6,
+    "exportRows": 0,
+    "drawers": 1,
+    "workspaces": 1,
+    "remarks": 0,
+    "overlapPairs": [
+      {
+        "a": "v19-admin-cockpit-lane tone-red",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-orange",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-blue",
+        "b": "v19-admin-cockpit-card has-blocker",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "v19-admin-cockpit-card ",
+        "ratio": 1,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      },
+      {
+        "a": "v19-admin-cockpit-lane tone-green",
+        "b": "admin-review-field-row is-pending ",
+        "ratio": 0.51,
+        "sameParent": false
+      }
+    ],
+    "horizontalOutliers": [],
+    "logs": [],
+    "status": "ok"
+  },
+  {
+    "label": "desktop1440-remark",
+    "viewport": "1440x900",
+    "status": "failed",
+    "error": "locator.click: Element is not visible\nCall log:\n\u001b[2m  - waiting for getByText(/Замечание/).last()\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n",
+    "logs": []
+  }
+]

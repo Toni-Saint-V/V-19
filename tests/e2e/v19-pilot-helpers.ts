@@ -60,7 +60,8 @@ export async function openFreshWorkspace(
   }
 
   const expectedHeading =
-    options.heading ?? (workspaceEmail === "2@2.ru" ? "Проверка" : "Мои действия");
+    options.heading ??
+    (workspaceEmail === "2@2.ru" ? /^(Очередь на проверку|Проверка)$/ : "Мои действия");
   await expect(
     page.getByRole("heading", { level: 1, name: expectedHeading }),
   ).toBeVisible();
@@ -210,23 +211,41 @@ export function submissionCardById(page: Page, id: string) {
 }
 
 export async function selectSubmissionStatus(page: Page, label: string | RegExp) {
-  const desktopTab = page.getByRole("tab", { name: label }).first();
+  const labels =
+    typeof label === "string"
+      ? [
+          label,
+          ...(label === "В работе" ? ["Черновики"] : []),
+          ...(label === "Требуют действия" ? ["С замечаниями"] : []),
+        ]
+      : [label];
 
-  if (await isVisible(desktopTab)) {
-    await desktopTab.click();
-    await expect(desktopTab).toHaveAttribute("aria-selected", "true");
-    return;
+  for (const candidate of labels) {
+    const desktopTab = page.getByRole("tab", { name: candidate }).first();
+
+    if (await isVisible(desktopTab)) {
+      await desktopTab.click();
+      await expect(desktopTab).toHaveAttribute("aria-selected", "true");
+      return;
+    }
   }
 
   await page.getByRole("button", { name: "Фильтры подач" }).click();
   const statusDialog = page.getByRole("dialog", { name: "Статус подач" });
-  const statusOption = statusDialog
-    .locator(".v19-mobile-filter-options")
-    .getByRole("button", { name: label });
 
-  await expect(statusOption).toBeVisible();
-  await statusOption.click();
-  await expect(statusDialog).toHaveCount(0);
+  for (const candidate of labels) {
+    const statusOption = statusDialog
+      .locator(".v19-mobile-filter-options")
+      .getByRole("button", { name: candidate });
+
+    if (await isVisible(statusOption.first())) {
+      await statusOption.first().click();
+      await expect(statusDialog).toHaveCount(0);
+      return;
+    }
+  }
+
+  throw new Error(`Submission status filter is not visible: ${String(label)}`);
 }
 
 export async function openDrawerTab(page: Page, labels: string[]) {
@@ -250,15 +269,61 @@ export async function openDrawerTab(page: Page, labels: string[]) {
     }
   }
 
+  for (const label of labels) {
+    const byRoleTab = drawer(page).getByRole("tab", { name: label }).first();
+    if (await isVisible(byRoleTab)) {
+      await byRoleTab.click();
+      await expect(byRoleTab).toHaveAttribute("aria-selected", "true");
+      return;
+    }
+
+    const byTabAttribute = drawer(page)
+      .locator('[role="tab"]')
+      .filter({ hasText: label })
+      .first();
+    if (await isVisible(byTabAttribute)) {
+      await byTabAttribute.click();
+      await expect(byTabAttribute).toHaveAttribute("aria-selected", "true");
+      return;
+    }
+
+    const byRoleButton = drawer(page).getByRole("button", { name: label }).first();
+    if (await isVisible(byRoleButton)) {
+      await byRoleButton.click();
+      return;
+    }
+
+    const byButtonText = drawer(page)
+      .locator("button")
+      .filter({ hasText: label })
+      .first();
+    if (await isVisible(byButtonText)) {
+      await byButtonText.click();
+      return;
+    }
+
+    const byExactText = drawer(page).getByText(label, { exact: true }).first();
+    if (await isVisible(byExactText)) {
+      await byExactText.click();
+      return;
+    }
+  }
+
   const escapedLabels = labels.map((label) =>
     label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
   );
   const name = new RegExp(`^(${escapedLabels.join("|")})([\\s,]|$)`);
   const semanticTab = drawer(page).getByRole("tab", { name }).first();
-  const tab = (await semanticTab.count()) > 0
-    ? semanticTab
-    : drawer(page).getByRole("button", { name }).first();
+  try {
+    await expect(semanticTab).toBeVisible();
+    await semanticTab.click();
+    await expect(semanticTab).toHaveAttribute("aria-selected", "true");
+    return;
+  } catch {
+    // Some legacy drawer controls are buttons instead of semantic tabs.
+  }
 
+  const tab = drawer(page).getByRole("button", { name }).first();
   await expect(tab).toBeVisible();
   await tab.click();
   if ((await tab.getAttribute("role")) === "tab") {

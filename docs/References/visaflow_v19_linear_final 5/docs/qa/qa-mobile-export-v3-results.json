@@ -1,0 +1,254 @@
+{
+  "generatedAt": "2026-07-04T19:28:10.105Z",
+  "url": "http://127.0.0.1:4195/START_HERE.html",
+  "console": {
+    "320x740": [],
+    "390x844": [],
+    "430x932": [],
+    "768x1024": []
+  },
+  "viewports": {
+    "320x740": {
+      "export": {
+        "h1": "Центр выгрузки",
+        "viewport": {
+          "width": 320,
+          "height": 740
+        },
+        "header": {
+          "exists": true,
+          "visible": true,
+          "top": 0,
+          "height": 56,
+          "width": 320,
+          "display": "flex"
+        },
+        "headerSharePercent": 7.57,
+        "overflowX": 0,
+        "textStart": "A\nVisaFlow V-19\nAdmin Zone\nОЧЕРЕДЬ\nПроверка\n2\nВыгрузка\n3\nСИСТЕМА\nПользователи\nНастройки\nВ агентскую зону\nЦентр выгрузки\nАД\nПакеты к выгрузке\nСемья Орловых\nSUB-1061\nМария Климова\nМосква\n18 файлов\n18 июля, 09:40\n100%\n1 war",
+        "metrics": {
+          "exists": true,
+          "visible": false,
+          "top": 0,
+          "height": 0,
+          "width": 0,
+          "display": "none"
+        },
+        "side": {
+          "exists": true,
+          "visible": false,
+          "top": 0,
+          "height": 0,
+          "width": 0,
+          "display": "none"
+        },
+        "list": {
+          "exists": true,
+          "visible": true,
+          "top": 72,
+          "height": 846,
+          "width": 288,
+          "display": "flex"
+        },
+        "dock": {
+          "exists": true,
+          "visible": true,
+          "top": 672,
+          "height": 56,
+          "width": 288,
+          "display": "grid"
+        }
+      }
+    },
+    "390x844": {
+      "export": {
+        "h1": "Центр выгрузки",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "header": {
+          "exists": true,
+          "visible": true,
+          "top": 0,
+          "height": 56,
+          "width": 390,
+          "display": "flex"
+        },
+        "headerSharePercent": 6.64,
+        "overflowX": 0,
+        "textStart": "A\nVisaFlow V-19\nAdmin Zone\nОЧЕРЕДЬ\nПроверка\n2\nВыгрузка\n3\nСИСТЕМА\nПользователи\nНастройки\nВ агентскую зону\nЦентр выгрузки\nАД\nПакеты к выгрузке\nСемья Орловых\nSUB-1061\nМария Климова\nМосква\n18 файлов\n18 июля, 09:40\n100%\n1 war",
+        "metrics": {
+          "exists": true,
+          "visible": false,
+          "top": 0,
+          "height": 0,
+          "width": 0,
+          "display": "none"
+        },
+        "side": {
+          "exists": true,
+          "visible": false,
+          "top": 0,
+          "height": 0,
+          "width": 0,
+          "display": "none"
+        },
+        "list": {
+          "exists": true,
+          "visible": true,
+          "top": 72,
+          "height": 795.5,
+          "width": 358,
+          "display": "flex"
+        },
+        "dock": {
+          "exists": true,
+          "visible": true,
+          "top": 776,
+          "height": 56,
+          "width": 358,
+          "display": "grid"
+        }
+      },
+      "exportSheet": {
+        "h1": "Центр выгрузки",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "header": {
+          "exists": true,
+          "visible": true,
+          "top": 0,
+          "height": 56,
+          "width": 390,
+          "display": "flex"
+        },
+        "headerSharePercent": 6.64,
+        "overflowX": 0,
+        "textStart": "A\nVisaFlow V-19\nAdmin Zone\nОЧЕРЕДЬ\nПроверка\n2\nВыгрузка\n3\nСИСТЕМА\nПользователи\nНастройки\nВ агентскую зону\nЦентр выгрузки\nАД\nПакеты к выгрузке\nСемья Орловых\nSUB-1061\nМария Климова\nМосква\n18 файлов\n18 июля, 09:40\n100%\n1 war",
+        "sheet": {
+          "exists": true,
+          "visible": true,
+          "top": 432.47,
+          "height": 411.53,
+          "width": 390,
+          "display": "grid"
+        },
+        "dock": {
+          "exists": true,
+          "visible": true,
+          "top": 776,
+          "height": 56,
+          "width": 358,
+          "display": "grid"
+        }
+      }
+    },
+    "430x932": {
+      "export": {
+        "h1": "Центр выгрузки",
+        "viewport": {
+          "width": 430,
+          "height": 932
+        },
+        "header": {
+          "exists": true,
+          "visible": true,
+          "top": 0,
+          "height": 56,
+          "width": 430,
+          "display": "flex"
+        },
+        "headerSharePercent": 6.01,
+        "overflowX": 0,
+        "textStart": "A\nVisaFlow V-19\nAdmin Zone\nОЧЕРЕДЬ\nПроверка\n2\nВыгрузка\n3\nСИСТЕМА\nПользователи\nНастройки\nВ агентскую зону\nЦентр выгрузки\nАД\nПакеты к выгрузке\nСемья Орловых\nSUB-1061\nМария Климова\nМосква\n18 файлов\n18 июля, 09:40\n100%\n1 war",
+        "metrics": {
+          "exists": true,
+          "visible": false,
+          "top": 0,
+          "height": 0,
+          "width": 0,
+          "display": "none"
+        },
+        "side": {
+          "exists": true,
+          "visible": false,
+          "top": 0,
+          "height": 0,
+          "width": 0,
+          "display": "none"
+        },
+        "list": {
+          "exists": true,
+          "visible": true,
+          "top": 72,
+          "height": 795.5,
+          "width": 398,
+          "display": "flex"
+        },
+        "dock": {
+          "exists": true,
+          "visible": true,
+          "top": 864,
+          "height": 56,
+          "width": 398,
+          "display": "grid"
+        }
+      }
+    },
+    "768x1024": {
+      "export": {
+        "h1": "Центр выгрузки",
+        "viewport": {
+          "width": 768,
+          "height": 1024
+        },
+        "header": {
+          "exists": true,
+          "visible": true,
+          "top": 0,
+          "height": 56,
+          "width": 508,
+          "display": "flex"
+        },
+        "headerSharePercent": 5.47,
+        "overflowX": 0,
+        "textStart": "A\nVisaFlow V-19\nAdmin Zone\nОЧЕРЕДЬ\nПроверка\n2\nВыгрузка\n3\nСИСТЕМА\nПользователи\nНастройки\nВ агентскую зону\nЦентр выгрузки\nАД\nГОТОВЫ\n4\nпакетов в очереди\nВЫБРАНО\n1\n4 заявителей\nДОКУМЕНТЫ\n18\nPDF/JPG/XLSX в manifest\nPRE-FLIGHT",
+        "metrics": {
+          "exists": true,
+          "visible": true,
+          "top": 72,
+          "height": 258,
+          "width": 476,
+          "display": "grid"
+        },
+        "side": {
+          "exists": true,
+          "visible": true,
+          "top": 1201,
+          "height": 2,
+          "width": 476,
+          "display": "flex"
+        },
+        "list": {
+          "exists": true,
+          "visible": true,
+          "top": 350,
+          "height": 831,
+          "width": 476,
+          "display": "flex"
+        },
+        "dock": {
+          "exists": true,
+          "visible": false,
+          "top": 0,
+          "height": 0,
+          "width": 0,
+          "display": "none"
+        }
+      }
+    }
+  }
+}

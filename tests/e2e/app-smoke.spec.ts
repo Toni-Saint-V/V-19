@@ -1284,7 +1284,7 @@ test.describe("V-19 operations workspace", () => {
     ).toHaveCount(0);
   });
 
-  test("admin creates a precise issue without suggestion shortcuts", async ({
+  test("admin can run and manage ББ suggestion candidates", async ({
     page,
   }) => {
     await switchToAdmin(page);
@@ -1296,19 +1296,54 @@ test.describe("V-19 operations workspace", () => {
     await drawer(page)
       .getByRole("tab", { name: /Замечания/ })
       .click();
-    await expect(
-      drawer(page).getByRole("button", { name: "Найти кандидаты" }),
-    ).toHaveCount(0);
-    await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
-    await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
-
-    await expect(
-      issueArticle(page, "Нина Волкова", "Требуется уточнение"),
-    ).toBeVisible();
+    await drawer(page).getByRole("button", { name: "Найти кандидаты" }).click();
     await expect(drawer(page).getByText("ББ-проверка запущена")).toHaveCount(0);
+    await expect(drawer(page).getByText(/Проверить:|Нет файла:|Заменить:/).first()).toBeVisible();
+    const acceptSuggestionButtons = drawer(page).getByRole("button", {
+      name: "Добавить как замечание",
+    });
+    const dismissSuggestionButtons = drawer(page).getByRole("button", {
+      name: "Отклонить",
+    });
+    const initialSuggestionCount = await acceptSuggestionButtons.count();
+
+    expect(initialSuggestionCount).toBeGreaterThan(0);
+    await acceptSuggestionButtons.first().click();
     await expect(
-      drawer(page).getByText("Подсказка ББ принята администратором"),
-    ).toHaveCount(0);
+      drawer(page)
+        .locator("article")
+        .filter({ hasText: "Нина Волкова" })
+        .filter({ hasText: /Проверить:|Нет файла:|Заменить:/ })
+        .filter({ hasText: "Открыто" })
+        .first(),
+    ).toBeVisible();
+    await expect(acceptSuggestionButtons).toHaveCount(initialSuggestionCount - 1);
+
+    const beforeDismissCount = await dismissSuggestionButtons.count();
+    if (beforeDismissCount > 0) {
+      await dismissSuggestionButtons.first().click();
+      await expect(dismissSuggestionButtons).toHaveCount(beforeDismissCount - 1);
+    }
+  });
+
+  test("admin AI helper fails closed without mutating the review", async ({ page }) => {
+    await switchToAdmin(page);
+    await openAdminSubmission(page, "Нина Волкова");
+    await expectDrawerStatus(page, "На проверке");
+    await expect(
+      drawer(page).getByText("0 открытых замечаний"),
+    ).toBeVisible();
+
+    await drawer(page).getByRole("button", { name: "Проверить AI" }).click();
+    await expect(
+      drawer(page)
+        .getByLabel("AI-помощник администратора")
+        .getByText(/локальный AI не настроен/),
+    ).toBeVisible();
+    await expectDrawerStatus(page, "На проверке");
+    await expect(
+      drawer(page).getByText("0 открытых замечаний"),
+    ).toBeVisible();
   });
 
   test("admin can add a precise issue and return a submission", async ({ page }) => {
@@ -1403,6 +1438,69 @@ test.describe("V-19 operations workspace", () => {
         name: /Передача агентам недоступна:/,
       }),
     ).toHaveCount(0);
+  });
+
+  test("admin can return corrected submission again after adding a new issue", async ({
+    page,
+  }) => {
+    await switchToAdmin(page);
+    await openCorrectionsTab(page);
+    await openAdminSubmission(page, "Петровы", "Семья Петровых");
+    await expectDrawerStatus(page, "Исправления получены");
+
+    await openDrawerTab(page, ["Замечания"]);
+    await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
+    await expect(drawer(page).getByLabel("Новое замечание")).toBeVisible();
+    await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
+
+    await expect(
+      drawer(page)
+        .locator("article")
+        .filter({ hasText: "Требуется уточнение" })
+        .filter({ hasText: "Открыто" })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      drawer(page).getByRole("button", { name: "Вернуть снова" }),
+    ).toBeEnabled();
+    await drawer(page).getByRole("button", { name: "Вернуть снова" }).click();
+    await expectDrawerStatus(page, "Возвращено");
+  });
+
+  test("agent can reopen OCR fields and explicitly submit without review", async ({
+    page,
+  }) => {
+    await openCreateSubmission(page);
+    await uploadCreatePassports(page, ["Ocr Dialog"]);
+    await drawer(page).getByRole("button", { name: "Сохранить черновик" }).click();
+    await expect(
+      drawer(page).getByRole("heading", { name: "Ocr Dialog" }),
+    ).toBeVisible();
+
+    await openMediaTab(page);
+    await uploadAllVisibleFiles(page);
+    await openQuestionnaireTab(page);
+    await fillQuestionnaire(page);
+    await saveDraftFromDrawer(page);
+
+    await drawer(page).getByRole("button", { name: "Отправить", exact: true }).click();
+    const reviewDialog = page.getByRole("dialog", {
+      name: "Проверить распознанные поля?",
+    });
+    await expect(reviewDialog).toBeVisible();
+    await reviewDialog.getByRole("button", { name: "Открыть поля" }).click();
+    await expect(reviewDialog).toHaveCount(0);
+    await expect(drawer(page)).toBeVisible();
+    await expect(
+      drawer(page).getByRole("tab", { name: /Анкета/ }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    await drawer(page).getByRole("button", { name: "Отправить", exact: true }).click();
+    await expect(reviewDialog).toBeVisible();
+    await reviewDialog
+      .getByRole("button", { name: "Отправить без проверки" })
+      .click();
+    await expectDrawerStatus(page, "На проверке");
   });
 
   test("export blocks same-city family and single packages with different trip dates", async ({

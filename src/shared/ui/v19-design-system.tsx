@@ -1,6 +1,7 @@
 import {
   type ButtonHTMLAttributes,
   type CSSProperties,
+  type InputHTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
@@ -13,6 +14,7 @@ import {
   Folder,
   List,
   Search,
+  Sparkles,
   User,
   Users,
 } from "lucide-react";
@@ -71,6 +73,88 @@ export type V19FamilyMember = {
   role: string;
   statusTone: V19MemberStatusTone;
 };
+
+type V19DossierChipTone = "danger" | "muted" | "primary" | "success" | "warning";
+
+export type V19DossierChip = {
+  label: string;
+  tone?: V19DossierChipTone;
+};
+
+export type V19DossierProgressItem = {
+  label: string;
+  tone?: "accent" | "danger" | "muted" | "success" | "warning";
+  value: number;
+};
+
+function V19DossierMetaRow({ items }: { items?: string[] }) {
+  const visibleItems = items?.filter(Boolean) ?? [];
+  if (!visibleItems.length) return null;
+
+  return (
+    <span className="v19-dossier-meta-row">
+      {visibleItems.map((item, index) => (
+        <span key={`${item}-${index}`}>
+          {index > 0 ? <i aria-hidden="true" /> : null}
+          {item}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function V19DossierNextAction({ label }: { label?: string }) {
+  if (!label) return null;
+
+  return (
+    <span className="v19-dossier-next-action">
+      <small>Действие</small>
+      <strong>{label}</strong>
+    </span>
+  );
+}
+
+function V19DossierProgress({ items }: { items?: V19DossierProgressItem[] }) {
+  const visibleItems = items?.filter((item) => Number.isFinite(item.value)) ?? [];
+  if (!visibleItems.length) return null;
+
+  return (
+    <span className="v19-dossier-progress-list">
+      {visibleItems.map((item) => (
+        <span className="v19-dossier-progress-item" key={item.label}>
+          <span>
+            <small>{item.label}</small>
+            <em>{Math.round(item.value)}%</em>
+          </span>
+          <V19ProgressMeter
+            ariaHidden
+            className="v19-dossier-progress"
+            tone={item.tone}
+            value={item.value}
+          />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function V19DossierChips({ chips }: { chips?: V19DossierChip[] }) {
+  const visibleChips = chips?.filter((chip) => chip.label.trim()) ?? [];
+  if (!visibleChips.length) return null;
+
+  return (
+    <span className="v19-dossier-chip-row">
+      {visibleChips.map((chip) => (
+        <span
+          className={cn("v19-dossier-chip", `tone-${chip.tone ?? "muted"}`)}
+          key={`${chip.tone ?? "muted"}-${chip.label}`}
+        >
+          {chip.label}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export function V19SignalButton({
   active = false,
@@ -143,14 +227,16 @@ export function V19EntityTypeSwitch({
   ];
 
   return (
-    <div className="v19-entity-switchbar">
+    <div className="v19-entity-switchbar" data-entity-mode={value}>
       <div className="v19-entity-switch" role="tablist" aria-label="Тип подачи">
         {options.map((option) => (
           <button
+            aria-label={option.label}
             aria-selected={value === option.id}
             className={value === option.id ? "is-active" : ""}
             key={option.id}
             role="tab"
+            title={option.label}
             type="button"
             onClick={() => onChange(option.id)}
           >
@@ -218,6 +304,60 @@ export function V19MemberStatusIcon({ tone }: { tone: V19MemberStatusTone }) {
   }
 
   return <CheckCircle2 className="vf-figma-member-ready" aria-hidden="true" size={15} />;
+}
+
+export function V19ReadinessCard({
+  description,
+  detail,
+  label = "AI readiness",
+  scoreLabel,
+  tone = "accent",
+  value,
+}: {
+  description?: ReactNode;
+  detail?: ReactNode;
+  label?: ReactNode;
+  scoreLabel: ReactNode;
+  tone?: "accent" | "danger" | "muted" | "success" | "warning";
+  value: number;
+}) {
+  return (
+    <section className="v19-readiness-card" aria-label="Готовность подачи">
+      <div className="v19-readiness-kicker">
+        <Sparkles aria-hidden="true" size={14} />
+        {label}
+      </div>
+      <div className="v19-readiness-score-row">
+        <strong>{scoreLabel}</strong>
+        {detail != null ? <span>{detail}</span> : null}
+      </div>
+      <div className="v19-readiness-track">
+        <V19ProgressMeter
+          ariaHidden
+          className="v19-readiness-progress-meter"
+          tone={tone}
+          value={value}
+        />
+      </div>
+      {description != null ? <p>{description}</p> : null}
+    </section>
+  );
+}
+
+export function V19SearchField({
+  className,
+  label,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+}) {
+  return (
+    <label className={cn("v19-search-field", className)}>
+      <span className="sr-only">{label}</span>
+      <Search aria-hidden="true" size={16} />
+      <input {...props} type={props.type ?? "search"} />
+    </label>
+  );
 }
 
 export function V19UnifiedToolbar<T extends string>({
@@ -368,6 +508,7 @@ export function V19LongListCell({
     <button
       aria-label={`Открыть подачу: ${title}, ${id}`}
       className={cn("vf-figma-action-row", triage && "has-ai-triage")}
+      data-people-count={peopleCount}
       data-submission-id={id}
       type="button"
       onClick={onOpen}
@@ -384,12 +525,14 @@ export function V19LongListCell({
         <strong>{city}</strong>
         <em>{dates}</em>
       </span>
-      {type === "family" ? (
-        <span className="vf-figma-mobile-people" aria-hidden="true">
+      <span className="vf-figma-mobile-people" aria-hidden="true">
+        {type === "family" ? (
           <Users aria-hidden="true" size={14} />
-          {peopleCount}
-        </span>
-      ) : null}
+        ) : (
+          <User aria-hidden="true" size={14} />
+        )}
+        {peopleLabel}
+      </span>
       <span className="vf-figma-action-meta">
         <strong>{city}</strong>
         <em>
@@ -868,35 +1011,53 @@ export function V19DrawerHeader<T extends string>({
 
 export function V19FamilyProfileCard({
   ariaLabel,
+  chips,
   dataSubmissionId,
+  footerActivityLabel,
   footerLabel,
   members,
+  metaItems,
+  nextActionLabel,
   onMemberOpen,
   onOpen,
   packageLabel,
+  progressItems,
   title,
   totalLabel,
 }: {
   ariaLabel?: string;
+  chips?: V19DossierChip[];
   dataSubmissionId?: string;
+  footerActivityLabel?: string;
   footerLabel: string;
   members: V19FamilyMember[];
+  metaItems?: string[];
+  nextActionLabel?: string;
   onMemberOpen?: () => void;
   onOpen?: () => void;
   packageLabel: string;
+  progressItems?: V19DossierProgressItem[];
   title: string;
   totalLabel: string;
 }) {
   return (
     <article
       aria-label={ariaLabel ?? `Открыть семейную подачу: ${title}`}
-      className="vf-figma-family-card"
+      className="vf-figma-family-card v19-dossier-card"
       data-submission-id={dataSubmissionId}
       role="button"
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={(event) => activateKeyboardCard(event, () => onOpen?.())}
     >
+      <V19DossierMetaRow items={metaItems} />
+      <span className="vf-figma-family-footer">
+        <span>{footerActivityLabel ?? footerLabel}</span>
+        <em>
+          <Folder aria-hidden="true" size={17} />
+          {packageLabel}
+        </em>
+      </span>
       <span className="vf-figma-family-head">
         <span className="vf-figma-family-icon">
           <Users aria-hidden="true" size={26} />
@@ -925,34 +1086,40 @@ export function V19FamilyProfileCard({
           </button>
         ))}
       </span>
-      <span className="vf-figma-family-footer">
-        <span>{footerLabel}</span>
-        <em>
-          <Folder aria-hidden="true" size={17} />
-          {packageLabel}
-        </em>
-      </span>
+      <V19DossierProgress items={progressItems} />
+      <V19DossierChips chips={chips} />
+      <V19DossierNextAction label={nextActionLabel} />
     </article>
   );
 }
 
 export function V19IndividualProfileCard({
   ariaLabel,
+  chips,
   dataSubmissionId,
+  footerActivityLabel,
   footerLabel,
   initials,
+  metaItems,
+  nextActionLabel,
   onOpen,
   packageLabel,
+  progressItems,
   statusLabel,
   statusTone,
   title,
 }: {
   ariaLabel?: string;
+  chips?: V19DossierChip[];
   dataSubmissionId?: string;
+  footerActivityLabel?: string;
   footerLabel: string;
   initials: string;
+  metaItems?: string[];
+  nextActionLabel?: string;
   onOpen?: () => void;
   packageLabel: string;
+  progressItems?: V19DossierProgressItem[];
   statusLabel: string;
   statusTone: V19MemberStatusTone;
   title: string;
@@ -960,11 +1127,19 @@ export function V19IndividualProfileCard({
   return (
     <button
       aria-label={ariaLabel ?? `Открыть заявителя: ${title}`}
-      className="vf-figma-individual-card"
+      className="vf-figma-individual-card v19-dossier-card"
       data-submission-id={dataSubmissionId}
       type="button"
       onClick={onOpen}
     >
+      <V19DossierMetaRow items={metaItems} />
+      <span className="vf-figma-family-footer">
+        <span>{footerActivityLabel ?? footerLabel}</span>
+        <em>
+          <Folder aria-hidden="true" size={17} />
+          {packageLabel}
+        </em>
+      </span>
       <span className="vf-figma-avatar">{initials}</span>
       <span>
         <strong>{title}</strong>
@@ -973,13 +1148,9 @@ export function V19IndividualProfileCard({
           {statusLabel}
         </em>
       </span>
-      <span className="vf-figma-family-footer">
-        <span>{footerLabel}</span>
-        <em>
-          <Folder aria-hidden="true" size={17} />
-          {packageLabel}
-        </em>
-      </span>
+      <V19DossierProgress items={progressItems} />
+      <V19DossierChips chips={chips} />
+      <V19DossierNextAction label={nextActionLabel} />
     </button>
   );
 }

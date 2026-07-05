@@ -73,11 +73,28 @@ export function searchSubmissions(
   const normalized = query.trim().toLowerCase();
   return submissions.filter((submission) => {
     const matchesCity =
-      city === "Все города" || questionnaireCityForSubmission(submission) === city;
+      city === "Все города" ||
+      submission.city === city ||
+      questionnaireCityForSubmission(submission) === city;
     if (!matchesCity) return false;
     if (!normalized) return true;
     return submissionSearchText(submission).includes(normalized);
   });
+}
+
+export function cityFilterValuesForSubmissions(submissions: Submission[]): string[] {
+  const cities = Array.from(
+    new Set(
+      submissions
+        .flatMap((submission) => [
+          submission.city.trim(),
+          questionnaireCityForSubmission(submission).trim(),
+        ])
+        .filter(Boolean),
+    ),
+  ).sort((left, right) => left.localeCompare(right, "ru-RU"));
+
+  return ["Все города", ...cities];
 }
 
 export function filterSubmissionsByAgentOwner(

@@ -34,16 +34,25 @@ function adminReviewSubmission(): Submission {
 
 function renderDrawer({
   activeTab = "overview",
+  onAcceptAiSuggestion = vi.fn(),
   onAddIssue = vi.fn(),
   onAction = vi.fn(),
+  onDismissAiSuggestion = vi.fn(),
+  onRunAiReview = vi.fn(),
 }: {
   activeTab?: DrawerTab;
   onAction?: () => void;
+  onAcceptAiSuggestion?: (suggestionId: string) => void;
   onAddIssue?: (input: IssueInput) => void;
+  onDismissAiSuggestion?: (suggestionId: string) => void;
+  onRunAiReview?: () => void;
 } = {}) {
   return {
+    onAcceptAiSuggestion,
     onAction,
     onAddIssue,
+    onDismissAiSuggestion,
+    onRunAiReview,
     ...render(
       <AdminReviewDrawer
         activeTab={activeTab}
@@ -51,10 +60,13 @@ function renderDrawer({
         focusTarget={undefined}
         submission={adminReviewSubmission()}
         onAction={onAction}
+        onAcceptAiSuggestion={onAcceptAiSuggestion}
         onAddIssue={onAddIssue}
         onClose={() => undefined}
         onClearFocusTarget={() => undefined}
+        onDismissAiSuggestion={onDismissAiSuggestion}
         onReviewFileAccept={() => undefined}
+        onRunAiReview={onRunAiReview}
         onTab={() => undefined}
       />,
     ),
@@ -65,7 +77,7 @@ describe("AdminReviewDrawer", () => {
   test("shows real admin review metadata and canonical review tabs", () => {
     const { container } = renderDrawer();
 
-    expect(screen.getByRole("heading", { level: 2, name: "Нина Волкова" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Нина Волкова/ })).toBeVisible();
     expect(screen.getAllByText("ПД-1053")[0]).toBeVisible();
     expect(container.querySelector(".admin-review-meta")?.textContent).toContain(
       "Казань",
@@ -75,8 +87,15 @@ describe("AdminReviewDrawer", () => {
       "Агент: Татьяна Николаева",
     );
 
-    for (const tab of ["Паспорт", "Селфи", "Анкета", "Замечания"]) {
-      expect(screen.getByRole("tab", { name: new RegExp(`^${tab}`) })).toBeVisible();
+    for (const tab of [
+      /^Обзор$/,
+      /^Заявители$/,
+      /^Анкета/,
+      /^Файлы$/,
+      /^Замечания/,
+      /^История$/,
+    ]) {
+      expect(screen.getByRole("tab", { name: tab })).toBeVisible();
     }
   });
 
@@ -109,7 +128,7 @@ describe("AdminReviewDrawer", () => {
 
   test("runs admin drawer AI through the edge helper and fails closed when unavailable", async () => {
     const onAction = vi.fn();
-    renderDrawer({ onAction });
+    renderDrawer({ activeTab: "files", onAction });
 
     fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
 
@@ -161,7 +180,7 @@ describe("AdminReviewDrawer", () => {
         source: "edge-provider",
         readinessExplanation: "Пакет не готов из-за открытого замечания.",
       });
-    renderDrawer({ onAction });
+    renderDrawer({ activeTab: "files", onAction });
 
     fireEvent.click(screen.getByRole("button", { name: "Проверить AI" }));
 

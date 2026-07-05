@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
   Briefcase,
@@ -79,6 +79,27 @@ function getDrawerFocusableElements(container: HTMLElement | null) {
       element.getAttribute("aria-hidden") !== "true" &&
       element.offsetParent !== null,
   );
+}
+
+function useDrawerDesktopQuery() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 1024px)").matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(media.matches);
+    update();
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isDesktop;
 }
 
 type QuestionnaireFocusTarget = {
@@ -325,7 +346,7 @@ const OverviewTab = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
-          <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-5">
+          <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider mb-5">
             Маршрут и подача
           </h3>
           <div className="space-y-4 text-sm">
@@ -333,14 +354,14 @@ const OverviewTab = ({
               <Calendar className="w-5 h-5 text-white/30 shrink-0" />
               <div>
                 <div className="text-white/90 font-medium">{data.tripDates}</div>
-                <div className="text-white/40 text-[11px] mt-0.5">Даты поездки</div>
+                <div className="text-white/40 text-[var(--v19b-size-11)] mt-0.5">Даты поездки</div>
               </div>
             </div>
             <div className="flex gap-4">
               <MapPin className="w-5 h-5 text-white/30 shrink-0" />
               <div>
                 <div className="text-white/90 font-medium">{data.city}</div>
-                <div className="text-white/40 text-[11px] mt-0.5">
+                <div className="text-white/40 text-[var(--v19b-size-11)] mt-0.5">
                   Визовый центр подачи
                 </div>
               </div>
@@ -350,10 +371,10 @@ const OverviewTab = ({
 
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider">
+            <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider">
               Пакет документов
             </h3>
-            <span className="text-[11px] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
+            <span className="text-[var(--v19b-size-11)] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
               {readyFilesCount}/{submission.files.length}
             </span>
           </div>
@@ -368,7 +389,7 @@ const OverviewTab = ({
                   <div className="v19-document-package-dot" />
                 )}
                 <span
-                  className={`text-[13px] ${
+                  className={`text-[var(--v19b-size-13)] ${
                     doc.status === "pending" ? "text-white" : "text-white/70"
                   }`}
                 >
@@ -381,7 +402,7 @@ const OverviewTab = ({
       </div>
 
     <div className="space-y-3">
-      <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider pl-1">
+      <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider pl-1">
         Участники ({data.applicantsCount})
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -390,20 +411,20 @@ const OverviewTab = ({
             key={`${applicant.name}-${index}`}
             className="flex items-center p-3 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-xl transition-all group"
           >
-            <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
+            <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[var(--v19b-color-control-hover)] to-[var(--v19b-color-panel-strong)] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
               {applicant.name
                 .split(" ")
                 .map((part) => part[0])
                 .join("")}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] text-white font-medium truncate group-hover:text-[#8fa3ff] transition-colors">
+              <div className="text-[var(--v19b-size-14)] text-white font-medium truncate group-hover:text-[var(--v19b-color-primary-text)] transition-colors">
                 {applicant.name}
               </div>
-              <div className="text-[11px] text-white/50 mt-0.5">{applicant.role}</div>
+              <div className="text-[var(--v19b-size-11)] text-white/50 mt-0.5">{applicant.role}</div>
             </div>
             <div className="text-right">
-              <div className="text-[12px] font-mono font-medium text-emerald-400">
+              <div className="text-[var(--v19b-size-12)] font-mono font-medium text-emerald-400">
                 {applicant.completeness}%
               </div>
             </div>
@@ -421,19 +442,22 @@ const QuestionnaireTab = ({
   onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
 }) => (
   <div className="space-y-6">
-    <div className="flex items-center justify-between">
-      <div>
-        <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
-        <p className="v19-questionnaire-progress-helper text-[12px] text-white/50 mt-1">
+    <div className="v19-drawer-questionnaire-summary-head">
+      <div className="v19-drawer-questionnaire-summary-copy">
+        <h3 className="v19-drawer-questionnaire-summary-title">
+          Прогресс заполнения
+        </h3>
+        <p className="v19-questionnaire-progress-helper v19-drawer-questionnaire-summary-helper">
           Осталось заполнить 2 блока данных
         </p>
       </div>
       <button
-        className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
+        className="v19-drawer-questionnaire-open-button"
         onClick={() => onOpenQuestionnaire()}
         type="button"
       >
-        <Edit3 className="w-4 h-4" /> Открыть анкету
+        <Edit3 className="v19-drawer-questionnaire-open-icon" />
+        <span className="v19-drawer-questionnaire-open-text">Открыть анкету</span>
       </button>
     </div>
 
@@ -469,7 +493,7 @@ const QuestionnaireTab = ({
               section.status === "done"
                 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                 : section.status === "in_progress"
-                  ? "bg-[#3a45b4]/10 border-[#3a45b4]/20 text-[#8fa3ff]"
+                  ? "bg-[var(--v19b-color-primary-soft-10)] border-[var(--v19b-color-primary-soft-20)] text-[var(--v19b-color-primary-text)]"
                   : "bg-white/5 border-white/10 text-white/40"
             }`}
           >
@@ -477,10 +501,10 @@ const QuestionnaireTab = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[13px] font-medium text-white truncate">
+              <span className="text-[var(--v19b-size-13)] font-medium text-white truncate">
                 {section.title}
               </span>
-              <span className="text-[11px] font-mono text-white/50">
+              <span className="text-[var(--v19b-size-11)] font-mono text-white/50">
                 {section.progress}%
               </span>
             </div>
@@ -497,7 +521,7 @@ const QuestionnaireTab = ({
               value={section.progress}
             />
             {section.remaining ? (
-              <div className="text-[10px] text-white/40 mt-1.5">
+              <div className="text-[var(--v19b-size-10)] text-white/40 mt-1.5">
                 Осталось: {section.remaining}
               </div>
             ) : null}
@@ -681,7 +705,7 @@ const IssuesTab = ({
 }) => (
   <div className="space-y-6">
     <AiReadinessQueuePanel submission={submission} onOpenTarget={onOpenTarget} />
-    <h3 className="text-[16px] font-semibold text-white">Замечания</h3>
+    <h3 className="text-[var(--v19b-size-16)] font-semibold text-white">Замечания</h3>
     {data.issuesCount > 0 ? (
       <div className="space-y-3">
         {submission.issues
@@ -697,7 +721,7 @@ const IssuesTab = ({
               key={issue.id}
               className="relative p-4 bg-white/[0.02] border border-orange-500/15 rounded-xl hover:bg-orange-500/[0.03] transition-colors"
             >
-              <span className="absolute right-4 top-4 px-1.5 py-0.5 rounded-md text-[10px] bg-orange-500/10 text-orange-400 font-medium border border-orange-500/20">
+              <span className="absolute right-4 top-4 px-1.5 py-0.5 rounded-md text-[var(--v19b-size-10)] bg-orange-500/10 text-orange-400 font-medium border border-orange-500/20">
                 {issue.status === "fixed_by_agent" ? "Исправлено" : "Blocker"}
               </span>
               <div className="grid grid-cols-[40px_minmax(0,1fr)] gap-x-3 gap-y-3 pr-20">
@@ -705,20 +729,20 @@ const IssuesTab = ({
                   <Icon className="w-5 h-5 text-orange-400" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-[14px] font-semibold text-white">
+                  <h4 className="text-[var(--v19b-size-14)] font-semibold text-white">
                     {issue.reason}
                   </h4>
-                  <div className="text-[11px] font-medium text-orange-400/70 mt-1.5">
+                  <div className="text-[var(--v19b-size-11)] font-medium text-orange-400/70 mt-1.5">
                     {issueTargetLine(issue)}
                   </div>
                 </div>
-                <p className="col-start-2 text-[13px] text-white/50 leading-relaxed">
+                <p className="col-start-2 text-[var(--v19b-size-13)] text-white/50 leading-relaxed">
                   {issue.comment}
                 </p>
               </div>
               {issue.type === "field" && issue.status === "open" ? (
                 <button
-                  className="mt-4 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
+                  className="mt-4 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[var(--v19b-size-13)] font-medium text-white/80 hover:text-white transition-colors"
                   type="button"
                   onClick={() =>
                     onOpenQuestionnaire({
@@ -733,7 +757,7 @@ const IssuesTab = ({
               ) : null}
               {canMarkFixed ? (
                 <button
-                  className="mt-2 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[13px] font-medium text-white/80 hover:text-white transition-colors"
+                  className="mt-2 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[var(--v19b-size-13)] font-medium text-white/80 hover:text-white transition-colors"
                   type="button"
                   onClick={() => onMarkIssueFixed?.(issue.id)}
                 >
@@ -749,10 +773,10 @@ const IssuesTab = ({
         <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/20">
           <CheckCircle2 className="w-8 h-8 text-emerald-400" />
         </div>
-        <h4 className="text-[16px] font-semibold text-white mb-2">
+        <h4 className="text-[var(--v19b-size-16)] font-semibold text-white mb-2">
           Ошибок не найдено
         </h4>
-        <p className="text-[13px] text-white/50 max-w-sm">
+        <p className="text-[var(--v19b-size-13)] text-white/50 max-w-sm">
           Все данные проверены администратором. Замечаний к анкете и документам нет.
         </p>
       </div>
@@ -862,9 +886,34 @@ export function FigmaSubmissionDrawer({
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerTabsRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const isDesktopDrawer = useDrawerDesktopQuery();
+  const prefersReducedMotion = useReducedMotion();
   const data = useMemo(() => buildDetail(submission), [submission]);
   const primaryAction = getPrimaryAction(submission, role, surface);
   const pendingTargetRef = useRef<WorkspaceTarget | null>(null);
+  const drawerPanelInitial = prefersReducedMotion
+    ? { opacity: 0, x: 0, y: 0 }
+    : {
+        opacity: 0.5,
+        x: isDesktopDrawer ? "100%" : 0,
+        y: isDesktopDrawer ? 0 : "100%",
+      };
+  const drawerPanelExit = prefersReducedMotion
+    ? { opacity: 0, x: 0, y: 0 }
+    : {
+        opacity: 0,
+        x: isDesktopDrawer ? "100%" : 0,
+        y: isDesktopDrawer ? 0 : "100%",
+      };
+  const drawerPanelTransition = prefersReducedMotion
+    ? { duration: 0.01 }
+    : { damping: 28, mass: 0.8, stiffness: 240, type: "spring" as const };
+  const tabContentInitial = prefersReducedMotion
+    ? { opacity: 0, y: 0 }
+    : { opacity: 0, y: 10 };
+  const tabContentExit = prefersReducedMotion
+    ? { opacity: 0, y: 0 }
+    : { opacity: 0, y: -10 };
 
   const openWorkspaceTarget = useCallback((target: WorkspaceTarget) => {
     pendingTargetRef.current = target;
@@ -1054,25 +1103,21 @@ export function FigmaSubmissionDrawer({
         initial={{ opacity: 0 }}
         key="figma-drawer-overlay"
         onClick={onClose}
-        transition={{ duration: 0.25 }}
+        transition={{ duration: prefersReducedMotion ? 0.01 : 0.25 }}
       />
 
       <motion.div
         animate={{ opacity: 1, x: 0, y: 0 }}
         className="vf-figma-surface v19-submission-drawer-frame v19-figma-drawer-shell"
-        exit={{ opacity: 0, x: 0, y: 0 }}
-        initial={{
-          opacity: 0.5,
-          x: 0,
-          y: 0,
-        }}
+        exit={drawerPanelExit}
+        initial={drawerPanelInitial}
         key="figma-drawer-panel"
         ref={drawerRef}
         role="dialog"
         aria-label={`Подача ${data.id}`}
         aria-modal="true"
         tabIndex={-1}
-        transition={{ damping: 28, mass: 0.8, stiffness: 240, type: "spring" }}
+        transition={drawerPanelTransition}
         onKeyDown={handleDrawerKeyDown}
       >
         <div className="v19-figma-drawer-grabber-wrap">
@@ -1082,10 +1127,10 @@ export function FigmaSubmissionDrawer({
         {status === "loading" ? (
           <div className="flex-1 p-6 lg:p-8 flex flex-col pointer-events-none">
             <Skeleton className="w-48 h-5 mb-4" />
-            <Skeleton className="w-3/4 max-w-[400px] h-8 mb-8" />
+            <Skeleton className="w-3/4 max-w-[var(--v19b-size-400)] h-8 mb-8" />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-              <Skeleton className="h-[160px] w-full rounded-xl" />
-              <Skeleton className="h-[160px] w-full rounded-xl" />
+              <Skeleton className="h-[var(--v19b-size-160)] w-full rounded-xl" />
+              <Skeleton className="h-[var(--v19b-size-160)] w-full rounded-xl" />
             </div>
           </div>
         ) : (
@@ -1104,10 +1149,10 @@ export function FigmaSubmissionDrawer({
               <AnimatePresence mode="wait">
                 <motion.div
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  initial={{ opacity: 0, y: 10 }}
+                  exit={tabContentExit}
+                  initial={tabContentInitial}
                   key={tab}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
                 >
                   {tab === "overview" ? (
                     <OverviewTab
@@ -1145,7 +1190,7 @@ export function FigmaSubmissionDrawer({
             </div>
 
             <footer className="v19-figma-drawer-footer">
-              <div className="v19-figma-drawer-footer-status text-[12px] text-white/40">
+              <div className="v19-figma-drawer-footer-status text-[var(--v19b-size-12)] text-white/40">
                 {footerStatusText}
               </div>
               <div className="flex gap-3 w-full sm:w-auto">

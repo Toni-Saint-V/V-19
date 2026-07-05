@@ -2,13 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   clickWorkspaceButton,
   collectBrowserProblems,
-  openFreshWorkspace,
 } from "./v19-pilot-helpers";
 
 const userPassword = "secure-local-password";
 
 async function submitAccessRequest(page: Page, email: string) {
-  await page.getByRole("button", { name: "Подать заявку на доступ" }).click();
+  await page.getByRole("button", { name: "Запросить доступ" }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Заявка на доступ" }),
   ).toBeVisible();
@@ -21,11 +20,20 @@ async function submitAccessRequest(page: Page, email: string) {
   await page.getByRole("button", { name: "Подать заявку на доступ" }).click();
 }
 
+async function openAccessGateForNewUser(page: Page, email: string) {
+  await page.goto("/");
+  await page.evaluate((workspaceEmail) => {
+    localStorage.clear();
+    localStorage.setItem("visaflow.workspaceEmail.v2", workspaceEmail);
+  }, email);
+  await page.reload();
+}
+
 async function login(page: Page, email: string, password: string) {
   await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Пароль", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByRole("button", { name: /Войти/ }).click();
 }
 
 async function logout(page: Page) {
@@ -53,13 +61,69 @@ async function logout(page: Page) {
 }
 
 test.describe("V-19 registration admin approval", () => {
+  test("access gate secondary actions stay wired and validated", async ({ page }) => {
+    const browserProblems = collectBrowserProblems(page);
+    const userEmail = `access-gate-${Date.now()}@example.com`;
+
+    await openAccessGateForNewUser(page, userEmail);
+    await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+
+    const loginPassword = page.locator("#workspace-password");
+    await expect(loginPassword).toHaveAttribute("type", "password");
+    await page.getByRole("button", { name: "Показать пароль" }).click();
+    await expect(loginPassword).toHaveAttribute("type", "text");
+    await page.getByRole("button", { name: "Скрыть пароль" }).click();
+    await expect(loginPassword).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: /Войти/ }).click();
+    await expect(page.getByText("Введите пароль")).toBeVisible();
+
+    await page.getByRole("button", { name: "Восстановить пароль" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Восстановление доступа" }),
+    ).toBeVisible();
+    await expect(page.locator("#workspace-reset-email")).toHaveValue(userEmail);
+    await page.getByRole("button", { name: "Отправить инструкции" }).click();
+    await expect(
+      page.getByText(/local\/dev режиме восстановление не отправляет email/),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Вернуться ко входу" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Запросить доступ" }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Заявка на доступ" }),
+    ).toBeVisible();
+    await expect(page.locator("#workspace-register-email")).toHaveValue(userEmail);
+
+    const requestPassword = page.locator("#workspace-register-password");
+    await expect(requestPassword).toHaveAttribute("type", "password");
+    await page.getByRole("button", { name: "Показать пароль" }).click();
+    await expect(requestPassword).toHaveAttribute("type", "text");
+    await page.getByRole("button", { name: "Скрыть пароль" }).click();
+    await expect(requestPassword).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: "Подать заявку на доступ" }).click();
+    await expect(page.getByText("Введите имя и фамилию")).toBeVisible();
+    await expect(page.getByText("Введите название агентства")).toBeVisible();
+    await expect(page.getByText("Введите город")).toBeVisible();
+    await expect(page.getByText("Введите телефон")).toBeVisible();
+    await expect(page.getByText("Введите пароль")).toBeVisible();
+
+    await page.getByRole("button", { name: "Вернуться ко входу" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+
+    expect(browserProblems, browserProblems.join("\n")).toEqual([]);
+  });
+
   test("new agent request stays pending until admin approves", async ({ page }) => {
     const browserProblems = collectBrowserProblems(page);
     const userEmail = `agent-${Date.now()}@example.com`;
     const secondAgentEmail = `agent-2-${Date.now()}@example.com`;
     const randomEmail = `random-${Date.now()}@example.com`;
 
-    await openFreshWorkspace(page, { workspaceEmail: userEmail });
+    await openAccessGateForNewUser(page, userEmail);
     await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
 
     await submitAccessRequest(page, userEmail);

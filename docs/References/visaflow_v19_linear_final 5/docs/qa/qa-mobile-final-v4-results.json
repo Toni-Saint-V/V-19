@@ -1,0 +1,114 @@
+{
+  "url": "http://127.0.0.1:4195/START_HERE.html",
+  "generatedAt": "2026-07-04T19:31:45.011Z",
+  "smoke": {
+    "title": "VisaFlow V-19",
+    "rootChildren": 1,
+    "h1": "Мои действия",
+    "header": {
+      "exists": true,
+      "visible": true,
+      "top": 0,
+      "height": 56,
+      "width": 390,
+      "display": "flex"
+    },
+    "headerSharePercent": 6.64,
+    "overflowX": 0,
+    "externalScripts": [],
+    "textStart": "Мои действия\nВсе действия\nОшибки 3\nНа проверке\nСЕГОДНЯ\nSUB-1042\nСемья Петровых\nСанкт-Петербург\n4 заявителя\nОткрыть\nSUB-1057\nАлина Смирнова\nМосква\n1 заявитель\nОткрыть\nSUB-1061\nСемья Орловых\nМосква\n4 заявителя\nОткрыть\nSUB-"
+  },
+  "smokeErrors": [],
+  "export390": {
+    "title": "VisaFlow V-19",
+    "rootChildren": 1,
+    "h1": "Центр выгрузки",
+    "header": {
+      "exists": true,
+      "visible": true,
+      "top": 0,
+      "height": 56,
+      "width": 390,
+      "display": "flex"
+    },
+    "headerSharePercent": 6.64,
+    "overflowX": 0,
+    "externalScripts": [],
+    "textStart": "A\nVisaFlow V-19\nAdmin Zone\nОЧЕРЕДЬ\nПроверка\n2\nВыгрузка\n3\nСИСТЕМА\nПользователи\nНастройки\nВ агентскую зону\nЦентр выгрузки\nАД\nПакеты к выгрузке\nСемья Орловых\nSUB-1061\nМария Климова\nМосква\n18 файлов\n18 июля, 09:40\n100%\n1 war",
+    "metrics": {
+      "exists": true,
+      "visible": false,
+      "top": 0,
+      "height": 0,
+      "width": 0,
+      "display": "none"
+    },
+    "side": {
+      "exists": true,
+      "visible": false,
+      "top": 0,
+      "height": 0,
+      "width": 0,
+      "display": "none"
+    },
+    "list": {
+      "exists": true,
+      "visible": true,
+      "top": 72,
+      "height": 795.5,
+      "width": 358,
+      "display": "flex"
+    },
+    "dock": {
+      "exists": true,
+      "visible": true,
+      "top": 776,
+      "height": 56,
+      "width": 358,
+      "display": "grid"
+    }
+  },
+  "exportErrors": [],
+  "upload390": {
+    "title": "VisaFlow V-19",
+    "rootChildren": 1,
+    "h1": "Загрузка и первичная сборка",
+    "header": {
+      "exists": true,
+      "visible": true,
+      "top": 0,
+      "height": 56,
+      "width": 390,
+      "display": "flex"
+    },
+    "headerSharePercent": 6.64,
+    "overflowX": 0,
+    "externalScripts": [],
+    "textStart": "Загрузка и первичная сборка\nСобери пакет\nСемья\nОдин\nВыбрать файлы\nЗагруженные файлы\n\nФайлы уже разложены по вероятным владельцам.\n\n4 ФАЙЛА\nPassport_Petrov_I.pdf\nИван Петров\nBank_Statement.pdf\nИван Петров\nHotel_Booking.pd",
+    "hero": {
+      "exists": true,
+      "visible": true,
+      "top": 66,
+      "height": 153.84,
+      "width": 366,
+      "display": "block"
+    },
+    "copy": {
+      "exists": true,
+      "visible": false,
+      "top": 0,
+      "height": 0,
+      "width": 0,
+      "display": "none"
+    },
+    "side": {
+      "exists": true,
+      "visible": false,
+      "top": 0,
+      "height": 0,
+      "width": 0,
+      "display": "none"
+    }
+  },
+  "uploadErrors": []
+}

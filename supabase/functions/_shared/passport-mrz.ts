@@ -258,10 +258,18 @@ function parseMrzDate(value: string, mode: "birth" | "expiry") {
 }
 
 function cleanMrzName(value: string) {
-  const cleaned = value
+  const rawTokens = value
     .replace(/</g, " ")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+  const tokens = rawTokens.filter((token) => !/^[KL]{2,}$/.test(token));
+  while (tokens.length > 1 && /^[KL]$/.test(tokens.at(-1) ?? "")) {
+    tokens.pop();
+  }
+  const cleaned = tokens.join(" ");
+
   return /^[A-Z][A-Z ]{1,38}$/.test(cleaned) ? cleaned : "";
 }
 

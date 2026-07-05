@@ -501,10 +501,11 @@ describe("passport extraction state", () => {
   });
 
   test("blocks domain submit actions until passport extraction review is explicit", () => {
+    const base = draftSubmission();
     const draft = {
-      ...draftSubmission(),
+      ...base,
       completeness: { questionnaire: 100, files: 100, total: 100 },
-      files: draftSubmission().files.map((file) => ({
+      files: base.files.map((file) => ({
         ...file,
         status: "accepted" as const,
       })),
@@ -576,6 +577,32 @@ describe("passport extraction state", () => {
         expect.objectContaining({
           key: "passportExpiresAt",
           value: "26.02.2026",
+        }),
+      ]),
+    );
+  });
+
+  test("drops trailing OCR filler tokens from MRZ given names", () => {
+    const fields = parsePassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<K<K".padEnd(44, "<"),
+        "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "firstName",
+          value: "IVAN",
+        }),
+      ]),
+    );
+    expect(fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "firstName",
+          value: "IVAN K K",
         }),
       ]),
     );

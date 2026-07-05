@@ -1,0 +1,116 @@
+[
+  {
+    "viewport": {
+      "width": 320,
+      "height": 740
+    },
+    "overflowX": false,
+    "scrollWidth": 320,
+    "clientWidth": 320,
+    "drawerTopRatio": 0.038,
+    "bodyTopRatio": 0.15,
+    "items": [
+      {
+        "itemWidth": 252,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      },
+      {
+        "itemWidth": 252,
+        "trailingText": "Заменить",
+        "trailingWidth": 96,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      },
+      {
+        "itemWidth": 252,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "overflowX": false,
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "drawerTopRatio": 0.05,
+    "bodyTopRatio": 0.149,
+    "items": [
+      {
+        "itemWidth": 322,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      },
+      {
+        "itemWidth": 322,
+        "trailingText": "Заменить",
+        "trailingWidth": 96,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      },
+      {
+        "itemWidth": 322,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "viewport": {
+      "width": 430,
+      "height": 932
+    },
+    "overflowX": false,
+    "scrollWidth": 430,
+    "clientWidth": 430,
+    "drawerTopRatio": 0.03,
+    "bodyTopRatio": 0.12,
+    "items": [
+      {
+        "itemWidth": 362,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      },
+      {
+        "itemWidth": 362,
+        "trailingText": "Заменить",
+        "trailingWidth": 96,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      },
+      {
+        "itemWidth": 362,
+        "trailingText": "Принято",
+        "trailingWidth": 91,
+        "trailingRightInset": 13,
+        "trailingTopInset": 13,
+        "copyRightGap": 12
+      }
+    ],
+    "consoleErrors": []
+  }
+]

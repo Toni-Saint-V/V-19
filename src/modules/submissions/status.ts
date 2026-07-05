@@ -333,10 +333,23 @@ export function nextProblem(submission: Submission) {
   }
   const open = openIssueCount(submission);
   if (open > 0) return `${open} замечаний ожидают исправления`;
-  if (fixedIssueCount(submission) > 0)
+  if (fixedIssueCount(submission) > 0) {
+    if (submission.status === "returned") {
+      if (requiresPassportGateBeforeAction(submission, "submit_corrections")) {
+        return passportGateReason(submission);
+      }
+      return "Исправления готовы к отправке";
+    }
     return "Исправления ждут закрытия администратором";
+  }
   if (hasMissingRequiredWork(submission))
     return "Не все обязательные анкеты и файлы готовы";
+  if (
+    submission.status === "in_progress" &&
+    requiresPassportGateBeforeAction(submission, "submit_for_review")
+  ) {
+    return passportGateReason(submission);
+  }
   if (submission.status === "submitted_for_review")
     return "Ожидает внутренней проверки";
   if (submission.status === "ready_for_export") return "Подача готова к Эксель";
@@ -618,18 +631,20 @@ export function getPrimaryAction(
   }
 
   if (submission.status === "corrections_received") {
+    const shouldReturnAgain = blockerCount(submission) > 0;
     const decision = {
-      action: "close_issues_accept",
-      label: "Закрыть и принять",
+      action: shouldReturnAgain ? "return_again" : "close_issues_accept",
+      label: shouldReturnAgain ? "Вернуть снова" : "Закрыть и принять",
     } as const;
     const guard = canPerformAction(submission, decision.action, role);
     return { ...decision, disabled: !guard.ok, reason: guard.reason };
   }
 
   if (submission.status === "submitted_for_review") {
+    const shouldReturn = blockerCount(submission) > 0;
     const decision = {
-      action: openIssueCount(submission) > 0 ? "return_with_issues" : "accept",
-      label: openIssueCount(submission) > 0 ? "Вернуть" : "Принять",
+      action: shouldReturn ? "return_with_issues" : "accept",
+      label: shouldReturn ? "Вернуть" : "Принять",
     } as const;
     const guard = canPerformAction(submission, decision.action, role);
     return { ...decision, disabled: !guard.ok, reason: guard.reason };

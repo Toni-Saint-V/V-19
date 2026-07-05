@@ -1,9 +1,16 @@
 import type { ReactNode } from "react";
 import {
   ClipboardCheck,
+  FileText,
+  FileWarning,
   FileSpreadsheet,
-  ListChecks,
+  ImageIcon,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
+  Search,
+  Users,
   UsersRound,
   X,
   type LucideIcon,
@@ -13,6 +20,7 @@ import { cn } from "../../../shared/ui/cn";
 import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
+export type OperationalSideMenuMode = "regular" | "compact";
 
 export type OperationalNavItem = {
   active?: boolean;
@@ -29,9 +37,11 @@ export type OperationalNavItem = {
 
 export function OperationalSidebar({
   createAction,
+  displayMode,
   footer,
   id,
   items,
+  onDisplayModeToggle,
   onMobileClose,
   mobileTitle,
 }: {
@@ -40,16 +50,22 @@ export function OperationalSidebar({
     label: string;
     onClick: () => void;
   };
+  displayMode: OperationalSideMenuMode;
   footer: ReactNode;
   id?: string;
   items: OperationalNavItem[];
+  onDisplayModeToggle: () => void;
   onMobileClose?: () => void;
   mobileTitle?: string;
 }) {
+  const isCompact = displayMode === "compact";
+  const DisplayModeIcon = isCompact ? PanelLeftOpen : PanelLeftClose;
+
   return (
     <aside
       id={id}
-      className={cn("ops-sidebar opsu-sidebar")}
+      className={cn("ops-sidebar opsu-sidebar", `is-${displayMode}`)}
+      data-side-menu-mode={displayMode}
       aria-label="Операционный центр"
     >
       {mobileTitle ? (
@@ -70,16 +86,23 @@ export function OperationalSidebar({
           />
         </span>
         <div className="ops-brand-copy opsu-brand-copy">
-          <strong className="opsu-wordmark vf-brand-wordmark">
-            <span className="vf-brand-tail" aria-hidden="true">
-              VisaFlow
-            </span>
-            <span className="vf-brand-comma-version" aria-hidden="true">
-              19
-            </span>
-          </strong>
-          <em>Рабочая область</em>
+          <strong className="opsu-wordmark vf-brand-wordmark">VisaFlow V-19</strong>
+          <em>Workspace</em>
         </div>
+        <IconButton
+          className="ops-sidebar-mode-toggle"
+          icon={
+            <DisplayModeIcon
+              aria-hidden="true"
+              focusable="false"
+              size={17}
+              strokeWidth={1.9}
+            />
+          }
+          label={isCompact ? "Развернуть меню" : "Свернуть меню"}
+          pressed={isCompact}
+          onClick={onDisplayModeToggle}
+        />
         {onMobileClose ? (
           <IconButton
             className="ops-mobile-close opsu-mobile-close"
@@ -89,7 +112,13 @@ export function OperationalSidebar({
           />
         ) : null}
       </div>
+      <button className="ops-sidebar-search" type="button" aria-label="Поиск">
+        <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
+        <span>Поиск...</span>
+        <kbd>⌘K</kbd>
+      </button>
       <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
+        <span className="ops-nav-group-label">Работа</span>
         {items.map((item) => (
           <Button
             aria-current={item.active ? "page" : undefined}
@@ -141,7 +170,11 @@ export function OperationalSidebar({
 }
 
 const operationalIconMap: Array<[needle: string, Icon: LucideIcon]> = [
-  ["actions", ListChecks],
+  ["actions", Menu],
+  ["drafts", FileText],
+  ["applicants", Users],
+  ["media", ImageIcon],
+  ["issues", FileWarning],
   ["submissions", UsersRound],
   ["review", ClipboardCheck],
   ["work", ClipboardCheck],

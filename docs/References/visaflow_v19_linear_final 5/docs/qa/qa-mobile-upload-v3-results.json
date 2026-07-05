@@ -1,0 +1,71 @@
+{
+  "before": [
+    {
+      "i": 0,
+      "text": "",
+      "visible": true,
+      "top": 7.5,
+      "left": 8,
+      "width": 40,
+      "height": 40
+    },
+    {
+      "i": 1,
+      "text": "Загрузить",
+      "visible": true,
+      "top": 9.5,
+      "left": 276,
+      "width": 46,
+      "height": 36
+    },
+    {
+      "i": 2,
+      "text": "Создать пакет",
+      "visible": true,
+      "top": 9.5,
+      "left": 330,
+      "width": 44,
+      "height": 36
+    }
+  ],
+  "body": "НОВЫЙ ПАКЕТ\nЗагрузка и первичная сборка\nСобери пакет\nСемья\nОдин\nВыбрать файлы\nЗагруженные файлы\n\nФайлы уже разложены по вероятным владельцам.\n\n4 ФАЙЛА\nPassport_Petrov_I.pdf\nИван Петров\nBank_Statement.pdf\nИван Петров\nHotel_Booking.pdf\nСемья Петровых\nSelfie_Front.jpg\nИван Петров\nМои действия\nВсе действия\nОшибки 3\nНа проверке\nСЕГОДНЯ\nSUB-1042\nСемья Петровых\nСанкт-Петербург\n4 заявителя\nОткрыть\nSUB-1057\nАлина Смирнова\nМосква\n1 заявитель\nОткрыть\nSUB-1061\nСемья Орловых\nМосква\n4 заявителя\nОткрыть\nSUB-10",
+  "metrics": {
+    "h1": "Загрузка и первичная сборка",
+    "bodyStart": "НОВЫЙ ПАКЕТ\nЗагрузка и первичная сборка\nСобери пакет\nСемья\nОдин\nВыбрать файлы\nЗагруженные файлы\n\nФайлы уже разложены по вероятным владельцам.\n\n4 ФАЙЛА\nPassport_Petrov_I.pdf\nИван Петров\nBank_Statement.pdf\nИван Петров\nHote",
+    "header": {
+      "exists": true,
+      "visible": true,
+      "top": 0,
+      "height": 56,
+      "width": 390,
+      "display": "flex"
+    },
+    "headerSharePercent": 6.64,
+    "overflowX": 0,
+    "hero": {
+      "exists": true,
+      "visible": true,
+      "top": 66,
+      "height": 153.84,
+      "width": 366,
+      "display": "block"
+    },
+    "copy": {
+      "exists": true,
+      "visible": false,
+      "top": 0,
+      "height": 0,
+      "width": 0,
+      "display": "none"
+    },
+    "side": {
+      "exists": true,
+      "visible": false,
+      "top": 0,
+      "height": 0,
+      "width": 0,
+      "display": "none"
+    }
+  },
+  "errors": []
+}

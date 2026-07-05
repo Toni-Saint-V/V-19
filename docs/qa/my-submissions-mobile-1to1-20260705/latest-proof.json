@@ -1,0 +1,992 @@
+{
+  "generatedAt": "2026-07-05T00:06:20.357Z",
+  "referenceUrl": "file:///Users/user/Desktop/visaflow_old_linearstyle_clean%204/START_HERE.html",
+  "targetUrl": "http://127.0.0.1:5191/",
+  "results": [
+    {
+      "viewport": "320x740",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/reference-320x740-screen.png",
+      "drawerPath": null,
+      "kind": "reference",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": null,
+      "innerWidth": 320,
+      "innerHeight": 740,
+      "scrollWidth": 320,
+      "overflowOk": true,
+      "headerRatio": 0.081,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 60
+      },
+      "h1": {
+        "x": 52.38,
+        "y": 10.5,
+        "width": 137.63,
+        "height": 38
+      },
+      "section": {
+        "x": 16,
+        "y": 76,
+        "width": 288,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 740
+      },
+      "firstCard": null,
+      "visibleInsetLeft": 16,
+      "insetOkMobile": true,
+      "toolbarDisplay": null,
+      "toolbarVisible": false,
+      "switchbarDisplay": null,
+      "firstCardBg": null,
+      "firstCardBorder": null,
+      "firstCardRadius": null,
+      "firstCardPadding": null,
+      "firstRoleDisplay": null,
+      "firstRoleRect": null,
+      "buttons": [
+        {
+          "text": "",
+          "aria": null,
+          "rect": {
+            "x": 8,
+            "y": 9.5,
+            "width": 32.38,
+            "height": 40
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": null,
+          "rect": {
+            "x": 206,
+            "y": 11.5,
+            "width": 46,
+            "height": 36
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Создать пакет",
+          "aria": null,
+          "rect": {
+            "x": 260,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        }
+      ],
+      "bodyTextSample": "Заявители и Семьи СЕМЬИ Семья Петровых 4 человека ИП Иван Петров Основной АП Анна Петрова Супруга МП Максим Петров Ребенок МП Мария Петрова Ребенок Акт: 12 авг 2026 2 пакета Семья Орловых 3 человека СО Сергей Орлов Основной МО Марина Орлова Супруга ДО Дмитрий Орлов Ребенок Акт: Вчера 1 пакета ОДИНОЧНЫЕ ПРОФИЛИ АС Алина Смирнова Профиль готов Акт: Сегодня 1 п",
+      "drawerAfterCardClick": null,
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "320x740",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-320x740-screen.png",
+      "drawerPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-320x740-drawer.png",
+      "kind": "target",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+      "innerWidth": 320,
+      "innerHeight": 740,
+      "scrollWidth": 320,
+      "overflowOk": true,
+      "headerRatio": 0.081,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 60
+      },
+      "h1": {
+        "x": 62,
+        "y": 20,
+        "width": 141.64,
+        "height": 19
+      },
+      "section": {
+        "x": 16,
+        "y": 76,
+        "width": 288,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 740
+      },
+      "firstCard": {
+        "x": 16,
+        "y": 111.5,
+        "width": 288,
+        "height": 300.38
+      },
+      "visibleInsetLeft": 16,
+      "insetOkMobile": true,
+      "toolbarDisplay": "none",
+      "toolbarVisible": false,
+      "switchbarDisplay": "none",
+      "firstCardBg": "linear-gradient(rgb(26, 26, 29), rgb(20, 20, 22))",
+      "firstCardBorder": "rgb(36, 37, 41)",
+      "firstCardRadius": "18px",
+      "firstCardPadding": "20px",
+      "firstRoleDisplay": "block",
+      "firstRoleRect": {
+        "x": 163,
+        "y": 227.59,
+        "width": 72,
+        "height": 13
+      },
+      "buttons": [
+        {
+          "text": "",
+          "aria": "Меню",
+          "rect": {
+            "x": 8,
+            "y": 9.5,
+            "width": 40,
+            "height": 40
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "rect": {
+            "x": 203,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "rect": {
+            "x": 255,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        }
+      ],
+      "bodyTextSample": "Заявители и Семьи Мои подачи СЕМЬИ Семья Петровы 2 заявителя ИП Ирина Петрова Основной ПП Павел Петров Супруга Акт: 15.06 1 пакет Семья Волковы 3 заявителя АВ Анна Волкова Основной ИВ Игорь Волков Супруга МВ Мила Волкова Ребенок Акт: 15.06 1 пакет Семья Ивановы 4 заявителя МИ Мария Иванова Основной АИ Антон Иванов Супруга СИ София Иванова Ребенок МИ Марк Ива",
+      "drawerAfterCardClick": [
+        {
+          "selector": "[role=\"dialog\"]",
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 48,
+            "width": 320,
+            "height": 692
+          }
+        }
+      ],
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "390x844",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/reference-390x844-screen.png",
+      "drawerPath": null,
+      "kind": "reference",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": null,
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "scrollWidth": 390,
+      "overflowOk": true,
+      "headerRatio": 0.071,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 60
+      },
+      "h1": {
+        "x": 60,
+        "y": 20,
+        "width": 170,
+        "height": 19
+      },
+      "section": {
+        "x": 16,
+        "y": 76,
+        "width": 358,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      },
+      "firstCard": null,
+      "visibleInsetLeft": 16,
+      "insetOkMobile": true,
+      "toolbarDisplay": null,
+      "toolbarVisible": false,
+      "switchbarDisplay": null,
+      "firstCardBg": null,
+      "firstCardBorder": null,
+      "firstCardRadius": null,
+      "firstCardPadding": null,
+      "firstRoleDisplay": null,
+      "firstRoleRect": null,
+      "buttons": [
+        {
+          "text": "",
+          "aria": null,
+          "rect": {
+            "x": 8,
+            "y": 9.5,
+            "width": 40,
+            "height": 40
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": null,
+          "rect": {
+            "x": 276,
+            "y": 11.5,
+            "width": 46,
+            "height": 36
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Создать пакет",
+          "aria": null,
+          "rect": {
+            "x": 330,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        }
+      ],
+      "bodyTextSample": "Заявители и Семьи СЕМЬИ Семья Петровых 4 человека ИП Иван Петров Основной АП Анна Петрова Супруга МП Максим Петров Ребенок МП Мария Петрова Ребенок Акт: 12 авг 2026 2 пакета Семья Орловых 3 человека СО Сергей Орлов Основной МО Марина Орлова Супруга ДО Дмитрий Орлов Ребенок Акт: Вчера 1 пакета ОДИНОЧНЫЕ ПРОФИЛИ АС Алина Смирнова Профиль готов Акт: Сегодня 1 п",
+      "drawerAfterCardClick": null,
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "390x844",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-390x844-screen.png",
+      "drawerPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-390x844-drawer.png",
+      "kind": "target",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "scrollWidth": 390,
+      "overflowOk": true,
+      "headerRatio": 0.071,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 60
+      },
+      "h1": {
+        "x": 62,
+        "y": 20,
+        "width": 192,
+        "height": 19
+      },
+      "section": {
+        "x": 16,
+        "y": 76,
+        "width": 358,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      },
+      "firstCard": {
+        "x": 16,
+        "y": 111.5,
+        "width": 358,
+        "height": 290
+      },
+      "visibleInsetLeft": 16,
+      "insetOkMobile": true,
+      "toolbarDisplay": "none",
+      "toolbarVisible": false,
+      "switchbarDisplay": "none",
+      "firstCardBg": "linear-gradient(rgb(26, 26, 29), rgb(20, 20, 22))",
+      "firstCardBorder": "rgb(36, 37, 41)",
+      "firstCardRadius": "18px",
+      "firstCardPadding": "20px",
+      "firstRoleDisplay": "block",
+      "firstRoleRect": {
+        "x": 233,
+        "y": 225,
+        "width": 72,
+        "height": 13
+      },
+      "buttons": [
+        {
+          "text": "",
+          "aria": "Меню",
+          "rect": {
+            "x": 8,
+            "y": 9.5,
+            "width": 40,
+            "height": 40
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "rect": {
+            "x": 273,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "rect": {
+            "x": 325,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        }
+      ],
+      "bodyTextSample": "Заявители и Семьи Мои подачи СЕМЬИ Семья Петровы 2 заявителя ИП Ирина Петрова Основной ПП Павел Петров Супруга Акт: 15.06 1 пакет Семья Волковы 3 заявителя АВ Анна Волкова Основной ИВ Игорь Волков Супруга МВ Мила Волкова Ребенок Акт: 15.06 1 пакет Семья Ивановы 4 заявителя МИ Мария Иванова Основной АИ Антон Иванов Супруга СИ София Иванова Ребенок МИ Марк Ива",
+      "drawerAfterCardClick": [
+        {
+          "selector": "[role=\"dialog\"]",
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 48,
+            "width": 390,
+            "height": 796
+          }
+        }
+      ],
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "430x932",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/reference-430x932-screen.png",
+      "drawerPath": null,
+      "kind": "reference",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": null,
+      "innerWidth": 430,
+      "innerHeight": 932,
+      "scrollWidth": 430,
+      "overflowOk": true,
+      "headerRatio": 0.064,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 60
+      },
+      "h1": {
+        "x": 60,
+        "y": 20,
+        "width": 170,
+        "height": 19
+      },
+      "section": {
+        "x": 16,
+        "y": 76,
+        "width": 398,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 932
+      },
+      "firstCard": null,
+      "visibleInsetLeft": 16,
+      "insetOkMobile": true,
+      "toolbarDisplay": null,
+      "toolbarVisible": false,
+      "switchbarDisplay": null,
+      "firstCardBg": null,
+      "firstCardBorder": null,
+      "firstCardRadius": null,
+      "firstCardPadding": null,
+      "firstRoleDisplay": null,
+      "firstRoleRect": null,
+      "buttons": [
+        {
+          "text": "",
+          "aria": null,
+          "rect": {
+            "x": 8,
+            "y": 9.5,
+            "width": 40,
+            "height": 40
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": null,
+          "rect": {
+            "x": 316,
+            "y": 11.5,
+            "width": 46,
+            "height": 36
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Создать пакет",
+          "aria": null,
+          "rect": {
+            "x": 370,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        }
+      ],
+      "bodyTextSample": "Заявители и Семьи СЕМЬИ Семья Петровых 4 человека ИП Иван Петров Основной АП Анна Петрова Супруга МП Максим Петров Ребенок МП Мария Петрова Ребенок Акт: 12 авг 2026 2 пакета Семья Орловых 3 человека СО Сергей Орлов Основной МО Марина Орлова Супруга ДО Дмитрий Орлов Ребенок Акт: Вчера 1 пакета ОДИНОЧНЫЕ ПРОФИЛИ АС Алина Смирнова Профиль готов Акт: Сегодня 1 п",
+      "drawerAfterCardClick": null,
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "430x932",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-430x932-screen.png",
+      "drawerPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-430x932-drawer.png",
+      "kind": "target",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+      "innerWidth": 430,
+      "innerHeight": 932,
+      "scrollWidth": 430,
+      "overflowOk": true,
+      "headerRatio": 0.064,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 60
+      },
+      "h1": {
+        "x": 62,
+        "y": 20,
+        "width": 232,
+        "height": 19
+      },
+      "section": {
+        "x": 16,
+        "y": 76,
+        "width": 398,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 932
+      },
+      "firstCard": {
+        "x": 16,
+        "y": 111.5,
+        "width": 398,
+        "height": 290
+      },
+      "visibleInsetLeft": 16,
+      "insetOkMobile": true,
+      "toolbarDisplay": "none",
+      "toolbarVisible": false,
+      "switchbarDisplay": "none",
+      "firstCardBg": "linear-gradient(rgb(26, 26, 29), rgb(20, 20, 22))",
+      "firstCardBorder": "rgb(36, 37, 41)",
+      "firstCardRadius": "18px",
+      "firstCardPadding": "20px",
+      "firstRoleDisplay": "block",
+      "firstRoleRect": {
+        "x": 273,
+        "y": 225,
+        "width": 72,
+        "height": 13
+      },
+      "buttons": [
+        {
+          "text": "",
+          "aria": "Меню",
+          "rect": {
+            "x": 8,
+            "y": 9.5,
+            "width": 40,
+            "height": 40
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "rect": {
+            "x": 313,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "rect": {
+            "x": 365,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        }
+      ],
+      "bodyTextSample": "Заявители и Семьи Мои подачи СЕМЬИ Семья Петровы 2 заявителя ИП Ирина Петрова Основной ПП Павел Петров Супруга Акт: 15.06 1 пакет Семья Волковы 3 заявителя АВ Анна Волкова Основной ИВ Игорь Волков Супруга МВ Мила Волкова Ребенок Акт: 15.06 1 пакет Семья Ивановы 4 заявителя МИ Мария Иванова Основной АИ Антон Иванов Супруга СИ София Иванова Ребенок МИ Марк Ива",
+      "drawerAfterCardClick": [
+        {
+          "selector": "[role=\"dialog\"]",
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 48,
+            "width": 430,
+            "height": 884
+          }
+        }
+      ],
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "768x1024",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/reference-768x1024-screen.png",
+      "drawerPath": null,
+      "kind": "reference",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": null,
+      "innerWidth": 768,
+      "innerHeight": 1024,
+      "scrollWidth": 768,
+      "overflowOk": true,
+      "headerRatio": 0.059,
+      "topbar": {
+        "x": 288,
+        "y": 0,
+        "width": 480,
+        "height": 60
+      },
+      "h1": {
+        "x": 304,
+        "y": 10.5,
+        "width": 166.28,
+        "height": 38
+      },
+      "section": {
+        "x": 304,
+        "y": 76,
+        "width": 448,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 288,
+        "y": 0,
+        "width": 480,
+        "height": 1024
+      },
+      "firstCard": null,
+      "visibleInsetLeft": 304,
+      "insetOkMobile": true,
+      "toolbarDisplay": null,
+      "toolbarVisible": false,
+      "switchbarDisplay": null,
+      "firstCardBg": null,
+      "firstCardBorder": null,
+      "firstCardRadius": null,
+      "firstCardPadding": null,
+      "firstRoleDisplay": null,
+      "firstRoleRect": null,
+      "buttons": [
+        {
+          "text": "",
+          "aria": null,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": null,
+          "rect": {
+            "x": 486.28,
+            "y": 11.5,
+            "width": 119.03,
+            "height": 36
+          },
+          "spanVisible": true
+        },
+        {
+          "text": "Создать пакет",
+          "aria": null,
+          "rect": {
+            "x": 613.31,
+            "y": 11.5,
+            "width": 138.69,
+            "height": 36
+          },
+          "spanVisible": true
+        }
+      ],
+      "bodyTextSample": "V VisaFlow V-19 Workspace Поиск... ⌘K РАБОТА Мои действия 12 Сбор документов Заявители / Семьи Файлы / Медиа Замечания В админскую зону ТН Татьяна Николаева Visa Center Spb Заявители и Семьи Загрузить Создать пакет СЕМЬИ Семья Петровых 4 человека ИП Иван Петров Основной АП Анна Петрова Супруга МП Максим Петров Ребенок МП Мария Петрова Ребенок Акт: 12 авг 202",
+      "drawerAfterCardClick": null,
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "768x1024",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-768x1024-screen.png",
+      "drawerPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-768x1024-drawer.png",
+      "kind": "target",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+      "innerWidth": 768,
+      "innerHeight": 1024,
+      "scrollWidth": 768,
+      "overflowOk": true,
+      "headerRatio": 0.059,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 60
+      },
+      "h1": {
+        "x": 66,
+        "y": 20,
+        "width": 566,
+        "height": 19
+      },
+      "section": {
+        "x": 16,
+        "y": 76,
+        "width": 736,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 768,
+        "height": 1024
+      },
+      "firstCard": {
+        "x": 16,
+        "y": 110.5,
+        "width": 736,
+        "height": 290
+      },
+      "visibleInsetLeft": 16,
+      "insetOkMobile": true,
+      "toolbarDisplay": "none",
+      "toolbarVisible": false,
+      "switchbarDisplay": "none",
+      "firstCardBg": "linear-gradient(rgb(26, 26, 29), rgb(20, 20, 22))",
+      "firstCardBorder": "rgb(36, 37, 41)",
+      "firstCardRadius": "18px",
+      "firstCardPadding": "20px",
+      "firstRoleDisplay": "block",
+      "firstRoleRect": {
+        "x": 611,
+        "y": 224,
+        "width": 72,
+        "height": 13
+      },
+      "buttons": [
+        {
+          "text": "",
+          "aria": "Меню",
+          "rect": {
+            "x": 8,
+            "y": 9.5,
+            "width": 44,
+            "height": 40
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "rect": {
+            "x": 651,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "rect": {
+            "x": 703,
+            "y": 11.5,
+            "width": 44,
+            "height": 36
+          },
+          "spanVisible": false
+        }
+      ],
+      "bodyTextSample": "Заявители и Семьи Мои подачи СЕМЬИ Семья Петровы 2 заявителя ИП Ирина Петрова Основной ПП Павел Петров Супруга Акт: 15.06 1 пакет Семья Волковы 3 заявителя АВ Анна Волкова Основной ИВ Игорь Волков Супруга МВ Мила Волкова Ребенок Акт: 15.06 1 пакет Семья Ивановы 4 заявителя МИ Мария Иванова Основной АИ Антон Иванов Супруга СИ София Иванова Ребенок МИ Марк Ива",
+      "drawerAfterCardClick": [
+        {
+          "selector": "[role=\"dialog\"]",
+          "visible": true,
+          "rect": {
+            "x": 0,
+            "y": 48,
+            "width": 768,
+            "height": 976
+          }
+        }
+      ],
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "1440x900",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/reference-1440x900-screen.png",
+      "drawerPath": null,
+      "kind": "reference",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": null,
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "overflowOk": true,
+      "headerRatio": 0.071,
+      "topbar": {
+        "x": 288,
+        "y": 0,
+        "width": 1152,
+        "height": 64
+      },
+      "h1": {
+        "x": 312,
+        "y": 21,
+        "width": 184.95,
+        "height": 21
+      },
+      "section": {
+        "x": 312,
+        "y": 88,
+        "width": 1104,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 288,
+        "y": 0,
+        "width": 1152,
+        "height": 900
+      },
+      "firstCard": null,
+      "visibleInsetLeft": 312,
+      "insetOkMobile": true,
+      "toolbarDisplay": null,
+      "toolbarVisible": false,
+      "switchbarDisplay": null,
+      "firstCardBg": null,
+      "firstCardBorder": null,
+      "firstCardRadius": null,
+      "firstCardPadding": null,
+      "firstRoleDisplay": null,
+      "firstRoleRect": null,
+      "buttons": [
+        {
+          "text": "",
+          "aria": null,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": null,
+          "rect": {
+            "x": 1133.73,
+            "y": 11.5,
+            "width": 123.41,
+            "height": 40
+          },
+          "spanVisible": true
+        },
+        {
+          "text": "Создать пакет",
+          "aria": null,
+          "rect": {
+            "x": 1265.14,
+            "y": 11.5,
+            "width": 150.86,
+            "height": 40
+          },
+          "spanVisible": true
+        }
+      ],
+      "bodyTextSample": "V VisaFlow V-19 Workspace Поиск... ⌘K РАБОТА Мои действия 12 Сбор документов Заявители / Семьи Файлы / Медиа Замечания В админскую зону ТН Татьяна Николаева Visa Center Spb Заявители и Семьи Загрузить Создать пакет СЕМЬИ Семья Петровых 4 человека ИП Иван Петров Основной АП Анна Петрова Супруга МП Максим Петров Ребенок МП Мария Петрова Ребенок Акт: 12 авг 202",
+      "drawerAfterCardClick": null,
+      "consoleMessages": [],
+      "pageErrors": []
+    },
+    {
+      "viewport": "1440x900",
+      "screenPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-1440x900-screen.png",
+      "drawerPath": "/Users/user/Documents/V-19/docs/qa/my-submissions-mobile-1to1-20260705/target-1440x900-drawer.png",
+      "kind": "target",
+      "titleText": "Заявители и Семьи",
+      "rootClasses": "ops-shell has-unified-side-menu surface-agent-submissions is-v19-collection-surface role-agent",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "overflowOk": true,
+      "headerRatio": 0.071,
+      "topbar": {
+        "x": 288,
+        "y": 0,
+        "width": 1152,
+        "height": 64
+      },
+      "h1": {
+        "x": 312,
+        "y": 21,
+        "width": 193.88,
+        "height": 21
+      },
+      "section": {
+        "x": 312,
+        "y": 88,
+        "width": 1104,
+        "height": 19.5
+      },
+      "grid": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 900
+      },
+      "firstCard": {
+        "x": 312,
+        "y": 123.5,
+        "width": 544,
+        "height": 360
+      },
+      "visibleInsetLeft": 312,
+      "insetOkMobile": true,
+      "toolbarDisplay": "none",
+      "toolbarVisible": false,
+      "switchbarDisplay": "none",
+      "firstCardBg": "linear-gradient(rgb(26, 26, 29), rgb(20, 20, 22))",
+      "firstCardBorder": "rgb(36, 37, 41)",
+      "firstCardRadius": "18px",
+      "firstCardPadding": "20px",
+      "firstRoleDisplay": "block",
+      "firstRoleRect": {
+        "x": 732.58,
+        "y": 266.16,
+        "width": 54.42,
+        "height": 13
+      },
+      "buttons": [
+        {
+          "text": "",
+          "aria": "Меню",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0
+          },
+          "spanVisible": false
+        },
+        {
+          "text": "Загрузить",
+          "aria": "Загрузить",
+          "rect": {
+            "x": 1124.73,
+            "y": 11.5,
+            "width": 123.41,
+            "height": 40
+          },
+          "spanVisible": true
+        },
+        {
+          "text": "Создать пакет",
+          "aria": "Создать пакет",
+          "rect": {
+            "x": 1258.14,
+            "y": 11.5,
+            "width": 152.86,
+            "height": 40
+          },
+          "spanVisible": true
+        }
+      ],
+      "bodyTextSample": "VisaFlow V-19 Workspace Поиск...⌘K Работа Мои действия 12 Сбор документов Заявители / Семьи Файлы / Медиа Замечания 2 Настройки Новая подача АГ 1@1.ru Агент · локальный доступ Заявители и Семьи Загрузить Создать пакет Мои подачи СЕМЬИ Семья Петровы 2 заявителя ИП Ирина Петрова Основной ПП Павел Петров Супруга Акт: 15.06 1 пакет Семья Волковы 3 заявителя АВ А",
+      "drawerAfterCardClick": [
+        {
+          "selector": "[role=\"dialog\"]",
+          "visible": true,
+          "rect": {
+            "x": 592,
+            "y": 8,
+            "width": 840,
+            "height": 884
+          }
+        }
+      ],
+      "consoleMessages": [],
+      "pageErrors": []
+    }
+  ]
+}
