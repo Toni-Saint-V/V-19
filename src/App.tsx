@@ -661,11 +661,11 @@ function MainApp() {
     surface === "export";
   const workspaceSurfaceTitle =
     surface === "admin-review"
-      ? "Очередь на проверку"
+      ? "Проверка"
       : surface === "export"
-        ? "Центр выгрузки"
+        ? "Выгрузка"
         : surface === "agent-submissions"
-          ? "Заявители и семейные подачи"
+          ? "Мои подачи"
         : surfaceTitle(surface);
   const workspaceSurfaceDescription =
     surface === "admin-review" || surface === "export" || surface === "agent-submissions"
@@ -723,7 +723,7 @@ function MainApp() {
             active: surface === "agent-submissions",
             icon: "З",
             id: "agent-submissions-applicants",
-            label: "Заявители / семейные",
+            label: "Мои подачи",
             meta: "Профили",
             onClick: () => showAgentTab("all"),
           },
@@ -3147,13 +3147,13 @@ function MainApp() {
         <span>Загрузить</span>
       </Button>
       <Button
-        aria-label="Создать пакет"
+        aria-label="Новая подача"
         className="vf-reference-create-action"
         variant="primary"
         onClick={openCreateSubmissionDrawer}
       >
         <Plus aria-hidden="true" focusable="false" size={16} strokeWidth={1.9} />
-        <span>Создать пакет</span>
+        <span>Новая подача</span>
       </Button>
     </div>
   ) : isFigmaVisualSurface ? null : !isV19CollectionSurface || isSupabaseMode ? (

@@ -1,0 +1,3525 @@
+{
+  "generatedAt": "2026-07-05T12:54:34.850Z",
+  "compact": [
+    {
+      "size": "mobile-320",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 740,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.076,
+      "minInset": 16,
+      "smallTargets": [
+        {
+          "text": "Сначала старые",
+          "w": 40,
+          "h": 38,
+          "x": 264,
+          "y": 121,
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.149,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.149,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.149,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.081,
+      "minInset": null,
+      "smallTargets": [
+        {
+          "text": "Новая подача",
+          "w": 44,
+          "h": 36,
+          "x": 259,
+          "y": 11.5,
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все",
+          "w": 62,
+          "h": 34,
+          "x": 21,
+          "y": 81,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 62,
+          "h": 34,
+          "x": 85,
+          "y": 81,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 62,
+          "h": 34,
+          "x": 149,
+          "y": 81,
+          "cls": ""
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.078,
+      "minInset": 13.796875,
+      "smallTargets": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 844,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.066,
+      "minInset": 16,
+      "smallTargets": [
+        {
+          "text": "Сначала старые",
+          "w": 40,
+          "h": 38,
+          "x": 334,
+          "y": 121,
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.131,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.131,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.131,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "minInset": null,
+      "smallTargets": [
+        {
+          "text": "Загрузить",
+          "w": 44,
+          "h": 36,
+          "x": 273,
+          "y": 11.5,
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Новая подача",
+          "w": 44,
+          "h": 36,
+          "x": 325,
+          "y": 11.5,
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все",
+          "w": 62,
+          "h": 34,
+          "x": 21,
+          "y": 81,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 62,
+          "h": 34,
+          "x": 85,
+          "y": 81,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 62,
+          "h": 34,
+          "x": 149,
+          "y": 81,
+          "cls": ""
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.069,
+      "minInset": 16.59375,
+      "smallTargets": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 932,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.06,
+      "minInset": 16,
+      "smallTargets": [
+        {
+          "text": "Сначала старые",
+          "w": 40,
+          "h": 38,
+          "x": 374,
+          "y": 121,
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.118,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.118,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.118,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.064,
+      "minInset": null,
+      "smallTargets": [
+        {
+          "text": "Загрузить",
+          "w": 44,
+          "h": 36,
+          "x": 313,
+          "y": 11.5,
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Новая подача",
+          "w": 44,
+          "h": 36,
+          "x": 365,
+          "y": 11.5,
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все",
+          "w": 62,
+          "h": 34,
+          "x": 21,
+          "y": 81,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 62,
+          "h": 34,
+          "x": 85,
+          "y": 81,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 62,
+          "h": 34,
+          "x": 149,
+          "y": 81,
+          "cls": ""
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.062,
+      "minInset": 17,
+      "smallTargets": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 8,
+        "y": 8,
+        "w": 336,
+        "h": 1008,
+        "display": "grid",
+        "overflowY": "auto"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.063,
+      "minInset": 24,
+      "smallTargets": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.126,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.126,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.126,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.057,
+      "minInset": 16,
+      "smallTargets": [
+        {
+          "text": "Все",
+          "w": 95.796875,
+          "h": 34,
+          "x": 45,
+          "y": 103,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 139.96875,
+          "h": 34,
+          "x": 142.796875,
+          "y": 103,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 146.65625,
+          "h": 34,
+          "x": 284.765625,
+          "y": 103,
+          "cls": ""
+        },
+        {
+          "text": "Открыть заявителя: Ирина Петрова, Семья Петровы",
+          "w": 305,
+          "h": 34,
+          "x": 56,
+          "y": 293.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Павел Петров, Семья Петровы",
+          "w": 305,
+          "h": 34,
+          "x": 56,
+          "y": 331.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Анна Волкова, Семья Волковы",
+          "w": 305,
+          "h": 34,
+          "x": 407,
+          "y": 294.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Игорь Волков, Семья Волковы",
+          "w": 305,
+          "h": 34,
+          "x": 407,
+          "y": 332.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Мария Иванова, Семья Ивановы",
+          "w": 305,
+          "h": 34,
+          "x": 56,
+          "y": 629.875,
+          "cls": "vf-figma-member-row"
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.057,
+      "minInset": 17,
+      "smallTargets": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "minInset": 288,
+      "smallTargets": [
+        {
+          "text": "Свернуть меню",
+          "w": 36,
+          "h": 36,
+          "x": 241,
+          "y": 14,
+          "cls": "mp-button icon-button ops-sidebar-mode-toggle"
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.166,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.166,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.166,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clippedTabs": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "minInset": 288,
+      "smallTargets": [
+        {
+          "text": "Свернуть меню",
+          "w": 36,
+          "h": 36,
+          "x": 243,
+          "y": 18,
+          "cls": "mp-button icon-button ops-sidebar-mode-toggle"
+        },
+        {
+          "text": "Мои действия",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 156,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Мои подачи",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 194,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Настройки",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 232,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Все",
+          "w": 95.796875,
+          "h": 34,
+          "x": 317,
+          "y": 93,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 139.96875,
+          "h": 34,
+          "x": 414.796875,
+          "y": 93,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 146.65625,
+          "h": 34,
+          "x": 556.765625,
+          "y": 93,
+          "cls": ""
+        },
+        {
+          "text": "Открыть заявителя: Ирина Петрова, Семья Петровы",
+          "w": 318.65625,
+          "h": 34,
+          "x": 328,
+          "y": 284.6875,
+          "cls": "vf-figma-member-row"
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "minInset": 321,
+      "smallTargets": [
+        {
+          "text": "Свернуть меню",
+          "w": 36,
+          "h": 36,
+          "x": 243,
+          "y": 18,
+          "cls": "mp-button icon-button ops-sidebar-mode-toggle"
+        },
+        {
+          "text": "Мои действия",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 156,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Мои подачи",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 194,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Настройки",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 232,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Профиль",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 82,
+          "cls": ""
+        },
+        {
+          "text": "Уведомления",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 114,
+          "cls": "active"
+        },
+        {
+          "text": "Интерфейс",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 146,
+          "cls": ""
+        },
+        {
+          "text": "Сбросить почту",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 186,
+          "cls": "settings-nav-signout"
+        }
+      ],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    }
+  ],
+  "results": [
+    {
+      "size": "mobile-320",
+      "screen": "menu-open",
+      "overflow": false,
+      "shellOpen": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular is-mobile-nav-open",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 740,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "actions",
+      "surface": "actions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 320,
+      "innerWidth": 320,
+      "innerHeight": 740,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 56,
+        "right": 320,
+        "bottom": 56,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.07567567567567568,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 740,
+        "right": 320,
+        "bottom": 740,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подачаМои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSU"
+      },
+      "main": {
+        "x": 0,
+        "y": 66,
+        "w": 320,
+        "h": 674,
+        "right": 320,
+        "bottom": 740,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявител"
+      },
+      "toolbar": {
+        "x": 16,
+        "y": 70,
+        "w": 288,
+        "h": 90,
+        "right": 304,
+        "bottom": 160,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все действия18Ошибки3На проверке2Поиск по действиям"
+      },
+      "visibleControls": 11,
+      "smallTargets": [
+        {
+          "text": "Сначала старые",
+          "w": 40,
+          "h": 38,
+          "x": 264,
+          "y": 121,
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        }
+      ],
+      "minInset": 16,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tabText": "Файлы",
+      "pageOverflow": false,
+      "headerRatio": 0.14917652027027026,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 320,
+        "h": 692,
+        "right": 320,
+        "bottom": 740,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияФайлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринят"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 318,
+        "h": 110.390625,
+        "right": 319,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 224,
+        "h": 22.390625,
+        "right": 245,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 278,
+        "h": 36,
+        "right": 279,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 318,
+        "h": 477.609375,
+        "right": 319,
+        "bottom": 667,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Файлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринятоПринятоСелфи 1Нужна заменаЗаменитьСелфи 2ПринятоПринятоАнтон Иванов0/3 ф"
+      },
+      "footer": {
+        "x": 1,
+        "y": 667,
+        "w": 318,
+        "h": 73,
+        "right": 319,
+        "bottom": 740,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tabText": "Анкета",
+      "pageOverflow": false,
+      "headerRatio": 0.14917652027027026,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 320,
+        "h": 692,
+        "right": 320,
+        "bottom": 740,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПрогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Пасп"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 318,
+        "h": 110.390625,
+        "right": 319,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 224,
+        "h": 22.390625,
+        "right": 245,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 278,
+        "h": 36,
+        "right": 279,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 318,
+        "h": 477.609375,
+        "right": 319,
+        "bottom": 667,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Прогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Паспортные данные100%Место работы / Учебы40%Осталось: 3 поляСпонсоры и финанс"
+      },
+      "footer": {
+        "x": 1,
+        "y": 667,
+        "w": 318,
+        "h": 73,
+        "right": 319,
+        "bottom": 740,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tabText": "Обзор",
+      "pageOverflow": false,
+      "headerRatio": 0.14917652027027026,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 320,
+        "h": 692,
+        "right": 320,
+        "bottom": 740,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПомощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место испр"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 318,
+        "h": 110.390625,
+        "right": 319,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 224,
+        "h": 22.390625,
+        "right": 245,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 278,
+        "h": 36,
+        "right": 279,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 318,
+        "h": 477.609375,
+        "right": 319,
+        "bottom": 667,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Помощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место исправленияЧто мешает движению2 открытых блокера по замечаниямФайлы готовы на"
+      },
+      "footer": {
+        "x": 1,
+        "y": 667,
+        "w": 318,
+        "h": 73,
+        "right": 319,
+        "bottom": 740,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "submissions",
+      "surface": "submissions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 320,
+      "innerWidth": 320,
+      "innerHeight": 740,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 60,
+        "right": 320,
+        "bottom": 60,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.08108108108108109,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 740,
+        "right": 320,
+        "bottom": 740,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подачаМои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подач"
+      },
+      "main": {
+        "x": 0,
+        "y": 60,
+        "w": 320,
+        "h": 598,
+        "right": 320,
+        "bottom": 658,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подачиПД-1054Москва04.09-14.0915.061"
+      },
+      "toolbar": {
+        "x": 16,
+        "y": 76,
+        "w": 288,
+        "h": 44,
+        "right": 304,
+        "bottom": 120,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверке"
+      },
+      "visibleControls": 23,
+      "smallTargets": [
+        {
+          "text": "Новая подача",
+          "w": 44,
+          "h": 36,
+          "x": 259,
+          "y": 11.5,
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все",
+          "w": 62,
+          "h": 34,
+          "x": 21,
+          "y": 81,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 62,
+          "h": 34,
+          "x": 85,
+          "y": 81,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 62,
+          "h": 34,
+          "x": 149,
+          "y": 81,
+          "cls": ""
+        }
+      ],
+      "minInset": null,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-320",
+      "screen": "settings",
+      "surface": "settings",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 320,
+      "innerWidth": 320,
+      "innerHeight": 740,
+      "topbar": {
+        "x": 13.796875,
+        "y": 13.796875,
+        "w": 292.40625,
+        "h": 58,
+        "right": 306.203125,
+        "bottom": 71.796875,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход."
+      },
+      "topbarRatio": 0.07837837837837838,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 740,
+        "right": 320,
+        "bottom": 740,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход.ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто п"
+      },
+      "main": {
+        "x": 13.796875,
+        "y": 73.796875,
+        "w": 292.40625,
+        "h": 577.203125,
+        "right": 306.203125,
+        "bottom": 651,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто показывать сводку задач агента.СразуЕжедневноНов"
+      },
+      "toolbar": null,
+      "visibleControls": 9,
+      "smallTargets": [],
+      "minInset": 13.796875,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-390",
+      "screen": "menu-open",
+      "overflow": false,
+      "shellOpen": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular is-mobile-nav-open",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 844,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "actions",
+      "surface": "actions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 390,
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 56,
+        "right": 390,
+        "bottom": 56,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.06635071090047394,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 844,
+        "right": 390,
+        "bottom": 844,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подачаМои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSU"
+      },
+      "main": {
+        "x": 0,
+        "y": 66,
+        "w": 390,
+        "h": 778,
+        "right": 390,
+        "bottom": 844,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявител"
+      },
+      "toolbar": {
+        "x": 16,
+        "y": 70,
+        "w": 358,
+        "h": 90,
+        "right": 374,
+        "bottom": 160,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все действия18Ошибки3На проверке2Поиск по действиям"
+      },
+      "visibleControls": 11,
+      "smallTargets": [
+        {
+          "text": "Сначала старые",
+          "w": 40,
+          "h": 38,
+          "x": 334,
+          "y": 121,
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        }
+      ],
+      "minInset": 16,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tabText": "Файлы",
+      "pageOverflow": false,
+      "headerRatio": 0.13079457938388625,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 390,
+        "h": 796,
+        "right": 390,
+        "bottom": 844,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияФайлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринят"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 388,
+        "h": 110.390625,
+        "right": 389,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 294,
+        "h": 22.390625,
+        "right": 315,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 348,
+        "h": 36,
+        "right": 349,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 388,
+        "h": 581.609375,
+        "right": 389,
+        "bottom": 771,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Файлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринятоПринятоСелфи 1Нужна заменаЗаменитьСелфи 2ПринятоПринятоАнтон Иванов0/3 ф"
+      },
+      "footer": {
+        "x": 1,
+        "y": 771,
+        "w": 388,
+        "h": 73,
+        "right": 389,
+        "bottom": 844,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tabText": "Анкета",
+      "pageOverflow": false,
+      "headerRatio": 0.13079457938388625,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 390,
+        "h": 796,
+        "right": 390,
+        "bottom": 844,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПрогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Пасп"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 388,
+        "h": 110.390625,
+        "right": 389,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 294,
+        "h": 22.390625,
+        "right": 315,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 348,
+        "h": 36,
+        "right": 349,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 388,
+        "h": 581.609375,
+        "right": 389,
+        "bottom": 771,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Прогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Паспортные данные100%Место работы / Учебы40%Осталось: 3 поляСпонсоры и финанс"
+      },
+      "footer": {
+        "x": 1,
+        "y": 771,
+        "w": 388,
+        "h": 73,
+        "right": 389,
+        "bottom": 844,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tabText": "Обзор",
+      "pageOverflow": false,
+      "headerRatio": 0.13079457938388625,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 390,
+        "h": 796,
+        "right": 390,
+        "bottom": 844,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПомощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место испр"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 388,
+        "h": 110.390625,
+        "right": 389,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 294,
+        "h": 22.390625,
+        "right": 315,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 348,
+        "h": 36,
+        "right": 349,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 388,
+        "h": 581.609375,
+        "right": 389,
+        "bottom": 771,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Помощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место исправленияЧто мешает движению2 открытых блокера по замечаниямФайлы готовы на"
+      },
+      "footer": {
+        "x": 1,
+        "y": 771,
+        "w": 388,
+        "h": 73,
+        "right": 389,
+        "bottom": 844,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "submissions",
+      "surface": "submissions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 390,
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 60,
+        "right": 390,
+        "bottom": 60,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.07109004739336493,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 844,
+        "right": 390,
+        "bottom": 844,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подачаМои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подач"
+      },
+      "main": {
+        "x": 0,
+        "y": 60,
+        "w": 390,
+        "h": 702,
+        "right": 390,
+        "bottom": 762,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подачиПД-1054Москва04.09-14.0915.061"
+      },
+      "toolbar": {
+        "x": 16,
+        "y": 76,
+        "w": 358,
+        "h": 44,
+        "right": 374,
+        "bottom": 120,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверке"
+      },
+      "visibleControls": 24,
+      "smallTargets": [
+        {
+          "text": "Загрузить",
+          "w": 44,
+          "h": 36,
+          "x": 273,
+          "y": 11.5,
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Новая подача",
+          "w": 44,
+          "h": 36,
+          "x": 325,
+          "y": 11.5,
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все",
+          "w": 62,
+          "h": 34,
+          "x": 21,
+          "y": 81,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 62,
+          "h": 34,
+          "x": 85,
+          "y": 81,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 62,
+          "h": 34,
+          "x": 149,
+          "y": 81,
+          "cls": ""
+        }
+      ],
+      "minInset": null,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-390",
+      "screen": "settings",
+      "surface": "settings",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 390,
+      "innerWidth": 390,
+      "innerHeight": 844,
+      "topbar": {
+        "x": 16.59375,
+        "y": 16.59375,
+        "w": 356.8125,
+        "h": 58,
+        "right": 373.40625,
+        "bottom": 74.59375,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход."
+      },
+      "topbarRatio": 0.06872037914691943,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 844,
+        "right": 390,
+        "bottom": 844,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход.ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто п"
+      },
+      "main": {
+        "x": 16.59375,
+        "y": 79.1875,
+        "w": 356.8125,
+        "h": 675.8125,
+        "right": 373.40625,
+        "bottom": 755,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто показывать сводку задач агента.СразуЕжедневноНов"
+      },
+      "toolbar": null,
+      "visibleControls": 9,
+      "smallTargets": [],
+      "minInset": 16.59375,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-430",
+      "screen": "menu-open",
+      "overflow": false,
+      "shellOpen": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular is-mobile-nav-open",
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 932,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "actions",
+      "surface": "actions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 430,
+      "innerWidth": 430,
+      "innerHeight": 932,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 430,
+        "h": 56,
+        "right": 430,
+        "bottom": 56,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.060085836909871244,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 430,
+        "h": 932,
+        "right": 430,
+        "bottom": 932,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подачаМои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSU"
+      },
+      "main": {
+        "x": 0,
+        "y": 66,
+        "w": 430,
+        "h": 866,
+        "right": 430,
+        "bottom": 932,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявител"
+      },
+      "toolbar": {
+        "x": 16,
+        "y": 70,
+        "w": 398,
+        "h": 90,
+        "right": 414,
+        "bottom": 160,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все действия18Ошибки3На проверке2Поиск по действиям"
+      },
+      "visibleControls": 11,
+      "smallTargets": [
+        {
+          "text": "Сначала старые",
+          "w": 40,
+          "h": 38,
+          "x": 374,
+          "y": 121,
+          "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button"
+        }
+      ],
+      "minInset": 16,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tabText": "Файлы",
+      "pageOverflow": false,
+      "headerRatio": 0.11844487660944206,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 430,
+        "h": 884,
+        "right": 430,
+        "bottom": 932,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияФайлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринят"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 428,
+        "h": 110.390625,
+        "right": 429,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 334,
+        "h": 22.390625,
+        "right": 355,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 388,
+        "h": 36,
+        "right": 389,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 428,
+        "h": 669.609375,
+        "right": 429,
+        "bottom": 859,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Файлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринятоПринятоСелфи 1Нужна заменаЗаменитьСелфи 2ПринятоПринятоАнтон Иванов0/3 ф"
+      },
+      "footer": {
+        "x": 1,
+        "y": 859,
+        "w": 428,
+        "h": 73,
+        "right": 429,
+        "bottom": 932,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tabText": "Анкета",
+      "pageOverflow": false,
+      "headerRatio": 0.11844487660944206,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 430,
+        "h": 884,
+        "right": 430,
+        "bottom": 932,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПрогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Пасп"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 428,
+        "h": 110.390625,
+        "right": 429,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 334,
+        "h": 22.390625,
+        "right": 355,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 388,
+        "h": 36,
+        "right": 389,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 428,
+        "h": 669.609375,
+        "right": 429,
+        "bottom": 859,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Прогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Паспортные данные100%Место работы / Учебы40%Осталось: 3 поляСпонсоры и финанс"
+      },
+      "footer": {
+        "x": 1,
+        "y": 859,
+        "w": 428,
+        "h": 73,
+        "right": 429,
+        "bottom": 932,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tabText": "Обзор",
+      "pageOverflow": false,
+      "headerRatio": 0.11844487660944206,
+      "shell": {
+        "x": 0,
+        "y": 48,
+        "w": 430,
+        "h": 884,
+        "right": 430,
+        "bottom": 932,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПомощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место испр"
+      },
+      "header": {
+        "x": 1,
+        "y": 79,
+        "w": 428,
+        "h": 110.390625,
+        "right": 429,
+        "bottom": 189.390625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 119,
+        "w": 334,
+        "h": 22.390625,
+        "right": 355,
+        "bottom": 141.390625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 153.390625,
+        "w": 388,
+        "h": 36,
+        "right": 389,
+        "bottom": 189.390625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 189.390625,
+        "w": 428,
+        "h": 669.609375,
+        "right": 429,
+        "bottom": 859,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Помощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место исправленияЧто мешает движению2 открытых блокера по замечаниямФайлы готовы на"
+      },
+      "footer": {
+        "x": 1,
+        "y": 859,
+        "w": 428,
+        "h": 73,
+        "right": 429,
+        "bottom": 932,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "submissions",
+      "surface": "submissions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 430,
+      "innerWidth": 430,
+      "innerHeight": 932,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 430,
+        "h": 60,
+        "right": 430,
+        "bottom": 60,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.06437768240343347,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 430,
+        "h": 932,
+        "right": 430,
+        "bottom": 932,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подачаМои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подач"
+      },
+      "main": {
+        "x": 0,
+        "y": 60,
+        "w": 430,
+        "h": 790,
+        "right": 430,
+        "bottom": 850,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подачиПД-1054Москва04.09-14.0915.061"
+      },
+      "toolbar": {
+        "x": 16,
+        "y": 76,
+        "w": 398,
+        "h": 44,
+        "right": 414,
+        "bottom": 120,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверке"
+      },
+      "visibleControls": 24,
+      "smallTargets": [
+        {
+          "text": "Загрузить",
+          "w": 44,
+          "h": 36,
+          "x": 313,
+          "y": 11.5,
+          "cls": "mp-button secondary-button vf-reference-upload-action"
+        },
+        {
+          "text": "Новая подача",
+          "w": 44,
+          "h": 36,
+          "x": 365,
+          "y": 11.5,
+          "cls": "mp-button primary-button vf-reference-create-action"
+        },
+        {
+          "text": "Все",
+          "w": 62,
+          "h": 34,
+          "x": 21,
+          "y": 81,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 62,
+          "h": 34,
+          "x": 85,
+          "y": 81,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 62,
+          "h": 34,
+          "x": 149,
+          "y": 81,
+          "cls": ""
+        }
+      ],
+      "minInset": null,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "mobile-430",
+      "screen": "settings",
+      "surface": "settings",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 430,
+      "innerWidth": 430,
+      "innerHeight": 932,
+      "topbar": {
+        "x": 17,
+        "y": 17,
+        "w": 396,
+        "h": 58,
+        "right": 413,
+        "bottom": 75,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход."
+      },
+      "topbarRatio": 0.06223175965665236,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 430,
+        "h": 932,
+        "right": 430,
+        "bottom": 932,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход.ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто п"
+      },
+      "main": {
+        "x": 17,
+        "y": 85.1875,
+        "w": 396,
+        "h": 757.8125,
+        "right": 413,
+        "bottom": 843,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто показывать сводку задач агента.СразуЕжедневноНов"
+      },
+      "toolbar": null,
+      "visibleControls": 9,
+      "smallTargets": [],
+      "minInset": 17,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "tablet-768",
+      "screen": "menu-open",
+      "overflow": false,
+      "shellOpen": "ops-shell has-unified-side-menu surface-agent-actions is-v19-collection-surface role-agent is-side-menu-regular is-mobile-nav-open",
+      "sidebar": {
+        "x": 8,
+        "y": 8,
+        "w": 336,
+        "h": 1008,
+        "display": "grid",
+        "overflowY": "auto"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "actions",
+      "surface": "actions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 768,
+      "innerWidth": 768,
+      "innerHeight": 1024,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 768,
+        "h": 64,
+        "right": 768,
+        "bottom": 64,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.0625,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 768,
+        "h": 1024,
+        "right": 768,
+        "bottom": 1024,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подачаМои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSU"
+      },
+      "main": {
+        "x": 0,
+        "y": 64,
+        "w": 768,
+        "h": 960,
+        "right": 768,
+        "bottom": 1024,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявител"
+      },
+      "toolbar": {
+        "x": 24,
+        "y": 70,
+        "w": 720,
+        "h": 96,
+        "right": 744,
+        "bottom": 166,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все действия18Ошибки3На проверке2Поиск по действиям"
+      },
+      "visibleControls": 12,
+      "smallTargets": [],
+      "minInset": 24,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tabText": "Файлы",
+      "pageOverflow": false,
+      "headerRatio": 0.1263580322265625,
+      "shell": {
+        "x": 0,
+        "y": 145.859375,
+        "w": 768,
+        "h": 878.140625,
+        "right": 768,
+        "bottom": 1024,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияФайлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринят"
+      },
+      "header": {
+        "x": 1,
+        "y": 163.859375,
+        "w": 766,
+        "h": 129.390625,
+        "right": 767,
+        "bottom": 293.25,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 215.859375,
+        "w": 726,
+        "h": 22.390625,
+        "right": 747,
+        "bottom": 238.25,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 258.25,
+        "w": 726,
+        "h": 34,
+        "right": 727,
+        "bottom": 292.25,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 293.25,
+        "w": 766,
+        "h": 665.75,
+        "right": 767,
+        "bottom": 959,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Файлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринятоПринятоСелфи 1Нужна заменаЗаменитьСелфи 2ПринятоПринятоАнтон Иванов0/3 ф"
+      },
+      "footer": {
+        "x": 1,
+        "y": 959,
+        "w": 766,
+        "h": 65,
+        "right": 767,
+        "bottom": 1024,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tabText": "Анкета",
+      "pageOverflow": false,
+      "headerRatio": 0.1263580322265625,
+      "shell": {
+        "x": 0,
+        "y": 375.609375,
+        "w": 768,
+        "h": 648.390625,
+        "right": 768,
+        "bottom": 1024,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПрогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Пасп"
+      },
+      "header": {
+        "x": 1,
+        "y": 393.609375,
+        "w": 766,
+        "h": 129.390625,
+        "right": 767,
+        "bottom": 523,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 445.609375,
+        "w": 726,
+        "h": 22.390625,
+        "right": 747,
+        "bottom": 468,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 488,
+        "w": 726,
+        "h": 34,
+        "right": 727,
+        "bottom": 522,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 523,
+        "w": 766,
+        "h": 436,
+        "right": 767,
+        "bottom": 959,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Прогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Паспортные данные100%Место работы / Учебы40%Осталось: 3 поляСпонсоры и финанс"
+      },
+      "footer": {
+        "x": 1,
+        "y": 959,
+        "w": 766,
+        "h": 65,
+        "right": 767,
+        "bottom": 1024,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tabText": "Обзор",
+      "pageOverflow": false,
+      "headerRatio": 0.1263580322265625,
+      "shell": {
+        "x": 0,
+        "y": 143.375,
+        "w": 768,
+        "h": 880.625,
+        "right": 768,
+        "bottom": 1024,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПомощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место испр"
+      },
+      "header": {
+        "x": 1,
+        "y": 160.375,
+        "w": 766,
+        "h": 129.390625,
+        "right": 767,
+        "bottom": 289.765625,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 21,
+        "y": 212.375,
+        "w": 726,
+        "h": 22.390625,
+        "right": 747,
+        "bottom": 234.765625,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 1,
+        "y": 254.765625,
+        "w": 726,
+        "h": 34,
+        "right": 727,
+        "bottom": 288.765625,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 1,
+        "y": 289.765625,
+        "w": 766,
+        "h": 669.234375,
+        "right": 767,
+        "bottom": 959,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Помощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место исправленияЧто мешает движению2 открытых блокера по замечаниямФайлы готовы на"
+      },
+      "footer": {
+        "x": 1,
+        "y": 959,
+        "w": 766,
+        "h": 65,
+        "right": 767,
+        "bottom": 1024,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "submissions",
+      "surface": "submissions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 768,
+      "innerWidth": 768,
+      "innerHeight": 1024,
+      "topbar": {
+        "x": 16,
+        "y": 16,
+        "w": 736,
+        "h": 58,
+        "right": 752,
+        "bottom": 74,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.056640625,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 768,
+        "h": 1024,
+        "right": 768,
+        "bottom": 1024,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подачаМои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подач"
+      },
+      "main": {
+        "x": 16,
+        "y": 74,
+        "w": 736,
+        "h": 934,
+        "right": 752,
+        "bottom": 1008,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подачиПД-1054Москва04.09-14.0915.061"
+      },
+      "toolbar": {
+        "x": 40,
+        "y": 98,
+        "w": 688,
+        "h": 44,
+        "right": 728,
+        "bottom": 142,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверке"
+      },
+      "visibleControls": 24,
+      "smallTargets": [
+        {
+          "text": "Все",
+          "w": 95.796875,
+          "h": 34,
+          "x": 45,
+          "y": 103,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 139.96875,
+          "h": 34,
+          "x": 142.796875,
+          "y": 103,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 146.65625,
+          "h": 34,
+          "x": 284.765625,
+          "y": 103,
+          "cls": ""
+        },
+        {
+          "text": "Открыть заявителя: Ирина Петрова, Семья Петровы",
+          "w": 305,
+          "h": 34,
+          "x": 56,
+          "y": 293.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Павел Петров, Семья Петровы",
+          "w": 305,
+          "h": 34,
+          "x": 56,
+          "y": 331.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Анна Волкова, Семья Волковы",
+          "w": 305,
+          "h": 34,
+          "x": 407,
+          "y": 294.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Игорь Волков, Семья Волковы",
+          "w": 305,
+          "h": 34,
+          "x": 407,
+          "y": 332.6875,
+          "cls": "vf-figma-member-row"
+        },
+        {
+          "text": "Открыть заявителя: Мария Иванова, Семья Ивановы",
+          "w": 305,
+          "h": 34,
+          "x": 56,
+          "y": 629.875,
+          "cls": "vf-figma-member-row"
+        }
+      ],
+      "minInset": 16,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "tablet-768",
+      "screen": "settings",
+      "surface": "settings",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 768,
+      "innerWidth": 768,
+      "innerHeight": 1024,
+      "topbar": {
+        "x": 17,
+        "y": 17,
+        "w": 734,
+        "h": 58,
+        "right": 751,
+        "bottom": 75,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход."
+      },
+      "topbarRatio": 0.056640625,
+      "workspace": {
+        "x": 0,
+        "y": 0,
+        "w": 768,
+        "h": 1024,
+        "right": 768,
+        "bottom": 1024,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход.ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто п"
+      },
+      "main": {
+        "x": 17,
+        "y": 75,
+        "w": 734,
+        "h": 932,
+        "right": 751,
+        "bottom": 1007,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто показывать сводку задач агента.СразуЕжедневноНов"
+      },
+      "toolbar": null,
+      "visibleControls": 9,
+      "smallTargets": [],
+      "minInset": 17,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "actions",
+      "surface": "actions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "topbar": {
+        "x": 288,
+        "y": 0,
+        "w": 1152,
+        "h": 64,
+        "right": 1440,
+        "bottom": 64,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.07111111111111111,
+      "workspace": {
+        "x": 288,
+        "y": 0,
+        "w": 1152,
+        "h": 900,
+        "right": 1440,
+        "bottom": 900,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияОчередь задач по подачам: блокеры, приоритет и следующий шаг.ЗагрузитьНовая подачаМои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSU"
+      },
+      "main": {
+        "x": 288,
+        "y": 64,
+        "w": 1152,
+        "h": 836,
+        "right": 1440,
+        "bottom": 900,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои действияВсе действия18Ошибки3На проверке2Поиск по действиямСегодняСемья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявител"
+      },
+      "toolbar": {
+        "x": 312,
+        "y": 88,
+        "w": 1104,
+        "h": 96,
+        "right": 1416,
+        "bottom": 184,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все действия18Ошибки3На проверке2Поиск по действиям"
+      },
+      "visibleControls": 18,
+      "smallTargets": [
+        {
+          "text": "Свернуть меню",
+          "w": 36,
+          "h": 36,
+          "x": 241,
+          "y": 14,
+          "cls": "mp-button icon-button ops-sidebar-mode-toggle"
+        }
+      ],
+      "minInset": 288,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tabText": "Файлы",
+      "pageOverflow": false,
+      "headerRatio": 0.16555555555555557,
+      "shell": {
+        "x": 592,
+        "y": 8,
+        "w": 840,
+        "h": 884,
+        "right": 1432,
+        "bottom": 892,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияФайлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринят"
+      },
+      "header": {
+        "x": 593,
+        "y": 9,
+        "w": 838,
+        "h": 149,
+        "right": 1431,
+        "bottom": 158,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 625,
+        "y": 63,
+        "w": 774,
+        "h": 36,
+        "right": 1399,
+        "bottom": 99,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 625,
+        "y": 113,
+        "w": 774,
+        "h": 44,
+        "right": 1399,
+        "bottom": 157,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 593,
+        "y": 158,
+        "w": 838,
+        "h": 660,
+        "right": 1431,
+        "bottom": 818,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Файлы подачи4/12Мария Иванова2/3 файлов готово · требуется 1СвернутьСкан паспортаПринятоПринятоСелфи 1Нужна заменаЗаменитьСелфи 2ПринятоПринятоАнтон Иванов0/3 ф"
+      },
+      "footer": {
+        "x": 593,
+        "y": 818,
+        "w": 838,
+        "h": 73,
+        "right": 1431,
+        "bottom": 891,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tabText": "Анкета",
+      "pageOverflow": false,
+      "headerRatio": 0.16555555555555557,
+      "shell": {
+        "x": 592,
+        "y": 8,
+        "w": 840,
+        "h": 884,
+        "right": 1432,
+        "bottom": 892,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПрогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Пасп"
+      },
+      "header": {
+        "x": 593,
+        "y": 9,
+        "w": 838,
+        "h": 149,
+        "right": 1431,
+        "bottom": 158,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 625,
+        "y": 63,
+        "w": 774,
+        "h": 36,
+        "right": 1399,
+        "bottom": 99,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 625,
+        "y": 113,
+        "w": 774,
+        "h": 44,
+        "right": 1399,
+        "bottom": 157,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 593,
+        "y": 158,
+        "w": 838,
+        "h": 660,
+        "right": 1431,
+        "bottom": 818,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Прогресс заполненияОсталось заполнить 2 блока данныхОткрыть анкетуЛичные данные100%Паспортные данные100%Место работы / Учебы40%Осталось: 3 поляСпонсоры и финанс"
+      },
+      "footer": {
+        "x": 593,
+        "y": 818,
+        "w": 838,
+        "h": 73,
+        "right": 1431,
+        "bottom": 891,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tabText": "Обзор",
+      "pageOverflow": false,
+      "headerRatio": 0.16555555555555557,
+      "shell": {
+        "x": 592,
+        "y": 8,
+        "w": 840,
+        "h": 884,
+        "right": 1432,
+        "bottom": 892,
+        "display": "flex",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2ИсторияПомощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место испр"
+      },
+      "header": {
+        "x": 593,
+        "y": 9,
+        "w": 838,
+        "h": 149,
+        "right": 1431,
+        "bottom": 158,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "ПД-1048·семейнаявозвращеноСемья ИвановыхОбзорАнкетаФайлыЗамечания2История"
+      },
+      "heading": {
+        "x": 625,
+        "y": 63,
+        "w": 774,
+        "h": 36,
+        "right": 1399,
+        "bottom": 99,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Семья Ивановых"
+      },
+      "tabs": {
+        "x": 625,
+        "y": 113,
+        "w": 774,
+        "h": 44,
+        "right": 1399,
+        "bottom": 157,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "ОбзорАнкетаФайлыЗамечания2История"
+      },
+      "body": {
+        "x": 593,
+        "y": 158,
+        "w": 838,
+        "h": 660,
+        "right": 1431,
+        "bottom": 818,
+        "display": "block",
+        "overflowX": "auto",
+        "overflowY": "auto",
+        "text": "Помощник по подачеЕсть блокерыГотовность 50%. Файлы: 6/12.Есть блокерОткрыть место исправленияЧто мешает движению2 открытых блокера по замечаниямФайлы готовы на"
+      },
+      "footer": {
+        "x": 593,
+        "y": 818,
+        "w": 838,
+        "h": 73,
+        "right": 1431,
+        "bottom": 891,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "text": "Сначала отметьте замечания исправленнымиЗакрыть Отправить исправления"
+      },
+      "clippedTabs": [],
+      "flags": {
+        "headingTabsOverlap": false,
+        "headerBodyOverlap": false,
+        "footerBodyOverlap": false
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "submissions",
+      "surface": "submissions",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "topbar": {
+        "x": 288,
+        "y": 0,
+        "w": 1128,
+        "h": 64,
+        "right": 1416,
+        "bottom": 64,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подача"
+      },
+      "topbarRatio": 0.07111111111111111,
+      "workspace": {
+        "x": 288,
+        "y": 0,
+        "w": 1128,
+        "h": 900,
+        "right": 1416,
+        "bottom": 900,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиЗагрузитьНовая подачаМои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подач"
+      },
+      "main": {
+        "x": 288,
+        "y": 64,
+        "w": 1128,
+        "h": 836,
+        "right": 1416,
+        "bottom": 900,
+        "display": "block",
+        "overflowX": "hidden",
+        "overflowY": "auto",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Мои подачиВсе8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверкеСемейные подачиПД-1054Москва04.09-14.0915.061"
+      },
+      "toolbar": {
+        "x": 312,
+        "y": 88,
+        "w": 1080,
+        "h": 44,
+        "right": 1392,
+        "bottom": 132,
+        "display": "grid",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "Все8Семейные3Одиночные5Все8Черновики2С замечаниями1На проверке2Готово3Поиск по подачам1Черновики1Замечания3Готово2На проверке"
+      },
+      "visibleControls": 30,
+      "smallTargets": [
+        {
+          "text": "Свернуть меню",
+          "w": 36,
+          "h": 36,
+          "x": 243,
+          "y": 18,
+          "cls": "mp-button icon-button ops-sidebar-mode-toggle"
+        },
+        {
+          "text": "Мои действия",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 156,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Мои подачи",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 194,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Настройки",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 232,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Все",
+          "w": 95.796875,
+          "h": 34,
+          "x": 317,
+          "y": 93,
+          "cls": "is-active"
+        },
+        {
+          "text": "Семейные",
+          "w": 139.96875,
+          "h": 34,
+          "x": 414.796875,
+          "y": 93,
+          "cls": ""
+        },
+        {
+          "text": "Одиночные",
+          "w": 146.65625,
+          "h": 34,
+          "x": 556.765625,
+          "y": 93,
+          "cls": ""
+        },
+        {
+          "text": "Открыть заявителя: Ирина Петрова, Семья Петровы",
+          "w": 318.65625,
+          "h": 34,
+          "x": 328,
+          "y": 284.6875,
+          "cls": "vf-figma-member-row"
+        }
+      ],
+      "minInset": 288,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "settings",
+      "surface": "settings",
+      "url": "http://127.0.0.1:5175/",
+      "pageOverflow": false,
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "topbar": {
+        "x": 321,
+        "y": 11,
+        "w": 1078,
+        "h": 64,
+        "right": 1399,
+        "bottom": 75,
+        "display": "flex",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход."
+      },
+      "topbarRatio": 0.07111111111111111,
+      "workspace": {
+        "x": 296,
+        "y": 10,
+        "w": 1128,
+        "h": 900,
+        "right": 1424,
+        "bottom": 910,
+        "display": "grid",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "НастройкиРоль, режим данных и безопасный выход.ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто п"
+      },
+      "main": {
+        "x": 321,
+        "y": 75,
+        "w": 1078,
+        "h": 790,
+        "right": 1399,
+        "bottom": 865,
+        "display": "block",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "16px",
+        "text": "ПрофильУведомленияИнтерфейсСбросить почтуУведомленияВозврат подачиПоказывать событие и точное действие.Сводка по действиямКак часто показывать сводку задач агента.СразуЕжедневноНов"
+      },
+      "toolbar": null,
+      "visibleControls": 15,
+      "smallTargets": [
+        {
+          "text": "Свернуть меню",
+          "w": 36,
+          "h": 36,
+          "x": 243,
+          "y": 18,
+          "cls": "mp-button icon-button ops-sidebar-mode-toggle"
+        },
+        {
+          "text": "Мои действия",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 156,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Мои подачи",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 194,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item"
+        },
+        {
+          "text": "Настройки",
+          "w": 271,
+          "h": 36,
+          "x": 8,
+          "y": 232,
+          "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active"
+        },
+        {
+          "text": "Профиль",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 82,
+          "cls": ""
+        },
+        {
+          "text": "Уведомления",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 114,
+          "cls": "active"
+        },
+        {
+          "text": "Интерфейс",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 146,
+          "cls": ""
+        },
+        {
+          "text": "Сбросить почту",
+          "w": 188,
+          "h": 28,
+          "x": 328,
+          "y": 186,
+          "cls": "settings-nav-signout"
+        }
+      ],
+      "minInset": 321,
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0,
+      "messages": []
+    }
+  ]
+}

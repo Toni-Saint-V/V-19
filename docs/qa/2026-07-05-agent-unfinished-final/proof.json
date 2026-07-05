@@ -1,0 +1,374 @@
+{
+  "generatedAt": "2026-07-05T14:38:31.763Z",
+  "results": [
+    {
+      "vp": "mobile-320",
+      "screen": "menu",
+      "overflow": false,
+      "logs": 0
+    },
+    {
+      "vp": "mobile-320",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.07567567567567568,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-320",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.14917652027027026,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-320",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.14917652027027026,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-320",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.14917652027027026,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-320",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.08108108108108109,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-320",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.07837837837837838,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-390",
+      "screen": "menu",
+      "overflow": false,
+      "logs": 0
+    },
+    {
+      "vp": "mobile-390",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.06635071090047394,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-390",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.13079457938388625,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-390",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.13079457938388625,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-390",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.13079457938388625,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-390",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.07109004739336493,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-390",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.06872037914691943,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-430",
+      "screen": "menu",
+      "overflow": false,
+      "logs": 0
+    },
+    {
+      "vp": "mobile-430",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.060085836909871244,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-430",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.11844487660944206,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-430",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.11844487660944206,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-430",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.11844487660944206,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-430",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.06437768240343347,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "mobile-430",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.06223175965665236,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "tablet-768",
+      "screen": "menu",
+      "overflow": false,
+      "logs": 0
+    },
+    {
+      "vp": "tablet-768",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.0625,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "tablet-768",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.1263580322265625,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "tablet-768",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.1263580322265625,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "tablet-768",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.1263580322265625,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "tablet-768",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.056640625,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "tablet-768",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.056640625,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "desktop-1440",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.07111111111111111,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.16555555555555557,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.16555555555555557,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.16555555555555557,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "logs": 0
+    },
+    {
+      "vp": "desktop-1440",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.07111111111111111,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    },
+    {
+      "vp": "desktop-1440",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.07111111111111111,
+      "clipped": [],
+      "fonts": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "logs": 0
+    }
+  ]
+}

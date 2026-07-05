@@ -1,0 +1,57 @@
+{
+  "metrics": {
+    "title": "Настройки",
+    "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent is-side-menu-regular",
+    "scrollWidth": 768,
+    "innerWidth": 768,
+    "overflow": false,
+    "topbar": {
+      "x": 17,
+      "y": 17,
+      "width": 734,
+      "height": 58
+    },
+    "topbarRatio": 0.057,
+    "settings": {
+      "x": 17,
+      "y": 75,
+      "width": 734,
+      "height": 932
+    },
+    "nav": {
+      "x": 17,
+      "y": 75,
+      "width": 734,
+      "height": 66
+    },
+    "minTouchTarget": 44,
+    "smallTargets": [],
+    "firstViewportText": [
+      "Настройки",
+      "Профиль",
+      "Уведомления",
+      "Интерфейс",
+      "Сбросить почту",
+      "Уведомления",
+      "Возврат подачи",
+      "Показывать событие и точное действие.",
+      "Сводка по действиям",
+      "Как часто показывать сводку задач агента.",
+      "Новые замечания",
+      "Открывать drawer на вкладке «Замечания».",
+      "Ошибки выгрузки",
+      "Только для роли администратора."
+    ]
+  },
+  "menuMetrics": {
+    "sidebar": {
+      "x": 8,
+      "y": 8,
+      "width": 336,
+      "height": 1008
+    },
+    "backdrop": true,
+    "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent is-side-menu-regular is-mobile-nav-open"
+  },
+  "messages": []
+}

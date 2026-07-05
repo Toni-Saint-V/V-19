@@ -1,0 +1,61 @@
+{
+  "data": [
+    {
+      "label": "export-mobile-final3",
+      "title": "Выгрузка",
+      "overflow": false,
+      "sw": 390,
+      "rects": {
+        "settingsNav": null,
+        "settingsForm": null,
+        "exportRoot": {
+          "x": 16,
+          "y": 42.59375,
+          "w": 358,
+          "h": 760,
+          "b": 802.59375
+        },
+        "topbar": {
+          "x": 16,
+          "y": 0,
+          "w": 358,
+          "h": 44,
+          "b": 44
+        }
+      },
+      "offscreen": []
+    },
+    {
+      "label": "settings-mobile-final3",
+      "title": "Настройки",
+      "overflow": false,
+      "sw": 390,
+      "rects": {
+        "settingsNav": {
+          "x": 16.59375,
+          "y": 79.1875,
+          "w": 356.8125,
+          "h": 166,
+          "b": 245.1875
+        },
+        "settingsForm": {
+          "x": 16.59375,
+          "y": 257.1875,
+          "w": 356.8125,
+          "h": 467.1875,
+          "b": 724.375
+        },
+        "exportRoot": null,
+        "topbar": {
+          "x": 16.59375,
+          "y": 16.59375,
+          "w": 356.8125,
+          "h": 58,
+          "b": 74.59375
+        }
+      },
+      "offscreen": []
+    }
+  ],
+  "logs": []
+}

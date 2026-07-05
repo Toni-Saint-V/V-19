@@ -1,0 +1,434 @@
+[
+  {
+    "viewport": {
+      "name": "mobile-320",
+      "width": 320,
+      "height": 740
+    },
+    "error": null,
+    "logs": [],
+    "states": [
+      {
+        "label": "review",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-review.png"
+      },
+      {
+        "label": "filter-open",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": true,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-filter-open.png"
+      },
+      {
+        "label": "filter-closed",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-filter-closed.png"
+      },
+      {
+        "label": "drawer-Файлы",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-drawer-Файлы.png"
+      },
+      {
+        "label": "drawer-Замечания",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": true,
+        "screenshot": "mobile-320-drawer-Замечания.png"
+      },
+      {
+        "label": "drawer-Анкета",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-drawer-Анкета.png"
+      },
+      {
+        "label": "passport-workspace",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-passport-workspace.png"
+      },
+      {
+        "label": "export",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-export.png"
+      },
+      {
+        "label": "export-summary-open",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": true,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-export-summary-open.png"
+      },
+      {
+        "label": "export-summary-closed",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-export-summary-closed.png"
+      },
+      {
+        "label": "settings",
+        "title": "Настройки",
+        "overflow": false,
+        "sw": 320,
+        "vw": 320,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-320-settings.png"
+      }
+    ],
+    "notes": []
+  },
+  {
+    "viewport": {
+      "name": "mobile-390",
+      "width": 390,
+      "height": 844
+    },
+    "error": null,
+    "logs": [],
+    "states": [
+      {
+        "label": "review",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-review.png"
+      },
+      {
+        "label": "filter-open",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": true,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-filter-open.png"
+      },
+      {
+        "label": "filter-closed",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-filter-closed.png"
+      },
+      {
+        "label": "drawer-Файлы",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-drawer-Файлы.png"
+      },
+      {
+        "label": "drawer-Замечания",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-drawer-Замечания.png"
+      },
+      {
+        "label": "drawer-Анкета",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-drawer-Анкета.png"
+      },
+      {
+        "label": "passport-workspace",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-passport-workspace.png"
+      },
+      {
+        "label": "export",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-export.png"
+      },
+      {
+        "label": "export-summary-open",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": true,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-export-summary-open.png"
+      },
+      {
+        "label": "export-summary-closed",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-export-summary-closed.png"
+      },
+      {
+        "label": "settings",
+        "title": "Настройки",
+        "overflow": false,
+        "sw": 390,
+        "vw": 390,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-390-settings.png"
+      }
+    ],
+    "notes": []
+  },
+  {
+    "viewport": {
+      "name": "mobile-430",
+      "width": 430,
+      "height": 932
+    },
+    "error": null,
+    "logs": [],
+    "states": [
+      {
+        "label": "review",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-review.png"
+      },
+      {
+        "label": "filter-open",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": true,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-filter-open.png"
+      },
+      {
+        "label": "filter-closed",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-filter-closed.png"
+      },
+      {
+        "label": "drawer-Файлы",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-drawer-Файлы.png"
+      },
+      {
+        "label": "drawer-Замечания",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-drawer-Замечания.png"
+      },
+      {
+        "label": "drawer-Анкета",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-drawer-Анкета.png"
+      },
+      {
+        "label": "passport-workspace",
+        "title": "Проверка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-passport-workspace.png"
+      },
+      {
+        "label": "export",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-export.png"
+      },
+      {
+        "label": "export-summary-open",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": true,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-export-summary-open.png"
+      },
+      {
+        "label": "export-summary-closed",
+        "title": "Выгрузка",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-export-summary-closed.png"
+      },
+      {
+        "label": "settings",
+        "title": "Настройки",
+        "overflow": false,
+        "sw": 430,
+        "vw": 430,
+        "offscreen": [],
+        "sheetBackdrop": false,
+        "exportBackdrop": false,
+        "footerOverlap": false,
+        "screenshot": "mobile-430-settings.png"
+      }
+    ],
+    "notes": []
+  }
+]

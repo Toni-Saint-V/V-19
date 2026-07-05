@@ -1,0 +1,97 @@
+{
+  "metrics": {
+    "title": "Настройки",
+    "shellClass": "ops-shell has-unified-side-menu surface-settings role-agent is-side-menu-regular",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "topbar": {
+      "x": 321,
+      "y": 11,
+      "width": 1078,
+      "height": 64
+    },
+    "topbarRatio": 0.071,
+    "settings": {
+      "x": 321,
+      "y": 75,
+      "width": 1078,
+      "height": 790
+    },
+    "nav": {
+      "x": 321,
+      "y": 75,
+      "width": 220,
+      "height": 146
+    },
+    "minTouchTarget": 24,
+    "smallTargets": [
+      {
+        "text": "Профиль",
+        "width": 188,
+        "height": 28,
+        "visible": true
+      },
+      {
+        "text": "Уведомления",
+        "width": 188,
+        "height": 28,
+        "visible": true
+      },
+      {
+        "text": "Интерфейс",
+        "width": 188,
+        "height": 28,
+        "visible": true
+      },
+      {
+        "text": "Сбросить почту",
+        "width": 188,
+        "height": 28,
+        "visible": true
+      },
+      {
+        "text": "Возврат подачи",
+        "width": 42,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "text": "СразуЕжедневно",
+        "width": 240,
+        "height": 32,
+        "visible": true
+      },
+      {
+        "text": "Новые замечания",
+        "width": 42,
+        "height": 24,
+        "visible": true
+      },
+      {
+        "text": "Ошибки выгрузки",
+        "width": 42,
+        "height": 24,
+        "visible": true
+      }
+    ],
+    "firstViewportText": [
+      "Настройки",
+      "Профиль",
+      "Уведомления",
+      "Интерфейс",
+      "Сбросить почту",
+      "Уведомления",
+      "Возврат подачи",
+      "Показывать событие и точное действие.",
+      "Сводка по действиям",
+      "Как часто показывать сводку задач агента.",
+      "Новые замечания",
+      "Открывать drawer на вкладке «Замечания».",
+      "Ошибки выгрузки",
+      "Только для роли администратора."
+    ]
+  },
+  "menuMetrics": null,
+  "messages": []
+}

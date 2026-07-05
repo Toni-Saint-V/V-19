@@ -1,0 +1,117 @@
+{
+  "data": [
+    {
+      "label": "files-mobile-final2",
+      "overflow": false,
+      "sw": 390,
+      "hasDialog": true,
+      "backdrop": false,
+      "rects": {
+        "content": {
+          "x": 1,
+          "y": 148,
+          "w": 388,
+          "h": 623,
+          "b": 771
+        },
+        "footer": {
+          "x": 1,
+          "y": 771,
+          "w": 388,
+          "h": 73,
+          "b": 844
+        },
+        "filesPreview": {
+          "x": 17,
+          "y": 437.5374450683594,
+          "w": 356,
+          "h": 54,
+          "b": 491.5374450683594
+        },
+        "checkPane": {
+          "x": 17,
+          "y": 505.5374450683594,
+          "w": 356,
+          "h": 1762.2030029296875,
+          "b": 2267.740447998047
+        },
+        "identityPanel": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "b": 0
+        },
+        "passport": null,
+        "passportDoc": null,
+        "passportCompare": null
+      }
+    },
+    {
+      "label": "passport-mobile-final2",
+      "overflow": false,
+      "sw": 390,
+      "hasDialog": true,
+      "backdrop": false,
+      "rects": {
+        "content": {
+          "x": 1,
+          "y": 148,
+          "w": 388,
+          "h": 623,
+          "b": 771
+        },
+        "footer": {
+          "x": 1,
+          "y": 771,
+          "w": 388,
+          "h": 73,
+          "b": 844
+        },
+        "filesPreview": {
+          "x": 17,
+          "y": 436.5625,
+          "w": 356,
+          "h": 54,
+          "b": 490.5625
+        },
+        "checkPane": {
+          "x": 17,
+          "y": 504.5625,
+          "w": 356,
+          "h": 1762.203125,
+          "b": 2266.765625
+        },
+        "identityPanel": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "b": 0
+        },
+        "passport": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 844,
+          "b": 844
+        },
+        "passportDoc": {
+          "x": 0,
+          "y": 52,
+          "w": 390,
+          "h": 244.75,
+          "b": 296.75
+        },
+        "passportCompare": {
+          "x": 0,
+          "y": 296.75,
+          "w": 390,
+          "h": 547.25,
+          "b": 844
+        }
+      }
+    }
+  ],
+  "logs": []
+}

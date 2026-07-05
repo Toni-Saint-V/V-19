@@ -116,7 +116,15 @@ export function CollectionToolbar<T extends string>({
         aria-label={ariaLabel}
       >
         <div className="v19-toolbar-secondary-row">
-          {leadingControl ?? (
+          {leadingControl}
+          {leadingControl ? (
+            <StatusTabs
+              ariaLabel={tabsAriaLabel ?? "Состояние списка"}
+              onValueChange={onTabChange}
+              tabs={tabs}
+              value={value}
+            />
+          ) : (
             <StatusTabs
               ariaLabel={tabsAriaLabel ?? "Состояние списка"}
               onValueChange={onTabChange}

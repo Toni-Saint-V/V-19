@@ -433,6 +433,7 @@ export function AgentActionsScreen({
       <section
         className="v19-actions-cockpit-shell v19-agent-actions-reference"
         aria-labelledby="agent-actions-title"
+        data-testid="agent-actions-cockpit"
       >
         <h2 id="agent-actions-title" className="sr-only">
           Мои действия
@@ -485,6 +486,7 @@ export function AgentActionsScreen({
                   peopleLabel={row.peopleLabel}
                   statusLabel={row.statusLabel}
                   statusTone={row.statusTone}
+                  testId="agent-action-queue-item"
                   title={row.title}
                   type={row.type}
                   updated={row.updated}
@@ -1162,16 +1164,16 @@ export function AgentSubmissionsScreen({
 
               <section
                 className="v19-reference-profile-section"
-                aria-label="Одиночные профили"
+                aria-label="Индивидуальные подачи"
               >
-                <h2>Одиночные профили</h2>
+                <h2>Индивидуальные подачи</h2>
                 {singleSubmissions.length ? (
                   <div className="v19-submission-profile-grid is-single">
                     {singleSubmissions.map(renderSubmissionProfileCard)}
                   </div>
                 ) : (
                   <div className="v19-submission-type-empty" role="status">
-                    Одиночных профилей нет.
+                    Индивидуальных подач нет.
                   </div>
                 )}
               </section>
@@ -1343,6 +1345,10 @@ function submissionDossierChips(submission: Submission): V19DossierChip[] {
   ];
 
   if (openTotal > 0) {
+    chips.push({
+      label: `+${openTotal}`,
+      tone: "danger",
+    });
     chips.push({
       label: `${openTotal} ${pluralRu(openTotal, "замечание", "замечания", "замечаний")}`,
       tone: "danger",
@@ -2003,9 +2009,10 @@ function AdminReviewQueueCard({
   const family = submission.type === "family";
 
   return (
-    <button
+    <article
       className={`v19-admin-cockpit-card ${hasBlocker ? "has-blocker" : ""}`}
-      type="button"
+      data-submission-card
+      data-submission-id={submission.id}
       onClick={onOpen}
     >
       <div className="v19-admin-cockpit-card-head">
@@ -2026,7 +2033,7 @@ function AdminReviewQueueCard({
             )}
             {applicantCountLabel(submission.applicants.length)}
             <i aria-hidden="true" />
-            {submission.agentId}
+            {agentOwnerDisplayName(submission.agentId)}
           </em>
         </div>
         <ChevronRight
@@ -2055,6 +2062,7 @@ function AdminReviewQueueCard({
       </div>
 
       <div className="v19-admin-cockpit-tags">
+        <span className="tone-blue">{facts.status}</span>
         {issueCount > 0 ? <span className="tone-red">{issueCount} блокера</span> : null}
         {warningCount > 0 ? (
           <span className="tone-orange">{warningCount} проверить</span>
@@ -2066,7 +2074,17 @@ function AdminReviewQueueCard({
       </div>
 
       <div className="v19-admin-cockpit-card-foot">{adminReviewLastEvent(submission)}</div>
-    </button>
+      <button
+        className="v19-admin-row-action"
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+      >
+        {facts.ctaLabel}
+      </button>
+    </article>
   );
 }
 
@@ -2269,6 +2287,19 @@ export function AdminReviewScreen({
     0,
   );
 
+  useEffect(() => {
+    if (!mobileFiltersOpen && !mobileSummaryOpen) return;
+
+    function handleAdminMobileSheetEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setMobileFiltersOpen(false);
+      setMobileSummaryOpen(false);
+    }
+
+    window.addEventListener("keydown", handleAdminMobileSheetEscape);
+    return () => window.removeEventListener("keydown", handleAdminMobileSheetEscape);
+  }, [mobileFiltersOpen, mobileSummaryOpen]);
+
   function chooseLane(nextLane: AdminReviewLaneFilter) {
     transitionUiState(() => {
       setActiveLane(nextLane);
@@ -2282,10 +2313,14 @@ export function AdminReviewScreen({
     triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
   ) {
     const target = triage.target;
-    const tab = drawerTabForScreenTarget(target, adminWorkDrawerTabFor(submission));
+    const defaultTab = adminWorkDrawerTabFor(submission);
+    const tab =
+      defaultTab === "issues" ? defaultTab : drawerTabForScreenTarget(target, defaultTab);
 
+    setMobileFiltersOpen(false);
+    setMobileSummaryOpen(false);
     onSelect(submission);
-    onOpen(submission, tab, target);
+    onOpen(submission, tab, defaultTab === "issues" ? undefined : target);
   }
 
   const renderBlockedState = (
@@ -2463,16 +2498,6 @@ export function AdminReviewScreen({
       <AnimatePresence>
         {mobileSummaryOpen ? (
           <>
-            <motion.button
-            aria-label="Закрыть сводку"
-            className="v19-admin-mobile-sheet-backdrop"
-            exit={{ opacity: 0 }}
-            initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
-            type="button"
-            onClick={() => setMobileSummaryOpen(false)}
-          />
             <motion.aside
               animate={{ opacity: 1, y: 0 }}
               aria-label="Сводка очереди"
@@ -2518,6 +2543,16 @@ export function AdminReviewScreen({
               />
             </div>
             </motion.aside>
+            <motion.button
+              aria-label="Закрыть сводку"
+              animate={{ opacity: 1 }}
+              className="v19-admin-mobile-sheet-backdrop"
+              exit={{ opacity: 0 }}
+              initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
+              transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
+              type="button"
+              onClick={() => setMobileSummaryOpen(false)}
+            />
           </>
         ) : null}
       </AnimatePresence>
@@ -2525,16 +2560,6 @@ export function AdminReviewScreen({
       <AnimatePresence>
         {mobileFiltersOpen ? (
           <>
-            <motion.button
-            aria-label="Закрыть фильтры"
-            className="v19-admin-mobile-sheet-backdrop"
-            exit={{ opacity: 0 }}
-            initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
-            type="button"
-            onClick={() => setMobileFiltersOpen(false)}
-          />
             <motion.aside
               animate={{ opacity: 1, y: 0 }}
               aria-label="Фильтры очереди"
@@ -2591,6 +2616,16 @@ export function AdminReviewScreen({
               <div className="v19-admin-sheet-extra-filters">{filterControl}</div>
             ) : null}
             </motion.aside>
+            <motion.button
+              aria-label="Закрыть фильтры"
+              animate={{ opacity: 1 }}
+              className="v19-admin-mobile-sheet-backdrop"
+              exit={{ opacity: 0 }}
+              initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
+              transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
+              type="button"
+              onClick={() => setMobileFiltersOpen(false)}
+            />
           </>
         ) : null}
       </AnimatePresence>
@@ -3617,9 +3652,7 @@ function AdminExportReferenceCockpit({
                 <button
                   className="v19-admin-export-icon-button"
                   type="button"
-                  aria-label={
-                    showingHistory ? "Показать пакеты к выгрузке" : "Показать историю выгрузки"
-                  }
+                  aria-label="История"
                   onClick={() =>
                     transitionUiState(() => onTab(showingHistory ? "ready" : "history"))
                   }
@@ -3648,7 +3681,11 @@ function AdminExportReferenceCockpit({
             <div>Размер</div>
           </div>
 
-          <div className="v19-admin-export-rows">
+          <div
+            className={`v19-admin-export-rows ${
+              showingHistory ? "export-history-table" : ""
+            }`}
+          >
             {showingHistory ? (
               historyList.length > 0 ? (
                 historyList.map((submission) => (
@@ -3698,6 +3735,7 @@ function AdminExportReferenceCockpit({
           <div>
             <span>Export cockpit</span>
             <h3>Правая панель</h3>
+            <h2>{exportPackageTitle(exportPlan)}</h2>
             <p>Контроль состава, блокеров, manifest и истории перед Excel.</p>
           </div>
           <div className="v19-admin-export-side-icon" aria-hidden="true">
@@ -3781,12 +3819,12 @@ function AdminExportReferenceCockpit({
               <HistoryIcon aria-hidden="true" focusable="false" size={16} />
               <h4>История сегодня</h4>
               <button
+                aria-selected={showingHistory}
+                role="tab"
                 type="button"
-                onClick={() =>
-                  transitionUiState(() => onTab(showingHistory ? "ready" : "history"))
-                }
+                onClick={() => transitionUiState(() => onTab("history"))}
               >
-                {showingHistory ? "Пакеты" : "Все"}
+                История
               </button>
             </div>
             <div className="v19-admin-export-history">
@@ -3815,7 +3853,7 @@ function AdminExportReferenceCockpit({
             className="v19-admin-export-primary-action"
             type="button"
             disabled={exportBusy || !exportPlan.canGenerate}
-            aria-describedby="admin-export-action-hint"
+            aria-describedby="export-action-hint"
             onClick={onGenerate}
           >
             {exportBusy ? (
@@ -3834,17 +3872,17 @@ function AdminExportReferenceCockpit({
               disabled={exportBusy || !exportPlan.canDownload}
               onClick={onDownload}
             >
-              Скачать
+              Скачать Excel
             </button>
             <button
               type="button"
               disabled={exportBusy || !exportPlan.canMarkExported}
               onClick={onMarkExported}
             >
-              Отметить
+              Отметить выгружено
             </button>
           </div>
-          <p id="admin-export-action-hint">{actionHint}</p>
+          <p id="export-action-hint">{actionHint}</p>
           <p>
             {packageFacts.city} · {packageFacts.dates}
           </p>
@@ -3937,24 +3975,37 @@ function AdminExportRow({
     "файла",
     "файлов",
   )}`;
+  const historyPdfSummary = history ? returnedPdfPackageSummary(submission) : null;
   const rowStatus = history
-    ? returnedPdfPackageSummary(submission).label
+    ? historyPdfSummary?.label
     : blocked
       ? "блокер"
-      : "чисто";
+      : "Готово";
 
   return (
     <article
-      className={`v19-admin-export-row ${selected ? "is-selected" : ""} ${
+      className={`export-row v19-admin-export-row ${selected ? "is-selected" : ""} ${
         blocked ? "is-blocked" : ""
       } ${history ? "is-history" : ""}`}
     >
+      {!blocked && !history ? (
+        <input
+          aria-label={selected ? `Убрать ${submission.title} из выгрузки` : `Выбрать ${submission.title}`}
+          checked={selected}
+          className="v19-admin-export-checkbox-native"
+          disabled={disabled}
+          type="checkbox"
+          onChange={() => onToggle?.()}
+        />
+      ) : null}
       <button
         className={`v19-admin-export-checkbox ${selected ? "is-selected" : ""}`}
         type="button"
         aria-label={
-          blocked || history
-            ? `Открыть ${submission.title}`
+          history
+            ? "Открыть запись истории"
+            : blocked
+              ? `Открыть блокеры ${submission.title}`
             : selected
               ? `Убрать ${submission.title} из выгрузки`
               : `Выбрать ${submission.title}`
@@ -4010,7 +4061,7 @@ function AdminExportRow({
         <AdminExportStatusPill tone={blocked ? "warning" : "success"}>
           {rowStatus}
         </AdminExportStatusPill>
-        <span>{fileLabel}</span>
+        <span>{historyPdfSummary?.detail ?? fileLabel}</span>
       </div>
     </article>
   );
@@ -4115,12 +4166,6 @@ function AdminExportMobileSheet({
       initial={{ opacity: prefersReducedMotion ? 1 : 0 }}
       transition={{ duration: prefersReducedMotion ? 0.01 : 0.16 }}
     >
-      <button
-        className="v19-admin-export-sheet-backdrop"
-        type="button"
-        aria-label="Закрыть сводку выгрузки"
-        onClick={onClose}
-      />
       <motion.aside
         animate={{ opacity: 1, y: 0 }}
         className="v19-admin-export-mobile-sheet"
@@ -4175,6 +4220,12 @@ function AdminExportMobileSheet({
         </div>
         <div className="v19-admin-export-sheet-note">{actionHint}</div>
       </motion.aside>
+      <button
+        aria-label="Закрыть сводку выгрузки"
+        className="v19-admin-export-sheet-backdrop"
+        type="button"
+        onClick={onClose}
+      />
     </motion.div>
   );
 }

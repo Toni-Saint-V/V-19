@@ -1,0 +1,17 @@
+{
+  "overflow": false,
+  "sw": 320,
+  "vw": 320,
+  "footer": {
+    "y": 667,
+    "h": 73
+  },
+  "addButton": {
+    "y": 572.5551147460938,
+    "h": 40,
+    "bottom": 612.5551147460938
+  },
+  "footerOverlap": false,
+  "aiAssistVisible": false,
+  "logs": []
+}

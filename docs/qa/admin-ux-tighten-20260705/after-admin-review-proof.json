@@ -1,0 +1,486 @@
+[
+  {
+    "viewport": {
+      "name": "desktop-1440",
+      "width": 1440,
+      "height": 900
+    },
+    "beforeClickMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "overflow": false,
+      "topbar": {
+        "x": 260,
+        "y": 0,
+        "w": 1180,
+        "h": 64,
+        "bottom": 64
+      },
+      "topbarRatio": 0.071,
+      "cockpit": {
+        "x": 284,
+        "y": 80,
+        "w": 1132,
+        "h": 812,
+        "bottom": 892
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 284,
+        "y": 80,
+        "w": 856,
+        "h": 1751,
+        "bottom": 1831
+      },
+      "dock": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "firstCard": {
+        "x": 314,
+        "y": 275,
+        "w": 377,
+        "h": 279,
+        "bottom": 554
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "afterInteractionsMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 1440,
+      "innerWidth": 1440,
+      "overflow": false,
+      "topbar": {
+        "x": 260,
+        "y": 0,
+        "w": 1180,
+        "h": 64,
+        "bottom": 64
+      },
+      "topbarRatio": 0.071,
+      "cockpit": {
+        "x": 284,
+        "y": 80,
+        "w": 1132,
+        "h": 812,
+        "bottom": 892
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 284,
+        "y": 80,
+        "w": 856,
+        "h": 1751,
+        "bottom": 1831
+      },
+      "dock": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "firstCard": {
+        "x": 314,
+        "y": 275,
+        "w": 377,
+        "h": 279,
+        "bottom": 554
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "interactions": [
+      "first-card-opens-admin-drawer",
+      "admin-drawer-closes"
+    ],
+    "problems": []
+  },
+  {
+    "viewport": {
+      "name": "tablet-768",
+      "width": 768,
+      "height": 1024
+    },
+    "beforeClickMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 768,
+      "innerWidth": 768,
+      "overflow": false,
+      "topbar": {
+        "x": 260,
+        "y": 0,
+        "w": 508,
+        "h": 56,
+        "bottom": 56
+      },
+      "topbarRatio": 0.055,
+      "cockpit": {
+        "x": 276,
+        "y": 32,
+        "w": 476,
+        "h": 944,
+        "bottom": 976
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 276,
+        "y": 32,
+        "w": 476,
+        "h": 944,
+        "bottom": 976
+      },
+      "dock": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "firstCard": {
+        "x": 306,
+        "y": 152,
+        "w": 416,
+        "h": 279,
+        "bottom": 431
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "afterInteractionsMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 768,
+      "innerWidth": 768,
+      "overflow": false,
+      "topbar": {
+        "x": 260,
+        "y": 0,
+        "w": 508,
+        "h": 56,
+        "bottom": 56
+      },
+      "topbarRatio": 0.055,
+      "cockpit": {
+        "x": 276,
+        "y": 32,
+        "w": 476,
+        "h": 944,
+        "bottom": 976
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 276,
+        "y": 32,
+        "w": 476,
+        "h": 944,
+        "bottom": 976
+      },
+      "dock": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "firstCard": {
+        "x": 306,
+        "y": 152,
+        "w": 416,
+        "h": 279,
+        "bottom": 431
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "interactions": [
+      "first-card-opens-admin-drawer",
+      "admin-drawer-closes"
+    ],
+    "problems": []
+  },
+  {
+    "viewport": {
+      "name": "mobile-390",
+      "width": 390,
+      "height": 844
+    },
+    "beforeClickMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 390,
+      "innerWidth": 390,
+      "overflow": false,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 44,
+        "bottom": 44
+      },
+      "topbarRatio": 0.052,
+      "cockpit": {
+        "x": 16,
+        "y": 47,
+        "w": 358,
+        "h": 760,
+        "bottom": 807
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 16,
+        "y": 47,
+        "w": 358,
+        "h": 684,
+        "bottom": 731
+      },
+      "dock": {
+        "x": 12,
+        "y": 788,
+        "w": 366,
+        "h": 48,
+        "bottom": 836
+      },
+      "firstCard": {
+        "x": 46,
+        "y": 146,
+        "w": 298,
+        "h": 279,
+        "bottom": 424
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "afterInteractionsMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 390,
+      "innerWidth": 390,
+      "overflow": false,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 390,
+        "h": 44,
+        "bottom": 44
+      },
+      "topbarRatio": 0.052,
+      "cockpit": {
+        "x": 16,
+        "y": 47,
+        "w": 358,
+        "h": 760,
+        "bottom": 807
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 16,
+        "y": 47,
+        "w": 358,
+        "h": 684,
+        "bottom": 731
+      },
+      "dock": {
+        "x": 12,
+        "y": 788,
+        "w": 366,
+        "h": 48,
+        "bottom": 836
+      },
+      "firstCard": {
+        "x": 46,
+        "y": 146,
+        "w": 298,
+        "h": 279,
+        "bottom": 424
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "interactions": [
+      "first-card-opens-admin-drawer",
+      "admin-drawer-closes",
+      "mobile-summary-sheet-opens",
+      "mobile-filter-sheet-opens"
+    ],
+    "problems": []
+  },
+  {
+    "viewport": {
+      "name": "mobile-320",
+      "width": 320,
+      "height": 740
+    },
+    "beforeClickMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 320,
+      "innerWidth": 320,
+      "overflow": false,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 44,
+        "bottom": 44
+      },
+      "topbarRatio": 0.059,
+      "cockpit": {
+        "x": 16,
+        "y": 44,
+        "w": 288,
+        "h": 656,
+        "bottom": 700
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 16,
+        "y": 44,
+        "w": 288,
+        "h": 580,
+        "bottom": 624
+      },
+      "dock": {
+        "x": 12,
+        "y": 684,
+        "w": 296,
+        "h": 48,
+        "bottom": 732
+      },
+      "firstCard": {
+        "x": 46,
+        "y": 143,
+        "w": 228,
+        "h": 315,
+        "bottom": 458
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "afterInteractionsMetrics": {
+      "title": "Очередь на проверку",
+      "scrollWidth": 320,
+      "innerWidth": 320,
+      "overflow": false,
+      "topbar": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 44,
+        "bottom": 44
+      },
+      "topbarRatio": 0.059,
+      "cockpit": {
+        "x": 16,
+        "y": 44,
+        "w": 288,
+        "h": 656,
+        "bottom": 700
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0,
+        "bottom": 0
+      },
+      "board": {
+        "x": 16,
+        "y": 44,
+        "w": 288,
+        "h": 580,
+        "bottom": 624
+      },
+      "dock": {
+        "x": 12,
+        "y": 684,
+        "w": 296,
+        "h": 48,
+        "bottom": 732
+      },
+      "firstCard": {
+        "x": 46,
+        "y": 143,
+        "w": 228,
+        "h": 315,
+        "bottom": 458
+      },
+      "primaryContentInFirstViewport": true,
+      "firstCardInFirstViewport": true,
+      "firstCardText": "ПД-1053Казань15.06Нина Волкова1 заявительlocal-agent-tonyСледующее действиеПринять или вернутьАнкета100%Файлы0%без замечанийПакет готов к внутренней проверке",
+      "cardCount": 6,
+      "laneCount": 4
+    },
+    "interactions": [
+      "first-card-opens-admin-drawer",
+      "admin-drawer-closes",
+      "mobile-summary-sheet-opens",
+      "mobile-filter-sheet-opens"
+    ],
+    "problems": []
+  }
+]

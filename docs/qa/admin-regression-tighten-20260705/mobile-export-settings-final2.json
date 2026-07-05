@@ -1,0 +1,47 @@
+{
+  "data": [
+    {
+      "nav": "export",
+      "ok": false,
+      "label": "export-mobile-final2",
+      "title": "Проверка",
+      "overflow": false,
+      "sw": 390,
+      "rects": {
+        "settingsNav": null,
+        "settingsForm": null,
+        "exportRoot": null,
+        "topbar": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 44,
+          "b": 44
+        }
+      },
+      "offscreen": []
+    },
+    {
+      "nav": "settings",
+      "ok": false,
+      "label": "settings-mobile-final2",
+      "title": "Проверка",
+      "overflow": false,
+      "sw": 390,
+      "rects": {
+        "settingsNav": null,
+        "settingsForm": null,
+        "exportRoot": null,
+        "topbar": {
+          "x": 0,
+          "y": 0,
+          "w": 390,
+          "h": 44,
+          "b": 44
+        }
+      },
+      "offscreen": []
+    }
+  ],
+  "logs": []
+}

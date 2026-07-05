@@ -1,0 +1,406 @@
+{
+  "generatedAt": "2026-07-05T12:59:08.220Z",
+  "compact": [
+    {
+      "size": "mobile-320",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 740,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.076,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.149,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.149,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.149,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.081,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-320",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.078,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 844,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.066,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.131,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.131,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.131,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-390",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.069,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 0,
+        "y": 0,
+        "w": 280,
+        "h": 932,
+        "display": "flex",
+        "overflowY": "hidden"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.06,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.118,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.118,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.118,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.064,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "mobile-430",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.062,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "menu-open",
+      "overflow": false,
+      "sidebar": {
+        "x": 8,
+        "y": 8,
+        "w": 336,
+        "h": 1008,
+        "display": "grid",
+        "overflowY": "auto"
+      },
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.063,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.126,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.126,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.126,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.057,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "tablet-768",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.057,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "actions",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Файлы",
+      "overflow": false,
+      "headerRatio": 0.166,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Анкета",
+      "overflow": false,
+      "headerRatio": 0.166,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "drawer",
+      "tab": "Обзор",
+      "overflow": false,
+      "headerRatio": 0.166,
+      "headingTabsOverlap": false,
+      "headerBodyOverlap": false,
+      "footerBodyOverlap": false,
+      "clipped": [],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "submissions",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    },
+    {
+      "size": "desktop-1440",
+      "screen": "settings",
+      "overflow": false,
+      "topbarRatio": 0.071,
+      "clipped": [],
+      "fontFamilies": [
+        "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif"
+      ],
+      "consoleMessages": 0
+    }
+  ]
+}
