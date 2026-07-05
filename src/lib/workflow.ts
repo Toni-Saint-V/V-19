@@ -12,6 +12,7 @@ import type {
   Submission,
   SubmissionStatus,
 } from "../types/domain";
+import { V19_COLOR_TOKENS, V19_RGB_TOKENS } from "../shared/ui/tokens";
 
 export const statusGroups: StatusGroup[] = [
   "filling",
@@ -153,9 +154,9 @@ export function roleProfile(role: Role) {
       initials: "OP",
       roleText: "Операционный доступ",
       sideText: "Все заявки, решения, выгрузка и запись",
-      accent: "#78A6FF",
-      accentRgb: "120, 166, 255",
-      ink: "#08101f",
+      accent: V19_COLOR_TOKENS.info,
+      accentRgb: V19_RGB_TOKENS.info,
+      ink: V19_COLOR_TOKENS.app,
     };
   }
 
@@ -164,9 +165,9 @@ export function roleProfile(role: Role) {
     initials: "AG",
     roleText: "Агентский доступ",
     sideText: "Свои заявки, медиа и исправления",
-    accent: "#F2C96D",
-    accentRgb: "242, 201, 109",
-    ink: "#181207",
+    accent: V19_COLOR_TOKENS.warningSoft,
+    accentRgb: V19_RGB_TOKENS.warning,
+    ink: V19_COLOR_TOKENS.app,
   };
 }
 
@@ -799,7 +800,13 @@ export function appendExportBatch(
 }
 
 export function familyGroupColor(id: string): string {
-  const colors = ["#2F3A4A", "#38514A", "#4A3E5F", "#5A4636", "#324D63"];
+  const colors = [
+    V19_COLOR_TOKENS.panel,
+    V19_COLOR_TOKENS.panelStrong,
+    V19_COLOR_TOKENS.control,
+    V19_COLOR_TOKENS.controlHover,
+    V19_COLOR_TOKENS.primary,
+  ];
   return colors[Math.abs(hashString(id)) % colors.length];
 }
 

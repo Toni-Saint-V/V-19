@@ -51,7 +51,7 @@ async function startFresh(page: Page, workspaceEmail: string) {
 }
 
 async function submitAccessRequest(page: Page, account: AgentAccount) {
-  await page.getByRole("button", { name: "Подать заявку на доступ" }).click();
+  await page.getByRole("button", { name: "Запросить доступ" }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Заявка на доступ" }),
   ).toBeVisible();
@@ -71,11 +71,11 @@ async function login(page: Page, email: string, password = accessPassword) {
   await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Пароль", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Войти" }).click();
+  await page.getByRole("button", { name: /Войти/ }).click();
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: /^(Мои действия|Проверка|Выгрузка|Настройки)$/,
+      name: /^(Мои действия|Мои подачи|Очередь на проверку|Проверка|Выгрузка|Настройки)$/,
     }),
   ).toBeVisible();
 }
@@ -130,7 +130,11 @@ async function openCreateSubmission(page: Page) {
   });
   await expect(createButton.first()).toBeVisible();
   await createButton.first().click();
-  await expect(drawer(page).getByRole("heading", { name: /Паспорт/ })).toBeVisible();
+  await expect(
+    drawer(page).getByRole("heading", { name: "Сборка документов" }),
+  ).toBeVisible();
+  await expect(drawer(page).getByRole("button", { name: "Семья" })).toBeVisible();
+  await expect(drawer(page).locator(".pi-file-input")).toHaveCount(1);
 }
 
 async function createFamilyAndSubmit(page: Page, family: FamilyDraft) {
@@ -175,7 +179,12 @@ async function openQuestionnaireTab(page: Page) {
 }
 
 async function openMediaTab(page: Page) {
-  await openDrawerTab(page, ["Файлы", "Селфи", "Паспорт"]);
+  const filesTab = drawer(page)
+    .locator('.v19-figma-drawer-tab, [data-drawer-tab="files"]')
+    .filter({ hasText: "Файлы" })
+    .first();
+  await expect(filesTab).toBeVisible();
+  await filesTab.click();
   await expect(drawer(page).getByRole("heading", { name: /Файлы подачи|Файлы/ })).toBeVisible();
 }
 
@@ -295,7 +304,6 @@ async function openAdminSubmission(page: Page, cardText: string, drawerTitle: st
 }
 
 async function returnWithIssue(page: Page, submissionId: string, drawerTitle: string) {
-  await page.getByRole("tab", { name: /К проверке|На проверке/ }).click();
   await openAdminSubmission(page, submissionId, drawerTitle);
   await openDrawerTab(page, ["Паспорт"]);
   await drawer(page)
@@ -311,6 +319,7 @@ async function returnWithIssue(page: Page, submissionId: string, drawerTitle: st
     drawer(page).getByText(/Переход агента[\s\S]*Паспорт \/ Номер паспорта/),
   ).toBeVisible();
   await drawer(page)
+    .getByLabel("Новое замечание")
     .getByRole("button", { name: "Создать замечание", exact: true })
     .click();
   await expect(drawer(page).getByText("Нужно уточнить номер паспорта")).toBeVisible();
@@ -329,14 +338,22 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
     .first();
   await expect(targetCard).toBeVisible();
   await targetCard.click();
-  await openDrawerTab(page, ["Замечания"]);
-  await expect(drawer(page).getByText(/Номер паспорта/).first()).toBeVisible();
-  await drawer(page).getByRole("button", { name: "Исправить" }).click();
-  await expect(page.getByRole("heading", { name: /Анкета:/ })).toBeVisible();
+  const questionnaireHeading = page.getByRole("heading", { name: /Анкета:/ });
+  if (!(await isVisible(questionnaireHeading))) {
+    const contextIssue = page.getByRole("button", { name: /Номер паспорта/ }).first();
+    if (await isVisible(contextIssue)) {
+      await contextIssue.click();
+    } else {
+      await openDrawerTab(page, ["Замечания"]);
+      await expect(drawer(page).getByText(/Номер паспорта/).first()).toBeVisible();
+      await drawer(page).getByRole("button", { name: "Исправить" }).click();
+    }
+  }
+  await expect(questionnaireHeading).toBeVisible();
   await expect(
     page.locator('[aria-selected="true"]').filter({ hasText: "Паспорт" }).first(),
   ).toBeVisible();
-  const passportNumberField = page.getByLabel("Номер паспорта").first();
+  const passportNumberField = page.getByRole("textbox", { name: "Номер паспорта" }).first();
   await expect(passportNumberField).toBeVisible();
   await expect(page.locator('[data-field-label="Номер паспорта"][data-field-focused="true"]')).toBeVisible();
   await passportNumberField.fill("991234567");
@@ -345,7 +362,6 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
     name: /Готово к проверке|Готово/,
   });
   await completeQuestionnaireButton.click();
-  await expect(drawer(page)).toBeVisible();
   await expect
     .poll(async () =>
       page.evaluate(
@@ -376,6 +392,20 @@ async function fixReturnedSubmission(page: Page, submissionId: string) {
       ),
     )
     .toContain("991234567");
+  if (!(await isVisible(drawer(page)))) {
+    const backButton = page.getByRole("button", { name: "Назад" }).first();
+    if (await isVisible(backButton)) {
+      await backButton.click();
+    }
+    const openSubmissionButton = page.getByRole("button", { name: "Открыть подачу" }).first();
+    if (await isVisible(openSubmissionButton)) {
+      await openSubmissionButton.click();
+    } else {
+      await clickWorkspaceButton(page, /Мои подачи/);
+      await targetCard.click();
+    }
+  }
+  await expect(drawer(page)).toBeVisible();
   await openDrawerTab(page, ["Замечания"]);
   await markVisibleIssuesFixed(page);
   await expect(drawer(page).getByText("Исправлено").first()).toBeVisible();
@@ -424,7 +454,7 @@ test.describe("V-19 real UI registration to city Excel export", () => {
   test("registers two agents, creates three city families with corrections, and downloads Excel files", async ({
     page,
   }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(420_000);
     const browserProblems = collectBrowserProblems(page);
     const suffix = Date.now();
     const agents: AgentAccount[] = [

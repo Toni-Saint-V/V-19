@@ -3,11 +3,16 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
+  Building2,
   CheckCircle2,
   ChevronDown,
   Info,
+  Mail,
+  Phone,
+  User,
   Users,
 } from "lucide-react";
+import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
 import type { Submission } from "../types";
 import {
   QuestionnaireProgressBadge,
@@ -170,13 +175,13 @@ function FormField({
         fullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
       }`}
     >
-      <label className="flex items-start gap-2 text-[12px] text-white/70 leading-snug">
+      <label className="flex items-start gap-2 text-[var(--v19b-size-12)] text-white/70 leading-snug">
         {number ? (
           <span className="v19-questionnaire-field-number">
             {number}
           </span>
         ) : null}
-        <span className="flex-1 mt-[3px]">
+        <span className="flex-1 mt-[var(--v19b-size-3)]">
           {label}
           {required ? <span className="text-red-400 ml-1">*</span> : null}
         </span>
@@ -238,7 +243,7 @@ function FormField({
         />
       )}
 
-      <div className="flex items-start gap-1.5 min-h-[18px] text-[10.5px] text-white/40 mt-1">
+      <div className="flex items-start gap-1.5 min-h-[var(--v19b-size-18)] text-[var(--v19b-size-10-5)] text-white/40 mt-1">
         {state === "needs_review" ? (
           <span className="text-orange-400 flex items-center gap-1.5 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
@@ -253,7 +258,7 @@ function FormField({
         ) : null}
         {excelMap ? (
           <span className="v19-questionnaire-excel-map">
-            <span className="font-medium text-white/60 tracking-wide text-[10px]">
+            <span className="font-medium text-white/60 tracking-wide text-[var(--v19b-size-10)]">
               {excelMap}
             </span>
           </span>
@@ -278,6 +283,13 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
     index: index + 1,
     name: applicant.fullName || (index === 0 ? "Иван Петров" : `Заявитель ${index + 1}`),
   }));
+}
+
+function applicantRoleLabel(role: Submission["applicants"][number]["role"] | undefined) {
+  if (role === "main") return "основной";
+  if (role === "spouse") return "супруга";
+  if (role === "child") return "ребенок";
+  return "заявитель";
 }
 
 function applicantNameParts(name: string | undefined) {
@@ -1256,20 +1268,26 @@ export function FigmaQuestionnaireScreen({
           type="button"
           onClick={onBack}
         >
-          <ArrowLeft className="w-[18px] h-[18px]" />
+          <ArrowLeft className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
         </button>
 
-        <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-3">
+        <div className="v19-questionnaire-title-wrap">
           <div className="v19-questionnaire-submission-id">
             {submission.id}
           </div>
-          <h1 className="text-[15px] lg:text-[18px] font-semibold tracking-tight text-white m-0 truncate">
-            Анкета: {submission.title || "Семья Петровых"}
+          <h1
+            aria-label={`Анкета: ${submission.title || "Семья Петровых"}`}
+            className="v19-questionnaire-title"
+          >
+            <span className="v19-questionnaire-title-mobile">Анкета</span>
+            <span className="v19-questionnaire-title-desktop">
+              Анкета: {submission.title || "Семья Петровых"}
+            </span>
           </h1>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <span className="text-[11px] text-white/40 hidden md:inline-flex items-center gap-1.5">
+          <span className="text-[var(--v19b-size-11)] text-white/40 hidden md:inline-flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
             Сохранено только что
           </span>
@@ -1306,7 +1324,7 @@ export function FigmaQuestionnaireScreen({
       </div>
 
       <div className="v19-questionnaire-scroll">
-        <div className="max-w-[1240px] mx-auto flex flex-col min-h-full gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-w-[var(--v19b-size-1240)] mx-auto flex flex-col min-h-full gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
           <div className="v19-questionnaire-applicant-bar">
             <div className="flex overflow-x-auto scrollbar-hide gap-1.5 lg:gap-2 flex-1 w-full snap-x pb-1 md:pb-0">
               {applicants.map((applicant) => (
@@ -1330,7 +1348,7 @@ export function FigmaQuestionnaireScreen({
               ))}
             </div>
 
-            <div className="hidden md:flex shrink-0 items-center gap-2 text-[12px] text-white/50 px-3 border-l border-white/5">
+            <div className="hidden md:flex shrink-0 items-center gap-2 text-[var(--v19b-size-12)] text-white/50 px-3 border-l border-white/5">
               <Users className="w-4 h-4" />
               <span>
                 {submission.type === "family"
@@ -1340,48 +1358,59 @@ export function FigmaQuestionnaireScreen({
             </div>
           </div>
 
-          <QuestionnaireWorkspaceShell className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
+          <QuestionnaireWorkspaceShell className="v19-questionnaire-workspace-shell flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
             <aside className="v19-questionnaire-section-nav">
-              {sections.map((section) => (
-                <button
-                  aria-selected={activeSection === section.id}
-                  className={`v19-questionnaire-section-tab ${
-                    activeSection === section.id ? "is-active" : ""
-                  }`}
-                  key={section.id}
-                  type="button"
-                  onClick={() => setActiveSection(section.id)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold truncate">
-                      {section.title}
-                    </div>
-                    <div className="text-[10px] text-white/40 mt-0.5 truncate tracking-wide">
-                      {section.meta}
-                    </div>
-                  </div>
+              <V19ReadinessCard
+                description="Пакет можно отправлять после сверки полей, отмеченных администратором."
+                detail="2 риска"
+                scoreLabel="68%"
+                value={68}
+              />
 
-                  <QuestionnaireProgressBadge
-                    className={`v19-questionnaire-progress-badge status-${section.status}`}
+              <V19SearchField label="Поиск поля анкеты" placeholder="Найти поле..." />
+
+              <div className="v19-questionnaire-section-list">
+                {sections.map((section) => (
+                  <button
+                    aria-selected={activeSection === section.id}
+                    className={`v19-questionnaire-section-tab ${
+                      activeSection === section.id ? "is-active" : ""
+                    }`}
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSection(section.id)}
                   >
-                    {section.status === "complete" ? (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    ) : section.status === "issue" ? (
-                      <AlertCircle className="w-3.5 h-3.5" />
-                    ) : (
-                      "-"
-                    )}
-                  </QuestionnaireProgressBadge>
-                </button>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[var(--v19b-size-12)] font-semibold truncate">
+                        {section.title}
+                      </div>
+                      <div className="text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
+                        {section.meta}
+                      </div>
+                    </div>
+
+                    <QuestionnaireProgressBadge
+                      className={`v19-questionnaire-progress-badge status-${section.status}`}
+                    >
+                      {section.status === "complete" ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : section.status === "issue" ? (
+                        <AlertCircle className="w-3.5 h-3.5" />
+                      ) : (
+                        "-"
+                      )}
+                    </QuestionnaireProgressBadge>
+                  </button>
+                ))}
+              </div>
             </aside>
 
             <div className="v19-questionnaire-work-panel">
               <div className="v19-questionnaire-work-head">
-                <h3 className="text-[15px] lg:text-[16px] font-semibold text-white leading-snug">
+                <h3 className="text-[var(--v19b-size-15)] lg:text-[var(--v19b-size-16)] font-semibold text-white leading-snug">
                   {sections.find((section) => section.id === activeSection)?.title}
                 </h3>
-                <p className="text-[11.5px] text-white/50 mt-1.5 leading-relaxed max-w-xl">
+                <p className="text-[var(--v19b-size-11-5)] text-white/50 mt-1.5 leading-relaxed max-w-xl">
                   {sectionDescriptions[activeSection]}
                 </p>
               </div>
@@ -1390,13 +1419,13 @@ export function FigmaQuestionnaireScreen({
                 <div className="v19-questionnaire-review-alert">
                   <div className="v19-questionnaire-review-strip" />
                   <div className="v19-questionnaire-review-icon">
-                    <AlertCircle className="w-[18px] h-[18px]" />
+                    <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13.5px] font-semibold text-white">
+                    <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
                       Несоответствие даты рождения
                     </div>
-                    <p className="text-[12px] text-white/60 mt-1.5 leading-relaxed">
+                    <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
                       В загруженном приложении PDF дата рождения{" "}
                       <strong className="text-white/90 font-medium">15.05.1985</strong>,
                       а в анкете указано{" "}
@@ -1407,13 +1436,50 @@ export function FigmaQuestionnaireScreen({
                 </div>
               ) : null}
 
-              <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-6">
-                {renderSectionFields()}
+              <div className="v19-questionnaire-work-grid">
+                <div className="v19-questionnaire-fields-grid">
+                  {renderSectionFields()}
+                </div>
+
+                <aside className="v19-questionnaire-context-rail">
+                  <section>
+                    <h3>Контекст заявителя</h3>
+                    <div className="v19-questionnaire-context-lines">
+                      <span>
+                        <User className="w-4 h-4" />
+                        {activeApplicantModel?.fullName ?? "Заявитель"},{" "}
+                        {applicantRoleLabel(activeApplicantModel?.role)}
+                      </span>
+                      <span>
+                        <Building2 className="w-4 h-4" />
+                        {formData.currentJob || formData.employerName || "Работа не указана"}
+                      </span>
+                      <span>
+                        <Mail className="w-4 h-4" />
+                        {formData.contactEmail || "Email не указан"}
+                      </span>
+                      <span>
+                        <Phone className="w-4 h-4" />
+                        {formData.contactPhone || "Телефон не указан"}
+                      </span>
+                    </div>
+                  </section>
+
+                  <section className="v19-questionnaire-next-action-card">
+                    <h3>Следующее лучшее действие</h3>
+                    <p>
+                      Подтвердите текущий раздел и перейдите к следующему блоку анкеты.
+                    </p>
+                    <button type="button" onClick={goToNextSection}>
+                      Следующий раздел
+                    </button>
+                  </section>
+                </aside>
               </div>
 
               <div className="v19-questionnaire-panel-footer">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-[11px] text-white/40 font-medium">
+                  <div className="flex items-center gap-2 text-[var(--v19b-size-11)] text-white/40 font-medium">
                     <Info className="w-4 h-4" />
                     <span>Автосохранение включено</span>
                   </div>

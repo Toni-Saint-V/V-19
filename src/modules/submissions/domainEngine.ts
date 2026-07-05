@@ -7,6 +7,7 @@ import {
 import { createDraftSubmission, type CreateDraftInput } from "./submissionActions";
 import {
   canPerformAction,
+  blockerCount,
   defaultDrawerTab,
   hasUsableTripDateRange,
   isFixedIssueStatus,
@@ -471,11 +472,12 @@ export function getNextAction(
     return guardedAction(submission, role, action, blocked ? "Вернуть" : "Принять");
   }
   if (submission.status === "corrections_received") {
+    const blocked = blockerCount(submission) > 0;
     return guardedAction(
       submission,
       role,
-      "close_issues_accept",
-      "Закрыть и принять",
+      blocked ? "return_again" : "close_issues_accept",
+      blocked ? "Вернуть снова" : "Закрыть и принять",
     );
   }
   if (submission.status === "ready_for_export") {

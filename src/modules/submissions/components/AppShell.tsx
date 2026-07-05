@@ -10,6 +10,7 @@ type AppShellProps = {
   mobileNavOpen: boolean;
   role: string;
   sidebar: ReactNode;
+  sideMenuMode: "regular" | "compact";
   surface: string;
   collectionSurface?: boolean;
   drawerOpen?: boolean;
@@ -27,6 +28,7 @@ export function AppShell({
   overlays = null,
   role,
   sidebar,
+  sideMenuMode,
   surface,
 }: AppShellProps) {
   return (
@@ -37,6 +39,7 @@ export function AppShell({
         `surface-${surface}`,
         collectionSurface && "is-v19-collection-surface",
         `role-${role}`,
+        `is-side-menu-${sideMenuMode}`,
         drawerOpen && "has-open-drawer",
         mobileNavOpen && "is-mobile-nav-open",
       )}

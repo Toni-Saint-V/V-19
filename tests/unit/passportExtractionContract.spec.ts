@@ -843,6 +843,33 @@ describe("passport extraction contract", () => {
     );
   });
 
+  test("drops trailing OCR filler tokens from TD3 given names", () => {
+    const result = extractPassportMrzText(
+      [
+        "P<RUSIVANOV<<IVAN<K<K".padEnd(44, "<"),
+        "1234567897RUS9008205M2602268<<<<<<<<<<<<<<00",
+      ].join("\n"),
+      0,
+    );
+
+    expect(result.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "firstName",
+          value: "IVAN",
+        }),
+      ]),
+    );
+    expect(result.fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "firstName",
+          value: "IVAN K K",
+        }),
+      ]),
+    );
+  });
+
   test("uses the current-year pivot for TD3 birth-date century inference", () => {
     const result = extractPassportMrzText(
       [

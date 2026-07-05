@@ -1,0 +1,135 @@
+import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { X, MessageSquarePlus, AlertTriangle, CheckCircle2, User, FileText, Send } from 'lucide-react';
+
+interface RemarkFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  submissionId: string;
+  defaultField?: string;
+  defaultApplicant?: string;
+}
+
+const templates = [
+  'Значение в анкете не совпадает с документом. Проверьте и исправьте поле.',
+  'Документ читается не полностью. Загрузите файл в лучшем качестве.',
+  'Нужно добавить подтверждающий документ для этого поля.',
+];
+
+export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaultApplicant }: RemarkFormProps) {
+  const [message, setMessage] = useState(defaultField ? `Проверьте поле «${defaultField}».` : templates[0]);
+  const [severity, setSeverity] = useState<'warning' | 'critical'>('warning');
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] bg-black/65 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <motion.div
+            role="dialog"
+            initial={{ opacity: 0, y: 22, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 22, scale: 0.98 }}
+            transition={{ type: 'spring', damping: 24, stiffness: 260 }}
+            className="fixed z-[80] inset-x-3 bottom-3 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[560px] bg-[#111113] border border-white/10 rounded-3xl shadow-[0_24px_100px_rgba(0,0,0,0.65)] overflow-hidden"
+          >
+            <header className="px-5 py-4 border-b border-white/10 flex items-start gap-4">
+              <div className="w-11 h-11 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                <MessageSquarePlus className="w-5 h-5 text-orange-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] text-white/40 uppercase tracking-wider font-medium">{submissionId || 'SUB-0000'}</div>
+                <h2 className="text-[18px] font-semibold text-white tracking-tight mt-1">Добавить замечание</h2>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </header>
+
+            <div className="p-5 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-2xl bg-[#161617] border border-[#242529]">
+                  <div className="flex items-center gap-2 text-[11px] text-white/40 uppercase tracking-wider font-medium mb-2">
+                    <FileText className="w-3.5 h-3.5" /> Поле
+                  </div>
+                  <div className="text-[13px] font-medium text-white truncate">{defaultField || 'Общее замечание'}</div>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#161617] border border-[#242529]">
+                  <div className="flex items-center gap-2 text-[11px] text-white/40 uppercase tracking-wider font-medium mb-2">
+                    <User className="w-3.5 h-3.5" /> Заявитель
+                  </div>
+                  <div className="text-[13px] font-medium text-white truncate">{defaultApplicant || 'Иван Петров'}</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] text-white/50 font-medium mb-2">Важность</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setSeverity('warning')}
+                    className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === 'warning' ? 'bg-orange-500/10 border-orange-500/25 text-orange-400' : 'bg-[#161617] border-[#242529] text-white/60 hover:text-white'}`}
+                  >
+                    <AlertTriangle className="w-4 h-4" /> Исправить
+                  </button>
+                  <button
+                    onClick={() => setSeverity('critical')}
+                    className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === 'critical' ? 'bg-red-500/10 border-red-500/25 text-red-400' : 'bg-[#161617] border-[#242529] text-white/60 hover:text-white'}`}
+                  >
+                    <AlertTriangle className="w-4 h-4" /> Критично
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] text-white/50 font-medium mb-2">Текст для клиента</label>
+                <textarea
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  className="min-h-[120px] w-full resize-none rounded-2xl bg-[#161617] border border-[#242529] px-4 py-3 text-[14px] text-white placeholder-white/35 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
+                  placeholder="Опишите, что именно нужно исправить..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[12px] text-white/50 font-medium">Быстрые шаблоны</div>
+                {templates.map((template) => (
+                  <button
+                    key={template}
+                    onClick={() => setMessage(template)}
+                    className="w-full text-left p-3 rounded-xl bg-[#161617] hover:bg-[#1e1e21] border border-[#242529] text-[12px] text-white/65 hover:text-white transition-colors"
+                  >
+                    {template}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <footer className="p-4 border-t border-white/10 bg-[#111113]/95 flex justify-end gap-3">
+              <button
+                onClick={onClose}
+                className="h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[13px] font-medium text-white/70 hover:text-white transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={onClose}
+                className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-[13px] font-semibold text-white flex items-center gap-2 shadow-[0_0_20px_rgba(249,115,22,0.18)] transition-colors"
+              >
+                <Send className="w-4 h-4" /> Отправить замечание
+              </button>
+            </footer>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}

@@ -1,0 +1,817 @@
+{
+  "url": "http://127.0.0.1:4195/START_HERE.html",
+  "generatedAt": "2026-07-04T19:46:08.664Z",
+  "viewports": {
+    "320x740": {
+      "h1": "Заявители и Семьи",
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "textStart": "V\nVisaFlow V-19\nWorkspace\nПоиск...\n⌘K\nРАБОТА\nМои действия\n12\nСбор документов\nЗаявители / Семьи\nФайлы / Медиа\nЗамечания\n2\nНастройки\nВ админскую зону\nТН\nТатьяна Николаева\nVisa Center Spb\nЗаявители и Семьи\nВсе\nСемьи\nОдиночн",
+      "overflowX": 0,
+      "externalScripts": [],
+      "header": {
+        "exists": true,
+        "visible": true,
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "height": 56,
+        "width": 320,
+        "display": "flex"
+      },
+      "headerSharePercent": 7.57,
+      "screen": {
+        "exists": true,
+        "visible": true,
+        "top": 72,
+        "left": 16,
+        "right": 16,
+        "height": 2522.81,
+        "width": 288,
+        "display": "grid"
+      },
+      "hero": {
+        "exists": true,
+        "visible": false,
+        "top": 0,
+        "left": 0,
+        "right": 320,
+        "height": 0,
+        "width": 0,
+        "display": "none"
+      },
+      "toolbar": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 16,
+        "right": 16,
+        "height": 104,
+        "width": 288,
+        "display": "grid"
+      },
+      "tabs": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 16,
+        "right": 16,
+        "height": 50,
+        "width": 288,
+        "display": "flex"
+      },
+      "search": {
+        "exists": true,
+        "visible": true,
+        "top": 152,
+        "left": 16,
+        "right": 16,
+        "height": 44,
+        "width": 288,
+        "display": "grid"
+      },
+      "section": {
+        "exists": true,
+        "visible": true,
+        "top": 228,
+        "left": 16,
+        "right": 16,
+        "height": 1250.53,
+        "width": 288,
+        "display": "block"
+      },
+      "familyRow": {
+        "exists": true,
+        "visible": true,
+        "top": 309.28,
+        "left": 17,
+        "right": 17,
+        "height": 451.25,
+        "width": 286,
+        "display": "inline-block"
+      },
+      "dock": {
+        "exists": true,
+        "visible": true,
+        "top": 672,
+        "left": 16,
+        "right": 16,
+        "height": 56,
+        "width": 288,
+        "display": "grid"
+      },
+      "edgeInsets": [
+        {
+          "selector": ".vf-applicants-tabs",
+          "exists": true,
+          "visible": true,
+          "top": 92,
+          "left": 16,
+          "right": 16,
+          "height": 50,
+          "width": 288,
+          "display": "flex"
+        },
+        {
+          "selector": ".vf-applicants-search-row",
+          "exists": true,
+          "visible": true,
+          "top": 152,
+          "left": 16,
+          "right": 16,
+          "height": 44,
+          "width": 288,
+          "display": "grid"
+        },
+        {
+          "selector": ".vf-applicants-section",
+          "exists": true,
+          "visible": true,
+          "top": 228,
+          "left": 16,
+          "right": 16,
+          "height": 1250.53,
+          "width": 288,
+          "display": "block"
+        },
+        {
+          "selector": ".vf-family-row",
+          "exists": true,
+          "visible": true,
+          "top": 309.28,
+          "left": 17,
+          "right": 17,
+          "height": 451.25,
+          "width": 286,
+          "display": "inline-block"
+        },
+        {
+          "selector": ".vf-individual-grid",
+          "exists": true,
+          "visible": true,
+          "top": 1591.81,
+          "left": 17,
+          "right": 17,
+          "height": 914,
+          "width": 286,
+          "display": "grid"
+        }
+      ],
+      "minVisibleInset": 16
+    },
+    "390x844": {
+      "h1": "Заявители и Семьи",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "textStart": "V\nVisaFlow V-19\nWorkspace\nПоиск...\n⌘K\nРАБОТА\nМои действия\n12\nСбор документов\nЗаявители / Семьи\nФайлы / Медиа\nЗамечания\n2\nНастройки\nВ админскую зону\nТН\nТатьяна Николаева\nVisa Center Spb\nЗаявители и Семьи\nВсе\nСемьи\nОдиночн",
+      "overflowX": 0,
+      "externalScripts": [],
+      "header": {
+        "exists": true,
+        "visible": true,
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "height": 56,
+        "width": 390,
+        "display": "flex"
+      },
+      "headerSharePercent": 6.64,
+      "screen": {
+        "exists": true,
+        "visible": true,
+        "top": 72,
+        "left": 16,
+        "right": 16,
+        "height": 2507.3,
+        "width": 358,
+        "display": "grid"
+      },
+      "hero": {
+        "exists": true,
+        "visible": false,
+        "top": 0,
+        "left": 0,
+        "right": 390,
+        "height": 0,
+        "width": 0,
+        "display": "none"
+      },
+      "toolbar": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 16,
+        "right": 16,
+        "height": 104,
+        "width": 358,
+        "display": "grid"
+      },
+      "tabs": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 16,
+        "right": 16,
+        "height": 50,
+        "width": 358,
+        "display": "flex"
+      },
+      "search": {
+        "exists": true,
+        "visible": true,
+        "top": 152,
+        "left": 16,
+        "right": 16,
+        "height": 44,
+        "width": 358,
+        "display": "grid"
+      },
+      "section": {
+        "exists": true,
+        "visible": true,
+        "top": 228,
+        "left": 16,
+        "right": 16,
+        "height": 1250.53,
+        "width": 358,
+        "display": "block"
+      },
+      "familyRow": {
+        "exists": true,
+        "visible": true,
+        "top": 309.28,
+        "left": 17,
+        "right": 17,
+        "height": 451.25,
+        "width": 356,
+        "display": "inline-block"
+      },
+      "dock": {
+        "exists": true,
+        "visible": true,
+        "top": 776,
+        "left": 16,
+        "right": 16,
+        "height": 56,
+        "width": 358,
+        "display": "grid"
+      },
+      "edgeInsets": [
+        {
+          "selector": ".vf-applicants-tabs",
+          "exists": true,
+          "visible": true,
+          "top": 92,
+          "left": 16,
+          "right": 16,
+          "height": 50,
+          "width": 358,
+          "display": "flex"
+        },
+        {
+          "selector": ".vf-applicants-search-row",
+          "exists": true,
+          "visible": true,
+          "top": 152,
+          "left": 16,
+          "right": 16,
+          "height": 44,
+          "width": 358,
+          "display": "grid"
+        },
+        {
+          "selector": ".vf-applicants-section",
+          "exists": true,
+          "visible": true,
+          "top": 228,
+          "left": 16,
+          "right": 16,
+          "height": 1250.53,
+          "width": 358,
+          "display": "block"
+        },
+        {
+          "selector": ".vf-family-row",
+          "exists": true,
+          "visible": true,
+          "top": 309.28,
+          "left": 17,
+          "right": 17,
+          "height": 451.25,
+          "width": 356,
+          "display": "inline-block"
+        },
+        {
+          "selector": ".vf-individual-grid",
+          "exists": true,
+          "visible": true,
+          "top": 1576.3,
+          "left": 17,
+          "right": 17,
+          "height": 914,
+          "width": 356,
+          "display": "grid"
+        }
+      ],
+      "minVisibleInset": 16,
+      "summarySheet": {
+        "visible": true,
+        "top": 491.47,
+        "left": 0,
+        "right": 0,
+        "height": 352.53,
+        "text": "ЕДИНЫЙ РЕЕСТР ЗАЯВИТЕЛЕЙ\nСемьи и одиночные профили\nСЕМЬИ\n3\nОДИНОЧНЫЕ\n4\nГОТОВО\n3\nНУЖНО\n3\nОбзор готовности, недостающие файлы и общий статус вынесены сюда, чтобы рабочий список заявителей был первым экраном.",
+        "overflowX": 0
+      }
+    },
+    "430x932": {
+      "h1": "Заявители и Семьи",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "textStart": "V\nVisaFlow V-19\nWorkspace\nПоиск...\n⌘K\nРАБОТА\nМои действия\n12\nСбор документов\nЗаявители / Семьи\nФайлы / Медиа\nЗамечания\n2\nНастройки\nВ админскую зону\nТН\nТатьяна Николаева\nVisa Center Spb\nЗаявители и Семьи\nВсе\nСемьи\nОдиночн",
+      "overflowX": 0,
+      "externalScripts": [],
+      "header": {
+        "exists": true,
+        "visible": true,
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        "height": 56,
+        "width": 430,
+        "display": "flex"
+      },
+      "headerSharePercent": 6.01,
+      "screen": {
+        "exists": true,
+        "visible": true,
+        "top": 72,
+        "left": 16,
+        "right": 16,
+        "height": 2491.78,
+        "width": 398,
+        "display": "grid"
+      },
+      "hero": {
+        "exists": true,
+        "visible": false,
+        "top": 0,
+        "left": 0,
+        "right": 430,
+        "height": 0,
+        "width": 0,
+        "display": "none"
+      },
+      "toolbar": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 16,
+        "right": 16,
+        "height": 104,
+        "width": 398,
+        "display": "grid"
+      },
+      "tabs": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 16,
+        "right": 16,
+        "height": 50,
+        "width": 398,
+        "display": "flex"
+      },
+      "search": {
+        "exists": true,
+        "visible": true,
+        "top": 152,
+        "left": 16,
+        "right": 16,
+        "height": 44,
+        "width": 398,
+        "display": "grid"
+      },
+      "section": {
+        "exists": true,
+        "visible": true,
+        "top": 228,
+        "left": 16,
+        "right": 16,
+        "height": 1235.02,
+        "width": 398,
+        "display": "block"
+      },
+      "familyRow": {
+        "exists": true,
+        "visible": true,
+        "top": 293.77,
+        "left": 17,
+        "right": 17,
+        "height": 451.25,
+        "width": 396,
+        "display": "inline-block"
+      },
+      "dock": {
+        "exists": true,
+        "visible": true,
+        "top": 864,
+        "left": 16,
+        "right": 16,
+        "height": 56,
+        "width": 398,
+        "display": "grid"
+      },
+      "edgeInsets": [
+        {
+          "selector": ".vf-applicants-tabs",
+          "exists": true,
+          "visible": true,
+          "top": 92,
+          "left": 16,
+          "right": 16,
+          "height": 50,
+          "width": 398,
+          "display": "flex"
+        },
+        {
+          "selector": ".vf-applicants-search-row",
+          "exists": true,
+          "visible": true,
+          "top": 152,
+          "left": 16,
+          "right": 16,
+          "height": 44,
+          "width": 398,
+          "display": "grid"
+        },
+        {
+          "selector": ".vf-applicants-section",
+          "exists": true,
+          "visible": true,
+          "top": 228,
+          "left": 16,
+          "right": 16,
+          "height": 1235.02,
+          "width": 398,
+          "display": "block"
+        },
+        {
+          "selector": ".vf-family-row",
+          "exists": true,
+          "visible": true,
+          "top": 293.77,
+          "left": 17,
+          "right": 17,
+          "height": 451.25,
+          "width": 396,
+          "display": "inline-block"
+        },
+        {
+          "selector": ".vf-individual-grid",
+          "exists": true,
+          "visible": true,
+          "top": 1560.78,
+          "left": 17,
+          "right": 17,
+          "height": 914,
+          "width": 396,
+          "display": "grid"
+        }
+      ],
+      "minVisibleInset": 16
+    },
+    "768x1024": {
+      "h1": "Заявители и Семьи",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "textStart": "V\nVisaFlow V-19\nWorkspace\nПоиск...\n⌘K\nРАБОТА\nМои действия\n12\nСбор документов\nЗаявители / Семьи\nФайлы / Медиа\nЗамечания\n2\nНастройки\nВ админскую зону\nТН\nТатьяна Николаева\nVisa Center Spb\nЗаявители и Семьи\nЗагрузить\nСоздать",
+      "overflowX": 0,
+      "externalScripts": [],
+      "header": {
+        "exists": true,
+        "visible": true,
+        "top": 0,
+        "left": 288,
+        "right": 0,
+        "height": 56,
+        "width": 480,
+        "display": "flex"
+      },
+      "headerSharePercent": 5.47,
+      "screen": {
+        "exists": true,
+        "visible": true,
+        "top": 72,
+        "left": 304,
+        "right": 16,
+        "height": 1762,
+        "width": 448,
+        "display": "grid"
+      },
+      "hero": {
+        "exists": true,
+        "visible": false,
+        "top": 0,
+        "left": 0,
+        "right": 768,
+        "height": 0,
+        "width": 0,
+        "display": "none"
+      },
+      "toolbar": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 304,
+        "right": 16,
+        "height": 104,
+        "width": 448,
+        "display": "grid"
+      },
+      "tabs": {
+        "exists": true,
+        "visible": true,
+        "top": 92,
+        "left": 304,
+        "right": 16,
+        "height": 50,
+        "width": 448,
+        "display": "flex"
+      },
+      "search": {
+        "exists": true,
+        "visible": true,
+        "top": 152,
+        "left": 304,
+        "right": 16,
+        "height": 44,
+        "width": 448,
+        "display": "grid"
+      },
+      "section": {
+        "exists": true,
+        "visible": true,
+        "top": 228,
+        "left": 304,
+        "right": 16,
+        "height": 934.75,
+        "width": 448,
+        "display": "block"
+      },
+      "familyRow": {
+        "exists": true,
+        "visible": true,
+        "top": 313.5,
+        "left": 305,
+        "right": 17,
+        "height": 304.25,
+        "width": 446,
+        "display": "inline-block"
+      },
+      "dock": {
+        "exists": true,
+        "visible": true,
+        "top": 956,
+        "left": 304,
+        "right": 16,
+        "height": 56,
+        "width": 448,
+        "display": "grid"
+      },
+      "edgeInsets": [
+        {
+          "selector": ".vf-applicants-tabs",
+          "exists": true,
+          "visible": true,
+          "top": 92,
+          "left": 304,
+          "right": 16,
+          "height": 50,
+          "width": 448,
+          "display": "flex"
+        },
+        {
+          "selector": ".vf-applicants-search-row",
+          "exists": true,
+          "visible": true,
+          "top": 152,
+          "left": 304,
+          "right": 16,
+          "height": 44,
+          "width": 448,
+          "display": "grid"
+        },
+        {
+          "selector": ".vf-applicants-section",
+          "exists": true,
+          "visible": true,
+          "top": 228,
+          "left": 304,
+          "right": 16,
+          "height": 934.75,
+          "width": 448,
+          "display": "block"
+        },
+        {
+          "selector": ".vf-family-row",
+          "exists": true,
+          "visible": true,
+          "top": 313.5,
+          "left": 305,
+          "right": 17,
+          "height": 304.25,
+          "width": 446,
+          "display": "inline-block"
+        },
+        {
+          "selector": ".vf-individual-grid",
+          "exists": true,
+          "visible": true,
+          "top": 1263,
+          "left": 305,
+          "right": 17,
+          "height": 482,
+          "width": 446,
+          "display": "grid"
+        }
+      ],
+      "minVisibleInset": 16
+    },
+    "1440x900": {
+      "h1": "Заявители и Семьи",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "textStart": "V\nVisaFlow V-19\nWorkspace\nПоиск...\n⌘K\nРАБОТА\nМои действия\n12\nСбор документов\nЗаявители / Семьи\nФайлы / Медиа\nЗамечания\n2\nНастройки\nВ админскую зону\nТН\nТатьяна Николаева\nVisa Center Spb\nЗаявители и Семьи\nЗагрузить\nСоздать",
+      "overflowX": 0,
+      "externalScripts": [],
+      "header": {
+        "exists": true,
+        "visible": true,
+        "top": 0,
+        "left": 288,
+        "right": 0,
+        "height": 64,
+        "width": 1152,
+        "display": "flex"
+      },
+      "headerSharePercent": 7.11,
+      "screen": {
+        "exists": true,
+        "visible": true,
+        "top": 88,
+        "left": 312,
+        "right": 24,
+        "height": 1122.88,
+        "width": 1104,
+        "display": "block"
+      },
+      "hero": {
+        "exists": true,
+        "visible": true,
+        "top": 88,
+        "left": 312,
+        "right": 24,
+        "height": 219.38,
+        "width": 1104,
+        "display": "block"
+      },
+      "toolbar": {
+        "exists": true,
+        "visible": true,
+        "top": 327.38,
+        "left": 312,
+        "right": 24,
+        "height": 48,
+        "width": 1104,
+        "display": "flex"
+      },
+      "tabs": {
+        "exists": true,
+        "visible": true,
+        "top": 327.38,
+        "left": 312,
+        "right": 643.14,
+        "height": 48,
+        "width": 484.86,
+        "display": "flex"
+      },
+      "search": {
+        "exists": true,
+        "visible": true,
+        "top": 331.38,
+        "left": 1048,
+        "right": 24,
+        "height": 40,
+        "width": 368,
+        "display": "flex"
+      },
+      "section": {
+        "exists": true,
+        "visible": true,
+        "top": 395.38,
+        "left": 312,
+        "right": 24,
+        "height": 478.5,
+        "width": 1104,
+        "display": "block"
+      },
+      "familyRow": {
+        "exists": true,
+        "visible": true,
+        "top": 452.38,
+        "left": 313,
+        "right": 25,
+        "height": 161,
+        "width": 1102,
+        "display": "inline-block"
+      },
+      "dock": {
+        "exists": true,
+        "visible": false,
+        "top": 0,
+        "left": 0,
+        "right": 1440,
+        "height": 0,
+        "width": 0,
+        "display": "none"
+      },
+      "edgeInsets": [
+        {
+          "selector": ".vf-applicants-tabs",
+          "exists": true,
+          "visible": true,
+          "top": 327.38,
+          "left": 312,
+          "right": 643.14,
+          "height": 48,
+          "width": 484.86,
+          "display": "flex"
+        },
+        {
+          "selector": ".vf-applicants-search-row",
+          "exists": true,
+          "visible": true,
+          "top": 331.38,
+          "left": 1048,
+          "right": 24,
+          "height": 40,
+          "width": 368,
+          "display": "flex"
+        },
+        {
+          "selector": ".vf-applicants-section",
+          "exists": true,
+          "visible": true,
+          "top": 395.38,
+          "left": 312,
+          "right": 24,
+          "height": 478.5,
+          "width": 1104,
+          "display": "block"
+        },
+        {
+          "selector": ".vf-family-row",
+          "exists": true,
+          "visible": true,
+          "top": 452.38,
+          "left": 313,
+          "right": 25,
+          "height": 161,
+          "width": 1102,
+          "display": "inline-block"
+        },
+        {
+          "selector": ".vf-individual-grid",
+          "exists": true,
+          "visible": true,
+          "top": 950.88,
+          "left": 313,
+          "right": 25,
+          "height": 259,
+          "width": 1102,
+          "display": "grid"
+        }
+      ],
+      "minVisibleInset": 24
+    }
+  },
+  "console": {
+    "320x740": [],
+    "390x844": [],
+    "430x932": [],
+    "768x1024": [],
+    "1440x900": []
+  }
+}

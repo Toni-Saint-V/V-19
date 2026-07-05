@@ -11,7 +11,7 @@ export default tseslint.config(
       "playwright-report",
       "test-results",
       "public/tesseract",
-      "docs/References/perfect_extracted/**",
+      "docs/References/**",
     ],
   },
   js.configs.recommended,

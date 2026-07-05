@@ -23,6 +23,15 @@ test.describe("V-19 release ops lists export flow", () => {
     await clickWorkspaceButton(page, /Проверка|Работа/);
     await expect(submissionCardById(page, "ПД-1053")).toBeVisible();
     await submissionCardById(page, "ПД-1053").click();
+    await expect(page.getByLabel("Детали проверки")).toContainText("Нина Волкова");
+    await expect(page.getByLabel("Детали проверки")).toContainText(
+      "Администратор проверки",
+    );
+    await page
+      .getByRole("button", { name: /^(Ручная проверка|Проверить)/ })
+      .first()
+      .click();
+    await expect(drawer(page)).toBeVisible();
     await expect(drawer(page).locator(".admin-review-meta")).toContainText(
       "Агент: Татьяна Николаева",
     );

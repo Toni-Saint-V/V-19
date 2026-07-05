@@ -29,6 +29,8 @@ type CollectionTab<T extends string> = {
   label: string;
 };
 
+export type CollectionToolbarVariant = "regular" | "compact";
+
 type CollectionToolbarProps<T extends string> = {
   activeFilters?: CollectionActiveFilter[];
   ariaLabel: string;
@@ -36,6 +38,7 @@ type CollectionToolbarProps<T extends string> = {
   className?: string;
   filterTabs?: ReactNode;
   filters?: ReactNode;
+  leadingControl?: ReactNode;
   mobileCityControl?: ReactNode;
   onClearActiveFilters?: () => void;
   onTabChange: (value: T) => void;
@@ -45,6 +48,7 @@ type CollectionToolbarProps<T extends string> = {
   tabsAriaLabel?: string;
   tools?: ReactNode;
   value: T;
+  variant?: CollectionToolbarVariant;
 };
 
 export type CollectionActiveFilter =
@@ -80,6 +84,7 @@ export function CollectionToolbar<T extends string>({
   className,
   filterTabs,
   filters,
+  leadingControl,
   mobileCityControl,
   onClearActiveFilters,
   onTabChange,
@@ -89,12 +94,14 @@ export function CollectionToolbar<T extends string>({
   tabsAriaLabel,
   tools = null,
   value,
+  variant = "regular",
 }: CollectionToolbarProps<T>) {
   return (
     <>
       <div
         className={cn(
           "v19-collection-toolbar",
+          `is-${variant}`,
           tabs.length > 3 && "has-many-tabs",
           (cityControl != null || filters != null) && "has-control-stack",
           cityControl != null && "has-city-control",
@@ -104,16 +111,19 @@ export function CollectionToolbar<T extends string>({
           tools != null && "has-toolbar-tools",
           className,
         )}
+        data-toolbar-variant={variant}
         role="region"
         aria-label={ariaLabel}
       >
         <div className="v19-toolbar-secondary-row">
-          <StatusTabs
-            ariaLabel={tabsAriaLabel ?? "Состояние списка"}
-            onValueChange={onTabChange}
-            tabs={tabs}
-            value={value}
-          />
+          {leadingControl ?? (
+            <StatusTabs
+              ariaLabel={tabsAriaLabel ?? "Состояние списка"}
+              onValueChange={onTabChange}
+              tabs={tabs}
+              value={value}
+            />
+          )}
           {cityControl ? (
             <div className="v19-toolbar-city-slot">{cityControl}</div>
           ) : null}
@@ -385,7 +395,7 @@ export function CollectionGroupLabel({
   return <div className={cn("v19-group-label", className)}>{children}</div>;
 }
 
-export type ToolbarIconName = "filter" | "panel" | "sort" | "view";
+export type ToolbarIconName = "filter" | "panel" | "search" | "sort" | "view";
 
 export function ToolbarIconButton({
   icon,
@@ -853,12 +863,21 @@ export function SvgIcon({ children }: { children: ReactNode }) {
 }
 
 function ToolbarIcon({ icon }: { icon: ToolbarIconName }) {
+  if (icon === "search") {
+    return (
+      <SvgIcon>
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m16 16 5 5" />
+      </SvgIcon>
+    );
+  }
+
   if (icon === "filter") {
     return (
       <SvgIcon>
-        <path d="M4 6h16" />
-        <path d="M7 12h10" />
-        <path d="M10 18h4" />
+        <path d="M4 5h16" />
+        <path d="m7 9 5 5 5-5" />
+        <path d="M12 14v5" />
       </SvgIcon>
     );
   }

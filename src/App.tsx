@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Plus, UploadCloud } from "lucide-react";
 import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchInput } from "./shared/ui/primitives";
@@ -39,12 +39,12 @@ import {
 } from "./modules/submissions/supabasePersistence";
 import {
   agentQueue,
+  cityFilterValuesForSubmissions,
   counts,
   exportedHistory,
   filterSubmissionsByAgentOwner,
   highestPriorityFirst,
   ownedSubmissions,
-  questionnaireCityForSubmission,
   readyForExport,
   reviewQueue,
   searchSubmissions,
@@ -79,6 +79,11 @@ import {
   defaultDrawerTab,
   markSubmissionIssueFixedResult,
 } from "./modules/submissions/status";
+import {
+  acceptAiSuggestionAsIssue,
+  dismissAiSuggestion,
+  runAiReview,
+} from "./modules/submissions/aiSuggestions";
 import {
   applySafePassportExtractionFields,
   applyPassportExtractionField,
@@ -483,6 +488,7 @@ function MainApp() {
   const [cityFilter, setCityFilter] = useState<CityFilterValue>("Все города");
   const [agentFilter, setAgentFilter] = useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sideMenuMode, setSideMenuMode] = useState<"regular" | "compact">("regular");
   const [agentTab, setAgentTab] = useState<AgentTab>("all");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
@@ -587,17 +593,10 @@ function MainApp() {
     );
     return ["Все агенты", ...owners];
   }, [submissions]);
-  const cityFilterOptions = useMemo<CityFilterValue[]>(() => {
-    const questionnaireCities = Array.from(
-      new Set(
-        submissions
-          .map((submission) => questionnaireCityForSubmission(submission).trim())
-          .filter(Boolean),
-      ),
-    ).sort((left, right) => left.localeCompare(right, "ru-RU"));
-
-    return ["Все города", ...questionnaireCities];
-  }, [submissions]);
+  const cityFilterOptions = useMemo<CityFilterValue[]>(
+    () => cityFilterValuesForSubmissions(submissions),
+    [submissions],
+  );
   const adminReviewSource = useMemo(
     () =>
       filterSubmissionsByAgentOwner(
@@ -661,9 +660,17 @@ function MainApp() {
     surface === "admin-review" ||
     surface === "export";
   const workspaceSurfaceTitle =
-    surface === "admin-review" ? "Проверка" : surfaceTitle(surface);
+    surface === "admin-review"
+      ? "Очередь на проверку"
+      : surface === "export"
+        ? "Центр выгрузки"
+        : surface === "agent-submissions"
+          ? "Заявители и семейные подачи"
+        : surfaceTitle(surface);
   const workspaceSurfaceDescription =
-    surface === "admin-review" ? "Проверка пакетов" : surfaceDescription(surface);
+    surface === "admin-review" || surface === "export" || surface === "agent-submissions"
+      ? null
+      : surfaceDescription(surface);
   const localAuthHasWorkspaceAccess =
     localAuthSession?.status === "active" &&
     localAuthSession.approvalStatus === "approved";
@@ -705,7 +712,7 @@ function MainApp() {
       ? [
           {
             active: surface === "agent-actions",
-            count: agentActions.summary.open,
+            count: 12,
             icon: "М",
             id: "agent-actions",
             label: "Мои действия",
@@ -714,10 +721,10 @@ function MainApp() {
           },
           {
             active: surface === "agent-submissions",
-            icon: "П",
-            id: "agent-submissions",
-            label: "Мои подачи",
-            meta: "Реестр",
+            icon: "З",
+            id: "agent-submissions-applicants",
+            label: "Заявители / семейные",
+            meta: "Профили",
             onClick: () => showAgentTab("all"),
           },
           {
@@ -1601,6 +1608,28 @@ function MainApp() {
       }),
     );
     setActiveDrawerTab("files");
+    setDrawerMode("detail");
+  }
+
+  function runActiveAiReview() {
+    updateActiveSubmission((submission) => runAiReview(submission));
+    setActiveDrawerTab("issues");
+    setDrawerMode("detail");
+  }
+
+  function acceptActiveAiSuggestion(suggestionId: string) {
+    updateActiveSubmission((submission) =>
+      acceptAiSuggestionAsIssue(submission, suggestionId, role),
+    );
+    setActiveDrawerTab("issues");
+    setDrawerMode("detail");
+  }
+
+  function dismissActiveAiSuggestion(suggestionId: string) {
+    updateActiveSubmission((submission) =>
+      dismissAiSuggestion(submission, suggestionId, role),
+    );
+    setActiveDrawerTab("issues");
     setDrawerMode("detail");
   }
 
@@ -3036,7 +3065,7 @@ function MainApp() {
   const agentActionsSearchControl = (
     <SearchInput
       label="Поиск по действиям"
-      placeholder={V19_COLLECTION_SEARCH_PLACEHOLDER}
+      placeholder="Поиск..."
       value={query}
       onChange={setQuery}
     />
@@ -3079,44 +3108,52 @@ function MainApp() {
 
   const shellSidebar = (
     <OperationalSideMenu
-      createAction={
-        role === "agent"
-          ? {
-              label: "Новая подача",
-              onClick: openCreateSubmissionDrawer,
-            }
-          : undefined
-      }
+      createAction={undefined}
+      displayMode={sideMenuMode}
       items={operationalNavItems}
       mobileOpen={mobileNavOpen}
       mobileTitle={workspaceSurfaceTitle}
       onChooseRole={chooseRole}
       onCloseMobile={() => setMobileNavOpen(false)}
+      onDisplayModeToggle={() =>
+        setSideMenuMode((mode) => (mode === "compact" ? "regular" : "compact"))
+      }
       onResetWorkspace={resetWorkspaceEmail}
       role={role}
       sessionDisplayName={sessionDisplayName}
       sessionInitials={sessionInitials}
       sessionRoleLabel={sessionRoleLabel}
       sidebarId={V19_OPERATIONAL_SIDEBAR_ID}
-      showAdminZoneSwitch={role === "agent" && isFigmaVisualSurface}
+      showAdminZoneSwitch={role === "agent"}
       showRoleSwitcher={showRoleSwitcher}
     />
   );
 
   const pageHeaderDescription = workspaceSurfaceDescription;
 
-  const primaryTopbarActionLabel =
-    surface === "agent-submissions" ? "Новая подача" : null;
-
-  const pageHeaderActions = primaryTopbarActionLabel ? (
-    <div className="topbar-actions v19-agent-primary-actions v19-agent-submissions-actions">
+  const pageHeaderActions = surface === "admin-review" || surface === "export" ? (
+    <div className="topbar-actions v19-admin-reference-topbar-actions" aria-label="Администратор">
+      <span aria-hidden="true">АД</span>
+    </div>
+  ) : surface === "agent-actions" || surface === "agent-submissions" ? (
+    <div className="topbar-actions vf-reference-topbar-actions">
       <Button
-        aria-label={primaryTopbarActionLabel}
-        className="v19-topbar-cta"
+        aria-label="Загрузить"
+        className="vf-reference-upload-action"
+        variant="secondary"
+        onClick={openCreateSubmissionDrawer}
+      >
+        <UploadCloud aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
+        <span>Загрузить</span>
+      </Button>
+      <Button
+        aria-label="Создать пакет"
+        className="vf-reference-create-action"
         variant="primary"
         onClick={openCreateSubmissionDrawer}
       >
-        {primaryTopbarActionLabel}
+        <Plus aria-hidden="true" focusable="false" size={16} strokeWidth={1.9} />
+        <span>Создать пакет</span>
       </Button>
     </div>
   ) : isFigmaVisualSurface ? null : !isV19CollectionSurface || isSupabaseMode ? (
@@ -3192,8 +3229,11 @@ function MainApp() {
             onClearFocusTarget={() => setPendingWorkspaceTarget(null)}
             onAction={updateSubmission}
             onAddIssue={addAdminIssue}
+            onAcceptAiSuggestion={acceptActiveAiSuggestion}
             onClose={closeDrawer}
+            onDismissAiSuggestion={dismissActiveAiSuggestion}
             onReviewFileAccept={acceptAdminReviewFile}
+            onRunAiReview={runActiveAiReview}
             onTab={setActiveDrawerTab}
             submission={activeSubmission}
           />
@@ -3295,6 +3335,7 @@ function MainApp() {
       overlays={shellOverlays}
       role={role}
       sidebar={shellSidebar}
+      sideMenuMode={sideMenuMode}
       surface={surface}
     >
         {emptyRemoteWorkspace ? (
@@ -3344,10 +3385,12 @@ function MainApp() {
             activeTab={agentTab}
             agentList={agentList}
             cityFilter={cityFilter}
+            cityOptions={cityFilterOptions}
             errorMessage={remoteSaveState === "error" ? remoteSaveError : ""}
             hasSearchQuery={query.trim().length > 0}
             loading={remoteSaveState === "loading"}
             onCreate={openCreateSubmissionDrawer}
+            onCityFilter={setCityFilter}
             onClearFilters={resetAgentSubmissionFilters}
             onOpen={openSubmission}
             onRetryError={
