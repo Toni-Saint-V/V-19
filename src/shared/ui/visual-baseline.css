@@ -16301,6 +16301,23 @@ body,
   }
 }
 
+/* Agent actions tablet cell lock: prevent mobile-only people labels from
+   squeezing into an icon-width column between desktop and mobile layouts. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .ops-shell.has-unified-side-menu.surface-agent-actions
+    .v19-agent-actions-reference
+    .vf-figma-action-row
+    :is(.vf-figma-action-title, .vf-figma-action-meta, .vf-figma-action-dates) {
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.surface-agent-actions
+    .v19-agent-actions-reference
+    .vf-figma-mobile-people {
+    display: none !important;
+  }
+}
+
 /* Admin UX/UI design-system tighten: keep review queue dense and scannable. */
 .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
   .v19-admin-cockpit-card {
