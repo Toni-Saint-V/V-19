@@ -616,13 +616,13 @@ function verifySmokeGuard() {
   );
   expectContains(
     productionWorkflowSmoke,
-    "submitted_for_review",
-    "Production workflow smoke proves canonical submitted_for_review",
+    "waiting_review",
+    "Production workflow smoke proves waiting_review handoff",
   );
   expectContains(
     productionWorkflowSmoke,
-    "ready_for_export",
-    "Production workflow smoke proves canonical ready_for_export",
+    "admin can accept case",
+    "Production workflow smoke proves admin acceptance",
   );
   expectContains(
     productionWorkflowSmoke,

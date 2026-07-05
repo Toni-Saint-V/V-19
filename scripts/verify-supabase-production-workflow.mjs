@@ -11,23 +11,20 @@ const evidencePath = resolve(repoRoot, "docs/qa/supabase-production-workflow-smo
 const productionProjectId = "tsymifccglpepvbmrcgh";
 const sandboxProjectId = "oevvaowoklqttqkraxho";
 const bucket = "submission-media";
-const cockpitSnapshotKey = "v19CockpitSnapshot";
-const canonicalRequiredMediaSlots = ["passport_scan", "selfie", "selfie_2"];
-// Production DB enum is still legacy; this smoke proves canonical state in the cockpit snapshot.
-const storageStatusByCanonicalStatus = {
-  draft: "draft",
-  submitted_for_review: "waiting_review",
-  returned: "returned",
-  corrections_received: "waiting_review",
-  ready_for_export: "accepted",
-};
 const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
 const runId = `VF-PROD-WORKFLOW-${stamp}`;
+const familyRunId = `${runId}-FAMILY`;
+const malformedBucketReadinessId = `${runId}-MALFORMED-BUCKET`;
+const malformedPathReadinessId = `${runId}-MALFORMED-PATH`;
 const correctionId = randomUUID();
 const applicantId = applicantIdFor(runId);
-const uploadPath = `${runId}/${applicantId}/selfie/v19smoke_selfie.jpg`;
+const requiredMediaSlots = ["passport_scan", "selfie", "selfie_2"];
+const uploadPaths = requiredMediaSlots.map((slot) =>
+  storagePathFor(runId, applicantId, slot, `v19smoke_${slot}.jpg`),
+);
+const uploadPath = storagePathFor(runId, applicantId, "selfie", "v19smoke_selfie.jpg");
 const checks = [];
-const cleanupPaths = new Set([uploadPath]);
+const cleanupPaths = new Set(uploadPaths);
 
 const publicEnv = readEnv(publicEnvPath);
 const adminEnv = readEnv(adminEnvPath);
@@ -64,7 +61,7 @@ async function main() {
     await cleanup(adminService);
 
     await save(agent.client, draftPayload(agent.userId, runId));
-    await expectCanonicalStatus(adminService, runId, "draft");
+    await expectStatus(adminService, runId, "draft");
     pass("agent can create draft through save_submission_draft");
 
     await uploadPrivateMedia(agent.client);
@@ -73,19 +70,21 @@ async function main() {
     pass("agent can upload private media and signed URLs are owner-scoped");
 
     await expectRejected(
-      save(
-        agent.client,
-        incompleteSubmittedForReviewPayload(agent.userId, `${runId}-incomplete`),
-      ),
-      "incomplete submitted_for_review is rejected",
+      save(agent.client, incompleteWaitingReviewPayload(agent.userId, `${runId}-incomplete`)),
+      "incomplete waiting_review is rejected",
     );
+    await expectMalformedBucketReadinessRejected(agent.client, adminService, agent.userId);
+    pass("wrong media bucket cannot satisfy review readiness");
+    await expectMalformedPathReadinessRejected(agent.client, adminService, agent.userId);
+    pass("wrong media path cannot satisfy review readiness");
 
-    await save(agent.client, validSubmittedForReviewPayload(agent.userId, runId));
-    await expectCanonicalStatus(adminService, runId, "submitted_for_review");
-    pass("valid submitted_for_review reaches admin queue");
+    await save(agent.client, validReviewPayload(agent.userId, runId, "ready_for_review"));
+    await save(agent.client, validReviewPayload(agent.userId, runId, "waiting_review"));
+    await expectStatus(adminService, runId, "waiting_review");
+    pass("valid waiting_review reaches admin queue");
 
     await save(adminUser.client, returnedPayload(agent.userId, adminUser.userId, runId));
-    await expectCanonicalStatus(adminService, runId, "returned");
+    await expectStatus(adminService, runId, "returned");
     pass("admin can return case with blocking correction");
 
     await expectRejected(
@@ -105,17 +104,23 @@ async function main() {
       payload: fixedCorrectionPayload(agent.userId, adminUser.userId, runId),
     });
     if (handoff.error) throw new Error(handoff.error.message);
-    await expectCanonicalStatus(adminService, runId, "corrections_received");
+    await expectStatus(adminService, runId, "waiting_review");
     pass("assigned agent can hand off fixed corrections");
 
-    await save(adminUser.client, readyForExportPayload(agent.userId, adminUser.userId, runId));
-    await expectCanonicalStatus(adminService, runId, "ready_for_export");
-    pass("admin can move package to ready_for_export");
+    await save(adminUser.client, acceptedPayload(agent.userId, adminUser.userId, runId));
+    await expectStatus(adminService, runId, "accepted");
+    pass("admin can accept case");
 
     await expectRejected(
       save(agent.client, draftPayload(agent.userId, runId)),
       "agent mutation is blocked after admin handoff",
     );
+
+    await save(agent.client, familyDraftPayload(agent.userId, familyRunId, false));
+    await uploadFamilyPrivateMedia(agent.client, familyRunId);
+    await save(agent.client, familyDraftPayload(agent.userId, familyRunId, true));
+    await expectFamilyReload(agent.client, familyRunId);
+    pass("family submission with 3 applicants persists applicants and required media");
 
     await cleanup(adminService);
     await writeEvidenceAndReadiness();
@@ -199,13 +204,15 @@ async function expectRejected(action, label) {
 }
 
 async function uploadPrivateMedia(client) {
-  const { error } = await client.storage
-    .from(bucket)
-    .upload(uploadPath, Buffer.from("supabase-production-workflow-smoke"), {
-      contentType: "image/jpeg",
-      upsert: true,
-    });
-  if (error) throw new Error(`private media upload failed: ${error.message}`);
+  for (const path of uploadPaths) {
+    const { error } = await client.storage
+      .from(bucket)
+      .upload(path, Buffer.from("supabase-production-workflow-smoke"), {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+    if (error) throw new Error(`private media upload failed: ${error.message}`);
+  }
 }
 
 async function createScopedSignedUrl(client, shouldPass) {
@@ -218,88 +225,359 @@ async function createScopedSignedUrl(client, shouldPass) {
   }
 }
 
-async function expectCanonicalStatus(client, id, canonicalStatus) {
+async function expectStatus(client, id, status) {
   const { data, error } = await client
     .from("submissions")
-    .select("status,family_intelligence")
+    .select("status")
     .eq("id", id)
     .single();
   if (error) throw new Error(`status read failed: ${error.message}`);
-  const storageStatus = storageStatusForCanonicalStatus(canonicalStatus);
-  if (data.status !== storageStatus) {
-    throw new Error(
-      `expected ${id} storage status ${storageStatus} for ${canonicalStatus}, got ${data.status}`,
-    );
+  if (data.status !== status) throw new Error(`expected ${id}=${status}, got ${data.status}`);
+}
+
+async function uploadFamilyPrivateMedia(client, id) {
+  for (const applicant of familyApplicants(id)) {
+    for (const slot of requiredMediaSlots) {
+      const path = storagePathFor(id, applicant.id, slot, `v19smoke_${applicant.suffix}_${slot}.jpg`);
+      cleanupPaths.add(path);
+      const { error } = await client.storage
+        .from(bucket)
+        .upload(path, Buffer.from("supabase-production-family-workflow-smoke"), {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      if (error) throw new Error(`family private media upload failed: ${error.message}`);
+    }
+  }
+}
+
+async function expectFamilyReload(client, id) {
+  const [{ data: submission, error: submissionError }, { data: applicants, error: applicantsError }, { data: media, error: mediaError }] =
+    await Promise.all([
+      client.from("submissions").select("id,type,status").eq("id", id).single(),
+      client.from("applicants").select("id").eq("submission_id", id),
+      client
+        .from("media_assets")
+        .select("applicant_id,type,upload_status,storage_path")
+        .eq("submission_id", id)
+        .in("type", requiredMediaSlots),
+    ]);
+
+  if (submissionError) throw new Error(`family submission reload failed: ${submissionError.message}`);
+  if (applicantsError) throw new Error(`family applicants reload failed: ${applicantsError.message}`);
+  if (mediaError) throw new Error(`family media reload failed: ${mediaError.message}`);
+  if (submission.type !== "family" || submission.status !== "draft") {
+    throw new Error(`family submission reload mismatch: ${submission.type}/${submission.status}`);
+  }
+  if ((applicants ?? []).length !== 3) {
+    throw new Error(`expected 3 family applicants, got ${(applicants ?? []).length}`);
+  }
+  if ((media ?? []).length !== 9) {
+    throw new Error(`expected 9 family required media rows, got ${(media ?? []).length}`);
+  }
+  if (
+    !(media ?? []).every(
+      (row) =>
+        row.upload_status === "uploaded" &&
+        typeof row.storage_path === "string" &&
+        row.storage_path.startsWith(`submissions/${id}/applicants/`),
+    )
+  ) {
+    throw new Error("family media reload returned invalid upload state or storage path");
+  }
+}
+
+async function expectMalformedBucketReadinessRejected(agentClient, adminClient, agentId) {
+  await save(agentClient, malformedMediaReadinessPayload(agentId, malformedBucketReadinessId));
+  const { error: mediaError } = await adminClient
+    .from("media_assets")
+    .update({
+      storage_bucket: "wrong-bucket",
+      storage_path: storagePathFor(
+        malformedBucketReadinessId,
+        applicantIdFor(malformedBucketReadinessId),
+        "passport_scan",
+        "v19smoke_passport_scan.jpg",
+      ),
+    })
+    .eq("submission_id", malformedBucketReadinessId)
+    .eq("type", "passport_scan");
+  if (mediaError) {
+    throw new Error(`malformed bucket media setup failed: ${mediaError.message}`);
   }
 
-  const snapshotStatus =
-    data.family_intelligence?.[cockpitSnapshotKey]?.submission?.status;
-  if (snapshotStatus !== canonicalStatus) {
-    throw new Error(
-      `expected ${id} canonical status ${canonicalStatus}, got ${snapshotStatus ?? "missing"}`,
-    );
+  await expectRejected(
+    adminClient
+      .from("submissions")
+      .update({ status: "waiting_review" })
+      .eq("id", malformedBucketReadinessId),
+    "malformed bucket media readiness is rejected",
+  );
+}
+
+async function expectMalformedPathReadinessRejected(agentClient, adminClient, agentId) {
+  await save(agentClient, malformedMediaReadinessPayload(agentId, malformedPathReadinessId));
+  const { error: mediaError } = await adminClient
+    .from("media_assets")
+    .update({
+      storage_bucket: bucket,
+      storage_path: storagePathFor(
+        malformedPathReadinessId,
+        applicantIdFor(malformedPathReadinessId),
+        "selfie",
+        "v19smoke_wrong_slot_selfie.jpg",
+      ),
+    })
+    .eq("submission_id", malformedPathReadinessId)
+    .eq("type", "passport_scan");
+  if (mediaError) {
+    throw new Error(`malformed path media setup failed: ${mediaError.message}`);
   }
+
+  await expectRejected(
+    adminClient
+      .from("submissions")
+      .update({ status: "waiting_review" })
+      .eq("id", malformedPathReadinessId),
+    "malformed path media readiness is rejected",
+  );
 }
 
 async function cleanup(client) {
   await client.storage.from(bucket).remove([...cleanupPaths]);
-  await client.from("corrections").delete().eq("submission_id", runId);
-  await client.from("status_history").delete().eq("submission_id", runId);
-  await client.from("media_assets").delete().eq("submission_id", runId);
-  await client.from("applicants").delete().eq("submission_id", runId);
-  await client.from("submissions").delete().eq("id", runId);
-  await client.from("corrections").delete().eq("submission_id", `${runId}-incomplete`);
-  await client.from("status_history").delete().eq("submission_id", `${runId}-incomplete`);
-  await client.from("media_assets").delete().eq("submission_id", `${runId}-incomplete`);
-  await client.from("applicants").delete().eq("submission_id", `${runId}-incomplete`);
-  await client.from("submissions").delete().eq("id", `${runId}-incomplete`);
+  for (const id of [
+    runId,
+    `${runId}-incomplete`,
+    malformedBucketReadinessId,
+    malformedPathReadinessId,
+    familyRunId,
+  ]) {
+    await client.from("corrections").delete().eq("submission_id", id);
+    await client.from("status_history").delete().eq("submission_id", id);
+    await client.from("media_assets").delete().eq("submission_id", id);
+    await client.from("applicants").delete().eq("submission_id", id);
+    await client.from("submissions").delete().eq("id", id);
+  }
 }
 
 function draftPayload(agentId, id) {
   return basePayload(agentId, id, "draft", { complete: true, media: [] });
 }
 
-function incompleteSubmittedForReviewPayload(agentId, id) {
-  return basePayload(agentId, id, "submitted_for_review", {
-    complete: false,
-    media: [],
+function incompleteWaitingReviewPayload(agentId, id) {
+  return basePayload(agentId, id, "waiting_review", { complete: false, media: [] });
+}
+
+function malformedMediaReadinessPayload(agentId, id) {
+  return basePayload(agentId, id, "draft", {
+    complete: true,
+    media: ["passport_scan", "selfie", "selfie_2"],
   });
 }
 
-function validSubmittedForReviewPayload(agentId, id) {
-  return basePayload(agentId, id, "submitted_for_review", {
+function validReviewPayload(agentId, id, status) {
+  return basePayload(agentId, id, status, {
     complete: true,
-    media: canonicalRequiredMediaSlots,
+    media: ["passport_scan", "selfie", "selfie_2"],
   });
 }
 
 function returnedPayload(agentId, adminId, id) {
   const payload = basePayload(agentId, id, "returned", {
     complete: true,
-    media: canonicalRequiredMediaSlots,
+    media: ["passport_scan", "selfie", "selfie_2"],
   });
   payload.corrections = [correction(adminId, "open", null)];
   return payload;
 }
 
 function fixedCorrectionPayload(agentId, adminId, id) {
-  const payload = basePayload(agentId, id, "corrections_received", {
+  const payload = basePayload(agentId, id, "waiting_review", {
     complete: true,
-    media: canonicalRequiredMediaSlots,
+    media: ["passport_scan", "selfie", "selfie_2"],
   });
   payload.corrections = [correction(adminId, "fixed", new Date().toISOString())];
   return payload;
 }
 
-function readyForExportPayload(agentId, adminId, id) {
-  const payload = basePayload(agentId, id, "ready_for_export", {
+function acceptedPayload(agentId, adminId, id) {
+  const payload = basePayload(agentId, id, "accepted", {
     complete: true,
-    media: canonicalRequiredMediaSlots,
+    media: ["passport_scan", "selfie", "selfie_2"],
     reviewStatus: "accepted",
   });
   payload.submission.accepted_at = new Date().toISOString();
   payload.corrections = [correction(adminId, "closed", new Date().toISOString())];
   return payload;
+}
+
+function familyDraftPayload(agentId, id, includeMedia) {
+  const now = new Date().toISOString();
+  const applicants = familyApplicants(id);
+  const media = includeMedia ? familyMediaRows(id) : [];
+  return {
+    submission: {
+      id,
+      agent_id: agentId,
+      type: "family",
+      title: "Production Family Workflow Smoke",
+      country: "Испания",
+      city: "Москва",
+      travel_date: "2026-07-10 - 2026-07-18",
+      status: "draft",
+      priority: "Средний",
+      readiness_percent: includeMedia ? 100 : 40,
+      family_intelligence: {
+        status: "unreviewed",
+        v19CockpitSnapshot: {
+          version: 1,
+          submission: {
+            id,
+            title: "Production Family Workflow Smoke",
+            type: "family",
+            country: "Испания",
+            city: "Москва",
+            tripDateFrom: "2026-07-10",
+            tripDateTo: "2026-07-18",
+            status: "in_progress",
+            applicants: applicants.map((applicant) => ({
+              id: applicant.id,
+              fullName: applicant.fullName,
+              role: applicant.role,
+              questionnaireStatus: "complete",
+              fileStatus: includeMedia ? "complete" : "empty",
+              sections: [],
+            })),
+            issues: [],
+            files: media.map(({ cockpit }) => cockpit),
+            completeness: {
+              questionnaire: 100,
+              files: includeMedia ? 100 : 0,
+              total: includeMedia ? 100 : 40,
+            },
+            aiSuggestions: [],
+            aiReviewState: "idle",
+            exportState: "not_ready",
+            createdAt: now,
+            updatedAt: now,
+            history: [],
+          },
+        },
+      },
+      appointment_status: "not_started",
+      submitted_at: null,
+      review_started_at: null,
+      accepted_at: null,
+      exported_at: null,
+      updated_at: now,
+    },
+    applicants: applicants.map((applicant) => ({
+      id: applicant.id,
+      submission_id: id,
+      full_name: applicant.fullName,
+      role: applicant.roleLabel,
+      suggested_role: null,
+      role_confirmed: true,
+      birth_date: applicant.birthDate,
+      patronymic: null,
+      citizenship: "Russia",
+      address: "Moscow, Tverskaya 1",
+      phone: "+79000000000",
+      email: `${applicant.suffix}@example.test`,
+      passport_number: applicant.passportNumber,
+      passport_issued_at: "2020-01-01",
+      passport_expires_at: "2030-01-01",
+      country: "Испания",
+      city: "Москва",
+      trip_dates: "2026-07-10 - 2026-07-18",
+      hotel_name: "ILUNION Barcelona",
+      hotel_address: "CALLE RAMON TUR 196-198",
+      questionnaire_percent: 100,
+      media_percent: includeMedia ? 100 : 0,
+    })),
+    media_assets: media.map(({ media }) => media),
+    corrections: [],
+    status_history: [],
+  };
+}
+
+function familyApplicants(id) {
+  return [
+    {
+      id: `${id}-applicant-1`,
+      suffix: "family_main",
+      fullName: "Production Family Smoke Main",
+      role: "main",
+      roleLabel: "Основной заявитель",
+      birthDate: "1990-01-01",
+      passportNumber: "FA1234561",
+    },
+    {
+      id: `${id}-applicant-2`,
+      suffix: "family_spouse",
+      fullName: "Production Family Smoke Spouse",
+      role: "spouse",
+      roleLabel: "Супруг/супруга",
+      birthDate: "1991-02-02",
+      passportNumber: "FA1234562",
+    },
+    {
+      id: `${id}-applicant-3`,
+      suffix: "family_child",
+      fullName: "Production Family Smoke Child",
+      role: "child",
+      roleLabel: "Ребенок",
+      birthDate: "2015-03-03",
+      passportNumber: "FA1234563",
+    },
+  ];
+}
+
+function familyMediaRows(id) {
+  const now = new Date().toISOString();
+  return familyApplicants(id).flatMap((applicant) =>
+    requiredMediaSlots.map((slot) => {
+      const generatedFileName = `v19smoke_${applicant.suffix}_${slot}.jpg`;
+      const storagePath = storagePathFor(id, applicant.id, slot, generatedFileName);
+      cleanupPaths.add(storagePath);
+      return {
+        cockpit: {
+          id: `${applicant.id}-${slot}`,
+          applicantId: applicant.id,
+          type: slot,
+          status: "pending_review",
+          generatedFileName,
+          mimeType: "image/jpeg",
+          originalFileName: `${slot}.jpg`,
+          sizeBytes: 2048,
+          storageBucket: bucket,
+          storagePath,
+          uploadedAtIso: now,
+          uploadedAt: "сейчас",
+          uploadedBy: "Агент",
+          uploadStatus: "uploaded",
+          reviewStatus: "not_reviewed",
+        },
+        media: {
+          id: `${applicant.id}-media-${slot}`,
+          applicant_id: applicant.id,
+          submission_id: id,
+          type: slot,
+          original_file_name: `${slot}.jpg`,
+          generated_file_name: generatedFileName,
+          storage_bucket: bucket,
+          storage_path: storagePath,
+          mime_type: "image/jpeg",
+          size_bytes: 2048,
+          upload_status: "uploaded",
+          review_status: "not_reviewed",
+          uploaded_at: now,
+          reviewed_at: null,
+          reviewed_by: null,
+        },
+      };
+    }),
+  );
 }
 
 function correction(adminId, status, fixedAt) {
@@ -323,7 +601,12 @@ function basePayload(agentId, id, status, options) {
   const now = new Date().toISOString();
   const complete = options.complete === true;
   const applicantId = applicantIdFor(id);
-  const storageStatus = storageStatusForCanonicalStatus(status);
+  const cockpitStatus =
+    status === "waiting_review"
+      ? "submitted_for_review"
+      : status === "accepted"
+        ? "ready_for_export"
+        : status;
   return {
     submission: {
       id,
@@ -333,7 +616,7 @@ function basePayload(agentId, id, status, options) {
       country: "Испания",
       city: "Москва",
       travel_date: complete ? "2026-07-10 - 2026-07-18" : "не указано",
-      status: storageStatus,
+      status,
       priority: "Средний",
       readiness_percent: complete ? 100 : 0,
       family_intelligence: {
@@ -348,7 +631,7 @@ function basePayload(agentId, id, status, options) {
             city: "Москва",
             tripDateFrom: complete ? "2026-07-10" : "не указано",
             tripDateTo: complete ? "2026-07-18" : "не указано",
-            status,
+            status: cockpitStatus,
             applicants: [
               {
                 id: applicantId,
@@ -370,7 +653,7 @@ function basePayload(agentId, id, status, options) {
             },
             aiSuggestions: [],
             aiReviewState: "idle",
-            exportState: status === "ready_for_export" ? "ready" : "not_ready",
+            exportState: status === "accepted" ? "ready" : "not_ready",
             createdAt: now,
             updatedAt: now,
             history: [],
@@ -378,7 +661,7 @@ function basePayload(agentId, id, status, options) {
         },
       },
       appointment_status: "not_started",
-      submitted_at: storageStatus === "waiting_review" ? now : null,
+      submitted_at: status === "waiting_review" ? now : null,
       review_started_at: null,
       accepted_at: null,
       exported_at: null,
@@ -425,7 +708,7 @@ function mediaRows(id, slots, reviewStatus = "not_reviewed") {
     const ext = "jpg";
     const mime = "image/jpeg";
     const generatedFileName = `v19smoke_${slot}.${ext}`;
-    const storagePath = `${id}/${applicantId}/${slot}/${generatedFileName}`;
+    const storagePath = storagePathFor(id, applicantId, slot, generatedFileName);
     cleanupPaths.add(storagePath);
     return {
       cockpit: {
@@ -470,10 +753,8 @@ function applicantIdFor(id) {
   return `${id}-applicant`;
 }
 
-function storageStatusForCanonicalStatus(status) {
-  const storageStatus = storageStatusByCanonicalStatus[status];
-  if (!storageStatus) throw new Error(`Unsupported canonical smoke status: ${status}`);
-  return storageStatus;
+function storagePathFor(id, applicantId, slot, generatedFileName) {
+  return `submissions/${id}/applicants/${applicantId}/${slot}/${generatedFileName}`;
 }
 
 async function writeEvidenceAndReadiness() {
@@ -489,10 +770,12 @@ async function writeEvidenceAndReadiness() {
   };
   packet.postActivationChecks = {
     ...packet.postActivationChecks,
+    agentSignInWorks: true,
+    adminSignInWorks: true,
     agentCanCreateDraft: true,
     agentCanUploadRequiredMedia: true,
-    incompleteSubmittedForReviewRejected: true,
-    validSubmittedForReviewReachesQueue: true,
+    incompleteWaitingReviewRejected: true,
+    validWaitingReviewReachesQueue: true,
     adminCanAcceptOrReturnCase: true,
     postHandoffAgentMutationBlocked: true,
     privateMediaSignedUrlScoped: true,

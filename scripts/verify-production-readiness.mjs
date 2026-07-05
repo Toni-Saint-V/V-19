@@ -884,8 +884,10 @@ function verifyProductionWorkflowEvidence(packet, env, post) {
     env.storagePolicyTestsPassed,
     post.agentCanCreateDraft,
     post.agentCanUploadRequiredMedia,
-    post.incompleteSubmittedForReviewRejected,
-    post.validSubmittedForReviewReachesQueue,
+    post.incompleteWaitingReviewRejected ??
+      post.incompleteSubmittedForReviewRejected,
+    post.validWaitingReviewReachesQueue ??
+      post.validSubmittedForReviewReachesQueue,
     post.adminCanAcceptOrReturnCase,
     post.postHandoffAgentMutationBlocked,
     post.privateMediaSignedUrlScoped,
@@ -920,18 +922,18 @@ function verifyProductionWorkflowEvidence(packet, env, post) {
   );
   requireSnippet(
     evidence,
-    "incomplete submitted_for_review is rejected",
-    "Production workflow smoke rejects incomplete submitted_for_review",
+    "incomplete waiting_review is rejected",
+    "Production workflow smoke rejects incomplete waiting_review",
   );
   requireSnippet(
     evidence,
-    "valid submitted_for_review reaches admin queue",
-    "Production workflow smoke proves submitted_for_review queue handoff",
+    "valid waiting_review reaches admin queue",
+    "Production workflow smoke proves waiting_review queue handoff",
   );
   requireSnippet(
     evidence,
-    "admin can move package to ready_for_export",
-    "Production workflow smoke proves ready_for_export acceptance",
+    "admin can accept case",
+    "Production workflow smoke proves accepted admin decision",
   );
 }
 
@@ -1235,14 +1237,8 @@ function verifyPacket(packet, rawContent) {
     ["adminSignInWorks", "Post-activation admin sign-in works"],
     ["agentCanCreateDraft", "Post-activation agent can create draft"],
     ["agentCanUploadRequiredMedia", "Post-activation agent can upload media"],
-    [
-      "incompleteSubmittedForReviewRejected",
-      "Incomplete submitted_for_review is rejected",
-    ],
-    [
-      "validSubmittedForReviewReachesQueue",
-      "Valid submitted_for_review reaches queue",
-    ],
+    ["incompleteWaitingReviewRejected", "Incomplete waiting_review is rejected"],
+    ["validWaitingReviewReachesQueue", "Valid waiting_review reaches queue"],
     ["adminCanAcceptOrReturnCase", "Admin can accept or return case"],
     ["postHandoffAgentMutationBlocked", "Post-handoff agent mutation is blocked"],
     ["privateMediaSignedUrlScoped", "Private media signed URL is scoped"],

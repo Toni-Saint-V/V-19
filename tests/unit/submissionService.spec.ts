@@ -148,7 +148,8 @@ describe("Supabase submission mapping", () => {
       original_file_name: null,
       generated_file_name: "751234567_photo_white.jpg",
       storage_bucket: "submission-media",
-      storage_path: "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg",
+      storage_path:
+        "submissions/VF-1044/applicants/applicant-1/photo_white/751234567_photo_white.jpg",
       upload_status: "uploaded",
       review_status: "accepted",
       mime_type: "image/jpeg",
@@ -178,7 +179,7 @@ describe("Supabase submission mapping", () => {
     expect(insert.original_file_name).toBe("phone_upload_name.jpg");
     expect(insert.generated_file_name).toBe("751234567_photo_white.jpg");
     expect(insert.storage_path).toBe(
-      "VF-1044/applicant-1/photo_white/751234567_photo_white.jpg",
+      "submissions/VF-1044/applicants/applicant-1/photo_white/751234567_photo_white.jpg",
     );
   });
 
