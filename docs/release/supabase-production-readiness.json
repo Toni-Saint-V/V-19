@@ -207,18 +207,18 @@
     "backendTargetSupabase": true,
     "activationTargetProduction": true,
     "releaseEnabled": false,
-    "transactionalPersistenceTested": false,
+    "transactionalPersistenceTested": true,
     "migrationApproved": false,
     "migrationsApplied": false,
-    "rlsPolicyTestsPassed": false,
-    "storagePolicyTestsPassed": false,
+    "rlsPolicyTestsPassed": true,
+    "storagePolicyTestsPassed": true,
     "edgeFunctionDryRunsPassed": false,
     "browserQaPassed": false,
     "browserKeyAudited": false,
     "productionApproved": false,
     "publicConfigRecorded": true,
     "productionMigrationEvidenceArtifact": "",
-    "productionWorkflowEvidenceArtifact": ""
+    "productionWorkflowEvidenceArtifact": "docs/qa/supabase-production-workflow-smoke-20260701.md"
   },
   "authSecurity": {
     "securityAdvisorsChecked": true,
@@ -248,18 +248,20 @@
     "evidenceArtifact": "docs/qa/supabase-production-security-advisors-20260701.md"
   },
   "postActivationChecks": {
-    "agentSignInWorks": false,
-    "adminSignInWorks": false,
-    "agentCanCreateDraft": false,
-    "agentCanUploadRequiredMedia": false,
+    "agentSignInWorks": true,
+    "adminSignInWorks": true,
+    "agentCanCreateDraft": true,
+    "agentCanUploadRequiredMedia": true,
     "incompleteSubmittedForReviewRejected": false,
     "validSubmittedForReviewReachesQueue": false,
-    "adminCanAcceptOrReturnCase": false,
-    "postHandoffAgentMutationBlocked": false,
-    "privateMediaSignedUrlScoped": false,
+    "adminCanAcceptOrReturnCase": true,
+    "postHandoffAgentMutationBlocked": true,
+    "privateMediaSignedUrlScoped": true,
     "logsAndErrorRateChecked": false,
     "logsEvidenceArtifact": "",
-    "workflowEvidenceArtifact": ""
+    "workflowEvidenceArtifact": "docs/qa/supabase-production-workflow-smoke-20260701.md",
+    "incompleteWaitingReviewRejected": true,
+    "validWaitingReviewReachesQueue": true
   },
   "goNoGo": {
     "decision": "NO_GO",

@@ -32,6 +32,11 @@ Backup owner:
 - `20260629193805_v19_access_requests_admin_pdfs.sql`
 - `20260630222703_returned_pdf_handoff_security_invoker.sql`
 - `20260630235513_allow_trip_date_sync_during_submit_handoff.sql`
+- `20260703115102_day10_submission_media_bucket_policies.sql`
+- `20260703141556_day10_save_submission_draft_media_path_contract.sql`
+- `20260703141744_day10_review_readiness_required_media_slots.sql`
+- `20260703165306_day10_review_readiness_storage_identity.sql`
+- `20260704050806_day10_required_media_canonical_write_paths.sql`
 
 ## Required Evidence
 
@@ -49,21 +54,6 @@ Backup owner:
 - Supabase plan eligibility for leaked password protection is confirmed.
 - Auth leaked password protection is enabled.
 - Production auth/profile discovery has no orphan auth users.
-
-## Backup, Restore, And RPO/RTO Gates
-
-- Backup owner is named in `docs/qa/supabase-production-owner-approval-20260701.md`.
-- Latest restorable production backup timestamp is recorded in `docs/qa/supabase-production-backup-discovery-20260701.md`.
-- Restore path is confirmed against an owner-approved non-production restore target.
-- Restore drill evidence is recorded without secrets or personal identifiers.
-- RPO/RTO is accepted by the owner.
-- Rollback communication owner is named.
-
-## Owner Approval Evidence
-
-- `docs/qa/supabase-production-owner-approval-20260701.md` is updated from `BLOCKED` to dated approvals.
-- Final owner approval is not inferred from local verifier output.
-- `VITE_SUPABASE_PRODUCTION_APPROVED=true` is set only after all activation evidence is recorded.
 
 ## Production Activation
 

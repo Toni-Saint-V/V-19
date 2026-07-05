@@ -51,6 +51,8 @@ import type {
   SubmissionStatus,
 } from "./types";
 
+let supabaseDraftSequence = 0;
+
 export type CreateDraftInput = {
   agentId?: AgentOwnerId;
   city: City;
@@ -190,11 +192,12 @@ export function createDraftSubmission({
   type,
 }: CreateDraftInput): Submission {
   const nextIndex = nextSubmissionIndex(submissions);
+  const draftIdToken = draftIdTokenForScheme(nextIndex, idScheme);
   const applicantTotal = type === "family" ? familyCount : 1;
-  const submissionId = submissionIdForScheme(nextIndex, idScheme);
+  const submissionId = submissionIdForScheme(draftIdToken, idScheme);
 
   const applicants = Array.from({ length: applicantTotal }, (_, index) => {
-    const id = applicantIdForScheme(nextIndex, index, idScheme);
+    const id = applicantIdForScheme(draftIdToken, index, idScheme);
     const fullName = draftApplicantName(index, type, applicantNames[index]);
 
     return {
@@ -229,7 +232,7 @@ export function createDraftSubmission({
     status: "draft",
     applicants: applyPreliminaryIntakeToApplicants(applicants, preliminaryIntake),
     issues: [],
-    files: requiredFilesForApplicants(applicants, nextIndex, idScheme),
+    files: requiredFilesForApplicants(applicants, draftIdToken, idScheme),
     completeness: { questionnaire: 0, files: 0, total: 0 },
     aiSuggestions: [],
     aiReviewState: "idle",
@@ -238,7 +241,10 @@ export function createDraftSubmission({
     updatedAt: "сейчас",
     history: [
       {
-        id: `и-${nextIndex}-создано`,
+        id:
+          idScheme === "supabase"
+            ? `i-${draftIdToken}-created`
+            : `и-${draftIdToken}-создано`,
         text: "Черновик создан",
         at: "сейчас",
         source: "agent",
@@ -417,7 +423,7 @@ export function uploadRequiredFiles(submission: Submission): Submission {
     ? submission.files
     : requiredFilesForApplicants(
         submission.applicants,
-        submissionIndexFromId(submission.id),
+        draftIdTokenFromSubmissionId(submission.id),
         submission.id.startsWith("VF-") ? "supabase" : "local",
       );
   const withFiles = { ...submission, files };
@@ -849,21 +855,54 @@ function submissionIndexFromId(id: string): number {
   return Number(id.match(/\d+/)?.[0]);
 }
 
-function submissionIdForScheme(
+function draftIdTokenFromSubmissionId(id: string): string {
+  if (id.startsWith("VF-")) return id.slice("VF-".length);
+  if (id.startsWith("ПД-")) return id.slice("ПД-".length);
+  const index = submissionIndexFromId(id);
+  return Number.isFinite(index) ? `${index}` : "0";
+}
+
+function randomBase36Segment(): string {
+  const cryptoSource = globalThis.crypto;
+  if (cryptoSource?.getRandomValues) {
+    const values = new Uint32Array(1);
+    cryptoSource.getRandomValues(values);
+    return (values[0] ?? 0).toString(36).padStart(7, "0");
+  }
+
+  return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
+    .toString(36)
+    .padStart(10, "0")
+    .slice(0, 10);
+}
+
+function draftIdTokenForScheme(
   nextIndex: number,
   idScheme: NonNullable<CreateDraftInput["idScheme"]>,
 ) {
-  return idScheme === "supabase" ? `VF-${nextIndex}` : `ПД-${nextIndex}`;
+  if (idScheme === "supabase") {
+    supabaseDraftSequence = (supabaseDraftSequence + 1) % 1_000_000;
+    return `${nextIndex}-${Date.now().toString(36)}-${supabaseDraftSequence.toString(36)}-${randomBase36Segment()}`;
+  }
+
+  return `${nextIndex}`;
+}
+
+function submissionIdForScheme(
+  draftIdToken: string,
+  idScheme: NonNullable<CreateDraftInput["idScheme"]>,
+) {
+  return idScheme === "supabase" ? `VF-${draftIdToken}` : `ПД-${draftIdToken}`;
 }
 
 function applicantIdForScheme(
-  nextIndex: number,
+  draftIdToken: string,
   applicantIndex: number,
   idScheme: NonNullable<CreateDraftInput["idScheme"]>,
 ) {
   return idScheme === "supabase"
-    ? `app-${nextIndex}-${applicantIndex + 1}`
-    : `з-${nextIndex}-${applicantIndex + 1}`;
+    ? `app-${draftIdToken}-${applicantIndex + 1}`
+    : `з-${draftIdToken}-${applicantIndex + 1}`;
 }
 
 function draftApplicantName(index: number, type: Submission["type"], input?: string) {
@@ -1017,10 +1056,9 @@ function canonicalRuntimeFiles(submission: Submission): SubmissionFile[] {
     if (!canonicalFiles.has(key)) canonicalFiles.set(key, file);
   }
 
-  const submissionIndex = submissionIndexFromId(submission.id);
   const templates = requiredFilesForApplicants(
     submission.applicants,
-    Number.isFinite(submissionIndex) ? submissionIndex : 0,
+    draftIdTokenFromSubmissionId(submission.id),
     submission.id.startsWith("VF-") ? "supabase" : "local",
   );
   const templatesByKey = new Map(
@@ -1098,7 +1136,7 @@ function markIssueFileForReplacement(
 
 function requiredFilesForApplicants(
   applicants: Submission["applicants"],
-  submissionIndex: number,
+  draftIdToken: string | number,
   idScheme: NonNullable<CreateDraftInput["idScheme"]> = "local",
 ): SubmissionFile[] {
   return applicants.flatMap((applicant, applicantIndex) =>
@@ -1106,8 +1144,8 @@ function requiredFilesForApplicants(
       (type, fileIndex) => ({
         id:
           idScheme === "supabase"
-            ? `file-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`
-            : `ф-${submissionIndex}-${applicantIndex + 1}-${fileIndex + 1}`,
+            ? `file-${draftIdToken}-${applicantIndex + 1}-${fileIndex + 1}`
+            : `ф-${draftIdToken}-${applicantIndex + 1}-${fileIndex + 1}`,
         applicantId: applicant.id,
         type,
         status: "missing" as const,

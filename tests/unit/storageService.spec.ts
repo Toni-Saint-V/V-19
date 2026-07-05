@@ -34,7 +34,7 @@ describe("media storage contract", () => {
 
     expect(target).toEqual({
       bucket: mediaStorageBucket,
-      path: "VF-1044/applicant-1/selfie/751234567_selfie.jpg",
+      path: "submissions/VF-1044/applicants/applicant-1/selfie/751234567_selfie.jpg",
     });
   });
 
@@ -75,7 +75,7 @@ describe("media storage contract", () => {
 
     expect(target).toEqual({
       bucket: mediaStorageBucket,
-      path: "VF-1044/applicant-1/visa_application_pdf/aaaaaaaaaaaaaaaa_20260623T101112000Zuploa_visa_application_pdf.pdf",
+      path: "submissions/VF-1044/applicants/applicant-1/visa_application_pdf/aaaaaaaaaaaaaaaa_20260623T101112000Zuploa_visa_application_pdf.pdf",
     });
     expect(() =>
       validateMediaStorageTarget({
@@ -126,7 +126,7 @@ describe("media storage contract", () => {
 
     expect(target).toEqual({
       bucket: mediaStorageBucket,
-      path: "VF-1044/common/appointment_pdf/cccccccccccccccc_20260627T101112000Z_appointment_pdf.pdf",
+      path: "submissions/VF-1044/common/appointment_pdf/cccccccccccccccc_20260627T101112000Z_appointment_pdf.pdf",
     });
     expect(() =>
       validateAppointmentPdfStorageTarget({
@@ -157,7 +157,7 @@ describe("media storage contract", () => {
 
     expect(target).toEqual({
       bucket: mediaStorageBucket,
-      path: "VF-1044/common/application_pdf/dddddddddddddddd_20260629T101112000Z_application_pdf.pdf",
+      path: "submissions/VF-1044/common/application_pdf/dddddddddddddddd_20260629T101112000Z_application_pdf.pdf",
     });
     expect(() =>
       validateApplicationPdfStorageTarget({
@@ -204,8 +204,83 @@ describe("media storage contract", () => {
       buildMediaStoragePath("ПД-1052", "з-1052-1", "selfie", "v1900abcde_selfie.jpg"),
     ).toEqual({
       bucket: mediaStorageBucket,
-      path: "ПД-1052/з-1052-1/selfie/v1900abcde_selfie.jpg",
+      path: "submissions/ПД-1052/applicants/з-1052-1/selfie/v1900abcde_selfie.jpg",
     });
+  });
+
+  test("accepts prefixed persisted storage paths for reload compatibility", () => {
+    expect(
+      validateMediaStorageTarget({
+        target: {
+          bucket: mediaStorageBucket,
+          path: "submissions/VF-1044/applicants/applicant-1/selfie/751234567_selfie.jpg",
+        },
+      }),
+    ).toEqual({
+      bucket: mediaStorageBucket,
+      path: "submissions/VF-1044/applicants/applicant-1/selfie/751234567_selfie.jpg",
+    });
+  });
+
+  test("rejects legacy unprefixed write paths", async () => {
+    const legacyTarget = {
+      bucket: mediaStorageBucket,
+      path: "VF-1044/applicant-1/selfie/751234567_selfie.jpg",
+    } as const;
+
+    expect(() => validateMediaStorageTarget({ target: legacyTarget })).toThrow(
+      /storage path/i,
+    );
+    await expect(
+      uploadMediaToStorage(
+        legacyTarget,
+        new File(["x"], "selfie.jpg", { type: "image/jpeg" }),
+      ),
+    ).rejects.toThrow(/storage path/i);
+  });
+
+  test("accepts HEIC and HEIF images for required media slots", () => {
+    expect(() =>
+      validateMediaStorageTarget({
+        file: new File(["x"], "selfie.heic", { type: "image/heic" }),
+        target: buildMediaStoragePath(
+          "VF-1044",
+          "applicant-1",
+          "selfie",
+          "v19selfie_selfie.heic",
+        ),
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      validateMediaStorageTarget({
+        file: new File(["x"], "passport.heif", { type: "image/heif" }),
+        target: buildMediaStoragePath(
+          "VF-1044",
+          "applicant-1",
+          "passport_scan",
+          "v19passport_passport_scan.heif",
+        ),
+      }),
+    ).not.toThrow();
+  });
+
+  test("rejects traversal and malformed prefixed paths", () => {
+    for (const path of [
+      "/submissions/VF-1044/applicants/applicant-1/selfie/751234567_selfie.jpg",
+      "submissions/VF-1044//applicants/applicant-1/selfie/751234567_selfie.jpg",
+      "submissions/VF-1044/applicants/../selfie/751234567_selfie.jpg",
+      "submissions/VF-1044/applicant-1/selfie/751234567_selfie.jpg",
+    ]) {
+      expect(() =>
+        validateMediaStorageTarget({
+          target: {
+            bucket: mediaStorageBucket,
+            path,
+          },
+        }),
+      ).toThrow();
+    }
   });
 
   test("rejects wrong MIME type", () => {

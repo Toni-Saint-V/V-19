@@ -1163,9 +1163,35 @@ describe("V-19 submission actions", () => {
       type: "single",
     });
 
-    expect(draft.id).toMatch(/^VF-\d+$/);
-    expect(draft.applicants[0]?.id).toMatch(/^app-\d+-1$/);
-    expect(draft.files[0]?.id).toMatch(/^file-\d+-1-1$/);
+    const supabaseDraftToken = /\d+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+/;
+    expect(draft.id).toMatch(new RegExp(`^VF-${supabaseDraftToken.source}$`));
+    expect(draft.applicants[0]?.id).toMatch(
+      new RegExp(`^app-${supabaseDraftToken.source}-1$`),
+    );
+    expect(draft.files[0]?.id).toMatch(
+      new RegExp(`^file-${supabaseDraftToken.source}-1-1$`),
+    );
+  });
+
+  it("creates globally unique Supabase draft ids without relying on the local list", () => {
+    const first = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "supabase",
+      submissions: [],
+      type: "single",
+    });
+    const second = createDraftSubmission({
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "supabase",
+      submissions: [],
+      type: "single",
+    });
+
+    expect(second.id).not.toBe(first.id);
+    expect(second.applicants[0]?.id).not.toBe(first.applicants[0]?.id);
+    expect(second.files[0]?.id).not.toBe(first.files[0]?.id);
   });
 
   it("generates a new safe storage file name for each Supabase upload attempt", () => {
@@ -1237,7 +1263,7 @@ describe("V-19 submission actions", () => {
         "v19canonical_selfie_2.jpg",
       ),
     ).toMatchObject({
-      path: "VF-1059/app-1059-1/selfie_2/v19canonical_selfie_2.jpg",
+      path: "submissions/VF-1059/applicants/app-1059-1/selfie_2/v19canonical_selfie_2.jpg",
     });
   });
 

@@ -2,7 +2,10 @@ import type { Role } from "../types/domain";
 import type { AppProfile, AppSession } from "../types/session";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { fetchCurrentProfile } from "./profileService";
-import { mapSupabasePersistenceError } from "./persistenceObservability";
+import {
+  mapSupabasePersistenceError,
+  safeDiagnosticsForPersistenceError,
+} from "./persistenceObservability";
 
 export type { AppProfile, AppSession };
 
@@ -32,6 +35,17 @@ const demoProfiles: Record<Role, AppProfile> = {
     role: "admin",
   },
 };
+const authSignInMaxAttempts = 2;
+const authSignInRetryDelayMs = 500;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+function canRetryAuthSignIn(error: unknown): boolean {
+  const diagnostics = safeDiagnosticsForPersistenceError(error);
+  return diagnostics?.operation === "auth.sign_in_password" && diagnostics.retryable;
+}
 
 async function profileForSupabaseUser(user: {
   email?: string;
@@ -111,18 +125,45 @@ export async function signInSupabaseWithPassword(
     throw new Error("Supabase is inactive.");
   }
 
-  const { data, error } = await client.auth.signInWithPassword({
-    email,
-    password,
-  });
+  let data:
+    | Awaited<ReturnType<typeof client.auth.signInWithPassword>>["data"]
+    | null = null;
 
-  if (error) {
-    throw mapSupabasePersistenceError(error, {
-      operation: "auth.sign_in_password",
-      fallbackKind: "auth",
-    });
+  for (let attempt = 1; attempt <= authSignInMaxAttempts; attempt += 1) {
+    try {
+      const result = await client.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (!result.error) {
+        data = result.data;
+        break;
+      }
+
+      const mappedError = mapSupabasePersistenceError(result.error, {
+        operation: "auth.sign_in_password",
+        fallbackKind: "auth",
+      });
+      if (attempt < authSignInMaxAttempts && canRetryAuthSignIn(mappedError)) {
+        await delay(authSignInRetryDelayMs);
+        continue;
+      }
+
+      throw mappedError;
+    } catch (error) {
+      const mappedError = mapSupabasePersistenceError(error, {
+        operation: "auth.sign_in_password",
+        fallbackKind: "auth",
+      });
+      if (attempt < authSignInMaxAttempts && canRetryAuthSignIn(mappedError)) {
+        await delay(authSignInRetryDelayMs);
+        continue;
+      }
+
+      throw mappedError;
+    }
   }
-  if (!data.session?.user.id) {
+  if (!data?.session?.user.id) {
     throw new Error("Supabase session was not returned.");
   }
 

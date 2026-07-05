@@ -21,6 +21,11 @@ export const requiredMigrationOrder = [
   "20260629193805_v19_access_requests_admin_pdfs.sql",
   "20260630222703_returned_pdf_handoff_security_invoker.sql",
   "20260630235513_allow_trip_date_sync_during_submit_handoff.sql",
+  "20260703115102_day10_submission_media_bucket_policies.sql",
+  "20260703141556_day10_save_submission_draft_media_path_contract.sql",
+  "20260703141744_day10_review_readiness_required_media_slots.sql",
+  "20260703165306_day10_review_readiness_storage_identity.sql",
+  "20260704050806_day10_required_media_canonical_write_paths.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -46,6 +51,24 @@ export const requiredRemoteMigrationOrder = [
   "20260629193805_v19_access_requests_admin_pdfs",
   "20260630222703_returned_pdf_handoff_security_invoker",
   "20260630235513_allow_trip_date_sync_during_submit_handoff",
+  "20260701221611_v19_prod_launch_blocker_fixes",
+  "20260701234224_v19_prod_storage_guardrails",
+  "20260701235545_v19_prod_questionnaire_pdf_media_slot",
+  "20260701235554_v19_prod_media_slots_contract",
+  "20260702001635_v19_prod_exact_agent_media_contract",
+  "20260702003544_v19_prod_media_progress_triggers",
+  "20260702003617_v19_prod_submission_readiness_summary",
+  "20260702003653_v19_prod_admin_package_readiness_view",
+  "20260702003719_v19_submission_state_summary_view",
+  "20260702003735_v19_applicant_media_state_view",
+  "20260703001508_v19_operational_readiness_indexes",
+  "20260703001536_v19_applicant_media_state_v2_safe",
+  "20260703001554_v19_submission_media_summary_view",
+  "20260703115102_day10_submission_media_bucket_policies",
+  "20260703141556_day10_save_submission_draft_media_path_contract",
+  "20260703141744_day10_review_readiness_required_media_slots",
+  "20260703165306_day10_review_readiness_storage_identity",
+  "20260704050806_day10_required_media_canonical_write_paths",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

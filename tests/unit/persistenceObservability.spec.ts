@@ -92,4 +92,28 @@ describe("Supabase persistence observability", () => {
       "Unable to sign in. Check email, password, and Supabase profile. Reference: auth.sign_in_password:auth:HTTP_400.",
     );
   });
+
+  test("maps transient Auth network failures as retryable", () => {
+    const error = mapSupabasePersistenceError(
+      {
+        name: "AuthRetryableFetchError",
+        message: "Failed to fetch",
+      },
+      {
+        operation: "auth.sign_in_password",
+        fallbackKind: "auth",
+      },
+    );
+
+    expect(error.diagnostics).toMatchObject({
+      operation: "auth.sign_in_password",
+      kind: "auth",
+      safeCode: "auth.sign_in_password:auth:NETWORK",
+      retryable: true,
+      sourceName: "AuthRetryableFetchError",
+    });
+    expect(formatPersistenceFailureForUser(error, "fallback")).toBe(
+      "Unable to sign in. Check email, password, and Supabase profile. Reference: auth.sign_in_password:auth:NETWORK.",
+    );
+  });
 });

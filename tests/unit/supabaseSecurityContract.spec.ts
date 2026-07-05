@@ -499,6 +499,24 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("requires canonical storage identity for review readiness media", () => {
+    const readinessMigration = readProjectFile(
+      "supabase/migrations/20260703141744_day10_review_readiness_required_media_slots.sql",
+    );
+
+    expect(readinessMigration).toContain("m.storage_bucket = 'submission-media'");
+    expect(readinessMigration).toContain("m.storage_path !~ '(^/|//|\\.\\.)'");
+    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 1) = 'submissions'");
+    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 2) = new.id");
+    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 3) = 'applicants'");
+    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 4) = a.id");
+    expect(readinessMigration).toContain(
+      "split_part(m.storage_path, '/', 5) = required_media.type::text",
+    );
+    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 6) <> ''");
+    expect(readinessMigration).toContain("split_part(m.storage_path, '/', 7) = ''");
+  });
+
   test("does not trust client-provided correction authors", () => {
     const submissionService = readProjectFile("src/services/submissionService.ts");
     const runtimeGuards = readProjectFile(
@@ -753,6 +771,78 @@ describe("Supabase security contract", () => {
     expect(migration).toContain(
       "status in ('draft', 'filling', 'returned', 'ready_for_review')",
     );
+  });
+
+  test("creates private submission media bucket and locks day-10 storage paths", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260703115102_day10_submission_media_bucket_policies.sql",
+    );
+
+    expect(migration).toContain("insert into storage.buckets");
+    expect(migration).toContain("'submission-media'");
+    expect(migration).toContain("public = false");
+    expect(migration).toContain("'image/jpeg'");
+    expect(migration).toContain("'image/png'");
+    expect(migration).toContain("'image/heic'");
+    expect(migration).toContain("'image/heif'");
+    expect(migration).toContain("'application/pdf'");
+    expect(migration).toContain("file_size_limit");
+    expect(migration).toContain("52428800");
+    expect(migration).toContain("to authenticated");
+    expect(migration).not.toContain("to anon");
+    expect(migration).not.toContain("for all");
+    expect(migration).toContain("name !~ '(^/|//|(^|/)\\.\\.?(/|$))'");
+    expect(migration).toContain("split_part(name, '/', 1) = 'submissions'");
+    expect(migration).toContain("split_part(name, '/', 3) = 'applicants'");
+    expect(migration).toContain("split_part(name, '/', 5) in ('selfie', 'selfie_2', 'passport_scan', 'visa_application_pdf')");
+    expect(migration).toContain("split_part(name, '/', 1) <> 'submissions'");
+    expect(migration).toContain("split_part(name, '/', 3) in ('selfie', 'selfie_2', 'passport_scan', 'visa_application_pdf')");
+    expect(migration).toContain("split_part(name, '/', 3) = 'common'");
+    expect(migration).toContain("split_part(name, '/', 4) in ('application_pdf', 'appointment_pdf')");
+    expect(migration).toContain("split_part(name, '/', 2) = 'common'");
+    expect(migration).toContain("split_part(name, '/', 3) in ('application_pdf', 'appointment_pdf')");
+    expect(migration).toContain("where agent_id = (select auth.uid())");
+    expect(migration).toContain("status in ('draft', 'filling', 'returned', 'ready_for_review')");
+    expect(migration).toContain("from public.admin_pdf_artifacts a");
+    expect(migration).toContain("from public.returned_pdf_handoff_artifacts h");
+    expect(migration).toContain("storage.extension(name) in ('jpg', 'jpeg', 'png', 'heic', 'heif', 'pdf')");
+    expect(migration).toContain("coalesce(metadata ->> 'mimetype', '') in ('image/jpeg', 'image/png', 'image/heic', 'image/heif')");
+    expect(migration).toContain("coalesce(metadata ->> 'mimetype', '') = 'application/pdf'");
+  });
+
+  test("rejects legacy submission-media object paths as write targets", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260703115102_day10_submission_media_bucket_policies.sql",
+    );
+    const insertStart = migration.indexOf(
+      'create policy "media storage write editable owner or admin"',
+    );
+    const updateStart = migration.indexOf(
+      'create policy "media storage update editable owner or admin"',
+    );
+    const deleteStart = migration.indexOf(
+      'create policy "media storage delete editable owner or admin"',
+    );
+    const insertPolicy = normalizeSql(migration.slice(insertStart, updateStart));
+    const updatePolicy = migration.slice(updateStart, deleteStart);
+    const updateWithCheck = normalizeSql(
+      updatePolicy.slice(updatePolicy.lastIndexOf("with check (")),
+    );
+
+    for (const writePolicy of [insertPolicy, updateWithCheck]) {
+      expect(writePolicy).not.toContain(
+        normalizeSql("split_part(name, '/', 1) <> 'submissions'"),
+      );
+      expect(writePolicy).not.toContain(
+        normalizeSql("split_part(name, '/', 2) = 'common'"),
+      );
+      expect(writePolicy).toContain(
+        normalizeSql("split_part(name, '/', 1) = 'submissions'"),
+      );
+      expect(writePolicy).toContain(
+        normalizeSql("split_part(name, '/', 3) = 'applicants'"),
+      );
+    }
   });
 
   test("keeps AI helper quota surfaces service-role only", () => {

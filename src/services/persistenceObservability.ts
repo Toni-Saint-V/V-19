@@ -151,13 +151,34 @@ function isRetryableStatus(status: number | undefined): boolean {
   );
 }
 
+function isNetworkOrTimeoutFailure(shape: SupabaseErrorShape): boolean {
+  const name = stringValue(shape.name)?.toLowerCase() ?? "";
+  const message = stringValue(shape.message)?.toLowerCase() ?? "";
+
+  return (
+    name.includes("fetch") ||
+    name.includes("network") ||
+    name.includes("timeout") ||
+    message.includes("failed to fetch") ||
+    message.includes("fetch failed") ||
+    message.includes("networkerror") ||
+    message.includes("load failed") ||
+    message.includes("timed out") ||
+    message.includes("timeout") ||
+    message.includes("err_timed_out")
+  );
+}
+
 function safeCodeFor(
   operation: SupabasePersistenceOperation,
   kind: PersistenceFailureKind,
   supabaseCode: string | undefined,
   status: number | undefined,
+  networkOrTimeoutFailure = false,
 ): string {
-  const code = supabaseCode ?? (status ? `HTTP_${status}` : "UNKNOWN");
+  const code =
+    supabaseCode ??
+    (status ? `HTTP_${status}` : networkOrTimeoutFailure ? "NETWORK" : "UNKNOWN");
   return `${operation}:${kind}:${code}`;
 }
 
@@ -173,11 +194,18 @@ export function mapSupabasePersistenceError(
   const sourceName = stringValue(shape.name);
   const baseKind = kindForOperation(context.operation, context.fallbackKind);
   const kind = isRlsDenied(shape) ? "rls" : baseKind;
+  const networkOrTimeoutFailure = isNetworkOrTimeoutFailure(shape);
   const diagnostics: PersistenceFailureDiagnostics = {
     operation: context.operation,
     kind,
-    safeCode: safeCodeFor(context.operation, kind, supabaseCode, status),
-    retryable: isRetryableStatus(status),
+    safeCode: safeCodeFor(
+      context.operation,
+      kind,
+      supabaseCode,
+      status,
+      networkOrTimeoutFailure,
+    ),
+    retryable: isRetryableStatus(status) || networkOrTimeoutFailure,
     ...(status ? { httpStatus: status } : {}),
     ...(supabaseCode ? { supabaseCode } : {}),
     ...(sourceName ? { sourceName } : {}),

@@ -75,7 +75,9 @@ describe("Supabase persistence failure paths", () => {
 
   test("does not overwrite an existing Storage object during media upload", async () => {
     const upload = vi.fn(async () => ({
-      data: { path: "VF-1044/applicant-1/selfie/751234567_selfie.jpg" },
+      data: {
+        path: "submissions/VF-1044/applicants/applicant-1/selfie/751234567_selfie.jpg",
+      },
       error: null,
     }));
     supabaseMock.client = {
@@ -233,6 +235,67 @@ describe("Supabase persistence failure paths", () => {
       },
       userMessage: "Unable to sign in. Check email, password, and Supabase profile.",
     });
+  });
+
+  test("retries transient Auth sign-in network failures once", async () => {
+    const userId = "00000000-0000-4000-8000-000000000777";
+    const signInWithPassword = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: { session: null },
+        error: {
+          name: "AuthRetryableFetchError",
+          message: "Failed to fetch",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          session: {
+            user: {
+              id: userId,
+              email: "retry-agent@example.com",
+            },
+          },
+        },
+        error: null,
+      });
+    supabaseMock.client = {
+      auth: { signInWithPassword },
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    id: userId,
+                    email: "retry-agent@example.com",
+                    display_name: "Retry Agent",
+                    organization_name: "Retry Agency",
+                    role: "agent",
+                    created_at: "2026-07-05T00:00:00.000Z",
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    await expect(
+      signInSupabaseWithPassword("retry-agent@example.com", "secret-password"),
+    ).resolves.toMatchObject({
+      mode: "supabase",
+      profile: {
+        email: "retry-agent@example.com",
+        role: "agent",
+      },
+    });
+    expect(signInWithPassword).toHaveBeenCalledTimes(2);
   });
 
   test("does not auto-create a missing Supabase profile during sign-in", async () => {

@@ -46,6 +46,11 @@ Apply migrations only in the repository order declared by
 - `20260629193805_v19_access_requests_admin_pdfs.sql`
 - `20260630222703_returned_pdf_handoff_security_invoker.sql`
 - `20260630235513_allow_trip_date_sync_during_submit_handoff.sql`
+- `20260703115102_day10_submission_media_bucket_policies.sql`
+- `20260703141556_day10_save_submission_draft_media_path_contract.sql`
+- `20260703141744_day10_review_readiness_required_media_slots.sql`
+- `20260703165306_day10_review_readiness_storage_identity.sql`
+- `20260704050806_day10_required_media_canonical_write_paths.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 
@@ -69,31 +74,6 @@ Confirm production auth/profile consistency before activation.
 
 Do not auto-create production profiles from Codex. Any profile repair requires
 owner approval, an actor list, a rollback note, and a dry-run report.
-
-## Backup, Restore, And RPO/RTO Gate
-
-Before production activation, record backup and restore evidence in
-`docs/qa/supabase-production-backup-discovery-20260701.md`.
-
-Required closure evidence:
-
-- latest restorable backup timestamp for the production project;
-- owner-approved restore target that is not the production project;
-- restore drill or Supabase-supported recovery proof;
-- accepted RPO/RTO;
-- backup owner and rollback communication owner.
-
-Do not treat `walg_enabled=true` alone as restore proof. Production remains
-`NO_GO` until the restore path and RPO/RTO are recorded.
-
-## Owner Approval Stop Gate
-
-Owner approval evidence lives in
-`docs/qa/supabase-production-owner-approval-20260701.md`.
-
-Do not set `VITE_SUPABASE_PRODUCTION_APPROVED=true`, apply production
-migrations, or accept Security Advisor/leaked-password risk from Codex without
-dated owner approval.
 
 ## Rollback Boundary
 

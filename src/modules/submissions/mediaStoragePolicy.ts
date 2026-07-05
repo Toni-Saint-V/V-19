@@ -23,6 +23,17 @@ const mediaStorageObjectTypes = new Set<MediaStorageObjectType>([
 ]);
 const legacyArchiveMediaStorageObjectTypes = new Set(["photo_white", "video"]);
 const appointmentPdfApplicantId = "common";
+const submissionStoragePrefix = "submissions";
+const applicantStoragePrefix = "applicants";
+export const passportScanUploadMimeTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
+] as const;
+export const passportScanUploadAccept = passportScanUploadMimeTypes.join(",");
+export const passportScanUploadFormatLabel = "JPEG, PNG, HEIC, HEIF или PDF";
 
 export interface MediaStorageTarget {
   bucket: typeof mediaStorageBucket;
@@ -50,6 +61,10 @@ function safePathSegment(value: string, label: string): string {
     throw new MediaStorageValidationError(`${label} is required.`);
   }
 
+  if (trimmed === "." || trimmed === "..") {
+    throw new MediaStorageValidationError(`${label} cannot be a traversal segment.`);
+  }
+
   if (!/^[\p{L}\p{N}_.-]+$/u.test(trimmed)) {
     throw new MediaStorageValidationError(
       `${label} may contain only letters, numbers, dots, dashes and underscores.`,
@@ -67,8 +82,9 @@ function allowedExtensions(type: MediaStorageObjectType): Set<string> {
   if (type === "application_pdf") return new Set(["pdf"]);
   if (type === "appointment_pdf") return new Set(["pdf"]);
   if (type === "visa_application_pdf") return new Set(["pdf"]);
-  if (type === "passport_scan") return new Set(["jpg", "jpeg", "png", "pdf"]);
-  return new Set(["jpg", "jpeg", "png"]);
+  if (type === "passport_scan")
+    return new Set(["jpg", "jpeg", "png", "heic", "heif", "pdf"]);
+  return new Set(["jpg", "jpeg", "png", "heic", "heif"]);
 }
 
 function allowedLegacyArchiveExtensions(type: string): Set<string> {
@@ -80,8 +96,14 @@ function allowedMimeTypes(type: MediaStorageObjectType): Set<string> {
   if (type === "appointment_pdf") return new Set(["application/pdf"]);
   if (type === "visa_application_pdf") return new Set(["application/pdf"]);
   if (type === "passport_scan")
-    return new Set(["image/jpeg", "image/png", "application/pdf"]);
-  return new Set(["image/jpeg", "image/png"]);
+    return new Set([
+      "image/jpeg",
+      "image/png",
+      "image/heic",
+      "image/heif",
+      "application/pdf",
+    ]);
+  return new Set(["image/jpeg", "image/png", "image/heic", "image/heif"]);
 }
 
 function allowedLegacyArchiveMimeTypes(type: string): Set<string> {
@@ -93,6 +115,8 @@ function allowedLegacyArchiveMimeTypes(type: string): Set<string> {
 function mimeTypeForExtension(extension: string): string | null {
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
   if (extension === "png") return "image/png";
+  if (extension === "heic") return "image/heic";
+  if (extension === "heif") return "image/heif";
   if (extension === "mp4") return "video/mp4";
   if (extension === "pdf") return "application/pdf";
   return null;
@@ -117,15 +141,32 @@ function parseStoragePath(
   applicantId: string;
   type: string;
   fileName: string;
+  normalizedPath: string;
 } {
   const parts = path.split("/");
-  if (parts.length !== 4) {
+  let submissionId: string;
+  let applicantId: string;
+  let type: string;
+  let fileName: string;
+
+  if (
+    parts.length === 6 &&
+    parts[0] === submissionStoragePrefix &&
+    parts[2] === applicantStoragePrefix
+  ) {
+    [, submissionId, , applicantId, type, fileName] = parts;
+  } else if (
+    parts.length === 5 &&
+    parts[0] === submissionStoragePrefix &&
+    parts[2] === appointmentPdfApplicantId
+  ) {
+    [, submissionId, applicantId, type, fileName] = parts;
+  } else {
     throw new MediaStorageValidationError(
-      "Media storage path must be <submissionId>/<applicantId>/<slotType>/<generatedFileName>.",
+      "Media storage path must be submissions/<submissionId>/applicants/<applicantId>/<slotType>/<generatedFileName>.",
     );
   }
 
-  const [submissionId, applicantId, type, fileName] = parts;
   if (
     !mediaStorageObjectTypes.has(type as MediaStorageObjectType) &&
     !(options.allowLegacyArchive && legacyArchiveMediaStorageObjectTypes.has(type))
@@ -135,11 +176,45 @@ function parseStoragePath(
     );
   }
 
+  if (
+    applicantId === appointmentPdfApplicantId &&
+    type !== "application_pdf" &&
+    type !== "appointment_pdf"
+  ) {
+    throw new MediaStorageValidationError(
+      "Common storage paths are allowed only for admin PDF artifacts.",
+    );
+  }
+  if (
+    applicantId !== appointmentPdfApplicantId &&
+    (type === "application_pdf" || type === "appointment_pdf")
+  ) {
+    throw new MediaStorageValidationError(
+      "Admin PDF artifacts must use the common storage path.",
+    );
+  }
+
   return {
-    submissionId: safePathSegment(submissionId, "submissionId"),
-    applicantId: safePathSegment(applicantId, "applicantId"),
+    submissionId: safePathSegment(submissionId ?? "", "submissionId"),
+    applicantId: safePathSegment(applicantId ?? "", "applicantId"),
     type,
-    fileName: safePathSegment(fileName, "generatedFileName"),
+    fileName: safePathSegment(fileName ?? "", "generatedFileName"),
+    normalizedPath:
+      applicantId === appointmentPdfApplicantId
+        ? `${submissionStoragePrefix}/${safePathSegment(
+            submissionId ?? "",
+            "submissionId",
+          )}/${appointmentPdfApplicantId}/${type}/${safePathSegment(
+            fileName ?? "",
+            "generatedFileName",
+          )}`
+        : `${submissionStoragePrefix}/${safePathSegment(
+            submissionId ?? "",
+            "submissionId",
+          )}/${applicantStoragePrefix}/${safePathSegment(
+            applicantId ?? "",
+            "applicantId",
+          )}/${type}/${safePathSegment(fileName ?? "", "generatedFileName")}`,
   };
 }
 
@@ -147,11 +222,14 @@ function hasExpectedGeneratedSuffix(
   type: MediaStorageObjectType,
   fileName: string,
 ): boolean {
-  if (type === "selfie") return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png)$/.test(fileName);
+  if (type === "selfie")
+    return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png|heic|heif)$/.test(fileName);
   if (type === "selfie_2")
-    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png)$/.test(fileName);
+    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png|heic|heif)$/.test(fileName);
   if (type === "passport_scan")
-    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|pdf)$/.test(fileName);
+    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|heic|heif|pdf)$/.test(
+      fileName,
+    );
   if (type === "application_pdf")
     return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_application_pdf\.pdf$/.test(fileName);
   if (type === "appointment_pdf")
@@ -192,8 +270,7 @@ export function validateMediaStorageTarget({
     );
   }
 
-  const expectedPath = `${parsed.submissionId}/${parsed.applicantId}/${parsed.type}/${parsed.fileName}`;
-  if (target.path !== expectedPath) {
+  if (target.path !== parsed.normalizedPath) {
     throw new MediaStorageValidationError(
       "Media storage path contains unsafe normalization differences.",
     );
@@ -251,12 +328,15 @@ export function buildMediaStoragePath(
   generatedFileName: string,
   options: { allowLegacyArchive?: boolean } = {},
 ): MediaStorageTarget {
+  const safeSubmissionId = safePathSegment(submissionId, "submissionId");
+  const safeApplicantId = safePathSegment(applicantId, "applicantId");
+  const safeGeneratedFileName = safePathSegment(generatedFileName, "generatedFileName");
   const target: MediaStorageTarget = {
     bucket: mediaStorageBucket,
-    path: `${safePathSegment(submissionId, "submissionId")}/${safePathSegment(
-      applicantId,
-      "applicantId",
-    )}/${type}/${safePathSegment(generatedFileName, "generatedFileName")}`,
+    path:
+      safeApplicantId === appointmentPdfApplicantId
+        ? `${submissionStoragePrefix}/${safeSubmissionId}/${appointmentPdfApplicantId}/${type}/${safeGeneratedFileName}`
+        : `${submissionStoragePrefix}/${safeSubmissionId}/${applicantStoragePrefix}/${safeApplicantId}/${type}/${safeGeneratedFileName}`,
   };
 
   return validateMediaStorageTarget({ ...options, target });
