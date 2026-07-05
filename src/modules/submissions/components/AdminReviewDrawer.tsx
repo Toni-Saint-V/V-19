@@ -537,13 +537,16 @@ export function AdminReviewDrawer({
                 {submission.city}
                 <span aria-hidden="true"> · </span>
                 Агент: {agentOwnerDisplayName(submission.agentId)}
+                <span aria-hidden="true"> · </span>
+                {openIssueCount(submission)} открытых замечаний
               </p>
               <h2>
-                Проверка пакета
+                {submission.title}
                 <span className={`admin-review-status-pill is-${submission.status}`}>
                   {statusLabels[submission.status]}
                 </span>
               </h2>
+              <p className="admin-review-meta">Проверка пакета</p>
             </div>
             <button
               aria-label="Закрыть проверку"
@@ -601,18 +604,18 @@ export function AdminReviewDrawer({
         ) : null}
 
         <div className="admin-review-content">
+          <div className="admin-review-drawer-assist">
+            <IdentityConsistencyStatusStrip compact report={identityReport} />
+            <AdminAiAssistancePanel state={adminAiState} onRun={runAdminAiReview} />
+          </div>
+
           {activeReviewTab === "questionnaire" ? (
             <ApplicantChips
               selectedApplicantId={selectedApplicantId}
               submission={submission}
               onApplicant={setSelectedApplicantId}
             />
-          ) : (
-            <div className="admin-review-drawer-assist">
-              <IdentityConsistencyStatusStrip compact report={identityReport} />
-              <AdminAiAssistancePanel state={adminAiState} onRun={runAdminAiReview} />
-            </div>
-          )}
+          ) : null}
 
           <AnimatePresence mode="wait">
             <motion.div
@@ -665,6 +668,7 @@ export function AdminReviewDrawer({
                     })
                   }
                   onFieldRemark={openQuestionnaireRemark}
+                  onOpenWorkspace={() => setPassportWorkspaceOpen(true)}
                   onNext={() => selectReviewTab("questionnaire")}
                   onRemark={() => openFileRemark("passport_scan", "Скан паспорта требует замены")}
                 />
@@ -746,6 +750,17 @@ export function AdminReviewDrawer({
           </button>
         </footer>
 
+        {remarkContext ? (
+          <AdminRemarkForm
+            context={remarkContext}
+            issueGuardReason={issueGuardReason}
+            submission={submission}
+            onClose={() => setRemarkContext(null)}
+            onDraftRemark={draftAdminRemark}
+            onSubmit={submitRemark}
+          />
+        ) : null}
+
       </motion.aside>
 
       {passportWorkspaceOpen ? (
@@ -782,16 +797,6 @@ export function AdminReviewDrawer({
         />
       ) : null}
 
-      {remarkContext ? (
-        <AdminRemarkForm
-          context={remarkContext}
-          issueGuardReason={issueGuardReason}
-          submission={submission}
-          onClose={() => setRemarkContext(null)}
-          onDraftRemark={draftAdminRemark}
-          onSubmit={submitRemark}
-        />
-      ) : null}
     </AnimatePresence>
   );
 }
@@ -957,6 +962,7 @@ function PassportReviewTab({
   onAcceptFile,
   onChecklistRemark,
   onFieldRemark,
+  onOpenWorkspace,
   onNext,
   onRemark,
 }: {
@@ -967,6 +973,7 @@ function PassportReviewTab({
   onAcceptFile: () => void;
   onChecklistRemark: (item: ChecklistItem) => void;
   onFieldRemark: (row: ReviewFieldRow) => void;
+  onOpenWorkspace: () => void;
   onNext: () => void;
   onRemark: () => void;
 }) {
@@ -1004,10 +1011,16 @@ function PassportReviewTab({
             <span>Паспортная проверка</span>
             <h3>Паспорт + ключевые поля</h3>
           </div>
-          <button disabled={!canAcceptPassport} type="button" onClick={onAcceptFile}>
-            <CheckCircle2 aria-hidden="true" size={15} />
-            Принять паспорт
-          </button>
+          <div className="admin-review-check-actions">
+            <button type="button" onClick={onOpenWorkspace}>
+              <ScanText aria-hidden="true" size={15} />
+              Сверить
+            </button>
+            <button disabled={!canAcceptPassport} type="button" onClick={onAcceptFile}>
+              <CheckCircle2 aria-hidden="true" size={15} />
+              Принять
+            </button>
+          </div>
         </header>
 
         {identityPanel}
@@ -1392,7 +1405,7 @@ function QuestionnaireReviewTab({
           <span className="is-ok">{reviewedCount} / {totalFields} ok</span>
           <span className={issueCount ? "is-warning" : ""}>
             <AlertCircle aria-hidden="true" size={13} />
-            {issueCount} issues
+            {issueCount} замечаний
           </span>
         </div>
       </div>
@@ -2244,8 +2257,8 @@ function issueTargetPath(issue: Submission["issues"][number]) {
     return `${fileLabel(issue.target.fileType)} / ${issue.target.field}`;
   }
   if (issue.target.fileType) return `Документ / ${fileLabel(issue.target.fileType)}`;
-  if (issue.target.field) return `Анкета / ${issue.target.field}`;
-  return issue.target.section ? `Анкета / ${issue.target.section}` : "Анкета";
+  if (issue.target.field) return `Анкета · ${issue.target.field}`;
+  return issue.target.section ? `Анкета · ${issue.target.section}` : "Анкета";
 }
 
 function findApplicantFile(

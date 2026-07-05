@@ -120,6 +120,7 @@ function V19DossierProgress({ items }: { items?: V19DossierProgressItem[] }) {
 
   return (
     <span className="v19-dossier-progress-list">
+      <small className="v19-dossier-progress-title">Готовность</small>
       {visibleItems.map((item) => (
         <span className="v19-dossier-progress-item" key={item.label}>
           <span>
@@ -485,6 +486,7 @@ export function V19LongListCell({
   peopleLabel,
   statusLabel,
   statusTone,
+  testId,
   title,
   triage,
   type,
@@ -499,6 +501,7 @@ export function V19LongListCell({
   peopleLabel: string;
   statusLabel: string;
   statusTone: V19VisualTone;
+  testId?: string;
   title: string;
   triage?: V19AiTriageSummary;
   type: "family" | "single";
@@ -510,6 +513,7 @@ export function V19LongListCell({
       className={cn("vf-figma-action-row", triage && "has-ai-triage")}
       data-people-count={peopleCount}
       data-submission-id={id}
+      data-testid={testId}
       type="button"
       onClick={onOpen}
     >
