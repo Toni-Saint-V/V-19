@@ -95,10 +95,10 @@ export async function isVisible(locator: Locator) {
 }
 
 export async function openMobileMenu(page: Page) {
-  const menuButton = page.getByRole("button", { name: "Меню" });
+  const menuButton = page.getByRole("button", { exact: true, name: "Меню" });
 
-  if (await isVisible(menuButton)) {
-    await menuButton.click();
+  if (await hasAtLeastOneVisible(menuButton)) {
+    await clickFirstVisible(menuButton);
   }
 }
 
@@ -171,10 +171,27 @@ export async function expectVisibleText(
 }
 
 export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
+  const mobileMenuButton = page.getByRole("button", { exact: true, name: "Меню" });
+  const mobileShellOpen = page.locator(".ops-shell.is-mobile-nav-open .ops-sidebar");
+
+  if ((await hasAtLeastOneVisible(mobileMenuButton)) || (await hasAtLeastOneVisible(mobileShellOpen))) {
+    if (!(await hasAtLeastOneVisible(mobileShellOpen))) {
+      await openMobileMenu(page);
+    }
+
+    const mobileButton = mobileShellOpen.getByRole("button", { name }).first();
+    await mobileButton.waitFor({ state: "visible", timeout: 2_000 });
+    await mobileButton.click({ timeout: 10_000 });
+    return;
+  }
+
   const button = page.getByRole("button", { name });
 
   if (!(await hasAtLeastOneVisible(button))) {
     await openMobileMenu(page);
+    await button.first().waitFor({ state: "visible", timeout: 2_000 }).catch(() => {
+      // Keep the original visible-button assertion below as the failure owner.
+    });
   }
 
   await expectAtLeastOneVisible(

@@ -10,8 +10,51 @@
   }
 }
 
+/* Admin passport workspace final mobile density pass. */
+@media (max-width: 767px) {
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-stats {
+    display: none !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-fields
+    .admin-review-row-main
+    > strong {
+    font-size: var(--v19b-size-12) !important;
+    font-weight: var(--v19b-weight-control) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace-footer
+    button {
+    border-color: var(--v19b-color-border-strong) !important;
+    background: var(--v19b-color-control) !important;
+    color: var(--v19b-color-text-strong) !important;
+    box-shadow: none !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace-footer
+    button:hover,
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace-footer
+    button:focus-visible {
+    border-color: var(--v19b-color-border-selected) !important;
+    background: var(--v19b-color-control-hover) !important;
+    box-shadow: none !important;
+  }
+}
+
 /* Admin mobile review scroll lock. The mobile board owns the long queue because
    the app shell itself is viewport-locked. */
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-cockpit-card-meta {
+  display: none !important;
+}
+
 @media (max-width: 767px) {
   .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
     > .workspace
@@ -33,6 +76,504 @@
     > .v19-admin-cockpit-lanes {
     overflow: visible !important;
   }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-lane
+    > header
+    > small {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-head {
+    display: grid !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+    align-items: start !important;
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-title {
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-title
+    em,
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-chevron {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-meta {
+    display: grid !important;
+    justify-items: end !important;
+    align-content: start !important;
+    gap: var(--v19b-size-2) !important;
+    max-width: var(--v19b-size-104) !important;
+    text-align: right !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-meta
+    strong {
+    display: inline-flex !important;
+    min-height: var(--v19b-size-20) !important;
+    align-items: center !important;
+    padding: var(--v19b-size-0) var(--v19b-size-6) !important;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-pill) !important;
+    background: var(--v19b-color-control) !important;
+    color: var(--v19b-color-text-muted) !important;
+    font-size: var(--v19b-size-9) !important;
+    font-weight: var(--v19b-weight-control) !important;
+    line-height: var(--v19b-line-height-control) !important;
+    white-space: nowrap !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-meta
+    span {
+    overflow: hidden !important;
+    max-width: var(--v19b-size-full) !important;
+    color: var(--v19b-color-text-faint) !important;
+    font-size: var(--v19b-size-9) !important;
+    font-weight: var(--v19b-weight-regular) !important;
+    line-height: var(--v19b-line-height-tight) !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-next
+    > span
+    > b {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-tags
+    span {
+    min-height: var(--v19b-size-22) !important;
+    font-size: var(--v19b-size-10) !important;
+  }
+}
+
+/* Admin passport workspace mobile fit: keep the document and fields in view. */
+@media (max-width: 767px) {
+  .ops-shell.role-admin.surface-admin-review .admin-passport-workspace {
+    grid-template-rows:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review .admin-passport-workspace-header,
+  .ops-shell.role-admin.surface-admin-review .admin-passport-compare-head {
+    display: none !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-workspace-main {
+    grid-template-rows:
+      minmax(var(--v19b-size-220), calc(var(--v19b-viewport-height) * 0.38))
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-document-zone {
+    max-height: calc(var(--v19b-viewport-height) * 0.4) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-compare-zone {
+    gap: var(--v19b-size-10) !important;
+    padding-top: var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-stats {
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-stats
+    article {
+    display: grid !important;
+    grid-template-columns: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+    grid-template-rows: auto !important;
+    min-height: var(--v19b-size-48) !important;
+    align-items: center !important;
+    gap: var(--v19b-size-6) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-10) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-stats
+    article
+    strong {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    font-size: var(--v19b-size-20) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-stats
+    article
+    span {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    align-self: end !important;
+    min-width: var(--v19b-size-0) !important;
+    font-size: var(--v19b-size-11) !important;
+    line-height: var(--v19b-line-height-control) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-stats
+    article
+    svg {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
+    width: var(--v19b-size-16) !important;
+    height: var(--v19b-size-16) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-fields {
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-fields
+    .admin-review-field-row {
+    display: grid !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    min-height: var(--v19b-size-88) !important;
+    padding: var(--v19b-size-14) var(--v19b-size-16) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-fields
+    .admin-review-row-main {
+    font-weight: var(--v19b-weight-control) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-fields
+    .admin-review-row-main
+    > strong {
+    font-weight: var(--v19b-weight-control) !important;
+  }
+
+  .ops-shell.role-admin.surface-admin-review
+    .admin-passport-workspace
+    .admin-passport-fields
+    .admin-review-row-actions {
+    display: none !important;
+  }
+}
+
+/* Admin review drawer mobile adapter: keep admin actions in the same quiet
+   drawer rhythm as the agent file drawer. */
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-decision-workspace {
+  gap: var(--v19b-size-10) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-media-pane,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-pane,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-card
+  article {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-row-background) !important;
+  box-shadow: var(--v19b-shadow-row-inner) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-preview-top {
+  min-height: var(--v19b-size-44) !important;
+  padding: var(--v19b-size-10) var(--v19b-size-14) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-preview-top
+  :is(span, em) {
+  font-size: var(--v19b-size-13) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-files-tab
+  .v19-drawer-file-section-head {
+  cursor: default !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-file-item {
+  grid-template-columns:
+    var(--v19b-size-36)
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-file-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: var(--v19b-size-8) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-file-actions
+  button {
+  min-height: var(--v19b-size-36) !important;
+  height: var(--v19b-size-36) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  font-size: var(--v19b-size-12) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-file-open {
+  border-color: var(--v19b-admin-drawer-blue-border) !important;
+  background: var(--v19b-admin-drawer-blue-bg) !important;
+  color: var(--v19b-admin-drawer-blue-text) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-file-remark {
+  width: auto !important;
+  min-width: var(--v19b-size-0) !important;
+  padding-inline: var(--v19b-size-10) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-pane {
+  gap: var(--v19b-size-10) !important;
+  padding: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-pane
+  > header {
+  gap: var(--v19b-size-10) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-pane
+  > header
+  > div:first-child
+  > span {
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-pane
+  h3,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-passport-fields
+  h4 {
+  font-size: var(--v19b-size-15) !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-actions
+  button,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-inline-footer
+  button,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-card
+  button {
+  min-height: var(--v19b-size-36) !important;
+  height: var(--v19b-size-36) !important;
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: none !important;
+  font-size: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-field-section
+  > h3
+  > button,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-row-verify {
+  min-height: var(--v19b-size-36) !important;
+  height: var(--v19b-size-36) !important;
+  border-color: var(--v19b-admin-drawer-blue-border) !important;
+  background: var(--v19b-admin-drawer-blue-bg) !important;
+  color: var(--v19b-admin-drawer-blue-text) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-field-section
+  > h3
+  > button
+  svg,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-row-verify
+  svg {
+  color: var(--v19b-admin-drawer-blue-text) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-row-remark,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-card
+  button {
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-row-remark
+  svg,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer
+  .admin-review-content
+  .admin-review-check-card
+  button
+  svg {
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+@media (max-width: 560px) {
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-drawer
+    .admin-review-content
+    .admin-review-row-actions
+    button {
+    min-height: var(--v19b-size-36) !important;
+    height: var(--v19b-size-36) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-drawer
+    .admin-review-content
+    .admin-review-row-verify {
+    flex: 1 1 auto !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-file-item {
+    grid-template-columns:
+      var(--v19b-size-36)
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-file-actions {
+    grid-column: 1 / -1 !important;
+    width: var(--v19b-size-full) !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-file-actions
+    button {
+    width: var(--v19b-size-full) !important;
+  }
+}
+
+/* Admin remark form icon scale pass. */
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-remark-form
+  svg {
+  width: var(--v19b-size-10) !important;
+  height: var(--v19b-size-10) !important;
+  stroke-width: var(--v19b-size-2) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-remark-form
+  > header
+  > div
+  > span
+  svg,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-remark-targets
+  button
+  svg,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-remark-form
+  > footer
+  button
+  svg {
+  width: var(--v19b-size-10) !important;
+  height: var(--v19b-size-10) !important;
 }
 
 /* ===== base, primitives, and surfaces ===== */

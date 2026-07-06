@@ -1961,6 +1961,10 @@ function AdminReviewQueueCard({
             {agentOwnerDisplayName(submission.agentId)}
           </em>
         </div>
+        <div className="v19-admin-cockpit-card-meta" aria-label="Заявитель и агент">
+          <strong>{applicantCountLabel(submission.applicants.length)}</strong>
+          <span>{agentOwnerDisplayName(submission.agentId)}</span>
+        </div>
         <ChevronRight
           aria-hidden="true"
           className="v19-admin-cockpit-chevron"
@@ -1976,7 +1980,7 @@ function AdminReviewQueueCard({
           ) : (
             <FileCheck2 aria-hidden="true" size={14} strokeWidth={1.8} />
           )}
-          Следующее действие
+          <b>Следующее действие</b>
         </span>
         <p>{facts.nextAction}</p>
       </div>
@@ -1999,7 +2003,7 @@ function AdminReviewQueueCard({
       </div>
 
       <button
-        className="v19-admin-row-action"
+        className="v19-admin-row-action v17-admin-row-action"
         type="button"
         onClick={(event) => {
           event.stopPropagation();

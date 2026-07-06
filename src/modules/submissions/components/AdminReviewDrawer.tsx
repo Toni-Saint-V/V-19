@@ -74,7 +74,7 @@ import { BbAiPanel } from "./BbAiPanel";
 
 type AdminReviewFileTarget = "passport_scan" | "selfie" | "selfie_2";
 
-type AdminReviewTab = "passport" | "selfie" | "questionnaire" | "issues";
+type AdminReviewTab = "files" | "passport" | "selfie" | "questionnaire" | "issues";
 
 type RemarkTargetType =
   | "checklistItem"
@@ -270,7 +270,7 @@ export function AdminReviewDrawer({
   const selectReviewTab = useCallback(
     (tab: AdminReviewTab) => {
       setActiveReviewTab(tab);
-      onTab(tab === "issues" ? "issues" : "questionnaire");
+      onTab(tab === "issues" ? "issues" : tab === "files" ? "files" : "questionnaire");
       if (tab === "passport") setReviewTarget("passport_scan");
       if (tab === "selfie" && reviewTarget === "passport_scan") {
         setReviewTarget("selfie");
@@ -281,7 +281,8 @@ export function AdminReviewDrawer({
 
   function isReferenceTabSelected(tab: DrawerTab) {
     if (tab === "issues") return activeReviewTab === "issues";
-    if (tab === "files") return activeReviewTab === "passport" || activeReviewTab === "selfie";
+    if (tab === "files")
+      return activeReviewTab === "files" || activeReviewTab === "passport" || activeReviewTab === "selfie";
     if (tab === "questionnaire") return activeReviewTab === "questionnaire";
     return false;
   }
@@ -293,7 +294,7 @@ export function AdminReviewDrawer({
     }
 
     if (tab === "files") {
-      selectReviewTab(reviewTarget === "selfie" || reviewTarget === "selfie_2" ? "selfie" : "passport");
+      selectReviewTab("files");
       return;
     }
 
@@ -634,7 +635,17 @@ export function AdminReviewDrawer({
               key={activeReviewTab}
               transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
             >
-              {activeReviewTab === "passport" ? (
+              {activeReviewTab === "files" ? (
+                <AdminFilesTab
+                  submission={submission}
+                  onFileRemark={openFileRemark}
+                  onOpenReview={(file) => {
+                    setSelectedApplicantId(file.applicantId);
+                    setReviewTarget(file.type as AdminReviewFileTarget);
+                    selectReviewTab(file.type === "passport_scan" ? "passport" : "selfie");
+                  }}
+                />
+              ) : activeReviewTab === "passport" ? (
                 <PassportReviewTab
                   identityPanel={
                     <IdentityConsistencyPanel
@@ -899,6 +910,127 @@ function isAdminReviewFileTarget(
   value: string | undefined,
 ): value is AdminReviewFileTarget {
   return value === "passport_scan" || value === "selfie" || value === "selfie_2";
+}
+
+function AdminFilesTab({
+  onFileRemark,
+  onOpenReview,
+  submission,
+}: {
+  onFileRemark: (fileType: AdminReviewFileTarget, reason?: string) => void;
+  onOpenReview: (file: SubmissionFile & { type: AdminReviewFileTarget }) => void;
+  submission: Submission;
+}) {
+  const reviewFiles = submission.files.filter(
+    (file): file is SubmissionFile & { type: AdminReviewFileTarget } =>
+      isAdminReviewFileTarget(file.type),
+  );
+  const readyCount = reviewFiles.filter(
+    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  ).length;
+
+  return (
+    <div className="admin-review-files-tab v19-drawer-files">
+      <div className="v19-drawer-files-head">
+        <h3 className="v19-drawer-files-title">Файлы подачи</h3>
+        <span className="v19-drawer-files-count">
+          {readyCount}/{reviewFiles.length}
+        </span>
+      </div>
+
+      <div className="v19-drawer-file-sections">
+        {submission.applicants.map((applicant) => {
+          const applicantFiles = reviewFiles.filter(
+            (file) => file.applicantId === applicant.id,
+          );
+          if (!applicantFiles.length) return null;
+
+          const applicantReadyCount = applicantFiles.filter(
+            (file) => file.status !== "missing" && file.status !== "needs_replacement",
+          ).length;
+
+          return (
+            <section className="v19-drawer-file-section" key={applicant.id}>
+              <div className="v19-drawer-file-section-head">
+                <span className="v19-drawer-file-section-copy">
+                  <span className="v19-drawer-file-section-title">
+                    {applicant.fullName}
+                  </span>
+                  <span className="v19-drawer-file-section-meta">
+                    {applicantReadyCount}/{applicantFiles.length} файлов готово
+                  </span>
+                </span>
+                <span className="v19-drawer-file-section-toggle">
+                  {applicant.role === "main" ? "Основной" : applicantRoleLabel(applicant.role)}
+                </span>
+              </div>
+
+              <div className="v19-drawer-file-list">
+                {applicantFiles.map((file) => {
+                  const Icon =
+                    file.type === "passport_scan"
+                      ? ScanText
+                      : file.type === "selfie" || file.type === "selfie_2"
+                        ? User
+                        : ImageIcon;
+                  const fileName =
+                    file.originalFileName ?? file.generatedFileName ?? fileLabel(file.type);
+
+                  return (
+                    <div
+                      className={`v19-drawer-file-item admin-review-file-item is-${file.status}`}
+                      id={targetElementId({
+                        applicantId: file.applicantId,
+                        fileType: file.type,
+                        tab: "files",
+                      })}
+                      key={file.id}
+                    >
+                      <div className="v19-drawer-file-icon">
+                        <Icon aria-hidden="true" />
+                      </div>
+                      <div className="v19-drawer-file-copy">
+                        <div className="v19-drawer-file-title">
+                          {fileLabel(file.type)}
+                        </div>
+                        <div className="v19-drawer-file-meta">
+                          {fileStatusLabels[file.status]} · {fileName}
+                          {file.sizeBytes ? ` · ${formatBytes(file.sizeBytes)}` : ""}
+                        </div>
+                      </div>
+                      <div className="admin-review-file-actions">
+                        <button
+                          className="v19-drawer-file-action admin-review-file-open"
+                          type="button"
+                          onClick={() => onOpenReview(file)}
+                        >
+                          Проверить
+                        </button>
+                        <button
+                          aria-label={`Создать замечание: ${fileLabel(file.type)}`}
+                          className="admin-review-row-remark admin-review-file-remark"
+                          type="button"
+                          onClick={() =>
+                            onFileRemark(
+                              file.type,
+                              `${fileLabel(file.type)} требует повторной проверки`,
+                            )
+                          }
+                        >
+                          <MessageSquarePlus aria-hidden="true" size={14} />
+                          <span>Замечание</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function ApplicantChips({
@@ -2251,7 +2383,7 @@ function isPassportReviewSection(section: Applicant["sections"][number]) {
 
 function drawerTabToReviewTab(tab: DrawerTab): AdminReviewTab {
   if (tab === "issues") return "issues";
-  if (tab === "files") return "selfie";
+  if (tab === "files") return "files";
   return "questionnaire";
 }
 

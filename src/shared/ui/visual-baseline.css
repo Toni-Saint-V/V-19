@@ -19992,3 +19992,111 @@ body,
     font-weight: var(--v19b-weight-control) !important;
   }
 }
+
+@media (max-width: 1024px) {
+  .ops-shell.has-unified-side-menu {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.has-unified-side-menu > .workspace.workspace,
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    > .workspace.workspace,
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings)
+    > .workspace.workspace {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    margin-left: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu > .workspace,
+  .ops-shell.has-unified-side-menu .workspace {
+    grid-column: 1 !important;
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu .v19-topbar-menu,
+  .ops-shell.has-unified-side-menu .v19-topbar-menu.mp-button.icon-button {
+    display: grid !important;
+    flex: 0 0 var(--v19-control-row-height) !important;
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    > .workspace
+    > .topbar
+    .v19-topbar-menu.mp-button.icon-button {
+    display: grid !important;
+    flex: 0 0 var(--v19-control-row-height) !important;
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-agent:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-settings
+    )
+    > .workspace
+    > .topbar
+    .v19-topbar-menu.mp-button.icon-button {
+    display: grid !important;
+    flex: 0 0 var(--v19-control-row-height) !important;
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  .ops-shell.has-unified-side-menu:not(.is-mobile-nav-open) .ops-sidebar {
+    position: fixed !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateX(calc(-100% - var(--v19b-size-32))) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-mobile-nav-open .ops-sidebar {
+    position: fixed !important;
+    inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
+    z-index: 220 !important;
+    display: grid !important;
+    width: min(var(--vf-ref-size-360px), calc(100vw - var(--v19b-size-16))) !important;
+    min-width: var(--v19b-size-0) !important;
+    max-width: calc(100vw - var(--v19b-size-16)) !important;
+    height: auto !important;
+    max-height: calc(100svh - var(--v19b-size-16)) !important;
+    padding: var(--v19b-size-14) !important;
+    border: var(--v19b-size-1) solid var(--v19-line-strong) !important;
+    border-radius: var(--v19-radius-panel) !important;
+    background: var(--v19-panel) !important;
+    box-shadow: var(--v19b-shadow-panel) !important;
+    overflow: auto !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-mobile-nav-open .ops-mobile-menu-backdrop {
+    position: fixed !important;
+    inset: var(--v19b-size-0) !important;
+    z-index: 210 !important;
+    display: block !important;
+    width: var(--v19b-size-full) !important;
+    height: 100svh !important;
+    border: 0 !important;
+    background: var(--v19-dialog-backdrop) !important;
+  }
+}
