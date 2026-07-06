@@ -149,6 +149,28 @@ describe("export media mega ZIP", () => {
     ).toHaveLength(3);
   });
 
+  test("downloads the local demo family package for three different applicants", async () => {
+    const selection = generatedSelection(byId("SUB-1102"));
+    const result = await createExportMediaZipArtifact(selection, {
+      expectedIdentity: identityFor(selection),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+    expect(result.artifact).toMatchObject({
+      applicantCount: 3,
+      fileCount: 9,
+      submissionCount: 1,
+    });
+
+    const names = await zipEntryNames(result.artifact.blob);
+    expect(names.fileNames).toHaveLength(9);
+    expect(
+      names.fileNames.every((name) => name.startsWith("Семьи/01_SUB-1102_")),
+    ).toBe(true);
+    expect(new Set(names.fileNames.map((name) => name.split("/")[2])).size).toBe(3);
+  });
+
   test("groups mixed export packages into families and applicants folders", async () => {
     const selection = generatedSelection(
       withCanonicalStorage(byId("SUB-1101")),
