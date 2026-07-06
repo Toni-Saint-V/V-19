@@ -26,6 +26,7 @@ export const requiredMigrationOrder = [
   "20260703141744_day10_review_readiness_required_media_slots.sql",
   "20260703165306_day10_review_readiness_storage_identity.sql",
   "20260704050806_day10_required_media_canonical_write_paths.sql",
+  "20260706000100_ai_helper_admin_intent_quota_contract.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -68,7 +69,7 @@ export const requiredRemoteMigrationOrder = [
   "20260703141556_day10_save_submission_draft_media_path_contract",
   "20260703141744_day10_review_readiness_required_media_slots",
   "20260703165306_day10_review_readiness_storage_identity",
-  "20260704050806_day10_required_media_canonical_write_paths",
+  "20260705235913_day10_required_media_canonical_write_paths",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {
