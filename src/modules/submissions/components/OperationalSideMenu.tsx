@@ -78,27 +78,24 @@ export function OperationalSideMenu({
     </Button>
   ) : null;
   const agentZoneButton =
-    role === "admin" ? (
-      <Button
-        className="vf-figma-agent-zone"
-        aria-label="В агентскую зону"
-        variant="secondary"
-        onClick={() => {
-          onChooseRole("agent");
-          onCloseMobile();
-        }}
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M7 7h10M7 7l3-3M7 7l3 3" />
-          <path d="M17 17H7m10 0-3-3m3 3-3 3" />
-        </svg>
-        В агентскую зону
-      </Button>
-    ) : null;
+    null;
   const useReferenceAgentFooter = showAdminZoneSwitch && role === "agent";
-  const footerInitials = useReferenceAgentFooter ? "ТН" : sessionInitials;
-  const footerName = useReferenceAgentFooter ? "Татьяна Николаева" : sessionDisplayName;
-  const footerRole = useReferenceAgentFooter ? "Visa Center Spb" : sessionRoleLabel;
+  const useReferenceAdminFooter = role === "admin";
+  const footerInitials = useReferenceAgentFooter
+    ? "ТН"
+    : useReferenceAdminFooter
+      ? "ИЛ"
+      : sessionInitials;
+  const footerName = useReferenceAgentFooter
+    ? "Татьяна Николаева"
+    : useReferenceAdminFooter
+      ? "Ирина Лебедева"
+      : sessionDisplayName;
+  const footerRole = useReferenceAgentFooter
+    ? "Visa Center Spb"
+    : useReferenceAdminFooter
+      ? "Администратор"
+      : sessionRoleLabel;
   const footer = (
     <>
       {adminZoneButton}
@@ -119,7 +116,7 @@ export function OperationalSideMenu({
               <strong>
                 {role === "agent" ? "Татьяна Николаева" : "Ирина Лебедева"}
               </strong>
-              <small>{role === "agent" ? "Visa Center Spb" : "Админ"}</small>
+              <small>{role === "agent" ? "Visa Center Spb" : "Администратор"}</small>
             </div>
             <svg className="ops-user-more" aria-hidden="true" viewBox="0 0 24 24">
               <circle cx="5" cy="12" r="1" />

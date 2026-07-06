@@ -329,21 +329,21 @@ const OverviewTab = ({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
-          <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider mb-5">
+        <div className="v19-drawer-route-card bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
+          <h3 className="v19-drawer-overview-heading text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider mb-5">
             Маршрут и подача
           </h3>
           <div className="space-y-4 text-sm">
             <div className="flex gap-4">
               <Calendar className="w-5 h-5 text-white/30 shrink-0" />
-              <div>
+              <div className="v19-drawer-route-copy">
                 <div className="text-white/90 font-medium">{data.tripDates}</div>
                 <div className="text-white/40 text-[var(--v19b-size-11)] mt-0.5">Даты поездки</div>
               </div>
             </div>
             <div className="flex gap-4">
               <MapPin className="w-5 h-5 text-white/30 shrink-0" />
-              <div>
+              <div className="v19-drawer-route-copy">
                 <div className="text-white/90 font-medium">{data.city}</div>
                 <div className="text-white/40 text-[var(--v19b-size-11)] mt-0.5">
                   Визовый центр подачи
@@ -355,7 +355,7 @@ const OverviewTab = ({
 
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider">
+            <h3 className="v19-drawer-overview-heading text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider">
               Пакет документов
             </h3>
             <span className="v19-drawer-package-count">
@@ -364,7 +364,7 @@ const OverviewTab = ({
           </div>
           <div className="space-y-3 flex-1 flex flex-col justify-center">
             {documentItems.map((doc) => (
-              <div key={doc.label} className="flex items-center gap-3">
+              <div key={doc.label} className="v19-drawer-package-row flex items-center gap-3">
                 {doc.status === "done" ? (
                   <CheckCircle2 className="v19-drawer-package-check" />
                 ) : doc.status === "in_progress" ? (
@@ -373,7 +373,7 @@ const OverviewTab = ({
                   <div className="v19-document-package-dot" />
                 )}
                 <span
-                  className={`text-[var(--v19b-size-13)] ${
+                  className={`v19-drawer-package-label text-[var(--v19b-size-13)] ${
                     doc.status === "pending" ? "text-white" : "text-white/70"
                   }`}
                 >
@@ -386,7 +386,7 @@ const OverviewTab = ({
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider pl-1">
+        <h3 className="v19-drawer-overview-heading text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider pl-1">
           Участники ({data.applicantsCount})
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -401,11 +401,11 @@ const OverviewTab = ({
                   .map((part) => part[0])
                   .join("")}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[var(--v19b-size-14)] text-white font-medium truncate group-hover:text-[var(--v19b-color-primary-text)] transition-colors">
+              <div className="v19-drawer-applicant-copy flex-1 min-w-0">
+                <div className="v19-drawer-applicant-name text-[var(--v19b-size-14)] text-white font-medium truncate group-hover:text-[var(--v19b-color-primary-text)] transition-colors">
                   {applicant.name}
                 </div>
-                <div className="text-[var(--v19b-size-11)] text-white/50 mt-0.5">
+                <div className="v19-drawer-applicant-role text-[var(--v19b-size-11)] text-white/50 mt-0.5">
                   {applicant.role}
                 </div>
               </div>
@@ -486,11 +486,11 @@ const QuestionnaireTab = ({
             <section.icon className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[var(--v19b-size-13)] font-medium text-white truncate">
+            <div className="v19-drawer-questionnaire-section-head flex items-center justify-between mb-1">
+              <span className="v19-drawer-questionnaire-section-title text-[var(--v19b-size-13)] font-medium text-white truncate">
                 {section.title}
               </span>
-              <span className="text-[var(--v19b-size-11)] font-mono text-white/50">
+              <span className="v19-drawer-questionnaire-section-percent text-[var(--v19b-size-11)] font-mono text-white/50">
                 {section.progress}%
               </span>
             </div>
@@ -507,7 +507,7 @@ const QuestionnaireTab = ({
               value={section.progress}
             />
             {section.remaining ? (
-              <div className="text-[var(--v19b-size-10)] text-white/40 mt-1.5">
+              <div className="v19-drawer-questionnaire-section-remaining text-[var(--v19b-size-10)] text-white/40 mt-1.5">
                 Осталось: {section.remaining}
               </div>
             ) : null}
@@ -1119,6 +1119,7 @@ export function FigmaSubmissionDrawer({
               tabs={drawerTabs}
               tabsRef={drawerTabsRef}
               title={data.title}
+              statusTone={data.status === "returned" ? "danger" : undefined}
               updated={data.updated}
             />
             <div className="v19-submission-drawer-body flex-1 min-h-0 overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10">
