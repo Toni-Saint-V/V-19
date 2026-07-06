@@ -2,116 +2,49 @@
    Raw reusable values live in ./tokens/index.css. Rules below must use var(...).
    Media-query breakpoints are the only CSS limitation exception. */
 
-/* Strict reference transfer: admin review cockpit from active ZIP source. */
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export) {
-  --v19b-shell-sidebar-width: var(--v19b-size-260);
+/* Admin surfaces use the same AppShell side menu as the agent surfaces. */
+.ops-shell.has-unified-side-menu.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  ) {
+  --v19b-shell-sidebar-width: var(--v19-unified-sidebar-width, var(--v19b-size-288));
 }
 
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .ops-sidebar-search {
-  display: none !important;
+.ops-shell.has-unified-side-menu.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
+  :is(.ops-sidebar-search, .ops-session) {
+  display: flex !important;
 }
 
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export) .ops-brand {
-  min-height: var(--v19b-size-56) !important;
-  padding: var(--v19b-size-8) var(--v19b-size-8) var(--v19b-size-16) !important;
-  border-bottom: var(--v19b-size-1) solid var(--v19b-color-border) !important;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .ops-brand-logo {
-  width: var(--v19b-size-32) !important;
-  height: var(--v19b-size-32) !important;
-  border: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
-  border-radius: var(--v19b-size-9) !important;
-  background: var(--v19b-admin-orange) !important;
-  color: var(--v19b-color-text-strong) !important;
-  box-shadow: var(--v19b-shadow-admin-brand) !important;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
+.ops-shell.has-unified-side-menu.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
   .ops-brand-logo
   img {
-  display: none !important;
+  display: block !important;
 }
 
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .ops-brand-logo::before {
-  content: "A";
-  color: var(--v19b-color-text-strong);
-  font-size: var(--v19b-size-14);
-  font-weight: var(--v19b-weight-row-title);
-  line-height: var(--v19b-line-height-control);
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
+.ops-shell.has-unified-side-menu.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
+  .ops-brand-logo::before,
+.ops-shell.has-unified-side-menu.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
   .ops-brand-copy
-  em {
-  color: var(--v19b-admin-orange) !important;
-  font-size: var(--v19b-size-0) !important;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .ops-brand-copy
-  em::after {
-  content: "Admin Zone";
-  color: var(--v19b-admin-orange);
-  font-size: var(--v19b-size-11);
-  font-style: normal;
-  font-weight: var(--v19b-weight-control);
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .ops-nav-group-label {
-  font-size: var(--v19b-size-0) !important;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
+  em::after,
+.ops-shell.has-unified-side-menu.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
   .ops-nav-group-label::after {
-  content: "ОЧЕРЕДЬ";
-  color: var(--v19b-color-text-faint);
-  font-size: var(--v19b-size-11);
-  font-weight: var(--v19b-weight-control);
-  text-transform: uppercase;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export) .ops-nav-item {
-  min-height: var(--v19b-size-42) !important;
-  border-radius: var(--v19b-radius-control) !important;
-  font-size: var(--v19b-size-14) !important;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .ops-nav-item.is-active {
-  border-color: var(--v19b-color-border-selected) !important;
-  background: var(--v19b-color-control-hover) !important;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .vf-figma-agent-zone {
-  width: var(--v19b-size-full) !important;
-  min-height: var(--v19b-size-40) !important;
-  justify-content: center !important;
-  gap: var(--v19b-size-8) !important;
-  border-color: var(--v19b-color-border-strong) !important;
-  border-radius: var(--v19b-radius-control) !important;
-  background: var(--v19b-color-control) !important;
-  color: var(--v19b-color-text) !important;
-  font-size: var(--v19b-size-13) !important;
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export)
-  .vf-figma-agent-zone
-  svg {
-  width: var(--v19b-size-16);
-  height: var(--v19b-size-16);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: var(--v19b-size-2);
-}
-
-.ops-shell.role-admin:is(.surface-admin-review, .surface-export) .ops-session {
   display: none !important;
+  content: none !important;
 }
 
 .ops-shell.surface-admin-review .workspace {
@@ -587,19 +520,20 @@
   font-style: normal;
 }
 
-.v19-admin-cockpit-progress i {
+.v19-admin-cockpit-progress .v19-progress-track {
   display: block;
+  width: var(--v19b-size-full);
   height: var(--v19b-size-6);
   margin-top: var(--v19b-size-4);
-  overflow: hidden;
-  border-radius: var(--v19b-radius-pill);
   background: var(--v19b-admin-muted-bg);
 }
 
-.v19-admin-cockpit-progress b {
-  display: block;
-  height: var(--v19b-size-full);
-  border-radius: var(--v19b-radius-pill);
+.v19-admin-cockpit-progress
+  .v19-progress-track.tone-success::-webkit-progress-value {
+  background: var(--v19b-dot-review);
+}
+
+.v19-admin-cockpit-progress .v19-progress-track.tone-success::-moz-progress-bar {
   background: var(--v19b-dot-review);
 }
 
@@ -6192,6 +6126,7 @@ body,
 
   .ops-shell.surface-agent-actions .v19-state-tabs .v19-tab-count {
     font-size: var(--v19b-size-10);
+    color: var(--v19b-color-text-strong) !important;
   }
 
   .ops-shell.surface-agent-actions .v19-actions-mobile-stage {
@@ -6288,6 +6223,7 @@ body,
     inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
     z-index: 220 !important;
     display: grid !important;
+    transform: translateX(var(--v19b-size-0)) !important;
     width: min(var(--vf-ref-size-360px), calc(100vw - var(--v19b-size-16))) !important;
     min-width: var(--v19b-size-0) !important;
     max-width: calc(100vw - var(--v19b-size-16)) !important;
@@ -8526,6 +8462,38 @@ body,
   border-color: var(--v19b-admin-orange-border);
 }
 
+.v19-admin-export-row.is-family {
+  border-color: var(--v19b-admin-blue-border);
+  background:
+    linear-gradient(
+      90deg,
+      var(--v19b-admin-blue-soft),
+      var(--v19b-color-clear) 46%
+    ),
+    var(--v19b-color-clear);
+}
+
+.v19-admin-export-row.is-family.is-selected {
+  border-color: var(--v19b-admin-export-selected-border);
+  background:
+    linear-gradient(
+      90deg,
+      var(--v19b-admin-blue-soft),
+      var(--v19b-admin-export-selected-bg) 52%
+    ),
+    var(--v19b-admin-export-selected-bg);
+}
+
+.v19-admin-export-row.is-family .v19-admin-export-row-title svg {
+  color: var(--v19b-dot-review);
+}
+
+.v19-admin-export-row.is-family .v19-admin-export-row-title small {
+  border-color: var(--v19b-admin-blue-border);
+  background: var(--v19b-admin-blue-soft);
+  color: var(--v19b-dot-review);
+}
+
 .v19-admin-export-checkbox {
   display: inline-grid;
   place-items: center;
@@ -8626,20 +8594,21 @@ body,
   min-width: var(--v19b-size-0);
 }
 
-.v19-admin-export-progress > span {
+.v19-admin-export-progress > .v19-progress-track {
   display: block;
   flex: 1;
   min-width: var(--v19b-size-52);
+  width: var(--v19b-size-full);
   height: var(--v19b-size-8);
-  overflow: hidden;
-  border-radius: var(--v19b-radius-pill);
   background: var(--v19b-admin-export-progress-bg);
 }
 
-.v19-admin-export-progress i {
-  display: block;
-  height: var(--v19b-size-full);
-  border-radius: inherit;
+.v19-admin-export-progress
+  > .v19-progress-track.tone-success::-webkit-progress-value {
+  background: var(--v19b-dot-success);
+}
+
+.v19-admin-export-progress > .v19-progress-track.tone-success::-moz-progress-bar {
   background: var(--v19b-dot-success);
 }
 
@@ -18079,11 +18048,15 @@ body,
     .v19-admin-export-reference
     .v19-admin-export-checkbox-native {
     position: absolute !important;
-    width: var(--v19b-size-1) !important;
-    height: var(--v19b-size-1) !important;
+    left: var(--v19b-size-0) !important;
+    top: 50% !important;
+    z-index: 3 !important;
+    width: var(--v19b-size-20) !important;
+    height: var(--v19b-size-44) !important;
     margin: var(--v19b-size-0) !important;
     opacity: 0 !important;
-    pointer-events: none !important;
+    pointer-events: auto !important;
+    transform: translateY(-50%) !important;
   }
 
   .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
@@ -18147,6 +18120,22 @@ body,
     .v19-admin-export-reference
     .v19-admin-export-row-end {
     display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row.is-history
+    .v19-admin-export-progress {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row.is-history
+    .v19-admin-export-row-end {
+    display: flex !important;
+    grid-column: 4 !important;
+    min-width: var(--v19b-size-0) !important;
   }
 }
 
@@ -19340,7 +19329,7 @@ body,
     .surface-export,
     .surface-settings
   ) {
-  --v19b-shell-sidebar-width: var(--v19-shell-sidebar-width);
+  --v19b-shell-sidebar-width: var(--v19-unified-sidebar-width, var(--v19b-size-288));
 }
 
 @media (min-width: 768px) {
@@ -20099,4 +20088,349 @@ body,
     border: 0 !important;
     background: var(--v19-dialog-backdrop) !important;
   }
+}
+
+/* Create drawer exposes one visible close control per viewport. */
+.create-submission-drawer
+  .v19-create-drawer-close.v19-create-drawer-close--back {
+  display: none !important;
+}
+
+.create-submission-drawer
+  .v19-create-drawer-close.v19-create-drawer-close--dismiss {
+  display: flex !important;
+}
+
+@media (max-width: 760px) {
+  .create-submission-drawer.is-passport-step
+    > header.v19-create-drawer-header
+    > .v19-create-drawer-close.v19-create-drawer-close--back:first-child,
+  .create-submission-drawer.is-passport-step
+    .v19-create-drawer-close.v19-create-drawer-close--back,
+  .create-submission-drawer
+    .v19-create-drawer-close.v19-create-drawer-close--back {
+    display: flex !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    .v19-create-drawer-close.v19-create-drawer-close--dismiss,
+  .create-submission-drawer
+    .v19-create-drawer-close.v19-create-drawer-close--dismiss {
+    display: none !important;
+  }
+}
+
+/* Browser comments 2026-07-06: header/sidebar control, actions spacing, dossiers, settings nav. */
+@media (min-width: 768px) {
+  .ops-shell.has-unified-side-menu.role-agent:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-settings
+    ) {
+    grid-template-columns: var(--v19-unified-sidebar-width) minmax(var(--v19b-size-0), 1fr) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-agent:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-settings
+    )
+    > .workspace {
+    grid-column: 2 !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-agent:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-settings
+    )
+    > .workspace
+    > .topbar {
+    display: grid !important;
+    grid-template-columns:
+      var(--v19-control-row-height)
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      auto !important;
+    align-items: center !important;
+    column-gap: var(--v19b-size-14) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-agent:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-settings
+    )
+    > .workspace
+    > .topbar
+    .v19-topbar-menu.mp-button.icon-button {
+    display: grid !important;
+    grid-column: 1 !important;
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-agent:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-settings
+    )
+    > .workspace
+    > .topbar
+    .topbar-heading {
+    grid-column: 2 !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-agent:is(
+      .surface-agent-actions,
+      .surface-agent-submissions,
+      .surface-settings
+    )
+    > .workspace
+    > .topbar
+    .topbar-actions {
+    grid-column: 3 !important;
+  }
+}
+
+.ops-shell.has-unified-side-menu .ops-sidebar-mode-toggle {
+  display: none !important;
+}
+
+.ops-shell.has-unified-side-menu.role-agent .ops-brand-logo.vf-brand-capital {
+  overflow: hidden !important;
+  border: var(--v19b-size-1) solid var(--v19-line-default) !important;
+  border-radius: var(--v19-radius-control) !important;
+  background: var(--v19b-color-black) !important;
+}
+
+.ops-shell.has-unified-side-menu.role-agent
+  .ops-brand-logo.vf-brand-capital
+  .vf-brand-capital-image {
+  top: var(--v19b-size-0) !important;
+  left: var(--v19b-size-0) !important;
+  width: var(--v19b-size-full) !important;
+  height: var(--v19b-size-full) !important;
+  object-fit: cover !important;
+}
+
+.ops-shell.surface-agent-actions .v19-agent-actions-reference {
+  gap: var(--v19b-size-32) !important;
+}
+
+.ops-shell.surface-agent-actions .v19-agent-actions-reference .vf-figma-action-list {
+  margin-top: var(--v19b-size-0) !important;
+}
+
+.ops-shell.surface-agent-actions
+  .v19-agent-actions-reference
+  .vf-figma-section-rule {
+  margin-bottom: var(--v19b-size-4) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-action-status .vf-figma-status,
+.ops-shell.surface-agent-actions .vf-figma-status.is-danger {
+  padding-inline: var(--v19b-size-4) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-overview-heading {
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-package-row,
+.v19-figma-drawer-shell .v19-drawer-package-label {
+  font-size: var(--v19b-size-12) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-files-title,
+.v19-figma-drawer-shell .v19-drawer-file-section-title {
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.v19-figma-drawer-shell
+  :is(
+    .v19-drawer-file-title,
+    .v19-drawer-file-meta,
+    .v19-drawer-file-status,
+    .v19-drawer-file-section-meta
+  ) {
+  font-size: var(--v19b-size-12) !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .v19-submission-profile-stage.is-all
+  .v19-submission-profile-grid.is-family {
+  grid-auto-columns: minmax(
+    min(var(--v19b-size-304), var(--v19b-size-full)),
+    var(--v19b-grid-fr)
+  ) !important;
+  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), 1fr)) !important;
+  grid-auto-flow: row !important;
+  align-items: stretch !important;
+  overflow: visible !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-card.v19-dossier-card {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: var(--v19b-size-228) !important;
+  height: var(--v19b-size-full) !important;
+  padding: var(--v19b-size-18) var(--v19b-size-18) var(--v19b-size-4) !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .v19-submission-profile-grid.is-family
+  > article.vf-figma-family-card.v19-dossier-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-content: stretch !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card
+  .vf-figma-family-head {
+  order: 1 !important;
+  margin-bottom: var(--v19b-size-4) !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card
+  .vf-figma-member-list {
+  order: 2 !important;
+  display: grid !important;
+  gap: var(--v19b-size-4) !important;
+  margin: var(--v19b-size-0) !important;
+  padding-bottom: var(--v19b-size-4) !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card
+  .vf-figma-member-list
+  > * {
+  display: grid !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card
+  .vf-figma-member-row:nth-child(n + 3) {
+  display: grid !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card
+  .vf-figma-family-footer {
+  position: static !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: auto !important;
+  order: 99 !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  justify-content: space-between !important;
+  margin-top: auto !important;
+  padding-top: var(--v19b-size-4) !important;
+  border-top: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .v19-submission-profile-grid.is-family
+  > .vf-figma-family-card.v19-dossier-card
+  > .vf-figma-family-footer {
+  position: static !important;
+  inset: auto !important;
+  order: 99 !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  margin-top: auto !important;
+  padding-top: var(--v19b-size-4) !important;
+}
+
+.ops-shell.surface-settings .settings-layout {
+  grid-template-columns: minmax(var(--v19b-size-180), var(--v19b-size-220)) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+}
+
+.ops-shell.surface-settings .settings-nav {
+  display: grid !important;
+  align-content: start !important;
+  gap: var(--v19b-size-8) !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow: visible !important;
+}
+
+.ops-shell.surface-settings .settings-nav button {
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  justify-content: flex-start !important;
+}
+
+@media (max-width: 767px) {
+  .ops-shell.surface-agent-submissions
+    .v19-submission-profile-stage.is-all
+    .v19-submission-profile-grid.is-family,
+  .ops-shell.surface-agent-submissions .v19-submission-profile-grid.is-family {
+    grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
+  }
+
+  .ops-shell.surface-settings .settings-layout {
+    grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
+  }
+
+  .ops-shell.surface-settings .settings-nav {
+    display: flex !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .ops-shell.surface-settings .settings-nav button {
+    flex: 0 0 auto !important;
+    width: auto !important;
+  }
+}
+
+/* Browser comments 2026-07-06: questionnaire typography density. */
+.vf-figma-questionnaire-screen .v19-questionnaire-title-desktop {
+  font-size: var(--v19b-size-16) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-screen-header > div:last-child {
+  font-size: var(--v19b-size-14) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-applicant-bar > div:last-child {
+  font-size: var(--v19b-size-14) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-readiness-score-row strong,
+.vf-figma-questionnaire-screen .v19-questionnaire-readiness-score-row strong {
+  font-size: var(--v19b-size-24) !important;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-section-tab
+  :is(.font-semibold, .tracking-wide) {
+  font-size: var(--v19b-size-14) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-review-alert,
+.vf-figma-questionnaire-screen .v19-questionnaire-review-alert :is(div, p, strong) {
+  font-size: var(--v19b-size-14) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label,
+.vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label .flex-1 {
+  font-size: var(--v19b-size-13) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-fields-grid
+  :is(.text-red-400, [class*="text-red-400"]) {
+  font-size: var(--v19b-size-12) !important;
 }

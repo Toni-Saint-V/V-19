@@ -78,27 +78,6 @@ function getDrawerFocusableElements(container: HTMLElement | null) {
   );
 }
 
-function useDrawerDesktopQuery() {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window === "undefined"
-      ? true
-      : window.matchMedia("(min-width: 1024px)").matches,
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const media = window.matchMedia("(min-width: 1024px)");
-    const update = () => setIsDesktop(media.matches);
-    update();
-    media.addEventListener("change", update);
-
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return isDesktop;
-}
-
 type QuestionnaireFocusTarget = {
   applicantId?: string;
   field?: string;
@@ -223,7 +202,7 @@ function fileAccept(file: SubmissionFile) {
 }
 
 function fileSummary(file: SubmissionFile) {
-  const uploadedName = file.originalFileName ?? file.generatedFileName;
+  const uploadedName = file.generatedFileName ?? file.originalFileName;
   if (!uploadedName) return fileStatusLabel(file);
   return `${fileStatusLabel(file)} · ${uploadedName}`;
 }
@@ -871,7 +850,6 @@ export function FigmaSubmissionDrawer({
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerTabsRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
-  const isDesktopDrawer = useDrawerDesktopQuery();
   const prefersReducedMotion = useReducedMotion();
   const data = useMemo(() => buildDetail(submission), [submission]);
   const primaryAction = getPrimaryAction(submission, role, surface);
@@ -880,15 +858,15 @@ export function FigmaSubmissionDrawer({
     ? { opacity: 0, x: 0, y: 0 }
     : {
         opacity: 0.5,
-        x: isDesktopDrawer ? "100%" : 0,
-        y: isDesktopDrawer ? 0 : "100%",
+        x: 0,
+        y: 0,
       };
   const drawerPanelExit = prefersReducedMotion
     ? { opacity: 0, x: 0, y: 0 }
     : {
         opacity: 0,
-        x: isDesktopDrawer ? "100%" : 0,
-        y: isDesktopDrawer ? 0 : "100%",
+        x: 0,
+        y: 0,
       };
   const drawerPanelTransition = prefersReducedMotion
     ? { duration: 0.01 }

@@ -6,8 +6,6 @@ import {
   FileSpreadsheet,
   ImageIcon,
   Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings,
   Search,
   Users,
@@ -41,7 +39,6 @@ export function OperationalSidebar({
   footer,
   id,
   items,
-  onDisplayModeToggle,
   onMobileClose,
   mobileTitle,
 }: {
@@ -54,13 +51,9 @@ export function OperationalSidebar({
   footer: ReactNode;
   id?: string;
   items: OperationalNavItem[];
-  onDisplayModeToggle: () => void;
   onMobileClose?: () => void;
   mobileTitle?: string;
 }) {
-  const isCompact = displayMode === "compact";
-  const DisplayModeIcon = isCompact ? PanelLeftOpen : PanelLeftClose;
-
   return (
     <aside
       id={id}
@@ -88,20 +81,6 @@ export function OperationalSidebar({
         <div className="ops-brand-copy opsu-brand-copy">
           <strong className="opsu-wordmark vf-brand-wordmark">VisaFlow</strong>
         </div>
-        <IconButton
-          className="ops-sidebar-mode-toggle"
-          icon={
-            <DisplayModeIcon
-              aria-hidden="true"
-              focusable="false"
-              size={17}
-              strokeWidth={1.9}
-            />
-          }
-          label={isCompact ? "Развернуть меню" : "Свернуть меню"}
-          pressed={isCompact}
-          onClick={onDisplayModeToggle}
-        />
         {onMobileClose ? (
           <IconButton
             className="ops-mobile-close opsu-mobile-close"

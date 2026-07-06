@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  CalendarDays,
   CheckCircle2,
   FileText,
   FileWarning,
@@ -18,7 +19,9 @@ import {
   Hash,
   Image as ImageIcon,
   Info,
+  MapPin,
   MessageSquarePlus,
+  PackageCheck,
   Send,
   ScanText,
   ShieldAlert,
@@ -66,6 +69,7 @@ import {
   buildIdentityConsistencyReport,
   type IdentityConsistencyFinding,
 } from "../identityConsistency";
+import { agentOwnerDisplayName } from "../ownership";
 import {
   IdentityConsistencyPanel,
   IdentityConsistencyStatusStrip,
@@ -74,7 +78,13 @@ import { BbAiPanel } from "./BbAiPanel";
 
 type AdminReviewFileTarget = "passport_scan" | "selfie" | "selfie_2";
 
-type AdminReviewTab = "files" | "passport" | "selfie" | "questionnaire" | "issues";
+type AdminReviewTab =
+  | "overview"
+  | "files"
+  | "passport"
+  | "selfie"
+  | "questionnaire"
+  | "issues";
 
 type RemarkTargetType =
   | "checklistItem"
@@ -209,6 +219,7 @@ export function AdminReviewDrawer({
   });
   const [questionnaireFocusTarget, setQuestionnaireFocusTarget] =
     useState<WorkspaceTarget | undefined>(undefined);
+  const reviewContentRef = useRef<HTMLDivElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -225,6 +236,9 @@ export function AdminReviewDrawer({
         activeTab === "questionnaire" &&
         (current === "passport" || current === "selfie" || current === "questionnaire")
       ) {
+        return current;
+      }
+      if (activeTab === "files" && (current === "passport" || current === "selfie")) {
         return current;
       }
       return mappedTab;
@@ -245,6 +259,10 @@ export function AdminReviewDrawer({
       document.body.style.overflow = previousOverflow;
     };
   }, [onClose]);
+
+  useEffect(() => {
+    reviewContentRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [activeReviewTab]);
 
   const selectedApplicant =
     submission.applicants.find((applicant) => applicant.id === selectedApplicantId) ??
@@ -270,7 +288,7 @@ export function AdminReviewDrawer({
   const selectReviewTab = useCallback(
     (tab: AdminReviewTab) => {
       setActiveReviewTab(tab);
-      onTab(tab === "issues" ? "issues" : tab === "files" ? "files" : "questionnaire");
+      onTab(drawerTabForReviewTab(tab));
       if (tab === "passport") setReviewTarget("passport_scan");
       if (tab === "selfie" && reviewTarget === "passport_scan") {
         setReviewTarget("selfie");
@@ -280,6 +298,7 @@ export function AdminReviewDrawer({
   );
 
   function isReferenceTabSelected(tab: DrawerTab) {
+    if (tab === "overview") return activeReviewTab === "overview";
     if (tab === "issues") return activeReviewTab === "issues";
     if (tab === "files")
       return activeReviewTab === "files" || activeReviewTab === "passport" || activeReviewTab === "selfie";
@@ -288,6 +307,11 @@ export function AdminReviewDrawer({
   }
 
   function selectReferenceTab(tab: DrawerTab) {
+    if (tab === "overview") {
+      selectReviewTab("overview");
+      return;
+    }
+
     if (tab === "issues") {
       selectReviewTab("issues");
       return;
@@ -509,7 +533,7 @@ export function AdminReviewDrawer({
       />
 
       <motion.aside
-        aria-label="Проверка пакета"
+        aria-label="Детали проверки"
         aria-modal="true"
         className="admin-review-drawer"
         key="admin-review-drawer"
@@ -542,6 +566,10 @@ export function AdminReviewDrawer({
               <p className="admin-review-meta">
                 {submission.city}
                 <span aria-hidden="true"> · </span>
+                Администратор проверки
+                <span aria-hidden="true"> · </span>
+                Агент: {agentOwnerDisplayName(submission.agentId)}
+                <span aria-hidden="true"> · </span>
                 {openIssueCount(submission)} замечаний
               </p>
               <h2>
@@ -572,8 +600,10 @@ export function AdminReviewDrawer({
 
               return (
                 <button
+                  aria-label={typeof count === "number" ? `${tab.label} ${count}` : tab.label}
                   aria-selected={selected}
                   className={selected ? "is-active" : ""}
+                  data-drawer-tab={tab.id}
                   key={tab.id}
                   role="tab"
                   type="button"
@@ -604,7 +634,7 @@ export function AdminReviewDrawer({
           </p>
         ) : null}
 
-        <div className="admin-review-content">
+        <div className="admin-review-content" ref={reviewContentRef}>
           <div className="admin-review-drawer-assist">
             <IdentityConsistencyStatusStrip compact report={identityReport} />
             <AdminAiAssistancePanel state={adminAiState} onRun={runAdminAiReview} />
@@ -635,7 +665,14 @@ export function AdminReviewDrawer({
               key={activeReviewTab}
               transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
             >
-              {activeReviewTab === "files" ? (
+              {activeReviewTab === "overview" ? (
+                <AdminOverviewTab
+                  primaryAction={primaryAction}
+                  submission={submission}
+                  onFiles={() => selectReviewTab("files")}
+                  onQuestionnaire={() => selectReviewTab("questionnaire")}
+                />
+              ) : activeReviewTab === "files" ? (
                 <AdminFilesTab
                   submission={submission}
                   onFileRemark={openFileRemark}
@@ -761,18 +798,17 @@ export function AdminReviewDrawer({
           </button>
         </footer>
 
+        {remarkContext ? (
+          <AdminRemarkForm
+            context={remarkContext}
+            issueGuardReason={issueGuardReason}
+            submission={submission}
+            onClose={() => setRemarkContext(null)}
+            onDraftRemark={draftAdminRemark}
+            onSubmit={submitRemark}
+          />
+        ) : null}
       </motion.aside>
-
-      {remarkContext ? (
-        <AdminRemarkForm
-          context={remarkContext}
-          issueGuardReason={issueGuardReason}
-          submission={submission}
-          onClose={() => setRemarkContext(null)}
-          onDraftRemark={draftAdminRemark}
-          onSubmit={submitRemark}
-        />
-      ) : null}
 
       {passportWorkspaceOpen ? (
         <AdminPassportReviewWorkspace
@@ -809,6 +845,157 @@ export function AdminReviewDrawer({
       ) : null}
 
     </AnimatePresence>
+  );
+}
+
+function AdminOverviewTab({
+  onFiles,
+  onQuestionnaire,
+  primaryAction,
+  submission,
+}: {
+  onFiles: () => void;
+  onQuestionnaire: () => void;
+  primaryAction: ReturnType<typeof getPrimaryAction>;
+  submission: Submission;
+}) {
+  const readyFilesCount = submission.files.filter(adminFileReady).length;
+  const packageItems = adminDocumentPackageItems(submission);
+  const issueCount = openIssueCount(submission);
+  const fixedByAgentCount = submission.issues.filter(
+    (issue) => issue.status === "fixed_by_agent",
+  ).length;
+  const blockingIssueCount = submission.issues.filter(
+    (issue) => issue.status === "open" && issue.severity === "blocker",
+  ).length;
+
+  return (
+    <div className="admin-review-overview-tab" data-admin-review-overview>
+      <section className="admin-review-overview-hero admin-review-card">
+        <div className="admin-review-section-title">
+          <span>Подача</span>
+          <h3>Пакет на проверке</h3>
+        </div>
+        <div className="admin-review-overview-route" aria-label="Маршрут подачи">
+          <div>
+            <CalendarDays aria-hidden="true" size={17} strokeWidth={1.8} />
+            <span>{submission.tripDateFrom} - {submission.tripDateTo}</span>
+            <small>Даты поездки</small>
+          </div>
+          <div>
+            <MapPin aria-hidden="true" size={17} strokeWidth={1.8} />
+            <span>{submission.city}</span>
+            <small>Визовый центр</small>
+          </div>
+        </div>
+        <dl className="admin-review-fact-grid">
+          <div>
+            <dt>ID</dt>
+            <dd>{submission.id}</dd>
+          </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>{statusLabels[submission.status]}</dd>
+          </div>
+          <div>
+            <dt>Заявители</dt>
+            <dd>{applicantCountLabel(submission.applicants.length)}</dd>
+          </div>
+          <div>
+            <dt>Файлы</dt>
+            <dd>
+              {readyFilesCount}/{submission.files.length}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="admin-review-overview-next admin-review-card">
+        <div className="admin-review-section-title">
+          <span>Вывод</span>
+          <h3>{primaryAction.label}</h3>
+        </div>
+        <p>
+          {primaryAction.disabled && primaryAction.reason
+            ? primaryAction.reason
+            : issueCount > 0
+              ? "Сначала закрыть замечания, затем принять решение."
+              : "Пакет можно сверять по файлам и анкете."}
+        </p>
+        <div className="admin-review-overview-flags" aria-label="Ключевые сигналы">
+          <span className={blockingIssueCount > 0 ? "is-danger" : "is-muted"}>
+            {blockingIssueCount} блокеров
+          </span>
+          <span className={fixedByAgentCount > 0 ? "is-warning" : "is-muted"}>
+            {fixedByAgentCount} исправлено
+          </span>
+          <span>{submission.completeness.total}% готовность</span>
+        </div>
+      </section>
+
+      <div className="admin-review-overview-metrics" aria-label="Сводка проверки">
+        <button type="button" onClick={onFiles}>
+          <PackageCheck aria-hidden="true" size={16} strokeWidth={1.8} />
+          <span>Файлы</span>
+          <strong>
+            {readyFilesCount}/{submission.files.length}
+          </strong>
+        </button>
+        <button type="button" onClick={onQuestionnaire}>
+          <FileText aria-hidden="true" size={16} strokeWidth={1.8} />
+          <span>Анкета</span>
+          <strong>{submission.completeness.questionnaire}%</strong>
+        </button>
+        <button type="button" aria-disabled="true" tabIndex={-1}>
+          <Users aria-hidden="true" size={16} strokeWidth={1.8} />
+          <span>Заявители</span>
+          <strong>{submission.applicants.length}</strong>
+        </button>
+        <button type="button" aria-disabled="true" tabIndex={-1}>
+          <FileWarning aria-hidden="true" size={16} strokeWidth={1.8} />
+          <span>Замечания</span>
+          <strong>{issueCount}</strong>
+        </button>
+      </div>
+
+      <section className="admin-review-overview-package admin-review-card">
+        <div className="admin-review-section-title">
+          <span>Пакет документов</span>
+          <h3>{readyFilesCount}/{submission.files.length} файлов готово</h3>
+        </div>
+        <div className="admin-review-overview-package-list">
+          {packageItems.map((item) => (
+            <div className={`is-${item.status}`} key={item.label}>
+              <span aria-hidden="true" />
+              <strong>{item.label}</strong>
+              <em>{item.helper}</em>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="admin-review-overview-applicants admin-review-card">
+        <div className="admin-review-section-title">
+          <span>Участники</span>
+          <h3>{applicantCountLabel(submission.applicants.length)}</h3>
+        </div>
+        <div className="admin-review-overview-applicant-list">
+          {submission.applicants.map((applicant) => (
+            <button
+              aria-label={`Открыть заявителя ${applicant.role}`}
+              key={applicant.id}
+              type="button"
+              aria-disabled="true"
+              tabIndex={-1}
+            >
+              <span>{applicantInitials(applicant.fullName)}</span>
+              <strong>{applicant.fullName}</strong>
+              <em>{applicantRoleLabel(applicant.role)}</em>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -928,13 +1115,35 @@ function AdminFilesTab({
   const readyCount = reviewFiles.filter(
     (file) => file.status !== "missing" && file.status !== "needs_replacement",
   ).length;
+  const pendingCount = reviewFiles.filter(
+    (file) => file.status === "pending_review" || file.status === "uploaded",
+  ).length;
+  const problemCount = reviewFiles.length - readyCount;
 
   return (
     <div className="admin-review-files-tab v19-drawer-files">
       <div className="v19-drawer-files-head">
-        <h3 className="v19-drawer-files-title">Файлы подачи</h3>
+        <div>
+          <h3 className="v19-drawer-files-title">Файлы подачи</h3>
+          <p className="v19-drawer-files-helper">Сверьте паспорт и селфи по каждому заявителю.</p>
+        </div>
         <span className="v19-drawer-files-count">
           {readyCount}/{reviewFiles.length}
+        </span>
+      </div>
+
+      <div className="v19-drawer-files-summary" aria-label="Сводка файлов">
+        <span>
+          <strong>{readyCount}</strong>
+          <em>готово</em>
+        </span>
+        <span>
+          <strong>{pendingCount}</strong>
+          <em>проверить</em>
+        </span>
+        <span className={problemCount > 0 ? "is-warning" : ""}>
+          <strong>{problemCount}</strong>
+          <em>замена</em>
         </span>
       </div>
 
@@ -974,7 +1183,7 @@ function AdminFilesTab({
                         ? User
                         : ImageIcon;
                   const fileName =
-                    file.originalFileName ?? file.generatedFileName ?? fileLabel(file.type);
+                    file.generatedFileName ?? file.originalFileName ?? fileLabel(file.type);
 
                   return (
                     <div
@@ -998,6 +1207,11 @@ function AdminFilesTab({
                           {file.sizeBytes ? ` · ${formatBytes(file.sizeBytes)}` : ""}
                         </div>
                       </div>
+                      <span
+                        className={`v19-drawer-file-status ${adminDrawerFileStatusClass(file.status)}`}
+                      >
+                        {fileStatusLabels[file.status]}
+                      </span>
                       <div className="admin-review-file-actions">
                         <button
                           className="v19-drawer-file-action admin-review-file-open"
@@ -1713,7 +1927,7 @@ function MediaReviewPane({
               />
             ) : (
               <>
-                <strong>{file?.originalFileName ?? file?.generatedFileName ?? fileLabel(reviewTarget)}</strong>
+                <strong>{file?.generatedFileName ?? file?.originalFileName ?? fileLabel(reviewTarget)}</strong>
                 <span>{file?.storagePath ?? "Приватный storage preview не доступен локально"}</span>
                 <small>
                   {file?.mimeType ?? "media slot"} · {file?.sizeBytes ? formatBytes(file.sizeBytes) : "без размера"}
@@ -1806,7 +2020,7 @@ function PassportDocumentSheet({
     <div className="admin-review-passport-sheet">
       <div className="admin-review-passport-file">
         <FileText aria-hidden="true" size={13} />
-        <span>{file?.originalFileName ?? file?.generatedFileName ?? fileLabel("passport_scan")}</span>
+        <span>{file?.generatedFileName ?? file?.originalFileName ?? fileLabel("passport_scan")}</span>
       </div>
       <div className="admin-review-passport-cover">
         <span>PASSPORT</span>
@@ -2217,7 +2431,7 @@ function AdminRemarkForm({
           </button>
           <button disabled={!canSubmit} type="button" onClick={submit}>
             <Send aria-hidden="true" size={16} />
-            Отправить замечание
+            Создать замечание
           </button>
         </footer>
       </motion.div>
@@ -2382,9 +2596,66 @@ function isPassportReviewSection(section: Applicant["sections"][number]) {
 }
 
 function drawerTabToReviewTab(tab: DrawerTab): AdminReviewTab {
+  if (tab === "overview") return "overview";
   if (tab === "issues") return "issues";
   if (tab === "files") return "files";
   return "questionnaire";
+}
+
+function drawerTabForReviewTab(tab: AdminReviewTab): DrawerTab {
+  if (tab === "overview") return "overview";
+  if (tab === "issues") return "issues";
+  if (tab === "files" || tab === "passport" || tab === "selfie") return "files";
+  return "questionnaire";
+}
+
+function adminFileReady(file: SubmissionFile) {
+  return file.status !== "missing" && file.status !== "needs_replacement";
+}
+
+function adminDocumentPackageItems(submission: Submission) {
+  const byType = new Map<
+    SubmissionFile["type"],
+    { ready: number; total: number; type: SubmissionFile["type"] }
+  >();
+
+  for (const file of submission.files) {
+    const current = byType.get(file.type) ?? { ready: 0, total: 0, type: file.type };
+    byType.set(file.type, {
+      ...current,
+      ready: current.ready + (adminFileReady(file) ? 1 : 0),
+      total: current.total + 1,
+    });
+  }
+
+  return Array.from(byType.values()).map((item) => {
+    const status =
+      item.ready === item.total ? "done" : item.ready > 0 ? "progress" : "pending";
+    return {
+      helper: `${item.ready}/${item.total}`,
+      label:
+        item.total > 1
+          ? `${fileLabel(item.type)} (${item.ready}/${item.total})`
+          : fileLabel(item.type),
+      status,
+    };
+  });
+}
+
+function applicantCountLabel(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} заявитель`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} заявителя`;
+  }
+  return `${count} заявителей`;
+}
+
+function applicantInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part[0]).join("");
+  return initials.toLocaleUpperCase("ru-RU") || "З";
 }
 
 function fieldStatus(
@@ -2448,6 +2719,12 @@ function fileStatusClass(file: SubmissionFile | undefined) {
   if (file.status === "needs_replacement" || file.status === "missing")
     return "is-warning";
   return "is-pending";
+}
+
+function adminDrawerFileStatusClass(status: SubmissionFile["status"]) {
+  if (status === "accepted") return "is-ready";
+  if (status === "needs_replacement" || status === "missing") return "is-warning";
+  return "is-review";
 }
 
 function mediaChecklist(target: AdminReviewFileTarget) {

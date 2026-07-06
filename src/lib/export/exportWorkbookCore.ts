@@ -33,6 +33,10 @@ const numericColumnNames = new Set([
   "AW",
   "AZ",
 ]);
+const familyDataStyleId = 52;
+const familyDataTextStyleId = 53;
+const familyDataDateStyleId = 54;
+const familyDataNoteStyleId = 55;
 
 export function createExportWorkbookBlob(
   workbookRows: readonly (readonly string[])[],
@@ -96,12 +100,18 @@ function workbookRelsXml(): string {
 }
 
 function stylesXml(): string {
-  const xfs = Array.from({ length: 52 }, (_, index) => {
+  const baseXfs = Array.from({ length: 52 }, (_, index) => {
     const dateStyle = [2, 5, 15, 16, 29, 35, 44].includes(index);
     const fillId = index === 1 || index === 2 || index === 3 ? 2 : 0;
     return `<xf numFmtId="${dateStyle ? 164 : 0}" fontId="0" fillId="${fillId}" borderId="1" xfId="0"${dateStyle ? ' applyNumberFormat="1"' : ""}/>`;
   }).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd;@"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor theme="4" tint="0.59999389629810485"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="52">${xfs}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const familyXfs = [
+    `<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>`,
+    `<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>`,
+    `<xf numFmtId="164" fontId="0" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>`,
+    `<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>`,
+  ].join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd;@"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor theme="4" tint="0.59999389629810485"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="56">${baseXfs}${familyXfs}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 }
 
 function worksheetXml(
@@ -153,7 +163,7 @@ function dataRowXml(
   const cells = Array.from({ length: templateVisibleColumnCount }, (_, index) => {
     const column = columnName(index + 1);
     if (index >= templateColumnCount) {
-      return `<c r="${column}${rowNumber}" s="33"/>`;
+      return `<c r="${column}${rowNumber}" s="${rowFill ? familyDataStyleId : 33}"/>`;
     }
 
     let value = row[index] ?? "";
@@ -161,7 +171,13 @@ function dataRowXml(
       value = isFirstFamilyRow ? familyAppointmentNote(row) : "";
     }
 
-    return templateCell(column, rowNumber, value, sharedStrings, dataStyleId(column));
+    return templateCell(
+      column,
+      rowNumber,
+      value,
+      sharedStrings,
+      rowFill ? familyStyleId(column) : dataStyleId(column),
+    );
   }).join("");
   return `<row r="${rowNumber}" spans="1:57" s="40" customFormat="1">${cells}</row>`;
 }
@@ -229,6 +245,15 @@ function dataStyleId(column: string) {
   if (column === "E" || column === "AP" || column === "AY") return 34;
   if (column === "BC") return 50;
   return 33;
+}
+
+function familyStyleId(column: string) {
+  if (dateColumnNames.has(column)) return familyDataDateStyleId;
+  if (column === "E" || column === "AP" || column === "AY") {
+    return familyDataTextStyleId;
+  }
+  if (column === "BC") return familyDataNoteStyleId;
+  return familyDataStyleId;
 }
 
 function blankStyleId(column: string) {
