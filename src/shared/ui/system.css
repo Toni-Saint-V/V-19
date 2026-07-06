@@ -27132,6 +27132,70 @@ p {
   line-height: 1.35;
 }
 
+.v19-passport-ai-hints {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--vf-ref-size-6px);
+  margin-top: var(--vf-ref-size-10px);
+}
+
+.v19-passport-ai-hints--panel {
+  margin-top: var(--vf-ref-size-0);
+}
+
+.v19-passport-ai-hint {
+  display: inline-flex;
+  min-width: 0;
+  min-height: var(--vf-ref-size-26px);
+  align-items: center;
+  gap: var(--vf-ref-size-5px);
+  padding: 0 var(--vf-ref-size-8px);
+  border: var(--vf-ref-size-1px) solid var(--v19-line-default);
+  border-radius: var(--v19-radius-pill);
+  background: var(--v19-control);
+  color: var(--v19-fg-muted);
+  font-size: var(--vf-ref-size-11px);
+  line-height: 1;
+}
+
+.v19-passport-ai-hint > span {
+  color: var(--v19-fg-tertiary);
+  font-weight: var(--vf-ref-font-weight-620);
+  text-transform: uppercase;
+}
+
+.v19-passport-ai-hint > em {
+  display: inline;
+  min-width: 0;
+  margin: var(--vf-ref-size-0);
+  overflow: hidden;
+  color: inherit;
+  font-size: inherit;
+  font-style: normal;
+  line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v19-passport-ai-hint.is-muted {
+  border-color: var(--v19-line-default);
+  background: var(--v19-control);
+  color: var(--v19-fg-muted);
+}
+
+.v19-passport-ai-hint.is-yellow {
+  border-color: var(--vf-yellow-soft-border, var(--vf-ref-color-rgba-244-184-64-0neg-48));
+  background: var(--vf-yellow-soft-bg, var(--vf-ref-color-rgba-244-184-64-0neg-13));
+  color: var(--vf-yellow-soft-text, var(--vf-ref-color-hexneg-f4c866));
+}
+
+.v19-passport-ai-hint.is-green {
+  border-color: var(--vf-green-soft-border, var(--vf-ref-color-rgba-69-208-130-0neg-48));
+  background: var(--vf-green-soft-bg, var(--vf-ref-color-rgba-69-208-130-0neg-12));
+  color: var(--vf-green-soft-text, var(--vf-ref-color-hexneg-59df94));
+}
+
 .v19-passport-live-indicator.is-red {
   border-color: var(--vf-red-soft-border, var(--vf-ref-color-rgba-255-92-103-0neg-48));
   background: var(--vf-red-soft-bg, var(--vf-ref-color-rgba-255-92-103-0neg-13));
