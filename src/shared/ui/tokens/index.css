@@ -78,6 +78,7 @@
   --v19-surface: rgb(var(--surface));
   --v19-raised: rgb(var(--raised));
   --v19-control: rgb(var(--control));
+  --v19-control-strong: rgb(var(--raised));
   --v19-hover: rgb(var(--hover));
   --v19-selected: rgb(var(--selected));
   --v19-line: rgb(var(--line));
@@ -217,6 +218,10 @@
   --v19-agent-context-panel-sticky-top: 20px;
   --v19-agent-context-padding: var(--v19-space-lg);
   --v19-work-search-height: 40px;
+  --v19-command-palette-z: 80;
+  --v19-command-palette-width: var(--v19b-size-560);
+  --v19-command-palette-mobile-inset: var(--v19b-size-12);
+  --v19-command-palette-max-height: calc(100svh - var(--v19b-size-96));
   --v19-agent-search-width: 260px;
   --v19-agent-search-max-width: 332px;
   --v19-agent-search-padding-x: 11px;
@@ -624,6 +629,7 @@
   --vf-ref-color-rgba-73-213-184-0neg-34: rgb(52 211 153 / 0.34);
   --vf-ref-color-hexneg-f4c866: #fb923c;
   /* size */
+  --vf-ref-size-0: 0;
   --vf-ref-size-0neg-02em: 0.02em;
   --vf-ref-size-0neg-06em: 0.06em;
   --vf-ref-size-0neg-08em: 0.08em;
@@ -636,6 +642,7 @@
   --vf-ref-size-0neg-625rem: 0.625rem;
   --vf-ref-size-0neg-68em: 0.68em;
   --vf-ref-size-0neg-92em: 0.92em;
+  --vf-ref-size-0px: 0px;
   --vf-ref-size-1004px: 1004px;
   --vf-ref-size-100px: 100px;
   --vf-ref-size-102px: 102px;
@@ -980,8 +987,12 @@
 /* ===== visual baseline tokens moved from ../visual-baseline.css ===== */
 :root {
   --v19b-font-family: var(--v19-font-family);
+  --v19b-font-mono: var(
+    --vf-ref-font-family-uineg-monospace-sfmononeg-regular-menlo-consolas-monospace
+  );
 
   --v19b-color-clear: transparent;
+  --v19b-color-black: rgb(0 0 0);
   --v19b-color-app: #101011;
   --v19b-color-page: #141416;
   --v19b-color-panel: #161617;
@@ -1006,6 +1017,7 @@
   --v19b-color-text-50: rgb(255 255 255 / 0.5);
   --v19b-color-text-40: rgb(255 255 255 / 0.4);
   --v19b-color-text-35: rgb(255 255 255 / 0.35);
+  --v19b-color-text-30: rgb(255 255 255 / 0.3);
   --v19b-color-text-25: rgb(255 255 255 / 0.25);
   --v19b-color-text-muted: rgb(255 255 255 / 0.6);
   --v19b-color-text-faint: rgb(255 255 255 / 0.5);
@@ -1110,6 +1122,7 @@
   --v19b-size-88: 88px;
   --v19b-size-92: 92px;
   --v19b-size-96: 96px;
+  --v19b-size-100: 100px;
   --v19b-size-104: 104px;
   --v19b-size-108: 108px;
   --v19b-size-110: 110px;
@@ -1126,16 +1139,20 @@
   --v19b-size-160: 160px;
   --v19b-size-172: 172px;
   --v19b-size-176: 176px;
+  --v19b-size-180: var(--vf-ref-size-180px);
   --v19b-size-188: 188px;
   --v19b-size-200: 200px;
   --v19b-size-220: 220px;
+  --v19b-size-228: var(--vf-ref-size-228px);
   --v19b-size-240: 240px;
+  --v19b-size-304: 304px;
   --v19b-size-half: 50%;
   --v19b-size-full: 100%;
   --v19b-size-quarter: 25%;
   --v19b-grid-fr: 1fr;
   --v19b-grid-fr-14: 1.4fr;
   --v19b-size-260: 260px;
+  --v19b-size-280: 280px;
   --v19b-size-288: 288px;
   --v19b-size-336: 336px;
   --v19b-size-340: 340px;
@@ -1144,6 +1161,7 @@
   --v19b-size-400: 400px;
   --v19b-size-420: 420px;
   --v19b-size-520: 520px;
+  --v19b-size-560: 560px;
   --v19b-size-760: 760px;
   --v19b-size-800: 800px;
   --v19b-size-840: 840px;
@@ -1169,8 +1187,12 @@
 
   --v19b-line-height-control: 1;
   --v19b-line-height-row: 1.2;
+  --v19b-line-height-tight: 1.08;
   --v19b-line-height-title: 1.12;
+  --v19b-line-height-copy: 1.45;
   --v19b-line-height-label: 1.5;
+  --v19b-letter-spacing-normal: 0;
+  --v19b-letter-spacing-wide: var(--v19b-tracking-wide);
   --v19b-tracking-wide: 0.08em;
   --v19b-tracking-wider: 0.18em;
 

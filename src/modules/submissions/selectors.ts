@@ -82,21 +82,16 @@ export function searchSubmissions(
   });
 }
 
-const submissionCityFilterValues = [
-  "Все города",
-  "Москва",
-  "Санкт-Петербург",
-  "Казань",
-  "Екатеринбург",
-  "Новосибирск",
-  "Нижний Новгород",
-  "Самара",
-  "Ростов-на-Дону",
-] as const;
+export function cityFilterValuesForSubmissions(submissions: Submission[]): string[] {
+  const cities = new Set<string>();
 
-export function cityFilterValuesForSubmissions(_submissions: Submission[]): string[] {
-  void _submissions;
-  return [...submissionCityFilterValues];
+  for (const submission of submissions) {
+    if (submission.city.trim()) cities.add(submission.city.trim());
+    const appointmentCity = questionnaireCityForSubmission(submission).trim();
+    if (appointmentCity) cities.add(appointmentCity);
+  }
+
+  return ["Все города", ...[...cities].sort((left, right) => left.localeCompare(right, "ru"))];
 }
 
 export function filterSubmissionsByAgentOwner(

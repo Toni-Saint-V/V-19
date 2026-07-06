@@ -56,6 +56,12 @@ const extractedFieldPreviewItems: Array<{
   { key: "passportExpiresAt", label: "Дата окончания паспорта" },
 ];
 
+const criticalPassportAutofillKeys = [
+  "surname",
+  "firstName",
+  "passportNumber",
+] as const satisfies readonly PassportExtractedFieldKey[];
+
 const mediaRequirements = [
   ["Загранпаспорт", "passport_scan"],
   ["Селфи", "selfie"],
@@ -251,6 +257,82 @@ function passportUploadFieldValue(
   return upload?.extractedFields.find((field) => field.key === key)?.value.trim() ?? "";
 }
 
+type PassportAiHintTone = "green" | "muted" | "yellow";
+
+type PassportAiHint = {
+  label: string;
+  tone: PassportAiHintTone;
+  value: string;
+};
+
+function passportUploadExtractedPreviewCount(upload: PassportUploadDraft | undefined) {
+  return extractedFieldPreviewItems.filter((item) =>
+    passportUploadFieldValue(upload, item.key),
+  ).length;
+}
+
+function passportUploadCriticalCount(upload: PassportUploadDraft | undefined) {
+  return criticalPassportAutofillKeys.filter((key) =>
+    passportUploadFieldValue(upload, key),
+  ).length;
+}
+
+function passportAiHintItems({
+  activeUpload,
+  passportFileError,
+  passportReady,
+  passportUploads,
+}: {
+  activeUpload: PassportUploadDraft | undefined;
+  passportFileError: string;
+  passportReady: boolean;
+  passportUploads: PassportUploadDraft[];
+}): PassportAiHint[] {
+  if (passportFileError) {
+    return [
+      { label: "AI", tone: "yellow", value: "Ждёт JPEG/PNG" },
+      { label: "Анкета", tone: "muted", value: "Поля не меняются" },
+    ];
+  }
+
+  if (activeUpload?.status === "extracting") {
+    return [
+      { label: "AI", tone: "yellow", value: "Читает MRZ" },
+      { label: "Анкета", tone: "muted", value: "Ждёт результат" },
+    ];
+  }
+
+  if (passportUploadVisualStatus(activeUpload) === "ready") {
+    const extractedCount = passportUploadExtractedPreviewCount(activeUpload);
+    const criticalCount = passportUploadCriticalCount(activeUpload);
+
+    return [
+      { label: "AI", tone: "green", value: `Найдено ${extractedCount}/10` },
+      { label: "Ключевые", tone: "green", value: `${criticalCount}/3` },
+      { label: "Анкета", tone: "yellow", value: "Только пустые" },
+    ];
+  }
+
+  if (activeUpload) {
+    return [
+      { label: "AI", tone: "yellow", value: "Нужна сверка" },
+      { label: "Анкета", tone: "muted", value: "Без автоподстановки" },
+    ];
+  }
+
+  if (passportReady && passportUploads.length) {
+    return [
+      { label: "AI", tone: "green", value: "Паспорта приняты" },
+      { label: "Анкета", tone: "green", value: "Черновик готов" },
+    ];
+  }
+
+  return [
+    { label: "AI", tone: "muted", value: "Ждёт паспорт" },
+    { label: "Анкета", tone: "muted", value: "Пустая" },
+  ];
+}
+
 function e2ePassportNumber(fileName: string) {
   const hash = [...fileName].reduce(
     (current, character) => (current * 31 + character.charCodeAt(0)) % 1_000_000,
@@ -362,6 +444,12 @@ export function CreateSubmissionDrawer({
     passportFileError,
     passportReady,
     type,
+  });
+  const passportAiHints = passportAiHintItems({
+    activeUpload,
+    passportFileError,
+    passportReady,
+    passportUploads,
   });
 
   function selectType(nextType: Submission["type"]) {
@@ -565,12 +653,12 @@ export function CreateSubmissionDrawer({
       exit={
         prefersReducedMotion
           ? { opacity: 0, y: 0 }
-          : { opacity: 0, y: 18 }
+          : { opacity: 0, y: 0 }
       }
       initial={
         prefersReducedMotion
           ? { opacity: 1, y: 0 }
-          : { opacity: 0, y: 18 }
+          : { opacity: 0, y: 0 }
       }
       role="dialog"
       aria-modal="true"
@@ -585,7 +673,7 @@ export function CreateSubmissionDrawer({
       <header className="v19-create-drawer-header">
         <button
           ref={headerCloseButtonRef}
-          className="v19-create-drawer-close"
+          className="v19-create-drawer-close v19-create-drawer-close--back"
           type="button"
           aria-label="Закрыть создание"
           onClick={onClose}
@@ -610,7 +698,7 @@ export function CreateSubmissionDrawer({
         </span>
 
         <button
-          className="v19-create-drawer-close"
+          className="v19-create-drawer-close v19-create-drawer-close--dismiss"
           type="button"
           aria-label="Закрыть создание"
           onClick={onClose}
@@ -845,6 +933,20 @@ export function CreateSubmissionDrawer({
                     <span>
                       <strong>{liveState.title}</strong>
                       <em>{liveState.description}</em>
+                      <span
+                        className="v19-passport-ai-hints"
+                        aria-label="AI-подсказки по паспорту"
+                      >
+                        {passportAiHints.map((hint) => (
+                          <span
+                            key={`${hint.label}-${hint.value}`}
+                            className={`v19-passport-ai-hint is-${hint.tone}`}
+                          >
+                            <span>{hint.label}</span>
+                            <em>{hint.value}</em>
+                          </span>
+                        ))}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -1050,6 +1152,20 @@ export function CreateSubmissionDrawer({
                     <h3>Извлечённые данные паспорта</h3>
                   </div>
                   <span>{passportUploads.length ? "Подставятся" : "Нет файла"}</span>
+                </div>
+                <div
+                  className="v19-passport-ai-hints v19-passport-ai-hints--panel"
+                  aria-label="AI-подсказки по подстановке"
+                >
+                  {passportAiHints.map((hint) => (
+                    <span
+                      key={`${hint.label}-${hint.value}`}
+                      className={`v19-passport-ai-hint is-${hint.tone}`}
+                    >
+                      <span>{hint.label}</span>
+                      <em>{hint.value}</em>
+                    </span>
+                  ))}
                 </div>
                 <div className="ef-preview">
                   {extractedFieldPreviewItems.map((item) => {
