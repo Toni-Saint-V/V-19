@@ -83,15 +83,36 @@ describe("AdminReviewDrawer", () => {
       "Казань",
     );
     expect(screen.getAllByText("На проверке")[0]).toBeVisible();
-    expect(container.querySelector(".admin-review-meta")?.textContent).toContain(
-      "Агент: Татьяна Николаева",
-    );
 
-    for (const tab of [/^Обзор$/, /^Анкета/, /^Файлы$/, /^Замечания/]) {
+    for (const tab of [
+      /^Обзор$/,
+      /^Заявители/,
+      /^Анкета/,
+      /^Файлы$/,
+      /^Замечания/,
+      /^История/,
+    ]) {
       expect(screen.getByRole("tab", { name: tab })).toBeVisible();
     }
-    expect(screen.queryByRole("tab", { name: /^Заявители$/ })).toBeNull();
-    expect(screen.queryByRole("tab", { name: /^История$/ })).toBeNull();
+  });
+
+  test("opens overview, applicant, and history admin subscreens from tabs", async () => {
+    renderDrawer();
+
+    expect(screen.getByLabelText("Сводка пакета")).toBeInTheDocument();
+    expect(screen.getByLabelText("Маршрут проверки")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Заявители/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Паспорт" })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "Селфи" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^История/ }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("История подачи")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Агент отправил подачу на проверку")).toBeInTheDocument();
   });
 
   test("creates only canonical admin issue targets", () => {
@@ -113,7 +134,7 @@ describe("AdminReviewDrawer", () => {
     fireEvent.change(screen.getByPlaceholderText("Что именно не так..."), {
       target: { value: "Паспорт не совпадает с анкетой." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Создать замечание" }));
+    fireEvent.click(screen.getByRole("button", { name: "Отправить замечание" }));
 
     expect(onAddIssue).toHaveBeenCalledWith(
       expect.objectContaining({
