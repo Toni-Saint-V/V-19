@@ -3153,7 +3153,7 @@ function MainApp() {
         onClick={openCreateSubmissionDrawer}
       >
         <Plus aria-hidden="true" focusable="false" size={16} strokeWidth={1.9} />
-        <span>Новая подача</span>
+        <span>Создать пакет</span>
       </Button>
     </div>
   ) : isFigmaVisualSurface ? null : !isV19CollectionSurface || isSupabaseMode ? (
