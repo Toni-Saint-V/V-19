@@ -86,8 +86,7 @@ export function OperationalSidebar({
           />
         </span>
         <div className="ops-brand-copy opsu-brand-copy">
-          <strong className="opsu-wordmark vf-brand-wordmark">VisaFlow V-19</strong>
-          <em>Workspace</em>
+          <strong className="opsu-wordmark vf-brand-wordmark">VisaFlow</strong>
         </div>
         <IconButton
           className="ops-sidebar-mode-toggle"

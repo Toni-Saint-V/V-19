@@ -21,6 +21,7 @@ import {
   FolderCheck,
   History as HistoryIcon,
   Lock,
+  MapPin,
   MessageSquareWarning,
   PackageCheck,
   Search,
@@ -1798,6 +1799,20 @@ const reviewTabForLane: Record<AdminReviewLaneFilter, AdminWorkTab> = {
   urgent: "review",
 };
 
+const adminReviewCityFilters = [
+  "Все города",
+  "Москва",
+  "Санкт-Петербург",
+  "Казань",
+  "Екатеринбург",
+  "Новосибирск",
+  "Нижний Новгород",
+  "Самара",
+  "Ростов-на-Дону",
+] as const;
+
+const adminReviewAllAgents = "Все агенты";
+
 function adminReviewLaneFor(
   submission: Submission,
   triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
@@ -2098,7 +2113,6 @@ function AdminReviewCockpitRail({
 
 export function AdminReviewScreen({
   error = "",
-  filterControl,
   loading = false,
   onOpen,
   onRetryError,
@@ -2107,7 +2121,6 @@ export function AdminReviewScreen({
   permissionDenied = false,
   reviewList,
   reviewSource,
-  reviewTab,
   searchControl,
   visibleSubmission,
 }: {
@@ -2126,13 +2139,40 @@ export function AdminReviewScreen({
   visibleSubmission: Submission | null;
 }) {
   const [activeLane, setActiveLane] = useState<AdminReviewLaneFilter>("all");
+  const [mobileCityFilter, setMobileCityFilter] =
+    useState<(typeof adminReviewCityFilters)[number]>("Все города");
+  const [mobileAgentFilter, setMobileAgentFilter] = useState(adminReviewAllAgents);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const sourceList = reviewSource.length ? reviewSource : reviewList;
-  const visibleReviewList = useMemo(
+  const sortedReviewSourceList = useMemo(
     () => sortSubmissionsForOperations(sourceList, "priority"),
     [sourceList],
+  );
+  const agentFilterOptions = useMemo(() => {
+    const names = Array.from(
+      new Set(
+        sortedReviewSourceList
+          .map((submission) => agentOwnerDisplayName(submission.agentId))
+          .filter(Boolean),
+      ),
+    ).sort((left, right) => left.localeCompare(right, "ru"));
+
+    return [adminReviewAllAgents, ...names];
+  }, [sortedReviewSourceList]);
+  const visibleReviewList = useMemo(
+    () =>
+      sortedReviewSourceList.filter((submission) => {
+        const cityMatches =
+          mobileCityFilter === "Все города" || submission.city === mobileCityFilter;
+        const agentMatches =
+          mobileAgentFilter === adminReviewAllAgents ||
+          agentOwnerDisplayName(submission.agentId) === mobileAgentFilter;
+
+        return cityMatches && agentMatches;
+      }),
+    [mobileAgentFilter, mobileCityFilter, sortedReviewSourceList],
   );
   const allQueue = visibleReviewList.filter(matchesReviewTab("all"));
   const reviewQueue = visibleReviewList.filter(matchesReviewTab("review"));
@@ -2172,6 +2212,14 @@ export function AdminReviewScreen({
     activeLane === "all"
       ? adminReviewLaneConfig
       : adminReviewLaneConfig.filter((lane) => lane.id === activeLane);
+  const hasActiveLaneItems =
+    activeLane === "all"
+      ? visibleReviewList.length > 0
+      : laneItems[activeLane].length > 0;
+  const activeLaneTitle =
+    activeLane === "all"
+      ? "Все пакеты"
+      : (adminReviewLaneConfig.find((lane) => lane.id === activeLane)?.title ?? "Очередь");
   const visibleSelectedSubmission =
     visibleSubmission &&
     visibleReviewList.some((submission) => submission.id === visibleSubmission.id)
@@ -2209,12 +2257,29 @@ export function AdminReviewScreen({
     return () => window.removeEventListener("keydown", handleAdminMobileSheetEscape);
   }, [mobileFiltersOpen, mobileSummaryOpen]);
 
-  function chooseLane(nextLane: AdminReviewLaneFilter) {
+  function chooseLane(nextLane: AdminReviewLaneFilter, keepSheetOpen = false) {
     transitionUiState(() => {
       setActiveLane(nextLane);
       onTab(reviewTabForLane[nextLane]);
-      setMobileFiltersOpen(false);
+      if (!keepSheetOpen) setMobileFiltersOpen(false);
     });
+  }
+
+  function countByMobileFilter(
+    city: string,
+    agent: string,
+    lane: AdminReviewLaneFilter = "all",
+  ) {
+    return sortedReviewSourceList.filter((submission) => {
+      const triage = adminTriageRadarItem(submission);
+      const laneMatches = lane === "all" || adminReviewLaneFor(submission, triage) === lane;
+      const cityMatches = city === "Все города" || submission.city === city;
+      const agentMatches =
+        agent === adminReviewAllAgents ||
+        agentOwnerDisplayName(submission.agentId) === agent;
+
+      return laneMatches && cityMatches && agentMatches;
+    }).length;
   }
 
   function openAdminReviewSubmission(
@@ -2365,7 +2430,7 @@ export function AdminReviewScreen({
               onRetryError ? "Повторить" : undefined,
               onRetryError,
             )
-          ) : visibleReviewList.length ? (
+          ) : visibleReviewList.length && hasActiveLaneItems ? (
             <div className="v19-admin-cockpit-lanes" aria-label="Очередь проверки">
               {visibleLanes.map((lane) => (
                 <AdminReviewLaneColumn
@@ -2377,12 +2442,22 @@ export function AdminReviewScreen({
               ))}
             </div>
           ) : (
-            <AdminWorkEmptyState
-              description="Новые задачи появятся после отправки подачи агентом или получения исправлений."
-              actionLabel="Открыть соседнюю очередь"
-              title="Нет пакетов на проверке"
-              onShow={() => onTab(reviewTab === "review" ? "corrections" : "review")}
-            />
+            <div className="v19-admin-cockpit-board-empty">
+              <AdminWorkEmptyState
+                description={
+                  activeLane === "all"
+                    ? "Новые задачи появятся после отправки подачи агентом или получения исправлений."
+                    : "В этой очереди сейчас нет пакетов."
+                }
+                actionLabel="Показать все"
+                title={
+                  activeLane === "all"
+                    ? "Нет пакетов на проверке"
+                    : `${activeLaneTitle}: пусто`
+                }
+                onShow={() => chooseLane("all")}
+              />
+            </div>
           )}
         </div>
 
@@ -2496,34 +2571,76 @@ export function AdminReviewScreen({
                 <X aria-hidden="true" size={16} strokeWidth={1.8} />
               </button>
             </div>
-            <div className="v19-admin-sheet-filters">
-              <button
-                className={activeLane === "all" ? "is-active" : ""}
-                type="button"
-                onClick={() => chooseLane("all")}
-              >
-                Все
-                <span>{visibleReviewList.length}</span>
-              </button>
-              {adminReviewLaneConfig.map((lane) => {
-                const Icon = lane.icon;
-                return (
+            <div className="v19-admin-sheet-filter-collections">
+              <section aria-label="Статусы очереди" className="v19-admin-sheet-filter-section">
+                <span>Статус</span>
+                <div className="v19-admin-sheet-filter-row">
                   <button
-                    className={activeLane === lane.id ? "is-active" : ""}
-                    key={lane.id}
+                    className={activeLane === "all" ? "is-active" : ""}
                     type="button"
-                    onClick={() => chooseLane(lane.id)}
+                    onClick={() => chooseLane("all", true)}
                   >
-                    <Icon aria-hidden="true" size={16} strokeWidth={1.8} />
-                    {lane.title}
-                    <span>{laneItems[lane.id].length}</span>
+                    Все
+                    <small>
+                      {countByMobileFilter(mobileCityFilter, mobileAgentFilter, "all")}
+                    </small>
                   </button>
-                );
-              })}
+                  {adminReviewLaneConfig.map((lane) => {
+                    const Icon = lane.icon;
+                    return (
+                      <button
+                        className={activeLane === lane.id ? "is-active" : ""}
+                        key={lane.id}
+                        type="button"
+                        onClick={() => chooseLane(lane.id, true)}
+                      >
+                        <Icon aria-hidden="true" size={16} strokeWidth={1.8} />
+                        {lane.title}
+                        <small>
+                          {countByMobileFilter(mobileCityFilter, mobileAgentFilter, lane.id)}
+                        </small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section aria-label="Города" className="v19-admin-sheet-filter-section">
+                <span>Города</span>
+                <div className="v19-admin-sheet-filter-row">
+                  {adminReviewCityFilters.map((city) => (
+                    <button
+                      className={mobileCityFilter === city ? "is-active" : ""}
+                      key={city}
+                      type="button"
+                      onClick={() => setMobileCityFilter(city)}
+                    >
+                      <MapPin aria-hidden="true" size={16} strokeWidth={1.8} />
+                      {city}
+                      <small>{countByMobileFilter(city, mobileAgentFilter, activeLane)}</small>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section aria-label="Агенты" className="v19-admin-sheet-filter-section">
+                <span>Агенты</span>
+                <div className="v19-admin-sheet-filter-row">
+                  {agentFilterOptions.map((agent) => (
+                    <button
+                      className={mobileAgentFilter === agent ? "is-active" : ""}
+                      key={agent}
+                      type="button"
+                      onClick={() => setMobileAgentFilter(agent)}
+                    >
+                      <Building2 aria-hidden="true" size={16} strokeWidth={1.8} />
+                      {agent}
+                      <small>{countByMobileFilter(mobileCityFilter, agent, activeLane)}</small>
+                    </button>
+                  ))}
+                </div>
+              </section>
             </div>
-            {filterControl ? (
-              <div className="v19-admin-sheet-extra-filters">{filterControl}</div>
-            ) : null}
             </motion.aside>
             <motion.button
               aria-label="Закрыть фильтры"
@@ -2979,7 +3096,7 @@ export function LegacyExportScreen({
                               <span className="cell-title">{submission.title}</span>
                               <span className="subtle mono">{submission.id}</span>
                               <span className="export-row-note">
-                                Владелец: Admin export · Дальше: сформировать Excel
+                                Ответственный: администратор · Дальше: сформировать Excel
                               </span>
                               <span className="export-row-note">
                                 Причина: {exportStateLabel(submission)}
@@ -3183,7 +3300,7 @@ export function LegacyExportScreen({
                 <div>
                   <p className="kicker">Контракт выгрузки</p>
                   <h2>
-                    Excel · {exportPlan.contract.sheetName} {exportPlan.contract.range}
+                    Excel · {exportPlan.contract.columnCount} колонок
                   </h2>
                 </div>
                 <button
@@ -3368,7 +3485,7 @@ export function LegacyExportScreen({
                   aria-label="Аудит сопоставления 56 колонок"
                 >
                   <div className="mapping-audit-head">
-                    <strong>Контракт A:BD</strong>
+                    <strong>Поля Excel</strong>
                     <span>
                       {mappedCount} связано · {derivedCount} вычислено ·{" "}
                       {unresolvedCount} не сопоставлено
@@ -3474,13 +3591,13 @@ function AdminExportReferenceCockpit({
     },
     {
       icon: FileSpreadsheet,
-      label: "Excel preview",
+      label: "Предпросмотр",
       state: exportPlan.contract.valid && exportPlan.rowCount > 0 ? "ok" : "neutral",
       value: exportPlan.rowCount > 0 ? "готов" : "не выбран",
     },
     {
       icon: FileArchive,
-      label: "Manifest",
+      label: "Файлы пакета",
       state:
         !exportHasBlocker(exportPlan, "канонического пакета медиа") &&
         exportPlan.rowCount > 0
@@ -3496,7 +3613,7 @@ function AdminExportReferenceCockpit({
     },
     {
       icon: AlertTriangle,
-      label: "Warnings",
+      label: "Предупреждения",
       state: selectedWarnings > 0 ? "warn" : "ok",
       value: String(selectedWarnings),
     },
@@ -3534,13 +3651,13 @@ function AdminExportReferenceCockpit({
             icon={FileArchive}
             label="Документы"
             value={selectedFiles}
-            detail="файлов в manifest"
+            detail="файлов в пакете"
           />
           <AdminExportMetricCard
             icon={hasExportBlockers ? XCircle : ShieldCheck}
-            label="Pre-flight"
+            label="Проверка"
             tone={hasExportBlockers ? "warning" : "success"}
-            value={hasExportBlockers ? "STOP" : "OK"}
+            value={hasExportBlockers ? "стоп" : "готово"}
             detail={`${selectedWarnings} ${pluralRu(selectedWarnings, "предупреждение", "предупреждения", "предупреждений")}`}
           />
         </div>
@@ -3552,7 +3669,7 @@ function AdminExportReferenceCockpit({
                 {showingHistory ? "История выгрузки" : "Пакеты к выгрузке"}
               </h2>
               <p>
-                Формирование Excel, контроль manifest и экспортных блокеров.
+                Формирование Excel, контроль файлов и экспортных блокеров.
               </p>
             </div>
             <div className="v19-admin-export-tools">
@@ -3642,10 +3759,10 @@ function AdminExportReferenceCockpit({
       <aside className="v19-admin-export-side" aria-label="Контекст выгрузки">
         <div className="v19-admin-export-side-head">
           <div>
-            <span>Export cockpit</span>
-            <h3>Правая панель</h3>
+            <span>Выгрузка</span>
+            <h3>Сводка</h3>
             <h2>{exportPackageTitle(exportPlan)}</h2>
-            <p>Контроль состава, блокеров, manifest и истории перед Excel.</p>
+            <p>Контроль состава, блокеров, файлов и истории перед Excel.</p>
           </div>
           <div className="v19-admin-export-side-icon" aria-hidden="true">
             <FolderCheck focusable="false" size={20} />
@@ -3689,7 +3806,7 @@ function AdminExportReferenceCockpit({
 
           <section className="v19-admin-export-rail-card">
             <div className="v19-admin-export-card-head">
-              <h4>Pre-flight checks</h4>
+              <h4>Проверки перед выгрузкой</h4>
               <AdminExportStatusPill tone={hasExportBlockers ? "warning" : "success"}>
                 {hasExportBlockers ? "нужна правка" : "можно выгружать"}
               </AdminExportStatusPill>
@@ -4110,10 +4227,10 @@ function AdminExportMobileSheet({
           />
           <AdminExportMetricCard
             icon={hasExportBlockers ? XCircle : ShieldCheck}
-            label="Pre-flight"
+            label="Проверка"
             tone={hasExportBlockers ? "warning" : "success"}
-            value={hasExportBlockers ? "STOP" : "OK"}
-            detail={`${selectedWarnings} warning`}
+            value={hasExportBlockers ? "стоп" : "готово"}
+            detail={`${selectedWarnings} ${pluralRu(selectedWarnings, "предупреждение", "предупреждения", "предупреждений")}`}
           />
           <AdminExportMetricCard
             icon={FileSpreadsheet}
@@ -4211,7 +4328,7 @@ function ExportMobileFlow({
                     <strong>{submission.title}</strong>
                     <span>Строки: {submission.applicants.length}</span>
                     <span>Статус: {exportStateLabel(submission)}</span>
-                    <span>Владелец: Admin export</span>
+                    <span>Ответственный: администратор</span>
                     <span>Дальше: проверить условия</span>
                     <Button
                       variant="secondary"
@@ -4257,7 +4374,7 @@ function ExportMobileFlow({
             />
             <ExportGuardItem
               ok={!exportHasBlocker(exportPlan, "канонического пакета медиа")}
-              label="Canonical media готов"
+              label="Обязательные файлы готовы"
             />
             <ExportGuardItem
               ok={exportPlan.contract.valid && exportPlan.rowCount > 0}
@@ -4319,7 +4436,7 @@ function ExportMobileFlow({
 
       {mobileStep === 4 ? (
         <div className="v19-export-mobile-step-body">
-          <section className="v19-export-mobile-summary" aria-label="Export summary">
+          <section className="v19-export-mobile-summary" aria-label="Сводка выгрузки">
             <strong>{exportPackageTitle(exportPlan)}</strong>
             <span>Пакеты: {selectedSubmissionCount}</span>
             <span>Строки: {exportPlan.rowCount}</span>

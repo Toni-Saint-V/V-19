@@ -566,7 +566,6 @@ export function AdminReviewDrawer({
             role="tablist"
           >
             {adminReferenceTabs.map((tab) => {
-              const TabIcon = tab.icon;
               const count = tab.count?.(submission);
               const selected = isReferenceTabSelected(tab.id);
 
@@ -579,7 +578,6 @@ export function AdminReviewDrawer({
                   type="button"
                   onClick={() => selectReferenceTab(tab.id)}
                 >
-                  <TabIcon aria-hidden="true" size={16} />
                   <span>{tab.label}</span>
                   {typeof count === "number" ? (
                     <em className={tab.warning && count > 0 ? "is-warning" : ""}>
@@ -1766,6 +1764,7 @@ function FieldReviewRow({
           onClick={onRemark}
         >
           <MessageSquarePlus aria-hidden="true" size={14} />
+          <span>Замечание</span>
         </button>
       </span>
     </div>

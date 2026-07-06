@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "errors": [],
+  "metrics": {
+    "overflowX": 0,
+    "background": "rgba(0, 0, 0, 0.28)",
+    "backdropFilter": "blur(14px) saturate(1.08)",
+    "errors": []
+  }
+}

@@ -19333,3 +19333,662 @@ body,
 .vf-figma-questionnaire-screen .v19-questionnaire-excel-map {
   display: none !important;
 }
+
+/* Admin closure pass: touch targets, filter collections, shared side menu rhythm. */
+.ops-shell.has-unified-side-menu.role-admin:is(
+    .surface-admin-review,
+    .surface-export,
+    .surface-settings
+  ) {
+  --v19b-shell-sidebar-width: var(--v19-shell-sidebar-width);
+}
+
+@media (min-width: 768px) {
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-sidebar {
+    align-items: stretch !important;
+    gap: var(--v19-space-md) !important;
+    padding: var(--v19-space-lg) var(--v19-space-md) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand {
+    display: grid !important;
+    grid-template-columns: var(--v19-control-row-height) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    align-items: center !important;
+    justify-items: stretch !important;
+    gap: var(--v19-space-md) !important;
+    min-height: var(--v19-mobile-header-height) !important;
+    height: auto !important;
+    padding: var(--v19b-size-0) var(--v19b-size-0) var(--v19-space-md) !important;
+    border-bottom: var(--v19b-size-1) solid var(--v19-line-default) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-logo {
+    width: var(--v19-control-row-height) !important;
+    min-width: var(--v19-control-row-height) !important;
+    height: var(--v19-control-row-height) !important;
+    min-height: var(--v19-control-row-height) !important;
+    border: var(--v19b-size-1) solid var(--v19-line-default) !important;
+    border-radius: var(--v19-radius-button) !important;
+    background: var(--v19-control) !important;
+    color: var(--v19-fg) !important;
+    box-shadow: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-logo
+    img {
+    display: block !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-logo::before,
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-copy
+    em::after,
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-nav-group-label::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    :is(.ops-brand-copy, .ops-brand-copy strong, .ops-brand-copy em) {
+    display: block !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-copy
+    em {
+    color: var(--v19-fg-secondary) !important;
+    font-size: var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-nav-group-label {
+    color: var(--v19-fg-tertiary) !important;
+    font-size: var(--v19b-size-11) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-nav-item {
+    display: grid !important;
+    grid-template-columns: var(--v19-control-row-height) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+    align-items: center !important;
+    gap: var(--v19-space-sm) !important;
+    width: var(--v19b-size-full) !important;
+    min-height: var(--v19-control-row-height) !important;
+    padding: var(--v19b-size-0) var(--v19-space-sm) !important;
+    border-radius: var(--v19-radius-button) !important;
+    font-size: var(--v19b-size-14) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    :is(.ops-nav-copy, .ops-nav-copy strong, .ops-nav-copy small, .ops-nav-action) {
+    display: block !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-nav-copy
+    strong {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-cockpit-hero {
+  display: none !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-collections {
+  display: grid !important;
+  gap: var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-section {
+  display: grid !important;
+  gap: var(--v19b-size-8) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-section
+  > span {
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-row {
+  display: flex !important;
+  gap: var(--v19b-size-8) !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding-bottom: var(--v19b-size-2) !important;
+  overscroll-behavior-x: contain !important;
+  scrollbar-width: none !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-row
+  button {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--v19b-size-8) !important;
+  min-width: max-content !important;
+  min-height: var(--v19b-size-44) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-14) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text) !important;
+  box-shadow: none !important;
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-row
+  button.is-active {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  background: var(--v19b-color-app) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-sheet-filter-row
+  button
+  small {
+  display: inline-grid !important;
+  place-items: center !important;
+  min-width: var(--v19b-size-24) !important;
+  height: var(--v19b-size-24) !important;
+  padding-inline: var(--v19b-size-6) !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background: var(--v19b-color-tag) !important;
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-11) !important;
+  font-weight: var(--v19b-weight-title) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-actions
+  button {
+  min-width: var(--v19b-size-44) !important;
+  min-height: var(--v19b-size-44) !important;
+  height: var(--v19b-size-44) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-remark {
+  width: auto !important;
+  min-width: var(--v19b-size-44) !important;
+  gap: var(--v19b-size-6) !important;
+  padding-inline: var(--v19b-size-10) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-remark
+  span {
+  display: inline !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-checkbox {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  width: var(--v19b-size-44) !important;
+  min-width: var(--v19b-size-44) !important;
+  height: var(--v19b-size-44) !important;
+  min-height: var(--v19b-size-44) !important;
+  padding: var(--v19b-size-0) !important;
+  border: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-clear) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-checkbox::before {
+  content: "" !important;
+  width: var(--v19b-size-20) !important;
+  height: var(--v19b-size-20) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-size-6) !important;
+  background: var(--v19b-color-control) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-checkbox.is-selected::before {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  background: var(--v19b-color-primary) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-checkbox
+  svg {
+  position: absolute !important;
+  z-index: 1 !important;
+  width: var(--v19b-size-16) !important;
+  height: var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  :is(.v19-admin-export-primary-action, .v19-admin-export-mobile-cta) {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  background: var(--v19b-color-app) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.ops-shell.surface-settings > .workspace > .topbar {
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.surface-settings .topbar-heading {
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.surface-settings .topbar-heading h1 {
+  min-width: max-content !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.surface-settings .settings-nav {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: var(--v19b-size-6) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain !important;
+  scrollbar-width: none !important;
+}
+
+.ops-shell.surface-settings .settings-nav::-webkit-scrollbar {
+  display: none !important;
+}
+
+.ops-shell.surface-settings .settings-nav button {
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+}
+
+@media (max-width: 1024px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-checkbox-native {
+    top: var(--v19b-size-8) !important;
+    right: var(--v19b-size-8) !important;
+    z-index: 3 !important;
+    width: var(--v19b-size-44) !important;
+    height: var(--v19b-size-44) !important;
+    opacity: 0 !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row
+    > .v19-admin-export-checkbox {
+    position: absolute !important;
+    top: var(--v19b-size-8) !important;
+    right: var(--v19b-size-8) !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-row-actions {
+    justify-content: stretch !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-row-actions
+    button {
+    flex: 1 1 var(--v19b-size-0) !important;
+  }
+}
+
+/* Admin mobile sheet backdrop: blur the workspace instead of covering it with a flat gray layer. */
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-mobile-sheet-backdrop {
+    background: rgb(0 0 0 / 0.28) !important;
+    backdrop-filter: blur(var(--v19b-size-14)) saturate(1.08) !important;
+    -webkit-backdrop-filter: blur(var(--v19b-size-14)) saturate(1.08) !important;
+  }
+}
+
+/* Admin feedback pass: shared sidebar, search alignment, drawer tab parity. */
+@media (min-width: 768px) {
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand {
+    grid-template-columns:
+      var(--v19b-size-48)
+      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+      var(--v19b-size-40) !important;
+    gap: var(--v19b-size-10) !important;
+    align-items: center !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-logo {
+    width: var(--v19b-size-48) !important;
+    min-width: var(--v19b-size-48) !important;
+    height: var(--v19b-size-48) !important;
+    min-height: var(--v19b-size-48) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-logo
+    img {
+    width: var(--v19b-size-32) !important;
+    height: var(--v19b-size-32) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-brand-copy
+    em {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export,
+      .surface-settings
+    )
+    .ops-sidebar-mode-toggle {
+    justify-self: end !important;
+    width: var(--v19b-size-36) !important;
+    min-width: var(--v19b-size-36) !important;
+    height: var(--v19b-size-36) !important;
+    min-height: var(--v19b-size-36) !important;
+    border-radius: var(--v19b-radius-control) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-toolbar {
+    align-items: end !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-tools {
+    display: grid !important;
+    grid-template-columns:
+      minmax(var(--v19b-size-220), var(--v19b-size-260))
+      var(--v19b-size-44) !important;
+    align-items: center !important;
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-search {
+    display: grid !important;
+    grid-template-columns: var(--v19b-size-24) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    align-items: center !important;
+    height: var(--v19b-size-40) !important;
+    min-height: var(--v19b-size-40) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-10) !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-search
+    .mp-searchbar {
+    display: flex !important;
+    align-items: center !important;
+    width: var(--v19b-size-full) !important;
+    height: var(--v19b-size-full) !important;
+    min-height: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-0) !important;
+    background: var(--v19b-color-clear) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-search
+    input {
+    width: var(--v19b-size-full) !important;
+    height: var(--v19b-size-full) !important;
+    min-height: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-0) !important;
+    background: var(--v19b-color-clear) !important;
+    line-height: var(--v19b-line-height-control) !important;
+  }
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+  .v19-admin-cockpit-board-empty {
+  display: grid !important;
+  min-height: var(--v19b-size-360) !important;
+  padding: var(--v19b-size-16) !important;
+  place-items: center !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-tabs,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .v19-figma-drawer-tabs {
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-tabs
+  button {
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-tabs
+  button
+  svg {
+  display: none !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-overview-heading {
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-package-label {
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell
+  :is(.v19-drawer-route-card, .v19-drawer-route-copy, .v19-drawer-package-row) {
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell
+  :is(.v19-drawer-applicant-name, .v19-drawer-applicant-role) {
+  font-size: var(--v19b-size-14) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-applicant-copy {
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell
+  .v19-figma-drawer-header-status[data-status-tone="danger"] {
+  border-color: var(--v19b-status-danger-border) !important;
+  background: var(--v19b-status-danger-bg) !important;
+  color: var(--v19b-dot-danger) !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-tab {
+  gap: var(--v19b-size-8) !important;
+  font-size: var(--v19b-size-12) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-questionnaire-open-button {
+  min-height: var(--v19b-size-44) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: none !important;
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-questionnaire-open-button:hover,
+.v19-figma-drawer-shell .v19-drawer-questionnaire-open-button:focus-visible {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: none !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-title-row > span {
+  min-height: var(--v19b-size-20) !important;
+  height: var(--v19b-size-20) !important;
+  font-size: var(--v19b-size-8) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-questionnaire-summary-copy {
+  font-size: var(--v19b-size-14) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-questionnaire-summary-title {
+  font-size: var(--v19b-size-14) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-questionnaire-summary-helper {
+  font-size: var(--v19b-size-12) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell
+  :is(
+    .v19-drawer-questionnaire-section-title,
+    .v19-drawer-questionnaire-section-head
+  ) {
+  font-size: var(--v19b-size-14) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.v19-figma-drawer-shell
+  :is(
+    .v19-drawer-questionnaire-section-percent,
+    .v19-drawer-questionnaire-section-remaining
+  ) {
+  font-size: var(--v19b-size-12) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+@media (max-width: 767px) {
+  .v19-figma-drawer-shell .v19-figma-drawer-heading {
+    font-size: var(--v19b-size-18) !important;
+  }
+
+  .v19-figma-drawer-shell .v19-figma-drawer-header-status {
+    min-height: var(--v19b-size-22) !important;
+    height: var(--v19b-size-22) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-10) !important;
+    font-size: var(--v19b-size-9) !important;
+    font-weight: var(--v19b-weight-control) !important;
+  }
+}

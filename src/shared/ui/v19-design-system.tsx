@@ -952,6 +952,7 @@ export function V19DrawerHeader<T extends string>({
   onClose,
   onTab,
   status,
+  statusTone,
   tabs,
   tabsRef,
   title,
@@ -964,6 +965,7 @@ export function V19DrawerHeader<T extends string>({
   onClose?: () => void;
   onTab: (tab: T) => void;
   status: string;
+  statusTone?: "danger" | "neutral";
   tabs: Array<V19DrawerTab<T>>;
   tabsRef?: RefObject<HTMLDivElement | null>;
   title: string;
@@ -980,7 +982,12 @@ export function V19DrawerHeader<T extends string>({
           </div>
           <h2 className="v19-figma-drawer-heading">{title}</h2>
           <div className="v19-figma-drawer-status-row">
-            <span className="v19-figma-drawer-header-status">{status}</span>
+            <span
+              className="v19-figma-drawer-header-status"
+              data-status-tone={statusTone}
+            >
+              {status}
+            </span>
             {updated ? (
               <span className="v19-figma-drawer-updated">
                 <Clock aria-hidden="true" size={12} />

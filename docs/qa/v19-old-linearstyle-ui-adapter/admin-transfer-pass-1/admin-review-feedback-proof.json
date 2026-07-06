@@ -1,0 +1,113 @@
+{
+  "metrics": {
+    "adminDesktop": {
+      "agentZoneCount": 0,
+      "brandText": "VisaFlow",
+      "collapseButton": {
+        "height": 36,
+        "width": 36,
+        "x": 239,
+        "y": 21.5
+      },
+      "logo": {
+        "height": 32,
+        "width": 32,
+        "x": 12,
+        "y": 23.5
+      },
+      "searchBackground": "rgb(16, 16, 17)",
+      "searchInput": {
+        "height": 38,
+        "width": 166,
+        "x": 806,
+        "y": 146
+      },
+      "searchShell": {
+        "height": 40,
+        "width": 220,
+        "x": 763,
+        "y": 145
+      },
+      "sessionText": "ИЛИрина ЛебедеваАдминистратор"
+    },
+    "adminEmpty": {
+      "emptyText": "Проверить: пустоВ этой очереди сейчас нет пакетов.Показать все",
+      "laneCount": 0
+    },
+    "agentDrawerDesktop": {
+      "applicantName": null,
+      "applicantRole": null,
+      "heading": null,
+      "packageLabel": null,
+      "status": {
+        "text": null,
+        "tone": null
+      },
+      "tab": null
+    },
+    "adminDrawer": {
+      "iconCount": 0,
+      "tabGap": "8px",
+      "tabTexts": [
+        "Обзор",
+        "Заявители",
+        "Анкета51",
+        "Файлы",
+        "Замечания0",
+        "История"
+      ]
+    }
+  },
+  "pages": [
+    {
+      "consoleErrors": [],
+      "name": "adminDesktop",
+      "overflow": 0,
+      "pageErrors": [],
+      "viewport": {
+        "width": 1352,
+        "height": 642
+      }
+    },
+    {
+      "consoleErrors": [],
+      "name": "adminEmpty",
+      "overflow": 0,
+      "pageErrors": [],
+      "viewport": {
+        "width": 716,
+        "height": 666
+      }
+    },
+    {
+      "consoleErrors": [],
+      "name": "agentDrawerDesktop",
+      "overflow": 0,
+      "pageErrors": [],
+      "viewport": {
+        "width": 1352,
+        "height": 642
+      }
+    },
+    {
+      "consoleErrors": [],
+      "name": "agentDrawerMobile",
+      "overflow": 0,
+      "pageErrors": [],
+      "viewport": {
+        "width": 716,
+        "height": 666
+      }
+    },
+    {
+      "consoleErrors": [],
+      "name": "adminDrawer",
+      "overflow": 0,
+      "pageErrors": [],
+      "viewport": {
+        "width": 1352,
+        "height": 642
+      }
+    }
+  ]
+}
