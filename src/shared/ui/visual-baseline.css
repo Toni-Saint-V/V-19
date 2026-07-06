@@ -7894,7 +7894,7 @@ body,
   min-height: var(--v19b-viewport-height) !important;
   height: var(--v19b-viewport-height) !important;
   display: grid !important;
-  grid-template-rows: auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+  grid-template-rows: auto auto minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
   gap: var(--v19b-size-16) !important;
   padding: var(--v19b-size-16) var(--v19b-size-8) !important;
   border: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
@@ -20453,4 +20453,33 @@ body,
 
 .ops-shell.surface-agent-submissions .v19-submission-profile-grid.is-family article.vf-figma-family-card.v19-dossier-card .vf-figma-family-footer {
   margin-top: auto !important;
+}
+
+/* Browser comments 2026-07-06: submission drawer annotated type and tabs. */
+.v19-figma-drawer-shell .v19-figma-drawer-header-status {
+  font-size: var(--v19b-size-9) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-tab {
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+  overflow: visible !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-tab > span:first-child {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-file-action,
+.v19-figma-drawer-shell .v19-figma-drawer-footer-status {
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-actions button:disabled {
+  cursor: not-allowed !important;
+  opacity: var(--v19b-opacity-disabled) !important;
 }

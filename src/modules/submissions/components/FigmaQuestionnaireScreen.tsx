@@ -1887,11 +1887,11 @@ export function FigmaQuestionnaireScreen({
 
   return (
     <motion.div
-      animate={{ opacity: 1, x: 0 }}
+      animate={{ opacity: 1 }}
       className="vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell"
-      exit={{ opacity: 0, x: -20 }}
-      initial={{ opacity: 0, x: 20 }}
-      transition={{ damping: 25, stiffness: 250, type: "spring" }}
+      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
     >
       <header className="v19-questionnaire-screen-header">
         <button
