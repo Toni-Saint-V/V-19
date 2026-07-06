@@ -1,0 +1,3307 @@
+{
+  "consoleErrors": [],
+  "pageErrors": [],
+  "checks": [
+    {
+      "viewport": {
+        "name": "desktop-1440",
+        "width": 1440,
+        "height": 900
+      },
+      "surface": "agent-submissions",
+      "header": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 771.734375,
+          "height": 21,
+          "top": 21,
+          "left": 334,
+          "right": 1105.734375,
+          "bottom": 42
+        },
+        "h1ScrollWidth": 772,
+        "h1ClientWidth": 772,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      },
+      "cards": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 246.5,
+            "right": 640.328125,
+            "bottom": 263.296875,
+            "left": 389,
+            "width": 251.328125,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 273.296875,
+            "right": 640.328125,
+            "bottom": 287.6875,
+            "left": 389,
+            "width": 251.328125,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 212.5,
+            "right": 640.328125,
+            "bottom": 236.5,
+            "left": 499.234375,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 310.5,
+            "right": 640.328125,
+            "bottom": 386.5,
+            "left": 333,
+            "width": 307.328125,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 246.5,
+            "right": 1005.65625,
+            "bottom": 263.296875,
+            "left": 754.328125,
+            "width": 251.328125,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 273.296875,
+            "right": 1005.65625,
+            "bottom": 287.6875,
+            "left": 754.328125,
+            "width": 251.328125,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 212.5,
+            "right": 1005.65625,
+            "bottom": 236.5,
+            "left": 864.5625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 310.5,
+            "right": 1005.65625,
+            "bottom": 386.5,
+            "left": 698.328125,
+            "width": 307.328125,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 246.5,
+            "right": 1371,
+            "bottom": 263.296875,
+            "left": 1119.65625,
+            "width": 251.34375,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 273.296875,
+            "right": 1371,
+            "bottom": 287.6875,
+            "left": 1119.65625,
+            "width": 251.34375,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 212.5,
+            "right": 1371,
+            "bottom": 236.5,
+            "left": 1229.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 310.5,
+            "right": 1371,
+            "bottom": 386.5,
+            "left": 1063.65625,
+            "width": 307.34375,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 549,
+            "right": 549,
+            "bottom": 565.796875,
+            "left": 391,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 575.796875,
+            "right": 549,
+            "bottom": 590.1875,
+            "left": 391,
+            "width": 158,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 605,
+            "right": 549,
+            "bottom": 648,
+            "left": 333,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 549,
+            "right": 823,
+            "bottom": 565.796875,
+            "left": 665,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 575.796875,
+            "right": 823,
+            "bottom": 590.796875,
+            "left": 665,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 605,
+            "right": 823,
+            "bottom": 648,
+            "left": 607,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 548,
+            "right": 1097,
+            "bottom": 564.796875,
+            "left": 939,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 574.796875,
+            "right": 1097,
+            "bottom": 589.796875,
+            "left": 939,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 604,
+            "right": 1097,
+            "bottom": 647,
+            "left": 881,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 549,
+            "right": 1371,
+            "bottom": 565.796875,
+            "left": 1213,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 575.796875,
+            "right": 1371,
+            "bottom": 590.796875,
+            "left": 1213,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 605,
+            "right": 1371,
+            "bottom": 648,
+            "left": 1155,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 754,
+            "right": 549,
+            "bottom": 770.796875,
+            "left": 391,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 780.796875,
+            "right": 549,
+            "bottom": 795.796875,
+            "left": 391,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 810,
+            "right": 549,
+            "bottom": 853,
+            "left": 333,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ],
+      "overflow": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "viewport": {
+        "name": "desktop-1440",
+        "width": 1440,
+        "height": 900
+      },
+      "surface": "settings",
+      "header": {
+        "title": "Настройки",
+        "h1Rect": {
+          "width": 958,
+          "height": 23.515625,
+          "top": 19.734375,
+          "left": 391,
+          "right": 1349,
+          "bottom": 43.25
+        },
+        "h1ScrollWidth": 958,
+        "h1ClientWidth": 958,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": "Роль, режим данных и безопасный выход.",
+        "descRect": {
+          "width": 760,
+          "height": 18
+        },
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      },
+      "hasExportErrorsSetting": false,
+      "overflow": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "viewport": {
+        "name": "tablet-768",
+        "width": 768,
+        "height": 1024
+      },
+      "surface": "agent-submissions",
+      "header": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 513.140625,
+          "height": 21,
+          "top": 55.5,
+          "left": 62,
+          "right": 575.140625,
+          "bottom": 76.5
+        },
+        "h1ScrollWidth": 513,
+        "h1ClientWidth": 513,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 768,
+        "innerWidth": 768
+      },
+      "cards": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 256.5,
+            "right": 355,
+            "bottom": 273.296875,
+            "left": 117,
+            "width": 238,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 283.296875,
+            "right": 355,
+            "bottom": 297.6875,
+            "left": 117,
+            "width": 238,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 222.5,
+            "right": 355,
+            "bottom": 246.5,
+            "left": 213.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 320.5,
+            "right": 355,
+            "bottom": 396.5,
+            "left": 61,
+            "width": 294,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 256.5,
+            "right": 707,
+            "bottom": 273.296875,
+            "left": 469,
+            "width": 238,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 283.296875,
+            "right": 707,
+            "bottom": 297.6875,
+            "left": 469,
+            "width": 238,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 222.5,
+            "right": 707,
+            "bottom": 246.5,
+            "left": 565.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 320.5,
+            "right": 707,
+            "bottom": 396.5,
+            "left": 413,
+            "width": 294,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 512.5,
+            "right": 355,
+            "bottom": 529.296875,
+            "left": 117,
+            "width": 238,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 539.296875,
+            "right": 355,
+            "bottom": 553.6875,
+            "left": 117,
+            "width": 238,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 478.5,
+            "right": 355,
+            "bottom": 502.5,
+            "left": 213.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 576.5,
+            "right": 355,
+            "bottom": 652.5,
+            "left": 61,
+            "width": 294,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 815,
+            "right": 355,
+            "bottom": 831.796875,
+            "left": 119,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 841.796875,
+            "right": 355,
+            "bottom": 856.1875,
+            "left": 119,
+            "width": 236,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 871,
+            "right": 355,
+            "bottom": 914,
+            "left": 61,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 815,
+            "right": 707,
+            "bottom": 831.796875,
+            "left": 471,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 841.796875,
+            "right": 707,
+            "bottom": 856.796875,
+            "left": 471,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 871,
+            "right": 707,
+            "bottom": 914,
+            "left": 413,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 1020,
+            "right": 355,
+            "bottom": 1036.796875,
+            "left": 119,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1046.796875,
+            "right": 355,
+            "bottom": 1061.796875,
+            "left": 119,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1076,
+            "right": 355,
+            "bottom": 1119,
+            "left": 61,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1020,
+            "right": 707,
+            "bottom": 1036.796875,
+            "left": 471,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1046.796875,
+            "right": 707,
+            "bottom": 1061.796875,
+            "left": 471,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1076,
+            "right": 707,
+            "bottom": 1119,
+            "left": 413,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1225,
+            "right": 355,
+            "bottom": 1241.796875,
+            "left": 119,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1251.796875,
+            "right": 355,
+            "bottom": 1266.796875,
+            "left": 119,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1281,
+            "right": 355,
+            "bottom": 1324,
+            "left": 61,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ],
+      "overflow": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "viewport": {
+        "name": "tablet-768",
+        "width": 768,
+        "height": 1024
+      },
+      "surface": "settings",
+      "header": {
+        "title": "Настройки",
+        "h1Rect": {
+          "width": 628,
+          "height": 23.515625,
+          "top": 22.734375,
+          "left": 77,
+          "right": 705,
+          "bottom": 46.25
+        },
+        "h1ScrollWidth": 628,
+        "h1ClientWidth": 628,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": "Роль, режим данных и безопасный выход.",
+        "descRect": {
+          "width": 491.515625,
+          "height": 18
+        },
+        "scrollWidth": 768,
+        "innerWidth": 768
+      },
+      "hasExportErrorsSetting": false,
+      "overflow": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "viewport": {
+        "name": "desktop-1440",
+        "width": 1440,
+        "height": 900
+      },
+      "surface": "agent-submissions-rail",
+      "rail": {
+        "facts": [
+          {
+            "label": "Поездка",
+            "value": "Москва · 04.09-14.09",
+            "labelRect": {
+              "top": 277.9375,
+              "right": 1122,
+              "bottom": 291.125,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 277.9375,
+              "right": 1370,
+              "bottom": 293.53125,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Заявители",
+            "value": "2 заявителя",
+            "labelRect": {
+              "top": 301.53125,
+              "right": 1122,
+              "bottom": 314.71875,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 301.53125,
+              "right": 1370,
+              "bottom": 317.125,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Причина",
+            "value": "1 исправление ждут проверки",
+            "labelRect": {
+              "top": 325.125,
+              "right": 1122,
+              "bottom": 338.3125,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 325.125,
+              "right": 1370,
+              "bottom": 340.71875,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Следующее",
+            "value": "Ждать проверки админа",
+            "labelRect": {
+              "top": 348.71875,
+              "right": 1122,
+              "bottom": 361.90625,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 348.71875,
+              "right": 1370,
+              "bottom": 364.3125,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Готовность",
+            "value": "50%",
+            "labelRect": {
+              "top": 372.3125,
+              "right": 1122,
+              "bottom": 385.5,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 372.3125,
+              "right": 1370,
+              "bottom": 387.90625,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          }
+        ],
+        "quickLinks": [
+          {
+            "text": "Анкета",
+            "rect": {
+              "top": 623.03125,
+              "right": 1151,
+              "bottom": 655.03125,
+              "left": 1057,
+              "width": 94,
+              "height": 32
+            },
+            "display": "flex",
+            "gap": "6px"
+          },
+          {
+            "text": "Файлы",
+            "rect": {
+              "top": 623.03125,
+              "right": 1253,
+              "bottom": 655.03125,
+              "left": 1159,
+              "width": 94,
+              "height": 32
+            },
+            "display": "flex",
+            "gap": "6px"
+          },
+          {
+            "text": "Замечания",
+            "rect": {
+              "top": 623.03125,
+              "right": 1355,
+              "bottom": 655.03125,
+              "left": 1261,
+              "width": 94,
+              "height": 32
+            },
+            "display": "flex",
+            "gap": "6px"
+          }
+        ]
+      },
+      "overflow": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "viewport": {
+        "name": "mobile-390",
+        "width": 390,
+        "height": 844
+      },
+      "surface": "mobile-agent-submissions-create-settings",
+      "header": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 192,
+          "height": 19,
+          "top": 20,
+          "left": 62,
+          "right": 254,
+          "bottom": 39
+        },
+        "h1ScrollWidth": 192,
+        "h1ClientWidth": 192,
+        "h1Computed": {
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 390,
+        "innerWidth": 390
+      },
+      "cards": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 200.5,
+            "right": 199.90625,
+            "bottom": 217.296875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 227.296875,
+            "right": 199.90625,
+            "bottom": 241.6875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 220.5,
+            "right": 353,
+            "bottom": 244.5,
+            "left": 211.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 254.5,
+            "right": 199.90625,
+            "bottom": 364.5,
+            "left": 37,
+            "width": 162.90625,
+            "height": 110
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 456.5,
+            "right": 199.90625,
+            "bottom": 473.296875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 483.296875,
+            "right": 199.90625,
+            "bottom": 497.6875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 476.5,
+            "right": 353,
+            "bottom": 500.5,
+            "left": 211.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 510.5,
+            "right": 199.90625,
+            "bottom": 620.5,
+            "left": 37,
+            "width": 162.90625,
+            "height": 110
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 712.5,
+            "right": 199.90625,
+            "bottom": 729.296875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 739.296875,
+            "right": 199.90625,
+            "bottom": 753.6875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 732.5,
+            "right": 353,
+            "bottom": 756.5,
+            "left": 211.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 766.5,
+            "right": 199.90625,
+            "bottom": 876.5,
+            "left": 37,
+            "width": 162.90625,
+            "height": 110
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 540,
+            "right": 353,
+            "bottom": 556.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 566.796875,
+            "right": 353,
+            "bottom": 581.1875,
+            "left": 95,
+            "width": 258,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 596,
+            "right": 353,
+            "bottom": 639,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 745,
+            "right": 353,
+            "bottom": 761.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 771.796875,
+            "right": 353,
+            "bottom": 786.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 801,
+            "right": 353,
+            "bottom": 844,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 950,
+            "right": 353,
+            "bottom": 966.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 976.796875,
+            "right": 353,
+            "bottom": 991.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1006,
+            "right": 353,
+            "bottom": 1049,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1155,
+            "right": 353,
+            "bottom": 1171.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1181.796875,
+            "right": 353,
+            "bottom": 1196.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1211,
+            "right": 353,
+            "bottom": 1254,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1360,
+            "right": 353,
+            "bottom": 1376.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1386.796875,
+            "right": 353,
+            "bottom": 1401.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1416,
+            "right": 353,
+            "bottom": 1459,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ],
+      "createDrawer": {
+        "visible": true,
+        "footer": {
+          "top": 759,
+          "right": 390,
+          "bottom": 844,
+          "left": 0,
+          "width": 390,
+          "height": 85
+        },
+        "upload": {
+          "top": 68,
+          "right": 378,
+          "bottom": 428,
+          "left": 12,
+          "width": 366,
+          "height": 360
+        },
+        "type": {
+          "top": 436,
+          "right": 378,
+          "bottom": 640.078125,
+          "left": 12,
+          "width": 366,
+          "height": 204.078125
+        },
+        "next": {
+          "top": 796,
+          "right": 378,
+          "bottom": 836,
+          "left": 199,
+          "width": 179,
+          "height": 40
+        },
+        "innerHeight": 844,
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "bodyText": "Мои подачи\nМои подачи\nФильтры\nСЕМЬИ\nАкт: 15.06\n1 пакет\nСемья Петровы\n2 заявителя\nИП\nИрина Петрова\nПП\nПавел Петров\nАкт: 15.06\n1 пакет\nСемья Волковы\n3 заявителя\nАВ\nАнна Волкова\nИВ\nИгорь Волков\nАкт: 15.06\n1 пакет\nСемья Ивановы\n4 заявителя\nМИ\nМария Иванова\nАИ\nАнтон Иванов\nОДИНОЧНЫЕ ПРОФИЛИ\nАкт: 15.06\n1 пакет\nНВ\nНина Волкова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nНМ\nНикита Морозов\nПрофиль готов\nАкт: 15.06\n1 пакет\nДО\nДмитрий Орлов\nПрофиль готов\nАкт: 15.06\n1 пакет\nЕС\nЕлена Смирнова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nАС\nАртём Соколов\nПрофиль в работе\nЗагрузка и первичная сборка\nНовая подача\nЗагрузите паспорт\n\nЗАЯВИТЕЛЬ / СЕМЬЯ\n\nСтруктура подачи\n1 чел.\nЗаявитель\nСемья\nГород подачи\nМосква\nСанкт-Петербург\nКазань\nПеретащите файлы\n\nJPEG, PNG.\nРазворот загранпаспорта с MRZ.\n\nВыбрать файлы\nНужен файл паспорта\nПаспорт ещё не выбран.\nНужен файл паспорта.\nСохранить черновик\nПродолжить"
+      },
+      "hasExportErrorsSetting": false,
+      "overflow": {
+        "scrollWidth": 390,
+        "innerWidth": 390
+      }
+    },
+    {
+      "viewport": {
+        "name": "mobile-320",
+        "width": 320,
+        "height": 740
+      },
+      "surface": "mobile-agent-submissions-create-settings",
+      "header": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 194,
+          "height": 18,
+          "top": 20.5,
+          "left": 52,
+          "right": 246,
+          "bottom": 38.5
+        },
+        "h1ScrollWidth": 194,
+        "h1ClientWidth": 194,
+        "h1Computed": {
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 320,
+        "innerWidth": 320
+      },
+      "cards": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 200.5,
+            "right": 129.90625,
+            "bottom": 217.296875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 227.296875,
+            "right": 129.90625,
+            "bottom": 270.46875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 43.171875
+          },
+          "footerRect": {
+            "top": 246.46875,
+            "right": 283,
+            "bottom": 270.46875,
+            "left": 141.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 280.46875,
+            "right": 129.90625,
+            "bottom": 364.5,
+            "left": 37,
+            "width": 92.90625,
+            "height": 84.03125
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 456.5,
+            "right": 129.90625,
+            "bottom": 473.296875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 483.296875,
+            "right": 129.90625,
+            "bottom": 526.46875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 43.171875
+          },
+          "footerRect": {
+            "top": 502.46875,
+            "right": 283,
+            "bottom": 526.46875,
+            "left": 141.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 536.46875,
+            "right": 129.90625,
+            "bottom": 620.5,
+            "left": 37,
+            "width": 92.90625,
+            "height": 84.03125
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 712.5,
+            "right": 129.90625,
+            "bottom": 729.296875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 739.296875,
+            "right": 129.90625,
+            "bottom": 782.46875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 43.171875
+          },
+          "footerRect": {
+            "top": 758.46875,
+            "right": 283,
+            "bottom": 782.46875,
+            "left": 141.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 792.46875,
+            "right": 129.90625,
+            "bottom": 876.5,
+            "left": 37,
+            "width": 92.90625,
+            "height": 84.03125
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 488,
+            "right": 283,
+            "bottom": 504.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 514.796875,
+            "right": 283,
+            "bottom": 529.1875,
+            "left": 95,
+            "width": 188,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 544,
+            "right": 283,
+            "bottom": 587,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 693,
+            "right": 283,
+            "bottom": 709.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 719.796875,
+            "right": 283,
+            "bottom": 734.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 749,
+            "right": 283,
+            "bottom": 792,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 898,
+            "right": 283,
+            "bottom": 914.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 924.796875,
+            "right": 283,
+            "bottom": 939.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 954,
+            "right": 283,
+            "bottom": 997,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1103,
+            "right": 283,
+            "bottom": 1119.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1129.796875,
+            "right": 283,
+            "bottom": 1144.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1159,
+            "right": 283,
+            "bottom": 1202,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1308,
+            "right": 283,
+            "bottom": 1324.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1334.796875,
+            "right": 283,
+            "bottom": 1349.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1364,
+            "right": 283,
+            "bottom": 1407,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ],
+      "createDrawer": {
+        "visible": true,
+        "footer": {
+          "top": 655,
+          "right": 320,
+          "bottom": 740,
+          "left": 0,
+          "width": 320,
+          "height": 85
+        },
+        "upload": {
+          "top": 68,
+          "right": 308,
+          "bottom": 428,
+          "left": 12,
+          "width": 296,
+          "height": 360
+        },
+        "type": {
+          "top": 436,
+          "right": 308,
+          "bottom": 664.078125,
+          "left": 12,
+          "width": 296,
+          "height": 228.078125
+        },
+        "next": {
+          "top": 692,
+          "right": 308,
+          "bottom": 732,
+          "left": 164,
+          "width": 144,
+          "height": 40
+        },
+        "innerHeight": 740,
+        "scrollWidth": 320,
+        "innerWidth": 320,
+        "bodyText": "Мои подачи\nМои подачи\nФильтры\nСЕМЬИ\nАкт: 15.06\n1 пакет\nСемья Петровы\n2 заявителя\nИП\nИрина Петрова\nПП\nПавел Петров\nАкт: 15.06\n1 пакет\nСемья Волковы\n3 заявителя\nАВ\nАнна Волкова\nИВ\nИгорь Волков\nАкт: 15.06\n1 пакет\nСемья Ивановы\n4 заявителя\nМИ\nМария Иванова\nАИ\nАнтон Иванов\nОДИНОЧНЫЕ ПРОФИЛИ\nАкт: 15.06\n1 пакет\nНВ\nНина Волкова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nНМ\nНикита Морозов\nПрофиль готов\nАкт: 15.06\n1 пакет\nДО\nДмитрий Орлов\nПрофиль готов\nАкт: 15.06\n1 пакет\nЕС\nЕлена Смирнова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nАС\nАртём Соколов\nПрофиль в работе\nЗагрузка и первичная сборка\nНовая подача\nЗагрузите паспорт\n\nЗАЯВИТЕЛЬ / СЕМЬЯ\n\nСтруктура подачи\n1 чел.\nЗаявитель\nСемья\nГород подачи\nМосква\nСанкт-Петербург\nКазань\nПеретащите файлы\n\nJPEG, PNG.\nРазворот загранпаспорта с MRZ.\n\nВыбрать файлы\nНужен файл паспорта\nПаспорт ещё не выбран.\nНужен файл паспорта.\nСохранить черновик\nПродолжить"
+      },
+      "hasExportErrorsSetting": false,
+      "overflow": {
+        "scrollWidth": 320,
+        "innerWidth": 320
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "name": "desktop-1440-agent-submissions-header-visible",
+      "pass": true,
+      "data": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 771.734375,
+          "height": 21,
+          "top": 21,
+          "left": 334,
+          "right": 1105.734375,
+          "bottom": 42
+        },
+        "h1ScrollWidth": 772,
+        "h1ClientWidth": 772,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "name": "desktop-1440-agent-submissions-cards-no-overlap",
+      "pass": true,
+      "data": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 246.5,
+            "right": 640.328125,
+            "bottom": 263.296875,
+            "left": 389,
+            "width": 251.328125,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 273.296875,
+            "right": 640.328125,
+            "bottom": 287.6875,
+            "left": 389,
+            "width": 251.328125,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 212.5,
+            "right": 640.328125,
+            "bottom": 236.5,
+            "left": 499.234375,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 310.5,
+            "right": 640.328125,
+            "bottom": 386.5,
+            "left": 333,
+            "width": 307.328125,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 246.5,
+            "right": 1005.65625,
+            "bottom": 263.296875,
+            "left": 754.328125,
+            "width": 251.328125,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 273.296875,
+            "right": 1005.65625,
+            "bottom": 287.6875,
+            "left": 754.328125,
+            "width": 251.328125,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 212.5,
+            "right": 1005.65625,
+            "bottom": 236.5,
+            "left": 864.5625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 310.5,
+            "right": 1005.65625,
+            "bottom": 386.5,
+            "left": 698.328125,
+            "width": 307.328125,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 246.5,
+            "right": 1371,
+            "bottom": 263.296875,
+            "left": 1119.65625,
+            "width": 251.34375,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 273.296875,
+            "right": 1371,
+            "bottom": 287.6875,
+            "left": 1119.65625,
+            "width": 251.34375,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 212.5,
+            "right": 1371,
+            "bottom": 236.5,
+            "left": 1229.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 310.5,
+            "right": 1371,
+            "bottom": 386.5,
+            "left": 1063.65625,
+            "width": 307.34375,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 549,
+            "right": 549,
+            "bottom": 565.796875,
+            "left": 391,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 575.796875,
+            "right": 549,
+            "bottom": 590.1875,
+            "left": 391,
+            "width": 158,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 605,
+            "right": 549,
+            "bottom": 648,
+            "left": 333,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 549,
+            "right": 823,
+            "bottom": 565.796875,
+            "left": 665,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 575.796875,
+            "right": 823,
+            "bottom": 590.796875,
+            "left": 665,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 605,
+            "right": 823,
+            "bottom": 648,
+            "left": 607,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 548,
+            "right": 1097,
+            "bottom": 564.796875,
+            "left": 939,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 574.796875,
+            "right": 1097,
+            "bottom": 589.796875,
+            "left": 939,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 604,
+            "right": 1097,
+            "bottom": 647,
+            "left": 881,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 549,
+            "right": 1371,
+            "bottom": 565.796875,
+            "left": 1213,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 575.796875,
+            "right": 1371,
+            "bottom": 590.796875,
+            "left": 1213,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 605,
+            "right": 1371,
+            "bottom": 648,
+            "left": 1155,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 754,
+            "right": 549,
+            "bottom": 770.796875,
+            "left": 391,
+            "width": 158,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 780.796875,
+            "right": 549,
+            "bottom": 795.796875,
+            "left": 391,
+            "width": 158,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 810,
+            "right": 549,
+            "bottom": 853,
+            "left": 333,
+            "width": 216,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ]
+    },
+    {
+      "name": "desktop-1440-agent-submissions-no-overflow",
+      "pass": true,
+      "data": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "name": "desktop-1440-settings-header-visible",
+      "pass": true,
+      "data": {
+        "title": "Настройки",
+        "h1Rect": {
+          "width": 958,
+          "height": 23.515625,
+          "top": 19.734375,
+          "left": 391,
+          "right": 1349,
+          "bottom": 43.25
+        },
+        "h1ScrollWidth": 958,
+        "h1ClientWidth": 958,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": "Роль, режим данных и безопасный выход.",
+        "descRect": {
+          "width": 760,
+          "height": 18
+        },
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "name": "desktop-1440-settings-no-agent-export-control",
+      "pass": true,
+      "data": false
+    },
+    {
+      "name": "desktop-1440-settings-no-overflow",
+      "pass": true,
+      "data": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "name": "tablet-768-agent-submissions-header-visible",
+      "pass": true,
+      "data": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 513.140625,
+          "height": 21,
+          "top": 55.5,
+          "left": 62,
+          "right": 575.140625,
+          "bottom": 76.5
+        },
+        "h1ScrollWidth": 513,
+        "h1ClientWidth": 513,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "name": "tablet-768-agent-submissions-cards-no-overlap",
+      "pass": true,
+      "data": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 256.5,
+            "right": 355,
+            "bottom": 273.296875,
+            "left": 117,
+            "width": 238,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 283.296875,
+            "right": 355,
+            "bottom": 297.6875,
+            "left": 117,
+            "width": 238,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 222.5,
+            "right": 355,
+            "bottom": 246.5,
+            "left": 213.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 320.5,
+            "right": 355,
+            "bottom": 396.5,
+            "left": 61,
+            "width": 294,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 256.5,
+            "right": 707,
+            "bottom": 273.296875,
+            "left": 469,
+            "width": 238,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 283.296875,
+            "right": 707,
+            "bottom": 297.6875,
+            "left": 469,
+            "width": 238,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 222.5,
+            "right": 707,
+            "bottom": 246.5,
+            "left": 565.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 320.5,
+            "right": 707,
+            "bottom": 396.5,
+            "left": 413,
+            "width": 294,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 512.5,
+            "right": 355,
+            "bottom": 529.296875,
+            "left": 117,
+            "width": 238,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 539.296875,
+            "right": 355,
+            "bottom": 553.6875,
+            "left": 117,
+            "width": 238,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 478.5,
+            "right": 355,
+            "bottom": 502.5,
+            "left": 213.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 576.5,
+            "right": 355,
+            "bottom": 652.5,
+            "left": 61,
+            "width": 294,
+            "height": 76
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 815,
+            "right": 355,
+            "bottom": 831.796875,
+            "left": 119,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 841.796875,
+            "right": 355,
+            "bottom": 856.1875,
+            "left": 119,
+            "width": 236,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 871,
+            "right": 355,
+            "bottom": 914,
+            "left": 61,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 815,
+            "right": 707,
+            "bottom": 831.796875,
+            "left": 471,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 841.796875,
+            "right": 707,
+            "bottom": 856.796875,
+            "left": 471,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 871,
+            "right": 707,
+            "bottom": 914,
+            "left": 413,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 1020,
+            "right": 355,
+            "bottom": 1036.796875,
+            "left": 119,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1046.796875,
+            "right": 355,
+            "bottom": 1061.796875,
+            "left": 119,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1076,
+            "right": 355,
+            "bottom": 1119,
+            "left": 61,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1020,
+            "right": 707,
+            "bottom": 1036.796875,
+            "left": 471,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1046.796875,
+            "right": 707,
+            "bottom": 1061.796875,
+            "left": 471,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1076,
+            "right": 707,
+            "bottom": 1119,
+            "left": 413,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1225,
+            "right": 355,
+            "bottom": 1241.796875,
+            "left": 119,
+            "width": 236,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1251.796875,
+            "right": 355,
+            "bottom": 1266.796875,
+            "left": 119,
+            "width": 236,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1281,
+            "right": 355,
+            "bottom": 1324,
+            "left": 61,
+            "width": 294,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ]
+    },
+    {
+      "name": "tablet-768-agent-submissions-no-overflow",
+      "pass": true,
+      "data": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "name": "tablet-768-settings-header-visible",
+      "pass": true,
+      "data": {
+        "title": "Настройки",
+        "h1Rect": {
+          "width": 628,
+          "height": 23.515625,
+          "top": 22.734375,
+          "left": 77,
+          "right": 705,
+          "bottom": 46.25
+        },
+        "h1ScrollWidth": 628,
+        "h1ClientWidth": 628,
+        "h1Computed": {
+          "overflow": "visible",
+          "textOverflow": "clip",
+          "whiteSpace": "nowrap"
+        },
+        "description": "Роль, режим данных и безопасный выход.",
+        "descRect": {
+          "width": 491.515625,
+          "height": 18
+        },
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "name": "tablet-768-settings-no-agent-export-control",
+      "pass": true,
+      "data": false
+    },
+    {
+      "name": "tablet-768-settings-no-overflow",
+      "pass": true,
+      "data": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "name": "desktop-1440-agent-submissions-rail-no-overflow",
+      "pass": true,
+      "data": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "name": "mobile-390-mobile-agent-submissions-create-settings-header-visible",
+      "pass": true,
+      "data": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 192,
+          "height": 19,
+          "top": 20,
+          "left": 62,
+          "right": 254,
+          "bottom": 39
+        },
+        "h1ScrollWidth": 192,
+        "h1ClientWidth": 192,
+        "h1Computed": {
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 390,
+        "innerWidth": 390
+      }
+    },
+    {
+      "name": "mobile-390-mobile-agent-submissions-create-settings-cards-no-overlap",
+      "pass": true,
+      "data": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 200.5,
+            "right": 199.90625,
+            "bottom": 217.296875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 227.296875,
+            "right": 199.90625,
+            "bottom": 241.6875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 220.5,
+            "right": 353,
+            "bottom": 244.5,
+            "left": 211.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 254.5,
+            "right": 199.90625,
+            "bottom": 364.5,
+            "left": 37,
+            "width": 162.90625,
+            "height": 110
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 456.5,
+            "right": 199.90625,
+            "bottom": 473.296875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 483.296875,
+            "right": 199.90625,
+            "bottom": 497.6875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 476.5,
+            "right": 353,
+            "bottom": 500.5,
+            "left": 211.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 510.5,
+            "right": 199.90625,
+            "bottom": 620.5,
+            "left": 37,
+            "width": 162.90625,
+            "height": 110
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 712.5,
+            "right": 199.90625,
+            "bottom": 729.296875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 739.296875,
+            "right": 199.90625,
+            "bottom": 753.6875,
+            "left": 93,
+            "width": 106.90625,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 732.5,
+            "right": 353,
+            "bottom": 756.5,
+            "left": 211.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 766.5,
+            "right": 199.90625,
+            "bottom": 876.5,
+            "left": 37,
+            "width": 162.90625,
+            "height": 110
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 540,
+            "right": 353,
+            "bottom": 556.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 566.796875,
+            "right": 353,
+            "bottom": 581.1875,
+            "left": 95,
+            "width": 258,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 596,
+            "right": 353,
+            "bottom": 639,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 745,
+            "right": 353,
+            "bottom": 761.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 771.796875,
+            "right": 353,
+            "bottom": 786.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 801,
+            "right": 353,
+            "bottom": 844,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 950,
+            "right": 353,
+            "bottom": 966.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 976.796875,
+            "right": 353,
+            "bottom": 991.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1006,
+            "right": 353,
+            "bottom": 1049,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1155,
+            "right": 353,
+            "bottom": 1171.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1181.796875,
+            "right": 353,
+            "bottom": 1196.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1211,
+            "right": 353,
+            "bottom": 1254,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1360,
+            "right": 353,
+            "bottom": 1376.796875,
+            "left": 95,
+            "width": 258,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1386.796875,
+            "right": 353,
+            "bottom": 1401.796875,
+            "left": 95,
+            "width": 258,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1416,
+            "right": 353,
+            "bottom": 1459,
+            "left": 37,
+            "width": 316,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ]
+    },
+    {
+      "name": "mobile-390-create-drawer-first-viewport",
+      "pass": true,
+      "data": {
+        "visible": true,
+        "footer": {
+          "top": 759,
+          "right": 390,
+          "bottom": 844,
+          "left": 0,
+          "width": 390,
+          "height": 85
+        },
+        "upload": {
+          "top": 68,
+          "right": 378,
+          "bottom": 428,
+          "left": 12,
+          "width": 366,
+          "height": 360
+        },
+        "type": {
+          "top": 436,
+          "right": 378,
+          "bottom": 640.078125,
+          "left": 12,
+          "width": 366,
+          "height": 204.078125
+        },
+        "next": {
+          "top": 796,
+          "right": 378,
+          "bottom": 836,
+          "left": 199,
+          "width": 179,
+          "height": 40
+        },
+        "innerHeight": 844,
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "bodyText": "Мои подачи\nМои подачи\nФильтры\nСЕМЬИ\nАкт: 15.06\n1 пакет\nСемья Петровы\n2 заявителя\nИП\nИрина Петрова\nПП\nПавел Петров\nАкт: 15.06\n1 пакет\nСемья Волковы\n3 заявителя\nАВ\nАнна Волкова\nИВ\nИгорь Волков\nАкт: 15.06\n1 пакет\nСемья Ивановы\n4 заявителя\nМИ\nМария Иванова\nАИ\nАнтон Иванов\nОДИНОЧНЫЕ ПРОФИЛИ\nАкт: 15.06\n1 пакет\nНВ\nНина Волкова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nНМ\nНикита Морозов\nПрофиль готов\nАкт: 15.06\n1 пакет\nДО\nДмитрий Орлов\nПрофиль готов\nАкт: 15.06\n1 пакет\nЕС\nЕлена Смирнова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nАС\nАртём Соколов\nПрофиль в работе\nЗагрузка и первичная сборка\nНовая подача\nЗагрузите паспорт\n\nЗАЯВИТЕЛЬ / СЕМЬЯ\n\nСтруктура подачи\n1 чел.\nЗаявитель\nСемья\nГород подачи\nМосква\nСанкт-Петербург\nКазань\nПеретащите файлы\n\nJPEG, PNG.\nРазворот загранпаспорта с MRZ.\n\nВыбрать файлы\nНужен файл паспорта\nПаспорт ещё не выбран.\nНужен файл паспорта.\nСохранить черновик\nПродолжить"
+      }
+    },
+    {
+      "name": "mobile-390-settings-no-agent-export-control",
+      "pass": true,
+      "data": false
+    },
+    {
+      "name": "mobile-390-mobile-agent-submissions-create-settings-no-overflow",
+      "pass": true,
+      "data": {
+        "scrollWidth": 390,
+        "innerWidth": 390
+      }
+    },
+    {
+      "name": "mobile-320-mobile-agent-submissions-create-settings-header-visible",
+      "pass": true,
+      "data": {
+        "title": "Мои подачи",
+        "h1Rect": {
+          "width": 194,
+          "height": 18,
+          "top": 20.5,
+          "left": 52,
+          "right": 246,
+          "bottom": 38.5
+        },
+        "h1ScrollWidth": 194,
+        "h1ClientWidth": 194,
+        "h1Computed": {
+          "overflow": "hidden",
+          "textOverflow": "ellipsis",
+          "whiteSpace": "nowrap"
+        },
+        "description": null,
+        "descRect": null,
+        "scrollWidth": 320,
+        "innerWidth": 320
+      }
+    },
+    {
+      "name": "mobile-320-mobile-agent-submissions-create-settings-cards-no-overlap",
+      "pass": true,
+      "data": [
+        {
+          "index": 0,
+          "kind": "family",
+          "title": "Семья Петровы",
+          "status": "2 заявителя",
+          "titleRect": {
+            "top": 200.5,
+            "right": 129.90625,
+            "bottom": 217.296875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 227.296875,
+            "right": 129.90625,
+            "bottom": 270.46875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 43.171875
+          },
+          "footerRect": {
+            "top": 246.46875,
+            "right": 283,
+            "bottom": 270.46875,
+            "left": 141.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 280.46875,
+            "right": 129.90625,
+            "bottom": 364.5,
+            "left": 37,
+            "width": 92.90625,
+            "height": 84.03125
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 1,
+          "kind": "family",
+          "title": "Семья Волковы",
+          "status": "3 заявителя",
+          "titleRect": {
+            "top": 456.5,
+            "right": 129.90625,
+            "bottom": 473.296875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 483.296875,
+            "right": 129.90625,
+            "bottom": 526.46875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 43.171875
+          },
+          "footerRect": {
+            "top": 502.46875,
+            "right": 283,
+            "bottom": 526.46875,
+            "left": 141.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 536.46875,
+            "right": 129.90625,
+            "bottom": 620.5,
+            "left": 37,
+            "width": 92.90625,
+            "height": 84.03125
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 2,
+          "kind": "family",
+          "title": "Семья Ивановы",
+          "status": "4 заявителя",
+          "titleRect": {
+            "top": 712.5,
+            "right": 129.90625,
+            "bottom": 729.296875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 739.296875,
+            "right": 129.90625,
+            "bottom": 782.46875,
+            "left": 93,
+            "width": 36.90625,
+            "height": 43.171875
+          },
+          "footerRect": {
+            "top": 758.46875,
+            "right": 283,
+            "bottom": 782.46875,
+            "left": 141.90625,
+            "width": 141.09375,
+            "height": 24
+          },
+          "memberRect": {
+            "top": 792.46875,
+            "right": 129.90625,
+            "bottom": 876.5,
+            "left": 37,
+            "width": 92.90625,
+            "height": 84.03125
+          },
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 3,
+          "kind": "single",
+          "title": "Нина Волкова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 488,
+            "right": 283,
+            "bottom": 504.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 514.796875,
+            "right": 283,
+            "bottom": 529.1875,
+            "left": 95,
+            "width": 188,
+            "height": 14.390625
+          },
+          "footerRect": {
+            "top": 544,
+            "right": 283,
+            "bottom": 587,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 4,
+          "kind": "single",
+          "title": "Никита Морозов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 693,
+            "right": 283,
+            "bottom": 709.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 719.796875,
+            "right": 283,
+            "bottom": 734.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 749,
+            "right": 283,
+            "bottom": 792,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 5,
+          "kind": "single",
+          "title": "Дмитрий Орлов",
+          "status": "Профиль готов",
+          "titleRect": {
+            "top": 898,
+            "right": 283,
+            "bottom": 914.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 924.796875,
+            "right": 283,
+            "bottom": 939.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 954,
+            "right": 283,
+            "bottom": 997,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 6,
+          "kind": "single",
+          "title": "Елена Смирнова",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1103,
+            "right": 283,
+            "bottom": 1119.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1129.796875,
+            "right": 283,
+            "bottom": 1144.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1159,
+            "right": 283,
+            "bottom": 1202,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        },
+        {
+          "index": 7,
+          "kind": "single",
+          "title": "Артём Соколов",
+          "status": "Профиль в работе",
+          "titleRect": {
+            "top": 1308,
+            "right": 283,
+            "bottom": 1324.796875,
+            "left": 95,
+            "width": 188,
+            "height": 16.796875
+          },
+          "statusRect": {
+            "top": 1334.796875,
+            "right": 283,
+            "bottom": 1349.796875,
+            "left": 95,
+            "width": 188,
+            "height": 15
+          },
+          "footerRect": {
+            "top": 1364,
+            "right": 283,
+            "bottom": 1407,
+            "left": 37,
+            "width": 246,
+            "height": 43
+          },
+          "memberRect": null,
+          "titleStatusOverlap": false,
+          "footerMainOverlap": false
+        }
+      ]
+    },
+    {
+      "name": "mobile-320-create-drawer-first-viewport",
+      "pass": true,
+      "data": {
+        "visible": true,
+        "footer": {
+          "top": 655,
+          "right": 320,
+          "bottom": 740,
+          "left": 0,
+          "width": 320,
+          "height": 85
+        },
+        "upload": {
+          "top": 68,
+          "right": 308,
+          "bottom": 428,
+          "left": 12,
+          "width": 296,
+          "height": 360
+        },
+        "type": {
+          "top": 436,
+          "right": 308,
+          "bottom": 664.078125,
+          "left": 12,
+          "width": 296,
+          "height": 228.078125
+        },
+        "next": {
+          "top": 692,
+          "right": 308,
+          "bottom": 732,
+          "left": 164,
+          "width": 144,
+          "height": 40
+        },
+        "innerHeight": 740,
+        "scrollWidth": 320,
+        "innerWidth": 320,
+        "bodyText": "Мои подачи\nМои подачи\nФильтры\nСЕМЬИ\nАкт: 15.06\n1 пакет\nСемья Петровы\n2 заявителя\nИП\nИрина Петрова\nПП\nПавел Петров\nАкт: 15.06\n1 пакет\nСемья Волковы\n3 заявителя\nАВ\nАнна Волкова\nИВ\nИгорь Волков\nАкт: 15.06\n1 пакет\nСемья Ивановы\n4 заявителя\nМИ\nМария Иванова\nАИ\nАнтон Иванов\nОДИНОЧНЫЕ ПРОФИЛИ\nАкт: 15.06\n1 пакет\nНВ\nНина Волкова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nНМ\nНикита Морозов\nПрофиль готов\nАкт: 15.06\n1 пакет\nДО\nДмитрий Орлов\nПрофиль готов\nАкт: 15.06\n1 пакет\nЕС\nЕлена Смирнова\nПрофиль в работе\nАкт: 15.06\n1 пакет\nАС\nАртём Соколов\nПрофиль в работе\nЗагрузка и первичная сборка\nНовая подача\nЗагрузите паспорт\n\nЗАЯВИТЕЛЬ / СЕМЬЯ\n\nСтруктура подачи\n1 чел.\nЗаявитель\nСемья\nГород подачи\nМосква\nСанкт-Петербург\nКазань\nПеретащите файлы\n\nJPEG, PNG.\nРазворот загранпаспорта с MRZ.\n\nВыбрать файлы\nНужен файл паспорта\nПаспорт ещё не выбран.\nНужен файл паспорта.\nСохранить черновик\nПродолжить"
+      }
+    },
+    {
+      "name": "mobile-320-settings-no-agent-export-control",
+      "pass": true,
+      "data": false
+    },
+    {
+      "name": "mobile-320-mobile-agent-submissions-create-settings-no-overflow",
+      "pass": true,
+      "data": {
+        "scrollWidth": 320,
+        "innerWidth": 320
+      }
+    },
+    {
+      "name": "desktop-1440-rail-facts-readable",
+      "pass": true,
+      "data": {
+        "facts": [
+          {
+            "label": "Поездка",
+            "value": "Москва · 04.09-14.09",
+            "labelRect": {
+              "top": 277.9375,
+              "right": 1122,
+              "bottom": 291.125,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 277.9375,
+              "right": 1370,
+              "bottom": 293.53125,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Заявители",
+            "value": "2 заявителя",
+            "labelRect": {
+              "top": 301.53125,
+              "right": 1122,
+              "bottom": 314.71875,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 301.53125,
+              "right": 1370,
+              "bottom": 317.125,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Причина",
+            "value": "1 исправление ждут проверки",
+            "labelRect": {
+              "top": 325.125,
+              "right": 1122,
+              "bottom": 338.3125,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 325.125,
+              "right": 1370,
+              "bottom": 340.71875,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Следующее",
+            "value": "Ждать проверки админа",
+            "labelRect": {
+              "top": 348.71875,
+              "right": 1122,
+              "bottom": 361.90625,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 348.71875,
+              "right": 1370,
+              "bottom": 364.3125,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          },
+          {
+            "label": "Готовность",
+            "value": "50%",
+            "labelRect": {
+              "top": 372.3125,
+              "right": 1122,
+              "bottom": 385.5,
+              "left": 1042,
+              "width": 80,
+              "height": 13.1875
+            },
+            "valueRect": {
+              "top": 372.3125,
+              "right": 1370,
+              "bottom": 387.90625,
+              "left": 1132,
+              "width": 238,
+              "height": 15.59375
+            },
+            "separated": true
+          }
+        ],
+        "quickLinks": [
+          {
+            "text": "Анкета",
+            "rect": {
+              "top": 623.03125,
+              "right": 1151,
+              "bottom": 655.03125,
+              "left": 1057,
+              "width": 94,
+              "height": 32
+            },
+            "display": "flex",
+            "gap": "6px"
+          },
+          {
+            "text": "Файлы",
+            "rect": {
+              "top": 623.03125,
+              "right": 1253,
+              "bottom": 655.03125,
+              "left": 1159,
+              "width": 94,
+              "height": 32
+            },
+            "display": "flex",
+            "gap": "6px"
+          },
+          {
+            "text": "Замечания",
+            "rect": {
+              "top": 623.03125,
+              "right": 1355,
+              "bottom": 655.03125,
+              "left": 1261,
+              "width": 94,
+              "height": 32
+            },
+            "display": "flex",
+            "gap": "6px"
+          }
+        ]
+      }
+    },
+    {
+      "name": "desktop-1440-rail-quick-links-readable",
+      "pass": true,
+      "data": [
+        {
+          "text": "Анкета",
+          "rect": {
+            "top": 623.03125,
+            "right": 1151,
+            "bottom": 655.03125,
+            "left": 1057,
+            "width": 94,
+            "height": 32
+          },
+          "display": "flex",
+          "gap": "6px"
+        },
+        {
+          "text": "Файлы",
+          "rect": {
+            "top": 623.03125,
+            "right": 1253,
+            "bottom": 655.03125,
+            "left": 1159,
+            "width": 94,
+            "height": 32
+          },
+          "display": "flex",
+          "gap": "6px"
+        },
+        {
+          "text": "Замечания",
+          "rect": {
+            "top": 623.03125,
+            "right": 1355,
+            "bottom": 655.03125,
+            "left": 1261,
+            "width": 94,
+            "height": 32
+          },
+          "display": "flex",
+          "gap": "6px"
+        }
+      ]
+    },
+    {
+      "name": "browser-console-errors",
+      "pass": true,
+      "data": []
+    },
+    {
+      "name": "browser-page-errors",
+      "pass": true,
+      "data": []
+    }
+  ]
+}

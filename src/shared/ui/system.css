@@ -34178,3 +34178,402 @@ select,
     height: var(--vf-ref-size-34px) !important;
   }
 }
+
+/* Agent QA lock: readable headers, non-overlapping cards, rail facts, and draft creation first viewport. */
+@media (min-width: 768px) {
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings) {
+    grid-template-columns: var(--v19-unified-sidebar-width) minmax(var(--v19b-size-0), 1fr) !important;
+  }
+
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings)
+    .workspace {
+    grid-column: 2 !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings)
+    .workspace
+    > .topbar.v19-page-header {
+    display: grid !important;
+    grid-template-columns:
+      var(--v19-control-height-large)
+      minmax(var(--v19b-size-240), 1fr)
+      auto !important;
+    align-items: center !important;
+    gap: var(--v19b-size-14) !important;
+    min-width: var(--v19b-size-0) !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings)
+    .workspace
+    > .topbar.v19-page-header
+    > .v19-topbar-menu {
+    grid-column: 1 !important;
+  }
+
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings)
+    .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading {
+    grid-column: 2 !important;
+    width: var(--v19b-size-full) !important;
+    min-width: var(--v19b-size-0) !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings)
+    .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading
+    h1 {
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: nowrap !important;
+  }
+
+  .ops-shell.has-unified-side-menu.surface-settings
+    .workspace
+    > .topbar.v19-page-header
+    > .topbar-heading
+    p {
+    max-width: min(var(--vf-ref-size-760px), 64vw) !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+  }
+
+  .ops-shell.has-unified-side-menu:is(.surface-agent-submissions, .surface-settings)
+    .workspace
+    > .topbar.v19-page-header
+    > .topbar-actions {
+    grid-column: 3 !important;
+    justify-self: end !important;
+    min-width: max-content !important;
+  }
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  :is(.vf-figma-family-card, .vf-figma-individual-card).v19-dossier-card {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-family-card.v19-dossier-card {
+  display: grid !important;
+  grid-template-rows: auto minmax(var(--v19b-size-0), 1fr) auto !important;
+  align-content: stretch !important;
+  row-gap: var(--v19b-size-14) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-family-card.v19-dossier-card
+  .vf-figma-family-head {
+  display: grid !important;
+  grid-template-columns: var(--v19b-size-44) minmax(var(--v19b-size-0), 1fr) !important;
+  align-items: start !important;
+  gap: var(--v19b-size-12) !important;
+  margin: var(--v19b-size-0) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-family-card.v19-dossier-card
+  .vf-figma-family-head
+  > span:last-child,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  > span:not(.v19-dossier-meta-row):not(.vf-figma-family-footer):not(.vf-figma-avatar):not(.v19-dossier-progress-list):not(.v19-dossier-chip-row):not(.v19-dossier-next-action) {
+  display: grid !important;
+  align-content: start !important;
+  gap: var(--v19b-size-6) !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  :is(.vf-figma-family-card, .vf-figma-individual-card).v19-dossier-card
+  :is(strong, em, small) {
+  min-width: var(--v19b-size-0) !important;
+  max-width: var(--v19b-size-full) !important;
+  overflow-wrap: anywhere !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  :is(.vf-figma-family-card, .vf-figma-individual-card).v19-dossier-card
+  .vf-figma-family-footer {
+  position: static !important;
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-0), 1fr) auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-10) !important;
+  width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  margin-top: auto !important;
+  padding-top: var(--v19b-size-14) !important;
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  :is(.vf-figma-family-card, .vf-figma-individual-card).v19-dossier-card
+  .vf-figma-family-footer
+  > * {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card {
+  display: grid !important;
+  grid-template-areas:
+    "meta meta"
+    "avatar copy"
+    "footer footer"
+    "progress progress"
+    "chips chips"
+    "next next" !important;
+  grid-template-columns: var(--v19b-size-44) minmax(var(--v19b-size-0), 1fr) !important;
+  align-items: start !important;
+  gap: var(--v19b-size-12) var(--v19b-size-14) !important;
+  text-align: left !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  .v19-dossier-meta-row {
+  grid-area: meta !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  .vf-figma-avatar {
+  grid-area: avatar !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  > span:not(.v19-dossier-meta-row):not(.vf-figma-family-footer):not(.vf-figma-avatar):not(.v19-dossier-progress-list):not(.v19-dossier-chip-row):not(.v19-dossier-next-action) {
+  grid-area: copy !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  .vf-figma-family-footer {
+  grid-area: footer !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  .v19-dossier-progress-list {
+  grid-area: progress !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  .v19-dossier-chip-row {
+  grid-area: chips !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  .v19-dossier-next-action {
+  grid-area: next !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel
+  .vf-figma-individual-card.v19-dossier-card
+  > span:not(.v19-dossier-meta-row):not(.vf-figma-family-footer):not(.vf-figma-avatar):not(.v19-dossier-progress-list):not(.v19-dossier-chip-row):not(.v19-dossier-next-action)
+  em {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--v19b-size-6) !important;
+  white-space: normal !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .v19-submissions-context
+  .v19-submission-context-identity
+  span {
+  display: block !important;
+  line-height: var(--v19b-line-height-row) !important;
+  overflow-wrap: anywhere !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .v19-submissions-context
+  .v19-submission-context-facts
+  span {
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-80), max-content) minmax(var(--v19b-size-0), 1fr) !important;
+  align-items: start !important;
+  gap: var(--v19b-size-4) var(--v19b-size-10) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .v19-submissions-context
+  .v19-submission-context-facts
+  strong {
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-11) !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .v19-submissions-context
+  .v19-submission-context-facts
+  em {
+  color: var(--v19b-color-text) !important;
+  font-size: var(--v19b-size-13) !important;
+  line-height: var(--v19b-line-height-row) !important;
+  overflow-wrap: anywhere !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .v19-submissions-context
+  .v19-rail-quick-links {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), 1fr)) !important;
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .v19-submissions-context
+  .v19-rail-quick-links
+  .mp-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--v19b-size-6) !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .v19-submissions-context
+  .v19-rail-quick-links
+  .mp-button
+  svg {
+  flex: 0 0 auto !important;
+}
+
+@media (max-width: 560px) {
+  .create-submission-drawer.is-passport-step {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .create-submission-drawer.is-passport-step > .flex-1 {
+    flex: 1 1 auto !important;
+    min-height: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-12) var(--v19b-size-8) !important;
+    overflow-y: auto !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    .create-submission-passport-shell
+    > .grid.grid-cols-1,
+  .create-submission-drawer.is-passport-step
+    .create-submission-passport-shell
+    > .grid.grid-cols-1
+    > .flex.flex-col {
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .create-submission-drawer.is-passport-step .create-submission-passport-upload-zone {
+    order: -1 !important;
+    min-height: min(var(--v19b-size-240), calc(var(--v19b-viewport-height) * 0.3)) !important;
+    padding: var(--v19b-size-16) !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    .create-submission-passport-upload-zone
+    .w-14 {
+    width: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    margin-bottom: var(--v19b-size-8) !important;
+  }
+
+  .create-submission-drawer.is-passport-step .create-submission-passport-upload-zone h3 {
+    margin-bottom: var(--v19b-size-4) !important;
+  }
+
+  .create-submission-drawer.is-passport-step .create-submission-passport-upload-zone p {
+    max-width: var(--v19b-size-240) !important;
+    margin-bottom: var(--v19b-size-10) !important;
+    line-height: var(--v19b-line-height-row) !important;
+  }
+
+  .create-submission-drawer.is-passport-step .v19-passport-live-indicator {
+    margin-top: var(--v19b-size-10) !important;
+    padding: var(--v19b-size-8) !important;
+  }
+
+  .create-submission-drawer.is-passport-step section[aria-label="Тип подачи"],
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Заявители семьи и общие ответы"] {
+    padding: var(--v19b-size-10) !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Тип подачи"]
+    > div:first-child {
+    margin-bottom: var(--v19b-size-8) !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Тип подачи"]
+    button,
+  .create-submission-drawer.is-passport-step
+    section[aria-label="Тип подачи"]
+    select {
+    min-height: var(--v19b-size-36) !important;
+    height: var(--v19b-size-36) !important;
+  }
+
+  .create-submission-drawer.is-passport-step > footer.v19-create-drawer-footer {
+    display: grid !important;
+    flex: 0 0 auto !important;
+    gap: var(--v19b-size-8) !important;
+    padding: var(--v19b-size-8) var(--v19b-size-12)
+      max(var(--v19b-size-8), env(safe-area-inset-bottom)) !important;
+  }
+
+  .create-submission-drawer.is-passport-step > footer.v19-create-drawer-footer > span {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+
+  .create-submission-drawer.is-passport-step
+    > footer.v19-create-drawer-footer
+    .v19-create-footer-action {
+    min-height: var(--v19b-size-40) !important;
+    height: var(--v19b-size-40) !important;
+    padding-inline: var(--v19b-size-10) !important;
+  }
+}

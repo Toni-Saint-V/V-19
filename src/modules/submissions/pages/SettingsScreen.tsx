@@ -333,13 +333,11 @@ function SettingsSectionContent({
           onChange={(checked) => onSettings({ drawerHints: checked })}
         />
       </SettingsRow>
-      <SettingsRow label="Ошибки выгрузки" help="Только для роли администратора.">
-        <SwitchButton
-          ariaLabel="Ошибки выгрузки"
-          checked={role === "admin"}
-          disabled={role !== "admin"}
-        />
-      </SettingsRow>
+      {role === "admin" ? (
+        <SettingsRow label="Ошибки выгрузки" help="Показывать сбои экспортных пакетов.">
+          <SwitchButton ariaLabel="Ошибки выгрузки" checked />
+        </SettingsRow>
+      ) : null}
     </SettingsBlock>
   );
 }
