@@ -9360,7 +9360,7 @@ body,
   .v19-admin-export-sheet-backdrop {
     position: fixed;
     inset: var(--v19b-size-0);
-    z-index: 70;
+    z-index: var(--v19b-z-overlay);
     display: block;
     border: var(--v19b-size-0);
     background: var(--v19b-admin-backdrop-bg);
@@ -9369,7 +9369,7 @@ body,
   .v19-admin-export-mobile-presence {
     position: fixed;
     inset: var(--v19b-size-0);
-    z-index: 70;
+    z-index: var(--v19b-z-overlay);
     display: block;
     pointer-events: none;
   }
@@ -9383,7 +9383,7 @@ body,
     right: var(--v19b-size-16);
     bottom: var(--v19b-size-16);
     left: var(--v19b-size-16);
-    z-index: 80;
+    z-index: calc(var(--v19b-z-overlay) + 1);
     display: grid;
     gap: var(--v19b-size-12);
     max-height: calc(var(--v19b-viewport-height) - var(--v19b-size-32));
