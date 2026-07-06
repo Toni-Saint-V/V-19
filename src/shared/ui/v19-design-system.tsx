@@ -1054,7 +1054,6 @@ export function V19FamilyProfileCard({
   members,
   metaItems,
   nextActionLabel,
-  onMemberOpen,
   onOpen,
   packageLabel,
   progressItems,
@@ -1105,21 +1104,16 @@ export function V19FamilyProfileCard({
       </span>
       <span className="vf-figma-member-list">
         {members.map((member) => (
-          <button
-            aria-label={`Открыть заявителя: ${member.name}, ${title}`}
+          <span
+            aria-label={`Заявитель: ${member.name}, ${title}`}
             className="vf-figma-member-row"
             key={`${member.name}-${member.role}`}
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMemberOpen?.();
-            }}
           >
             <em>{member.initials}</em>
             <strong>{member.name}</strong>
             <small>{member.role}</small>
             <V19MemberStatusIcon tone={member.statusTone} />
-          </button>
+          </span>
         ))}
       </span>
       <V19DossierProgress items={progressItems} />

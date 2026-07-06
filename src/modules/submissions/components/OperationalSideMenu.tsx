@@ -14,8 +14,8 @@ export function OperationalSideMenu({
   sidebarId,
   createAction,
   onChooseRole,
+  onCommandSearch,
   onCloseMobile,
-  onDisplayModeToggle,
   onResetWorkspace,
   role,
   sessionDisplayName,
@@ -33,8 +33,8 @@ export function OperationalSideMenu({
   mobileOpen: boolean;
   mobileTitle: string;
   onChooseRole: (role: Role) => void;
+  onCommandSearch?: () => void;
   onCloseMobile: () => void;
-  onDisplayModeToggle: () => void;
   onResetWorkspace: () => void | Promise<void>;
   role: Role;
   sessionDisplayName: string;
@@ -158,8 +158,8 @@ export function OperationalSideMenu({
         footer={footer}
         id={sidebarId}
         items={navItems}
+        onCommandSearch={onCommandSearch}
         mobileTitle={mobileTitle}
-        onDisplayModeToggle={onDisplayModeToggle}
         onMobileClose={onCloseMobile}
       />
       {mobileOpen ? (
