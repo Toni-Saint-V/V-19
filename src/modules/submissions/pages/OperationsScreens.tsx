@@ -3658,7 +3658,7 @@ function AdminExportReferenceCockpit({
             <div className="v19-admin-export-tools">
               <div className="v19-admin-export-search">{searchControl}</div>
               {filterControl ? (
-                <div className="v19-admin-export-filter-control">
+                <div className="v19-admin-export-filter-control v19-admin-export-city-filter-control">
                   {filterControl}
                 </div>
               ) : null}

@@ -1086,6 +1086,13 @@ export function V19FamilyProfileCard({
       onKeyDown={(event) => activateKeyboardCard(event, () => onOpen?.())}
     >
       <V19DossierMetaRow items={metaItems} />
+      <span className="vf-figma-family-footer">
+        <span>{footerActivityLabel ?? footerLabel}</span>
+        <em>
+          <Folder aria-hidden="true" size={17} />
+          {packageLabel}
+        </em>
+      </span>
       <span className="vf-figma-family-head">
         <span className="vf-figma-family-icon">
           <Users aria-hidden="true" size={26} />
@@ -1112,13 +1119,6 @@ export function V19FamilyProfileCard({
       <V19DossierProgress items={progressItems} />
       <V19DossierChips chips={chips} />
       <V19DossierNextAction label={nextActionLabel} />
-      <span className="vf-figma-family-footer">
-        <span>{footerActivityLabel ?? footerLabel}</span>
-        <em>
-          <Folder aria-hidden="true" size={17} />
-          {packageLabel}
-        </em>
-      </span>
     </article>
   );
 }

@@ -8395,6 +8395,15 @@ body,
   min-height: var(--v19b-size-40) !important;
 }
 
+.v19-admin-export-city-filter-control {
+  width: var(--v19b-size-188);
+  min-width: var(--v19b-size-144);
+}
+
+.v19-admin-export-city-filter-control > * {
+  width: var(--v19b-size-full);
+}
+
 .v19-admin-export-icon-button {
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19b-size-12);
