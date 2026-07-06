@@ -929,8 +929,13 @@ export function FigmaSubmissionDrawer({
 
   useEffect(() => {
     if (!focusTarget) return;
+    if (initialTab(activeTab) === "issues" && focusTarget.tab !== "issues") {
+      pendingTargetRef.current = null;
+      onClearFocusTarget?.();
+      return;
+    }
     openWorkspaceTarget(focusTarget);
-  }, [focusTarget, openWorkspaceTarget, submission.id]);
+  }, [activeTab, focusTarget, onClearFocusTarget, openWorkspaceTarget, submission.id]);
 
   useEffect(() => {
     if (status !== "success") return;

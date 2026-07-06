@@ -74,9 +74,7 @@ async function main() {
       "incomplete waiting_review is rejected",
     );
     await expectMalformedBucketReadinessRejected(agent.client, adminService, agent.userId);
-    pass("wrong media bucket cannot satisfy review readiness");
     await expectMalformedPathReadinessRejected(agent.client, adminService, agent.userId);
-    pass("wrong media path cannot satisfy review readiness");
 
     await save(agent.client, validReviewPayload(agent.userId, runId, "ready_for_review"));
     await save(agent.client, validReviewPayload(agent.userId, runId, "waiting_review"));
@@ -303,7 +301,12 @@ async function expectMalformedBucketReadinessRejected(agentClient, adminClient, 
     .eq("submission_id", malformedBucketReadinessId)
     .eq("type", "passport_scan");
   if (mediaError) {
-    throw new Error(`malformed bucket media setup failed: ${mediaError.message}`);
+    if (!isCanonicalStorageIdentityError(mediaError)) {
+      throw new Error(`malformed bucket media setup failed: ${mediaError.message}`);
+    }
+    await expectStatus(adminClient, malformedBucketReadinessId, "draft");
+    pass("malformed bucket media storage identity is rejected");
+    return;
   }
 
   await expectRejected(
@@ -313,6 +316,7 @@ async function expectMalformedBucketReadinessRejected(agentClient, adminClient, 
       .eq("id", malformedBucketReadinessId),
     "malformed bucket media readiness is rejected",
   );
+  pass("wrong media bucket cannot satisfy review readiness");
 }
 
 async function expectMalformedPathReadinessRejected(agentClient, adminClient, agentId) {
@@ -331,7 +335,12 @@ async function expectMalformedPathReadinessRejected(agentClient, adminClient, ag
     .eq("submission_id", malformedPathReadinessId)
     .eq("type", "passport_scan");
   if (mediaError) {
-    throw new Error(`malformed path media setup failed: ${mediaError.message}`);
+    if (!isCanonicalStorageIdentityError(mediaError)) {
+      throw new Error(`malformed path media setup failed: ${mediaError.message}`);
+    }
+    await expectStatus(adminClient, malformedPathReadinessId, "draft");
+    pass("malformed path media storage identity is rejected");
+    return;
   }
 
   await expectRejected(
@@ -340,6 +349,16 @@ async function expectMalformedPathReadinessRejected(agentClient, adminClient, ag
       .update({ status: "waiting_review" })
       .eq("id", malformedPathReadinessId),
     "malformed path media readiness is rejected",
+  );
+  pass("wrong media path cannot satisfy review readiness");
+}
+
+function isCanonicalStorageIdentityError(error) {
+  return (
+    error?.code === "23514" &&
+    /Required media must use canonical submission-media storage identity/i.test(
+      error.message ?? "",
+    )
   );
 }
 
