@@ -20,6 +20,11 @@ import {
   type PreliminaryIntakeDraft,
   type Submission,
 } from "../types";
+import {
+  isPassportScanUploadFileAccepted,
+  passportScanUploadAccept,
+  passportScanUploadFormatLabel,
+} from "../mediaStorage";
 import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
 
 const maxFamilyApplicants = 6;
@@ -84,12 +89,6 @@ const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
   tripDateTo: "",
 };
 
-const passportScanUploadMimeTypes = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-]);
-
 const e2ePassportMockEnabled =
   import.meta.env.DEV && import.meta.env.VITE_E2E_PASSPORT_MOCK_ENABLED === "true";
 
@@ -127,7 +126,7 @@ function hasRequiredPassportIdentity(upload: PassportUploadDraft | undefined) {
 }
 
 function hasAcceptedPassportFile(upload: PassportUploadDraft | undefined) {
-  return Boolean(upload?.file && passportScanUploadMimeTypes.has(upload.file.type));
+  return Boolean(upload?.file && isPassportScanUploadFileAccepted(upload.file));
 }
 
 function isPassportUploadReady(upload: PassportUploadDraft | undefined) {
@@ -194,7 +193,7 @@ function passportUploadStatusCopy(upload: PassportUploadDraft | undefined) {
     };
   }
   return {
-    description: "Загрузите PDF, JPEG или PNG с разворотом загранпаспорта и MRZ.",
+    description: `Загрузите ${passportScanUploadFormatLabel} с разворотом загранпаспорта и MRZ.`,
     title: "Нужен файл паспорта",
   };
 }
@@ -214,7 +213,7 @@ function passportLiveState({
 }) {
   if (passportFileError) {
     return {
-      description: "Проверьте формат: нужен PDF, JPEG или PNG с разворотом загранпаспорта.",
+      description: `Проверьте формат: нужен ${passportScanUploadFormatLabel} с разворотом загранпаспорта.`,
       title: "Файл не принят",
       tone: "red" as const,
     };
@@ -401,13 +400,15 @@ export function CreateSubmissionDrawer({
 
     const allSelectedFiles = Array.from(files);
     const rejectedCount = allSelectedFiles.filter(
-      (file) => !passportScanUploadMimeTypes.has(file.type),
+      (file) => !isPassportScanUploadFileAccepted(file),
     ).length;
     const selectedFiles = allSelectedFiles
-      .filter((file) => passportScanUploadMimeTypes.has(file.type))
+      .filter((file) => isPassportScanUploadFileAccepted(file))
       .slice(0, maxFamilyApplicants);
     setPassportFileError(
-      rejectedCount ? "Паспорт принимается только в формате PDF, JPEG или PNG." : "",
+      rejectedCount
+        ? `Паспорт принимается только в формате ${passportScanUploadFormatLabel}.`
+        : "",
     );
     if (!selectedFiles.length) return;
     const nextBatch = uploadBatchRef.current + 1;
@@ -504,7 +505,7 @@ export function CreateSubmissionDrawer({
 
   function showPassportNotReadyAlert() {
     window.alert(
-      "Паспорт еще не принят. Загрузите PDF, JPEG или PNG для каждого заявителя и дождитесь завершения проверки. Если OCR недоступен, файл уйдет на ручную проверку оператора.",
+      `Паспорт еще не принят. Загрузите ${passportScanUploadFormatLabel} для каждого заявителя и дождитесь завершения проверки. Если OCR недоступен, файл уйдет на ручную проверку оператора.`,
     );
   }
 
@@ -789,7 +790,7 @@ export function CreateSubmissionDrawer({
                   ref={passportFileInputRef}
                   className="pi-file-input"
                   aria-hidden="true"
-                  accept="application/pdf,image/jpeg,image/png"
+                  accept={passportScanUploadAccept}
                   multiple
                   name="preintakePassportScans"
                   tabIndex={-1}
@@ -821,7 +822,7 @@ export function CreateSubmissionDrawer({
                     Перетащите файлы
                   </h3>
                   <p className="text-[var(--v19b-size-12)] text-white/60 max-w-[var(--v19b-size-240)] mb-8 font-light relative z-10 leading-relaxed">
-                    PDF, JPEG, PNG.
+                    {passportScanUploadFormatLabel}.
                     <br />
                     Разворот загранпаспорта с MRZ.
                   </p>

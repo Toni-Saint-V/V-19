@@ -37,18 +37,12 @@ import {
   type WorkspaceTarget,
 } from "../workspaceModel";
 import type {
-  Applicant,
   DrawerTab,
   Role,
   Submission,
   SubmissionAction,
   SubmissionFile,
 } from "../types";
-import {
-  acceptForDocumentType,
-  documentTypeForSubmissionFileType,
-  expectedSubmissionDocumentFileName,
-} from "../documentUploadContract";
 
 type SourceStatus =
   | "draft"
@@ -204,9 +198,8 @@ function buildDetail(submission: Submission): FigmaSubmissionDetail {
 
 function fileTypeLabel(type: SubmissionFile["type"]) {
   if (type === "passport_scan") return "Скан паспорта";
-  if (type === "selfie") return "Фото 1";
-  if (type === "selfie_2") return "Фото 2";
-  if (type === "pdf") return "PDF";
+  if (type === "selfie") return "Селфи 1";
+  if (type === "selfie_2") return "Селфи 2";
   return "Документ";
 }
 
@@ -224,22 +217,15 @@ function fileActionLabel(file: SubmissionFile) {
 }
 
 function fileAccept(file: SubmissionFile) {
-  const documentType = documentTypeForSubmissionFileType(file.type);
-  if (documentType) return acceptForDocumentType(documentType);
+  if (file.type === "passport_scan") return "image/jpeg,image/png,application/pdf";
+  if (file.type === "selfie" || file.type === "selfie_2") return "image/*";
   return undefined;
 }
 
-function fileSummary(file: SubmissionFile, applicant: Applicant | undefined) {
-  if (file.generatedFileName) {
-    return `${fileStatusLabel(file)} · ${file.generatedFileName}`;
-  }
-
-  const documentType = documentTypeForSubmissionFileType(file.type);
-  if (!documentType || !applicant) return fileStatusLabel(file);
-
-  const expected = expectedSubmissionDocumentFileName({ applicant, documentType });
-  if (!expected.ok) return `${fileStatusLabel(file)} · ${expected.safeMessage}`;
-  return `${fileStatusLabel(file)} · ${expected.fileName}`;
+function fileSummary(file: SubmissionFile) {
+  const uploadedName = file.originalFileName ?? file.generatedFileName;
+  if (!uploadedName) return fileStatusLabel(file);
+  return `${fileStatusLabel(file)} · ${uploadedName}`;
 }
 
 function fileReadyBadgeLabel(file: SubmissionFile) {
@@ -250,7 +236,6 @@ function fileReadyBadgeLabel(file: SubmissionFile) {
 }
 
 type FileApplicantSection = {
-  applicant?: Applicant;
   files: SubmissionFile[];
   id: string;
   name: string;
@@ -279,7 +264,6 @@ function fileApplicantSections(submission: Submission): FileApplicantSection[] {
         leftId.localeCompare(rightId),
     )
     .map(([applicantId, files], index) => ({
-      applicant: submission.applicants.find((applicant) => applicant.id === applicantId),
       files,
       id: applicantId,
       name: applicantNameById.get(applicantId) ?? `Заявитель ${index + 1}`,
@@ -645,7 +629,7 @@ const FilesTab = ({
                             {fileTypeLabel(file.type)}
                           </div>
                           <div className="v19-drawer-file-meta">
-                            {fileSummary(file, section.applicant)}
+                            {fileSummary(file)}
                           </div>
                         </div>
                         {canUpload ? (

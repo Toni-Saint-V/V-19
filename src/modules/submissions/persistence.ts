@@ -5,15 +5,13 @@ import type { Submission } from "./types";
 
 const storageKey = "visaflow.v19.submissions.v1";
 
-export type LocalSubmissionSaveResult =
-  | { ok: true }
-  | { ok: false; message: string };
-
 type StorageLike = {
   getItem(key: string): string | null;
   removeItem(key: string): void;
   setItem(key: string, value: string): void;
 };
+
+type SaveSubmissionsResult = { ok: true } | { ok: false; message: string };
 
 export function loadSubmissions(): Submission[] {
   const storage = getStorage();
@@ -36,26 +34,24 @@ export function loadSubmissions(): Submission[] {
   }
 }
 
-export function saveSubmissions(
-  submissions: Submission[],
-): LocalSubmissionSaveResult {
+export function saveSubmissions(submissions: Submission[]): SaveSubmissionsResult {
   const storage = getStorage();
   if (!storage) {
     return {
       ok: false,
-      message:
-        "Локальное сохранение недоступно. Данные останутся только до обновления страницы.",
+      message: "Локальное сохранение не прошло: localStorage недоступен.",
     };
   }
 
   try {
     storage.setItem(storageKey, JSON.stringify(submissions));
     return { ok: true };
-  } catch {
+  } catch (error) {
+    // Persistence is helpful, but the cockpit must keep working if storage is unavailable.
+    const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
     return {
       ok: false,
-      message:
-        "Локальное сохранение не прошло. Данные останутся только до обновления страницы.",
+      message: `Локальное сохранение не прошло.${detail}`,
     };
   }
 }

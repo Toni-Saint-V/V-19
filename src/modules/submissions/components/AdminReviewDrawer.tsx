@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   FileText,
   FileWarning,
+  History,
   Hash,
   Image as ImageIcon,
   Info,
@@ -25,6 +26,7 @@ import {
   Sparkles,
   Target,
   User,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -46,7 +48,6 @@ import {
   openIssueCount,
   statusLabels,
 } from "../status";
-import { agentOwnerDisplayName } from "../ownership";
 import {
   fileLabel,
   targetElementId,
@@ -75,11 +76,13 @@ type AdminReviewFileTarget = "passport_scan" | "selfie" | "selfie_2";
 
 type AdminReviewTab =
   | "overview"
+  | "applicants"
   | "files"
   | "passport"
   | "selfie"
   | "questionnaire"
-  | "issues";
+  | "issues"
+  | "history";
 
 type RemarkTargetType =
   | "checklistItem"
@@ -134,6 +137,12 @@ const adminReferenceTabs: Array<{
 }> = [
   { icon: Info, id: "overview", label: "Обзор" },
   {
+    count: (submission) => submission.applicants.length,
+    icon: Users,
+    id: "applicants",
+    label: "Заявители",
+  },
+  {
     count: (submission) => questionnaireFieldCount(submission),
     icon: FileText,
     id: "questionnaire",
@@ -146,6 +155,12 @@ const adminReferenceTabs: Array<{
     id: "issues",
     label: "Замечания",
     warning: true,
+  },
+  {
+    count: (submission) => submission.history.length,
+    icon: History,
+    id: "history",
+    label: "История",
   },
 ];
 
@@ -273,15 +288,7 @@ export function AdminReviewDrawer({
   const selectReviewTab = useCallback(
     (tab: AdminReviewTab) => {
       setActiveReviewTab(tab);
-      onTab(
-        tab === "overview"
-          ? "overview"
-          : tab === "issues"
-            ? "issues"
-            : tab === "files" || tab === "passport" || tab === "selfie"
-              ? "files"
-              : "questionnaire",
-      );
+      onTab(reviewTabToDrawerTab(tab));
       if (tab === "passport") setReviewTarget("passport_scan");
       if (tab === "selfie" && reviewTarget === "passport_scan") {
         setReviewTarget("selfie");
@@ -292,7 +299,9 @@ export function AdminReviewDrawer({
 
   function isReferenceTabSelected(tab: DrawerTab) {
     if (tab === "overview") return activeReviewTab === "overview";
+    if (tab === "applicants") return activeReviewTab === "applicants";
     if (tab === "issues") return activeReviewTab === "issues";
+    if (tab === "history") return activeReviewTab === "history";
     if (tab === "files")
       return activeReviewTab === "files" || activeReviewTab === "passport" || activeReviewTab === "selfie";
     if (tab === "questionnaire") return activeReviewTab === "questionnaire";
@@ -305,8 +314,18 @@ export function AdminReviewDrawer({
       return;
     }
 
+    if (tab === "applicants") {
+      selectReviewTab("applicants");
+      return;
+    }
+
     if (tab === "issues") {
       selectReviewTab("issues");
+      return;
+    }
+
+    if (tab === "history") {
+      selectReviewTab("history");
       return;
     }
 
@@ -316,6 +335,16 @@ export function AdminReviewDrawer({
     }
 
     selectReviewTab("questionnaire");
+  }
+
+  function openApplicantSubscreen(
+    applicantId: string,
+    tab: Extract<AdminReviewTab, "passport" | "selfie" | "questionnaire" | "files">,
+  ) {
+    setSelectedApplicantId(applicantId);
+    if (tab === "passport") setReviewTarget("passport_scan");
+    if (tab === "selfie") setReviewTarget("selfie");
+    selectReviewTab(tab);
   }
 
   useEffect(() => {
@@ -559,8 +588,6 @@ export function AdminReviewDrawer({
               <p className="admin-review-meta">
                 {submission.city}
                 <span aria-hidden="true"> · </span>
-                Агент: {agentOwnerDisplayName(submission.agentId)}
-                <span aria-hidden="true"> · </span>
                 {openIssueCount(submission)} замечаний
               </p>
               <h2>
@@ -629,7 +656,9 @@ export function AdminReviewDrawer({
             <AdminAiAssistancePanel state={adminAiState} onRun={runAdminAiReview} />
           </div>
 
-          {activeReviewTab === "questionnaire" ? (
+          {activeReviewTab === "passport" ||
+          activeReviewTab === "selfie" ||
+          activeReviewTab === "questionnaire" ? (
             <ApplicantChips
               selectedApplicantId={selectedApplicantId}
               submission={submission}
@@ -655,9 +684,17 @@ export function AdminReviewDrawer({
               transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
             >
               {activeReviewTab === "overview" ? (
-                <AdminReviewOverviewTab
-                  primaryAction={primaryAction}
+                <AdminOverviewTab
+                  primaryActionLabel={primaryAction.label}
                   submission={submission}
+                  onOpenTab={selectReviewTab}
+                />
+              ) : activeReviewTab === "applicants" ? (
+                <ApplicantsReviewTab
+                  selectedApplicantId={selectedApplicant?.id}
+                  submission={submission}
+                  onOpenSubscreen={openApplicantSubscreen}
+                  onSelectApplicant={setSelectedApplicantId}
                 />
               ) : activeReviewTab === "files" ? (
                 <AdminFilesTab
@@ -744,7 +781,7 @@ export function AdminReviewDrawer({
                   onSectionRemark={openSectionRemark}
                   onVerifyPassport={() => setPassportWorkspaceOpen(true)}
                 />
-              ) : (
+              ) : activeReviewTab === "issues" ? (
                 <IssuesTab
                   identityFindings={identityReport.findings}
                   submission={submission}
@@ -756,7 +793,9 @@ export function AdminReviewDrawer({
                   onJump={handleIssueJump}
                   onRunAiReview={onRunAiReview}
                 />
-              )}
+              ) : activeReviewTab === "history" ? (
+                <HistoryReviewTab submission={submission} />
+              ) : null}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -855,7 +894,7 @@ function AdminAiAssistancePanel({
   const readinessCopy =
     state.readiness?.readinessExplanation ||
     state.readiness?.summary ||
-    "Готовность объясняется статусами, файлами и открытыми замечаниями.";
+    "Готовность объясняется deterministic статусами, файлами и открытыми замечаниями.";
 
   return (
     <section className="admin-ai-assist" aria-label="AI-помощник администратора">
@@ -929,63 +968,221 @@ function AdminAiAssistancePanel({
   );
 }
 
-function AdminReviewOverviewTab({
-  primaryAction,
+function AdminOverviewTab({
+  primaryActionLabel,
   submission,
+  onOpenTab,
 }: {
-  primaryAction: ReturnType<typeof getPrimaryAction>;
+  primaryActionLabel: string;
   submission: Submission;
+  onOpenTab: (tab: AdminReviewTab) => void;
 }) {
-  const totalFiles = submission.files.length;
-  const readyFiles = submission.files.filter(
+  const fileCount = submission.files.length;
+  const readyFileCount = submission.files.filter(
     (file) => file.status !== "missing" && file.status !== "needs_replacement",
   ).length;
+  const fieldCount = questionnaireFieldCount(submission);
   const openIssues = openIssueCount(submission);
-  const fixedIssues = submission.issues.filter(
-    (issue) => issue.status === "fixed_by_agent",
-  ).length;
+  const nextChecks: Array<{
+    count: string;
+    id: Extract<AdminReviewTab, "passport" | "selfie" | "questionnaire" | "issues" | "files">;
+    label: string;
+    tone?: "warning";
+  }> = [
+    { count: `${readyFileCount}/${fileCount}`, id: "files", label: "Файлы" },
+    { count: String(fieldCount), id: "questionnaire", label: "Поля анкеты" },
+    {
+      count: String(openIssues),
+      id: "issues",
+      label: "Замечания",
+      tone: openIssues > 0 ? "warning" : undefined,
+    },
+  ];
 
   return (
-    <section className="admin-review-overview" aria-label="Обзор проверки">
-      <div className="admin-review-overview-grid">
-        <article>
-          <small>Статус</small>
-          <strong>{statusLabels[submission.status]}</strong>
-          <span>{primaryAction.disabled ? primaryAction.reason : primaryAction.label}</span>
-        </article>
-        <article>
-          <small>Заявители</small>
-          <strong>{submission.applicants.length}</strong>
-          <span>{submission.type === "family" ? "Семейная подача" : "Один заявитель"}</span>
-        </article>
-        <article>
-          <small>Файлы</small>
-          <strong>
-            {readyFiles}/{totalFiles}
-          </strong>
-          <span>готово к проверке</span>
-        </article>
-        <article>
-          <small>Замечания</small>
-          <strong>{openIssues + fixedIssues}</strong>
-          <span>
-            {openIssues ? `${openIssues} открыто` : "Открытых нет"}
-            {fixedIssues ? ` · ${fixedIssues} исправлено` : ""}
-          </span>
-        </article>
-      </div>
-
-      <div className="admin-review-overview-next">
-        <Info aria-hidden="true" size={18} />
+    <div className="admin-review-overview-tab" data-admin-review-overview>
+      <section className="admin-review-overview-hero" aria-label="Сводка пакета">
         <div>
-          <h3>Следующий шаг</h3>
+          <span>{submission.type === "family" ? "Семейная подача" : "Один заявитель"}</span>
+          <h3>{submission.title}</h3>
           <p>
-            Проверьте анкету и файлы. Если есть ошибка, добавьте точное замечание
-            и верните подачу агенту. Если блокеров нет, примите подачу к выгрузке.
+            {submission.city} · {submission.tripDateFrom}-{submission.tripDateTo} ·{" "}
+            {submission.applicants.length} заявителей
           </p>
         </div>
+        <strong>{primaryActionLabel}</strong>
+      </section>
+
+      <div className="admin-review-overview-metrics" aria-label="Метрики проверки">
+        <MetricTile label="Анкета" value={`${submission.completeness.questionnaire}%`} />
+        <MetricTile label="Файлы" value={`${submission.completeness.files}%`} />
+        <MetricTile label="Всего" value={`${submission.completeness.total}%`} />
+        <MetricTile label="Открыто" tone={openIssues > 0 ? "warning" : undefined} value={openIssues} />
       </div>
-    </section>
+
+      <section className="admin-review-overview-route" aria-label="Маршрут проверки">
+        {nextChecks.map((item) => (
+          <button
+            className={item.tone ? "is-warning" : ""}
+            key={item.id}
+            type="button"
+            onClick={() => onOpenTab(item.id)}
+          >
+            <span>{item.label}</span>
+            <strong>{item.count}</strong>
+          </button>
+        ))}
+      </section>
+
+      <section className="admin-review-overview-next" aria-label="Быстрые проверки">
+        <button type="button" onClick={() => onOpenTab("passport")}>
+          <ScanText aria-hidden="true" size={15} />
+          Паспорт
+        </button>
+        <button type="button" onClick={() => onOpenTab("selfie")}>
+          <User aria-hidden="true" size={15} />
+          Селфи
+        </button>
+        <button type="button" onClick={() => onOpenTab("history")}>
+          <History aria-hidden="true" size={15} />
+          История
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function MetricTile({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone?: "warning";
+  value: number | string;
+}) {
+  return (
+    <article className={tone ? "is-warning" : ""}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function ApplicantsReviewTab({
+  selectedApplicantId,
+  submission,
+  onOpenSubscreen,
+  onSelectApplicant,
+}: {
+  selectedApplicantId?: string;
+  submission: Submission;
+  onOpenSubscreen: (
+    applicantId: string,
+    tab: Extract<AdminReviewTab, "passport" | "selfie" | "questionnaire" | "files">,
+  ) => void;
+  onSelectApplicant: (applicantId: string) => void;
+}) {
+  return (
+    <div className="admin-review-applicants-tab">
+      {submission.applicants.map((applicant, index) => {
+        const applicantFiles = submission.files.filter(
+          (file) => file.applicantId === applicant.id,
+        );
+        const readyFiles = applicantFiles.filter(
+          (file) => file.status !== "missing" && file.status !== "needs_replacement",
+        ).length;
+        const applicantIssues = submission.issues.filter(
+          (issue) => issue.status === "open" && issue.target.applicantId === applicant.id,
+        ).length;
+        const fieldCount = applicant.sections.reduce(
+          (count, section) => count + section.fields.length,
+          0,
+        );
+        const checkedFields = applicant.sections.reduce(
+          (count, section) =>
+            count +
+            section.fields.filter(
+              (field) => field.reviewState === "confirmed" || field.reviewConfirmedAtIso,
+            ).length,
+          0,
+        );
+        const selected = selectedApplicantId === applicant.id;
+
+        return (
+          <article
+            className={selected ? "is-selected" : ""}
+            key={applicant.id}
+            onFocus={() => onSelectApplicant(applicant.id)}
+            onMouseEnter={() => onSelectApplicant(applicant.id)}
+          >
+            <header>
+              <span>{index + 1}</span>
+              <div>
+                <strong>{applicant.fullName}</strong>
+                <small>{applicantRoleLabel(applicant.role)}</small>
+              </div>
+              {applicantIssues > 0 ? <em>{applicantIssues} замеч.</em> : null}
+            </header>
+            <dl>
+              <div>
+                <dt>Анкета</dt>
+                <dd>{checkedFields}/{fieldCount}</dd>
+              </div>
+              <div>
+                <dt>Файлы</dt>
+                <dd>{readyFiles}/{applicantFiles.length}</dd>
+              </div>
+              <div>
+                <dt>Статус</dt>
+                <dd>{applicant.questionnaireStatus === "complete" ? "Готово" : "Проверить"}</dd>
+              </div>
+            </dl>
+            <footer>
+              <button type="button" onClick={() => onOpenSubscreen(applicant.id, "passport")}>
+                Паспорт
+              </button>
+              <button type="button" onClick={() => onOpenSubscreen(applicant.id, "selfie")}>
+                Селфи
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenSubscreen(applicant.id, "questionnaire")}
+              >
+                Анкета
+              </button>
+            </footer>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function HistoryReviewTab({ submission }: { submission: Submission }) {
+  if (!submission.history.length) {
+    return (
+      <div className="admin-review-empty-card">
+        <History aria-hidden="true" size={18} />
+        <strong>История пока пуста</strong>
+        <span>События появятся после действий агента, администратора или системы.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="admin-review-history-tab" aria-label="История подачи">
+      {submission.history.map((event) => (
+        <article key={event.id}>
+          <span>{historySourceLabel(event.source)}</span>
+          <div>
+            <strong>{event.text}</strong>
+            {event.detail ? <p>{event.detail}</p> : null}
+            <small>{event.at}</small>
+          </div>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -1795,6 +1992,12 @@ function MediaReviewPane({
                 file={file}
                 rows={previewRows}
               />
+            ) : reviewTarget !== "passport_scan" && previewApplicant ? (
+              <PhotoDocumentSheet
+                applicant={previewApplicant}
+                file={file}
+                reviewTarget={reviewTarget}
+              />
             ) : (
               <>
                 <strong>{file?.originalFileName ?? file?.generatedFileName ?? fileLabel(reviewTarget)}</strong>
@@ -1924,6 +2127,53 @@ function PassportDocumentSheet({
         <span>{`P<RUS${mrzName}<<<<<<<<<<<<<<<<<<`}</span>
         <span>{`${mrzNumber || "000000000"}RUS${birthDate.replace(/\\D/g, "").slice(0, 6)}M${expiryDate.replace(/\\D/g, "").slice(0, 6)}7<<<<<<<<<<04`}</span>
       </div>
+    </div>
+  );
+}
+
+function PhotoDocumentSheet({
+  applicant,
+  file,
+  reviewTarget,
+}: {
+  applicant: Applicant;
+  file?: SubmissionFile;
+  reviewTarget: Extract<AdminReviewFileTarget, "selfie" | "selfie_2">;
+}) {
+  const fileName = file?.originalFileName ?? file?.generatedFileName ?? fileLabel(reviewTarget);
+  const fileMeta = `${file?.mimeType ?? "image slot"} · ${
+    file?.sizeBytes ? formatBytes(file.sizeBytes) : "без размера"
+  }`;
+  const requirements =
+    reviewTarget === "selfie"
+      ? ["Лицо видно", "Свет ровный", "Совпадает с анкетой"]
+      : ["Доп. фото видно", "Без бликов", "Подходит центру"];
+
+  return (
+    <div className="admin-review-photo-sheet">
+      <div className="admin-review-passport-file">
+        <ImageIcon aria-hidden="true" size={13} />
+        <span>{fileName}</span>
+      </div>
+      <div className="admin-review-photo-frame">
+        <div className="admin-review-photo-person" aria-hidden="true">
+          <User size={54} />
+        </div>
+        <div className="admin-review-photo-meta">
+          <span>{fileLabel(reviewTarget)}</span>
+          <strong>{applicant.fullName}</strong>
+          <small>{file?.storagePath ?? "Приватный storage preview не доступен локально"}</small>
+        </div>
+      </div>
+      <div className="admin-review-photo-requirements" aria-label="Требования к фото">
+        {requirements.map((item) => (
+          <span key={item} className="admin-review-photo-chip">
+            <CheckCircle2 aria-hidden="true" size={12} />
+            {item}
+          </span>
+        ))}
+      </div>
+      <small className="admin-review-photo-file-meta">{fileMeta}</small>
     </div>
   );
 }
@@ -2301,7 +2551,7 @@ function AdminRemarkForm({
           </button>
           <button disabled={!canSubmit} type="button" onClick={submit}>
             <Send aria-hidden="true" size={16} />
-            Создать замечание
+            Отправить замечание
           </button>
         </footer>
       </motion.div>
@@ -2330,24 +2580,29 @@ function IssuesTab({
   submission: Submission;
   onJump: (issue: Submission["issues"][number]) => void;
 }) {
-  const [scope, setScope] = useState<"ai" | "all" | "closed" | "fixed" | "open">("open");
-  const issueGroups = {
-    all: submission.issues,
-    closed: submission.issues.filter((issue) => issue.status === "closed_by_admin"),
-    fixed: submission.issues.filter((issue) => issue.status === "fixed_by_agent"),
-    open: submission.issues.filter((issue) => issue.status === "open"),
-  };
-  const visibleIssues = scope === "ai" ? [] : issueGroups[scope];
-  const visibleIdentityFindings = scope === "ai" || scope === "all" ? identityFindings : [];
-  const hasContent = visibleIssues.length > 0 || visibleIdentityFindings.length > 0;
-  const blockerIssues = submission.issues.filter((issue) => issue.severity === "blocker").length;
-  const tabs = [
-    { id: "open" as const, label: "Открытые", count: issueGroups.open.length },
-    { id: "fixed" as const, label: "Исправлено", count: issueGroups.fixed.length },
-    { id: "closed" as const, label: "Закрыто", count: issueGroups.closed.length },
-    { id: "ai" as const, label: "AI", count: identityFindings.length },
-    { id: "all" as const, label: "Все", count: issueGroups.all.length + identityFindings.length },
-  ];
+  if (!submission.issues.length && !identityFindings.length) {
+    return (
+      <div className="admin-review-issues-list">
+        <BbAiPanel
+          role="admin"
+          submission={submission}
+          surface="review"
+          onAccept={onAcceptAiSuggestion}
+          onDismiss={onDismissAiSuggestion}
+          onRun={onRunAiReview}
+        />
+        <div className="admin-review-empty-card">
+          <ShieldCheck aria-hidden="true" size={18} />
+          <strong>Замечаний пока нет</strong>
+          <span>Если паспорт, селфи и анкета корректны, можно принимать заявку.</span>
+          <button type="button" onClick={onAddRemark}>
+            <MessageSquarePlus aria-hidden="true" size={15} />
+            Добавить замечание
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-review-issues-list">
@@ -2360,64 +2615,19 @@ function IssuesTab({
         onRun={onRunAiReview}
       />
 
-      <div className="v19-admin-issues-command">
-        <div>
-          <span>Замечания</span>
-          <strong>
-            {issueGroups.open.length} открыто · {issueGroups.fixed.length} исправлено · {blockerIssues} блокеров
-          </strong>
-          <em>Фильтр, AI-конфликты и ручные замечания собраны в одной рабочей вкладке.</em>
-        </div>
-        <button type="button" onClick={onAddRemark}>
-          <MessageSquarePlus aria-hidden="true" size={15} />
-          Новое замечание
-        </button>
-      </div>
+      <button type="button" onClick={onAddRemark}>
+        <MessageSquarePlus aria-hidden="true" size={15} />
+        Добавить замечание
+      </button>
 
-      <div className="v19-admin-issues-toolbar">
-        <div className="v19-admin-issues-tabs" role="tablist" aria-label="Фильтр замечаний">
-          {tabs.map((tab) => (
-            <button
-              aria-selected={scope === tab.id}
-              className={scope === tab.id ? "is-active" : ""}
-              key={tab.id}
-              role="tab"
-              type="button"
-              onClick={() => setScope(tab.id)}
-            >
-              {tab.label}
-              <span>{tab.count}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {!hasContent ? (
-        <div className="admin-review-empty-card">
-          <ShieldCheck aria-hidden="true" size={18} />
-          <strong>Замечаний пока нет</strong>
-          <span>Если паспорт, селфи и анкета корректны, можно принимать заявку.</span>
-          <button type="button" onClick={onAddRemark}>
-            <MessageSquarePlus aria-hidden="true" size={15} />
-            Добавить замечание
-          </button>
-        </div>
-      ) : null}
-
-      {visibleIdentityFindings.length ? (
+      {identityFindings.length ? (
         <section className="admin-review-ai-conflicts" aria-label="AI-конфликты личности">
           <header>
             <span>AI-конфликты личности</span>
-            <em>{visibleIdentityFindings.length}</em>
+            <em>{identityFindings.length}</em>
           </header>
-          {visibleIdentityFindings.map((finding) => (
-            <motion.article
-              animate={{ opacity: 1, y: 0 }}
-              className={`is-${finding.severity}`}
-              initial={{ opacity: 0, y: 8 }}
-              key={finding.id}
-              transition={{ duration: 0.18 }}
-            >
+          {identityFindings.map((finding) => (
+            <article className={`is-${finding.severity}`} key={finding.id}>
               <header>
                 <span>{finding.severity}</span>
                 <em>{finding.applicantName}</em>
@@ -2437,45 +2647,29 @@ function IssuesTab({
                   </button>
                 ) : null}
               </footer>
-            </motion.article>
+            </article>
           ))}
         </section>
       ) : null}
 
-      {visibleIssues.length ? (
-        <div className="v19-admin-issue-list-stack">
-          {visibleIssues.map((issue) => (
-            <motion.article
-              animate={{ opacity: 1, y: 0 }}
-              id={targetElementId({ issueId: issue.id, tab: "issues" })}
-              className={`v19-admin-issue-card is-${issue.severity}`}
-              initial={{ opacity: 0, y: 8 }}
-              key={issue.id}
-              transition={{ duration: 0.18 }}
-            >
-              <div>
-                <header>
-                  <span>{issue.id}</span>
-                  <em>{issueStatusLabel(issue.status)}</em>
-                  <em>{issue.severity === "blocker" ? "Блокер" : "Предупреждение"}</em>
-                </header>
-                <strong>{issue.reason}</strong>
-                <p>{issue.comment || "Комментарий не указан."}</p>
-                <small>{issue.target.applicantName} · {issueTargetPath(issue)}</small>
-              </div>
-              <button type="button" onClick={() => onJump(issue)}>
-                Перейти к месту
-              </button>
-            </motion.article>
-          ))}
-        </div>
-      ) : hasContent ? (
-        <div className="admin-review-empty-card">
-          <ShieldCheck aria-hidden="true" size={18} />
-          <strong>В этом фильтре пусто</strong>
-          <span>Переключите статус или добавьте новое замечание.</span>
-        </div>
-      ) : null}
+      {submission.issues.map((issue) => (
+        <article
+          id={targetElementId({ issueId: issue.id, tab: "issues" })}
+          className={`is-${issue.severity}`}
+          key={issue.id}
+        >
+          <header>
+            <span>{issue.id}</span>
+            <em>{issueStatusLabel(issue.status)}</em>
+          </header>
+          <strong>{issue.reason}</strong>
+          <p>{issue.comment}</p>
+          <small>{issue.target.applicantName} · {issueTargetPath(issue)}</small>
+          <button type="button" onClick={() => onJump(issue)}>
+            Перейти к месту
+          </button>
+        </article>
+      ))}
     </div>
   );
 }
@@ -2523,9 +2717,16 @@ function isPassportReviewSection(section: Applicant["sections"][number]) {
 
 function drawerTabToReviewTab(tab: DrawerTab): AdminReviewTab {
   if (tab === "overview") return "overview";
+  if (tab === "applicants") return "applicants";
   if (tab === "issues") return "issues";
   if (tab === "files") return "files";
+  if (tab === "history") return "history";
   return "questionnaire";
+}
+
+function reviewTabToDrawerTab(tab: AdminReviewTab): DrawerTab {
+  if (tab === "passport" || tab === "selfie") return "files";
+  return tab;
 }
 
 function fieldStatus(
@@ -2662,6 +2863,13 @@ function applicantRoleLabel(role: Applicant["role"] | undefined) {
   if (role === "spouse") return "супруга";
   if (role === "child") return "ребенок";
   return "заявитель";
+}
+
+function historySourceLabel(source: Submission["history"][number]["source"]) {
+  if (source === "admin") return "Админ";
+  if (source === "agent") return "Агент";
+  if (source === "bb") return "BB";
+  return "Система";
 }
 
 function formatBytes(value: number) {

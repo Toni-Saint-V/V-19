@@ -21,8 +21,6 @@ export type Surface =
   | "agent-issues"
   | "agent-submissions"
   | "admin-review"
-  | "admin-intake"
-  | "admin-access"
   | "export"
   | "settings";
 

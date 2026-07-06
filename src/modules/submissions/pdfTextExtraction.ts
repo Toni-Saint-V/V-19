@@ -18,10 +18,6 @@ export type ExtractedPdfText = {
   text: string;
 };
 
-export type PdfUploadReadiness =
-  | { ok: true; sourceLabel: string }
-  | { ok: false; safeMessage: string };
-
 type PdfTextItem = {
   str?: unknown;
 };
@@ -83,26 +79,6 @@ export function isVisaApplicationPdfFile(file: File) {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 }
 
-export function validateVisaApplicationPdfFile(file: File): PdfUploadReadiness {
-  if (!isVisaApplicationPdfFile(file)) {
-    return { ok: false, safeMessage: "Загрузите PDF анкеты." };
-  }
-  if (file.size <= 0) {
-    return { ok: false, safeMessage: "PDF анкеты пустой. Экспортируйте файл повторно." };
-  }
-  if (file.size > maxVisaApplicationPdfBytes) {
-    return {
-      ok: false,
-      safeMessage: "PDF анкеты слишком большой. Максимальный размер: 25 МБ.",
-    };
-  }
-  return { ok: true, sourceLabel: "PDF анкеты готов к локальной сверке" };
-}
-
-export function pdfExtractionSourceLabel(source: VisaApplicationPdfExtractionSource) {
-  return source === "text_layer" ? "Текстовый слой PDF" : "Локальный OCR";
-}
-
 export function normalizeVisaApplicationPdfUploadFile(file: File) {
   if (file.type === "application/pdf") return file;
   return new File([file], file.name, {
@@ -112,9 +88,11 @@ export function normalizeVisaApplicationPdfUploadFile(file: File) {
 }
 
 export async function extractPdfTextFromFile(file: File): Promise<ExtractedPdfText> {
-  const readiness = validateVisaApplicationPdfFile(file);
-  if (!readiness.ok) {
-    throw new Error(readiness.safeMessage);
+  if (!isVisaApplicationPdfFile(file)) {
+    throw new Error("Загрузите PDF анкеты.");
+  }
+  if (file.size > maxVisaApplicationPdfBytes) {
+    throw new Error("PDF анкеты слишком большой. Максимальный размер: 25 МБ.");
   }
 
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -129,13 +107,8 @@ export async function extractPdfTextFromFile(file: File): Promise<ExtractedPdfTe
   const loadingTask = pdfjs.getDocument({
     data: bytes,
     isEvalSupported: false,
-  } as unknown as Parameters<typeof pdfjs.getDocument>[0]);
-  let document: PdfDocumentProxy;
-  try {
-    document = (await loadingTask.promise) as unknown as PdfDocumentProxy;
-  } catch (error) {
-    throw new Error(pdfLoadFailureMessage(error));
-  }
+  });
+  const document = (await loadingTask.promise) as unknown as PdfDocumentProxy;
   const pages: string[] = [];
 
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
@@ -148,14 +121,10 @@ export async function extractPdfTextFromFile(file: File): Promise<ExtractedPdfTe
     pages.push(pageText);
   }
 
-  const textLayerText = normalizeExtractedPdfText(pages.join("\n\n"));
+  const textLayerText = pages.join("\n\n").trim();
   const source = textLayerText ? "text_layer" : "local_ocr";
   const ocrResult = textLayerText ? null : await extractPdfTextWithLocalOcr(document);
-  const text = normalizeExtractedPdfText(textLayerText || ocrResult?.text || "");
-
-  if (!text) {
-    throw new Error("PDF анкеты не содержит читаемого текста. Загрузите сформированный PDF или более качественный скан.");
-  }
+  const text = textLayerText || ocrResult?.text || "";
 
   return {
     extractedPageCount: textLayerText
@@ -208,7 +177,7 @@ async function extractPdfTextWithLocalOcr(document: PdfDocumentProxy) {
     if (response.data.text?.trim()) recognizedPages.push(response.data.text.trim());
   }
 
-  const text = normalizeExtractedPdfText(recognizedPages.join("\n\n"));
+  const text = recognizedPages.join("\n\n").trim();
   if (!text) {
     throw new Error(
       "В PDF нет текстового слоя, а локальный OCR не смог прочитать анкету. Загрузите сформированную PDF-анкету.",
@@ -218,28 +187,6 @@ async function extractPdfTextWithLocalOcr(document: PdfDocumentProxy) {
     extractedPageCount: pageLimit,
     text,
   };
-}
-
-function normalizeExtractedPdfText(value: string) {
-  return value
-    .replace(/\r\n?/g, "\n")
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-}
-
-function pdfLoadFailureMessage(error: unknown) {
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
-
-  if (message.includes("password") || message.includes("encrypted")) {
-    return "PDF анкеты защищён паролем. Снимите защиту и загрузите файл повторно.";
-  }
-  if (message.includes("invalid") || message.includes("damaged") || message.includes("corrupt")) {
-    return "PDF анкеты повреждён или не читается. Экспортируйте файл заново.";
-  }
-  return "PDF анкеты не удалось открыть. Проверьте файл и повторите загрузку.";
 }
 
 function getBrowserDocument() {

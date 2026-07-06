@@ -988,6 +988,5 @@ function shortFileTypeLabel(type: SubmissionFile["type"]) {
   if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";
   if (type === "selfie") return "Селфи 1";
-  if (type === "pdf") return "PDF";
   return "Файл";
 }
