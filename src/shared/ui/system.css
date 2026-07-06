@@ -10,6 +10,31 @@
   }
 }
 
+/* Admin mobile review scroll lock. The mobile board owns the long queue because
+   the app shell itself is viewport-locked. */
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit
+    .v19-admin-cockpit-main
+    > .v19-admin-cockpit-board {
+    min-height: var(--v19b-size-0) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit
+    .v19-admin-cockpit-main
+    > .v19-admin-cockpit-board
+    > .v19-admin-cockpit-lanes {
+    overflow: visible !important;
+  }
+}
+
 /* ===== base, primitives, and surfaces ===== */
 
 .vf-figma-surface,
