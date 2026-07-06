@@ -65,6 +65,24 @@ export async function deleteMediaFromStorage(
   }
 }
 
+export async function downloadMediaFromStorage(
+  target: MediaStorageTarget,
+): Promise<Blob | null> {
+  validateMediaStorageTarget({ target });
+
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  const { data, error } = await client.storage.from(target.bucket).download(target.path);
+  if (error) {
+    throw mapSupabasePersistenceError(error, {
+      operation: "storage.download_media",
+      fallbackKind: "storage",
+    });
+  }
+  return data;
+}
+
 export async function createMediaSignedUrl(
   target: MediaStorageTarget,
   expiresInSeconds = 60 * 10,
