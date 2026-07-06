@@ -109,7 +109,9 @@ async function logoutThroughUi(page: Page) {
 async function approveAccessRequests(page: Page, emails: string[]) {
   await login(page, "2@2.ru", "22");
   await clickWorkspaceButton(page, /Настройки/);
-  await page.getByRole("button", { name: "Заявки на доступ" }).click();
+  await page
+    .getByRole("button", { name: /Входящие заявки на регистрацию/ })
+    .click();
   const queue = page.getByTestId("admin-access-queue");
   await expect(queue).toBeVisible();
 
