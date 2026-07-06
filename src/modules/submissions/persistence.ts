@@ -5,6 +5,13 @@ import type { Submission } from "./types";
 
 const storageKey = "visaflow.v19.submissions.v1";
 
+interface PersistenceImportMeta {
+  env: {
+    readonly DEV?: boolean;
+    readonly VITE_SUPABASE_BACKEND_TARGET?: string;
+  };
+}
+
 type StorageLike = {
   getItem(key: string): string | null;
   removeItem(key: string): void;
@@ -52,11 +59,54 @@ function getStorage() {
 }
 
 function normalizeLoadedSubmissions(submissions: Submission[]): Submission[] {
-  return submissions.map((submission) =>
+  const normalized = submissions.map((submission) =>
     normalizeSubmissionForCanonicalRuntime(
       ensureSubmissionOwner(submission, defaultLocalAgentOwnerId),
     ),
   );
+
+  return seedLocalDemoStoredMedia(normalized);
+}
+
+function seedLocalDemoStoredMedia(submissions: Submission[]): Submission[] {
+  if (!canSeedLocalDemoStoredMedia()) return submissions;
+
+  const demoSubmission = initialSubmissions.find(
+    (submission) => submission.id === "SUB-1102",
+  );
+  if (!demoSubmission) return submissions;
+
+  const demoFilesById = new Map(demoSubmission.files.map((file) => [file.id, file]));
+
+  return submissions.map((submission) => {
+    if (submission.id !== demoSubmission.id) return submission;
+
+    return {
+      ...submission,
+      files: submission.files.map((file) => {
+        const demoFile = demoFilesById.get(file.id);
+        if (!demoFile || file.status !== "accepted") return file;
+
+        return {
+          ...file,
+          generatedFileName: demoFile.generatedFileName,
+          mimeType: demoFile.mimeType,
+          originalFileName: demoFile.originalFileName,
+          reviewStatus: demoFile.reviewStatus,
+          sizeBytes: demoFile.sizeBytes,
+          storageAdapter: demoFile.storageAdapter,
+          storageBucket: demoFile.storageBucket,
+          storagePath: demoFile.storagePath,
+          uploadStatus: demoFile.uploadStatus,
+        };
+      }),
+    };
+  });
+}
+
+function canSeedLocalDemoStoredMedia(): boolean {
+  const env = (import.meta as unknown as PersistenceImportMeta).env;
+  return Boolean(env.DEV) && env.VITE_SUPABASE_BACKEND_TARGET !== "supabase";
 }
 
 function isSubmissionLike(value: unknown): value is Submission {
