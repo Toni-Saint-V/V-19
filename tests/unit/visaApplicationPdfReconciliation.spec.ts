@@ -15,7 +15,6 @@ import {
   validateVisaApplicationPdfStorageTarget,
 } from "../../src/modules/submissions/mediaStoragePolicy";
 import {
-  completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
@@ -24,6 +23,7 @@ import {
   canPerformAction,
 } from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const pdfTextFrom669308614 = `
 1. Apellido(s)/Фамилия(-и):
@@ -682,7 +682,7 @@ function submittedFixture(
     submissions: [],
     type: references.length > 1 ? "family" : "single",
   });
-  const completed = completeQuestionnaire(draft);
+  const completed = fillRequiredQuestionnaireForTest(draft);
   const withPassportFields = {
     ...completed,
     applicants: completed.applicants.map((item, index) => {

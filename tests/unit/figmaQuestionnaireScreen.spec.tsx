@@ -197,9 +197,106 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    expect(screen.getByText("Дата рождения не совпадает")).toBeInTheDocument();
-    expect(screen.getByText("PDF не совпадает с заявкой: Дата рождения.")).toBeInTheDocument();
+    expect(screen.getByText("Дата рождения: PDF не совпадает")).toBeInTheDocument();
+    expect(screen.getAllByText("PDF не совпадает с заявкой: Дата рождения.")).toHaveLength(2);
     expect(screen.queryByText(/Проверить|passport_ocr/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Место рождения")).toHaveClass("is-review");
+  });
+
+  test("returns every changed questionnaire field on completion", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicantId = draft.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+    const onComplete = vi.fn();
+
+    render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={onComplete}
+        submission={draft}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Фамилия"), {
+      target: { value: "VOLKOV" },
+    });
+    fireEvent.change(screen.getByLabelText("Имя"), {
+      target: { value: "ANTON" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Готово/ }));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete.mock.calls[0]?.[0].fieldUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          applicantId,
+          fieldId: "surname",
+          sectionId: "personal",
+          value: "VOLKOV",
+        }),
+        expect.objectContaining({
+          applicantId,
+          fieldId: "first-name",
+          sectionId: "personal",
+          value: "ANTON",
+        }),
+      ]),
+    );
+  });
+
+  test("matches open issues by legacy labels after questionnaire label changes", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const applicant = draft.applicants[0];
+    if (!applicant) throw new Error("expected applicant");
+    const submission: Submission = {
+      ...draft,
+      issues: [
+        {
+          comment: "Проверьте срок действия паспорта.",
+          createdAt: "2026-07-06T00:00:00.000Z",
+          createdBy: "admin",
+          id: "issue-passport-expiry",
+          reason: "Требует проверки",
+          severity: "blocker",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Дата окончания паспорта",
+            section: "Паспорт",
+          },
+          type: "field",
+        },
+      ],
+    };
+
+    render(
+      <FigmaQuestionnaireScreen
+        initialFocus={{
+          applicantId: applicant.id,
+          field: "passport-expiry-date",
+        }}
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    expect(screen.getByLabelText("Действителен до")).toHaveClass("is-invalid");
+    expect(screen.getAllByText("Проверьте срок действия паспорта.")).toHaveLength(2);
   });
 });

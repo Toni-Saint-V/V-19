@@ -55,7 +55,6 @@ import {
   addPreciseAdminIssue,
   applyUploadedFileMetadata,
   applyExportStateToSelection,
-  completeQuestionnaire,
   createDraftSubmission,
   generatedCockpitMediaFileName,
   markSelectedExported,
@@ -87,6 +86,7 @@ import type {
   SubmissionStatus,
 } from "../../src/modules/submissions/types";
 import { matchesReviewTab } from "../../src/modules/submissions/uiTypes";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const canonicalMediaTypes = ["passport_scan", "selfie", "selfie_2"] as const;
 
@@ -304,7 +304,7 @@ describe("V-19 submission status rules", () => {
       type: "single",
     });
     const filled = {
-      ...uploadRequiredFiles(completeQuestionnaire(draft)),
+      ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
       status: "in_progress" as const,
       tripDateFrom: "не указано",
       tripDateTo: "не указано",
@@ -990,7 +990,7 @@ describe("V-19 submission actions", () => {
       canPerformAction(withAllReplacements, "submit_corrections", "agent"),
     ).toEqual({
       ok: false,
-      reason: "Сначала отметьте замечания исправленными",
+      reason: "Не найден номер загранпаспорта.",
     });
 
     const withExtractedPassport = finishPassportExtraction(
@@ -1146,11 +1146,12 @@ describe("V-19 submission actions", () => {
     expect(questionnaireValue(draft, "arrival-date", 1)).toBe("19.08.2026");
     expect(questionnaireValue(draft, "departure-date", 1)).toBe("27.08.2026");
     expect(questionnaireValue(draft, "hotel-name", 2)).toBe("HOTEL ILUNION BARCELONA");
-    expect(questionnaireValue(draft, "hotel-city", 2)).toBe("BARCELONA");
     expect(questionnaireValue(draft, "hotel-address", 2)).toBe(
       "CALLE RAMON TUR 196-198",
     );
-    expect(questionnaireValue(draft, "route", 2)).toBe("Москва, Барселона, Москва");
+    expect(questionnaireValue(draft, "first-entry-country", 2)).toBe(
+      "Москва, Барселона, Москва",
+    );
     expect(draft.applicants[0]?.questionnaireStatus).toBe("partial");
   });
 
@@ -1275,7 +1276,7 @@ describe("V-19 submission actions", () => {
       submissions: initialSubmissions,
       type: "single",
     });
-    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const inProgress = applySubmissionAction(filled, "save_progress", "agent");
 
     expect(canPerformAction(inProgress, "submit_for_review", "agent")).toEqual({
@@ -1298,7 +1299,7 @@ describe("V-19 submission actions", () => {
       submissions: initialSubmissions,
       type: "family",
     });
-    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const spouse = filled.applicants[1];
     const spousePassport = filled.files.find(
       (file) => file.applicantId === spouse?.id && file.type === "passport_scan",
@@ -1338,7 +1339,7 @@ describe("V-19 submission actions", () => {
       submissions: initialSubmissions,
       type: "single",
     });
-    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const passportFile = filled.files.find(
       (file) =>
         file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
@@ -1398,7 +1399,7 @@ describe("V-19 submission actions", () => {
       submissions: initialSubmissions,
       type: "single",
     });
-    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const passportFile = filled.files.find(
       (file) =>
         file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
@@ -1445,7 +1446,7 @@ describe("V-19 submission actions", () => {
       submissions: initialSubmissions,
       type: "single",
     });
-    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const passportFile = filled.files.find(
       (file) =>
         file.type === "passport_scan" && file.applicantId === filled.applicants[0]?.id,
@@ -1483,7 +1484,7 @@ describe("V-19 submission actions", () => {
     const firstFile = draft.files[0];
     if (!firstFile) throw new Error("Missing draft file");
 
-    const updated = uploadRequiredFile(completeQuestionnaire(draft), firstFile.id);
+    const updated = uploadRequiredFile(fillRequiredQuestionnaireForTest(draft), firstFile.id);
 
     expect(updated.files[0]?.status).toBe("uploaded");
     expect(updated.completeness.files).toBe(33);
@@ -1497,7 +1498,7 @@ describe("V-19 submission actions", () => {
   });
 
   it("merges uploaded media metadata without dropping concurrent submission edits", () => {
-    const draft = completeQuestionnaire(
+    const draft = fillRequiredQuestionnaireForTest(
       createDraftSubmission({
         city: "Москва",
         familyCount: 1,
@@ -1533,7 +1534,7 @@ describe("V-19 submission actions", () => {
   });
 
   it("commits uploaded media metadata into the latest submission after remote save resolves", () => {
-    const draft = completeQuestionnaire(
+    const draft = fillRequiredQuestionnaireForTest(
       createDraftSubmission({
         city: "Москва",
         familyCount: 1,
@@ -1661,26 +1662,26 @@ describe("V-19 submission actions", () => {
       status: "uploaded",
       uploadStatus: "uploaded",
     });
-    expect(sofiaFields.get("surname")).toBe("IVANOVA");
-    expect(sofiaFields.get("first-name")).toBe("SOFIYA");
-    expect(sofiaFields.get("passport-no")).toBe("660010483");
+    expect(sofiaFields.get("surname")).toBe("VOLKOV");
+    expect(sofiaFields.get("first-name")).toBe("ANTON");
+    expect(sofiaFields.get("passport-no")).toBe("752869613");
     expect(passportExtractionRows(sofia)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          conflict: true,
-          currentValue: "IVANOVA",
+          conflict: false,
+          currentValue: "VOLKOV",
           extractedValue: "VOLKOV",
           key: "surname",
         }),
         expect.objectContaining({
-          conflict: true,
-          currentValue: "SOFIYA",
+          conflict: false,
+          currentValue: "ANTON",
           extractedValue: "ANTON",
           key: "firstName",
         }),
         expect.objectContaining({
-          conflict: true,
-          currentValue: "660010483",
+          conflict: false,
+          currentValue: "752869613",
           extractedValue: "752869613",
           key: "passportNumber",
         }),
@@ -1713,7 +1714,7 @@ describe("V-19 submission actions", () => {
   });
 
   it("does not mutate state for legacy media upload targets", () => {
-    const draft = completeQuestionnaire(
+    const draft = fillRequiredQuestionnaireForTest(
       createDraftSubmission({
         city: "Москва",
         familyCount: 1,
@@ -1873,7 +1874,7 @@ describe("V-19 submission actions", () => {
       submissions: initialSubmissions,
       type: "family",
     });
-    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const inProgress = applySubmissionAction(filled, "save_progress", "agent");
     const submitted = applySubmissionAction(inProgress, "submit_for_review", "agent");
     const applicant = submitted.applicants[0];
@@ -1916,7 +1917,7 @@ describe("V-19 submission actions", () => {
       (section) => section.title === "Поездка",
     );
     const routeField = tripSection?.fields.find(
-      (field) => field.label === "Маршрут поездки",
+      (field) => field.label === "Страна первого въезда",
     );
     if (!tripSection || !routeField) throw new Error("Missing route field");
 
@@ -1931,7 +1932,7 @@ describe("V-19 submission actions", () => {
     expect(
       edited.applicants[0]?.sections
         .find((section) => section.title === "Поездка")
-        ?.fields.find((field) => field.label === "Маршрут поездки")?.error,
+        ?.fields.find((field) => field.label === "Страна первого въезда")?.error,
     ).toBe("Нужно уточнить маршрут поездки");
 
     const returned = applySubmissionAction(edited, "return_with_issues", "admin");
@@ -1956,9 +1957,9 @@ describe("V-19 submission actions", () => {
     expect(
       corrected.applicants[0]?.sections
         .find((section) => section.title === "Поездка")
-        ?.fields.find((field) => field.label === "Маршрут поездки")?.error,
+        ?.fields.find((field) => field.label === "Страна первого въезда")?.error,
     ).toBeUndefined();
-    expect(corrected.applicants[0]?.questionnaireStatus).toBe("complete");
+    expect(corrected.applicants[0]?.questionnaireStatus).toBe("partial");
   });
 
   it("blocks marking a returned issue fixed until its target changes", () => {
@@ -2107,7 +2108,7 @@ describe("V-19 ББ helper suggestions", () => {
       submissions: initialSubmissions,
       type: "single",
     });
-    const filled = uploadRequiredFiles(completeQuestionnaire(draft));
+    const filled = uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft));
     const passportFile = filled.files.find(
       (file) =>
         file.type === "passport_scan" &&
@@ -2334,7 +2335,7 @@ describe("V-19 persistence boundary", () => {
 
   it("normalizes legacy local status and media into canonical runtime slots", () => {
     installStorageStub();
-    const draft = completeQuestionnaire(
+    const draft = fillRequiredQuestionnaireForTest(
       createDraftSubmission({
         city: "Москва",
         familyCount: 1,

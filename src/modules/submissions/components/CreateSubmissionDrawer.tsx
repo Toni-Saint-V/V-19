@@ -280,7 +280,7 @@ function e2ePassportMockFields(fileName: string): PassportExtractedField[] | nul
     ["birthPlace", "MOSCOW", "low"],
     ["birthCountry", "USSR", "medium"],
     ["citizenship", "Russian Federation", "medium"],
-    ["gender", "Male - Мужской", "medium"],
+    ["gender", "Мужской", "medium"],
     ["passportType", "Ordinary Passport", "medium"],
     ["passportNumber", e2ePassportNumber(fileName), "high"],
     ["passportIssueCountry", "Russian Federation", "medium"],

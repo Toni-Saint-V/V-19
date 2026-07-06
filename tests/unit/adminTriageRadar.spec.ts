@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { buildAdminTriageRadar } from "../../src/modules/submissions/adminTriageRadar";
 import {
-  completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import type { Submission, VisaApplicationPdfReviewState } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function readySubmission(idOffset = 0): Submission {
   const draft = createDraftSubmission({
@@ -18,7 +18,7 @@ function readySubmission(idOffset = 0): Submission {
   });
 
   return {
-    ...uploadRequiredFiles(completeQuestionnaire(draft)),
+    ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
     id: `ПД-${2000 + idOffset}`,
     status: "submitted_for_review",
     updatedAt: `15.0${idOffset + 1}`,

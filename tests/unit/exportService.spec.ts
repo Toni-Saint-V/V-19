@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
+import JSZip from "jszip";
 import { buildMediaSlot, normalizeSubmission } from "../../src/lib/workflow";
 import {
   applyExportPackageDraft,
+  buildExportPackageArchiveArtifact,
   buildExportPackageDraft,
   exportColumns,
 } from "../../src/services/exportService";
@@ -174,6 +176,44 @@ describe("durable export package service", () => {
       idempotencyKey: draft.idempotencyKey,
       contentFingerprint: expect.stringContaining("VF-1001"),
       fileName: draft.artifact.fileName,
+    });
+  });
+
+  test("wraps the generated Excel and manifest into one ZIP archive", async () => {
+    const submission = acceptedSubmission({ id: "VF-ZIP-1", title: "Zip Export" });
+    const draft = buildExportPackageDraft([submission], {
+      batchId: "batch-zip",
+      createdAt,
+      createdBy,
+      format: "xlsx",
+    });
+
+    if (draft.status !== "ready") throw new Error("expected ready draft");
+
+    const archive = await buildExportPackageArchiveArtifact(draft);
+    const zip = await JSZip.loadAsync(archive.blob);
+    const names = Object.keys(zip.files).sort();
+    const manifestRaw = await zip.file("manifest.json")?.async("string");
+    if (!manifestRaw) throw new Error("missing manifest");
+    const manifest = JSON.parse(manifestRaw) as {
+      batchId: string;
+      excelFileName: string;
+      idempotencyKey: string;
+      rowCount: number;
+      submissionIds: string[];
+    };
+
+    expect(archive.contentType).toBe("application/zip");
+    expect(archive.fileName).toBe(
+      `visaflow-export-${draft.idempotencyKey}_documents.zip`,
+    );
+    expect(names).toEqual([draft.artifact.fileName, "manifest.json"].sort());
+    expect(manifest).toMatchObject({
+      batchId: "batch-zip",
+      excelFileName: draft.artifact.fileName,
+      idempotencyKey: draft.idempotencyKey,
+      rowCount: 1,
+      submissionIds: ["VF-ZIP-1"],
     });
   });
 

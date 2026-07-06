@@ -18,7 +18,6 @@ import { buildExportPackageIdentity } from "../../src/modules/submissions/export
 import { normalizeSubmissionQuestionnaire } from "../../src/modules/submissions/questionnaire";
 import { finishPassportExtraction } from "../../src/modules/submissions/passportExtraction";
 import {
-  completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFile,
   uploadRequiredFiles,
@@ -38,6 +37,7 @@ import type {
   Submission,
   VisaApplicationPdfReviewState,
 } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 type ApplicantFieldValues = Record<string, string>;
 
@@ -362,8 +362,7 @@ describe("operational workflow logic spine", () => {
         reviewState: "needs_review",
         value: "NEVSKY 10",
       });
-      expect(field(applied, applicantIndex, "hotel-city")?.value).toBe("MADRID");
-      expect(field(applied, applicantIndex, "route")?.value).toBe(
+      expect(field(applied, applicantIndex, "first-entry-country")?.value).toBe(
         "Москва, Мадрид, Москва",
       );
     }
@@ -398,7 +397,7 @@ describe("operational workflow logic spine", () => {
       fieldLabel: "Дата рождения",
       focus: true,
       highlight: "error",
-      sectionTitle: "Личные данные",
+      sectionTitle: "Личные данные заявителя",
     });
     expect(submission.issues[0]?.status).toBe("open");
   });
@@ -489,7 +488,7 @@ describe("operational workflow logic spine", () => {
           target: expect.objectContaining({
             applicantId: exported.applicants[0]?.id,
             field: "Дата рождения",
-            section: "Личные данные",
+            section: "Личные данные заявителя",
           }),
         }),
       ]),
@@ -1063,7 +1062,7 @@ function completeInProgressSubmission(): Submission {
   return {
     ...uploadRequiredFilesWithRealPassportScan(
       setApplicantFieldValues(
-        completeQuestionnaire(
+        fillRequiredQuestionnaireForTest(
           createDraftSubmission({
             applicantNames: ["ANTON VOLKOV"],
             city: "Москва",
@@ -1182,7 +1181,7 @@ function completedWithReference(input: {
     submissions: [],
     type: input.type,
   });
-  const completed = completeQuestionnaire(draft);
+  const completed = fillRequiredQuestionnaireForTest(draft);
   const withReference = setApplicantFieldValues(completed, 0, {
     "birth-country": mainReference.birthCountry,
     "birth-date": mainReference.birthDate,

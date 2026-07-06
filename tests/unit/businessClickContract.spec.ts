@@ -18,7 +18,6 @@ import {
 import {
   addPreciseAdminIssue,
   applyExportStateToSelection,
-  completeQuestionnaire,
   createDraftSubmission,
   markSubmissionFileAccepted,
   uploadRequiredFile,
@@ -37,6 +36,7 @@ import type {
   Submission,
   SubmissionAction,
 } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const allContracts = V19_BUSINESS_CLICK_CONTRACT_LIST;
 const actionContracts = V19_SUBMISSION_ACTION_CLICK_CONTRACTS;
@@ -327,7 +327,7 @@ function draftFixture(): Submission {
 
 function inProgressReadyFixture(): Submission {
   return {
-    ...uploadRequiredFiles(completeQuestionnaire(draftFixture())),
+    ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draftFixture())),
     status: "in_progress",
     tripDateFrom: "2026-08-11",
     tripDateTo: "2026-08-20",

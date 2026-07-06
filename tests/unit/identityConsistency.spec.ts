@@ -1,15 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { buildIdentityConsistencyReport } from "../../src/modules/submissions/identityConsistency";
 import {
-  completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import type { Submission, VisaApplicationPdfReviewState } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function baseSubmission(): Submission {
   return uploadRequiredFiles(
-    completeQuestionnaire(
+    fillRequiredQuestionnaireForTest(
       createDraftSubmission({
         applicantNames: ["Мария Иванова"],
         city: "Москва",
@@ -94,7 +94,7 @@ describe("identity consistency report", () => {
 
   test("accepts equivalent date formats between questionnaire and PDF", () => {
     const submission = withVisaPdfReview(baseSubmission(), {
-      birthDate: "1990-01-01",
+      birthDate: "1990-08-20",
     });
 
     const report = buildIdentityConsistencyReport(submission);

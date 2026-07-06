@@ -236,7 +236,7 @@ describe("V-19 export workbook contract", () => {
     expect(row?.lastName).toBe("Сергеева");
   });
 
-  test("pre-fills questionnaire first name and surname correctly for Russian surname-first names", () => {
+  test("does not pre-fill questionnaire name fields from applicant display names", () => {
     const sections = createQuestionnaireSections(
       "applicant-test",
       "Сергеева Анна",
@@ -248,9 +248,9 @@ describe("V-19 export workbook contract", () => {
       ),
     );
 
-    expect(fields.get("first-name")).toBe("ANNA");
-    expect(fields.get("surname")).toBe("SERGEEVA");
-    expect(fields.get("surname-at-birth")).toBe("SERGEEVA");
+    expect(fields.get("first-name")).toBe("");
+    expect(fields.get("surname")).toBe("");
+    expect(fields.get("previous-surname")).toBe("");
   });
 
   test("ignores blank BLS template rows without Passport No and applicant name", () => {

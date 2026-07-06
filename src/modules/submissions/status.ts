@@ -914,12 +914,37 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
   }
 
   const fields = applicant.sections.flatMap((section) => section.fields);
-  const field = fields.find((item) => item.label === issue.target.field);
+  const field = fields.find((item) =>
+    questionnaireIssueFieldMatches(item, issue.target.field),
+  );
   if (!field) return false;
 
   const value = field.value.trim();
   if (!value) return false;
   return issue.snapshot ? value !== issue.snapshot : true;
+}
+
+const questionnaireIssueFieldAliases: Record<string, string[]> = {
+  "first-entry-country": ["Маршрут поездки", "Маршрут", "Страна въезда"],
+  "passport-expiry-date": ["Дата окончания паспорта"],
+  "passport-type": ["Тип документа", "Тип проездного документа"],
+  "previous-surname": ["Фамилия при рождении", "Девичья фамилия"],
+};
+
+function questionnaireIssueFieldMatches(
+  field: Submission["applicants"][number]["sections"][number]["fields"][number],
+  target?: string,
+) {
+  const normalizedTarget = normalizeQuestionnaireIssueTarget(target);
+  if (!normalizedTarget) return false;
+
+  return [field.id, field.label, ...(questionnaireIssueFieldAliases[field.id] ?? [])].some(
+    (candidate) => normalizeQuestionnaireIssueTarget(candidate) === normalizedTarget,
+  );
+}
+
+function normalizeQuestionnaireIssueTarget(value?: string) {
+  return (value ?? "").trim().toLocaleLowerCase("ru-RU");
 }
 
 function isPassportExtractionReviewIssue(issue: Issue) {

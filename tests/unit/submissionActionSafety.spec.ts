@@ -11,11 +11,11 @@ import {
 } from "../../src/modules/submissions/submissionActionErrors";
 import {
   applyActionToSubmissionListResult,
-  completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function reviewReadySubmission(): Submission {
   const draft = createDraftSubmission({
@@ -28,7 +28,7 @@ function reviewReadySubmission(): Submission {
   });
 
   return {
-    ...uploadRequiredFiles(completeQuestionnaire(draft)),
+    ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
     status: "in_progress",
     tripDateFrom: "2026-07-10",
     tripDateTo: "2026-07-18",

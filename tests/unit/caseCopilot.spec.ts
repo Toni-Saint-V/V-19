@@ -8,7 +8,6 @@ import {
   startPassportExtraction,
 } from "../../src/modules/submissions/passportExtraction";
 import {
-  completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFiles,
   updateQuestionnaireField,
@@ -20,6 +19,7 @@ import {
 } from "../../src/modules/submissions/caseCopilot";
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import type { Issue, Submission } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const forbiddenTrustCopy =
   /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официальн[а-я\s]+провер|ш[а]нс[а-я\s]+визы|вероятн[а-я\s]+одобр|решени[ея][а-я\s]+принял[а-я\s]+ии/i;
@@ -101,7 +101,7 @@ function sectionIdForField(submission: Submission, fieldId: string) {
 
 function reviewReadySubmission(): Submission {
   return {
-    ...uploadRequiredFiles(completeQuestionnaire(draftSubmission())),
+    ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draftSubmission())),
     status: "in_progress",
     tripDateFrom: "2026-07-10",
     tripDateTo: "2026-07-18",
@@ -414,7 +414,7 @@ describe("local Case Copilot", () => {
     });
     const correctionsBrief = buildCaseCopilotBrief({
       role: "admin",
-      submission: byId("ПД-1054"),
+      submission: fillRequiredQuestionnaireForTest(byId("ПД-1054")),
       surface: "review",
     });
 
@@ -517,7 +517,9 @@ describe("local Case Copilot", () => {
 
     const readyExport = buildCaseCopilotBrief({
       role: "admin",
-      submission: canonicalMediaSubmission(byId("ПД-1056")),
+      submission: fillRequiredQuestionnaireForTest(
+        canonicalMediaSubmission(byId("ПД-1056")),
+      ),
       surface: "export",
     });
     expect(readyExport.status).toBe("ready");

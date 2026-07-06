@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  background: #101011;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+  margin: 0;
+  background: #101011;
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thumb-white\/10::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::selection {
+  color: white;
+  background: rgba(58, 69, 180, 0.55);
+}
+
+/* Linear-style polish pass: reduce status rainbow, keep purple as the only vivid accent. */
+:root {
+  --vf-bg: #0f0f11;
+  --vf-panel: #151518;
+  --vf-panel-2: #1a1a1e;
+  --vf-border: rgba(255,255,255,0.085);
+  --vf-border-strong: rgba(255,255,255,0.14);
+  --vf-text-muted: rgba(255,255,255,0.58);
+  --vf-accent: #6f64ff;
+  --vf-accent-soft: rgba(111,100,255,0.12);
+}
+
+body,
+#root {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(111,100,255,0.075), transparent 30%),
+    linear-gradient(180deg, #111113 0%, #0d0d0f 100%);
+}
+
+button {
+  isolation: isolate;
+}
+
+button:not(:disabled) {
+  transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease, color .18s ease;
+}
+
+button:not(:disabled):hover {
+  transform: translateY(-0.5px);
+}
+
+/* Premium black/gray buttons with a very subtle pearl highlight. */
+.bg-\[\#202126\],
+.bg-\[\#24242a\] {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.018)),
+    linear-gradient(135deg, #202126 0%, #17181c 100%) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 34px rgba(0,0,0,0.22) !important;
+}
+
+.bg-\[\#202126\]:hover,
+.bg-\[\#24242a\]:hover {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.105), rgba(255,255,255,0.028)),
+    linear-gradient(135deg, #292a31 0%, #1b1c21 100%) !important;
+}
+
+/* Vivid states are muted by default; severity is carried by copy and icon, not color blocks. */
+[class*="bg-white/\[0.045\]"],
+[class*="bg-white/\[0.06\]"] {
+  backdrop-filter: blur(10px);
+}
+
+/* Keep blocker visible but not screaming. */
+.bg-\[\#24191b\]\/60,
+.bg-\[\#1d1719\]\/80,
+.bg-\[\#2a1d20\]\/70 {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+}

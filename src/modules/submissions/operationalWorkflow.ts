@@ -472,9 +472,9 @@ const pdfFieldTargets = {
   birthPlace: { fieldId: "birth-place", sectionKey: "personal" },
   citizenship: { fieldId: "nationality", sectionKey: "personal" },
   departureDate: { fieldId: "departure-date", sectionKey: "trip" },
-  destinationCountry: { fieldId: "hotel-country", sectionKey: "trip" },
+  destinationCountry: { fieldId: "main-destination", sectionKey: "trip" },
   entriesRequested: { fieldId: "entry-count", sectionKey: "trip" },
-  firstEntryCountry: { fieldId: "route", sectionKey: "trip" },
+  firstEntryCountry: { fieldId: "first-entry-country", sectionKey: "trip" },
   firstName: { fieldId: "first-name", sectionKey: "personal" },
   passportExpiresAt: { fieldId: "passport-expiry-date", sectionKey: "passport" },
   passportIssueCountry: { fieldId: "passport-issue-country", sectionKey: "passport" },
@@ -722,9 +722,7 @@ export function applyFamilySharedAnswers(
   if (input.sameSpainStay) {
     const stay = input.spainStay;
     addFamilySharedField(fieldUpdates, true, "hotel-name", stay?.name);
-    addFamilySharedField(fieldUpdates, true, "hotel-country", stay?.country);
-    addFamilySharedField(fieldUpdates, true, "hotel-city", stay?.city);
-    addFamilySharedField(fieldUpdates, true, "hotel-postal-code", stay?.postalCode);
+    addFamilySharedField(fieldUpdates, true, "main-destination", stay?.country);
     addFamilySharedField(fieldUpdates, true, "hotel-address", stay?.address);
     addFamilySharedField(fieldUpdates, true, "hotel-email", stay?.email);
     addFamilySharedField(fieldUpdates, true, "hotel-contact", stay?.contact);
@@ -733,7 +731,7 @@ export function applyFamilySharedAnswers(
         fieldUpdates,
         true,
         "inviting-party-type",
-        "Гостиница/временное жильё",
+        "Гостиница/временное жилье",
       );
     }
   }
@@ -742,7 +740,7 @@ export function applyFamilySharedAnswers(
     const trip = input.tripDetails;
     addFamilySharedField(fieldUpdates, true, "arrival-date", trip?.arrivalDate);
     addFamilySharedField(fieldUpdates, true, "departure-date", trip?.departureDate);
-    addFamilySharedField(fieldUpdates, true, "route", trip?.route);
+    addFamilySharedField(fieldUpdates, true, "first-entry-country", trip?.route);
     addFamilySharedField(fieldUpdates, true, "stay-duration", trip?.stayDuration);
     addFamilySharedField(fieldUpdates, true, "purpose", trip?.purpose);
     addFamilySharedField(fieldUpdates, true, "entry-count", trip?.entryCount);

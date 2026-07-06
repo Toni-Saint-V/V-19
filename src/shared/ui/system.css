@@ -24020,8 +24020,6 @@ p {
 .settings-nav button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--vf-ref-size-8px);
   width: calc(100% - var(--vf-ref-size-18px));
   height: var(--v19-settings-nav-button-height);
   padding: var(--v19-settings-nav-button-padding);
@@ -24036,35 +24034,6 @@ p {
   letter-spacing: 0;
   text-align: left;
   cursor: pointer;
-}
-
-.settings-nav-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-nav-badge {
-  display: inline-flex;
-  flex: none;
-  min-width: var(--vf-ref-size-20px);
-  height: var(--vf-ref-size-20px);
-  align-items: center;
-  justify-content: center;
-  border: var(--vf-ref-size-1px) solid var(--vf-border-subtle);
-  border-radius: var(--vf-ref-size-999px);
-  color: var(--vf-text-muted);
-  background: var(--vf-bg-control);
-  font-size: var(--vf-ref-size-11px);
-  font-weight: var(--vf-ref-font-weight-820);
-  line-height: 1;
-}
-
-.settings-nav-badge.has-items {
-  color: var(--vf-text-primary);
-  border-color: var(--vf-selected-border);
-  background: var(--vf-selected-bg);
 }
 
 .settings-nav button:hover {
