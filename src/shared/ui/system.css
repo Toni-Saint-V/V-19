@@ -27422,7 +27422,7 @@ p {
 }
 
 .access-shell {
-  background: var(--vf-bg-canvas) !important;
+  background: #000 !important;
 }
 
 .access-card,
@@ -27436,6 +27436,17 @@ p {
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
+}
+
+.access-brand-panel {
+  border-color: #000 !important;
+  background: #000 !important;
+}
+
+.access-brand-logo {
+  display: block !important;
+  margin-bottom: var(--vf-ref-size-20px) !important;
+  margin-left: var(--vf-ref-size-150px) !important;
 }
 
 .access-card h1,
@@ -27646,13 +27657,16 @@ p {
 }
 
 .access-card .access-secondary-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: var(--vf-ref-size-10px) !important;
   width: 100% !important;
 }
 
 .access-card .access-secondary-actions .access-secondary-link {
-  flex: 0 0 auto !important;
-  width: fit-content !important;
-  max-width: 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
   white-space: nowrap !important;
 }
 
@@ -27673,12 +27687,15 @@ p {
   }
 
   .access-shell {
+    height: 100dvh !important;
     min-height: 100dvh !important;
-    place-items: center !important;
-    align-content: center !important;
+    place-items: start center !important;
+    align-content: start !important;
     overflow-x: hidden !important;
+    overflow-y: auto !important;
     scrollbar-width: none;
     overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .access-layout {
@@ -27704,6 +27721,28 @@ p {
     right: 0;
     bottom: 0;
     left: 0;
+  }
+
+  .access-brand-panel {
+    justify-items: center !important;
+    text-align: center !important;
+  }
+
+  .access-brand-lockup {
+    display: flex !important;
+    justify-content: center !important;
+    justify-self: center !important;
+    width: 100% !important;
+  }
+
+  .access-brand-logo {
+    display: block !important;
+    width: min(100%, 282px) !important;
+    height: auto !important;
+    margin-bottom: 0 !important;
+    margin-inline: auto !important;
+    object-fit: contain !important;
+    object-position: center center !important;
   }
 
   .access-card {
@@ -27742,19 +27781,21 @@ p {
   }
 
   .access-card .access-secondary-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: var(--vf-ref-size-8px) !important;
     min-height: var(--v19-control-height-touch) !important;
   }
-}
 
-.access-layout:has(#workspace-register-title) {
-  --v19-register-motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --v19-register-motion-soft: cubic-bezier(0.22, 0.72, 0.14, 1);
+  .access-card .access-secondary-actions .access-secondary-link {
+    padding-inline: var(--vf-ref-size-6px) !important;
+    font-size: var(--vf-ref-size-11px) !important;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .access-layout:has(#workspace-register-title) .access-brand-panel,
   .access-layout:has(#workspace-register-title) .access-card {
-    animation: v19-register-panel-in var(--v19b-motion-register-duration) var(--v19-register-motion-ease) both;
+    animation: v19-register-panel-in var(--v19b-motion-register-duration) cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
   .access-layout:has(#workspace-register-title) .access-card {
@@ -27769,7 +27810,7 @@ p {
   .access-layout:has(#workspace-register-title) .access-error,
   .access-layout:has(#workspace-register-title) .access-success,
   .access-layout:has(#workspace-register-title) .access-submit {
-    animation: v19-register-item-in var(--v19b-motion-item-duration) var(--v19-register-motion-soft) both;
+    animation: v19-register-item-in var(--v19b-motion-item-duration) cubic-bezier(0.22, 0.72, 0.14, 1) both;
   }
 
   .access-layout:has(#workspace-register-title) .access-back-button {
