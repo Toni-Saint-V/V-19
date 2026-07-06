@@ -64,16 +64,20 @@ describe("SettingsScreen", () => {
     });
 
     expect(sections).toHaveTextContent("Профиль");
-    expect(sections).toHaveTextContent("Заявки на доступ");
+    expect(sections).toHaveTextContent("Входящие заявки на регистрацию");
     expect(sections).toHaveTextContent("Команда и роли");
     expect(sections).toHaveTextContent("Уведомления");
     expect(sections).toHaveTextContent("Выгрузка");
     expect(sections).toHaveTextContent("Интерфейс");
     expect(screen.getByRole("heading", { name: "Уведомления" })).toBeVisible();
 
-    fireEvent.click(screen.getByRole("button", { name: "Заявки на доступ" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Входящие заявки на регистрацию/ }),
+    );
 
-    expect(screen.getByRole("heading", { name: "Заявки на доступ" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Входящие заявки на регистрацию" }),
+    ).toBeVisible();
     expect(screen.getByText("Новых заявок нет.")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Уведомления" }));
@@ -96,15 +100,20 @@ describe("SettingsScreen", () => {
     expect(sections).toHaveTextContent("Профиль");
     expect(sections).toHaveTextContent("Уведомления");
     expect(sections).toHaveTextContent("Интерфейс");
-    expect(sections).not.toHaveTextContent("Заявки на доступ");
+    expect(sections).not.toHaveTextContent("Входящие заявки на регистрацию");
     expect(sections).not.toHaveTextContent("Команда и роли");
     expect(sections).not.toHaveTextContent("Выгрузка");
   });
 
   test("renders admin access requests and fires review actions", () => {
     const props = renderSettings({ accessRequests: sampleAccessRequests });
+    const accessRequestNavButton = screen.getByRole("button", {
+      name: /Входящие заявки на регистрацию, новых: 1/,
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Заявки на доступ" }));
+    expect(accessRequestNavButton).toHaveTextContent("1");
+
+    fireEvent.click(accessRequestNavButton);
 
     expect(screen.getByTestId("admin-access-queue")).toBeVisible();
     expect(screen.getByText("Новый Агент")).toBeVisible();

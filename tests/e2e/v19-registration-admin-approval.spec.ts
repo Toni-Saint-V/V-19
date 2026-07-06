@@ -145,7 +145,9 @@ test.describe("V-19 registration admin approval", () => {
     await login(page, "2@2.ru", "22");
     await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
     await clickWorkspaceButton(page, /^Настройки$/);
-    await page.getByRole("button", { name: "Заявки на доступ" }).click();
+    await page
+      .getByRole("button", { name: /Входящие заявки на регистрацию/ })
+      .click();
     const queue = page.getByTestId("admin-access-queue");
     await expect(queue).toBeVisible();
     await expect(queue.getByText(userEmail)).toBeVisible();
@@ -169,7 +171,9 @@ test.describe("V-19 registration admin approval", () => {
     await login(page, "2@2.ru", "22");
     await expect(page.getByRole("heading", { level: 1, name: "Проверка" })).toBeVisible();
     await clickWorkspaceButton(page, /^Настройки$/);
-    await page.getByRole("button", { name: "Заявки на доступ" }).click();
+    await page
+      .getByRole("button", { name: /Входящие заявки на регистрацию/ })
+      .click();
     await expect(queue.getByText(secondAgentEmail)).toBeVisible();
     await queue
       .filter({ hasText: secondAgentEmail })
