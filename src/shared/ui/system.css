@@ -197,6 +197,30 @@
     min-height: var(--v19b-size-22) !important;
     font-size: var(--v19b-size-10) !important;
   }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit
+    .v19-admin-cockpit-card
+    .v19-admin-cockpit-card-title
+    > em {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: var(--v19b-size-5) !important;
+    margin-top: var(--v19b-size-5) !important;
+    font-size: var(--v19b-size-9) !important;
+    line-height: var(--v19b-line-height-tight) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit
+    .v19-admin-cockpit-card
+    .v19-admin-cockpit-next {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--v19b-size-8) !important;
+  }
 }
 
 /* Admin passport workspace mobile fit: keep the document and fields in view. */
