@@ -85,6 +85,7 @@ const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
 };
 
 const passportScanUploadMimeTypes = new Set([
+  "application/pdf",
   "image/jpeg",
   "image/png",
 ]);
@@ -193,7 +194,7 @@ function passportUploadStatusCopy(upload: PassportUploadDraft | undefined) {
     };
   }
   return {
-    description: "Загрузите JPEG или PNG с разворотом загранпаспорта и MRZ.",
+    description: "Загрузите PDF, JPEG или PNG с разворотом загранпаспорта и MRZ.",
     title: "Нужен файл паспорта",
   };
 }
@@ -213,7 +214,7 @@ function passportLiveState({
 }) {
   if (passportFileError) {
     return {
-      description: "Проверьте формат: нужен JPEG или PNG с разворотом загранпаспорта.",
+      description: "Проверьте формат: нужен PDF, JPEG или PNG с разворотом загранпаспорта.",
       title: "Файл не принят",
       tone: "red" as const,
     };
@@ -406,7 +407,7 @@ export function CreateSubmissionDrawer({
       .filter((file) => passportScanUploadMimeTypes.has(file.type))
       .slice(0, maxFamilyApplicants);
     setPassportFileError(
-      rejectedCount ? "Паспорт принимается только в формате JPEG или PNG." : "",
+      rejectedCount ? "Паспорт принимается только в формате PDF, JPEG или PNG." : "",
     );
     if (!selectedFiles.length) return;
     const nextBatch = uploadBatchRef.current + 1;
@@ -503,7 +504,7 @@ export function CreateSubmissionDrawer({
 
   function showPassportNotReadyAlert() {
     window.alert(
-      "Паспорт еще не принят. Загрузите JPEG или PNG для каждого заявителя и дождитесь завершения проверки. Если OCR недоступен, файл уйдет на ручную проверку оператора.",
+      "Паспорт еще не принят. Загрузите PDF, JPEG или PNG для каждого заявителя и дождитесь завершения проверки. Если OCR недоступен, файл уйдет на ручную проверку оператора.",
     );
   }
 
@@ -788,7 +789,7 @@ export function CreateSubmissionDrawer({
                   ref={passportFileInputRef}
                   className="pi-file-input"
                   aria-hidden="true"
-                  accept="image/jpeg,image/png"
+                  accept="application/pdf,image/jpeg,image/png"
                   multiple
                   name="preintakePassportScans"
                   tabIndex={-1}
@@ -820,7 +821,7 @@ export function CreateSubmissionDrawer({
                     Перетащите файлы
                   </h3>
                   <p className="text-[var(--v19b-size-12)] text-white/60 max-w-[var(--v19b-size-240)] mb-8 font-light relative z-10 leading-relaxed">
-                    JPEG, PNG.
+                    PDF, JPEG, PNG.
                     <br />
                     Разворот загранпаспорта с MRZ.
                   </p>

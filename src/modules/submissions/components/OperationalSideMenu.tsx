@@ -44,7 +44,7 @@ export function OperationalSideMenu({
   showAdminZoneSwitch: boolean;
   showRoleSwitcher: boolean;
 }) {
-  const navItems = buildUnifiedSideMenuItems(items).map((item) => ({
+  const navItems = items.map((item) => ({
     ...item,
     onClick: () => {
       item.onClick();
@@ -173,25 +173,4 @@ export function OperationalSideMenu({
       ) : null}
     </>
   );
-}
-
-function buildUnifiedSideMenuItems(items: OperationalNavItem[]) {
-  const actions = items.find((item) => item.id === "agent-actions");
-  const submissions = items.find((item) => item.id === "agent-submissions");
-  const settings = items.find((item) => item.id === "agent-settings");
-
-  if (!actions || !submissions || !settings) return items;
-
-  return [
-    actions,
-    {
-      ...submissions,
-      count: undefined,
-      icon: "З",
-      id: "agent-submissions-applicants",
-      label: "Заявители / семейные",
-      meta: "Профили",
-    },
-    settings,
-  ];
 }

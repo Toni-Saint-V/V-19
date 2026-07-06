@@ -37,8 +37,14 @@ export function matchesReviewTab(tab: ReviewTab) {
 
 export function surfaceTitle(surface: Surface) {
   if (surface === "agent-actions") return "Мои действия";
+  if (surface === "agent-drafts") return "Сбор документов";
+  if (surface === "agent-applicants") return "Заявители / Семьи";
+  if (surface === "agent-media") return "Файлы / Медиа";
+  if (surface === "agent-issues") return "Замечания";
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка";
+  if (surface === "admin-intake") return "Загрузка списков / PDF";
+  if (surface === "admin-access") return "Заявки на доступ";
   if (surface === "settings") return "Настройки";
   return "Выгрузка";
 }
@@ -48,12 +54,36 @@ export function surfaceDescription(surface: Surface) {
     return "Очередь задач по подачам: блокеры, приоритет и следующий шаг.";
   }
 
+  if (surface === "agent-drafts") {
+    return "Документы по каждой подаче: что собрано, что заменить и где открыт блокер.";
+  }
+
+  if (surface === "agent-applicants") {
+    return "Семьи и индивидуальные заявители с быстрым переходом в карточку и анкету.";
+  }
+
+  if (surface === "agent-media") {
+    return "Единая очередь файлов: загрузка, замена, проверка и принятые медиа.";
+  }
+
+  if (surface === "agent-issues") {
+    return "Открытые замечания администратора и исправления, ожидающие закрытия.";
+  }
+
   if (surface === "agent-submissions") {
     return "Все подачи агента: статус, готовность, блокеры и следующий переход.";
   }
 
   if (surface === "admin-review") {
     return "Админская очередь: новые проверки, полученные исправления и готовность к выгрузке.";
+  }
+
+  if (surface === "admin-intake") {
+    return "Загрузка листов записи, PDF анкет и план передачи пакетов агентам.";
+  }
+
+  if (surface === "admin-access") {
+    return "Новые агенты: список заявок, принятие и отказ в доступе.";
   }
 
   if (surface === "settings") {

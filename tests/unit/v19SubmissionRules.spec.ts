@@ -2284,8 +2284,28 @@ describe("V-19 persistence boundary", () => {
       type: "single",
     });
 
-    saveSubmissions([draft, ...initialSubmissions]);
+    expect(saveSubmissions([draft, ...initialSubmissions])).toEqual({ ok: true });
     expect(loadSubmissions()[0].id).toBe(draft.id);
+  });
+
+  it("reports local save failures instead of swallowing them", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => null,
+        removeItem: () => undefined,
+        setItem: () => {
+          throw new Error("quota exceeded");
+        },
+      },
+    });
+
+    const result = saveSubmissions([initialSubmissions[0]!]);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("Локальное сохранение не прошло");
+    }
   });
 
   it("falls back to initial submissions for invalid storage", () => {

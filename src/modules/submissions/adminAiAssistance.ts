@@ -1,4 +1,4 @@
-import type { AiHelperActor, AiHelperResult } from "../../../supabase/functions/_shared/ai-helper-contract";
+import type { AiHelperActor, AiHelperResult } from "../../shared/ai-helper-contract";
 import {
   acceptanceBlockingIssueCount,
   blockerCount,

@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   FileText,
   FileWarning,
-  History,
   Hash,
   Image as ImageIcon,
   Info,
@@ -26,7 +25,6 @@ import {
   Sparkles,
   Target,
   User,
-  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -48,6 +46,7 @@ import {
   openIssueCount,
   statusLabels,
 } from "../status";
+import { agentOwnerDisplayName } from "../ownership";
 import {
   fileLabel,
   targetElementId,
@@ -74,7 +73,13 @@ import { BbAiPanel } from "./BbAiPanel";
 
 type AdminReviewFileTarget = "passport_scan" | "selfie" | "selfie_2";
 
-type AdminReviewTab = "files" | "passport" | "selfie" | "questionnaire" | "issues";
+type AdminReviewTab =
+  | "overview"
+  | "files"
+  | "passport"
+  | "selfie"
+  | "questionnaire"
+  | "issues";
 
 type RemarkTargetType =
   | "checklistItem"
@@ -128,7 +133,6 @@ const adminReferenceTabs: Array<{
   warning?: boolean;
 }> = [
   { icon: Info, id: "overview", label: "Обзор" },
-  { icon: Users, id: "applicants", label: "Заявители" },
   {
     count: (submission) => questionnaireFieldCount(submission),
     icon: FileText,
@@ -143,7 +147,6 @@ const adminReferenceTabs: Array<{
     label: "Замечания",
     warning: true,
   },
-  { icon: History, id: "history", label: "История" },
 ];
 
 const mediaTargets: Array<{
@@ -270,7 +273,15 @@ export function AdminReviewDrawer({
   const selectReviewTab = useCallback(
     (tab: AdminReviewTab) => {
       setActiveReviewTab(tab);
-      onTab(tab === "issues" ? "issues" : tab === "files" ? "files" : "questionnaire");
+      onTab(
+        tab === "overview"
+          ? "overview"
+          : tab === "issues"
+            ? "issues"
+            : tab === "files" || tab === "passport" || tab === "selfie"
+              ? "files"
+              : "questionnaire",
+      );
       if (tab === "passport") setReviewTarget("passport_scan");
       if (tab === "selfie" && reviewTarget === "passport_scan") {
         setReviewTarget("selfie");
@@ -280,6 +291,7 @@ export function AdminReviewDrawer({
   );
 
   function isReferenceTabSelected(tab: DrawerTab) {
+    if (tab === "overview") return activeReviewTab === "overview";
     if (tab === "issues") return activeReviewTab === "issues";
     if (tab === "files")
       return activeReviewTab === "files" || activeReviewTab === "passport" || activeReviewTab === "selfie";
@@ -288,6 +300,11 @@ export function AdminReviewDrawer({
   }
 
   function selectReferenceTab(tab: DrawerTab) {
+    if (tab === "overview") {
+      selectReviewTab("overview");
+      return;
+    }
+
     if (tab === "issues") {
       selectReviewTab("issues");
       return;
@@ -542,6 +559,8 @@ export function AdminReviewDrawer({
               <p className="admin-review-meta">
                 {submission.city}
                 <span aria-hidden="true"> · </span>
+                Агент: {agentOwnerDisplayName(submission.agentId)}
+                <span aria-hidden="true"> · </span>
                 {openIssueCount(submission)} замечаний
               </p>
               <h2>
@@ -635,7 +654,12 @@ export function AdminReviewDrawer({
               key={activeReviewTab}
               transition={{ duration: prefersReducedMotion ? 0.01 : 0.2 }}
             >
-              {activeReviewTab === "files" ? (
+              {activeReviewTab === "overview" ? (
+                <AdminReviewOverviewTab
+                  primaryAction={primaryAction}
+                  submission={submission}
+                />
+              ) : activeReviewTab === "files" ? (
                 <AdminFilesTab
                   submission={submission}
                   onFileRemark={openFileRemark}
@@ -831,7 +855,7 @@ function AdminAiAssistancePanel({
   const readinessCopy =
     state.readiness?.readinessExplanation ||
     state.readiness?.summary ||
-    "Готовность объясняется deterministic статусами, файлами и открытыми замечаниями.";
+    "Готовность объясняется статусами, файлами и открытыми замечаниями.";
 
   return (
     <section className="admin-ai-assist" aria-label="AI-помощник администратора">
@@ -901,6 +925,66 @@ function AdminAiAssistancePanel({
           </section>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function AdminReviewOverviewTab({
+  primaryAction,
+  submission,
+}: {
+  primaryAction: ReturnType<typeof getPrimaryAction>;
+  submission: Submission;
+}) {
+  const totalFiles = submission.files.length;
+  const readyFiles = submission.files.filter(
+    (file) => file.status !== "missing" && file.status !== "needs_replacement",
+  ).length;
+  const openIssues = openIssueCount(submission);
+  const fixedIssues = submission.issues.filter(
+    (issue) => issue.status === "fixed_by_agent",
+  ).length;
+
+  return (
+    <section className="admin-review-overview" aria-label="Обзор проверки">
+      <div className="admin-review-overview-grid">
+        <article>
+          <small>Статус</small>
+          <strong>{statusLabels[submission.status]}</strong>
+          <span>{primaryAction.disabled ? primaryAction.reason : primaryAction.label}</span>
+        </article>
+        <article>
+          <small>Заявители</small>
+          <strong>{submission.applicants.length}</strong>
+          <span>{submission.type === "family" ? "Семейная подача" : "Один заявитель"}</span>
+        </article>
+        <article>
+          <small>Файлы</small>
+          <strong>
+            {readyFiles}/{totalFiles}
+          </strong>
+          <span>готово к проверке</span>
+        </article>
+        <article>
+          <small>Замечания</small>
+          <strong>{openIssues + fixedIssues}</strong>
+          <span>
+            {openIssues ? `${openIssues} открыто` : "Открытых нет"}
+            {fixedIssues ? ` · ${fixedIssues} исправлено` : ""}
+          </span>
+        </article>
+      </div>
+
+      <div className="admin-review-overview-next">
+        <Info aria-hidden="true" size={18} />
+        <div>
+          <h3>Следующий шаг</h3>
+          <p>
+            Проверьте анкету и файлы. Если есть ошибка, добавьте точное замечание
+            и верните подачу агенту. Если блокеров нет, примите подачу к выгрузке.
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -2217,7 +2301,7 @@ function AdminRemarkForm({
           </button>
           <button disabled={!canSubmit} type="button" onClick={submit}>
             <Send aria-hidden="true" size={16} />
-            Отправить замечание
+            Создать замечание
           </button>
         </footer>
       </motion.div>
@@ -2246,29 +2330,24 @@ function IssuesTab({
   submission: Submission;
   onJump: (issue: Submission["issues"][number]) => void;
 }) {
-  if (!submission.issues.length && !identityFindings.length) {
-    return (
-      <div className="admin-review-issues-list">
-        <BbAiPanel
-          role="admin"
-          submission={submission}
-          surface="review"
-          onAccept={onAcceptAiSuggestion}
-          onDismiss={onDismissAiSuggestion}
-          onRun={onRunAiReview}
-        />
-        <div className="admin-review-empty-card">
-          <ShieldCheck aria-hidden="true" size={18} />
-          <strong>Замечаний пока нет</strong>
-          <span>Если паспорт, селфи и анкета корректны, можно принимать заявку.</span>
-          <button type="button" onClick={onAddRemark}>
-            <MessageSquarePlus aria-hidden="true" size={15} />
-            Добавить замечание
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const [scope, setScope] = useState<"ai" | "all" | "closed" | "fixed" | "open">("open");
+  const issueGroups = {
+    all: submission.issues,
+    closed: submission.issues.filter((issue) => issue.status === "closed_by_admin"),
+    fixed: submission.issues.filter((issue) => issue.status === "fixed_by_agent"),
+    open: submission.issues.filter((issue) => issue.status === "open"),
+  };
+  const visibleIssues = scope === "ai" ? [] : issueGroups[scope];
+  const visibleIdentityFindings = scope === "ai" || scope === "all" ? identityFindings : [];
+  const hasContent = visibleIssues.length > 0 || visibleIdentityFindings.length > 0;
+  const blockerIssues = submission.issues.filter((issue) => issue.severity === "blocker").length;
+  const tabs = [
+    { id: "open" as const, label: "Открытые", count: issueGroups.open.length },
+    { id: "fixed" as const, label: "Исправлено", count: issueGroups.fixed.length },
+    { id: "closed" as const, label: "Закрыто", count: issueGroups.closed.length },
+    { id: "ai" as const, label: "AI", count: identityFindings.length },
+    { id: "all" as const, label: "Все", count: issueGroups.all.length + identityFindings.length },
+  ];
 
   return (
     <div className="admin-review-issues-list">
@@ -2281,19 +2360,64 @@ function IssuesTab({
         onRun={onRunAiReview}
       />
 
-      <button type="button" onClick={onAddRemark}>
-        <MessageSquarePlus aria-hidden="true" size={15} />
-        Добавить замечание
-      </button>
+      <div className="v19-admin-issues-command">
+        <div>
+          <span>Замечания</span>
+          <strong>
+            {issueGroups.open.length} открыто · {issueGroups.fixed.length} исправлено · {blockerIssues} блокеров
+          </strong>
+          <em>Фильтр, AI-конфликты и ручные замечания собраны в одной рабочей вкладке.</em>
+        </div>
+        <button type="button" onClick={onAddRemark}>
+          <MessageSquarePlus aria-hidden="true" size={15} />
+          Новое замечание
+        </button>
+      </div>
 
-      {identityFindings.length ? (
+      <div className="v19-admin-issues-toolbar">
+        <div className="v19-admin-issues-tabs" role="tablist" aria-label="Фильтр замечаний">
+          {tabs.map((tab) => (
+            <button
+              aria-selected={scope === tab.id}
+              className={scope === tab.id ? "is-active" : ""}
+              key={tab.id}
+              role="tab"
+              type="button"
+              onClick={() => setScope(tab.id)}
+            >
+              {tab.label}
+              <span>{tab.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!hasContent ? (
+        <div className="admin-review-empty-card">
+          <ShieldCheck aria-hidden="true" size={18} />
+          <strong>Замечаний пока нет</strong>
+          <span>Если паспорт, селфи и анкета корректны, можно принимать заявку.</span>
+          <button type="button" onClick={onAddRemark}>
+            <MessageSquarePlus aria-hidden="true" size={15} />
+            Добавить замечание
+          </button>
+        </div>
+      ) : null}
+
+      {visibleIdentityFindings.length ? (
         <section className="admin-review-ai-conflicts" aria-label="AI-конфликты личности">
           <header>
             <span>AI-конфликты личности</span>
-            <em>{identityFindings.length}</em>
+            <em>{visibleIdentityFindings.length}</em>
           </header>
-          {identityFindings.map((finding) => (
-            <article className={`is-${finding.severity}`} key={finding.id}>
+          {visibleIdentityFindings.map((finding) => (
+            <motion.article
+              animate={{ opacity: 1, y: 0 }}
+              className={`is-${finding.severity}`}
+              initial={{ opacity: 0, y: 8 }}
+              key={finding.id}
+              transition={{ duration: 0.18 }}
+            >
               <header>
                 <span>{finding.severity}</span>
                 <em>{finding.applicantName}</em>
@@ -2313,29 +2437,45 @@ function IssuesTab({
                   </button>
                 ) : null}
               </footer>
-            </article>
+            </motion.article>
           ))}
         </section>
       ) : null}
 
-      {submission.issues.map((issue) => (
-        <article
-          id={targetElementId({ issueId: issue.id, tab: "issues" })}
-          className={`is-${issue.severity}`}
-          key={issue.id}
-        >
-          <header>
-            <span>{issue.id}</span>
-            <em>{issueStatusLabel(issue.status)}</em>
-          </header>
-          <strong>{issue.reason}</strong>
-          <p>{issue.comment}</p>
-          <small>{issue.target.applicantName} · {issueTargetPath(issue)}</small>
-          <button type="button" onClick={() => onJump(issue)}>
-            Перейти к месту
-          </button>
-        </article>
-      ))}
+      {visibleIssues.length ? (
+        <div className="v19-admin-issue-list-stack">
+          {visibleIssues.map((issue) => (
+            <motion.article
+              animate={{ opacity: 1, y: 0 }}
+              id={targetElementId({ issueId: issue.id, tab: "issues" })}
+              className={`v19-admin-issue-card is-${issue.severity}`}
+              initial={{ opacity: 0, y: 8 }}
+              key={issue.id}
+              transition={{ duration: 0.18 }}
+            >
+              <div>
+                <header>
+                  <span>{issue.id}</span>
+                  <em>{issueStatusLabel(issue.status)}</em>
+                  <em>{issue.severity === "blocker" ? "Блокер" : "Предупреждение"}</em>
+                </header>
+                <strong>{issue.reason}</strong>
+                <p>{issue.comment || "Комментарий не указан."}</p>
+                <small>{issue.target.applicantName} · {issueTargetPath(issue)}</small>
+              </div>
+              <button type="button" onClick={() => onJump(issue)}>
+                Перейти к месту
+              </button>
+            </motion.article>
+          ))}
+        </div>
+      ) : hasContent ? (
+        <div className="admin-review-empty-card">
+          <ShieldCheck aria-hidden="true" size={18} />
+          <strong>В этом фильтре пусто</strong>
+          <span>Переключите статус или добавьте новое замечание.</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2382,6 +2522,7 @@ function isPassportReviewSection(section: Applicant["sections"][number]) {
 }
 
 function drawerTabToReviewTab(tab: DrawerTab): AdminReviewTab {
+  if (tab === "overview") return "overview";
   if (tab === "issues") return "issues";
   if (tab === "files") return "files";
   return "questionnaire";

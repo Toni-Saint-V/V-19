@@ -50,6 +50,7 @@ test.describe("V-19 pilot admin review click flow", () => {
       heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
+    await expect(page.getByText("Локальный демо-режим").first()).toBeVisible();
     await expect(page.locator(".ops-nav").getByRole("button", { name: "Входящие" })).toHaveCount(0);
     await expect(page.locator(".ops-nav").getByRole("button", { name: "Мои действия" })).toHaveCount(0);
     await expect(page.locator(".ops-nav").getByRole("button", { name: "Мои подачи" })).toHaveCount(0);
@@ -58,15 +59,18 @@ test.describe("V-19 pilot admin review click flow", () => {
     await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
     await openAdminSubmission(page, "Нина Волкова");
 
-    await openDrawerTab(page, ["Паспорт"]);
-    await openDrawerTab(page, ["Селфи"]);
+    await openDrawerTab(page, ["Обзор"]);
     await openDrawerTab(page, ["Анкета", "Данные"]);
+    await openDrawerTab(page, ["Файлы"]);
     await openDrawerTab(page, ["Замечания"]);
+    await expect(drawer(page).getByRole("tab", { name: "Паспорт" })).toHaveCount(0);
+    await expect(drawer(page).getByRole("tab", { name: "Селфи" })).toHaveCount(0);
 
     await openDrawerTab(page, ["Замечания"]);
     await drawer(page).getByRole("button", { name: "Добавить замечание" }).click();
-    await expect(drawer(page).getByLabel("Новое замечание")).toBeVisible();
-    await drawer(page).getByRole("button", { name: "Создать замечание" }).click();
+    const remarkDialog = page.getByRole("dialog", { name: "Новое замечание" });
+    await expect(remarkDialog).toBeVisible();
+    await remarkDialog.getByRole("button", { name: "Создать замечание" }).click();
 
     const issueSummary = drawer(page)
       .locator("article")
@@ -81,7 +85,7 @@ test.describe("V-19 pilot admin review click flow", () => {
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
 
-  test("admin closes corrections and downloads Excel-only export", async ({
+  test("admin closes corrections and downloads ZIP export package", async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "desktop pilot runs once");
@@ -91,9 +95,11 @@ test.describe("V-19 pilot admin review click flow", () => {
       heading: "Проверка",
       workspaceEmail: "admin@visaflow.local",
     });
+    await expect(page.getByText("Локальный демо-режим").first()).toBeVisible();
     await page.getByRole("tab", { name: /Исправления/ }).click();
     await openAdminSubmission(page, "Петровы", "Семья Петровых");
-    await expect(page.getByText("Исправлено агентом").first()).toBeVisible();
+    await expect(drawer(page).getByText("Исправления получены").first()).toBeVisible();
+    await expect(drawer(page).getByText(/1 исправлено|Исправлено 1/).first()).toBeVisible();
     await drawer(page).getByRole("button", { name: "Закрыть и принять" }).click();
     await expectDrawerStatus(page, "Готово к выгрузке");
     await drawer(page)
@@ -114,14 +120,14 @@ test.describe("V-19 pilot admin review click flow", () => {
       page.getByRole("heading", { name: "1 подача · 2 заявителя" }),
     ).toBeVisible();
     await expect(page.getByText("Sheet1 · предпросмотр")).toBeVisible();
-    await expect(page.getByText(/ZIP|zip/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Скачать ZIP + Excel" })).toBeDisabled();
 
     await page.getByRole("button", { name: "Сформировать Excel" }).click();
-    await expect(page.getByRole("button", { name: "Скачать Excel" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Скачать ZIP + Excel" })).toBeEnabled();
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Скачать Excel" }).click();
+    await page.getByRole("button", { name: "Скачать ZIP + Excel" }).click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+\.xlsx$/);
+    expect(download.suggestedFilename()).toMatch(/^visaflow-export-.+_documents\.zip$/);
     await expect(download.failure()).resolves.toBeNull();
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

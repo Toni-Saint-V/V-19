@@ -49,6 +49,7 @@ import {
   type V19MemberStatusTone,
   type V19VisualTone,
 } from "../../../shared/ui/v19-design-system";
+import { V19SideMenu } from "../../../shared/ui/v19-product-kit";
 import {
   buildAgentActionTasks,
   summarizeAgentActionTasks,
@@ -76,12 +77,13 @@ import {
   blockerCount,
   defaultDrawerTab,
   fixedIssueCount,
+  getPrimaryAction,
   hasMissingRequiredWork,
   nextProblem,
   openIssueCount,
   statusLabelFor,
 } from "../status";
-import type { DrawerTab, Submission } from "../types";
+import type { DrawerTab, Submission, SubmissionAction } from "../types";
 import {
   matchesReviewTab,
   type AgentTab,
@@ -358,6 +360,13 @@ export function AgentActionsScreen({
 
   return (
     <div className="v19-screen-grid v19-work-screen v19-actions-screen is-panel-closed">
+      <V19SideMenu
+        className="vf-agent-actions-side-menu"
+        items={tabs}
+        label="Мои действия"
+        value={statusFilter}
+        onChange={(tab) => transitionUiState(() => setStatusFilter(tab))}
+      />
       <section
         className="v19-actions-cockpit-shell v19-agent-actions-reference"
         aria-labelledby="agent-actions-title"
@@ -1804,6 +1813,7 @@ function AdminReviewLaneColumn({
   items,
   lane,
   onOpen,
+  onQuickAction,
 }: {
   items: Array<{
     submission: Submission;
@@ -1811,6 +1821,7 @@ function AdminReviewLaneColumn({
   }>;
   lane: AdminReviewLaneConfig;
   onOpen: (submission: Submission, triage: AdminTriageRadarItem) => void;
+  onQuickAction?: (submission: Submission, action: SubmissionAction) => void;
 }) {
   const Icon = lane.icon;
 
@@ -1834,6 +1845,8 @@ function AdminReviewLaneColumn({
               submission={submission}
               triage={triage}
               onOpen={() => onOpen(submission, triage)}
+              onQuickAction={onQuickAction}
+              onReturnOpen={() => onOpen(submission, { ...triage, target: { tab: "issues" } })}
             />
           ))
         ) : (
@@ -1846,10 +1859,14 @@ function AdminReviewLaneColumn({
 
 function AdminReviewQueueCard({
   onOpen,
+  onQuickAction,
+  onReturnOpen,
   submission,
   triage,
 }: {
   onOpen: () => void;
+  onQuickAction?: (submission: Submission, action: SubmissionAction) => void;
+  onReturnOpen?: () => void;
   submission: Submission;
   triage: AdminTriageRadarItem;
 }) {
@@ -1859,6 +1876,26 @@ function AdminReviewQueueCard({
   const aiFlagCount = adminReviewAiFlagCount(submission);
   const issueCount = openIssueCount(submission);
   const family = submission.type === "family";
+  const primaryDecision = getPrimaryAction(submission, "admin", "review");
+  const acceptAction = primaryDecision.action === "accept" || primaryDecision.action === "close_issues_accept"
+    ? primaryDecision.action
+    : submission.status === "submitted_for_review"
+      ? "accept"
+      : submission.status === "corrections_received"
+        ? "close_issues_accept"
+        : null;
+  const returnAction = submission.status === "submitted_for_review"
+    ? "return_with_issues"
+    : submission.status === "corrections_received"
+      ? "return_again"
+      : null;
+  const canQuickAccept = Boolean(
+    onQuickAction &&
+      acceptAction &&
+      (primaryDecision.action === acceptAction || primaryDecision.action === "generate_export") &&
+      !primaryDecision.disabled,
+  );
+  const canQuickReturn = Boolean(onQuickAction && returnAction && openIssueCount(submission) > 0);
 
   return (
     <article
@@ -1935,16 +1972,43 @@ function AdminReviewQueueCard({
         ) : null}
       </div>
 
-      <button
-        className="v19-admin-row-action v17-admin-row-action"
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpen();
-        }}
-      >
-        {facts.ctaLabel}
-      </button>
+      <div className="v19-admin-card-actions" onClick={(event) => event.stopPropagation()}>
+        <button
+          className="v19-admin-row-action v17-admin-row-action"
+          type="button"
+          onClick={onOpen}
+        >
+          {facts.ctaLabel}
+        </button>
+        <button
+          className="v19-admin-row-action v17-admin-row-action is-return"
+          disabled={!returnAction}
+          type="button"
+          title={canQuickReturn ? "Вернуть агенту с открытыми замечаниями" : "Открыть замечания и добавить причину возврата"}
+          onClick={() => {
+            if (canQuickReturn && returnAction) {
+              onQuickAction?.(submission, returnAction);
+              return;
+            }
+            onReturnOpen?.();
+            onOpen();
+          }}
+        >
+          Вернуть
+        </button>
+        <button
+          className="v19-admin-row-action v17-admin-row-action is-confirm"
+          disabled={!canQuickAccept || !acceptAction}
+          type="button"
+          title={canQuickAccept ? "Принять заявку" : primaryDecision.reason ?? "Сначала закройте блокеры"}
+          onClick={() => {
+            if (!acceptAction) return;
+            onQuickAction?.(submission, acceptAction);
+          }}
+        >
+          Принять
+        </button>
+      </div>
     </article>
   );
 }
@@ -2055,6 +2119,7 @@ export function AdminReviewScreen({
   error = "",
   loading = false,
   onOpen,
+  onQuickAction,
   onRetryError,
   onSelect,
   onTab,
@@ -2068,6 +2133,7 @@ export function AdminReviewScreen({
   filterControl?: ReactNode;
   loading?: boolean;
   onOpen: (submission: Submission, tab?: DrawerTab, target?: WorkspaceTarget) => void;
+  onQuickAction?: (submission: Submission, action: SubmissionAction) => void;
   onRetryError?: () => void;
   onSelect: (submission: Submission) => void;
   onTab: (tab: AdminWorkTab) => void;
@@ -2379,6 +2445,7 @@ export function AdminReviewScreen({
                   key={lane.id}
                   lane={lane}
                   onOpen={openAdminReviewSubmission}
+                  onQuickAction={onQuickAction}
                 />
               ))}
             </div>
@@ -3251,7 +3318,7 @@ export function LegacyExportScreen({
                     disabled: exportBusy || !exportPlan.canDownload,
                     disabledReason:
                       !exportPlan.canDownload || exportBusy ? actionHint : undefined,
-                    label: "Скачать Excel",
+                    label: "Скачать ZIP + Excel",
                     onClick: onDownload,
                   },
                   {
@@ -3548,11 +3615,33 @@ function AdminExportReferenceCockpit({
       value: String(selectedWarnings),
     },
   ] satisfies AdminExportPanelCheck[];
+  const cityBuckets = useMemo(
+    () =>
+      Object.entries(
+        exportReadyList.reduce<Record<string, Submission[]>>((acc, submission) => {
+          acc[submission.city] = [...(acc[submission.city] ?? []), submission];
+          return acc;
+        }, {}),
+      ),
+    [exportReadyList],
+  );
   const toggleAllReady = () => {
     transitionUiState(() => {
       exportReadyList.forEach((submission) => {
         const selected = selectedExportIdSet.has(submission.id);
         if (selected === allReadySelected) onToggle(submission.id);
+      });
+    });
+  };
+  const toggleReadyCity = (city: string) => {
+    const cityList = exportReadyList.filter((submission) => submission.city === city);
+    if (!cityList.length) return;
+    const cityFullySelected = cityList.every((submission) => selectedExportIdSet.has(submission.id));
+
+    transitionUiState(() => {
+      cityList.forEach((submission) => {
+        const selected = selectedExportIdSet.has(submission.id);
+        if (selected === cityFullySelected) onToggle(submission.id);
       });
     });
   };
@@ -3599,12 +3688,13 @@ function AdminExportReferenceCockpit({
                 {showingHistory ? "История выгрузки" : "Пакеты к выгрузке"}
               </h2>
               <p>
-                Формирование Excel, контроль файлов и экспортных блокеров.
+                Этап 1: выгрузка Excel по городам для программистов. При скачивании Excel выбранные подачи уходят вместе с документами в одном ZIP.
               </p>
             </div>
             <div className="v19-admin-export-tools">
               <div className="v19-admin-export-search">{searchControl}</div>
               <div className="v19-admin-export-filter-control">
+                {filterControl}
                 <button
                   className="v19-admin-export-icon-button"
                   type="button"
@@ -3618,6 +3708,32 @@ function AdminExportReferenceCockpit({
               </div>
             </div>
           </div>
+
+          {cityBuckets.length > 0 && !showingHistory ? (
+            <div className="v19-admin-export-city-toolbar" aria-label="Быстрый выбор города">
+              {cityBuckets.map(([city, list]) => {
+                const citySelected = list.every((submission) =>
+                  selectedExportIdSet.has(submission.id),
+                );
+                const applicants = list.reduce(
+                  (sum, submission) => sum + submission.applicants.length,
+                  0,
+                );
+                return (
+                  <button
+                    aria-pressed={citySelected}
+                    className={citySelected ? "is-selected" : ""}
+                    key={city}
+                    type="button"
+                    onClick={() => toggleReadyCity(city)}
+                  >
+                    <span>{city}</span>
+                    <em>{list.length} пак. · {applicants} чел.</em>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
 
           <div className="v19-admin-export-table-head" aria-hidden="true">
             <button
@@ -3690,7 +3806,7 @@ function AdminExportReferenceCockpit({
             <span>Выгрузка</span>
             <h3>Сводка</h3>
             <h2>{exportPackageTitle(exportPlan)}</h2>
-            <p>Контроль состава, блокеров, файлов и истории перед Excel.</p>
+            <p>Это только выгрузка. Загрузка готовых PDF анкет и списков записи выполняется отдельно в админском пайплайне.</p>
           </div>
           <div className="v19-admin-export-side-icon" aria-hidden="true">
             <FolderCheck focusable="false" size={20} />
@@ -3912,7 +4028,7 @@ function AdminExportReferenceCockpit({
               disabled={exportBusy || !exportPlan.canDownload}
               onClick={onDownload}
             >
-              Скачать Excel
+              Скачать ZIP + Excel
             </button>
             <button
               type="button"

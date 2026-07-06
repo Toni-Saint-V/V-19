@@ -14,7 +14,7 @@ import {
   aiHelperBaseGuardrails,
   type AiHelperIntent,
   type AiHelperResult as BaseAiHelperResult,
-} from "../../supabase/functions/_shared/ai-helper-contract";
+} from "../shared/ai-helper-contract";
 
 export type { AiHelperIntent };
 

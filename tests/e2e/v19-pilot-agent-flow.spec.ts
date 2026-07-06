@@ -23,6 +23,7 @@ test.describe("V-19 pilot agent click flow", () => {
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, { heading: "Мои действия" });
+    await expect(page.getByText("Локальный демо-режим").first()).toBeVisible();
 
     await clickWorkspaceButton(page, /Мои действия/);
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
