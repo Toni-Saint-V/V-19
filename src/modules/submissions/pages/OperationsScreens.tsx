@@ -1608,7 +1608,6 @@ function issueTargetLine(issue: Submission["issues"][number]) {
 
 export type AdminWorkTab = "all" | "review" | "corrections" | "ready";
 type SubmissionSortMode = "priority" | "updated" | "created" | "trip";
-type ExportMobileStep = 1 | 2 | 3 | 4;
 
 const exportSortModes: SubmissionSortMode[] = ["updated", "created", "trip"];
 
@@ -1805,8 +1804,6 @@ function AdminReviewLaneColumn({
   items,
   lane,
   onOpen,
-  onSelect,
-  selectedSubmissionId,
 }: {
   items: Array<{
     submission: Submission;
@@ -1814,11 +1811,8 @@ function AdminReviewLaneColumn({
   }>;
   lane: AdminReviewLaneConfig;
   onOpen: (submission: Submission, triage: AdminTriageRadarItem) => void;
-  onSelect: (submission: Submission) => void;
-  selectedSubmissionId?: string;
 }) {
   const Icon = lane.icon;
-  const mobileLaneLabel = items[0]?.submission.city ?? String(items.length);
 
   return (
     <section className={`v19-admin-cockpit-lane tone-${lane.tone}`}>
@@ -1830,7 +1824,7 @@ function AdminReviewLaneColumn({
           <strong>{lane.title}</strong>
           <em>{lane.subtitle}</em>
         </div>
-        <small data-mobile-label={mobileLaneLabel}>{items.length}</small>
+        <small>{items.length}</small>
       </header>
       <div className="v19-admin-cockpit-lane-body">
         {items.length ? (
@@ -1839,9 +1833,7 @@ function AdminReviewLaneColumn({
               key={submission.id}
               submission={submission}
               triage={triage}
-              selected={submission.id === selectedSubmissionId}
               onOpen={() => onOpen(submission, triage)}
-              onSelect={() => onSelect(submission)}
             />
           ))
         ) : (
@@ -1854,14 +1846,10 @@ function AdminReviewLaneColumn({
 
 function AdminReviewQueueCard({
   onOpen,
-  onSelect,
-  selected,
   submission,
   triage,
 }: {
   onOpen: () => void;
-  onSelect: () => void;
-  selected: boolean;
   submission: Submission;
   triage: AdminTriageRadarItem;
 }) {
@@ -1874,21 +1862,18 @@ function AdminReviewQueueCard({
 
   return (
     <article
-      className={`v19-admin-cockpit-card ${hasBlocker ? "has-blocker" : ""} ${
-        selected ? "is-selected" : ""
-      }`}
+      className={`v19-admin-cockpit-card ${hasBlocker ? "has-blocker" : ""}`}
       data-submission-card
       data-submission-id={submission.id}
-      aria-label={selected ? "Детали проверки" : undefined}
-      onClick={onSelect}
+      onClick={onOpen}
     >
       <div className="v19-admin-cockpit-card-head">
         <div className="v19-admin-cockpit-card-title">
           <span>
             <strong className="mono">{submission.id}</strong>
             <i className="v19-admin-cockpit-card-date-dot" aria-hidden="true" />
-            <strong className="v19-admin-cockpit-card-city">{submission.city}</strong>
-            <i className="v19-admin-cockpit-card-city-dot" aria-hidden="true" />
+            <strong>{submission.city}</strong>
+            <i aria-hidden="true" />
             <strong className="v19-admin-cockpit-card-date">{submission.updatedAt}</strong>
           </span>
           <h3>{formatSubmissionListTitle(submission)}</h3>
@@ -1909,6 +1894,10 @@ function AdminReviewQueueCard({
             {agentOwnerDisplayName(submission.agentId)}
           </em>
         </div>
+        <div className="v19-admin-cockpit-card-meta" aria-label="Заявитель и агент">
+          <strong>{applicantCountLabel(submission.applicants.length)}</strong>
+          <span>{agentOwnerDisplayName(submission.agentId)}</span>
+        </div>
         <ChevronRight
           aria-hidden="true"
           className="v19-admin-cockpit-chevron"
@@ -1927,7 +1916,6 @@ function AdminReviewQueueCard({
           <b>Следующее действие</b>
         </span>
         <p>{facts.nextAction}</p>
-        <em>Ответственный: {facts.owner}</em>
       </div>
 
       <div className="v19-admin-cockpit-progress-grid">
@@ -2164,6 +2152,7 @@ export function AdminReviewScreen({
     activeLane === "all"
       ? adminReviewLaneConfig
       : adminReviewLaneConfig.filter((lane) => lane.id === activeLane);
+  const populatedVisibleLanes = visibleLanes.filter((lane) => laneItems[lane.id].length > 0);
   const hasActiveLaneItems =
     activeLane === "all"
       ? visibleReviewList.length > 0
@@ -2384,14 +2373,12 @@ export function AdminReviewScreen({
             )
           ) : visibleReviewList.length && hasActiveLaneItems ? (
             <div className="v19-admin-cockpit-lanes" aria-label="Очередь проверки">
-              {visibleLanes.map((lane) => (
+              {populatedVisibleLanes.map((lane) => (
                 <AdminReviewLaneColumn
                   items={laneItems[lane.id]}
                   key={lane.id}
                   lane={lane}
                   onOpen={openAdminReviewSubmission}
-                  onSelect={onSelect}
-                  selectedSubmissionId={visibleSelectedSubmission?.id}
                 />
               ))}
             </div>
@@ -2811,7 +2798,6 @@ export function LegacyExportScreen({
   );
   const [sortMode, setSortMode] = useState<SubmissionSortMode>("updated");
   const [entityMode, setEntityMode] = useState<V19EntityViewMode>("all");
-  const [mobileExportStep, setMobileExportStep] = useState<ExportMobileStep>(1);
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
@@ -2969,23 +2955,6 @@ export function LegacyExportScreen({
             value={entityMode}
             onChange={(mode) => setEntityMode(mode)}
           />
-          <ExportMobileFlow
-            actionHint={actionHint}
-            exportBusy={exportBusy}
-            exportError={exportError}
-            exportPlan={exportPlan}
-            mobileStep={mobileExportStep}
-            onDownload={onDownload}
-            onGenerate={onGenerate}
-            onChoosePackage={onChoosePackage}
-            onMarkExported={onMarkExported}
-            onOpen={onOpen}
-            onStep={setMobileExportStep}
-            readyList={visibleReadyList}
-            blockedList={visibleBlockedList}
-            selectedExportIds={selectedExportIds}
-          />
-          <div className="v19-export-desktop-content">
           {exportTab === "ready" ? (
             <div className="magic-export-list export-contract-table">
               <div className="table-wrap">
@@ -3242,7 +3211,6 @@ export function LegacyExportScreen({
               ) : null}
             </div>
           )}
-          </div>
         </CardComponent>
 
         {exportPanelOpen ? (
@@ -3489,20 +3457,16 @@ function AdminExportReferenceCockpit({
   selectedExportIds,
 }: Parameters<typeof LegacyExportScreen>[0]) {
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
-  const [mobileExportStep, setMobileExportStep] = useState<ExportMobileStep>(1);
   const selectedExportIdSet = useMemo(
     () => new Set(selectedExportIds),
     [selectedExportIds],
   );
   const exportReadyList = useMemo(
-    () => orderFamiliesBeforeSingles(readyList.filter(isSubmissionSelectableForExport)),
+    () => readyList.filter(isSubmissionSelectableForExport),
     [readyList],
   );
   const exportBlockedList = useMemo(
-    () =>
-      orderFamiliesBeforeSingles(
-        readyList.filter((submission) => !isSubmissionSelectableForExport(submission)),
-      ),
+    () => readyList.filter((submission) => !isSubmissionSelectableForExport(submission)),
     [readyList],
   );
   const selectedReadySubmissions = useMemo(
@@ -3628,23 +3592,6 @@ function AdminExportReferenceCockpit({
           />
         </div>
 
-        <ExportMobileFlow
-          actionHint={actionHint}
-          blockedList={exportBlockedList}
-          exportBusy={exportBusy}
-          exportError={exportError}
-          exportPlan={exportPlan}
-          mobileStep={mobileExportStep}
-          onDownload={onDownload}
-          onGenerate={onGenerate}
-          onChoosePackage={onChoosePackage}
-          onMarkExported={onMarkExported}
-          onOpen={onOpen}
-          onStep={setMobileExportStep}
-          readyList={exportReadyList}
-          selectedExportIds={selectedExportIds}
-        />
-
         <div className="v19-admin-export-list">
           <div className="v19-admin-export-list-head">
             <div className="v19-admin-export-title-copy">
@@ -3657,11 +3604,6 @@ function AdminExportReferenceCockpit({
             </div>
             <div className="v19-admin-export-tools">
               <div className="v19-admin-export-search">{searchControl}</div>
-              {filterControl ? (
-                <div className="v19-admin-export-filter-control v19-admin-export-city-filter-control">
-                  {filterControl}
-                </div>
-              ) : null}
               <div className="v19-admin-export-filter-control">
                 <button
                   className="v19-admin-export-icon-button"
@@ -3672,7 +3614,6 @@ function AdminExportReferenceCockpit({
                   }
                 >
                   <Filter aria-hidden="true" focusable="false" size={16} />
-                  <span>{showingHistory ? "Пакеты" : "История"}</span>
                 </button>
               </div>
             </div>
@@ -3691,7 +3632,6 @@ function AdminExportReferenceCockpit({
               ) : null}
             </button>
             <div>Пакет / заявитель</div>
-            <div>Слот</div>
             <div>Готовность</div>
             <div>Размер</div>
           </div>
@@ -4073,7 +4013,12 @@ function AdminExportRow({
     "файла",
     "файлов",
   )}`;
-  const documentLabel = `Анкета + ${submission.files.length} документов`;
+  const documentLabel = `${submission.files.length} ${pluralRu(
+    submission.files.length,
+    "документ",
+    "документа",
+    "документов",
+  )}`;
   const historyPdfSummary = history ? returnedPdfPackageSummary(submission) : null;
   const rowStatus = history
     ? historyPdfSummary?.label
@@ -4152,8 +4097,6 @@ function AdminExportRow({
           <span className="v19-admin-export-row-reason">{blockedReason}</span>
         ) : null}
       </button>
-
-      <div className="v19-admin-export-slot">{exportTripDates(submission)}</div>
 
       <div className="v19-admin-export-progress">
         <progress
@@ -4336,282 +4279,6 @@ function AdminExportMobileSheet({
       />
     </motion.div>
   );
-}
-
-function ExportMobileFlow({
-  actionHint,
-  blockedList,
-  exportBusy,
-  exportError,
-  exportPlan,
-  mobileStep,
-  onDownload,
-  onGenerate,
-  onChoosePackage,
-  onMarkExported,
-  onOpen,
-  onStep,
-  readyList,
-  selectedExportIds,
-}: {
-  actionHint: string;
-  blockedList: Submission[];
-  exportBusy: boolean;
-  exportError: string;
-  exportPlan: ExportSummary;
-  mobileStep: ExportMobileStep;
-  onDownload: () => void;
-  onGenerate: () => void;
-  onChoosePackage: (id: string) => void;
-  onMarkExported: () => void;
-  onOpen: (submission: Submission, tab?: DrawerTab) => void;
-  onStep: (step: ExportMobileStep) => void;
-  readyList: Submission[];
-  selectedExportIds: string[];
-}) {
-  const selectedIdSet = new Set(selectedExportIds);
-  const stepTitle = exportMobileStepTitle(mobileStep);
-  const selectedSubmissionCount = new Set(
-    exportPlan.rows.map((row) => row.submissionId),
-  ).size;
-  const stepDisabledReason = exportPlan.ready
-    ? ""
-    : (exportPlan.blockers[0]?.reason ?? "Пакет не прошел проверку выгрузки.");
-  const previewRows = exportPlan.rows.slice(0, 8);
-
-  return (
-    <div className="v19-export-mobile-flow" aria-label="Мобильная выгрузка">
-      <div className="v19-export-mobile-step-head">
-        <strong>{mobileStep} / 4&nbsp; {stepTitle}</strong>
-        <span aria-hidden="true">
-          {[1, 2, 3, 4].map((step) => (
-            <i
-              className={step <= mobileStep ? "is-complete" : ""}
-              key={step}
-            />
-          ))}
-        </span>
-      </div>
-
-      {mobileStep === 1 ? (
-        <div className="v19-export-mobile-step-body">
-          {readyList.length || blockedList.length ? (
-            <>
-              {readyList.map((submission) => {
-                const selected = selectedIdSet.has(submission.id);
-
-                return (
-                  <article
-                    className={`v19-export-mobile-package ${
-                      selected ? "is-selected" : ""
-                    } ${submission.type === "family" ? "is-family" : "is-single"}`}
-                    data-submission-type={submission.type}
-                    key={submission.id}
-                  >
-                    <div className="v19-export-mobile-package-head">
-                      <div>
-                        <strong>{submission.title}</strong>
-                        <span className="v19-export-mobile-package-id">{submission.id}</span>
-                      </div>
-                      <span className="v19-export-mobile-package-status">
-                        {exportStateLabel(submission)}
-                      </span>
-                    </div>
-                    <div className="v19-export-mobile-package-meta">
-                      <span>
-                        <em>Строки</em>
-                        <b>{submission.applicants.length}</b>
-                      </span>
-                      <span>
-                        <em>Тип</em>
-                        <b>{submission.type === "family" ? "Семья" : "Один"}</b>
-                      </span>
-                      <span>
-                        <em>Ответственный</em>
-                        <b>Администратор</b>
-                      </span>
-                      <span>
-                        <em>Дальше</em>
-                        <b>Проверить условия</b>
-                      </span>
-                    </div>
-                    <Button
-                      className="v19-export-mobile-package-action"
-                      variant="secondary"
-                      onClick={() => {
-                        onChoosePackage(submission.id);
-                        onStep(2);
-                      }}
-                    >
-                      Выбрать пакет
-                    </Button>
-                  </article>
-                );
-              })}
-              {blockedList.map((submission) => (
-                <article className="v19-export-mobile-package is-blocked" key={submission.id}>
-                  <div className="v19-export-mobile-package-head">
-                    <div>
-                      <strong>{submission.title}</strong>
-                      <span className="v19-export-mobile-package-id">{submission.id}</span>
-                    </div>
-                    <span className="v19-export-mobile-package-status is-blocked">
-                      Блокеры
-                    </span>
-                  </div>
-                  <div className="v19-export-mobile-package-meta">
-                    <span>
-                      <em>Строки</em>
-                      <b>{submission.applicants.length}</b>
-                    </span>
-                    <span>
-                      <em>Тип</em>
-                      <b>{submission.type === "family" ? "Семья" : "Один"}</b>
-                    </span>
-                  </div>
-                  <p className="v19-export-mobile-package-note">
-                    {exportBlockedReason(submission)}
-                  </p>
-                  <Button
-                    className="v19-export-mobile-package-action"
-                    variant="secondary"
-                    onClick={() => onOpen(submission, "issues")}
-                  >
-                    Смотреть блокеры
-                  </Button>
-                </article>
-              ))}
-            </>
-          ) : (
-            <EmptyState text="Нет пакетов для выгрузки." />
-          )}
-        </div>
-      ) : null}
-
-      {mobileStep === 2 ? (
-        <div className="v19-export-mobile-step-body">
-          <div className="v19-export-mobile-checks">
-            <ExportGuardItem
-              ok={exportPlan.rowCount > 0}
-              label="Пакет принят и выбран"
-            />
-            <ExportGuardItem
-              ok={!exportHasBlocker(exportPlan, "блокирующие замечания")}
-              label="Нет открытых блокеров"
-            />
-            <ExportGuardItem
-              ok={!exportHasBlocker(exportPlan, "канонического пакета медиа")}
-              label="Обязательные файлы готовы"
-            />
-            <ExportGuardItem
-              ok={exportPlan.contract.valid && exportPlan.rowCount > 0}
-              label="Данные строк валидны"
-            />
-            <ExportGuardItem
-              detail={exportPlan.ready ? "Можно перейти к предпросмотру" : stepDisabledReason}
-              ok={exportPlan.ready}
-              label="Пакет экспортируем"
-            />
-          </div>
-          <div className="v19-export-mobile-step-footer">
-            <Button
-              aria-describedby={!exportPlan.ready ? "export-mobile-disabled-reason" : undefined}
-              disabled={!exportPlan.ready}
-              variant="primary"
-              onClick={() => onStep(3)}
-            >
-              Продолжить
-            </Button>
-            {!exportPlan.ready ? (
-              <p id="export-mobile-disabled-reason" role="status">
-                Причина: {stepDisabledReason}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {mobileStep === 3 ? (
-        <div className="v19-export-mobile-step-body">
-          {previewRows.length ? (
-            previewRows.map((row, index) => (
-              <article className="v19-export-mobile-preview-row" key={`${row.submissionId}-${row.applicantId}`}>
-                <strong>Строка {index + 1}</strong>
-                <span>Имя: {row.applicantName || "имя отсутствует"}</span>
-                <span>Город: {row.city || "город отсутствует"}</span>
-                <span>Дата: {row.tripDates || "дата отсутствует"}</span>
-                <span>Статус: {exportPlan.ready ? "готово" : "ошибка"}</span>
-              </article>
-            ))
-          ) : (
-            <EmptyState text="Сначала выберите пакет." />
-          )}
-          <div className="v19-export-mobile-step-footer">
-            <Button variant="secondary" onClick={() => onStep(2)}>
-              Назад
-            </Button>
-            <Button
-              disabled={!exportPlan.ready}
-              variant="primary"
-              onClick={() => onStep(4)}
-            >
-              Продолжить
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {mobileStep === 4 ? (
-        <div className="v19-export-mobile-step-body">
-          <section className="v19-export-mobile-summary" aria-label="Сводка выгрузки">
-            <strong>{exportPackageTitle(exportPlan)}</strong>
-            <span>Пакеты: {selectedSubmissionCount}</span>
-            <span>Строки: {exportPlan.rowCount}</span>
-            <span>Предупреждения: {exportPlan.warnings.length}</span>
-            <span>Ошибки: {exportPlan.blockers.length}</span>
-            {exportError ? <span role="alert">{exportError}</span> : null}
-          </section>
-          <div className="v19-export-mobile-step-footer">
-            <PanelActionFooter
-              primary={{
-                disabled: exportBusy || !exportPlan.canGenerate,
-                disabledReason:
-                  !exportPlan.canGenerate || exportBusy ? actionHint : undefined,
-                label: "Сформировать Excel",
-                onClick: onGenerate,
-              }}
-              secondary={[
-                {
-                  disabled: exportBusy || !exportPlan.canDownload,
-                  disabledReason:
-                    !exportPlan.canDownload || exportBusy ? actionHint : undefined,
-                  label: "Скачать Excel",
-                  onClick: onDownload,
-                },
-                {
-                  disabled: exportBusy || !exportPlan.canMarkExported,
-                  disabledReason:
-                    !exportPlan.canMarkExported || exportBusy
-                      ? actionHint
-                      : undefined,
-                  label: "Отметить выгружено",
-                  onClick: onMarkExported,
-                },
-              ]}
-              status={<span id="export-mobile-action-hint">{actionHint}</span>}
-            />
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function exportMobileStepTitle(step: ExportMobileStep) {
-  if (step === 1) return "Выбрать пакет";
-  if (step === 2) return "Проверить условия";
-  if (step === 3) return "Предпросмотр строк";
-  return "Сформировать Excel";
 }
 
 function exportBlockedReason(submission: Submission) {
