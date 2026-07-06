@@ -6,7 +6,6 @@ import {
   e2ePassportFile,
   expectAtLeastOneVisible,
   expectDrawerStatus,
-  isVisible,
   markVisibleIssuesFixed,
   openDrawerTab,
   openFreshWorkspace,
@@ -19,7 +18,8 @@ import {
 test.describe("V-19 pilot agent click flow", () => {
   test("access gate, agent navigation, filters, and create drawer clicks stay wired", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "desktop pilot runs once");
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, { heading: "Мои действия" });
@@ -38,28 +38,18 @@ test.describe("V-19 pilot agent click flow", () => {
     await agentActionSurface.getByRole("tab", { name: /Все действия/ }).click();
 
     await agentActionSurface.getByRole("button", { name: "Сначала старые" }).click();
-    await expect(
-      agentActionSurface.getByRole("button", { name: "Сначала новые" }),
-    ).toBeVisible();
+    await expect(agentActionSurface.getByText("Старые")).toBeVisible();
     await agentActionSurface.getByRole("button", { name: "Сначала новые" }).click();
-    await expect(
-      agentActionSurface.getByRole("button", { name: "Сначала старые" }),
-    ).toBeVisible();
+    await expect(agentActionSurface.getByText("Сегодня")).toBeVisible();
 
-    if (await isVisible(agentActionSearch)) {
-      await agentActionSearch.fill("ПД-1048");
-      await expect(
-        agentActionSurface.locator('[data-submission-id="ПД-1048"]').first(),
-      ).toBeVisible();
-      await expect(agentActionSurface.locator('[data-submission-id="ПД-1051"]')).toHaveCount(
-        0,
-      );
-      await agentActionSearch.fill("");
-    } else {
-      await expect(
-        agentActionSurface.locator('[data-submission-id="ПД-1048"]').first(),
-      ).toBeVisible();
-    }
+    await agentActionSearch.fill("ПД-1048");
+    await expect(
+      agentActionSurface.locator('[data-submission-id="ПД-1048"]').first(),
+    ).toBeVisible();
+    await expect(agentActionSurface.locator('[data-submission-id="ПД-1051"]')).toHaveCount(
+      0,
+    );
+    await agentActionSearch.fill("");
 
     await expect(agentActionSurface.locator("[data-submission-id]").first()).toBeVisible();
 
@@ -67,21 +57,11 @@ test.describe("V-19 pilot agent click flow", () => {
       .getByRole("button", { name: /^Открыть подачу:/ })
       .first();
     await expect(firstActionRow).toBeVisible();
-    const firstActionSubmissionId = await firstActionRow.getAttribute(
-      "data-submission-id",
-    );
-    if (!firstActionSubmissionId) {
-      throw new Error("Agent action row is missing data-submission-id.");
-    }
     await firstActionRow.click();
     await expect(drawer(page)).toBeVisible();
-    await expect(drawer(page)).toHaveAttribute(
-      "aria-label",
-      `Подача ${firstActionSubmissionId}`,
-    );
     await expect(drawer(page).getByText(/ПД-\d+|SUB-\d+/).first()).toBeVisible();
     await expect(drawer(page).getByRole("heading", { name: "Файлы подачи" })).toBeVisible();
-    await drawer(page).getByRole("button", { name: "Закрыть подачу" }).first().click();
+    await drawer(page).getByRole("button", { name: "Закрыть подачу" }).click();
 
     await clickWorkspaceButton(page, /Мои подачи/);
     await expect(page.getByRole("heading", { level: 1, name: "Мои подачи" })).toBeVisible();
@@ -92,11 +72,8 @@ test.describe("V-19 pilot agent click flow", () => {
 
     await selectSubmissionStatus(page, "Требуют действия");
     await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
-    await expect(submissionCardById(page, "ПД-1048")).toContainText("Семья Ивановы");
-    await expect(submissionCardById(page, "ПД-1048")).toContainText("4 заявителя");
-    await submissionCardById(page, "ПД-1048").click();
-    await expect(drawer(page)).toHaveAttribute("aria-label", "Подача ПД-1048");
-    await drawer(page).getByRole("button", { name: "Закрыть подачу" }).first().click();
+    await expect(submissionCardById(page, "ПД-1048")).toContainText("Селфи 1");
+    await expect(submissionCardById(page, "ПД-1048")).toContainText("2/3");
 
     await page.getByRole("button", { name: "Новая подача" }).first().click();
     await expect(drawer(page).getByText("Новая подача")).toBeVisible();
@@ -150,7 +127,8 @@ test.describe("V-19 pilot agent click flow", () => {
 
   test("returned issue can be opened, fixed, and resubmitted by the agent", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "desktop pilot runs once");
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, { heading: "Мои действия" });

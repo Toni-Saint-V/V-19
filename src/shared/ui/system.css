@@ -10,527 +10,6 @@
   }
 }
 
-.v19-command-palette-overlay {
-  position: fixed;
-  inset: var(--v19b-size-0);
-  z-index: var(--v19-command-palette-z);
-  background: rgb(var(--canvas) / 0.72);
-}
-
-.v19-command-palette-content {
-  position: fixed;
-  top: var(--v19b-size-72);
-  left: var(--v19b-size-half);
-  z-index: var(--v19-command-palette-z);
-  width: min(
-    calc(var(--v19b-size-full) - var(--v19b-size-48)),
-    var(--v19-command-palette-width)
-  );
-  max-height: var(--v19-command-palette-max-height);
-  transform: translateX(-50%);
-  overflow: hidden;
-  border: var(--v19b-size-1) solid var(--v19-line-strong);
-  border-radius: var(--v19b-radius-panel);
-  background: var(--v19-panel);
-  box-shadow: var(--v19b-shadow-panel);
-  color: var(--v19-fg);
-}
-
-.v19-command-palette {
-  display: grid;
-  max-height: inherit;
-  background: transparent;
-  color: inherit;
-  font-family: var(--v19-font-family);
-}
-
-.v19-command-palette-search {
-  display: grid;
-  grid-template-columns: var(--v19b-size-24) minmax(var(--v19b-size-0), 1fr);
-  align-items: center;
-  gap: var(--v19b-size-10);
-  min-height: var(--v19b-size-56);
-  padding: var(--v19b-size-0) var(--v19b-size-16);
-  border-bottom: var(--v19b-size-1) solid var(--v19-line-default);
-  background: var(--v19-surface);
-  color: var(--v19-fg-muted);
-}
-
-.v19-command-palette-search input {
-  width: var(--v19b-size-full);
-  min-width: var(--v19b-size-0);
-  border: var(--v19b-size-0);
-  outline: var(--v19b-size-0);
-  background: transparent;
-  color: var(--v19-fg);
-  font: inherit;
-  font-size: var(--v19b-size-14);
-}
-
-.v19-command-palette-search input::placeholder {
-  color: var(--v19-fg-muted);
-}
-
-.v19-command-palette-list {
-  max-height: calc(var(--v19-command-palette-max-height) - var(--v19b-size-56));
-  overflow-y: auto;
-  padding: var(--v19b-size-8);
-}
-
-.v19-command-palette-list [cmdk-group-heading] {
-  padding: var(--v19b-size-10) var(--v19b-size-10) var(--v19b-size-6);
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-11);
-  font-weight: var(--v19b-weight-control);
-  letter-spacing: var(--v19b-letter-spacing-normal);
-  text-transform: uppercase;
-}
-
-.v19-command-palette-list [cmdk-item] {
-  display: grid;
-  grid-template-columns: var(--v19b-size-32) minmax(var(--v19b-size-0), 1fr) auto;
-  align-items: center;
-  gap: var(--v19b-size-10);
-  min-height: var(--v19b-size-44);
-  padding: var(--v19b-size-6) var(--v19b-size-10);
-  border: var(--v19b-size-1) solid transparent;
-  border-radius: var(--v19b-radius-control);
-  color: var(--v19-fg-secondary);
-  cursor: pointer;
-}
-
-.v19-command-palette-list [cmdk-item][data-selected="true"] {
-  border-color: var(--v19-line-strong);
-  background: var(--v19-selected);
-  color: var(--v19-fg);
-}
-
-.v19-command-palette-list [cmdk-item] svg {
-  color: var(--v19-fg-muted);
-}
-
-.v19-command-palette-list [cmdk-item] span,
-.v19-command-palette-list [cmdk-item] em {
-  min-width: var(--v19b-size-0);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.v19-command-palette-list [cmdk-item] span {
-  font-size: var(--v19b-size-14);
-  font-weight: var(--v19b-weight-control);
-}
-
-.v19-command-palette-list [cmdk-item] em {
-  max-width: var(--v19b-size-220);
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-12);
-  font-style: normal;
-}
-
-.v19-command-palette-empty {
-  padding: var(--v19b-size-20);
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-13);
-  text-align: center;
-}
-
-@media (max-width: 767px) {
-  .v19-command-palette-content {
-    top: var(--v19b-size-56);
-    left: var(--v19-command-palette-mobile-inset);
-    right: var(--v19-command-palette-mobile-inset);
-    width: auto;
-    transform: none;
-  }
-
-  .v19-command-palette-list [cmdk-item] {
-    grid-template-columns: var(--v19b-size-32) minmax(var(--v19b-size-0), 1fr);
-    min-height: var(--v19b-size-48);
-  }
-
-  .v19-command-palette-list [cmdk-item] em {
-    grid-column: 2;
-    max-width: none;
-  }
-}
-
-/* Admin drawer overview/files convergence. */
-.admin-review-overview-tab[data-admin-review-overview] {
-  display: grid;
-  grid-template-columns: minmax(var(--v19b-size-0), 1.15fr) minmax(var(--v19b-size-280), 0.85fr);
-  gap: var(--v19b-size-12);
-}
-
-.admin-review-overview-hero,
-.admin-review-overview-metrics {
-  grid-column: 1 / -1;
-}
-
-.admin-review-overview-route {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(var(--v19b-size-0), 1fr));
-  gap: var(--v19b-size-8);
-}
-
-.admin-review-overview-route > div,
-.admin-review-overview-metrics > button,
-.admin-review-overview-package-list > div,
-.admin-review-overview-applicant-list > :is(div, button),
-.admin-review-applicant-card {
-  min-width: var(--v19b-size-0);
-  border: var(--v19b-size-1) solid var(--v19-line-default);
-  border-radius: var(--v19-radius-button);
-  background: var(--v19-control);
-}
-
-.admin-review-overview-route > div {
-  display: grid;
-  grid-template-columns: var(--v19b-size-24) minmax(var(--v19b-size-0), 1fr);
-  gap: var(--v19b-size-2) var(--v19b-size-8);
-  padding: var(--v19b-size-12);
-}
-
-.admin-review-overview-route svg {
-  grid-row: 1 / span 2;
-  color: var(--v19-fg-muted);
-}
-
-.admin-review-overview-route span,
-.admin-review-overview-package-list strong,
-.admin-review-overview-applicant-list strong,
-.admin-review-applicant-card strong {
-  min-width: var(--v19b-size-0);
-  overflow: hidden;
-  color: var(--v19-fg);
-  font-weight: var(--v19b-weight-title);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-review-overview-route small,
-.admin-review-overview-next p,
-.admin-review-overview-package-list em,
-.admin-review-overview-applicant-list em,
-.admin-review-applicant-card em,
-.admin-review-applicant-card dt {
-  margin: var(--v19b-size-0);
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-12);
-  font-style: normal;
-  line-height: var(--v19b-line-height-row);
-}
-
-.admin-review-overview-next p {
-  font-size: var(--v19b-size-13);
-}
-
-.admin-review-overview-flags,
-.admin-review-overview-metrics {
-  display: flex;
-  min-width: var(--v19b-size-0);
-  flex-wrap: wrap;
-  gap: var(--v19b-size-8);
-}
-
-.admin-review-overview-flags span {
-  display: inline-flex;
-  min-height: var(--v19b-size-28);
-  align-items: center;
-  border: var(--v19b-size-1) solid var(--v19-line-default);
-  border-radius: var(--v19b-radius-pill);
-  background: var(--v19-control);
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-12);
-  font-weight: var(--v19b-weight-control);
-  padding-inline: var(--v19b-size-10);
-}
-
-.admin-review-overview-flags span.is-danger {
-  border-color: var(--vf-red-soft-border);
-  background: var(--vf-red-soft-bg);
-  color: var(--vf-red-soft-text);
-}
-
-.admin-review-overview-flags span.is-warning {
-  border-color: var(--vf-yellow-soft-border);
-  background: var(--vf-yellow-soft-bg);
-  color: var(--vf-yellow-soft-text);
-}
-
-.admin-review-overview-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(var(--v19b-size-0), 1fr));
-}
-
-.admin-review-overview-metrics > button {
-  display: grid;
-  grid-template-columns: var(--v19b-size-28) minmax(var(--v19b-size-0), 1fr);
-  gap: var(--v19b-size-2) var(--v19b-size-8);
-  min-height: var(--v19b-size-68);
-  padding: var(--v19b-size-12);
-  color: var(--v19-fg);
-  text-align: left;
-}
-
-.admin-review-overview-metrics > button svg {
-  grid-row: 1 / span 2;
-  color: var(--v19-fg-muted);
-}
-
-.admin-review-overview-metrics > button span {
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-11);
-  font-weight: var(--v19b-weight-control);
-  text-transform: uppercase;
-}
-
-.admin-review-overview-metrics > button strong {
-  color: var(--v19-fg);
-  font-size: var(--v19b-size-18);
-  line-height: var(--v19b-line-height-tight);
-}
-
-.admin-review-overview-package-list,
-.admin-review-overview-applicant-list,
-.admin-review-applicants-tab {
-  display: grid;
-  gap: var(--v19b-size-8);
-}
-
-.admin-review-overview-package-list > div {
-  display: grid;
-  grid-template-columns: var(--v19b-size-10) minmax(var(--v19b-size-0), 1fr) auto;
-  align-items: center;
-  gap: var(--v19b-size-10);
-  padding: var(--v19b-size-10) var(--v19b-size-12);
-}
-
-.admin-review-overview-package-list > div > span {
-  width: var(--v19b-size-7);
-  height: var(--v19b-size-7);
-  border-radius: var(--v19b-radius-pill);
-  background: var(--v19b-color-text-faint);
-}
-
-.admin-review-overview-package-list > div.is-done > span {
-  background: var(--v19b-dot-success);
-  box-shadow: var(--v19b-dot-halo-shadow-success);
-}
-
-.admin-review-overview-package-list > div.is-progress > span {
-  background: var(--v19b-dot-review);
-  box-shadow: var(--v19b-dot-halo-shadow-review);
-}
-
-.admin-review-overview-applicant-list > :is(div, button),
-.admin-review-applicant-card {
-  display: grid;
-  grid-template-columns: var(--v19b-size-40) minmax(var(--v19b-size-0), 1fr) auto;
-  align-items: center;
-  gap: var(--v19b-size-10);
-  padding: var(--v19b-size-10);
-  color: inherit;
-  text-align: left;
-}
-
-.admin-review-overview-applicant-list > :is(div, button) > span,
-.admin-review-applicant-card > span {
-  display: grid;
-  width: var(--v19b-size-40);
-  height: var(--v19b-size-40);
-  place-items: center;
-  border: var(--v19b-size-1) solid var(--v19-line-strong);
-  border-radius: var(--v19b-radius-pill);
-  background: var(--v19-control-strong);
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-12);
-  font-weight: var(--v19b-weight-title);
-}
-
-.admin-review-applicant-card dl {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), 1fr));
-  gap: var(--v19b-size-8);
-  margin: var(--v19b-size-0);
-}
-
-.admin-review-applicant-card dl div {
-  min-width: var(--v19b-size-0);
-  border-top: var(--v19b-size-1) solid var(--v19-line-default);
-  padding-top: var(--v19b-size-8);
-}
-
-.admin-review-applicant-card dd {
-  margin: var(--v19b-size-3) var(--v19b-size-0) var(--v19b-size-0);
-  color: var(--v19-fg);
-  font-size: var(--v19b-size-13);
-  font-weight: var(--v19b-weight-control);
-}
-
-.v19-drawer-files-head > div {
-  display: grid;
-  min-width: var(--v19b-size-0);
-  gap: var(--v19b-size-3);
-}
-
-.v19-drawer-files-helper {
-  margin: var(--v19b-size-0);
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-12);
-  line-height: var(--v19b-line-height-row);
-}
-
-.v19-drawer-files-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), 1fr));
-  gap: var(--v19b-size-8);
-}
-
-.v19-drawer-files-summary span {
-  display: grid;
-  gap: var(--v19b-size-2);
-  min-width: var(--v19b-size-0);
-  border: var(--v19b-size-1) solid var(--v19-line-default);
-  border-radius: var(--v19-radius-button);
-  background: var(--v19-control);
-  padding: var(--v19b-size-10);
-}
-
-.v19-drawer-files-summary strong {
-  color: var(--v19-fg);
-  font-size: var(--v19b-size-18);
-  line-height: var(--v19b-line-height-tight);
-}
-
-.v19-drawer-files-summary em {
-  color: var(--v19-fg-muted);
-  font-size: var(--v19b-size-11);
-  font-style: normal;
-  font-weight: var(--v19b-weight-control);
-  text-transform: uppercase;
-}
-
-.v19-drawer-files-summary span.is-warning {
-  border-color: var(--vf-yellow-soft-border);
-  background: var(--vf-yellow-soft-bg);
-}
-
-.admin-review-files-tab .v19-drawer-file-item {
-  grid-template-columns:
-    var(--v19b-size-36)
-    minmax(var(--v19b-size-0), 1fr)
-    auto;
-}
-
-.admin-review-files-tab .v19-drawer-file-status {
-  grid-column: 3;
-  grid-row: 1;
-  align-self: start;
-}
-
-.admin-review-files-tab .v19-drawer-file-status.is-review::before {
-  background: var(--v19b-dot-review);
-  box-shadow: var(--v19b-dot-halo-shadow-review);
-}
-
-.admin-review-files-tab .v19-drawer-file-status.is-warning {
-  border-color: var(--vf-yellow-soft-border);
-  background: var(--vf-yellow-soft-bg);
-  color: var(--vf-yellow-soft-text);
-}
-
-.admin-review-files-tab .v19-drawer-file-status.is-warning::before {
-  background: var(--v19b-dot-warning);
-  box-shadow: var(--v19b-dot-halo-shadow-warning);
-}
-
-.admin-review-file-actions {
-  grid-column: 3;
-  grid-row: 2;
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--v19b-size-6);
-  min-width: var(--v19b-size-0);
-}
-
-.admin-review-file-actions .admin-review-row-remark {
-  min-height: var(--v19b-size-36);
-  border-radius: var(--v19-radius-button);
-  white-space: nowrap;
-}
-
-@media (max-width: 767px) {
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card {
-    position: relative !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-title
-    > span {
-    padding-right: var(--v19b-size-72) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-title
-    .v19-admin-cockpit-card-date-dot {
-    display: none !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-title
-    .v19-admin-cockpit-card-date {
-    position: absolute !important;
-    top: var(--v19b-size-16) !important;
-    right: var(--v19b-size-16) !important;
-    display: inline-flex !important;
-    min-height: var(--v19b-size-24) !important;
-    align-items: center !important;
-    border: var(--v19b-size-1) solid var(--v19-line-default) !important;
-    border-radius: var(--v19b-radius-pill) !important;
-    background: var(--v19-control) !important;
-    color: var(--v19-fg-muted) !important;
-    padding-inline: var(--v19b-size-9) !important;
-  }
-
-  .admin-review-overview-tab[data-admin-review-overview],
-  .admin-review-overview-route,
-  .admin-review-overview-metrics,
-  .v19-drawer-files-summary {
-    grid-template-columns: minmax(var(--v19b-size-0), 1fr);
-  }
-
-  .admin-review-files-tab .v19-drawer-file-item {
-    grid-template-columns:
-      var(--v19b-size-36)
-      minmax(var(--v19b-size-0), 1fr);
-  }
-
-  .admin-review-files-tab .v19-drawer-file-status {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: start;
-  }
-
-  .admin-review-file-actions {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    justify-content: stretch;
-  }
-
-  .admin-review-file-actions > button {
-    flex: 1 1 var(--v19b-size-0);
-    min-width: var(--v19b-size-0);
-  }
-
-  .admin-review-applicant-card dl {
-    grid-template-columns: minmax(var(--v19b-size-0), 1fr);
-  }
-}
-
 /* Admin passport workspace final mobile density pass. */
 @media (max-width: 767px) {
   .ops-shell.role-admin.surface-admin-review
@@ -602,7 +81,28 @@
     .v19-admin-cockpit-lane
     > header
     > small {
-    display: none !important;
+    display: inline-flex !important;
+    min-height: var(--v19b-size-20) !important;
+    align-items: center !important;
+    padding: var(--v19b-size-0) var(--v19b-size-7) !important;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-pill) !important;
+    background: var(--v19b-color-control) !important;
+    color: transparent !important;
+    font-size: var(--v19b-size-0) !important;
+    line-height: var(--v19b-line-height-control) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-lane
+    > header
+    > small::before {
+    content: attr(data-mobile-label);
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-10);
+    font-weight: var(--v19b-weight-control);
+    line-height: var(--v19b-line-height-control);
+    white-space: nowrap;
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
@@ -620,43 +120,66 @@
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
     .v19-admin-cockpit-card-title
-    em,
+    .v19-admin-cockpit-card-city,
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-title
+    .v19-admin-cockpit-card-city-dot,
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
     .v19-admin-cockpit-chevron {
     display: none !important;
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-meta {
-    display: none !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-meta
-    strong {
-    display: inline-flex !important;
-    min-height: var(--v19b-size-20) !important;
-    align-items: center !important;
-    padding: var(--v19b-size-0) var(--v19b-size-6) !important;
-    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
-    border-radius: var(--v19b-radius-pill) !important;
-    background: var(--v19b-color-control) !important;
-    color: var(--v19b-color-text-muted) !important;
+    .v19-admin-cockpit-card-title
+    em {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: var(--v19b-size-5) !important;
+    margin-top: var(--v19b-size-5) !important;
+    color: var(--v19b-color-text-faint) !important;
     font-size: var(--v19b-size-9) !important;
-    font-weight: var(--v19b-weight-control) !important;
-    line-height: var(--v19b-line-height-control) !important;
+    line-height: var(--v19b-line-height-tight) !important;
     white-space: nowrap !important;
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-meta
-    span {
-    overflow: hidden !important;
-    max-width: var(--v19b-size-full) !important;
+    .v19-admin-cockpit-card-title
+    em
+    svg {
+    width: var(--v19b-size-10) !important;
+    height: var(--v19b-size-10) !important;
     color: var(--v19b-color-text-faint) !important;
-    font-size: var(--v19b-size-9) !important;
-    font-weight: var(--v19b-weight-regular) !important;
-    line-height: var(--v19b-line-height-tight) !important;
+    flex: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-title
+    em
+    i {
+    width: var(--v19b-size-3) !important;
+    height: var(--v19b-size-3) !important;
+    flex: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-next {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-next
+    > span {
+    flex: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-next
+    p {
+    min-width: var(--v19b-size-0) !important;
+    margin: var(--v19b-size-0) !important;
+    color: var(--v19b-color-text-faint) !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }
@@ -673,6 +196,30 @@
     span {
     min-height: var(--v19b-size-22) !important;
     font-size: var(--v19b-size-10) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit
+    .v19-admin-cockpit-card
+    .v19-admin-cockpit-card-title
+    > em {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: var(--v19b-size-5) !important;
+    margin-top: var(--v19b-size-5) !important;
+    font-size: var(--v19b-size-9) !important;
+    line-height: var(--v19b-line-height-tight) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit
+    .v19-admin-cockpit-card
+    .v19-admin-cockpit-next {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--v19b-size-8) !important;
   }
 }
 
@@ -1130,7 +677,7 @@
   display: block;
   min-width: 0;
   margin-top: var(--vf-ref-size-6px);
-  color: var(--v19b-color-text-60);
+  color: var(--v19b-color-text-40);
   font-size: var(--vf-ref-size-11px);
   line-height: var(--vf-ref-line-height-1neg-35);
 }
@@ -3715,7 +3262,7 @@ p {
   padding: 0;
   border: 0;
   border-radius: 0;
-  color: var(--v19b-color-text-80);
+  color: var(--v19b-color-text-40);
   background: transparent;
   font-size: var(--vf-ref-size-10px);
   font-weight: var(--vf-ref-font-weight-400);
@@ -9500,10 +9047,6 @@ p {
 .tabs button.active .v19-tab-count,
 .tabs button.is-active .v19-tab-count {
   color: currentColor;
-}
-
-.v19-state-tabs .tab:not(.active):not(.is-active) .v19-tab-count {
-  color: var(--v19b-color-text-80) !important;
 }
 
 .v19-work-mode-tabs .tabs button.is-active {
@@ -25958,23 +25501,6 @@ p {
   text-transform: uppercase;
 }
 
-.admin-review-title-submission {
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  padding: 0;
-  text-align: left;
-  text-transform: inherit;
-}
-
-.admin-review-title-submission:hover,
-.admin-review-title-submission:focus-visible {
-  color: var(--vf-text-primary, var(--vf-ref-color-hexneg-f3f4f6));
-  outline: 0;
-}
-
 .admin-review-titlecopy h2 {
   margin: 0;
   overflow-wrap: anywhere;
@@ -27604,70 +27130,6 @@ p {
   font-size: var(--vf-ref-size-11px);
   font-style: normal;
   line-height: 1.35;
-}
-
-.v19-passport-ai-hints {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: var(--vf-ref-size-6px);
-  margin-top: var(--vf-ref-size-10px);
-}
-
-.v19-passport-ai-hints--panel {
-  margin-top: var(--vf-ref-size-0);
-}
-
-.v19-passport-ai-hint {
-  display: inline-flex;
-  min-width: 0;
-  min-height: var(--vf-ref-size-26px);
-  align-items: center;
-  gap: var(--vf-ref-size-5px);
-  padding: 0 var(--vf-ref-size-8px);
-  border: var(--vf-ref-size-1px) solid var(--v19-line-default);
-  border-radius: var(--v19-radius-pill);
-  background: var(--v19-control);
-  color: var(--v19-fg-muted);
-  font-size: var(--vf-ref-size-11px);
-  line-height: 1;
-}
-
-.v19-passport-ai-hint > span {
-  color: var(--v19-fg-tertiary);
-  font-weight: var(--vf-ref-font-weight-620);
-  text-transform: uppercase;
-}
-
-.v19-passport-ai-hint > em {
-  display: inline;
-  min-width: 0;
-  margin: var(--vf-ref-size-0);
-  overflow: hidden;
-  color: inherit;
-  font-size: inherit;
-  font-style: normal;
-  line-height: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.v19-passport-ai-hint.is-muted {
-  border-color: var(--v19-line-default);
-  background: var(--v19-control);
-  color: var(--v19-fg-muted);
-}
-
-.v19-passport-ai-hint.is-yellow {
-  border-color: var(--vf-yellow-soft-border, var(--vf-ref-color-rgba-244-184-64-0neg-48));
-  background: var(--vf-yellow-soft-bg, var(--vf-ref-color-rgba-244-184-64-0neg-13));
-  color: var(--vf-yellow-soft-text, var(--vf-ref-color-hexneg-f4c866));
-}
-
-.v19-passport-ai-hint.is-green {
-  border-color: var(--vf-green-soft-border, var(--vf-ref-color-rgba-69-208-130-0neg-48));
-  background: var(--vf-green-soft-bg, var(--vf-ref-color-rgba-69-208-130-0neg-12));
-  color: var(--vf-green-soft-text, var(--vf-ref-color-hexneg-59df94));
 }
 
 .v19-passport-live-indicator.is-red {
@@ -33172,7 +32634,8 @@ p {
     min-height: var(--v19-control-height-touch) !important;
   }
 
-  .ops-shell.surface-export .v17-export-context-rail {
+  .ops-shell.surface-export .v17-export-context-rail,
+  .ops-shell.surface-export .v19-export-desktop-content {
     display: none !important;
   }
 
@@ -33201,6 +32664,96 @@ p {
     display: none !important;
   }
 
+  .ops-shell.surface-export .v19-export-mobile-flow {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: var(--v19-space-sm) !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .v19-export-mobile-step-head {
+    display: grid !important;
+    gap: var(--vf-ref-size-6px) !important;
+    min-height: var(--vf-ref-size-48px) !important;
+    padding: var(--v19-space-sm) var(--v19-space-md) !important;
+    border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+    border-radius: var(--v19-radius-button) !important;
+    background: var(--v19-control) !important;
+  }
+
+  .v19-export-mobile-step-head span {
+    display: flex !important;
+    gap: var(--vf-ref-size-6px) !important;
+  }
+
+  .v19-export-mobile-step-head i {
+    width: var(--vf-ref-size-8px) !important;
+    height: var(--vf-ref-size-8px) !important;
+    border-radius: var(--v19-radius-pill) !important;
+    background: var(--v19-line-strong) !important;
+  }
+
+  .v19-export-mobile-step-head i.is-complete {
+    background: var(--v19-accent) !important;
+  }
+
+  .v19-export-mobile-step-body {
+    display: grid !important;
+    align-content: start !important;
+    gap: var(--v19-space-sm) !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding-bottom: max(var(--v19-space-lg), env(safe-area-inset-bottom)) !important;
+  }
+
+  .v19-export-mobile-package,
+  .v19-export-mobile-preview-row,
+  .v19-export-mobile-summary,
+  .v19-export-mobile-checks {
+    display: grid !important;
+    gap: var(--vf-ref-size-6px) !important;
+    min-width: 0 !important;
+    padding: var(--v19-space-md) !important;
+    border: var(--vf-ref-size-1px) solid var(--v19-line-default) !important;
+    border-radius: var(--v19-radius-card) !important;
+    background: var(--v19-panel) !important;
+  }
+
+  .v19-export-mobile-package {
+    gap: var(--vf-ref-size-2px) !important;
+    padding: var(--v19-space-sm) !important;
+  }
+
+  .v19-export-mobile-package :is(strong, span) {
+    line-height: var(--vf-ref-line-height-1neg-16) !important;
+  }
+
+  .v19-export-mobile-package.is-selected {
+    border-color: var(--v19-line-strong) !important;
+    background: var(--v19-selected) !important;
+  }
+
+  .v19-export-mobile-package.is-blocked {
+    border-color: var(--vf-red-soft-border, var(--v19-line-strong)) !important;
+  }
+
+  .v19-export-mobile-package .mp-button,
+  .v19-export-mobile-step-footer .mp-button {
+    min-height: var(--v19-control-height-touch) !important;
+  }
+
+  .v19-export-mobile-step-footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    display: grid !important;
+    gap: var(--v19-space-sm) !important;
+    padding: var(--v19-space-sm) 0 max(var(--v19-space-sm), env(safe-area-inset-bottom)) !important;
+    background: var(--v19-panel) !important;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -34882,25 +34435,12 @@ select,
 
 .v19-submission-reference-filterbar {
   display: flex !important;
-  align-items: center !important;
-  gap: var(--vf-ref-size-10px) !important;
   justify-content: flex-end !important;
   margin: var(--vf-ref-size-0px) var(--vf-ref-size-0px) var(--vf-ref-size-14px) !important;
 }
 
-.v19-submission-reference-search {
-  flex: 1 1 auto !important;
-  min-width: var(--vf-ref-size-0px) !important;
-}
-
-.v19-submission-reference-search :is(.search, .mp-searchbar, .mp-search-input) {
-  width: var(--v19b-size-full) !important;
-  min-height: var(--v19-control-height-touch) !important;
-}
-
 .v19-submission-reference-filter-trigger {
   display: inline-flex !important;
-  flex: 0 0 auto !important;
   min-height: var(--v19-control-height-touch) !important;
   align-items: center !important;
   justify-content: center !important;
@@ -35742,7 +35282,6 @@ select,
     inset: var(--v19b-size-8) auto var(--v19b-size-8) var(--v19b-size-8) !important;
     z-index: 220 !important;
     display: grid !important;
-    transform: translateX(var(--v19b-size-0)) !important;
     width: min(var(--vf-ref-size-360px), calc(100vw - var(--v19b-size-16))) !important;
     min-width: var(--v19b-size-0) !important;
     max-width: calc(100vw - var(--v19b-size-16)) !important;
@@ -35794,308 +35333,5 @@ select,
     img {
     width: var(--v19b-size-32) !important;
     height: var(--v19b-size-32) !important;
-  }
-}
-
-/* Admin drawer final convergence lock: placed after legacy drawer rules. */
-.admin-review-drawer .admin-review-overview-tab[data-admin-review-overview] {
-  display: grid !important;
-  grid-template-columns: minmax(var(--v19b-size-0), 1.15fr) minmax(var(--v19b-size-280), 0.85fr) !important;
-  gap: var(--v19b-size-12) !important;
-}
-
-.admin-review-drawer .admin-review-overview-hero,
-.admin-review-drawer .admin-review-overview-metrics {
-  grid-column: 1 / -1 !important;
-}
-
-.admin-review-drawer .admin-review-overview-metrics {
-  display: grid !important;
-  grid-template-columns: repeat(4, minmax(var(--v19b-size-0), 1fr)) !important;
-}
-
-.admin-review-drawer .admin-review-overview-route {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(var(--v19b-size-0), 1fr)) !important;
-}
-
-.admin-review-files-tab .v19-drawer-file-item {
-  grid-template-columns:
-    var(--v19b-size-36)
-    minmax(var(--v19b-size-0), 1fr)
-    auto !important;
-}
-
-.admin-review-files-tab .v19-drawer-file-status {
-  grid-column: 3 !important;
-  grid-row: 1 !important;
-  justify-self: end !important;
-}
-
-.admin-review-file-actions {
-  grid-column: 3 !important;
-  grid-row: 2 !important;
-}
-
-@media (max-width: 767px) {
-  .admin-review-drawer .admin-review-overview-tab[data-admin-review-overview],
-  .admin-review-drawer .admin-review-overview-route,
-  .admin-review-drawer .admin-review-overview-metrics {
-    grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
-  }
-
-  .admin-review-files-tab .v19-drawer-file-item {
-    grid-template-columns:
-      var(--v19b-size-36)
-      minmax(var(--v19b-size-0), 1fr) !important;
-  }
-
-  .admin-review-files-tab .v19-drawer-file-status {
-    grid-column: 2 !important;
-    grid-row: 2 !important;
-    justify-self: start !important;
-  }
-
-  .admin-review-file-actions {
-    grid-column: 1 / -1 !important;
-    grid-row: auto !important;
-  }
-}
-
-/* 2026-07-06 mobile convergence: admin review/export cells and tap targets. */
-.ops-shell .ops-nav-item,
-.ops-nav-item,
-.opsu-nav-item,
-.v19-state-tabs button,
-.vf-figma-tabs button,
-.ops-shell.has-unified-side-menu.surface-agent-actions
-  .v19-agent-actions-reference-toolbar
-  button.tab {
-  min-height: var(--v19b-size-40) !important;
-}
-
-@media (max-width: 767px) {
-  .v19-state-tabs button,
-  .vf-figma-tabs button,
-  .ops-shell.has-unified-side-menu.surface-agent-actions
-    .v19-agent-actions-reference-toolbar
-    button.tab {
-    min-height: var(--v19-control-height-touch) !important;
-    height: var(--v19-control-height-touch) !important;
-  }
-
-  .ops-shell.surface-agent-actions
-    .v19-agent-actions-reference-toolbar
-    .v19-state-tabs
-    button {
-    min-height: var(--v19-control-height-touch) !important;
-    height: var(--v19-control-height-touch) !important;
-  }
-
-  .vf-figma-tabs,
-  .ops-shell.surface-agent-actions .vf-figma-tabs {
-    min-height: calc(var(--v19-control-height-touch) + var(--v19b-size-8)) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-lanes {
-    padding-bottom: calc(var(--v19b-size-84) + var(--v19b-size-16)) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card {
-    display: grid !important;
-    gap: var(--v19b-size-10) !important;
-    padding: var(--v19b-size-14) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card.has-blocker {
-    border-color: var(--v19b-admin-red-border) !important;
-    background: var(--v19b-color-panel) !important;
-    box-shadow: inset var(--v19b-size-3) 0 0 var(--v19b-admin-red-border) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-head {
-    display: grid !important;
-    grid-template-columns: minmax(var(--v19b-size-0), 1fr) auto !important;
-    gap: var(--v19b-size-10) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-title
-    > span {
-    padding-right: var(--v19b-size-72) !important;
-    row-gap: var(--v19b-size-4) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-title
-    h3 {
-    display: -webkit-box !important;
-    overflow: hidden !important;
-    margin-top: var(--v19b-size-6) !important;
-    white-space: normal !important;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-title
-    em {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: var(--v19b-size-5) var(--v19b-size-8) !important;
-    white-space: normal !important;
-    font-size: var(--v19b-size-11) !important;
-    line-height: var(--v19b-line-height-row) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-next {
-    display: grid !important;
-    grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
-    grid-auto-flow: row !important;
-    align-items: stretch !important;
-    gap: var(--v19b-size-6) !important;
-    margin-top: var(--v19b-size-0) !important;
-    padding: var(--v19b-size-10) var(--v19b-size-12) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-next
-    > span {
-    grid-column: 1 !important;
-    width: 100% !important;
-    min-width: var(--v19b-size-0) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-next
-    > span
-    > b {
-    display: inline !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-next
-    p {
-    grid-column: 1 !important;
-    display: -webkit-box !important;
-    overflow: hidden !important;
-    width: 100% !important;
-    min-width: var(--v19b-size-0) !important;
-    margin: var(--v19b-size-0) !important;
-    color: var(--v19b-color-text-muted) !important;
-    white-space: normal !important;
-    text-overflow: clip !important;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-next
-    em {
-    grid-column: 1 !important;
-    display: block !important;
-    width: 100% !important;
-    min-width: var(--v19b-size-0) !important;
-    overflow-wrap: anywhere !important;
-    color: var(--v19b-color-text-faint) !important;
-    font-size: var(--v19b-size-11) !important;
-    font-style: normal !important;
-    line-height: var(--v19b-line-height-row) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-progress-grid {
-    grid-template-columns: minmax(var(--v19b-size-0), 1fr) !important;
-    gap: var(--v19b-size-8) !important;
-    margin-top: var(--v19b-size-0) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-tags {
-    gap: var(--v19b-size-6) !important;
-    margin-top: var(--v19b-size-0) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-tags
-    span {
-    min-height: var(--v19b-size-24) !important;
-    font-size: var(--v19b-size-10) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card
-    .v19-admin-row-action {
-    width: 100% !important;
-    min-height: var(--v19-control-height-touch) !important;
-    height: var(--v19-control-height-touch) !important;
-    justify-self: stretch !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .ops-shell.surface-agent-actions
-    .v19-agent-actions-reference-toolbar.v19-collection-toolbar
-    .v19-toolbar-secondary-row,
-  .ops-shell.surface-agent-actions
-    .v19-agent-actions-reference-toolbar.v19-collection-toolbar
-    .v19-state-tabs {
-    min-height: calc(var(--v19-control-height-touch) + var(--v19b-size-8)) !important;
-    height: auto !important;
-    align-items: stretch !important;
-  }
-
-  .ops-shell.surface-agent-actions
-    .v19-agent-actions-reference-toolbar.v19-collection-toolbar
-    .v19-state-tabs
-    > button.tab {
-    min-height: var(--v19-control-height-touch) !important;
-    height: var(--v19-control-height-touch) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
-    > .workspace
-    > .v19-admin-cockpit
-    .v19-admin-cockpit-card
-    .v19-admin-cockpit-next {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: var(--v19b-size-6) !important;
-    height: auto !important;
-    min-height: var(--v19b-size-0) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
-    > .workspace
-    > .v19-admin-cockpit
-    .v19-admin-cockpit-card
-    .v19-admin-cockpit-next
-    > :is(span, p, em) {
-    flex: 0 1 auto !important;
-    align-self: stretch !important;
-    width: auto !important;
-    min-width: var(--v19b-size-0) !important;
-  }
-
-  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
-    > .workspace
-    > .v19-admin-cockpit
-    .v19-admin-cockpit-card
-    .v19-admin-cockpit-next
-    > p,
-  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
-    > .workspace
-    > .v19-admin-cockpit
-    .v19-admin-cockpit-card
-    .v19-admin-cockpit-next
-    > em {
-    overflow-wrap: normal !important;
-    word-break: normal !important;
   }
 }

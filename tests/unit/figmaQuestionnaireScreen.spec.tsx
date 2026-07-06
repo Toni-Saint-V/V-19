@@ -72,7 +72,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getByLabelText("Номер паспорта")).toHaveValue("752869613");
     expect(screen.getByLabelText("Дата выдачи")).toHaveValue("26.02.2016");
     expect(screen.getByLabelText("Действителен до")).toHaveValue("26.02.2026");
-    expect(screen.getByLabelText("Место выдачи")).toHaveValue("FMS 78039");
+    expect(screen.getByLabelText("Кем выдан")).toHaveValue("FMS 78039");
     expect(result.container.querySelector("[data-field-focused='true']")).toHaveTextContent(
       "Действителен до",
     );

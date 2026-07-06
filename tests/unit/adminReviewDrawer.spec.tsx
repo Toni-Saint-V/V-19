@@ -77,7 +77,7 @@ describe("AdminReviewDrawer", () => {
   test("shows real admin review metadata and canonical review tabs", () => {
     const { container } = renderDrawer();
 
-    expect(screen.getAllByText("Нина Волкова")[0]).toBeVisible();
+    expect(screen.getByRole("button", { name: /Нина Волкова/ })).toBeVisible();
     expect(screen.getAllByText("ПД-1053")[0]).toBeVisible();
     expect(container.querySelector(".admin-review-meta")?.textContent).toContain(
       "Казань",
@@ -115,9 +115,6 @@ describe("AdminReviewDrawer", () => {
     expect(screen.queryByRole("button", { name: "Документ" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Скан загранпаспорта" }));
-    fireEvent.change(screen.getByPlaceholderText("Что именно не так..."), {
-      target: { value: "Паспорт не совпадает с анкетой." },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Создать замечание" }));
 
     expect(onAddIssue).toHaveBeenCalledWith(

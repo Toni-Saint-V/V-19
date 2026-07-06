@@ -6,6 +6,8 @@ import {
   FileSpreadsheet,
   ImageIcon,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Search,
   Users,
@@ -39,7 +41,7 @@ export function OperationalSidebar({
   footer,
   id,
   items,
-  onCommandSearch,
+  onDisplayModeToggle,
   onMobileClose,
   mobileTitle,
 }: {
@@ -52,10 +54,13 @@ export function OperationalSidebar({
   footer: ReactNode;
   id?: string;
   items: OperationalNavItem[];
-  onCommandSearch?: () => void;
+  onDisplayModeToggle: () => void;
   onMobileClose?: () => void;
   mobileTitle?: string;
 }) {
+  const isCompact = displayMode === "compact";
+  const DisplayModeIcon = isCompact ? PanelLeftOpen : PanelLeftClose;
+
   return (
     <aside
       id={id}
@@ -83,6 +88,20 @@ export function OperationalSidebar({
         <div className="ops-brand-copy opsu-brand-copy">
           <strong className="opsu-wordmark vf-brand-wordmark">VisaFlow</strong>
         </div>
+        <IconButton
+          className="ops-sidebar-mode-toggle"
+          icon={
+            <DisplayModeIcon
+              aria-hidden="true"
+              focusable="false"
+              size={17}
+              strokeWidth={1.9}
+            />
+          }
+          label={isCompact ? "Развернуть меню" : "Свернуть меню"}
+          pressed={isCompact}
+          onClick={onDisplayModeToggle}
+        />
         {onMobileClose ? (
           <IconButton
             className="ops-mobile-close opsu-mobile-close"
@@ -92,12 +111,7 @@ export function OperationalSidebar({
           />
         ) : null}
       </div>
-      <button
-        className="ops-sidebar-search"
-        type="button"
-        aria-label="Открыть командную палитру"
-        onClick={onCommandSearch}
-      >
+      <button className="ops-sidebar-search" type="button" aria-label="Поиск">
         <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
         <span>Поиск...</span>
         <kbd>⌘K</kbd>

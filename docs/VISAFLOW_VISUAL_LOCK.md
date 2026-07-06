@@ -6,12 +6,10 @@ This system is a constraint system, not an open UI kit.
 
 ## Closed Reference Set
 
-Anything outside the closed reference files is not an agent visual/layout source:
+Anything outside these two files is not an agent visual/layout source:
 
-- `docs/qa/2026-07-05-agent-unfinished-final/desktop-1440-actions.png`
-- `docs/qa/2026-07-05-agent-unfinished-final/desktop-1440-submissions.png`
-- `docs/qa/2026-07-05-agent-unfinished-final/mobile-390-actions.png`
-- `docs/qa/2026-07-05-agent-unfinished-final/mobile-390-submissions.png`
+- `docs/qa/v19-agent-actions-reference-2026-06-20.png`
+- `docs/qa/v19-agent-submissions-reference-2026-06-20.png`
 
 Do not read files outside the closed reference set when making agent visual or layout decisions.
 
