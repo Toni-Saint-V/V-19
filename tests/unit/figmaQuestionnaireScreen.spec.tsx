@@ -31,6 +31,27 @@ function setField(submission: Submission, fieldId: string, value: string) {
   });
 }
 
+function setFieldReview(
+  submission: Submission,
+  fieldId: string,
+  value: string,
+  review: Pick<
+    NonNullable<Submission["applicants"][number]["sections"][number]["fields"][number]>,
+    "reviewSource" | "reviewState"
+  >,
+) {
+  const applicantId = submission.applicants[0]?.id;
+  if (!applicantId) throw new Error("expected applicant");
+
+  return updateQuestionnaireField(submission, {
+    applicantId,
+    fieldId,
+    sectionId: sectionIdForField(submission, fieldId),
+    value,
+    ...review,
+  });
+}
+
 describe("FigmaQuestionnaireScreen", () => {
   test("renders passport values from the active submission instead of static defaults", () => {
     const draft = createDraftSubmission({
@@ -104,5 +125,81 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.click(cityTrigger);
 
     expect(screen.getByRole("button", { name: "Екатеринбург" })).toBeInTheDocument();
+  });
+
+  test("does not render a hardcoded birth date PDF mismatch for clean submission data", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const submission = setField(draft, "birth-date", "20.08.1990");
+
+    render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    expect(screen.getByLabelText("Дата рождения")).toHaveValue("20.08.1990");
+    expect(screen.queryByText("Дата рождения не совпадает")).not.toBeInTheDocument();
+    expect(screen.queryByText("Не совпадает с PDF")).not.toBeInTheDocument();
+    expect(screen.queryByText(/12\.05\.1985|15\.05\.1985/)).not.toBeInTheDocument();
+  });
+
+  test("keeps real PDF mismatch issues visible while needs-review fields only get an outline", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const reviewed = setFieldReview(draft, "birth-place", "LENINGRAD", {
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+    });
+    const applicant = reviewed.applicants[0];
+    if (!applicant) throw new Error("expected applicant");
+    const submission: Submission = {
+      ...reviewed,
+      issues: [
+        {
+          comment: "PDF не совпадает с заявкой: Дата рождения.",
+          createdAt: "2026-07-06T00:00:00.000Z",
+          createdBy: "system",
+          id: "issue-birth-date",
+          reason: "PDF не совпадает",
+          severity: "blocker",
+          status: "open",
+          target: {
+            applicantId: applicant.id,
+            applicantName: applicant.fullName,
+            field: "Дата рождения",
+            section: "Личные данные",
+          },
+          type: "field",
+        },
+      ],
+    };
+
+    render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    expect(screen.getByText("Дата рождения не совпадает")).toBeInTheDocument();
+    expect(screen.getByText("PDF не совпадает с заявкой: Дата рождения.")).toBeInTheDocument();
+    expect(screen.queryByText(/Проверить|passport_ocr/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Место рождения")).toHaveClass("is-review");
   });
 });

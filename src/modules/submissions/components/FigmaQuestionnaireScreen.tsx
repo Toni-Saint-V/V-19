@@ -309,6 +309,10 @@ function FormField({
       : state === "invalid"
         ? "is-invalid"
         : "is-normal";
+  const reviewTitle =
+    state === "needs_review" && reviewSource
+      ? `Источник сверки: ${reviewSource}`
+      : undefined;
 
   return (
     <div
@@ -335,6 +339,7 @@ function FormField({
           <button
             className={`flex items-center justify-between text-left ${baseClasses} ${stateClasses}`}
             type="button"
+            title={reviewTitle}
             onClick={() => setIsOpen(!isOpen)}
           >
             <span className="truncate">
@@ -375,6 +380,7 @@ function FormField({
         <textarea
           className={`${baseClasses} is-textarea ${stateClasses}`}
           readOnly={readOnly ?? !onChange}
+          title={reviewTitle}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
         />
@@ -384,25 +390,18 @@ function FormField({
           className={`${baseClasses} ${stateClasses}`}
           type={type === "email" || type === "number" ? type : "text"}
           readOnly={readOnly ?? !onChange}
+          title={reviewTitle}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
         />
       )}
 
-      {state === "needs_review" || state === "invalid" ? (
+      {state === "invalid" ? (
       <div className="flex items-start gap-1.5 text-[var(--v19b-size-10-5)] text-white/40 mt-1">
-        {state === "needs_review" ? (
-          <span className="text-orange-400 flex items-center gap-1.5 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-            Проверить{reviewSource ? `: ${reviewSource}` : ""}
-          </span>
-        ) : null}
-        {state === "invalid" ? (
-          <span className="text-red-400 flex items-center gap-1.5 font-medium">
-            <AlertCircle className="w-3.5 h-3.5" />
-            Не совпадает с PDF
-          </span>
-        ) : null}
+        <span className="text-red-400 flex items-center gap-1.5 font-medium">
+          <AlertCircle className="w-3.5 h-3.5" />
+          Не совпадает с PDF
+        </span>
       </div>
       ) : null}
     </div>
@@ -448,32 +447,32 @@ function fallbackQuestionnaireFormData(
   const nameParts = applicantNameParts(applicantName);
 
   return {
-    appointmentCity: "Москва",
+    appointmentCity: "",
     appointmentNote: "",
-    birthCountry: "USSR",
-    birthCitizenship: "Russian Federation",
-    birthPlace: "MOSCOW",
-    category: "Normal",
-    citizenship: "Russian Federation",
+    birthCountry: "",
+    birthCitizenship: "",
+    birthPlace: "",
+    category: "",
+    citizenship: "",
     companyContactPerson: "",
     companyOrgDetails: "",
     companyPhone: "",
-    contactAddress: "LENINSKY PROSPECT 10-24",
-    contactEmail: "petrov@example.com",
-    contactPhone: "+7 921 555-44-33",
-    currentJob: "TECHNICAL DIRECTOR",
-    desiredDate1: "22.07.2026",
-    desiredDate2: "24.07.2026",
-    desiredDate3: "26.07.2026",
-    dob: "12.05.1985",
-    employerAddress: "MOSCOW, TVERSKAYA 7",
-    employerContact: "+7 495 000-00-00",
-    employerName: "OOO VECTOR",
-    entryCount: "Многократная",
-    euRelationship: "Иное",
+    contactAddress: "",
+    contactEmail: "",
+    contactPhone: "",
+    currentJob: "",
+    desiredDate1: "",
+    desiredDate2: "",
+    desiredDate3: "",
+    dob: "",
+    employerAddress: "",
+    employerContact: "",
+    employerName: "",
+    entryCount: "",
+    euRelationship: "",
     euRelativeDetails: "",
-    firstEntryCountry: "Spain",
-    firstName: nameParts.firstName || "IVAN",
+    firstEntryCountry: "",
+    firstName: nameParts.firstName,
     finalEntryPermit: "",
     finalEntryPermitIssuedBy: "",
     finalEntryPermitValidFrom: "",
@@ -482,50 +481,50 @@ function fallbackQuestionnaireFormData(
     formFillerName: "",
     formFillerPhone: "",
     guardianInfo: "",
-    hotelAddress: "BARCELONA, CARRER DE MALLORCA 401",
-    hotelCity: "BARCELONA",
-    hotelContact: "+34 900 111 222",
-    hotelCountry: "Spain",
-    hotelEmail: "hotel@example.com",
-    hotelName: "HOTEL DIAGONAL",
-    hotelPostalCode: "08005",
-    homeCountry: "Russian Federation",
-    invitingPartyType: "Гостиница/временное жилье",
-    livesOutsideCitizenship: "Нет",
-    mainDestination: "Spain",
-    maritalStatus: "Женат/замужем",
+    hotelAddress: "",
+    hotelCity: "",
+    hotelContact: "",
+    hotelCountry: "",
+    hotelEmail: "",
+    hotelName: "",
+    hotelPostalCode: "",
+    homeCountry: "",
+    invitingPartyType: "",
+    livesOutsideCitizenship: "",
+    mainDestination: "",
+    maritalStatus: "",
     nationalId: "",
-    occupation: "IT PROFESSIONAL",
+    occupation: "",
     otherCitizenship: "",
     otherSponsor: "",
-    passportExpiry: "18.09.2032",
-    passportIssued: "18.09.2022",
-    passportIssueCountry: "Russian Federation",
-    passportIssuePlace: "FMS 770-001",
-    passportNumber: "751234567",
-    passportType: "Ordinary Passport",
-    paymentSponsor: "Сам заявитель",
-    paymentType: "Кредитная карта",
+    passportExpiry: "",
+    passportIssued: "",
+    passportIssueCountry: "",
+    passportIssuePlace: "",
+    passportNumber: "",
+    passportType: "",
+    paymentSponsor: "",
+    paymentType: "",
     previousSurname: "",
     previousVisaNumber: "",
-    previousBiometrics: "Нет",
+    previousBiometrics: "",
     previousBiometricsDate: "",
-    residenceCity: "MOSCOW",
+    residenceCity: "",
     residencePermitNumber: "",
     residencePermitType: "",
     residencePermitValidUntil: "",
-    residencePostalCode: "119991",
-    sex: "Мужской",
-    sponsorInHostFields: "Нет",
+    residencePostalCode: "",
+    sex: "",
+    sponsorInHostFields: "",
     sponsorMeans: "",
-    stayDuration: "9",
+    stayDuration: "",
     stayPurposeDetails: "",
-    stayPurpose: "TOURISM",
-    stayRoute: "MADRID - BARCELONA",
-    surname: nameParts.surname || "PETROV",
-    travelEnd: "31.07.2026",
-    travelStart: "22.07.2026",
-    visaType: "Шенгенская",
+    stayPurpose: "",
+    stayRoute: "",
+    surname: nameParts.surname,
+    travelEnd: "",
+    travelStart: "",
+    visaType: "",
   };
 }
 
@@ -568,6 +567,24 @@ function submissionFieldOptions(
 ) {
   const options = questionnaireField(applicant, fieldId)?.options;
   return options?.length ? options : fallback;
+}
+
+function isOpenQuestionnaireIssue(
+  issue: Submission["issues"][number],
+  applicantId: string,
+  sectionTitle?: string,
+  fieldLabel?: string,
+) {
+  if (issue.status !== "open") return false;
+  if (issue.target.applicantId !== applicantId) return false;
+  if (fieldLabel && issue.target.field !== fieldLabel) return false;
+  if (!sectionTitle) return true;
+
+  return (
+    issue.target.section === sectionTitle ||
+    issue.target.section === "Анкета" ||
+    issue.target.section === "Данные"
+  );
 }
 
 function questionnaireFormDataFromSubmission(
@@ -888,6 +905,12 @@ const focusableQuestionnaireFields: FocusableQuestionnaireField[] = [
     sectionId: "passport",
   },
   {
+    fieldId: "birth-date",
+    formKey: "dob",
+    labels: ["Дата рождения"],
+    sectionId: "personal",
+  },
+  {
     fieldId: "arrival-date",
     formKey: "travelStart",
     labels: ["Дата въезда"],
@@ -1104,7 +1127,12 @@ export function FigmaQuestionnaireScreen({
   const sections: Array<SectionTab & { id: SectionId }> = [
     { id: "files", meta: "3 файла", status: "complete", title: "Файлы" },
     { id: "appointment", meta: "7 полей", status: "pending", title: "Запись" },
-    { id: "personal", meta: "13 полей", status: "issue", title: "Личные данные" },
+    {
+      id: "personal",
+      meta: "13 полей",
+      status: sectionHasOpenIssue("Личные данные") ? "issue" : "complete",
+      title: "Личные данные",
+    },
     { id: "passport", meta: "6 полей", status: "complete", title: "Паспорт" },
     { id: "euRelative", meta: "2 поля", status: "pending", title: "Родственник ЕС" },
     { id: "contact", meta: "10 полей", status: "complete", title: "Адрес и контакты" },
@@ -1143,6 +1171,48 @@ export function FigmaQuestionnaireScreen({
     return fieldReviewState(label) === "needs_review"
       ? "замечание администратора"
       : undefined;
+  }
+
+  function sectionHasOpenIssue(sectionTitle: string) {
+    if (!activeApplicantModel) return false;
+
+    return submission.issues.some((issue) =>
+      isOpenQuestionnaireIssue(issue, activeApplicantModel.id, sectionTitle),
+    );
+  }
+
+  function activeField(fieldId: string) {
+    return questionnaireField(activeApplicantModel, fieldId);
+  }
+
+  function fieldIssue(sectionTitle: string, fieldLabel: string) {
+    if (!activeApplicantModel) return undefined;
+
+    return submission.issues.find((issue) =>
+      isOpenQuestionnaireIssue(issue, activeApplicantModel.id, sectionTitle, fieldLabel),
+    );
+  }
+
+  function modelFieldState(
+    fieldId: string,
+    sectionTitle: string,
+    fieldLabel: string,
+  ): FieldState {
+    if (fieldIssue(sectionTitle, fieldLabel)) return "invalid";
+
+    const field = activeField(fieldId);
+    if (field?.reviewState === "needs_review") {
+      return field.reviewSource === "pdf_reconciliation" ? "invalid" : "needs_review";
+    }
+
+    return fieldReviewState(fieldLabel);
+  }
+
+  function modelFieldReviewSource(fieldId: string, fieldLabel: string) {
+    const field = activeField(fieldId);
+    return field?.reviewState === "needs_review"
+      ? field.reviewSource
+      : fieldReviewSource(fieldLabel);
   }
 
   function goToNextSection() {
@@ -1442,8 +1512,8 @@ export function FigmaQuestionnaireScreen({
             number="1"
             options={selectOptions.occupation}
             required
-            reviewSource="employment_doc"
-            state="needs_review"
+            reviewSource={modelFieldReviewSource("occupation", "Профессия")}
+            state={modelFieldState("occupation", "Работа / учеба", "Профессия")}
             value={formData.occupation}
             onChange={(value) => updateField("occupation", value)}
           />
@@ -1795,7 +1865,8 @@ export function FigmaQuestionnaireScreen({
           label="Дата рождения"
           number="4"
           required
-          state={activeApplicant === applicants[0]?.id ? "invalid" : "normal"}
+          reviewSource={modelFieldReviewSource("birth-date", "Дата рождения")}
+          state={modelFieldState("birth-date", "Личные данные", "Дата рождения")}
           value={formData.dob}
           onChange={(value) => updateField("dob", value)}
         />
@@ -1804,8 +1875,8 @@ export function FigmaQuestionnaireScreen({
           label="Место рождения"
           number="5"
           required
-          reviewSource="passport_ocr"
-          state="needs_review"
+          reviewSource={modelFieldReviewSource("birth-place", "Место рождения")}
+          state={modelFieldState("birth-place", "Личные данные", "Место рождения")}
           value={formData.birthPlace}
           onChange={(value) => updateField("birthPlace", value)}
         />
@@ -2047,7 +2118,8 @@ export function FigmaQuestionnaireScreen({
                 </p>
               </div>
 
-              {activeSection === "personal" && activeApplicant === applicants[0]?.id ? (
+              {activeSection === "personal" &&
+              modelFieldState("birth-date", "Личные данные", "Дата рождения") === "invalid" ? (
                 <div className="v19-questionnaire-review-alert">
                   <div className="v19-questionnaire-review-strip" />
                   <div className="v19-questionnaire-review-icon">
@@ -2058,8 +2130,8 @@ export function FigmaQuestionnaireScreen({
                       Дата рождения не совпадает
                     </div>
                     <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
-                      PDF: <strong className="text-white/90 font-medium">15.05.1985</strong>.
-                      Анкета: <strong className="text-white/90 font-medium">12.05.1985</strong>.
+                      {fieldIssue("Личные данные", "Дата рождения")?.comment ||
+                        "Поле требует сверки с PDF перед отправкой."}
                     </p>
                   </div>
                 </div>
