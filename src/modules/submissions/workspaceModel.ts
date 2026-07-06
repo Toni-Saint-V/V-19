@@ -92,7 +92,6 @@ export function fileLabel(type: SubmissionFileType) {
   if (type === "selfie_2") return "Селфи 2";
   if (type === "selfie") return "Селфи 1";
   if (type === "passport_scan") return "Скан паспорта";
-  if (type === "pdf") return "PDF";
   if (type === "video") return "Видео";
   return fileTypeLabels[type];
 }
@@ -102,7 +101,6 @@ export function fileShortLabel(type: SubmissionFileType) {
   if (type === "selfie") return "Селфи 1";
   if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Паспорт";
-  if (type === "pdf") return "PDF";
   return "Видео";
 }
 

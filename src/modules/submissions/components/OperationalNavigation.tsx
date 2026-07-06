@@ -6,7 +6,6 @@ import {
   FileSpreadsheet,
   ImageIcon,
   Menu,
-  Plus,
   Settings,
   Search,
   Users,
@@ -16,8 +15,7 @@ import {
 } from "lucide-react";
 import visaOpsLogo from "../../../assets/visaflow-logo.png";
 import { cn } from "../../../shared/ui/cn";
-import { IconButton } from "../../../shared/ui/primitives";
-import { SideMenuButton } from "../../../shared/ui/SideMenuButton";
+import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
 
 export type OperationalNavTone = "default" | "danger" | "warning" | "success";
 export type OperationalSideMenuMode = "regular" | "compact";
@@ -107,38 +105,49 @@ export function OperationalSidebar({
       <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
         <span className="ops-nav-group-label">Работа</span>
         {items.map((item) => (
-          <SideMenuButton
-            active={item.active}
+          <Button
+            aria-current={item.active ? "page" : undefined}
+            aria-label={item.label}
             className={cn(
               "ops-nav-item opsu-nav-item",
               item.active && "is-active",
               item.tone && `tone-${item.tone}`,
             )}
-            collapsed={displayMode === "compact"}
-            count={item.count}
             data-nav-id={item.id}
-            description={item.meta}
             disabled={item.disabled}
-            icon={<OperationalIcon id={item.id} fallback={item.icon} />}
             key={item.id}
-            label={item.label}
-            labelText={item.label}
-            shortcut={item.quickAction}
-            tone={item.tone}
+            variant="ghost"
             onClick={item.onClick}
-          />
+          >
+            <span className="ops-nav-icon opsu-nav-icon" aria-hidden="true">
+              <OperationalIcon id={item.id} fallback={item.icon} />
+            </span>
+            <span className="ops-nav-copy opsu-nav-copy">
+              <strong>{item.label}</strong>
+            </span>
+            {typeof item.count === "number" ? (
+              <NavCount label={`${item.count}`}>{item.count}</NavCount>
+            ) : null}
+            {item.quickAction ? (
+              <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
+            ) : null}
+          </Button>
         ))}
       </nav>
       {createAction ? (
-        <SideMenuButton
-          appearance="action"
+        <Button
           className="ops-sidebar-create opsu-sidebar-create"
-          collapsed={displayMode === "compact"}
-          icon={<Plus aria-hidden="true" focusable="false" size={17} strokeWidth={2} />}
-          label={createAction.label}
-          labelText={createAction.label}
+          aria-label={createAction.label}
+          variant="plain"
           onClick={createAction.onClick}
-        />
+        >
+          <span aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </span>
+          <strong>{createAction.label}</strong>
+        </Button>
       ) : null}
       <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
     </aside>

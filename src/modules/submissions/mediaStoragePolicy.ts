@@ -17,7 +17,6 @@ const mediaStorageObjectTypes = new Set<MediaStorageObjectType>([
   "application_pdf",
   "appointment_pdf",
   "passport_scan",
-  "pdf",
   "selfie",
   "selfie_2",
   "visa_application_pdf",
@@ -29,12 +28,22 @@ const applicantStoragePrefix = "applicants";
 export const passportScanUploadMimeTypes = [
   "image/jpeg",
   "image/png",
+  "image/webp",
   "image/heic",
   "image/heif",
   "application/pdf",
 ] as const;
 export const passportScanUploadAccept = passportScanUploadMimeTypes.join(",");
-export const passportScanUploadFormatLabel = "JPEG, PNG, HEIC, HEIF или PDF";
+export const passportScanUploadFormatLabel = "JPEG, PNG, WEBP, HEIC, HEIF или PDF";
+const passportScanUploadExtensions = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "heic",
+  "heif",
+  "pdf",
+]);
 
 export interface MediaStorageTarget {
   bucket: typeof mediaStorageBucket;
@@ -76,17 +85,19 @@ function safePathSegment(value: string, label: string): string {
 }
 
 function extensionForFileName(fileName: string): string {
-  return fileName.split(".").at(-1)?.toLowerCase() ?? "";
+  const trimmed = fileName.trim();
+  const dotIndex = trimmed.lastIndexOf(".");
+  if (dotIndex < 0 || dotIndex === trimmed.length - 1) return "";
+  return trimmed.slice(dotIndex + 1).toLowerCase();
 }
 
 function allowedExtensions(type: MediaStorageObjectType): Set<string> {
   if (type === "application_pdf") return new Set(["pdf"]);
   if (type === "appointment_pdf") return new Set(["pdf"]);
-  if (type === "pdf") return new Set(["pdf"]);
   if (type === "visa_application_pdf") return new Set(["pdf"]);
   if (type === "passport_scan")
-    return new Set(["jpg", "jpeg", "png", "heic", "heif", "pdf"]);
-  return new Set(["jpg", "jpeg", "png", "heic", "heif"]);
+    return new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "pdf"]);
+  return new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
 }
 
 function allowedLegacyArchiveExtensions(type: string): Set<string> {
@@ -96,17 +107,17 @@ function allowedLegacyArchiveExtensions(type: string): Set<string> {
 function allowedMimeTypes(type: MediaStorageObjectType): Set<string> {
   if (type === "application_pdf") return new Set(["application/pdf"]);
   if (type === "appointment_pdf") return new Set(["application/pdf"]);
-  if (type === "pdf") return new Set(["application/pdf"]);
   if (type === "visa_application_pdf") return new Set(["application/pdf"]);
   if (type === "passport_scan")
     return new Set([
       "image/jpeg",
       "image/png",
+      "image/webp",
       "image/heic",
       "image/heif",
       "application/pdf",
     ]);
-  return new Set(["image/jpeg", "image/png", "image/heic", "image/heif"]);
+  return new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 }
 
 function allowedLegacyArchiveMimeTypes(type: string): Set<string> {
@@ -118,6 +129,7 @@ function allowedLegacyArchiveMimeTypes(type: string): Set<string> {
 function mimeTypeForExtension(extension: string): string | null {
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
   if (extension === "png") return "image/png";
+  if (extension === "webp") return "image/webp";
   if (extension === "heic") return "image/heic";
   if (extension === "heif") return "image/heif";
   if (extension === "mp4") return "video/mp4";
@@ -226,14 +238,15 @@ function hasExpectedGeneratedSuffix(
   fileName: string,
 ): boolean {
   if (type === "selfie")
-    return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png|heic|heif)$/.test(fileName);
+    return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png|webp|heic|heif)$/.test(fileName);
   if (type === "selfie_2")
-    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png|heic|heif)$/.test(fileName);
-  if (type === "passport_scan")
-    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|heic|heif|pdf)$/.test(
+    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png|webp|heic|heif)$/.test(
       fileName,
     );
-  if (type === "pdf") return /^[a-zA-Z0-9]+_pdf\.pdf$/.test(fileName);
+  if (type === "passport_scan")
+    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|webp|heic|heif|pdf)$/.test(
+      fileName,
+    );
   if (type === "application_pdf")
     return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_application_pdf\.pdf$/.test(fileName);
   if (type === "appointment_pdf")
@@ -293,16 +306,17 @@ export function validateMediaStorageTarget({
   }
 
   if (file) {
+    const fileType = file.type.trim();
     const mimeAllowed = isLegacyArchive
-      ? allowedLegacyArchiveMimeTypes(parsed.type).has(file.type)
-      : allowedMimeTypes(parsed.type as MediaStorageObjectType).has(file.type);
-    if (!mimeAllowed) {
+      ? allowedLegacyArchiveMimeTypes(parsed.type).has(fileType)
+      : allowedMimeTypes(parsed.type as MediaStorageObjectType).has(fileType);
+    if (fileType && !mimeAllowed) {
       throw new MediaStorageValidationError(
         `MIME type is not allowed for ${parsed.type}.`,
       );
     }
 
-    if (mimeTypeForExtension(extension) !== file.type) {
+    if (fileType && mimeTypeForExtension(extension) !== fileType) {
       throw new MediaStorageValidationError(
         "File MIME type must match the generated file extension.",
       );
@@ -323,6 +337,17 @@ export function validateMediaStorageTarget({
   }
 
   return target;
+}
+
+export function isPassportScanUploadFileAccepted(
+  file: Pick<File, "name" | "type">,
+): boolean {
+  const fileType = file.type.trim();
+  if (fileType) {
+    return allowedMimeTypes("passport_scan").has(fileType);
+  }
+
+  return passportScanUploadExtensions.has(extensionForFileName(file.name));
 }
 
 export function buildMediaStoragePath(

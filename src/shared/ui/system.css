@@ -27465,9 +27465,8 @@ p {
 }
 
 .v19-questionnaire-field-control.is-review {
-  border-color: var(--vf-ref-color-rgba-244-184-64-0neg-34);
-  background: var(--vf-bg-control, var(--vf-ref-color-hexneg-1a1c21));
-  box-shadow: inset 0 0 0 var(--vf-ref-size-1px) var(--vf-ref-color-rgba-244-184-64-0neg-09);
+  border-color: var(--vf-yellow-soft-border, var(--vf-ref-color-rgba-244-184-64-0neg-48));
+  background: var(--vf-yellow-soft-bg, var(--vf-ref-color-rgba-244-184-64-0neg-13));
 }
 
 .v19-questionnaire-field-control.is-invalid {

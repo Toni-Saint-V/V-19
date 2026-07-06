@@ -43,8 +43,6 @@ export function surfaceTitle(surface: Surface) {
   if (surface === "agent-issues") return "Замечания";
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка";
-  if (surface === "admin-intake") return "Загрузка списков / PDF";
-  if (surface === "admin-access") return "Заявки на доступ";
   if (surface === "settings") return "Настройки";
   return "Выгрузка";
 }
@@ -76,14 +74,6 @@ export function surfaceDescription(surface: Surface) {
 
   if (surface === "admin-review") {
     return "Админская очередь: новые проверки, полученные исправления и готовность к выгрузке.";
-  }
-
-  if (surface === "admin-intake") {
-    return "Загрузка листов записи, PDF анкет и план передачи пакетов агентам.";
-  }
-
-  if (surface === "admin-access") {
-    return "Новые агенты: список заявок, принятие и отказ в доступе.";
   }
 
   if (surface === "settings") {

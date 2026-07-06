@@ -63,7 +63,6 @@ export type MediaSlotType =
   | "selfie"
   | "selfie_2"
   | "passport_scan"
-  | "pdf"
   | "video";
 
 export type Tone =

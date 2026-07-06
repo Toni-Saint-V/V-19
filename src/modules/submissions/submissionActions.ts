@@ -148,7 +148,7 @@ export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
 export function cockpitUploadExtensionForMimeType(
   mimeType: string,
   fileType: SubmissionFileType,
-): "jpg" | "png" | "webp" | "pdf" | "mp4" {
+): "jpg" | "png" | "pdf" | "mp4" {
   if (
     !isCanonicalFrontendMediaType(fileType) &&
     !isRejectedLegacyMediaType(fileType)
@@ -156,9 +156,7 @@ export function cockpitUploadExtensionForMimeType(
     throw new Error("Unsupported media type for Package 1 upload slot.");
   }
   if (fileType === "passport_scan" && mimeType === "application/pdf") return "pdf";
-  if (fileType === "pdf" && mimeType === "application/pdf") return "pdf";
   if (fileType === "video" && mimeType === "video/mp4") return "mp4";
-  if (mimeType === "image/webp") return "webp";
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/jpeg") return "jpg";
   throw new Error("Unsupported media MIME type for this upload slot.");
@@ -981,7 +979,6 @@ function fileTypeName(type: SubmissionFile["type"]) {
   if (type === "selfie") return "Селфи 1";
   if (type === "selfie_2") return "Селфи 2";
   if (type === "passport_scan") return "Скан паспорта";
-  if (type === "pdf") return "PDF";
   return "Видео";
 }
 

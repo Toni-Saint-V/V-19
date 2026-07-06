@@ -15,7 +15,6 @@ export type SupabasePersistenceOperation =
   | "applicants.list"
   | "questionnaire_answers.list"
   | "media_assets.list"
-  | "submission_files.upsert"
   | "corrections.list"
   | "appointments.list"
   | "export_batches.insert"

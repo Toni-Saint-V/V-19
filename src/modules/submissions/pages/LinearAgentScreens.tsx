@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "../../../shared/ui/primitives";
-import { V19InfoStrip } from "../../../shared/ui/v19-product-kit";
 import { cn } from "../../../shared/ui/cn";
 import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
@@ -190,22 +189,27 @@ export function AgentDraftsScreen({
 
   return (
     <section className="vf-linear-screen vf-linear-screen--drafts">
-      <V19InfoStrip
-        className="vf-linear-metrics vf-linear-metrics--compact"
-        items={[
-          { label: "Файлы", value: `${readyFiles}/${totalFiles || 0}` },
-          { label: "Блокеры", tone: blockedSubmissions ? "warning" : "success", value: blockedSubmissions },
-          {
-            label: "Готовность",
-            value: `${
-              submissions.length
-                ? Math.round(submissions.reduce((sum, item) => sum + item.completeness.total, 0) / submissions.length)
-                : 0
-            }%`,
-          },
-        ]}
-        label="Сводка сбора документов"
-      />
+      <div className="vf-linear-metrics">
+        <article>
+          <small>Файлы собраны</small>
+          <strong>{readyFiles}/{totalFiles || 0}</strong>
+          <span>по текущей очереди</span>
+        </article>
+        <article>
+          <small>Пакеты с блокерами</small>
+          <strong>{blockedSubmissions}</strong>
+          <span>нужны действия агента</span>
+        </article>
+        <article>
+          <small>Средняя готовность</small>
+          <strong>
+            {submissions.length
+              ? Math.round(submissions.reduce((sum, item) => sum + item.completeness.total, 0) / submissions.length)
+              : 0}%
+          </strong>
+          <span>анкета + файлы</span>
+        </article>
+      </div>
 
       <LinearSectionHeader
         icon={<FileText size={18} strokeWidth={1.8} />}
@@ -395,15 +399,23 @@ export function AgentMediaScreen({
 
   return (
     <section className="vf-linear-screen vf-linear-screen--media">
-      <V19InfoStrip
-        className="vf-linear-metrics vf-linear-metrics--compact"
-        items={[
-          { label: "Загрузить", tone: missing ? "warning" : "success", value: missing },
-          { label: "Проверка", value: review },
-          { label: "Принято", tone: "success", value: accepted },
-        ]}
-        label="Сводка файлов"
-      />
+      <div className="vf-linear-metrics">
+        <article>
+          <small>Нужно загрузить/заменить</small>
+          <strong>{missing}</strong>
+          <span>медиа-слотов</span>
+        </article>
+        <article>
+          <small>На проверке</small>
+          <strong>{review}</strong>
+          <span>файлов ожидают решения</span>
+        </article>
+        <article>
+          <small>Принято</small>
+          <strong>{accepted}</strong>
+          <span>подтверждено админом</span>
+        </article>
+      </div>
 
       <LinearSectionHeader
         icon={<ImageIcon size={18} strokeWidth={1.8} />}
@@ -478,15 +490,23 @@ export function AgentIssuesScreen({
 
   return (
     <section className="vf-linear-screen vf-linear-screen--issues">
-      <V19InfoStrip
-        className="vf-linear-metrics vf-linear-metrics--compact"
-        items={[
-          { label: "Открыто", tone: open ? "warning" : "success", value: open },
-          { label: "Блокеры", tone: blockers ? "danger" : "neutral", value: blockers },
-          { label: "Исправлено", tone: fixed ? "success" : "neutral", value: fixed },
-        ]}
-        label="Сводка замечаний"
-      />
+      <div className="vf-linear-metrics">
+        <article>
+          <small>Открыто</small>
+          <strong>{open}</strong>
+          <span>ждут исправления</span>
+        </article>
+        <article>
+          <small>Блокеры</small>
+          <strong>{blockers}</strong>
+          <span>нельзя отправлять дальше</span>
+        </article>
+        <article>
+          <small>Исправлено</small>
+          <strong>{fixed}</strong>
+          <span>ожидают закрытия админом</span>
+        </article>
+      </div>
 
       <LinearSectionHeader
         icon={<MessageSquareWarning size={18} strokeWidth={1.8} />}
