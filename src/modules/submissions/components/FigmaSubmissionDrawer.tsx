@@ -24,7 +24,11 @@ import {
   UploadCloud,
   User,
 } from "lucide-react";
-import { getPrimaryAction, statusLabels } from "../status";
+import {
+  getPrimaryAction,
+  isSubmissionIssueResolved,
+  statusLabels,
+} from "../status";
 import { ProgressMeter } from "./CollectionPrimitives";
 import {
   V19DrawerHeader,
@@ -67,6 +71,12 @@ const drawerFocusableSelector = [
   "textarea:not([disabled])",
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
+
+function initialDesktopDrawerMotion() {
+  return typeof window !== "undefined"
+    ? window.matchMedia("(min-width: 1024px)").matches
+    : true;
+}
 
 function getDrawerFocusableElements(container: HTMLElement | null) {
   if (!container) return [];
@@ -682,6 +692,13 @@ const IssuesTab = ({
             const Icon = issue.type === "file" ? ImageIcon : FileText;
             const canMarkFixed =
               role === "agent" && issue.status === "open" && Boolean(onMarkIssueFixed);
+            const isIssueResolved = isSubmissionIssueResolved(submission, issue);
+            const fixBlockReason =
+              canMarkFixed && !isIssueResolved
+                ? issue.target.fileType
+                  ? "Сначала замените файл"
+                  : "Сначала исправьте цель"
+                : "";
 
             return (
             <div
@@ -720,10 +737,15 @@ const IssuesTab = ({
                 ) : null}
                 {canMarkFixed ? (
                   <button
+                    aria-disabled={!isIssueResolved}
+                    disabled={!isIssueResolved}
+                    title={fixBlockReason || undefined}
                     type="button"
-                    onClick={() => onMarkIssueFixed?.(issue.id)}
+                    onClick={() => {
+                      if (isIssueResolved) onMarkIssueFixed?.(issue.id);
+                    }}
                   >
-                    Отметить исправленным
+                    {isIssueResolved ? "Отметить исправленным" : fixBlockReason}
                   </button>
                 ) : null}
                 {!canMarkFixed && !(issue.type === "field" && issue.status === "open") ? (
@@ -847,6 +869,7 @@ export function FigmaSubmissionDrawer({
 }: FigmaSubmissionDrawerProps) {
   const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
   const [status, setStatus] = useState<"loading" | "success">("loading");
+  const [isDesktopDrawer, setIsDesktopDrawer] = useState(initialDesktopDrawerMotion);
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerTabsRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
@@ -858,15 +881,15 @@ export function FigmaSubmissionDrawer({
     ? { opacity: 0, x: 0, y: 0 }
     : {
         opacity: 0.5,
-        x: 0,
-        y: 0,
+        x: isDesktopDrawer ? "100%" : 0,
+        y: isDesktopDrawer ? 0 : "100%",
       };
   const drawerPanelExit = prefersReducedMotion
     ? { opacity: 0, x: 0, y: 0 }
     : {
         opacity: 0,
-        x: 0,
-        y: 0,
+        x: isDesktopDrawer ? "100%" : 0,
+        y: isDesktopDrawer ? 0 : "100%",
       };
   const drawerPanelTransition = prefersReducedMotion
     ? { duration: 0.01 }
@@ -889,6 +912,15 @@ export function FigmaSubmissionDrawer({
 
     setTab(tabIdForWorkspaceTarget(target));
   }, [onOpenQuestionnaireWorkspace, role]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const handleChange = () => setIsDesktopDrawer(query.matches);
+
+    handleChange();
+    query.addEventListener("change", handleChange);
+    return () => query.removeEventListener("change", handleChange);
+  }, []);
 
   useEffect(() => {
     previouslyFocusedElementRef.current =
