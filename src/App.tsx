@@ -3136,7 +3136,7 @@ function MainApp() {
   const pageHeaderDescription = workspaceSurfaceDescription;
 
   const pageHeaderActions = surface === "admin-review" || surface === "export" ? (
-    <div className="topbar-actions v19-admin-reference-topbar-actions">
+    <div className="topbar-actions v19-admin-reference-topbar-actions" aria-label="Администратор">
       <span aria-hidden="true">АД</span>
     </div>
   ) : surface === "agent-actions" || surface === "agent-submissions" ? (
