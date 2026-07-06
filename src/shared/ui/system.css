@@ -81,7 +81,28 @@
     .v19-admin-cockpit-lane
     > header
     > small {
-    display: none !important;
+    display: inline-flex !important;
+    min-height: var(--v19b-size-20) !important;
+    align-items: center !important;
+    padding: var(--v19b-size-0) var(--v19b-size-7) !important;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-pill) !important;
+    background: var(--v19b-color-control) !important;
+    color: transparent !important;
+    font-size: var(--v19b-size-0) !important;
+    line-height: var(--v19b-line-height-control) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-lane
+    > header
+    > small::before {
+    content: attr(data-mobile-label);
+    color: var(--v19b-color-text-muted);
+    font-size: var(--v19b-size-10);
+    font-weight: var(--v19b-weight-control);
+    line-height: var(--v19b-line-height-control);
+    white-space: nowrap;
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
@@ -99,48 +120,66 @@
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
     .v19-admin-cockpit-card-title
-    em,
+    .v19-admin-cockpit-card-city,
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-title
+    .v19-admin-cockpit-card-city-dot,
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
     .v19-admin-cockpit-chevron {
     display: none !important;
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-meta {
-    display: grid !important;
-    justify-items: end !important;
-    align-content: start !important;
-    gap: var(--v19b-size-2) !important;
-    max-width: var(--v19b-size-104) !important;
-    text-align: right !important;
-  }
-
-  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-meta
-    strong {
-    display: inline-flex !important;
-    min-height: var(--v19b-size-20) !important;
-    align-items: center !important;
-    padding: var(--v19b-size-0) var(--v19b-size-6) !important;
-    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
-    border-radius: var(--v19b-radius-pill) !important;
-    background: var(--v19b-color-control) !important;
-    color: var(--v19b-color-text-muted) !important;
+    .v19-admin-cockpit-card-title
+    em {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: var(--v19b-size-5) !important;
+    margin-top: var(--v19b-size-5) !important;
+    color: var(--v19b-color-text-faint) !important;
     font-size: var(--v19b-size-9) !important;
-    font-weight: var(--v19b-weight-control) !important;
-    line-height: var(--v19b-line-height-control) !important;
+    line-height: var(--v19b-line-height-tight) !important;
     white-space: nowrap !important;
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-    .v19-admin-cockpit-card-meta
-    span {
-    overflow: hidden !important;
-    max-width: var(--v19b-size-full) !important;
+    .v19-admin-cockpit-card-title
+    em
+    svg {
+    width: var(--v19b-size-10) !important;
+    height: var(--v19b-size-10) !important;
     color: var(--v19b-color-text-faint) !important;
-    font-size: var(--v19b-size-9) !important;
-    font-weight: var(--v19b-weight-regular) !important;
-    line-height: var(--v19b-line-height-tight) !important;
+    flex: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-title
+    em
+    i {
+    width: var(--v19b-size-3) !important;
+    height: var(--v19b-size-3) !important;
+    flex: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-next {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-next
+    > span {
+    flex: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-next
+    p {
+    min-width: var(--v19b-size-0) !important;
+    margin: var(--v19b-size-0) !important;
+    color: var(--v19b-color-text-faint) !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }

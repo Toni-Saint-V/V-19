@@ -1880,6 +1880,7 @@ function AdminReviewLaneColumn({
   onOpen: (submission: Submission, triage: AdminTriageRadarItem) => void;
 }) {
   const Icon = lane.icon;
+  const mobileLaneLabel = items[0]?.submission.city ?? String(items.length);
 
   return (
     <section className={`v19-admin-cockpit-lane tone-${lane.tone}`}>
@@ -1891,7 +1892,7 @@ function AdminReviewLaneColumn({
           <strong>{lane.title}</strong>
           <em>{lane.subtitle}</em>
         </div>
-        <small>{items.length}</small>
+        <small data-mobile-label={mobileLaneLabel}>{items.length}</small>
       </header>
       <div className="v19-admin-cockpit-lane-body">
         {items.length ? (
@@ -1939,8 +1940,8 @@ function AdminReviewQueueCard({
           <span>
             <strong className="mono">{submission.id}</strong>
             <i aria-hidden="true" />
-            <strong>{submission.city}</strong>
-            <i aria-hidden="true" />
+            <strong className="v19-admin-cockpit-card-city">{submission.city}</strong>
+            <i className="v19-admin-cockpit-card-city-dot" aria-hidden="true" />
             <strong>{submission.updatedAt}</strong>
           </span>
           <h3>{formatSubmissionListTitle(submission)}</h3>
@@ -1960,10 +1961,6 @@ function AdminReviewQueueCard({
             />
             {agentOwnerDisplayName(submission.agentId)}
           </em>
-        </div>
-        <div className="v19-admin-cockpit-card-meta" aria-label="Заявитель и агент">
-          <strong>{applicantCountLabel(submission.applicants.length)}</strong>
-          <span>{agentOwnerDisplayName(submission.agentId)}</span>
         </div>
         <ChevronRight
           aria-hidden="true"
