@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   buildExportPackageIdentity,
 } from "../../src/modules/submissions/exportRules";
@@ -9,6 +9,11 @@ import {
   type ExportMediaZipDownloader,
 } from "../../src/modules/submissions/exportMediaZip";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import {
+  clearSubmissions,
+  loadSubmissions,
+  saveSubmissions,
+} from "../../src/modules/submissions/persistence";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import { mediaStorageBucket } from "../../src/modules/submissions/mediaStorage";
 import type {
@@ -17,6 +22,19 @@ import type {
 } from "../../src/modules/submissions/types";
 
 const canonicalTypes = ["passport_scan", "selfie", "selfie_2"] as const;
+let storageMap: Map<string, string> | null = null;
+
+function installLocalStorage() {
+  storageMap = new Map();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storageMap?.get(key) ?? null,
+      removeItem: (key: string) => storageMap?.delete(key),
+      setItem: (key: string, value: string) => storageMap?.set(key, value),
+    },
+  });
+}
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -86,6 +104,14 @@ async function zipEntryNames(blob: Blob): Promise<{
 }
 
 describe("export media mega ZIP", () => {
+  afterEach(() => {
+    if (storageMap) {
+      clearSubmissions();
+      storageMap = null;
+    }
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
   test("puts a single applicant under the applicants folder", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
     const result = await createExportMediaZipArtifact(selection, {
@@ -169,6 +195,34 @@ describe("export media mega ZIP", () => {
       names.fileNames.every((name) => name.startsWith("Семьи/01_SUB-1102_")),
     ).toBe(true);
     expect(new Set(names.fileNames.map((name) => name.split("/")[2])).size).toBe(3);
+  });
+
+  test("migrates saved local demo family media identity for browser rechecks", async () => {
+    installLocalStorage();
+    const staleFamily = {
+      ...byId("SUB-1102"),
+      files: byId("SUB-1102").files.map((file) => ({
+        ...file,
+        generatedFileName: undefined,
+        storageBucket: undefined,
+        storagePath: undefined,
+      })),
+    };
+    saveSubmissions([staleFamily]);
+
+    const loadedFamily = loadSubmissions()[0] as Submission;
+    const selection = generatedSelection(loadedFamily);
+    const result = await createExportMediaZipArtifact(selection, {
+      expectedIdentity: identityFor(selection),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+    expect(result.artifact).toMatchObject({
+      applicantCount: 3,
+      fileCount: 9,
+      submissionCount: 1,
+    });
   });
 
   test("groups mixed export packages into families and applicants folders", async () => {
