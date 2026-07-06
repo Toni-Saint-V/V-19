@@ -2748,13 +2748,16 @@ function ExportGuardItem({
 }
 
 export function LegacyExportScreen({
+  canDownloadMediaZip = false,
   exportBusy = false,
   exportError = "",
   exportPlan,
   exportTab,
   filterControl,
   historyList,
+  mediaZipBusy = false,
   onDownload,
+  onDownloadMediaZip,
   onGenerate,
   onChoosePackage,
   onMarkExported,
@@ -2765,13 +2768,16 @@ export function LegacyExportScreen({
   searchControl,
   selectedExportIds,
 }: {
+  canDownloadMediaZip?: boolean;
   exportBusy?: boolean;
   exportError?: string;
   exportPlan: ExportSummary;
   exportTab: ExportTab;
   filterControl?: ReactNode;
   historyList: Submission[];
+  mediaZipBusy?: boolean;
   onDownload: () => void;
+  onDownloadMediaZip?: () => void;
   onGenerate: () => void;
   onChoosePackage: (id: string) => void;
   onMarkExported: () => void;
@@ -2784,7 +2790,12 @@ export function LegacyExportScreen({
 }) {
   const actionHint =
     exportError ||
-    (exportBusy ? "Формируем и проверяем Excel-файл..." : exportActionHint(exportPlan));
+    (mediaZipBusy
+      ? "Формируем ZIP-файл..."
+      : exportBusy
+        ? "Формируем и проверяем Excel-файл..."
+        : exportActionHint(exportPlan));
+  const exportActionBusy = exportBusy || mediaZipBusy;
   const packageFacts = exportPackageFacts(exportPlan);
   const previewColumns = exportPlan.preview.headers.slice(0, 9);
   const previewRows = exportPlan.preview.rows.slice(0, 4);
@@ -2966,7 +2977,7 @@ export function LegacyExportScreen({
                           aria-label="Выбрать все совместимые"
                           checked={allReadySelected}
                           className="checkbox"
-                          disabled={exportBusy || visibleReadyList.length === 0}
+                          disabled={exportActionBusy || visibleReadyList.length === 0}
                           type="checkbox"
                           onChange={(event) =>
                             handleToggleAllReady(event.currentTarget.checked)
@@ -3001,7 +3012,7 @@ export function LegacyExportScreen({
                               aria-label={`Выбрать ${submission.title}`}
                               checked={selected}
                               className="checkbox"
-                              disabled={exportBusy}
+                              disabled={exportActionBusy}
                               type="checkbox"
                               onChange={() => onToggle(submission.id)}
                             />
@@ -3240,24 +3251,34 @@ export function LegacyExportScreen({
             footer={
               <PanelActionFooter
                 primary={{
-                  disabled: exportBusy || !exportPlan.canGenerate,
+                  disabled: exportActionBusy || !exportPlan.canGenerate,
                   disabledReason:
-                    !exportPlan.canGenerate || exportBusy ? actionHint : undefined,
+                    !exportPlan.canGenerate || exportActionBusy ? actionHint : undefined,
                   label: "Сформировать Excel",
                   onClick: onGenerate,
                 }}
                 secondary={[
                   {
-                    disabled: exportBusy || !exportPlan.canDownload,
+                    disabled: exportActionBusy || !exportPlan.canDownload,
                     disabledReason:
-                      !exportPlan.canDownload || exportBusy ? actionHint : undefined,
+                      !exportPlan.canDownload || exportActionBusy ? actionHint : undefined,
                     label: "Скачать Excel",
                     onClick: onDownload,
                   },
                   {
-                    disabled: exportBusy || !exportPlan.canMarkExported,
+                    disabled:
+                      exportActionBusy || !canDownloadMediaZip || !onDownloadMediaZip,
                     disabledReason:
-                      !exportPlan.canMarkExported || exportBusy
+                      !canDownloadMediaZip || exportActionBusy
+                        ? actionHint
+                        : undefined,
+                    label: "Скачать ZIP файлов",
+                    onClick: onDownloadMediaZip ?? (() => undefined),
+                  },
+                  {
+                    disabled: exportActionBusy || !exportPlan.canMarkExported,
+                    disabledReason:
+                      !exportPlan.canMarkExported || exportActionBusy
                         ? actionHint
                         : undefined,
                     label: "Отметить выгружено",
@@ -3439,13 +3460,16 @@ export function ExportScreen(props: Parameters<typeof LegacyExportScreen>[0]) {
 }
 
 function AdminExportReferenceCockpit({
+  canDownloadMediaZip = false,
   exportBusy = false,
   exportError = "",
   exportPlan,
   exportTab,
   filterControl,
   historyList,
+  mediaZipBusy = false,
   onDownload,
+  onDownloadMediaZip,
   onGenerate,
   onChoosePackage,
   onMarkExported,
@@ -3497,13 +3521,18 @@ function AdminExportReferenceCockpit({
   );
   const selectedWarnings = exportPlan.warnings.length;
   const hasExportBlockers = exportPlan.blockers.length > 0;
+  const exportActionBusy = exportBusy || mediaZipBusy;
   const allReadySelected =
     exportReadyList.length > 0 &&
     exportReadyList.every((submission) => selectedExportIdSet.has(submission.id));
   const packageFacts = exportPackageFacts(exportPlan);
   const actionHint =
     exportError ||
-    (exportBusy ? "Формируем и проверяем Excel-файл..." : exportActionHint(exportPlan));
+    (mediaZipBusy
+      ? "Формируем ZIP-файл..."
+      : exportBusy
+        ? "Формируем и проверяем Excel-файл..."
+        : exportActionHint(exportPlan));
   const activeBlockers = activeSubmission ? getExportBlockers([activeSubmission]) : [];
   const showingHistory = exportTab === "history";
   const selectedComposition =
@@ -3624,7 +3653,7 @@ function AdminExportReferenceCockpit({
               className={`v19-admin-export-checkbox ${allReadySelected ? "is-selected" : ""}`}
               type="button"
               aria-label="Выбрать все совместимые"
-              disabled={exportBusy || exportReadyList.length === 0}
+              disabled={exportActionBusy || exportReadyList.length === 0}
               onClick={toggleAllReady}
             >
               {allReadySelected ? (
@@ -3648,7 +3677,7 @@ function AdminExportReferenceCockpit({
                     history
                     key={submission.id}
                     submission={submission}
-                    disabled={exportBusy}
+                    disabled={exportActionBusy}
                     onOpen={() => onOpen(submission, "files")}
                   />
                 ))
@@ -3661,7 +3690,7 @@ function AdminExportReferenceCockpit({
                   <AdminExportRow
                     key={submission.id}
                     submission={submission}
-                    disabled={exportBusy}
+                    disabled={exportActionBusy}
                     selected={selectedExportIdSet.has(submission.id)}
                     onOpen={() => onOpen(submission)}
                     onToggle={() => onToggle(submission.id)}
@@ -3670,7 +3699,7 @@ function AdminExportReferenceCockpit({
                 {exportBlockedList.map((submission) => (
                   <AdminExportRow
                     blockedReason={exportBlockedReason(submission)}
-                    disabled={exportBusy}
+                    disabled={exportActionBusy}
                     key={submission.id}
                     submission={submission}
                     onOpen={() => onOpen(submission, "issues")}
@@ -3892,7 +3921,7 @@ function AdminExportReferenceCockpit({
           <button
             className="v19-admin-export-primary-action"
             type="button"
-            disabled={exportBusy || !exportPlan.canGenerate}
+            disabled={exportActionBusy || !exportPlan.canGenerate}
             aria-describedby="export-action-hint"
             onClick={onGenerate}
           >
@@ -3909,14 +3938,21 @@ function AdminExportReferenceCockpit({
           <div className="v19-admin-export-secondary-actions">
             <button
               type="button"
-              disabled={exportBusy || !exportPlan.canDownload}
+              disabled={exportActionBusy || !exportPlan.canDownload}
               onClick={onDownload}
             >
               Скачать Excel
             </button>
             <button
               type="button"
-              disabled={exportBusy || !exportPlan.canMarkExported}
+              disabled={exportActionBusy || !canDownloadMediaZip || !onDownloadMediaZip}
+              onClick={onDownloadMediaZip}
+            >
+              Скачать ZIP файлов
+            </button>
+            <button
+              type="button"
+              disabled={exportActionBusy || !exportPlan.canMarkExported}
               onClick={onMarkExported}
             >
               Отметить выгружено
@@ -3935,10 +3971,18 @@ function AdminExportReferenceCockpit({
         </button>
         <button
           type="button"
-          disabled={exportBusy || !exportPlan.canGenerate}
+          disabled={exportActionBusy || !exportPlan.canGenerate}
           onClick={onGenerate}
         >
           {exportBusy ? "Excel..." : "Выгрузить"}
+        </button>
+        <button
+          aria-label="Скачать ZIP файлов"
+          type="button"
+          disabled={exportActionBusy || !canDownloadMediaZip || !onDownloadMediaZip}
+          onClick={onDownloadMediaZip}
+        >
+          ZIP
         </button>
       </div>
 

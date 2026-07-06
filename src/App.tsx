@@ -499,6 +499,7 @@ function MainApp() {
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
   const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
   const [exportBusy, setExportBusy] = useState(false);
+  const [mediaZipBusy, setMediaZipBusy] = useState(false);
   const [exportError, setExportError] = useState("");
   const [passportReviewRequest, setPassportReviewRequest] =
     useState<PassportReviewRequest | null>(null);
@@ -662,6 +663,10 @@ function MainApp() {
   );
   const selectedVisibleExportIds = selectedForExport.map((submission) => submission.id);
   const exportPlan = exportSummary(selectedForExport);
+  const canDownloadMediaZip =
+    exportPlan.ready &&
+    (exportPlan.exportState === "file_generated" ||
+      exportPlan.exportState === "file_downloaded");
   const showRoleSwitcher = canShowLocalDemoRoleSwitch({
     env: import.meta.env,
     isSupabaseMode,
@@ -2542,7 +2547,7 @@ function MainApp() {
   }
 
   function toggleExportSelection(id: string) {
-    if (exportBusy) return;
+    if (exportBusy || mediaZipBusy) return;
 
     setSelectedExportIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
@@ -2550,14 +2555,14 @@ function MainApp() {
   }
 
   function chooseExportPackage(id: string) {
-    if (exportBusy) return;
+    if (exportBusy || mediaZipBusy) return;
 
     selectedExportIdsRef.current = [id];
     setSelectedExportIds([id]);
   }
 
   async function generateExport() {
-    if (!exportPlan.canGenerate || exportBusy) return;
+    if (!exportPlan.canGenerate || exportBusy || mediaZipBusy) return;
 
     setExportBusy(true);
     setExportError("");
@@ -2629,7 +2634,7 @@ function MainApp() {
   }
 
   async function downloadExport() {
-    if (!exportPlan.canDownload) return;
+    if (!exportPlan.canDownload || mediaZipBusy) return;
 
     setExportError("");
 
@@ -2667,8 +2672,35 @@ function MainApp() {
     });
   }
 
+  async function downloadMediaZip() {
+    if (!canDownloadMediaZip || exportBusy || mediaZipBusy) return;
+
+    setMediaZipBusy(true);
+    setExportError("");
+
+    try {
+      const { default: downloadExportMediaZip } = await import(
+        "./modules/submissions/exportMediaZip"
+      );
+      const currentSelectedIds = selectedExportIdsRef.current;
+      const currentSelection = selectedReadySubmissionsForExport(
+        submissionsRef.current,
+        currentSelectedIds,
+      );
+      const currentIdentity = buildExportPackageIdentity(currentSelection);
+      const result = await downloadExportMediaZip(currentSelection, currentIdentity);
+      if (!result.ok) {
+        return setExportError(result.safeMessage);
+      }
+    } catch {
+      return setExportError("Не удалось скачать ZIP файлов. Повторите попытку.");
+    } finally {
+      setMediaZipBusy(false);
+    }
+  }
+
   async function markExported() {
-    if (!exportPlan.canMarkExported || exportBusy) return;
+    if (!exportPlan.canMarkExported || exportBusy || mediaZipBusy) return;
     const selectedIds = new Set(selectedVisibleExportIds);
     const selectedSubmissions = submissions.filter((submission) =>
       selectedIds.has(submission.id),
@@ -3463,12 +3495,14 @@ function MainApp() {
 
         {surface === "export" ? (
           <ExportScreen
+            canDownloadMediaZip={canDownloadMediaZip}
             exportPlan={exportPlan}
             exportTab={exportTab}
             exportBusy={exportBusy}
             exportError={exportError}
             historyList={historyList}
             onDownload={downloadExport}
+            onDownloadMediaZip={downloadMediaZip}
             onGenerate={generateExport}
             onChoosePackage={chooseExportPackage}
             onMarkExported={markExported}
@@ -3477,6 +3511,7 @@ function MainApp() {
             onToggle={toggleExportSelection}
             filterControl={adminFilterControl}
             readyList={readyList}
+            mediaZipBusy={mediaZipBusy}
             searchControl={adminSearchControl}
             selectedExportIds={selectedVisibleExportIds}
           />

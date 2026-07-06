@@ -28,6 +28,7 @@ import { saveSubmissionDraft } from "../../src/services/submissionService";
 import {
   buildMediaStoragePath,
   deleteMediaFromStorage,
+  downloadMediaFromStorage,
   uploadMediaToStorage,
 } from "../../src/services/storageService";
 
@@ -173,6 +174,41 @@ describe("Supabase persistence failure paths", () => {
         operation: "storage.delete_media",
         kind: "storage",
         safeCode: "storage.delete_media:storage:S3Error",
+        retryable: true,
+      },
+      userMessage: "Supabase storage could not complete the file action.",
+    });
+  });
+
+  test("wraps Storage download failures with safe diagnostics", async () => {
+    supabaseMock.client = {
+      storage: {
+        from: () => ({
+          download: async () => ({
+            data: null,
+            error: {
+              name: "StorageApiError",
+              code: "S3Error",
+              statusCode: 500,
+              message: "download backend stack trace",
+            },
+          }),
+        }),
+      },
+    };
+
+    const target = buildMediaStoragePath(
+      "VF-1044",
+      "applicant-1",
+      "selfie",
+      "751234567_selfie.jpg",
+    );
+
+    await expect(downloadMediaFromStorage(target)).rejects.toMatchObject({
+      diagnostics: {
+        operation: "storage.download_media",
+        kind: "storage",
+        safeCode: "storage.download_media:storage:S3Error",
         retryable: true,
       },
       userMessage: "Supabase storage could not complete the file action.",
