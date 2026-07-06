@@ -388,7 +388,19 @@ function sortedSubmissionIds(submissions: Submission[]): string[] {
 }
 
 function sortSubmissionsForExport(submissions: Submission[]): Submission[] {
-  return [...submissions].sort((left, right) => left.id.localeCompare(right.id));
+  return [...submissions]
+    .map((submission, index) => ({ index, submission }))
+    .sort((left, right) => {
+      const leftRank = left.submission.type === "family" ? 0 : 1;
+      const rightRank = right.submission.type === "family" ? 0 : 1;
+
+      return (
+        leftRank - rightRank ||
+        left.submission.id.localeCompare(right.submission.id) ||
+        left.index - right.index
+      );
+    })
+    .map((item) => item.submission);
 }
 
 function sameStringSet(left: string[], right: string[]): boolean {

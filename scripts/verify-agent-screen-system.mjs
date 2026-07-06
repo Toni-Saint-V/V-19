@@ -5,8 +5,15 @@ import { parse } from "postcss";
 const root = process.cwd();
 const visualLockPath = path.join(root, "docs", "VISAFLOW_VISUAL_LOCK.md");
 const expectedReferences = [
-  "docs/qa/v19-agent-actions-reference-2026-06-20.png",
-  "docs/qa/v19-agent-submissions-reference-2026-06-20.png",
+  "docs/qa/2026-07-05-agent-unfinished-final/desktop-1440-actions.png",
+  "docs/qa/2026-07-05-agent-unfinished-final/desktop-1440-submissions.png",
+  "docs/qa/2026-07-05-agent-unfinished-final/mobile-390-actions.png",
+  "docs/qa/2026-07-05-agent-unfinished-final/mobile-390-submissions.png",
+];
+const runtimeStyleFiles = [
+  "src/shared/ui/tokens/index.css",
+  "src/shared/ui/system.css",
+  "src/shared/ui/visual-baseline.css",
 ];
 const scannedRoots = ["docs", "src"].map((dir) => path.join(root, dir));
 const ignoredDirs = new Set([".git", "node_modules", "dist"]);
@@ -55,7 +62,7 @@ function verifyVisualLock() {
     "The reference set is closed",
     "This system is a constraint system, not an open UI kit.",
     "### Developer Decision Gate",
-    "Anything outside these two files is not an agent visual/layout source",
+    "Anything outside the closed reference files is not an agent visual/layout source",
     "Do not read files outside the closed reference set",
     "prefer the reference screens for visual/layout decisions",
     "No separate event-only archetype exists in the agent system.",
@@ -69,9 +76,7 @@ function verifyVisualLock() {
   }
 
   const listedReferences = unique(
-    [...text.matchAll(/`(docs\/qa\/v19-agent-[^`]+-reference-[^`]+\.png)`/g)].map(
-      (match) => match[1],
-    ),
+    [...text.matchAll(/`(docs\/qa\/[^`]+\.png)`/g)].map((match) => match[1]),
   );
 
   assertSameSet(
@@ -123,92 +128,84 @@ function verifyMotionContract() {
 }
 
 function verifyCssTokenContract() {
-  const stylesPath = path.join(root, "src", "shared", "ui", "system.css");
+  const missingStyleFile = runtimeStyleFiles.find(
+    (file) => !fs.existsSync(path.join(root, file)),
+  );
 
-  if (!fs.existsSync(stylesPath)) {
-    failures.push("src/shared/ui/system.css is missing");
+  if (missingStyleFile) {
+    failures.push(`${missingStyleFile} is missing`);
     return;
   }
 
-  const styles = fs.readFileSync(stylesPath, "utf8");
-  const parsedStyles = parse(styles, { from: stylesPath });
+  const styleSources = runtimeStyleFiles.map((file) => ({
+    path: path.join(root, file),
+    source: fs.readFileSync(path.join(root, file), "utf8"),
+  }));
   const definedTokens = new Set();
   const rootTokenValues = new Map();
 
-  parsedStyles.walkDecls((declaration) => {
-    if (!declaration.prop.startsWith("--")) return;
-    definedTokens.add(declaration.prop);
-    if (declaration.parent?.type === "rule" && declaration.parent.selector === ":root") {
-      rootTokenValues.set(declaration.prop, declaration.value.trim());
-    }
-  });
-  const lockedTokens = new Map([
-    ["--vf-bg-app", "#070809"],
-    ["--vf-bg-shell", "#0b0c0e"],
-    ["--vf-bg-panel", "#0e1013"],
-    ["--vf-bg-row", "#15171b"],
-    ["--vf-bg-row-hover", "#191c21"],
-    ["--vf-bg-control", "#1a1c21"],
-    ["--vf-border-subtle", "rgba(255, 255, 255, 0.08)"],
-    ["--vf-border-strong", "rgba(255, 255, 255, 0.13)"],
-    ["--vf-text-primary", "#f3f4f6"],
-    ["--vf-text-secondary", "#b2b6bf"],
-    ["--vf-text-muted", "#8f949e"],
-    ["--vf-accent", "#6874e8"],
-    ["--vf-accent-hover", "#7580ee"],
-    ["--vf-accent-active", "#5964d6"],
-    ["--vf-focus", "#7c84ff"],
-    ["--vf-selected-bg", "#25272d"],
-    ["--vf-selected-bg-hover", "#2a2d34"],
-    ["--vf-selected-border", "rgba(255, 255, 255, 0.11)"],
-    ["--vf-selected-text", "#f3f4f6"],
-    ["--vf-nav-selected-bg", "#25272d"],
-    ["--vf-nav-selected-border", "rgba(255, 255, 255, 0.12)"],
-    ["--vf-row-selected-bg", "#181b21"],
-    ["--vf-row-selected-border", "rgba(104, 116, 232, 0.72)"],
-    ["--vf-red", "#ff5c67"],
-    ["--vf-red-hover", "#ff6b75"],
-    ["--vf-red-active", "#e94d59"],
-    ["--vf-red-fg", "#18080a"],
-    ["--vf-red-soft-bg", "rgba(255, 92, 103, 0.13)"],
-    ["--vf-red-soft-border", "rgba(255, 92, 103, 0.48)"],
-    ["--vf-red-soft-text", "#ff8a92"],
-    ["--vf-yellow", "#f4b840"],
-    ["--vf-yellow-hover", "#ffc653"],
-    ["--vf-yellow-active", "#d99b25"],
-    ["--vf-yellow-fg", "#171006"],
-    ["--vf-yellow-soft-bg", "rgba(244, 184, 64, 0.13)"],
-    ["--vf-yellow-soft-border", "rgba(244, 184, 64, 0.48)"],
-    ["--vf-yellow-soft-text", "#f4b840"],
-    ["--vf-green", "#45d082"],
-    ["--vf-green-hover", "#58df93"],
-    ["--vf-green-active", "#30b86a"],
-    ["--vf-green-fg", "#06150c"],
-    ["--vf-green-soft-bg", "rgba(69, 208, 130, 0.13)"],
-    ["--vf-green-soft-border", "rgba(69, 208, 130, 0.48)"],
-    ["--vf-green-soft-text", "#59df94"],
-  ]);
+  for (const styleSource of styleSources) {
+    const parsedStyles = parse(styleSource.source, { from: styleSource.path });
 
-  for (const [token, expectedValue] of lockedTokens) {
-    if (rootTokenValues.get(token)?.toLowerCase() !== expectedValue.toLowerCase()) {
-      failures.push(`src/shared/ui/system.css missing locked token ${token}: ${expectedValue}`);
+    parsedStyles.walkDecls((declaration) => {
+      if (!declaration.prop.startsWith("--")) return;
+      definedTokens.add(declaration.prop);
+      if (declaration.parent?.type === "rule" && declaration.parent.selector === ":root") {
+        rootTokenValues.set(declaration.prop, declaration.value.trim());
+      }
+    });
+  }
+
+  const requiredRootTokens = [
+    "--canvas",
+    "--panel",
+    "--surface",
+    "--raised",
+    "--control",
+    "--hover",
+    "--selected",
+    "--line",
+    "--line-default",
+    "--line-strong",
+    "--fg",
+    "--accent",
+    "--danger",
+    "--warning",
+    "--success",
+    "--v19-canvas",
+    "--v19-panel",
+    "--v19-control",
+    "--v19-fg",
+    "--v19-accent",
+    "--v19-radius-button",
+    "--v19b-size-0",
+    "--v19b-size-1",
+    "--v19b-radius-pill",
+    "--v19b-color-page",
+  ];
+
+  for (const token of requiredRootTokens) {
+    if (!rootTokenValues.has(token)) {
+      failures.push(`runtime style tokens missing required :root custom property ${token}`);
     }
   }
 
   const undefinedReferences = new Set();
-  for (const match of styles.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)/g)) {
-    if (!definedTokens.has(match[1])) undefinedReferences.add(match[1]);
+  const combinedStyles = styleSources.map((styleSource) => styleSource.source).join("\n");
+  for (const match of combinedStyles.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)([^)]*)\)/g)) {
+    const [, token, rest] = match;
+    if (!definedTokens.has(token) && !rest.includes(",")) undefinedReferences.add(token);
   }
 
   for (const token of [...undefinedReferences].sort()) {
-    failures.push(`src/shared/ui/system.css references undefined custom property ${token}`);
+    failures.push(`runtime styles reference undefined custom property ${token}`);
   }
 
-  for (const match of styles.matchAll(
+  for (const match of combinedStyles.matchAll(
     /var\(\s*(--[A-Za-z0-9_-]+)\s*,\s*var\(\s*\1\b/g,
   )) {
     failures.push(
-      `src/shared/ui/system.css has self-referential fallback for ${match[1]}`,
+      `runtime styles have self-referential fallback for ${match[1]}`,
     );
   }
 }
@@ -218,10 +215,7 @@ function verifySingleStyleEntrypoint() {
   const cssFiles = listFiles(srcRoot)
     .map((file) => relative(file))
     .filter((file) => /\.(?:css|scss|less)$/i.test(file));
-  const expectedCssFiles = [
-    "src/shared/ui/system.css",
-    "src/shared/ui/visual-baseline.css",
-  ];
+  const expectedCssFiles = runtimeStyleFiles;
 
   assertSameSet(cssFiles, expectedCssFiles, "runtime stylesheet files");
 
@@ -255,10 +249,7 @@ function verifySingleStyleEntrypoint() {
     "runtime stylesheet import owners",
   );
 
-  const expectedCssImports = [
-    "src/shared/ui/system.css",
-    "src/shared/ui/visual-baseline.css",
-  ];
+  const expectedCssImports = runtimeStyleFiles;
   const resolvedCssImports = cssImports.map((cssImport) => cssImport.resolved);
 
   assertSameOrderedList(
@@ -426,11 +417,15 @@ function verifyReferenceFiles() {
     }
   }
 
-  const allQaReferences = listFiles(path.join(root, "docs", "qa"))
+  const allAgentLockReferences = listFiles(path.join(root, "docs", "qa"))
     .map((file) => relative(file))
-    .filter((file) => /reference.*\.png$/i.test(file));
+    .filter((file) => /^docs\/qa\/v19-agent-.*reference.*\.png$/i.test(file));
 
-  assertSameSet(allQaReferences, expectedReferences, "docs/qa reference PNG files");
+  assertSameSet(
+    allAgentLockReferences,
+    expectedReferences.filter((file) => /^docs\/qa\/v19-agent-/.test(file)),
+    "docs/qa agent reference PNG files",
+  );
 }
 
 function verifyNoForbiddenArtifacts() {

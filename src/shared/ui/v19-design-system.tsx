@@ -1054,7 +1054,6 @@ export function V19FamilyProfileCard({
   members,
   metaItems,
   nextActionLabel,
-  onMemberOpen,
   onOpen,
   packageLabel,
   progressItems,
@@ -1087,13 +1086,6 @@ export function V19FamilyProfileCard({
       onKeyDown={(event) => activateKeyboardCard(event, () => onOpen?.())}
     >
       <V19DossierMetaRow items={metaItems} />
-      <span className="vf-figma-family-footer">
-        <span>{footerActivityLabel ?? footerLabel}</span>
-        <em>
-          <Folder aria-hidden="true" size={17} />
-          {packageLabel}
-        </em>
-      </span>
       <span className="vf-figma-family-head">
         <span className="vf-figma-family-icon">
           <Users aria-hidden="true" size={26} />
@@ -1105,26 +1097,28 @@ export function V19FamilyProfileCard({
       </span>
       <span className="vf-figma-member-list">
         {members.map((member) => (
-          <button
-            aria-label={`Открыть заявителя: ${member.name}, ${title}`}
+          <span
+            aria-label={`Заявитель: ${member.name}, ${title}`}
             className="vf-figma-member-row"
             key={`${member.name}-${member.role}`}
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMemberOpen?.();
-            }}
           >
             <em>{member.initials}</em>
             <strong>{member.name}</strong>
             <small>{member.role}</small>
             <V19MemberStatusIcon tone={member.statusTone} />
-          </button>
+          </span>
         ))}
       </span>
       <V19DossierProgress items={progressItems} />
       <V19DossierChips chips={chips} />
       <V19DossierNextAction label={nextActionLabel} />
+      <span className="vf-figma-family-footer">
+        <span>{footerActivityLabel ?? footerLabel}</span>
+        <em>
+          <Folder aria-hidden="true" size={17} />
+          {packageLabel}
+        </em>
+      </span>
     </article>
   );
 }

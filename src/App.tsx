@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Plus, UploadCloud } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Plus } from "lucide-react";
 import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchInput } from "./shared/ui/primitives";
@@ -489,6 +489,9 @@ function MainApp() {
   const [agentFilter, setAgentFilter] = useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sideMenuMode, setSideMenuMode] = useState<"regular" | "compact">("regular");
+  const [isDesktopShell, setIsDesktopShell] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth > 760,
+  );
   const [agentTab, setAgentTab] = useState<AgentTab>("all");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
@@ -1437,15 +1440,19 @@ function MainApp() {
   }, [drawerMode]);
 
   useEffect(() => {
-    function closeMobileNavAbovePhone() {
-      if (window.innerWidth > 760) {
+    function syncShellViewport() {
+      const desktopShell = window.innerWidth > 760;
+
+      setIsDesktopShell(desktopShell);
+
+      if (desktopShell) {
         setMobileNavOpen(false);
       }
     }
 
-    closeMobileNavAbovePhone();
-    window.addEventListener("resize", closeMobileNavAbovePhone);
-    return () => window.removeEventListener("resize", closeMobileNavAbovePhone);
+    syncShellViewport();
+    window.addEventListener("resize", syncShellViewport);
+    return () => window.removeEventListener("resize", syncShellViewport);
   }, []);
 
   function updateActiveSubmission(transform: (submission: Submission) => Submission) {
@@ -3115,9 +3122,6 @@ function MainApp() {
       mobileTitle={workspaceSurfaceTitle}
       onChooseRole={chooseRole}
       onCloseMobile={() => setMobileNavOpen(false)}
-      onDisplayModeToggle={() =>
-        setSideMenuMode((mode) => (mode === "compact" ? "regular" : "compact"))
-      }
       onResetWorkspace={resetWorkspaceEmail}
       role={role}
       sessionDisplayName={sessionDisplayName}
@@ -3132,20 +3136,11 @@ function MainApp() {
   const pageHeaderDescription = workspaceSurfaceDescription;
 
   const pageHeaderActions = surface === "admin-review" || surface === "export" ? (
-    <div className="topbar-actions v19-admin-reference-topbar-actions" aria-label="Администратор">
+    <div className="topbar-actions v19-admin-reference-topbar-actions">
       <span aria-hidden="true">АД</span>
     </div>
   ) : surface === "agent-actions" || surface === "agent-submissions" ? (
     <div className="topbar-actions vf-reference-topbar-actions">
-      <Button
-        aria-label="Загрузить"
-        className="vf-reference-upload-action"
-        variant="secondary"
-        onClick={openCreateSubmissionDrawer}
-      >
-        <UploadCloud aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
-        <span>Загрузить</span>
-      </Button>
       <Button
         aria-label="Новая подача"
         className="vf-reference-create-action"
@@ -3195,9 +3190,16 @@ function MainApp() {
         <PageHeaderMenuButton
           controls={V19_OPERATIONAL_SIDEBAR_ID}
           disabled={drawerMode !== "closed"}
-          open={mobileNavOpen}
+          open={isDesktopShell ? sideMenuMode === "regular" : mobileNavOpen}
           onClick={() => {
             if (drawerMode !== "closed") return;
+
+            if (isDesktopShell) {
+              setMobileNavOpen(false);
+              setSideMenuMode((mode) => (mode === "compact" ? "regular" : "compact"));
+              return;
+            }
+
             setMobileNavOpen((open) => !open);
           }}
         />
