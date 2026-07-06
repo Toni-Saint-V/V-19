@@ -92,6 +92,11 @@ const slotFileNames: Record<CanonicalFrontendMediaType, string> = {
   selfie_2: "03_selfie_2",
 };
 
+const archiveRootFolders = {
+  family: "Семьи",
+  single: "Заявители",
+} as const;
+
 export function canDownloadExportMediaZip(submissions: Submission[]): boolean {
   const summary = exportSummary(submissions);
   return (
@@ -116,15 +121,28 @@ export async function createExportMediaZipArtifact(
 
   const downloadMedia = options.downloadMedia ?? defaultDownloadMedia;
   const outerZip = new JSZip();
+  outerZip.folder(archiveRootFolders.family);
+  outerZip.folder(archiveRootFolders.single);
+
+  const groupIndexes = {
+    family: 0,
+    single: 0,
+  };
   let applicantCount = 0;
   let fileCount = 0;
 
   try {
-    for (const [submissionIndex, submission] of submissions.entries()) {
-      const submissionZip = new JSZip();
+    for (const submission of submissions) {
+      const group = archiveGroupForSubmission(submission);
+      groupIndexes[group] += 1;
+      const submissionFolder = `${archiveRootFolders[group]}/${numberPrefix(
+        groupIndexes[group],
+      )}_${safeArchiveName(`${submission.id}_${submission.title}`, "submission")}`;
 
       for (const [applicantIndex, applicant] of submission.applicants.entries()) {
-        const applicantZip = new JSZip();
+        const applicantFolder = `${submissionFolder}/${numberPrefix(
+          applicantIndex + 1,
+        )}_${safeArchiveName(applicant.fullName, "applicant")}`;
 
         for (const type of CANONICAL_FRONTEND_MEDIA_TYPES) {
           const prepared = prepareMediaFile(submission, applicant, type);
@@ -157,35 +175,14 @@ export async function createExportMediaZipArtifact(
             );
           }
 
-          applicantZip.file(archiveMediaFileName(type, prepared.file), blob);
+          outerZip.file(
+            `${applicantFolder}/${archiveMediaFileName(type, prepared.file)}`,
+            blob,
+          );
           fileCount += 1;
         }
-
-        const applicantZipBytes = await applicantZip.generateAsync({
-          compression: "DEFLATE",
-          type: "uint8array",
-        });
-        submissionZip.file(
-          `${numberPrefix(applicantIndex + 1)}_${safeArchiveName(
-            applicant.fullName,
-            "applicant",
-          )}.zip`,
-          applicantZipBytes,
-        );
         applicantCount += 1;
       }
-
-      const submissionZipBytes = await submissionZip.generateAsync({
-        compression: "DEFLATE",
-        type: "uint8array",
-      });
-      outerZip.file(
-        `${numberPrefix(submissionIndex + 1)}_${safeArchiveName(
-          `${submission.id}_${submission.title}`,
-          "submission",
-        )}.zip`,
-        submissionZipBytes,
-      );
     }
 
     const blob = await outerZip.generateAsync({
@@ -350,6 +347,10 @@ function prepareMediaFile(
 
 async function defaultDownloadMedia(target: MediaStorageTarget): Promise<Blob | null> {
   return downloadMediaFromStorage(target);
+}
+
+function archiveGroupForSubmission(submission: Submission): keyof typeof archiveRootFolders {
+  return submission.type === "family" ? "family" : "single";
 }
 
 function archiveMediaFileName(
