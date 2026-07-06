@@ -29,7 +29,8 @@ export type SupabasePersistenceOperation =
   | "rpc.submit_corrections_handoff"
   | "storage.upload_media"
   | "storage.delete_media"
-  | "storage.create_signed_url";
+  | "storage.create_signed_url"
+  | "storage.download_media";
 
 export type PersistenceFailureKind =
   | "auth"

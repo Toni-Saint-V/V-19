@@ -1,5 +1,6 @@
 import { createQuestionnaireSections } from "./questionnaire";
 import { alternateLocalAgentOwnerId, defaultLocalAgentOwnerId } from "./ownership";
+import { buildMediaStoragePath, mediaStorageBucket } from "./mediaStoragePolicy";
 import type { Applicant, Issue, Submission, SubmissionFile } from "./types";
 
 function applicant(
@@ -50,6 +51,39 @@ function file(
     uploadedBy: status === "missing" ? undefined : "Агент",
     uploadedAt: status === "missing" ? undefined : "14.06",
   };
+}
+
+function localDemoStoredFile(submissionId: string, source: SubmissionFile): SubmissionFile {
+  const applicantKey = source.applicantId.replace(/\D/g, "");
+  const generatedFileName = `demo${applicantKey}_${source.type}.jpg`;
+  const target = buildMediaStoragePath(
+    submissionId,
+    source.applicantId,
+    source.type,
+    generatedFileName,
+  );
+
+  return {
+    ...source,
+    generatedFileName,
+    mimeType: "image/jpeg",
+    originalFileName: generatedFileName,
+    reviewStatus: "accepted",
+    sizeBytes: 4,
+    storageAdapter: "supabase-private",
+    storageBucket: mediaStorageBucket,
+    storagePath: target.path,
+    uploadStatus: "uploaded",
+  };
+}
+
+function localDemoStoredFiles(
+  submissionId: string,
+  files: SubmissionFile[],
+): SubmissionFile[] {
+  return files.map((item) =>
+    item.status === "accepted" ? localDemoStoredFile(submissionId, item) : item,
+  );
 }
 
 function issue(
@@ -399,7 +433,7 @@ export const initialSubmissions: Submission[] = [
       applicant("з-1102-3", "Мила Волкова", "child", "complete", "complete"),
     ],
     issues: [],
-    files: [
+    files: localDemoStoredFiles("SUB-1102", [
       file("ф-1102-2", "з-1102-1", "selfie", "accepted"),
       file("ф-1102-3", "з-1102-1", "selfie_2", "accepted"),
       file("ф-1102-4", "з-1102-1", "passport_scan", "accepted"),
@@ -409,7 +443,7 @@ export const initialSubmissions: Submission[] = [
       file("ф-1102-9", "з-1102-3", "selfie", "accepted"),
       file("ф-1102-10", "з-1102-3", "selfie_2", "accepted"),
       file("ф-1102-11", "з-1102-3", "passport_scan", "accepted"),
-    ],
+    ]),
     completeness: { questionnaire: 100, files: 100, total: 100 },
     exportState: "ready",
     createdAt: "14.06",
