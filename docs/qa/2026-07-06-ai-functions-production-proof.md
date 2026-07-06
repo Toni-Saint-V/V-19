@@ -48,4 +48,3 @@ Production live readiness was not claimed:
 ## Non-AI Finding
 
 `npx playwright test tests/e2e/v19-agent-actions-cockpit.spec.ts --project=chromium` failed before reaching the target screen because the current dirty checkout reached the access gate with `Почта не найдена в списке доступа`. This is outside the AI scope and was not changed in this pass.
-
