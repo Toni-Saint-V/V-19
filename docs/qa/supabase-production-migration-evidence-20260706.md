@@ -3,6 +3,7 @@
 Result: `BLOCKED_FOR_PENDING_AI_MIGRATION`
 Project: `tsymifccglpepvbmrcgh`
 Latest recheck: `2026-07-06T00:16:12.628Z`
+Latest Supabase plugin read-only migration list: `2026-07-06T02:27:56Z`
 
 No email, password, service-role key, signed URL, or personal identifier is recorded in this artifact.
 
@@ -95,3 +96,4 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 
 - `20260705235913_day10_required_media_canonical_write_paths` is the Supabase MCP-recorded remote migration for local file `20260704050806_day10_required_media_canonical_write_paths.sql`.
 - `20260706000100_ai_helper_admin_intent_quota_contract.sql` is local-only in this evidence snapshot. It has no owner-approved production apply evidence yet, so production readiness must remain fail-closed.
+- Supabase plugin `list_migrations` against project `tsymifccglpepvbmrcgh` confirmed the remote list still ends at `20260705235913_day10_required_media_canonical_write_paths`; it did not mutate the project.

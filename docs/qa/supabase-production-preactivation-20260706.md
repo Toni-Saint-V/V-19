@@ -5,7 +5,7 @@ Project: `tsymifccglpepvbmrcgh`
 Checked at: `2026-07-06T01:38:58Z`
 Git head: `6345019a`
 Readiness verifier hash: `e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9`
-Scoped diff hash: `a52c62212bb8e1b700d2e78aedc24e035ddf5ebff149049f192b754fca562efb`
+Scoped diff hash: `d6bab06d0652fc7c83a2ca7fcaa3d155d6bde8fa4409d8d17934b6c1b27ebc09`
 
 ## Scope
 
@@ -23,7 +23,7 @@ Shared verification fields:
 - checkedAt: `2026-07-06T01:38:58Z`
 - exitCode: `0`
 - gitHead: `6345019a`
-- scopedDiffSha256: `a52c62212bb8e1b700d2e78aedc24e035ddf5ebff149049f192b754fca562efb`
+- scopedDiffSha256: `d6bab06d0652fc7c83a2ca7fcaa3d155d6bde8fa4409d8d17934b6c1b27ebc09`
 - readinessVerifierSha256: `e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9`
 
 Commands:
