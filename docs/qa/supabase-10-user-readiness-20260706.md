@@ -1,30 +1,24 @@
 # Supabase 10 Registered Agent Readiness Evidence - 2026-07-06
 
-Status: `PILOT_GO` for a controlled 10 registered agent pilot.
+Status: `NO_GO` for a controlled 10 registered agent pilot.
 
-Scope: production Supabase readiness pass for a controlled V-19 pilot with 10 registered agents and a workload cap of 50 submissions per registered agent. Intentional production mutations in this pass were limited to the owner-approved schema migration `day10_required_media_canonical_write_paths` and synthetic production workflow-smoke records/storage objects that the smoke script cleans up. No Auth users, real user application data, real user Storage objects, or Supabase settings were changed for readiness collection.
+Scope: production Supabase readiness pass for a controlled V-19 pilot with 10 registered agents and a workload cap of 50 submissions per registered agent. This artifact records aggregate-only evidence and launch blockers. No Auth users, real user application data, real user Storage objects, or Supabase settings were changed by this evidence refresh.
 
 Target project:
 
 - Production project: `tsymifccglpepvbmrcgh`
 - Production URL: `https://tsymifccglpepvbmrcgh.supabase.co`
 - Organization: `hsolrwjysdlmyqopryon`
-- Supabase project status from plugin: `ACTIVE_HEALTHY`
 
 ## Local Gates
 
 Fresh local commands:
 
-- `npm run verify:supabase-release` - PASS, 186 checks.
-- `npm run verify:auth-data-readiness` - PASS, 152 checks.
-- `npm run supabase:pilot-cohort -- --check --required-size 10` - PASS.
-- `npm run supabase:pilot-cohort -- --check --required-size 20` - PASS.
-- `npm run supabase:production-workflow-smoke` - PASS.
-- `npm run test:e2e:supabase` latest full run - 4 passed / 1 failed. The failed case is the sandbox cross-role UI scenario waiting for the admin review drawer button `Добавить замечание`; it is deferred for this controlled pilot because production workflow smoke covers cross-role backend behavior.
-- `npm run verify:pilot-volume` - PASS for 10 registered agents, 500 total submissions, 1500 applicants, and 4500 required media objects.
-- `npm run verify:production-packet` - PASS after controlled-pilot packet refresh.
-
-The ignored local cohort file already contains 20 pilot users with 1 admin and 19 agents, so the local cohort preflight is sufficient for 10 registered agents. This check did not print or record emails/passwords.
+- `npm run verify:auth-data-readiness` - PASS, 154 checks.
+- `npm run verify:supabase-release` - PASS, 188 checks.
+- `npm run verify:pilot-volume` - BLOCKED because production has `22` registered agent profiles and the local pilot cohort declares `19` registered agents, above the pilot cap of `10`.
+- `npm run verify:production-packet -- --expect-blocked` - PASS as fail-closed with activation blockers only.
+- `npm run test -- tests/unit/supabaseSecurityContract.spec.ts` - PASS; Vitest ran 59 files and 592 tests.
 
 ## Workload Envelope
 
@@ -41,17 +35,6 @@ The ignored local cohort file already contains 20 pilot users with 1 admin and 1
 
 Collected through read-only Supabase plugin calls and aggregate SQL only.
 
-Security advisor:
-
-- Open warning: `auth_leaked_password_protection`
-- Level: `WARN`
-- Remediation: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
-
-Performance advisor:
-
-- Most findings are `unused_index` INFO.
-- One relevant WARN remains: multiple permissive policies on `public.access_requests` for authenticated `SELECT`.
-
 Aggregate database checks:
 
 - Auth users: `24`
@@ -63,9 +46,8 @@ Aggregate database checks:
 - Public tables with RLS enabled: `16`
 - Public storage buckets: `0`
 - `submission-media` bucket public: `false`
-- Storage object policies are present for `SELECT`, `INSERT`, `UPDATE`, and `DELETE`.
 
-Pilot cohort live check:
+Pilot cohort aggregate check:
 
 - Desired pilot users in ignored local cohort file: `20`
 - Cohort roles: `admin=1`, `agent=19`
@@ -75,48 +57,36 @@ Pilot cohort live check:
 - Missing auth users: `0`
 - Missing profiles: `0`
 - Role mismatches: `0`
-- No email, password, or direct personal identifier was printed or recorded.
 
-Policy inventory:
+Remote migration check:
 
-- Key public data tables have one policy per action.
-- `public.access_requests` has two permissive authenticated `SELECT` policies: `access requests admin read` and `access requests requester read own`.
+- Supabase plugin `list_migrations` confirmed the production remote list ends at `20260705235913_day10_required_media_canonical_write_paths`.
+- Local migration `20260706000100_ai_helper_admin_intent_quota_contract.sql` is not applied remotely.
+
+No email, password, service-role key, signed URL, or direct personal identifier was printed or recorded.
 
 ## Launch Blockers
 
-Closed blocker:
+Owner: Rollout owner / Supabase production operator.
 
-- Production now has `day10_required_media_canonical_write_paths` applied through Supabase MCP as remote migration `20260705235913_day10_required_media_canonical_write_paths`.
-- Live checks show `app_private.enforce_required_media_canonical_storage_path` exists.
-- Live checks show canonical trigger `media_assets_required_media_canonical_storage_path` exists on `public.media_assets`.
-- Production workflow smoke proved malformed required-media bucket/path writes are rejected.
+Verification command:
 
-Closed integrity issue:
+- `npm run verify:pilot-volume`
+- `npm run verify:production-packet -- --expect-blocked`
+- Supabase plugin `list_migrations` against project `tsymifccglpepvbmrcgh`
 
-- `docs/release/supabase-production-readiness.json` was refreshed for `scope: controlled-10-registered-agent-500-submission-pilot`.
-- Local remote migration contract now matches the Supabase MCP-recorded remote migration version.
+Expected artifact:
 
-Resolved or narrowed by this pass:
+- `docs/qa/supabase-pilot-volume-envelope-20260706.md`
+- `docs/qa/supabase-production-migration-evidence-20260706.md`
+- `docs/qa/supabase-production-preactivation-20260706.md`
 
-- Production project is reachable and `ACTIVE_HEALTHY`.
-- Production has enough already-provisioned pilot accounts for 10 registered agents.
-- The pilot envelope is now bounded by submissions and required media objects, not only by user count.
-- Production Auth/Profile aggregate consistency is clean: `0` orphan Auth users.
-- All public base tables have RLS enabled and the `submission-media` bucket is private.
+Blocking findings:
 
-Accepted deferred risks for this controlled pilot:
-
-- Backup restore drill/RPO evidence is deferred to active launch operations.
-- `auth_leaked_password_protection` remains disabled on the free plan and is accepted only for this capped pilot with admin-provisioned users.
-- Logs/error-rate review is deferred to active launch monitoring.
-- Edge Function dry-runs are deferred because core launch readiness is bounded to Supabase Auth/RLS/Storage/workflow persistence.
-- Cross-role browser UI proof is deferred after the latest full Supabase Playwright run returned 4 passed / 1 failed; cross-role backend workflow is covered by production workflow smoke.
-- Open public production remains out of scope.
-
-Safety note:
-
-- `.env.supabase-production.local` currently contains production activation flags set to `true`, including release enabled, migrations applied, browser QA, browser key audit, and production approved.
-- Those local flags are backed by the fresh production packet evidence for this controlled pilot. If production schema, env, Auth/profile state, or launch scope changes, refresh the packet before extending the GO decision.
+- Production has `22` registered agent profiles, above the cap of `10`.
+- Local pilot cohort declares `19` registered agents, above the cap of `10`.
+- Local migration `20260706000100_ai_helper_admin_intent_quota_contract.sql` lacks owner-approved production apply evidence.
+- `docs/release/supabase-production-readiness.json` correctly remains `NO_GO`.
 
 ## Launch Constraints
 
@@ -125,6 +95,5 @@ Safety note:
 3. Existing provisioned users only; do not open public sign-up.
 4. Spain-only V-19 flow.
 5. Stop intake if media persistence, cross-agent isolation, review handoff, or workload latency shows any incident.
-6. Continue fixing launch-tolerable UI/advisor/backup hardening during the pilot.
 
-Verdict: PILOT_GO for controlled 10 registered agents / 500 total submissions, not GO for open public production.
+Verdict: `NO_GO` for controlled 10 registered agents / 500 total submissions. This is not GO for open public production.
