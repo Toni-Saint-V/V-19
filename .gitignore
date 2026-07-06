@@ -26,6 +26,7 @@ pnpm-debug.log*
 # Local Codex/research/runtime artifacts.
 /research_*/
 /research_*.zip
+/src.backup.*/
 /codex-agent-system-visaflow.zip
 /v19-*.png
 /docs/*.zip
