@@ -129,6 +129,18 @@ import {
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
+import {
+  AgentApplicantsScreen,
+  AgentDraftsScreen,
+  AgentIssuesScreen,
+  AgentMediaScreen,
+} from "./modules/submissions/pages/LinearAgentScreens";
+import {
+  AdminAccessRequestsScreen,
+  AdminIntakeScreen,
+  type AdminUploadArtifact,
+  type AdminUploadArtifactKind,
+} from "./modules/submissions/pages/AdminPipelineScreens";
 import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import type {
   City,
@@ -214,6 +226,11 @@ type WorkspaceSettings = {
   compactLists: boolean;
   digest: "instant" | "daily";
   drawerHints: boolean;
+};
+
+type AdminArtifactUploadInput = {
+  files: File[];
+  kind: AdminUploadArtifactKind;
 };
 
 const defaultWorkspaceSettings: WorkspaceSettings = {
@@ -452,6 +469,7 @@ function MainApp() {
   const [pendingAccessRequests, setPendingAccessRequests] = useState<AccessRequest[]>(
     [],
   );
+  const [adminUploadArtifacts, setAdminUploadArtifacts] = useState<AdminUploadArtifact[]>([]);
   const [remoteProfile, setRemoteProfile] = useState<AppProfile | null>(null);
   const [remoteSaveState, setRemoteSaveState] = useState<
     "idle" | "loading" | "saving" | "error"
@@ -523,6 +541,7 @@ function MainApp() {
   const submissionsRef = useRef<Submission[]>(submissions);
   const selectedExportIdsRef = useRef<string[]>(selectedExportIds);
   const localPassportFilesRef = useRef<Map<string, File>>(new Map());
+  const localDocumentFilesRef = useRef<Map<string, File>>(new Map());
   const uploadQueuesRef = useRef<Map<string, Promise<void>>>(new Map());
   const [, setLocalPassportFileIds] = useState<string[]>([]);
   const [, setUploadingSubmissionIds] = useState<Set<string>>(() => new Set());
@@ -669,21 +688,18 @@ function MainApp() {
   });
   const isV19CollectionSurface =
     surface === "agent-actions" ||
+    surface === "agent-drafts" ||
+    surface === "agent-applicants" ||
+    surface === "agent-media" ||
+    surface === "agent-issues" ||
     surface === "agent-submissions" ||
     surface === "admin-review" ||
+    surface === "admin-intake" ||
+    surface === "admin-access" ||
     surface === "export";
-  const workspaceSurfaceTitle =
-    surface === "admin-review"
-      ? "Проверка"
-      : surface === "export"
-        ? "Выгрузка"
-        : surface === "agent-submissions"
-          ? "Мои подачи"
-        : surfaceTitle(surface);
+  const workspaceSurfaceTitle = surfaceTitle(surface);
   const workspaceSurfaceDescription =
-    surface === "admin-review" || surface === "export" || surface === "agent-submissions"
-      ? null
-      : surfaceDescription(surface);
+    isV19CollectionSurface || surface === "settings" ? null : surfaceDescription(surface);
   const localAuthHasWorkspaceAccess =
     localAuthSession?.status === "active" &&
     localAuthSession.approvalStatus === "approved";
@@ -725,7 +741,7 @@ function MainApp() {
       ? [
           {
             active: surface === "agent-actions",
-            count: 12,
+            count: agentActions.open.length + agentActions.completed.length,
             icon: "М",
             id: "agent-actions",
             label: "Мои действия",
@@ -734,11 +750,20 @@ function MainApp() {
           },
           {
             active: surface === "agent-submissions",
+            count: totalAgentSubmissionCount,
             icon: "З",
-            id: "agent-submissions-applicants",
+            id: "agent-submissions",
             label: "Мои подачи",
-            meta: "Профили",
+            meta: "Заявки",
             onClick: () => showAgentTab("all"),
+          },
+          {
+            active: false,
+            icon: "+",
+            id: "agent-create",
+            label: "Создать",
+            meta: "Новая подача",
+            onClick: openCreateSubmissionDrawer,
           },
           {
             active: surface === "settings",
@@ -770,14 +795,32 @@ function MainApp() {
             tone: summary.ready > 0 ? "success" : "default",
           },
           {
-            active: surface === "settings",
+            active: surface === "admin-intake",
+            count: adminUploadArtifacts.length,
+            icon: "З",
+            id: "admin-intake",
+            label: "Списки / PDF",
+            meta: "Загрузка",
+            onClick: showAdminIntakeSurface,
+            tone: adminUploadArtifacts.length > 0 ? "success" : "default",
+          },
+          {
+            active: surface === "admin-access",
             count: pendingAccessRequests.length,
+            icon: "Д",
+            id: "admin-access",
+            label: "Заявки доступа",
+            meta: "Принять / отказать",
+            onClick: showAdminAccessSurface,
+            tone: pendingAccessRequests.length > 0 ? "warning" : "default",
+          },
+          {
+            active: surface === "settings",
             icon: "Н",
             id: "admin-settings",
             label: "Настройки",
             meta: "Роли",
             onClick: showSettingsSurface,
-            tone: pendingAccessRequests.length > 0 ? "warning" : "default",
           },
         ];
 
@@ -885,7 +928,14 @@ function MainApp() {
 
   useEffect(() => {
     if (isSupabaseMode) return;
-    saveSubmissions(submissions);
+    const result = saveSubmissions(submissions);
+    if (!result.ok) {
+      setRemoteSaveState("error");
+      setRemoteSaveError(result.message);
+      return;
+    }
+    setRemoteSaveState("idle");
+    setRemoteSaveError("");
   }, [isSupabaseMode, submissions]);
 
   useEffect(() => {
@@ -1244,6 +1294,48 @@ function MainApp() {
     });
   }
 
+  function showAgentDrafts() {
+    requestSettingsLeave(() => {
+      setSurface("agent-drafts");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+      const nextSubmission = searchedAgentQueue[0];
+      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
+  function showAgentApplicants() {
+    requestSettingsLeave(() => {
+      setSurface("agent-applicants");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+      const nextSubmission = searchedAgentQueue[0];
+      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
+  function showAgentMedia() {
+    requestSettingsLeave(() => {
+      setSurface("agent-media");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+      const nextSubmission =
+        searchedAgentQueue.find((submission) => submission.files.length > 0) ?? searchedAgentQueue[0];
+      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
+  function showAgentIssues() {
+    requestSettingsLeave(() => {
+      setSurface("agent-issues");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+      const nextSubmission =
+        searchedAgentQueue.find((submission) => submission.issues.some((issue) => issue.status !== "closed_by_admin")) ?? searchedAgentQueue[0];
+      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
   function resetAgentSubmissionFilters() {
     requestSettingsLeave(() => {
       setQuery("");
@@ -1278,6 +1370,24 @@ function MainApp() {
       setAgentQuestionnaireOpen(false);
       const nextSubmission = exportReadyList[0] ?? historyList[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
+  function showAdminIntakeSurface() {
+    requestSettingsLeave(() => {
+      setSurface("admin-intake");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
+      const nextSubmission = searchedReviewQueue[0] ?? exportReadyList[0] ?? submissions[0];
+      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+    });
+  }
+
+  function showAdminAccessSurface() {
+    requestSettingsLeave(() => {
+      setSurface("admin-access");
+      setDrawerMode("closed");
+      setAgentQuestionnaireOpen(false);
     });
   }
 
@@ -1550,7 +1660,10 @@ function MainApp() {
     return queued;
   }
 
-  function commitSubmissionAction(submission: Submission, action: SubmissionAction) {
+  async function commitSubmissionAction(
+    submission: Submission,
+    action: SubmissionAction,
+  ) {
     const currentSubmissions = submissionsRef.current;
     const currentSubmission =
       currentSubmissions.find((candidate) => candidate.id === submission.id) ??
@@ -1574,12 +1687,61 @@ function MainApp() {
       return;
     }
 
-    setSubmissionActionError(null);
     const nextSubmissions = result.data;
+    const updated = nextSubmissions.find((candidate) => candidate.id === submission.id);
+    if (!updated) {
+      setRemoteSaveState("error");
+      setRemoteSaveError("Сохранение не прошло. Подача не найдена, статус не изменён.");
+      return;
+    }
+
+    try {
+      if (isSupabaseMode) {
+        if (!remoteProfile) {
+          setRemoteSaveState("error");
+          setRemoteSaveError(
+            "Удалённое сохранение недоступно. Статус не изменён.",
+          );
+          return;
+        }
+
+        const savePromise = saveRemoteWorkspaceSnapshot(remoteProfile, [updated]);
+        remoteSavePromiseRef.current = savePromise;
+        try {
+          await savePromise;
+        } finally {
+          if (remoteSavePromiseRef.current === savePromise) {
+            remoteSavePromiseRef.current = null;
+          }
+        }
+      } else {
+        const saveResult = saveSubmissions(nextSubmissions);
+        if (!saveResult.ok) throw new Error(saveResult.message);
+        setRemoteSaveState("idle");
+        setRemoteSaveError("");
+      }
+    } catch (error) {
+      setRemoteSaveState("error");
+      setRemoteSaveError(
+        formatPersistenceFailureForUser(
+          error,
+          error instanceof Error && error.message
+            ? error.message
+            : "Сохранение не прошло. Статус не изменён.",
+        ),
+      );
+      return;
+    }
+
+    setSubmissionActionError(null);
     submissionsRef.current = nextSubmissions;
     setSubmissions(nextSubmissions);
-    const updated = nextSubmissions.find((candidate) => candidate.id === submission.id);
-    if (updated) setActiveDrawerTab(defaultDrawerTab(updated));
+    setActiveDrawerTab(defaultDrawerTab(updated));
+  }
+
+  function quickAdminReviewAction(submission: Submission, action: SubmissionAction) {
+    if (role !== "admin") return;
+    void commitSubmissionAction(submission, action);
   }
 
   function updateSubmission(action: SubmissionAction) {
@@ -1608,10 +1770,15 @@ function MainApp() {
       return;
     }
 
-    commitSubmissionAction(activeSubmission, action);
+    void commitSubmissionAction(activeSubmission, action);
+  }
+
+  function rememberLocalDocumentFile(fileId: string, file: File) {
+    localDocumentFilesRef.current.set(fileId, file);
   }
 
   function rememberLocalPassportFile(fileId: string, file: File) {
+    rememberLocalDocumentFile(fileId, file);
     localPassportFilesRef.current.set(fileId, file);
     setLocalPassportFileIds((current) =>
       current.includes(fileId) ? current : [...current, fileId],
@@ -1784,6 +1951,8 @@ function MainApp() {
           targetFile,
         );
       }
+    } else {
+      rememberLocalDocumentFile(fileId, selectedFile);
     }
     setSubmissionActionError(null);
     setActiveDrawerTab("files");
@@ -1950,6 +2119,8 @@ function MainApp() {
       );
       if (targetFile.type === "passport_scan") {
         rememberLocalPassportFile(fileId, selectedFile);
+      } else {
+        rememberLocalDocumentFile(fileId, selectedFile);
       }
 
       if (previousStorageTarget) {
@@ -2529,7 +2700,7 @@ function MainApp() {
     submissionsRef.current = reviewedSubmissions;
     setSubmissions(reviewedSubmissions);
     setPassportReviewRequest(null);
-    commitSubmissionAction(reviewedSubmission, request.action);
+    void commitSubmissionAction(reviewedSubmission, request.action);
   }
 
   function returnToPassportReviewFields() {
@@ -2634,8 +2805,8 @@ function MainApp() {
     setExportError("");
 
     try {
-      const { default: downloadExportWorkbook } =
-        await import("./modules/submissions/exportWorkbook");
+      const { downloadExportPackageZip } =
+        await import("./modules/submissions/exportPackageZip");
       const currentSelectedIds = selectedExportIdsRef.current;
       const currentPlan = exportSummaryForSelectedIds(
         submissionsRef.current,
@@ -2645,15 +2816,20 @@ function MainApp() {
         return setExportError("Выбор изменился. Сформируйте Excel заново.");
       }
 
-      const result = downloadExportWorkbook(
-        currentPlan.rows,
-        currentPlan.downloadPackageIdentity,
-      );
+      const result = await downloadExportPackageZip({
+        identity: currentPlan.downloadPackageIdentity,
+        localFilesById: localDocumentFilesRef.current,
+        rows: currentPlan.rows,
+        submissions: selectedReadySubmissionsForExport(
+          submissionsRef.current,
+          currentSelectedIds,
+        ),
+      });
       if (!result.ok) {
         return setExportError(result.safeMessage);
       }
     } catch {
-      return setExportError("Не удалось скачать Excel. Повторите попытку.");
+      return setExportError("Не удалось скачать ZIP с Excel. Повторите попытку.");
     }
 
     setSubmissions((current) => {
@@ -3081,6 +3257,38 @@ function MainApp() {
     }
   }
 
+  function inferAdminArtifactCity(fileName: string): AdminUploadArtifact["city"] {
+    if (/petersburg|stp|spb|санкт|петербург/i.test(fileName)) {
+      return "Санкт-Петербург";
+    }
+    if (/moscow|москва|msk/i.test(fileName)) return "Москва";
+    if (/kazan|казань/i.test(fileName)) return "Казань";
+    return "auto";
+  }
+
+  function registerAdminUploadArtifacts({ files, kind }: AdminArtifactUploadInput) {
+    if (!files.length) return;
+    const uploadedAtIso = new Date().toISOString();
+    const nextArtifacts = files.map((file, index): AdminUploadArtifact => ({
+      city: inferAdminArtifactCity(file.name),
+      fileName: file.name,
+      id: `${kind}-${uploadedAtIso}-${index}-${file.name}`,
+      kind,
+      sizeBytes: file.size,
+      uploadedAtIso,
+    }));
+
+    setAdminUploadArtifacts((current) => [...nextArtifacts, ...current]);
+  }
+
+  function uploadAdminAppointmentFiles(files: File[]) {
+    registerAdminUploadArtifacts({ files, kind: "appointment_list" });
+  }
+
+  function uploadAdminQuestionnairePdfs(files: File[]) {
+    registerAdminUploadArtifacts({ files, kind: "questionnaire_pdf" });
+  }
+
   const adminSearchControl = (
     <SearchInput
       label="Поиск в текущем списке"
@@ -3172,13 +3380,37 @@ function MainApp() {
   );
 
   const pageHeaderDescription = workspaceSurfaceDescription;
+  const saveStatusIndicator = (
+    <p
+      className="save-status"
+      role={remoteSaveState === "error" ? "alert" : "status"}
+    >
+      {isSupabaseMode
+        ? remoteSaveState === "saving"
+          ? "Сохранение"
+          : remoteSaveState === "error"
+            ? remoteSaveError
+            : "Supabase"
+        : "Локальный демо-режим"}
+    </p>
+  );
 
   const pageHeaderActions = surface === "admin-review" || surface === "export" ? (
     <div className="topbar-actions v19-admin-reference-topbar-actions" aria-label="Администратор">
+      {saveStatusIndicator}
       <span aria-hidden="true">АД</span>
     </div>
-  ) : surface === "agent-actions" || surface === "agent-submissions" ? (
+  ) : role === "agent" && isV19CollectionSurface ? (
     <div className="topbar-actions vf-reference-topbar-actions">
+      {saveStatusIndicator}
+      <Button
+        aria-label="Загрузить документы"
+        className="vf-reference-upload-action"
+        variant="secondary"
+        onClick={openApplicantsUploadTarget}
+      >
+        <span>Загрузить</span>
+      </Button>
       <Button
         aria-label="Новая подача"
         className="vf-reference-create-action"
@@ -3189,7 +3421,7 @@ function MainApp() {
         <span>Создать пакет</span>
       </Button>
     </div>
-  ) : isFigmaVisualSurface ? null : !isV19CollectionSurface || isSupabaseMode ? (
+  ) : isFigmaVisualSurface ? null : (
     <div className="topbar-actions">
       {!isV19CollectionSurface && surface !== "settings" ? (
         <span className="service-logo vf-brand-wordmark" aria-label="VisaFlow 19">
@@ -3205,20 +3437,9 @@ function MainApp() {
           </span>
         </span>
       ) : null}
-      {isSupabaseMode ? (
-        <p
-          className="save-status"
-          role={remoteSaveState === "error" ? "alert" : "status"}
-        >
-          {remoteSaveState === "saving"
-            ? "Сохранение"
-            : remoteSaveState === "error"
-              ? remoteSaveError
-              : "Supabase"}
-        </p>
-      ) : null}
+      {saveStatusIndicator}
     </div>
-  ) : null;
+  );
 
   const pageHeader = (
     <PageHeader
@@ -3418,6 +3639,7 @@ function MainApp() {
             filterControl={adminFilterControl}
             loading={remoteSaveState === "loading"}
             onOpen={openSubmission}
+            onQuickAction={quickAdminReviewAction}
             onRetryError={
               remoteSaveState === "error"
                 ? () => void retryRemoteWorkspaceSave()
@@ -3431,6 +3653,21 @@ function MainApp() {
             reviewTab={reviewTab}
             searchControl={adminSearchControl}
             visibleSubmission={activeSubmission ?? null}
+          />
+        ) : surface === "admin-intake" ? (
+          <AdminIntakeScreen
+            artifacts={adminUploadArtifacts}
+            onOpen={openSubmission}
+            onUploadAppointmentFiles={uploadAdminAppointmentFiles}
+            onUploadQuestionnairePdfs={uploadAdminQuestionnairePdfs}
+            submissions={searchedExportSubmissions}
+          />
+        ) : surface === "admin-access" ? (
+          <AdminAccessRequestsScreen
+            busy={loginBusy}
+            requests={pendingAccessRequests}
+            onApprove={(requestId) => void approvePendingAccessRequest(requestId)}
+            onReject={(requestId) => void rejectPendingAccessRequest(requestId)}
           />
         ) : surface === "agent-submissions" && activeSubmission ? (
           <AgentSubmissionsScreen
@@ -3458,6 +3695,37 @@ function MainApp() {
             totalSubmissionCount={totalAgentSubmissionCount}
             visibleSubmission={visibleAgentSubmission}
             summary={summary}
+          />
+        ) : surface === "agent-drafts" ? (
+          <AgentDraftsScreen
+            hasSearchQuery={query.trim().length > 0}
+            onClearSearch={() => setQuery("")}
+            onCreate={openCreateSubmissionDrawer}
+            onOpen={openSubmission}
+            submissions={searchedAgentQueue}
+          />
+        ) : surface === "agent-applicants" ? (
+          <AgentApplicantsScreen
+            hasSearchQuery={query.trim().length > 0}
+            onClearSearch={() => setQuery("")}
+            onCreate={openCreateSubmissionDrawer}
+            onOpen={openSubmission}
+            submissions={searchedAgentQueue}
+          />
+        ) : surface === "agent-media" ? (
+          <AgentMediaScreen
+            hasSearchQuery={query.trim().length > 0}
+            onClearSearch={() => setQuery("")}
+            onCreate={openApplicantsUploadTarget}
+            onOpen={openSubmission}
+            submissions={searchedAgentQueue}
+          />
+        ) : surface === "agent-issues" ? (
+          <AgentIssuesScreen
+            hasSearchQuery={query.trim().length > 0}
+            onClearSearch={() => setQuery("")}
+            onOpen={openSubmission}
+            submissions={searchedAgentQueue}
           />
         ) : null}
 

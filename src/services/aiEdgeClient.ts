@@ -5,7 +5,7 @@ import {
   type AiHelperIntent,
   type AiHelperResult,
   type AiHelperRequest,
-} from "../../supabase/functions/_shared/ai-helper-contract";
+} from "../shared/ai-helper-contract";
 
 export async function invokeAiHelperEdge(
   intent: AiHelperIntent,

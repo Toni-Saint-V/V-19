@@ -5,6 +5,10 @@ import type { Submission } from "./types";
 
 const storageKey = "visaflow.v19.submissions.v1";
 
+export type LocalSubmissionSaveResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 type StorageLike = {
   getItem(key: string): string | null;
   removeItem(key: string): void;
@@ -32,14 +36,27 @@ export function loadSubmissions(): Submission[] {
   }
 }
 
-export function saveSubmissions(submissions: Submission[]) {
+export function saveSubmissions(
+  submissions: Submission[],
+): LocalSubmissionSaveResult {
   const storage = getStorage();
-  if (!storage) return;
+  if (!storage) {
+    return {
+      ok: false,
+      message:
+        "Локальное сохранение недоступно. Данные останутся только до обновления страницы.",
+    };
+  }
 
   try {
     storage.setItem(storageKey, JSON.stringify(submissions));
+    return { ok: true };
   } catch {
-    // Persistence is helpful, but the cockpit must keep working if storage is unavailable.
+    return {
+      ok: false,
+      message:
+        "Локальное сохранение не прошло. Данные останутся только до обновления страницы.",
+    };
   }
 }
 

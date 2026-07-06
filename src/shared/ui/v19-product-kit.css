@@ -1,0 +1,1155 @@
+:root {
+  --v19pk-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --v19pk-text: rgb(245 245 247 / 0.94);
+  --v19pk-text-soft: rgb(245 245 247 / 0.68);
+  --v19pk-text-muted: rgb(245 245 247 / 0.48);
+  --v19pk-bg: rgb(15 15 17 / 0.88);
+  --v19pk-surface: rgb(255 255 255 / 0.045);
+  --v19pk-surface-hover: rgb(255 255 255 / 0.075);
+  --v19pk-line: rgb(255 255 255 / 0.085);
+  --v19pk-line-strong: rgb(255 255 255 / 0.16);
+  --v19pk-blue: #4055ff;
+  --v19pk-blue-soft: rgb(64 85 255 / 0.18);
+  --v19pk-green: #42d98f;
+  --v19pk-green-soft: rgb(66 217 143 / 0.16);
+  --v19pk-red: #ef4444;
+  --v19pk-red-soft: rgb(239 68 68 / 0.16);
+  --v19pk-amber: #f59e0b;
+  --v19pk-amber-soft: rgb(245 158 11 / 0.16);
+  --v19pk-radius-sm: 8px;
+  --v19pk-radius-md: 12px;
+  --v19pk-radius-lg: 16px;
+  --v19pk-radius-xl: 24px;
+  --v19pk-space-2: 2px;
+  --v19pk-space-4: 4px;
+  --v19pk-space-8: 8px;
+  --v19pk-space-12: 12px;
+  --v19pk-space-16: 16px;
+  --v19pk-space-24: 24px;
+  --v19pk-space-32: 32px;
+  --v19pk-body-font-size: 14px;
+  --v19pk-small-font-size: 12px;
+  --v19pk-tag-font-size: 8px;
+  --v19pk-font-weight: 500;
+}
+
+/* Product typography contract: 14/12, mostly 500. */
+.ops-shell,
+.vf-linear-screen,
+.v19-figma-drawer-shell,
+.v19-create-drawer-shell,
+.vf-admin-pipeline,
+.vf-admin-access-screen,
+.v19pk-button,
+.v19pk-card,
+.v19pk-tab-search,
+.v19pk-side-menu,
+.v19pk-right-rail,
+.v19pk-list-cell,
+.v19pk-bottom-sheet {
+  font-family: var(--v19pk-font) !important;
+  font-size: var(--v19pk-body-font-size) !important;
+  font-weight: var(--v19pk-font-weight) !important;
+  letter-spacing: -0.01em !important;
+}
+
+.ops-shell :where(p, span, em, small, label, input, select, textarea, button),
+.v19-figma-drawer-shell :where(p, span, em, small, label, input, select, textarea, button),
+.v19-create-drawer-shell :where(p, span, em, small, label, input, select, textarea, button),
+.vf-admin-pipeline :where(p, span, em, small, label, input, select, textarea, button) {
+  font-weight: 500 !important;
+}
+
+.ops-shell :where(small, em, .subtle, .kicker, [class*="meta"], [class*="detail"]),
+.v19-figma-drawer-shell :where(small, em, .kicker, [class*="meta"], [class*="detail"]),
+.v19-create-drawer-shell :where(small, em, .kicker, [class*="meta"], [class*="detail"]),
+.vf-admin-pipeline :where(small, em, .kicker, [class*="meta"], [class*="detail"]) {
+  font-size: var(--v19pk-small-font-size) !important;
+}
+
+.ops-shell :where(.badge, [class*="badge"], [class*="chip"], [class*="tag"], [class*="status"]),
+.v19-figma-drawer-shell :where(.badge, [class*="badge"], [class*="chip"], [class*="tag"], [class*="status"]),
+.v19-create-drawer-shell :where(.badge, [class*="badge"], [class*="chip"], [class*="tag"], [class*="status"]),
+.vf-admin-pipeline :where(.badge, [class*="badge"], [class*="chip"], [class*="tag"], [class*="status"]) {
+  min-height: max(16px, calc(var(--v19pk-tag-font-size) + 8px)) !important;
+  padding-block: var(--v19pk-space-4) !important;
+  font-size: var(--v19pk-tag-font-size) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+}
+
+/* Three button kinds: close / CTA / confirm. */
+.v19pk-button {
+  position: relative;
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v19pk-space-8);
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-md);
+  padding: 0 var(--v19pk-space-12);
+  color: var(--v19pk-text);
+  background: var(--v19pk-surface);
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035);
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.v19pk-button--close {
+  min-width: 36px;
+  padding-inline: var(--v19pk-space-8);
+  color: var(--v19pk-text-soft);
+  background: rgb(255 255 255 / 0.035);
+}
+
+.v19pk-button--cta {
+  border-color: rgb(64 85 255 / 0.36);
+  color: var(--v19pk-text);
+  background: linear-gradient(180deg, rgb(64 85 255 / 0.24), rgb(64 85 255 / 0.12));
+  box-shadow: 0 12px 40px rgb(64 85 255 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.v19pk-button--confirm {
+  border-color: rgb(66 217 143 / 0.38);
+  color: var(--v19pk-text);
+  background: linear-gradient(180deg, rgb(66 217 143 / 0.22), rgb(66 217 143 / 0.1));
+  box-shadow: 0 12px 40px rgb(66 217 143 / 0.1), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.v19pk-button:not(:disabled):is(:hover, :focus-visible) {
+  border-color: var(--v19pk-line-strong);
+  background: var(--v19pk-surface-hover);
+}
+
+.v19pk-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.v19pk-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Universal cards/list motion. */
+.v19pk-card,
+.v19pk-list-cell,
+.ops-shell :where([data-submission-card], .vf-figma-action-row, .vf-figma-family-card, .vf-figma-individual-card, .v19-admin-cockpit-card, .vf-linear-submission-card, .vf-linear-family-card, .vf-linear-person-card, .vf-linear-issue-card, .vf-linear-media-row, .vf-admin-pipeline-card, .vf-admin-submission-decision-list article),
+.v19-create-drawer-shell :where(section, .v19-passport-queue-card, .v19-create-upload-zone, .v19-passport-live-indicator),
+.v19-figma-drawer-shell :where(article, section, .admin-review-empty-card, .admin-ai-assist, .admin-review-issues-list > button) {
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease !important;
+}
+
+.ops-shell :where([data-submission-card], .vf-figma-action-row, .vf-figma-family-card, .vf-figma-individual-card, .v19-admin-cockpit-card, .vf-linear-submission-card, .vf-linear-family-card, .vf-linear-person-card, .vf-linear-issue-card, .vf-linear-media-row):is(:hover, :focus-visible),
+.v19-create-drawer-shell :where(.v19-passport-queue-card, .v19-create-upload-zone):is(:hover, :focus-within),
+.v19-figma-drawer-shell :where(.admin-review-issues-list article, .admin-review-empty-card):is(:hover, :focus-within) {
+  transform: translateY(-1px) !important;
+  border-color: var(--v19pk-line-strong) !important;
+  background: var(--v19pk-surface-hover) !important;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.18) !important;
+}
+
+/* Compact information panels: max ~20% of screen. */
+.v19-admin-cockpit-hero,
+.v19-admin-cockpit-metrics,
+.vf-linear-metrics,
+.vf-admin-pipeline-hero,
+.vf-admin-pipeline-metrics,
+.v19pk-info-strip {
+  max-height: min(20vh, 154px) !important;
+}
+
+.v19-admin-cockpit-hero,
+.vf-admin-pipeline-hero {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: var(--v19pk-space-12) !important;
+  min-height: 0 !important;
+  padding: var(--v19pk-space-12) var(--v19pk-space-16) !important;
+  overflow: hidden !important;
+}
+
+.v19-admin-cockpit-hero h2,
+.vf-admin-pipeline-hero h2 {
+  margin: var(--v19pk-space-2) 0 !important;
+  font-size: 18px !important;
+  line-height: 1.05 !important;
+}
+
+.v19-admin-cockpit-hero p,
+.vf-admin-pipeline-hero p {
+  display: -webkit-box !important;
+  max-width: 78ch !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  color: var(--v19pk-text-soft) !important;
+  font-size: var(--v19pk-small-font-size) !important;
+  line-height: 1.25 !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+.v19-admin-cockpit-metrics,
+.vf-linear-metrics,
+.vf-admin-pipeline-metrics {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)) !important;
+  gap: var(--v19pk-space-8) !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+}
+
+.v19-admin-cockpit-metric,
+.vf-linear-metrics article,
+.vf-admin-pipeline-metrics article {
+  min-height: 68px !important;
+  padding: var(--v19pk-space-8) var(--v19pk-space-12) !important;
+  border-radius: var(--v19pk-radius-lg) !important;
+}
+
+.v19-admin-cockpit-metric strong,
+.vf-linear-metrics strong,
+.vf-admin-pipeline-metrics strong {
+  font-size: clamp(20px, 3vw, 30px) !important;
+  line-height: 1 !important;
+}
+
+.v19-admin-cockpit-metric span,
+.vf-linear-metrics small,
+.vf-linear-metrics span,
+.vf-admin-pipeline-metrics small,
+.vf-admin-pipeline-metrics span {
+  font-size: var(--v19pk-small-font-size) !important;
+  line-height: 1.12 !important;
+}
+
+.v19pk-info-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--v19pk-space-12);
+  min-height: 0;
+  padding: var(--v19pk-space-8) var(--v19pk-space-12);
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-xl);
+  background: var(--v19pk-bg);
+  overflow: hidden;
+}
+
+.v19pk-info-title {
+  color: var(--v19pk-text-soft);
+  font-size: var(--v19pk-small-font-size);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.v19pk-info-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: var(--v19pk-space-8);
+  min-width: 0;
+}
+
+.v19pk-info-item {
+  display: grid;
+  gap: var(--v19pk-space-2);
+  min-height: 54px;
+  padding: var(--v19pk-space-8);
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-md);
+  background: var(--v19pk-surface);
+}
+
+.v19pk-info-item span,
+.v19pk-info-item em {
+  color: var(--v19pk-text-muted);
+  font-size: var(--v19pk-small-font-size);
+  font-style: normal;
+  line-height: 1.1;
+}
+
+.v19pk-info-item b {
+  color: var(--v19pk-text);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.v19pk-info-item.tone-success b { color: var(--v19pk-green); }
+.v19pk-info-item.tone-danger b { color: var(--v19pk-red); }
+.v19pk-info-item.tone-warning b { color: var(--v19pk-amber); }
+
+/* Universal tab/search/filter bar. */
+.v19pk-tab-search,
+.v19-admin-cockpit-toolbar,
+.v19-submission-reference-filterbar,
+.v19-agent-actions-reference-toolbar.v19-collection-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: grid !important;
+  grid-template-columns: minmax(0, auto) minmax(180px, 1fr) auto auto !important;
+  align-items: center !important;
+  gap: var(--v19pk-space-8) !important;
+  margin: 0 0 var(--v19pk-space-12) !important;
+  padding: var(--v19pk-space-8) !important;
+  border: 1px solid var(--v19pk-line) !important;
+  border-radius: var(--v19pk-radius-xl) !important;
+  background: rgb(12 12 14 / 0.78) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+.v19pk-tabs,
+.v19-admin-cockpit-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--v19pk-space-4) !important;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.v19pk-tabs::-webkit-scrollbar,
+.v19-admin-cockpit-tabs::-webkit-scrollbar { display: none; }
+
+.v19pk-tabs button,
+.v19-admin-cockpit-tabs button,
+.v19-submission-reference-filter-trigger {
+  display: inline-flex !important;
+  min-height: 32px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--v19pk-space-4) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--v19pk-radius-md) !important;
+  padding: 0 var(--v19pk-space-8) !important;
+  color: var(--v19pk-text-muted) !important;
+  background: transparent !important;
+  font-size: var(--v19pk-small-font-size) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.v19pk-tabs button.is-active,
+.v19-admin-cockpit-tabs button.is-active,
+.v19-submission-reference-filter-trigger.is-active,
+.v19pk-tabs button:is(:hover, :focus-visible),
+.v19-admin-cockpit-tabs button:is(:hover, :focus-visible),
+.v19-submission-reference-filter-trigger:is(:hover, :focus-visible) {
+  border-color: var(--v19pk-line-strong) !important;
+  color: var(--v19pk-text) !important;
+  background: var(--v19pk-surface-hover) !important;
+}
+
+.v19pk-tabs em,
+.v19-admin-cockpit-tabs span {
+  min-width: 18px;
+  padding: var(--v19pk-space-4) var(--v19pk-space-4);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: var(--v19pk-text-soft);
+  font-size: var(--v19pk-tag-font-size);
+  font-style: normal;
+}
+
+.v19pk-search,
+.v19-admin-cockpit-search,
+.v19-submission-reference-search :is(.search, .mp-searchbar, .mp-search-input) {
+  display: flex !important;
+  min-width: 0 !important;
+  min-height: 34px !important;
+  align-items: center !important;
+  gap: var(--v19pk-space-8) !important;
+  border: 1px solid var(--v19pk-line) !important;
+  border-radius: var(--v19pk-radius-md) !important;
+  padding: 0 var(--v19pk-space-10, 10px) !important;
+  color: var(--v19pk-text-muted) !important;
+  background: var(--v19pk-surface) !important;
+}
+
+.v19pk-search input,
+.v19-admin-cockpit-search input,
+.v19-submission-reference-search input {
+  width: 100% !important;
+  min-width: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: var(--v19pk-text) !important;
+  font-size: var(--v19pk-small-font-size) !important;
+}
+
+.v19pk-search input::placeholder,
+.v19-admin-cockpit-search input::placeholder,
+.v19-submission-reference-search input::placeholder {
+  color: var(--v19pk-text-muted) !important;
+}
+
+/* Universal side menu + right rail. */
+.v19pk-side-menu,
+.vf-agent-actions-side-menu {
+  position: sticky !important;
+  top: var(--v19pk-space-12) !important;
+  align-self: start !important;
+  display: grid !important;
+  gap: var(--v19pk-space-4) !important;
+  min-width: 160px !important;
+  max-width: 204px !important;
+  padding: var(--v19pk-space-8) !important;
+  border: 1px solid var(--v19pk-line) !important;
+  border-radius: var(--v19pk-radius-xl) !important;
+  background: rgb(13 13 16 / 0.72) !important;
+  backdrop-filter: blur(18px) !important;
+  box-shadow: none !important;
+}
+
+.v19pk-side-menu > span,
+.vf-agent-actions-side-menu > span {
+  padding: var(--v19pk-space-4) var(--v19pk-space-8) !important;
+  color: var(--v19pk-text-muted) !important;
+  font-size: var(--v19pk-small-font-size) !important;
+}
+
+.v19pk-side-menu button,
+.vf-agent-actions-side-menu button {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: var(--v19pk-space-4) !important;
+  min-height: 32px !important;
+  padding: var(--v19pk-space-4) var(--v19pk-space-8) !important;
+  border-radius: var(--v19pk-radius-md) !important;
+  font-size: var(--v19pk-small-font-size) !important;
+}
+
+.v19pk-right-rail,
+.v19-admin-cockpit-rail,
+.agent-submission-context-rail {
+  border: 1px solid var(--v19pk-line) !important;
+  border-radius: var(--v19pk-radius-xl) !important;
+  background: rgb(13 13 16 / 0.82) !important;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.24) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+.v19pk-right-rail > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v19pk-space-8);
+  padding: var(--v19pk-space-12);
+  border-bottom: 1px solid var(--v19pk-line);
+}
+
+.v19pk-right-rail-body {
+  display: grid;
+  gap: var(--v19pk-space-8);
+  padding: var(--v19pk-space-12);
+}
+
+/* List cells. */
+.v19pk-list-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--v19pk-space-8);
+  width: 100%;
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-lg);
+  padding: var(--v19pk-space-12);
+  background: var(--v19pk-surface);
+  color: var(--v19pk-text);
+  text-align: left;
+}
+
+.v19pk-list-cell--dossier {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 72px;
+}
+
+.v19pk-list-cell--decision {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  border-radius: var(--v19pk-radius-xl);
+}
+
+.v19pk-list-main {
+  display: grid;
+  gap: var(--v19pk-space-4);
+  min-width: 0;
+}
+
+.v19pk-list-main strong {
+  overflow: hidden;
+  color: var(--v19pk-text);
+  font-size: 14px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v19pk-list-main em,
+.v19pk-list-body,
+.v19pk-list-footer {
+  color: var(--v19pk-text-soft);
+  font-size: var(--v19pk-small-font-size);
+  font-style: normal;
+}
+
+.v19pk-list-status,
+.v19pk-list-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--v19pk-space-4);
+}
+
+/* Bottom sheet. */
+.v19pk-bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  border: 0;
+  background: rgb(0 0 0 / 0.48);
+}
+
+.v19pk-bottom-sheet {
+  position: fixed;
+  inset-inline: var(--v19pk-space-8);
+  bottom: var(--v19pk-space-8);
+  z-index: 81;
+  display: grid;
+  gap: var(--v19pk-space-12);
+  max-height: min(76vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--v19pk-line-strong);
+  border-radius: var(--v19pk-radius-xl);
+  padding: var(--v19pk-space-16);
+  background: rgb(13 13 16 / 0.96);
+  box-shadow: 0 28px 120px rgb(0 0 0 / 0.46);
+  backdrop-filter: blur(24px);
+}
+
+/* Create drawer redesign / responsive. */
+.v19-create-drawer-shell {
+  background: rgb(10 10 12 / 0.98) !important;
+}
+
+.v19-create-drawer-shell .flex-1.overflow-y-auto {
+  padding: var(--v19pk-space-16) clamp(var(--v19pk-space-12), 3vw, var(--v19pk-space-24)) !important;
+}
+
+.v19-create-drawer-shell .create-submission-passport-shell {
+  width: min(100%, 1180px) !important;
+}
+
+.v19-create-drawer-shell .grid.grid-cols-1.lg\:grid-cols-\[1\.3fr_1fr\] {
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.72fr) !important;
+  gap: var(--v19pk-space-16) !important;
+}
+
+.v19-create-drawer-shell section {
+  border-radius: var(--v19pk-radius-xl) !important;
+}
+
+.v19-create-drawer-header,
+.v19-create-drawer-footer,
+.v19-figma-drawer-shell .v19-figma-drawer-header,
+.v19-figma-drawer-shell .admin-review-footer {
+  backdrop-filter: blur(20px) !important;
+}
+
+.v19-create-upload-zone,
+.v19-create-drawer-shell [aria-label="Загрузить паспорт"] {
+  min-height: clamp(220px, 34vh, 390px) !important;
+  border-radius: var(--v19pk-radius-xl) !important;
+}
+
+.v19-create-footer-action,
+.v19-create-upload-button,
+.admin-review-primary,
+.admin-review-secondary,
+.v19-drawer-footer-action--primary,
+.v19-drawer-footer-action--ghost,
+.primary-button,
+.secondary-button,
+.ghost-button,
+.mp-button,
+.v19-admin-row-action {
+  min-height: 36px !important;
+  border-radius: var(--v19pk-radius-md) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.v19-create-footer-action--primary,
+.admin-review-primary,
+.primary-button,
+.v19-drawer-footer-action--primary {
+  border-color: rgb(64 85 255 / 0.36) !important;
+  background: linear-gradient(180deg, rgb(64 85 255 / 0.22), rgb(64 85 255 / 0.1)) !important;
+  box-shadow: 0 12px 40px rgb(64 85 255 / 0.1) !important;
+}
+
+.v19-create-footer-action--secondary,
+.admin-review-secondary,
+.secondary-button,
+.ghost-button,
+.v19-drawer-footer-action--ghost {
+  border-color: var(--v19pk-line) !important;
+  background: var(--v19pk-surface) !important;
+}
+
+/* Admin remarks. */
+.admin-review-issues-list {
+  display: grid !important;
+  gap: var(--v19pk-space-8) !important;
+}
+
+.v19-admin-issues-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v19pk-space-4);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--v19pk-space-8);
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-xl);
+  background: rgb(255 255 255 / 0.035);
+}
+
+.v19-admin-issues-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v19pk-space-4);
+}
+
+.v19-admin-issues-tabs button,
+.admin-review-issues-list > button,
+.admin-review-ai-conflicts footer button,
+.admin-review-issues-list article > button {
+  display: inline-flex !important;
+  min-height: 30px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--v19pk-space-4) !important;
+  border: 1px solid var(--v19pk-line) !important;
+  border-radius: var(--v19pk-radius-md) !important;
+  padding: 0 var(--v19pk-space-8) !important;
+  background: var(--v19pk-surface) !important;
+  color: var(--v19pk-text-soft) !important;
+  font-size: var(--v19pk-small-font-size) !important;
+}
+
+.v19-admin-issues-tabs button.is-active,
+.admin-review-issues-list > button:is(:hover, :focus-visible),
+.admin-review-issues-list article > button:is(:hover, :focus-visible) {
+  border-color: var(--v19pk-line-strong) !important;
+  background: var(--v19pk-surface-hover) !important;
+  color: var(--v19pk-text) !important;
+}
+
+.v19-admin-issue-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--v19pk-space-8);
+  padding: var(--v19pk-space-12);
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-xl);
+  background: var(--v19pk-surface);
+}
+
+.v19-admin-issue-card header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v19pk-space-4);
+  align-items: center;
+}
+
+.v19-admin-issue-card strong {
+  color: var(--v19pk-text);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.v19-admin-issue-card p {
+  margin: var(--v19pk-space-4) 0 0;
+  color: var(--v19pk-text-soft);
+  font-size: var(--v19pk-small-font-size);
+  line-height: 1.35;
+}
+
+/* Admin direct decision list. */
+.v19-admin-card-actions,
+.vf-admin-submission-decision-list article .v19-admin-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v19pk-space-4);
+  align-items: center;
+}
+
+.v19-admin-card-actions button,
+.vf-admin-submission-decision-list article > button,
+.vf-admin-submission-decision-list .mp-button {
+  min-height: 30px !important;
+  border-radius: var(--v19pk-radius-md) !important;
+  padding-inline: var(--v19pk-space-8) !important;
+  font-size: var(--v19pk-small-font-size) !important;
+}
+
+.v19-admin-card-actions .is-confirm {
+  border-color: rgb(66 217 143 / 0.38) !important;
+  background: var(--v19pk-green-soft) !important;
+}
+
+.v19-admin-card-actions .is-return {
+  border-color: rgb(239 68 68 / 0.36) !important;
+  background: var(--v19pk-red-soft) !important;
+}
+
+/* Admin upload pipeline: clarified export vs return intake. */
+.vf-admin-pipeline-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--v19pk-space-8);
+}
+
+.vf-admin-pipeline-flow article {
+  display: grid;
+  gap: var(--v19pk-space-4);
+  min-height: 88px;
+  padding: var(--v19pk-space-12);
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-lg);
+  background: var(--v19pk-surface);
+}
+
+.vf-admin-pipeline-flow span {
+  width: max-content;
+  min-width: 20px;
+  border-radius: 999px;
+  padding: var(--v19pk-space-4) var(--v19pk-space-8);
+  background: var(--v19pk-blue-soft);
+  color: var(--v19pk-text);
+  font-size: var(--v19pk-tag-font-size);
+}
+
+.vf-admin-pipeline-flow strong {
+  color: var(--v19pk-text);
+  font-size: 14px;
+}
+
+.vf-admin-pipeline-flow em {
+  color: var(--v19pk-text-soft);
+  font-size: var(--v19pk-small-font-size);
+  font-style: normal;
+  line-height: 1.32;
+}
+
+.vf-admin-pipeline-split-note {
+  display: grid;
+  gap: var(--v19pk-space-4);
+  padding: var(--v19pk-space-12);
+  border: 1px solid rgb(64 85 255 / 0.22);
+  border-radius: var(--v19pk-radius-lg);
+  background: var(--v19pk-blue-soft);
+}
+
+.vf-admin-pipeline-split-note strong {
+  color: var(--v19pk-text);
+}
+
+.vf-admin-pipeline-split-note span {
+  color: var(--v19pk-text-soft);
+  font-size: var(--v19pk-small-font-size);
+  line-height: 1.35;
+}
+
+/* Mobile: content first, panels as sheets/docks. */
+@media (max-width: 900px) {
+  .v19-admin-cockpit-hero,
+  .vf-admin-pipeline-hero {
+    grid-template-columns: minmax(0, 1fr) !important;
+    max-height: 126px !important;
+    padding: var(--v19pk-space-12) !important;
+  }
+
+  .v19-admin-cockpit-hero-cta,
+  .vf-admin-pipeline-hero-actions {
+    display: none !important;
+  }
+
+  .v19-admin-cockpit-metrics,
+  .vf-linear-metrics,
+  .vf-admin-pipeline-metrics {
+    grid-auto-flow: column !important;
+    grid-auto-columns: minmax(132px, 40vw) !important;
+    grid-template-columns: none !important;
+    max-height: 96px !important;
+    overflow-x: auto !important;
+    padding-bottom: var(--v19pk-space-4) !important;
+    scrollbar-width: none !important;
+  }
+
+  .v19-admin-cockpit-metrics::-webkit-scrollbar,
+  .vf-linear-metrics::-webkit-scrollbar,
+  .vf-admin-pipeline-metrics::-webkit-scrollbar { display: none; }
+
+  .v19pk-tab-search,
+  .v19-admin-cockpit-toolbar,
+  .v19-submission-reference-filterbar,
+  .v19-agent-actions-reference-toolbar.v19-collection-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    border-radius: var(--v19pk-radius-lg) !important;
+  }
+
+  .v19pk-tabs,
+  .v19-admin-cockpit-tabs {
+    grid-column: 1 / -1;
+    order: 2;
+  }
+
+  .v19pk-search,
+  .v19-admin-cockpit-search,
+  .v19-submission-reference-search {
+    grid-column: 1;
+  }
+
+  .v19-admin-cockpit-rail,
+  .agent-submission-context-rail,
+  .v19pk-right-rail {
+    position: fixed !important;
+    inset-inline: var(--v19pk-space-8) !important;
+    bottom: var(--v19pk-space-8) !important;
+    top: auto !important;
+    z-index: 70 !important;
+    max-height: 72vh !important;
+    overflow: auto !important;
+  }
+
+  .v19-actions-screen {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .vf-agent-actions-side-menu,
+  .v19pk-side-menu {
+    position: static !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: max-content !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
+  }
+
+  .vf-admin-pipeline-flow {
+    grid-template-columns: 1fr !important;
+  }
+
+  .v19-create-drawer-shell .grid.grid-cols-1.lg\:grid-cols-\[1\.3fr_1fr\] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .v19-create-drawer-shell .flex-1.overflow-y-auto {
+    padding: var(--v19pk-space-12) !important;
+  }
+
+  .v19-create-upload-zone,
+  .v19-create-drawer-shell [aria-label="Загрузить паспорт"] {
+    min-height: 210px !important;
+  }
+
+  .v19-create-drawer-footer,
+  .admin-review-footer,
+  .v19-figma-drawer-footer {
+    gap: var(--v19pk-space-8) !important;
+  }
+
+  .v19-create-drawer-footer > div,
+  .admin-review-footer > div,
+  .v19-figma-drawer-footer > div {
+    width: 100% !important;
+  }
+
+  .v19-create-footer-action,
+  .admin-review-primary,
+  .admin-review-secondary {
+    width: 100% !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+.v19-admin-issue-list-stack {
+  display: grid;
+  gap: var(--v19pk-space-8);
+}
+
+.v19-admin-issues-tabs button span {
+  min-width: 16px;
+  padding: var(--v19pk-space-4);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: var(--v19pk-text-soft);
+  font-size: var(--v19pk-tag-font-size);
+}
+
+/* Round 4 constructor polish: compact panels, content-first screens, consistent motion. */
+.vf-linear-screen,
+.v19-actions-cockpit-shell,
+.v19-admin-cockpit-main,
+.vf-admin-pipeline,
+.v19-create-drawer-shell,
+.v19-figma-drawer-shell {
+  --v19pk-active-text-size: 14px;
+  --v19pk-secondary-text-size: 12px;
+  --v19pk-active-weight: 500;
+}
+
+.vf-linear-screen > .v19pk-info-strip,
+.vf-admin-pipeline > .v19pk-info-strip,
+.v19-admin-cockpit-metrics,
+.vf-linear-metrics,
+.vf-admin-pipeline-metrics {
+  flex: 0 0 auto !important;
+  max-height: min(20dvh, 112px) !important;
+  margin-block: 0 var(--v19pk-space-8) !important;
+}
+
+.v19pk-info-strip.vf-linear-metrics,
+.v19pk-info-strip.vf-admin-pipeline-metrics {
+  grid-template-columns: minmax(132px, 0.42fr) minmax(0, 1fr) auto !important;
+  min-height: 64px !important;
+  padding: var(--v19pk-space-8) var(--v19pk-space-12) !important;
+}
+
+.v19pk-info-strip.vf-linear-metrics .v19pk-info-item,
+.v19pk-info-strip.vf-admin-pipeline-metrics .v19pk-info-item {
+  min-height: 44px !important;
+  padding: var(--v19pk-space-4) var(--v19pk-space-8) !important;
+}
+
+.v19pk-info-strip.vf-linear-metrics .v19pk-info-item b,
+.v19pk-info-strip.vf-admin-pipeline-metrics .v19pk-info-item b {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.vf-linear-screen--drafts,
+.vf-linear-screen--media,
+.vf-linear-screen--issues,
+.vf-admin-pipeline {
+  align-content: start !important;
+  gap: var(--v19pk-space-12) !important;
+}
+
+.vf-linear-card-list,
+.vf-linear-media-list,
+.vf-linear-issue-list,
+.vf-admin-submission-decision-list,
+.vf-admin-artifact-list {
+  min-height: 0 !important;
+  gap: var(--v19pk-space-8) !important;
+}
+
+.vf-linear-submission-card,
+.vf-linear-media-row,
+.vf-linear-issue-card,
+.vf-admin-submission-decision-list article,
+.vf-admin-artifact-list article,
+.vf-admin-city-plan article,
+.vf-admin-agent-plan article {
+  min-height: 0 !important;
+  padding: var(--v19pk-space-12) !important;
+}
+
+.vf-linear-section-head {
+  min-height: 44px !important;
+  padding-block: var(--v19pk-space-4) !important;
+}
+
+.vf-linear-section-head strong,
+.vf-linear-card-title-row h3,
+.vf-linear-family-card h3,
+.vf-linear-person-card h3,
+.vf-admin-pipeline-card h3,
+.v19-admin-issue-card strong,
+.v19-admin-issues-command strong {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.vf-linear-section-head small,
+.vf-linear-meta-row span,
+.vf-linear-problem,
+.vf-admin-pipeline-card-head span,
+.vf-admin-pipeline-flow em,
+.v19-admin-issues-command em,
+.v19-admin-issue-card p,
+.v19-admin-issue-card small {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.vf-linear-status-pill,
+.vf-linear-meta-row span,
+.v19-admin-issue-card header em,
+.v19-admin-issue-card header span,
+.v19-admin-issues-tabs button span,
+.vf-admin-artifact-kind,
+.vf-admin-pipeline-flow span {
+  min-height: 16px !important;
+  padding: 4px 6px !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+}
+
+.v19-create-drawer-shell .create-submission-passport-upload-zone,
+.v19-create-drawer-shell [aria-label="Загрузить паспорт"] {
+  min-height: clamp(168px, 24dvh, 260px) !important;
+  padding: var(--v19pk-space-16) !important;
+}
+
+.v19-create-drawer-shell .create-submission-passport-upload-zone h3,
+.v19-create-drawer-shell .create-submission-passport-upload-zone .text-\[var\(--v19b-size-15\)\] {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.v19-create-drawer-shell .create-submission-family-grid,
+.v19-create-drawer-shell .grid.gap-2,
+.v19-create-drawer-shell .flex.flex-col.gap-6 {
+  gap: var(--v19pk-space-8) !important;
+}
+
+.v19-create-drawer-shell .rounded-\[var\(--v19b-size-14\)\],
+.v19-create-drawer-shell .v19-passport-queue-card,
+.v19-create-drawer-shell .v19-passport-live-indicator {
+  border-radius: var(--v19pk-radius-lg) !important;
+}
+
+.v19-admin-issues-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--v19pk-space-8);
+  padding: var(--v19pk-space-12);
+  border: 1px solid var(--v19pk-line);
+  border-radius: var(--v19pk-radius-xl);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.025));
+}
+
+.v19-admin-issues-command > div {
+  display: grid;
+  gap: var(--v19pk-space-4);
+  min-width: 0;
+}
+
+.v19-admin-issues-command > div > span {
+  color: var(--v19pk-text-muted);
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.v19-admin-issues-command button,
+.vf-admin-agent-plan article button,
+.vf-admin-submission-decision-list .v19pk-button,
+.vf-admin-access-actions .v19pk-button {
+  min-height: 32px !important;
+  padding-inline: var(--v19pk-space-8) !important;
+  border-radius: var(--v19pk-radius-md) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.vf-admin-pipeline-flow small {
+  width: max-content;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 4px 6px;
+  background: rgb(255 255 255 / 0.06);
+  color: var(--v19pk-text-soft);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vf-admin-pipeline-card,
+.vf-admin-pipeline-flow article,
+.v19-admin-issues-command,
+.v19-admin-issue-card,
+.vf-linear-submission-card,
+.vf-linear-family-card,
+.vf-linear-person-card,
+.vf-linear-media-row,
+.vf-linear-issue-card {
+  will-change: transform, opacity;
+}
+
+.vf-admin-pipeline-card:is(:hover, :focus-within),
+.vf-admin-pipeline-flow article:is(:hover, :focus-within),
+.vf-admin-city-plan article:is(:hover, :focus-within),
+.vf-admin-agent-plan article:is(:hover, :focus-within),
+.vf-admin-submission-decision-list article:is(:hover, :focus-within) {
+  transform: translateY(-1px) !important;
+  border-color: var(--v19pk-line-strong) !important;
+  background: var(--v19pk-surface-hover) !important;
+}
+
+@media (min-width: 901px) {
+  .v19-create-drawer-shell .create-submission-passport-shell {
+    max-height: calc(100dvh - 112px) !important;
+  }
+
+  .v19-create-drawer-shell .hidden.lg\:flex.flex-col.h-full {
+    max-height: calc(100dvh - 154px) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .v19pk-info-strip.vf-linear-metrics,
+  .v19pk-info-strip.vf-admin-pipeline-metrics {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    max-height: 96px !important;
+    gap: var(--v19pk-space-4) !important;
+  }
+
+  .v19pk-info-strip.vf-linear-metrics .v19pk-info-title,
+  .v19pk-info-strip.vf-admin-pipeline-metrics .v19pk-info-title {
+    display: none !important;
+  }
+
+  .v19-create-drawer-shell .create-submission-passport-upload-zone,
+  .v19-create-drawer-shell [aria-label="Загрузить паспорт"] {
+    min-height: 168px !important;
+  }
+
+  .v19-admin-issues-command {
+    grid-template-columns: 1fr !important;
+  }
+}

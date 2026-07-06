@@ -87,16 +87,11 @@ describe("AdminReviewDrawer", () => {
       "Агент: Татьяна Николаева",
     );
 
-    for (const tab of [
-      /^Обзор$/,
-      /^Заявители$/,
-      /^Анкета/,
-      /^Файлы$/,
-      /^Замечания/,
-      /^История$/,
-    ]) {
+    for (const tab of [/^Обзор$/, /^Анкета/, /^Файлы$/, /^Замечания/]) {
       expect(screen.getByRole("tab", { name: tab })).toBeVisible();
     }
+    expect(screen.queryByRole("tab", { name: /^Заявители$/ })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /^История$/ })).toBeNull();
   });
 
   test("creates only canonical admin issue targets", () => {

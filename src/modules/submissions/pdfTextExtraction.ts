@@ -107,7 +107,7 @@ export async function extractPdfTextFromFile(file: File): Promise<ExtractedPdfTe
   const loadingTask = pdfjs.getDocument({
     data: bytes,
     isEvalSupported: false,
-  });
+  } as unknown as Parameters<typeof pdfjs.getDocument>[0]);
   const document = (await loadingTask.promise) as unknown as PdfDocumentProxy;
   const pages: string[] = [];
 

@@ -15,8 +15,14 @@ export type UserRole = Role;
 
 export type Surface =
   | "agent-actions"
+  | "agent-drafts"
+  | "agent-applicants"
+  | "agent-media"
+  | "agent-issues"
   | "agent-submissions"
   | "admin-review"
+  | "admin-intake"
+  | "admin-access"
   | "export"
   | "settings";
 
