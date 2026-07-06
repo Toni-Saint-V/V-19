@@ -8,6 +8,7 @@ import {
   createMediaSignedUrl,
   deleteMediaFromStorage,
   mediaStorageBucket,
+  isPassportScanUploadFileAccepted,
   storageTargetForSlot,
   uploadMediaToStorage,
   validateAppointmentPdfStorageTarget,
@@ -260,6 +261,45 @@ describe("media storage contract", () => {
           "applicant-1",
           "passport_scan",
           "v19passport_passport_scan.heif",
+        ),
+      }),
+    ).not.toThrow();
+  });
+
+  test("accepts WEBP passport uploads and empty browser MIME with safe extensions", () => {
+    expect(isPassportScanUploadFileAccepted({ name: "passport.webp", type: "" })).toBe(
+      true,
+    );
+    expect(isPassportScanUploadFileAccepted({ name: "passport.PDF", type: "" })).toBe(
+      true,
+    );
+    expect(isPassportScanUploadFileAccepted({ name: "passport.gif", type: "" })).toBe(
+      false,
+    );
+    expect(
+      isPassportScanUploadFileAccepted({ name: "passport.pdf", type: "text/plain" }),
+    ).toBe(false);
+
+    expect(() =>
+      validateMediaStorageTarget({
+        file: new File(["x"], "passport.webp", { type: "image/webp" }),
+        target: buildMediaStoragePath(
+          "VF-1044",
+          "applicant-1",
+          "passport_scan",
+          "v19passport_passport_scan.webp",
+        ),
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      validateMediaStorageTarget({
+        file: { name: "passport.pdf", size: 1024, type: "" } as File,
+        target: buildMediaStoragePath(
+          "VF-1044",
+          "applicant-1",
+          "passport_scan",
+          "v19passport_passport_scan.pdf",
         ),
       }),
     ).not.toThrow();
