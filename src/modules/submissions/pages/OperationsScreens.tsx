@@ -1506,7 +1506,7 @@ function agentSubmissionCardAction(submission: Submission): {
     const target = targetForSubmissionTab(submission, "issues");
     return {
       label: "Исправить",
-      tab: drawerTabForScreenTarget(target, "issues"),
+      tab: "issues",
       target,
     };
   }
@@ -3527,6 +3527,13 @@ function AdminExportReferenceCockpit({
       ),
     [exportReadyList, selectedExportIdSet],
   );
+  const previewColumns = exportPlan.preview.headers.slice(0, 9);
+  const previewRows = exportPlan.preview.rows.slice(0, 4);
+  const mappingAudit = buildExportMappingAudit(exportPlan.preview);
+  const mappingRows = mappingAudit.rows;
+  const mappedCount = mappingAudit.mappedCount;
+  const derivedCount = mappingAudit.derivedCount;
+  const unresolvedCount = mappingAudit.unresolvedCount;
   const activeSubmission =
     selectedReadySubmissions[0] ??
     exportReadyList[0] ??
@@ -3652,12 +3659,13 @@ function AdminExportReferenceCockpit({
                 <button
                   className="v19-admin-export-icon-button"
                   type="button"
-                  aria-label="История"
+                  aria-label={showingHistory ? "Пакеты" : "История"}
                   onClick={() =>
                     transitionUiState(() => onTab(showingHistory ? "ready" : "history"))
                   }
                 >
                   <Filter aria-hidden="true" focusable="false" size={16} />
+                  <span>{showingHistory ? "Пакеты" : "История"}</span>
                 </button>
               </div>
             </div>
@@ -3789,6 +3797,78 @@ function AdminExportReferenceCockpit({
               {checks.map((check) => (
                 <AdminExportCheckRow key={check.label} {...check} />
               ))}
+            </div>
+          </section>
+
+          <section
+            className="v19-admin-export-rail-card export-preview magic-export-preview"
+            aria-label="Предпросмотр Excel"
+          >
+            <div
+              className="excel-table export-preview-sheet"
+              aria-label="Предпросмотр Sheet1"
+              tabIndex={0}
+            >
+              {exportPlan.rowCount === 0 ? (
+                <p className="export-preview-empty-title">Пакет не выбран</p>
+              ) : null}
+              <div className="sheet-head">
+                <span />
+                <span />
+                <span />
+                <strong>{exportPlan.contract.sheetName} · предпросмотр</strong>
+              </div>
+              <div className="excel-head">
+                <span>#</span>
+                {previewColumns.map((header) => (
+                  <span key={header}>{header}</span>
+                ))}
+              </div>
+              {previewRows.map((row, rowIndex) => (
+                <div
+                  className={`excel-row ${
+                    exportPlan.rows[rowIndex]?.applicantCount &&
+                    exportPlan.rows[rowIndex].applicantCount > 1
+                      ? "is-family"
+                      : ""
+                  }`}
+                  key={`${exportPlan.rows[rowIndex]?.submissionId ?? "row"}-${rowIndex}`}
+                >
+                  <span>{rowIndex + 1}</span>
+                  {row.slice(0, previewColumns.length).map((value, cellIndex) => (
+                    <span key={`${cellIndex}-${value}`}>
+                      {maskPreviewValue(value)}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <p className="sheet-caption">
+              Показаны первые 9 из 56 колонок. Один заявитель = одна строка; члены
+              семьи идут последовательным блоком.
+            </p>
+          </section>
+
+          <section className="v19-admin-export-rail-card v17-export-mapping-card">
+            <div className="mapping-audit" aria-label="Аудит сопоставления 56 колонок">
+              <div className="mapping-audit-head">
+                <strong>Контракт A:BD</strong>
+                <span>
+                  {mappedCount} связано · {derivedCount} вычислено ·{" "}
+                  {unresolvedCount} не сопоставлено
+                </span>
+              </div>
+              <div className="mapping-audit-scroll" tabIndex={0}>
+                {mappingRows.map((row) => (
+                  <div className="mapping-row" key={row.header}>
+                    <span className="mapping-index">{row.index}</span>
+                    <span className="mapping-name">{row.header}</span>
+                    <span className={`mapping-state ${row.state}`}>
+                      {exportMappingStateLabel(row.state)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
 
@@ -3984,6 +4064,7 @@ function AdminExportRow({
 
   return (
     <article
+      aria-label={`${history ? "Выгруженный пакет" : blocked ? "Пакет с блокером" : "Пакет к выгрузке"} ${submission.title}`}
       className={`export-row v19-admin-export-row ${selected ? "is-selected" : ""} ${
         blocked ? "is-blocked" : ""
       } ${history ? "is-history" : ""}`}
