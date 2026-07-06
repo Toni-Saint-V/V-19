@@ -1,0 +1,24 @@
+{
+  "screenshot": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/drawer-reference-interface/target-drawer-390x844-issues-after-mobile-fix.png",
+  "overflowOk": true,
+  "hasAiHelperText": false,
+  "cardRect": {
+    "x": 21,
+    "y": 337.78125,
+    "w": 348,
+    "h": 150.25
+  },
+  "actionRect": {
+    "x": 36,
+    "y": 435.03125,
+    "w": 318,
+    "h": 38
+  },
+  "cardGrid": "40px 266px",
+  "titleColor": "rgba(255, 255, 255, 0.94)",
+  "headColor": "rgba(255, 255, 255, 0.94)",
+  "font": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+  "activeTab": "Замечания2",
+  "consoleErrors": [],
+  "pageErrors": []
+}

@@ -1,0 +1,282 @@
+{
+  "outDir": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/drawer-reference-transfer-pass-1",
+  "total": 5,
+  "failed": 5,
+  "results": [
+    {
+      "label": "320x740",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "drawerMetrics": {
+        "scrollWidth": 320,
+        "innerWidth": 320,
+        "overflow": false,
+        "drawer": {
+          "x": 0,
+          "y": 48,
+          "width": 320,
+          "height": 704
+        },
+        "headerHeight": 147,
+        "headerRatio": 0.199,
+        "fieldRow": {
+          "x": 21,
+          "y": 485,
+          "width": 278,
+          "height": 113
+        },
+        "tabCount": 6,
+        "hasApplicantSelect": true,
+        "hasVisibleAssist": false,
+        "visibleVerifyButtons": 7
+      },
+      "remarkMetrics": {
+        "form": {
+          "x": 12,
+          "y": 12,
+          "width": 296,
+          "height": 716
+        },
+        "layer": {
+          "x": 0,
+          "y": 0,
+          "width": 320,
+          "height": 740
+        },
+        "targetSectionVisible": true,
+        "templateButtons": 3,
+        "overflow": false
+      },
+      "workspaceMetrics": {
+        "workspace": {
+          "x": 0,
+          "y": 0,
+          "width": 320,
+          "height": 740
+        },
+        "mainDisplay": "grid",
+        "overflow": false
+      }
+    },
+    {
+      "label": "390x844",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "drawerMetrics": {
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "overflow": false,
+        "drawer": {
+          "x": 0,
+          "y": 48,
+          "width": 390,
+          "height": 808
+        },
+        "headerHeight": 133,
+        "headerRatio": 0.158,
+        "fieldRow": {
+          "x": 21,
+          "y": 439,
+          "width": 348,
+          "height": 113
+        },
+        "tabCount": 6,
+        "hasApplicantSelect": true,
+        "hasVisibleAssist": false,
+        "visibleVerifyButtons": 7
+      },
+      "remarkMetrics": {
+        "form": {
+          "x": 12,
+          "y": 12,
+          "width": 366,
+          "height": 820
+        },
+        "layer": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "targetSectionVisible": true,
+        "templateButtons": 3,
+        "overflow": false
+      },
+      "workspaceMetrics": {
+        "workspace": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "mainDisplay": "grid",
+        "overflow": false
+      }
+    },
+    {
+      "label": "430x932",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "drawerMetrics": {
+        "scrollWidth": 430,
+        "innerWidth": 430,
+        "overflow": false,
+        "drawer": {
+          "x": 0,
+          "y": 48,
+          "width": 430,
+          "height": 896
+        },
+        "headerHeight": 133,
+        "headerRatio": 0.143,
+        "fieldRow": {
+          "x": 21,
+          "y": 407,
+          "width": 388,
+          "height": 113
+        },
+        "tabCount": 6,
+        "hasApplicantSelect": true,
+        "hasVisibleAssist": false,
+        "visibleVerifyButtons": 7
+      },
+      "remarkMetrics": {
+        "form": {
+          "x": 12,
+          "y": 12,
+          "width": 406,
+          "height": 908
+        },
+        "layer": {
+          "x": 0,
+          "y": 0,
+          "width": 430,
+          "height": 932
+        },
+        "targetSectionVisible": true,
+        "templateButtons": 3,
+        "overflow": false
+      },
+      "workspaceMetrics": {
+        "workspace": {
+          "x": 0,
+          "y": 0,
+          "width": 430,
+          "height": 932
+        },
+        "mainDisplay": "grid",
+        "overflow": false
+      }
+    },
+    {
+      "label": "768x1024",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "drawerMetrics": {
+        "scrollWidth": 768,
+        "innerWidth": 768,
+        "overflow": false,
+        "drawer": {
+          "x": 0,
+          "y": 48,
+          "width": 768,
+          "height": 976
+        },
+        "headerHeight": 139,
+        "headerRatio": 0.136,
+        "fieldRow": {
+          "x": 21,
+          "y": 413,
+          "width": 726,
+          "height": 72
+        },
+        "tabCount": 6,
+        "hasApplicantSelect": true,
+        "hasVisibleAssist": false,
+        "visibleVerifyButtons": 7
+      },
+      "remarkMetrics": {
+        "form": {
+          "x": 192,
+          "y": 12,
+          "width": 384,
+          "height": 1000
+        },
+        "layer": {
+          "x": 0,
+          "y": 0,
+          "width": 768,
+          "height": 1024
+        },
+        "targetSectionVisible": true,
+        "templateButtons": 3,
+        "overflow": false
+      },
+      "workspaceMetrics": {
+        "workspace": {
+          "x": 0,
+          "y": 0,
+          "width": 768,
+          "height": 1024
+        },
+        "mainDisplay": "grid",
+        "overflow": false
+      }
+    },
+    {
+      "label": "1440x900",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "drawerMetrics": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "overflow": false,
+        "drawer": {
+          "x": 572,
+          "y": 8,
+          "width": 860,
+          "height": 884
+        },
+        "headerHeight": 142,
+        "headerRatio": 0.158,
+        "fieldRow": {
+          "x": 605,
+          "y": 376,
+          "width": 794,
+          "height": 72
+        },
+        "tabCount": 6,
+        "hasApplicantSelect": true,
+        "hasVisibleAssist": false,
+        "visibleVerifyButtons": 7
+      },
+      "remarkMetrics": {
+        "form": {
+          "x": 360,
+          "y": 12,
+          "width": 720,
+          "height": 876
+        },
+        "layer": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 900
+        },
+        "targetSectionVisible": true,
+        "templateButtons": 3,
+        "overflow": false
+      },
+      "workspaceMetrics": {
+        "workspace": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 900
+        },
+        "mainDisplay": "grid",
+        "overflow": false
+      }
+    }
+  ]
+}

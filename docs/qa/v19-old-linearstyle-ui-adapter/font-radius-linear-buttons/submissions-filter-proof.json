@@ -1,0 +1,44 @@
+{
+  "shot": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/font-radius-linear-buttons/submissions-filter-linear-sheet-390x844.png",
+  "metrics": {
+    "overflowOk": true,
+    "close": {
+      "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+      "borderRadius": "8px",
+      "backgroundColor": "rgb(30, 30, 33)",
+      "borderColor": "rgb(36, 37, 41)",
+      "color": "rgba(255, 255, 255, 0.7)",
+      "boxShadow": "none",
+      "stroke": "rgba(255, 255, 255, 0.7)",
+      "text": ""
+    },
+    "footerPrimary": {
+      "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+      "borderRadius": "8px",
+      "backgroundColor": "rgb(16, 16, 17)",
+      "borderColor": "rgb(58, 69, 180)",
+      "color": "rgb(255, 255, 255)",
+      "boxShadow": "rgba(58, 69, 180, 0.2) 0px 0px 24px 0px",
+      "stroke": "none",
+      "text": "Готово"
+    },
+    "cityChip": {
+      "fontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+      "borderRadius": "8px",
+      "backgroundColor": "rgb(39, 39, 43)",
+      "borderColor": "rgb(58, 69, 180)",
+      "color": "rgb(255, 255, 255)",
+      "boxShadow": "none",
+      "stroke": "none",
+      "text": "Все города"
+    },
+    "carousel": {
+      "scrollWidth": 1156,
+      "clientWidth": 357
+    },
+    "consoleErrors": [],
+    "pageErrors": []
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

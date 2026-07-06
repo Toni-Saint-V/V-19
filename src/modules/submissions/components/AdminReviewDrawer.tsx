@@ -19,7 +19,7 @@ import {
   Image as ImageIcon,
   Info,
   MessageSquarePlus,
-  Save,
+  Send,
   ScanText,
   ShieldAlert,
   ShieldCheck,
@@ -48,7 +48,6 @@ import {
   openIssueCount,
   statusLabels,
 } from "../status";
-import { agentOwnerDisplayName } from "../ownership";
 import {
   fileLabel,
   targetElementId,
@@ -155,6 +154,12 @@ const mediaTargets: Array<{
   { id: "passport_scan", label: "Скан паспорта", shortLabel: "Паспорт" },
   { id: "selfie", label: "Селфи 1", shortLabel: "Селфи 1" },
   { id: "selfie_2", label: "Селфи N2", shortLabel: "Селфи 2" },
+];
+
+const remarkTemplates = [
+  "Значение в анкете не совпадает с документом. Проверьте и исправьте поле.",
+  "Документ читается не полностью. Загрузите файл в лучшем качестве.",
+  "Нужно добавить подтверждающий документ для этого поля.",
 ];
 
 export function AdminReviewDrawer({
@@ -536,17 +541,14 @@ export function AdminReviewDrawer({
               <p className="admin-review-meta">
                 {submission.city}
                 <span aria-hidden="true"> · </span>
-                Агент: {agentOwnerDisplayName(submission.agentId)}
-                <span aria-hidden="true"> · </span>
-                {openIssueCount(submission)} открытых замечаний
+                {openIssueCount(submission)} замечаний
               </p>
               <h2>
-                {submission.title}
+                Проверка пакета
                 <span className={`admin-review-status-pill is-${submission.status}`}>
                   {statusLabels[submission.status]}
                 </span>
               </h2>
-              <p className="admin-review-meta">Проверка пакета</p>
             </div>
             <button
               aria-label="Закрыть проверку"
@@ -750,18 +752,18 @@ export function AdminReviewDrawer({
           </button>
         </footer>
 
-        {remarkContext ? (
-          <AdminRemarkForm
-            context={remarkContext}
-            issueGuardReason={issueGuardReason}
-            submission={submission}
-            onClose={() => setRemarkContext(null)}
-            onDraftRemark={draftAdminRemark}
-            onSubmit={submitRemark}
-          />
-        ) : null}
-
       </motion.aside>
+
+      {remarkContext ? (
+        <AdminRemarkForm
+          context={remarkContext}
+          issueGuardReason={issueGuardReason}
+          submission={submission}
+          onClose={() => setRemarkContext(null)}
+          onDraftRemark={draftAdminRemark}
+          onSubmit={submitRemark}
+        />
+      ) : null}
 
       {passportWorkspaceOpen ? (
         <AdminPassportReviewWorkspace
@@ -910,45 +912,52 @@ function ApplicantChips({
   submission: Submission;
   onApplicant: (applicantId: string) => void;
 }) {
-  const reviewedApplicants = submission.applicants.filter(
-    (applicant) => applicant.questionnaireStatus === "complete" && applicant.fileStatus === "complete",
+  const selectedApplicant =
+    submission.applicants.find((applicant) => applicant.id === selectedApplicantId) ??
+    submission.applicants[0];
+  const selectedFields = selectedApplicant
+    ? selectedApplicant.sections.flatMap((section) => section.fields)
+    : [];
+  const reviewedFields = selectedFields.filter(
+    (field) => field.reviewState === "confirmed" || field.reviewConfirmedAtIso,
   ).length;
-  const openIssues = openIssueCount(submission);
+  const remainingFields = Math.max(selectedFields.length - reviewedFields, 0);
+  const openIssues = selectedApplicant
+    ? submission.issues.filter(
+        (issue) =>
+          issue.status === "open" && issue.target.applicantId === selectedApplicant.id,
+      ).length
+    : openIssueCount(submission);
 
   return (
     <div className="admin-review-applicant-strip" aria-label="Заявители в проверке">
-      <div className="admin-review-family-progress">
-        <strong>{reviewedApplicants}/{submission.applicants.length}</strong>
-        <span>заявителей проверено</span>
-        <em className={openIssues ? "is-warning" : ""}>{openIssues} замечаний</em>
-      </div>
-      <div className="admin-review-applicant-chips">
-        {submission.applicants.map((applicant) => {
-          const issueCount = submission.issues.filter(
-            (issue) => issue.status === "open" && issue.target.applicantId === applicant.id,
-          ).length;
-          const selected = applicant.id === selectedApplicantId;
-          const status =
-            issueCount > 0
-              ? "has-remarks"
-              : applicant.fileStatus === "complete" && applicant.questionnaireStatus === "complete"
-                ? "accepted"
-                : "pending";
+      <label className="admin-review-applicant-select">
+        <span>Заявитель</span>
+        <select
+          value={selectedApplicant?.id ?? ""}
+          onChange={(event) => onApplicant(event.target.value)}
+        >
+          {submission.applicants.map((applicant) => (
+            <option key={applicant.id} value={applicant.id}>
+              {applicant.fullName} ({applicantRoleLabel(applicant.role)})
+            </option>
+          ))}
+        </select>
+      </label>
 
-          return (
-            <button
-              aria-pressed={selected}
-              className={`is-${status} ${selected ? "is-active" : ""}`}
-              key={applicant.id}
-              type="button"
-              onClick={() => onApplicant(applicant.id)}
-            >
-              <span>{applicantInitials(applicant.fullName)}</span>
-              <strong>{applicant.fullName}</strong>
-              {issueCount ? <em>{issueCount}</em> : null}
-            </button>
-          );
-        })}
+      <div className="admin-review-applicant-stats" aria-label="Статус проверки заявителя">
+        <span className="is-ok">
+          <CheckCircle2 aria-hidden="true" size={16} />
+          {reviewedFields} проверено
+        </span>
+        <span>
+          <i aria-hidden="true" />
+          {remainingFields} осталось
+        </span>
+        <span className={openIssues ? "is-warning" : ""}>
+          <AlertCircle aria-hidden="true" size={16} />
+          {openIssues} замечаний
+        </span>
       </div>
     </div>
   );
@@ -1726,20 +1735,36 @@ function FieldReviewRow({
       className={`admin-review-field-row is-${status} ${focused ? "is-ai-target" : ""}`}
     >
       <span aria-hidden="true" className="admin-review-row-dot" />
-      <span className="admin-review-row-label" title={row.label}>
-        {row.label}
-      </span>
-      <strong title={row.value || "Не заполнено"}>{row.value || "Не заполнено"}</strong>
-      <span className="admin-review-row-status">
-        {status === "ok" ? "Проверено" : status === "error" ? "Есть замечание" : "Проверить"}
+      <span className="admin-review-row-main">
+        <span className="admin-review-row-kicker">
+          <span className="admin-review-row-label" title={row.label}>
+            {row.label}
+          </span>
+          <span className={`admin-review-row-status is-${status}`}>
+            {status === "ok" ? "Проверено" : status === "error" ? "Есть замечание" : "Проверить"}
+          </span>
+        </span>
+        <strong title={row.value || "Не заполнено"}>{row.value || "Не заполнено"}</strong>
       </span>
       <span className="admin-review-row-actions">
         {onVerifyPassport ? (
-          <button aria-label={`Сверить с паспортом: ${row.label}`} type="button" onClick={onVerifyPassport}>
+          <button
+            aria-label={`Сверить с паспортом: ${row.label}`}
+            className="admin-review-row-verify"
+            type="button"
+            onClick={onVerifyPassport}
+          >
             <ScanText aria-hidden="true" size={13} />
+            <span>Сверить с паспортом</span>
           </button>
         ) : null}
-        <button aria-label={`Создать замечание: ${row.label}`} type="button" onClick={onRemark}>
+        <button
+          aria-label={`Создать замечание: ${row.label}`}
+          className="admin-review-row-remark"
+          title="Добавить замечание"
+          type="button"
+          onClick={onRemark}
+        >
           <MessageSquarePlus aria-hidden="true" size={14} />
         </button>
       </span>
@@ -1798,12 +1823,8 @@ function AdminRemarkForm({
   }, [context, defaultApplicant]);
 
   const selectedFileType = remarkTargetFileType(targetType) ?? context.fileType;
-  const issuePreviewId = nextAdminIssueId(submission);
   const fieldReference =
     context.checklistItemLabel || field.trim() || context.targetLabel || "раздел";
-  const targetReference = selectedFileType
-    ? `${fileLabel(selectedFileType)} / ${fieldReference}`
-    : `${context.sectionLabel ?? "Анкета"} / ${fieldReference}`;
   const canSubmit = Boolean(
     applicantId && reason.trim() && comment.trim() && !issueGuardReason,
   );
@@ -1875,10 +1896,10 @@ function AdminRemarkForm({
         <header>
           <div>
             <span>
-              <AlertCircle aria-hidden="true" size={20} />
+              <MessageSquarePlus aria-hidden="true" size={20} />
             </span>
             <div>
-              <h3>Создать замечание</h3>
+              <h3>Добавить замечание</h3>
               <p>
                 <strong>{submission.id}</strong>
                 <i aria-hidden="true" />
@@ -1894,16 +1915,19 @@ function AdminRemarkForm({
         <div className="admin-remark-body">
           <div className="admin-remark-reference" aria-label="Идентификатор замечания">
             <div>
-              <span>ID замечания</span>
-              <strong>{issuePreviewId}</strong>
+              <span>Поле</span>
+              <strong>{fieldReference}</strong>
             </div>
             <div>
-              <span>Переход агента</span>
-              <strong>{targetReference}</strong>
+              <span>Заявитель</span>
+              <strong>
+                {submission.applicants.find((applicant) => applicant.id === applicantId)
+                  ?.fullName ?? "Заявитель"}
+              </strong>
             </div>
           </div>
 
-          <section>
+          <section className="admin-remark-target-section">
             <label>
               <Target aria-hidden="true" size={14} />
               Где найдена ошибка?
@@ -1935,7 +1959,7 @@ function AdminRemarkForm({
             </div>
           </section>
 
-          <div className="admin-remark-grid">
+          <div className="admin-remark-grid admin-remark-edit-controls">
             <label>
               <span>
                 <User aria-hidden="true" size={14} />
@@ -1974,19 +1998,19 @@ function AdminRemarkForm({
                 type="button"
                 onClick={() => setSeverity("low")}
               >
-                Низкая (Рекомендация)
+                Исправить
               </button>
               <button
                 className={severity === "high" ? "is-active is-high" : ""}
                 type="button"
                 onClick={() => setSeverity("high")}
               >
-                Высокая (Blocker)
+                Критично
               </button>
             </div>
           </section>
 
-          <label>
+          <label className="admin-remark-reason">
             <span>Описание ошибки (для агента)</span>
             <textarea
               placeholder="Что именно не так..."
@@ -2008,14 +2032,27 @@ function AdminRemarkForm({
             </button>
           </div>
 
-          <label>
-            <span className="sr-only">Что нужно исправить?</span>
+          <label className="admin-remark-client-comment">
+            <span>Текст для клиента</span>
             <textarea
               placeholder="Конкретное действие для агента"
               value={comment}
               onChange={(event) => setComment(event.target.value)}
             />
           </label>
+
+          <div className="admin-remark-templates">
+            <span>Быстрые шаблоны</span>
+            {remarkTemplates.map((template) => (
+              <button
+                key={template}
+                type="button"
+                onClick={() => setComment(template)}
+              >
+                {template}
+              </button>
+            ))}
+          </div>
 
           {draftState.status === "unavailable" || draftState.status === "failed" ? (
             <p className="admin-remark-ai-status" role="status">
@@ -2048,8 +2085,8 @@ function AdminRemarkForm({
             Отмена
           </button>
           <button disabled={!canSubmit} type="button" onClick={submit}>
-            <Save aria-hidden="true" size={16} />
-            Создать замечание
+            <Send aria-hidden="true" size={16} />
+            Отправить замечание
           </button>
         </footer>
       </motion.div>
@@ -2248,10 +2285,6 @@ function questionnaireFieldCount(submission: Submission) {
   );
 }
 
-function nextAdminIssueId(submission: Submission) {
-  return `зм-${submission.id}-новое-${submission.issues.length + 1}`;
-}
-
 function issueTargetPath(issue: Submission["issues"][number]) {
   if (issue.target.fileType && issue.target.field) {
     return `${fileLabel(issue.target.fileType)} / ${issue.target.field}`;
@@ -2357,15 +2390,6 @@ function applicantRoleLabel(role: Applicant["role"] | undefined) {
   if (role === "spouse") return "супруга";
   if (role === "child") return "ребенок";
   return "заявитель";
-}
-
-function applicantInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }
 
 function formatBytes(value: number) {

@@ -1,0 +1,148 @@
+{
+  "title": "Подачи",
+  "bodyText": "Мои действия\nМои действия\nВсе действия\n18\nОшибки\n3\nНа проверке\n2\nСемья Петровых\nSUB-1042\nСанкт-Петербург\n4 заявителя\nОткрыть\nАлина Смирнова\nSUB-1057\nМосква\n1 заявитель\nОткрыть\nСемья Орловых\nSUB-1061\nМосква\n4 заявителя\nОткрыть\nДмитрий Волков\nSUB-1078\nМосква\n1 заявитель\nОткрыть",
+  "buttons": [
+    {
+      "text": "",
+      "cls": "mp-button icon-button ops-sidebar-mode-toggle",
+      "aria": "Свернуть меню"
+    },
+    {
+      "text": "",
+      "cls": "mp-button icon-button ops-mobile-close opsu-mobile-close",
+      "aria": "Закрыть меню"
+    },
+    {
+      "text": "Поиск...⌘K",
+      "cls": "ops-sidebar-search",
+      "aria": "Поиск"
+    },
+    {
+      "text": "Мои действия12",
+      "cls": "mp-button ghost-button ops-nav-item opsu-nav-item is-active",
+      "aria": "Мои действия"
+    },
+    {
+      "text": "Мои подачи",
+      "cls": "mp-button ghost-button ops-nav-item opsu-nav-item",
+      "aria": "Мои подачи"
+    },
+    {
+      "text": "Настройки",
+      "cls": "mp-button ghost-button ops-nav-item opsu-nav-item",
+      "aria": "Настройки"
+    },
+    {
+      "text": "В админскую зону",
+      "cls": "mp-button secondary-button vf-figma-admin-zone",
+      "aria": "В админскую зону"
+    },
+    {
+      "text": "ТНТатьяна НиколаеваVisa Center Spb",
+      "cls": "mp-button ghost-button ops-session",
+      "aria": "Выйти из рабочей области"
+    },
+    {
+      "text": "",
+      "cls": "mp-button icon-button v19-topbar-menu",
+      "aria": "Меню"
+    },
+    {
+      "text": "Загрузить",
+      "cls": "mp-button secondary-button vf-reference-upload-action",
+      "aria": "Загрузить"
+    },
+    {
+      "text": "Создать пакет",
+      "cls": "mp-button primary-button vf-reference-create-action",
+      "aria": "Новая подача"
+    },
+    {
+      "text": "Все действия18",
+      "cls": "tab active is-active",
+      "aria": null
+    },
+    {
+      "text": "Ошибки3",
+      "cls": "tab",
+      "aria": null
+    },
+    {
+      "text": "На проверке2",
+      "cls": "tab",
+      "aria": null
+    },
+    {
+      "text": "",
+      "cls": "clear",
+      "aria": "Очистить поиск"
+    },
+    {
+      "text": "",
+      "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button",
+      "aria": "Сначала старые"
+    },
+    {
+      "text": "Семья ПетровыхSUB-1042Обновлено: 12 мин назадСанкт-Петербург18–23 июл 20264 заявителяСанкт-Петербург4 заявителя18–23 июл 2026Даты поездкиОШИБКИОткрыть",
+      "cls": "vf-figma-action-row",
+      "aria": "Открыть подачу: Семья Петровых, SUB-1042"
+    },
+    {
+      "text": "Алина СмирноваSUB-1057Обновлено: 34 мин назадМосква02–09 авг 20261 заявительМосква1 заявитель02–09 авг 2026Даты поездкиВ РАБОТЕОткрыть",
+      "cls": "vf-figma-action-row",
+      "aria": "Открыть подачу: Алина Смирнова, SUB-1057"
+    },
+    {
+      "text": "Семья ОрловыхSUB-1061Обновлено: 1 ч назадМосква11–21 авг 20264 заявителяМосква4 заявителя11–21 авг 2026Даты поездкиНА ПРОВЕРКЕОткрыть",
+      "cls": "vf-figma-action-row",
+      "aria": "Открыть подачу: Семья Орловых, SUB-1061"
+    },
+    {
+      "text": "Дмитрий ВолковSUB-1078Обновлено: 2 ч назадМосква06–12 сен 20261 заявительМосква1 заявитель06–12 сен 2026Даты поездкиГОТОВООткрыть",
+      "cls": "vf-figma-action-row",
+      "aria": "Открыть подачу: Дмитрий Волков, SUB-1078"
+    }
+  ],
+  "classes": [
+    {
+      "tag": "DIV",
+      "cls": "v19-collection-toolbar is-regular has-toolbar-tools v19-agent-actions-reference-toolbar",
+      "text": "Все действия18Ошибки3На проверке2Поиск по действиям"
+    },
+    {
+      "tag": "DIV",
+      "cls": "v19-toolbar-secondary-row",
+      "text": "Все действия18Ошибки3На проверке2"
+    },
+    {
+      "tag": "DIV",
+      "cls": "v19-toolbar-primary-row",
+      "text": "Поиск по действиям"
+    },
+    {
+      "tag": "DIV",
+      "cls": "v19-toolbar-control-stack",
+      "text": "Поиск по действиям"
+    },
+    {
+      "tag": "LABEL",
+      "cls": "mp-searchbar search panel-search v19-toolbar-search mp-search-input",
+      "text": "Поиск по действиям"
+    },
+    {
+      "tag": "DIV",
+      "cls": "v19-toolbar-tools",
+      "text": ""
+    },
+    {
+      "tag": "DIV",
+      "cls": "v19-desktop-toolbar-tools",
+      "text": ""
+    },
+    {
+      "tag": "BUTTON",
+      "cls": "mp-button icon-button v19-toolbar-icon vf-figma-icon-button",
+      "text": ""
+    }
+  ]
+}

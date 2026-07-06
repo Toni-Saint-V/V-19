@@ -1315,9 +1315,7 @@
   --tw-border-style: solid;
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
-  font-family:
-    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-    "Segoe UI Symbol", "Noto Color Emoji";
+  font-family: var(--v19-font-family);
   line-height: var(--vf-ref-line-height-1neg-5);
 }
 
@@ -14722,6 +14720,124 @@ p {
   .admin-document-meta div {
     border-right: 0;
   }
+}
+
+/* Linear Style final lock: fullscreen BLS questionnaire. */
+.vf-figma-questionnaire-screen,
+.vf-figma-questionnaire-screen :where(button, input, textarea, label) {
+  font-family: var(--v19-font-family) !important;
+  letter-spacing: 0 !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-submission-id, .v19-questionnaire-field-number) {
+  font-family: var(--v19-font-family) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(
+    .v19-questionnaire-back-button,
+    .v19-questionnaire-complete-button,
+    .v19-questionnaire-next-button,
+    .v19-questionnaire-next-action-card button,
+    .v19-questionnaire-field-control,
+    .v19-questionnaire-dropdown,
+    .v19-questionnaire-dropdown-option,
+    .v19-questionnaire-applicant-tab,
+    .v19-questionnaire-section-tab,
+    .v19-questionnaire-applicant-index,
+    .v19-questionnaire-progress-badge,
+    .v19-questionnaire-excel-map
+  ) {
+  border-radius: var(--v19-control-radius) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(
+    .v19-questionnaire-applicant-bar,
+    .v19-questionnaire-section-nav,
+    .v19-questionnaire-work-panel,
+    .v19-questionnaire-review-alert,
+    .v19-readiness-card,
+    .v19-questionnaire-context-rail > section
+  ) {
+  border-radius: var(--v19b-radius-control) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-back-button, .v19-questionnaire-next-button) {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text) !important;
+  box-shadow: none !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-back-button, .v19-questionnaire-next-button):is(
+    :hover,
+    :focus-visible
+  ) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-complete-button, .v19-questionnaire-next-action-card button) {
+  border: var(--v19b-size-1) solid var(--v19b-color-primary) !important;
+  background: var(--v19b-color-app) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: 0 0 var(--v19b-size-24) var(--v19b-color-primary-soft-20) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-complete-button, .v19-questionnaire-next-action-card button):is(
+    :hover,
+    :focus-visible
+  ) {
+  border-color: var(--v19b-color-primary-bright) !important;
+  background: var(--v19b-color-page) !important;
+  box-shadow: 0 0 var(--v19b-size-28) var(--v19b-color-primary-soft-30) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-panel-footer > div {
+  min-width: var(--v19b-size-0) !important;
+  flex-wrap: wrap !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control[type="number"] {
+  appearance: textfield;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button,
+.vf-figma-questionnaire-screen .v19-questionnaire-next-action-card button {
+  border: var(--v19b-size-1) solid var(--v19b-color-primary) !important;
+  border-radius: var(--v19-control-radius) !important;
+  background: var(--v19b-color-app) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: 0 0 var(--v19b-size-24) var(--v19b-color-primary-soft-20) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-back-button,
+.vf-figma-questionnaire-screen .v19-questionnaire-next-button,
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control,
+.vf-figma-questionnaire-screen .v19-questionnaire-dropdown,
+.vf-figma-questionnaire-screen .v19-questionnaire-dropdown-option,
+.vf-figma-questionnaire-screen .v19-questionnaire-applicant-tab,
+.vf-figma-questionnaire-screen .v19-questionnaire-section-tab,
+.vf-figma-questionnaire-screen .v19-questionnaire-applicant-index,
+.vf-figma-questionnaire-screen .v19-questionnaire-progress-badge,
+.vf-figma-questionnaire-screen .v19-questionnaire-excel-map {
+  border-radius: var(--v19-control-radius) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-applicant-bar,
+.vf-figma-questionnaire-screen .v19-questionnaire-section-nav,
+.vf-figma-questionnaire-screen .v19-questionnaire-work-panel,
+.vf-figma-questionnaire-screen .v19-questionnaire-review-alert,
+.vf-figma-questionnaire-screen .v19-readiness-card,
+.vf-figma-questionnaire-screen .v19-questionnaire-context-rail > section {
+  border-radius: var(--v19b-radius-control) !important;
 }
 
 
@@ -33327,4 +33443,738 @@ select,
   overflow: visible !important;
   text-overflow: clip !important;
   white-space: nowrap !important;
+}
+
+/* LinearStyle Drawer transfer lock. Keep drawer logic in React, mirror reference shell. */
+.v19-figma-drawer-shell {
+  font-family: var(--v19-font-family) !important;
+  font-synthesis: none !important;
+  text-rendering: geometricPrecision !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+.v19-figma-drawer-shell :where(button, input, select, textarea) {
+  font: inherit !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-title-row {
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+  align-items: start !important;
+  gap: var(--vf-ref-size-16px) !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-title-block {
+  gap: var(--vf-ref-size-8px) !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-meta {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center !important;
+  gap: var(--vf-ref-size-8px) !important;
+  min-width: var(--v19b-size-0) !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-5) !important;
+  font-size: var(--vf-ref-size-11px) !important;
+  line-height: var(--vf-ref-line-height-1neg-2) !important;
+  text-transform: uppercase !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-status-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: var(--vf-ref-size-8px) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-header-status {
+  justify-self: start !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: var(--vf-ref-size-24px) !important;
+  padding: var(--vf-ref-size-5px) var(--vf-ref-size-10px) !important;
+  border: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-1) !important;
+  border-radius: var(--v19-radius-pill) !important;
+  color: var(--v19b-color-primary-text) !important;
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-045) !important;
+  font-size: var(--vf-ref-size-11px) !important;
+  font-weight: var(--vf-ref-font-weight-560) !important;
+  line-height: var(--vf-ref-line-height-1) !important;
+  text-transform: uppercase !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-updated {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--vf-ref-size-6px) !important;
+  min-width: var(--v19b-size-0) !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-4) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  line-height: var(--vf-ref-line-height-1neg-2) !important;
+}
+
+.v19-figma-drawer-shell .v19-figma-drawer-close {
+  display: flex !important;
+  flex: 0 0 auto !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-package-count {
+  color: var(--v19b-color-primary-text) !important;
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-045) !important;
+  font-family: var(--v19b-font-mono) !important;
+  font-size: var(--vf-ref-size-11px) !important;
+  font-weight: var(--vf-ref-font-weight-560) !important;
+  line-height: var(--vf-ref-line-height-1neg-2) !important;
+  padding: var(--vf-ref-size-2px) var(--vf-ref-size-8px) !important;
+  border-radius: var(--vf-ref-size-6px) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-package-check,
+.v19-figma-drawer-shell .v19-drawer-applicant-score {
+  color: var(--v19b-color-primary-text) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-package-check {
+  width: var(--vf-ref-size-16px) !important;
+  height: var(--vf-ref-size-16px) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-applicant-score {
+  font-family: var(--v19b-font-mono) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  font-weight: var(--vf-ref-font-weight-560) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues {
+  display: grid !important;
+  gap: var(--vf-ref-size-16px) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: var(--vf-ref-size-16px) !important;
+  padding-bottom: var(--vf-ref-size-16px) !important;
+  border-bottom: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-05) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-head h3 {
+  margin: 0 !important;
+  color: var(--vf-ref-color-hexneg-f3f3f5) !important;
+  font-size: var(--vf-ref-size-16px) !important;
+  font-weight: var(--vf-ref-font-weight-600) !important;
+  line-height: var(--vf-ref-line-height-1neg-25) !important;
+  letter-spacing: 0 !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-head p {
+  margin: var(--vf-ref-size-4px) 0 0 !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-5) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  line-height: var(--vf-ref-line-height-1neg-45) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-head > span {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  min-height: var(--vf-ref-size-28px) !important;
+  align-items: center !important;
+  border: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-1) !important;
+  border-radius: var(--vf-ref-size-8px) !important;
+  padding: 0 var(--vf-ref-size-10px) !important;
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-045) !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-62) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  font-weight: var(--vf-ref-font-weight-500) !important;
+  white-space: nowrap !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-list {
+  display: grid !important;
+  gap: var(--vf-ref-size-12px) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-card {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: var(--vf-ref-size-40px) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) minmax(var(--vf-ref-size-150px), var(--vf-ref-size-180px)) !important;
+  align-items: center !important;
+  gap: var(--vf-ref-size-16px) !important;
+  min-height: var(--vf-ref-size-96px) !important;
+  overflow: hidden !important;
+  border: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-08) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-02) !important;
+  padding: var(--vf-ref-size-16px) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-accent {
+  position: absolute !important;
+  inset: 0 auto 0 0 !important;
+  width: var(--vf-ref-size-3px) !important;
+  background: var(--v19b-dot-warning) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-icon {
+  display: flex !important;
+  width: var(--vf-ref-size-40px) !important;
+  height: var(--vf-ref-size-40px) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-1) !important;
+  border-radius: var(--v19-control-radius) !important;
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-045) !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-62) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-copy {
+  min-width: var(--v19b-size-0) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-title-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: var(--vf-ref-size-8px) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-title-row h4 {
+  margin: 0 !important;
+  color: var(--vf-ref-color-hexneg-f3f3f5) !important;
+  font-size: var(--vf-ref-size-14px) !important;
+  font-weight: var(--vf-ref-font-weight-600) !important;
+  line-height: var(--vf-ref-line-height-1neg-3) !important;
+  letter-spacing: 0 !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-title-row span {
+  display: inline-flex !important;
+  min-height: var(--vf-ref-size-22px) !important;
+  align-items: center !important;
+  border: var(--vf-ref-size-1px) solid var(--v19b-admin-orange-border) !important;
+  border-radius: var(--vf-ref-size-7px) !important;
+  padding: 0 var(--vf-ref-size-7px) !important;
+  background: var(--v19b-dot-halo-warning) !important;
+  color: var(--v19b-dot-warning) !important;
+  font-size: var(--vf-ref-size-10px) !important;
+  font-weight: var(--vf-ref-font-weight-600) !important;
+  line-height: var(--vf-ref-line-height-1) !important;
+  text-transform: uppercase !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-target {
+  margin-top: var(--vf-ref-size-7px) !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-4) !important;
+  font-size: var(--vf-ref-size-11px) !important;
+  font-weight: var(--vf-ref-font-weight-500) !important;
+  line-height: var(--vf-ref-line-height-1neg-25) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-copy p {
+  margin: var(--vf-ref-size-8px) 0 0 !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-55) !important;
+  font-size: var(--vf-ref-size-13px) !important;
+  line-height: var(--vf-ref-line-height-1neg-5) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-actions {
+  display: flex !important;
+  min-width: var(--v19b-size-0) !important;
+  justify-content: flex-end !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-actions button,
+.v19-figma-drawer-shell .v19-drawer-issue-state {
+  display: inline-flex !important;
+  width: var(--v19b-size-full) !important;
+  min-height: var(--vf-ref-size-38px) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-1) !important;
+  border-radius: var(--v19-control-radius) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-72) !important;
+  font-size: var(--vf-ref-size-12px) !important;
+  font-weight: var(--vf-ref-font-weight-560) !important;
+  line-height: var(--vf-ref-line-height-1) !important;
+  text-align: center !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-actions button {
+  cursor: pointer !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issue-actions button:hover {
+  color: var(--v19b-color-primary-text) !important;
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-empty {
+  display: flex !important;
+  min-height: var(--vf-ref-size-240px) !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-55) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-empty > div {
+  display: flex !important;
+  width: var(--vf-ref-size-64px) !important;
+  height: var(--vf-ref-size-64px) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-bottom: var(--vf-ref-size-16px) !important;
+  border: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-1) !important;
+  border-radius: var(--v19-radius-pill) !important;
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-045) !important;
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-62) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-empty h4 {
+  margin: 0 0 var(--vf-ref-size-8px) !important;
+  color: var(--vf-ref-color-hexneg-f3f3f5) !important;
+  font-size: var(--vf-ref-size-16px) !important;
+  font-weight: var(--vf-ref-font-weight-600) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-issues-empty p {
+  max-width: var(--vf-ref-size-360px) !important;
+  margin: 0 !important;
+  font-size: var(--vf-ref-size-13px) !important;
+  line-height: var(--vf-ref-line-height-1neg-5) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-footer-action--returned {
+  border-color: var(--v19b-color-primary) !important;
+  background: var(--v19b-color-app) !important;
+  box-shadow: 0 0 var(--vf-ref-size-24px) var(--v19b-color-primary-soft-20) !important;
+}
+
+.v19-figma-drawer-shell .v19-drawer-footer-action--returned:hover:not(:disabled) {
+  color: var(--v19-fg) !important;
+  background: var(--v19b-color-page) !important;
+  box-shadow: 0 0 var(--vf-ref-size-28px) var(--v19b-color-primary-soft-30) !important;
+}
+
+.v19-submission-reference-filterbar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin: var(--vf-ref-size-0px) var(--vf-ref-size-0px) var(--vf-ref-size-14px) !important;
+}
+
+.v19-submission-reference-filter-trigger {
+  display: inline-flex !important;
+  min-height: var(--v19-control-height-touch) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--vf-ref-size-8px) !important;
+  border: var(--vf-ref-size-1px) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19-control-radius) !important;
+  padding: var(--vf-ref-size-0px) var(--vf-ref-size-14px) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-70) !important;
+  font-family: var(--v19-font-family) !important;
+  font-size: var(--vf-ref-size-13px) !important;
+  font-weight: var(--vf-ref-font-weight-560) !important;
+  line-height: var(--vf-ref-line-height-1) !important;
+  letter-spacing: 0 !important;
+}
+
+.v19-submission-reference-filter-trigger svg {
+  width: var(--vf-ref-size-16px) !important;
+  height: var(--vf-ref-size-16px) !important;
+}
+
+.v19-submission-reference-filter-trigger:is(:hover, :focus-visible),
+.v19-submission-reference-filter-trigger.is-active {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.v19-submission-filter-sheet.mp-bottom-sheet {
+  border-radius: var(--v19b-radius-row) var(--v19b-radius-row) 0 0 !important;
+  font-family: var(--v19-font-family) !important;
+}
+
+.v19-submission-filter-sheet :where(button, input, select, textarea) {
+  font-family: var(--v19-font-family) !important;
+  letter-spacing: 0 !important;
+}
+
+.v19-submission-filter-sheet .mp-bottom-sheet-close,
+.v19-submission-filter-sheet .v19-filter-sheet-option,
+.v19-submission-filter-sheet-footer .mp-button {
+  border-radius: var(--v19-control-radius) !important;
+}
+
+.v19-submission-filter-sheet .mp-bottom-sheet-close,
+.v19-submission-filter-sheet .v19-filter-sheet-option,
+.v19-submission-filter-sheet-footer .ghost-button,
+.v19-submission-filter-sheet-footer .secondary-button {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-70) !important;
+  box-shadow: none !important;
+}
+
+.v19-submission-filter-sheet .v19-filter-sheet-option:is(:hover, :focus-visible),
+.v19-submission-filter-sheet .v19-filter-sheet-option.is-active,
+.v19-submission-filter-sheet-footer .ghost-button:is(:hover, :focus-visible),
+.v19-submission-filter-sheet-footer .secondary-button:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.v19-submission-filter-sheet-footer .primary-button {
+  border-color: var(--v19b-color-primary) !important;
+  border-radius: var(--v19-control-radius) !important;
+  background: var(--v19b-color-app) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: 0 0 var(--vf-ref-size-24px) var(--v19b-color-primary-soft-20) !important;
+}
+
+.v19-submission-filter-sheet-footer .primary-button:is(:hover, :focus-visible) {
+  background: var(--v19b-color-page) !important;
+  box-shadow: 0 0 var(--vf-ref-size-28px) var(--v19b-color-primary-soft-30) !important;
+}
+
+.v19-filter-sheet-section--city .v19-filter-sheet-options {
+  margin-inline: calc(var(--vf-ref-size-16px) * -1) !important;
+  overflow: hidden !important;
+}
+
+.v19-filter-sheet-city-carousel {
+  display: flex !important;
+  gap: var(--vf-ref-size-8px) !important;
+  width: var(--v19b-size-full) !important;
+  overflow-x: auto !important;
+  overscroll-behavior-x: contain !important;
+  scroll-padding-inline: var(--vf-ref-size-16px) !important;
+  scroll-snap-type: x proximity !important;
+  padding: var(--vf-ref-size-2px) var(--vf-ref-size-16px) var(--vf-ref-size-6px) !important;
+  scrollbar-width: none !important;
+}
+
+.v19-filter-sheet-city-carousel::-webkit-scrollbar {
+  display: none !important;
+}
+
+.v19-filter-sheet-city-chip {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  min-width: var(--vf-ref-size-112px) !important;
+  min-height: var(--vf-ref-size-40px) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--vf-ref-size-8px) !important;
+  scroll-snap-align: start !important;
+  border: var(--vf-ref-size-1px) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19-control-radius) !important;
+  padding: var(--vf-ref-size-0px) var(--vf-ref-size-14px) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-70) !important;
+  font-family: var(--v19-font-family) !important;
+  font-size: var(--vf-ref-size-13px) !important;
+  font-weight: var(--vf-ref-font-weight-560) !important;
+  line-height: var(--vf-ref-line-height-1) !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+}
+
+.v19-filter-sheet-city-chip:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.v19-filter-sheet-city-chip.is-active {
+  border-color: var(--v19b-color-primary) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.v19-filter-sheet-city-chip:disabled {
+  cursor: not-allowed !important;
+  opacity: var(--v19b-opacity-disabled) !important;
+}
+
+.v19-filter-sheet-city-dot {
+  width: var(--vf-ref-size-6px) !important;
+  height: var(--vf-ref-size-6px) !important;
+  border-radius: var(--v19-radius-pill) !important;
+  background: currentColor !important;
+  opacity: 0.72 !important;
+}
+
+@media (min-width: 640px) {
+  .v19-figma-drawer-shell .v19-figma-drawer-footer {
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .v19-figma-drawer-shell .v19-drawer-issues-head {
+    display: grid !important;
+    gap: var(--vf-ref-size-10px) !important;
+  }
+
+  .v19-figma-drawer-shell .v19-drawer-issues-head > span {
+    justify-self: start !important;
+  }
+
+  .v19-figma-drawer-shell .v19-drawer-issue-card {
+    grid-template-columns: var(--vf-ref-size-40px) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    align-items: start !important;
+    gap: var(--vf-ref-size-12px) !important;
+    min-height: auto !important;
+    padding: var(--vf-ref-size-14px) !important;
+  }
+
+  .v19-figma-drawer-shell .v19-drawer-issue-actions {
+    grid-column: 1 / -1 !important;
+    justify-content: stretch !important;
+  }
+
+  .v19-figma-drawer-shell .v19-drawer-issue-actions button,
+  .v19-figma-drawer-shell .v19-drawer-issue-state {
+    width: var(--v19b-size-full) !important;
+  }
+
+  .v19-figma-drawer-shell .v19-figma-drawer-footer-status {
+    display: none !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-title-row {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--v19-control-height-touch) !important;
+    min-height: auto !important;
+    padding-right: 0 !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-meta {
+    display: flex !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-status-row {
+    gap: var(--vf-ref-size-6px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-updated {
+    max-width: var(--v19b-size-full) !important;
+    font-size: var(--vf-ref-size-11px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-tabs-scroll {
+    width: calc(var(--v19b-size-full) + var(--vf-ref-size-28px)) !important;
+    max-width: none !important;
+    margin: 0 calc(var(--vf-ref-size-14px) * -1) calc(var(--vf-ref-size-1px) * -1) !important;
+    padding: 0 var(--vf-ref-size-14px) !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain !important;
+    scroll-padding-inline: var(--vf-ref-size-14px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-tabs {
+    width: max-content !important;
+    min-width: max-content !important;
+    gap: var(--vf-ref-size-6px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-tab {
+    flex: 0 0 auto !important;
+    min-width: auto !important;
+    height: var(--v19-control-height-touch) !important;
+    padding-inline: var(--vf-ref-size-12px) !important;
+    font-size: var(--vf-ref-size-12px) !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-header {
+    gap: var(--vf-ref-size-6px) !important;
+    padding: var(--vf-ref-size-8px) var(--vf-ref-size-14px) 0 !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-title-row {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--vf-ref-size-36px) !important;
+    gap: var(--vf-ref-size-10px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-title-block {
+    gap: var(--vf-ref-size-4px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-meta {
+    font-size: var(--vf-ref-size-10px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-heading {
+    font-size: var(--vf-ref-size-18px) !important;
+    line-height: var(--vf-ref-line-height-1neg-12) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-updated {
+    display: none !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-header-status {
+    min-height: var(--vf-ref-size-22px) !important;
+    padding: var(--vf-ref-size-4px) var(--vf-ref-size-8px) !important;
+    font-size: var(--vf-ref-size-10px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-close {
+    width: var(--vf-ref-size-36px) !important;
+    height: var(--vf-ref-size-36px) !important;
+  }
+
+  .ops-shell.has-open-drawer.surface-agent-submissions .v19-figma-drawer-tab {
+    height: var(--vf-ref-size-34px) !important;
+    min-height: var(--vf-ref-size-34px) !important;
+    padding-inline: var(--vf-ref-size-8px) !important;
+    font-size: var(--vf-ref-size-11px) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-title-row {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--v19-control-height-touch) !important;
+    min-height: auto !important;
+    padding-right: 0 !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-meta {
+    display: flex !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-tabs-scroll {
+    width: calc(var(--v19b-size-full) + var(--vf-ref-size-28px)) !important;
+    max-width: none !important;
+    margin: 0 calc(var(--vf-ref-size-14px) * -1) calc(var(--vf-ref-size-1px) * -1) !important;
+    padding: 0 var(--vf-ref-size-14px) !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain !important;
+    scroll-padding-inline: var(--vf-ref-size-14px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-tabs {
+    width: max-content !important;
+    min-width: max-content !important;
+    gap: var(--vf-ref-size-6px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-tab {
+    flex: 0 0 auto !important;
+    min-width: auto !important;
+    height: var(--v19-control-height-touch) !important;
+    padding-inline: var(--vf-ref-size-12px) !important;
+    font-size: var(--vf-ref-size-12px) !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-header {
+    gap: var(--vf-ref-size-6px) !important;
+    padding: var(--vf-ref-size-8px) var(--vf-ref-size-14px) 0 !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-title-row {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--vf-ref-size-36px) !important;
+    gap: var(--vf-ref-size-10px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-title-block {
+    gap: var(--vf-ref-size-4px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-meta {
+    font-size: var(--vf-ref-size-10px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-heading {
+    font-size: var(--vf-ref-size-18px) !important;
+    line-height: var(--vf-ref-line-height-1neg-12) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-updated {
+    display: none !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-header-status {
+    min-height: var(--vf-ref-size-22px) !important;
+    padding: var(--vf-ref-size-4px) var(--vf-ref-size-8px) !important;
+    font-size: var(--vf-ref-size-10px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-close {
+    width: var(--vf-ref-size-36px) !important;
+    height: var(--vf-ref-size-36px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-tab {
+    height: var(--vf-ref-size-34px) !important;
+    min-height: var(--vf-ref-size-34px) !important;
+    padding-inline: var(--vf-ref-size-8px) !important;
+    font-size: var(--vf-ref-size-11px) !important;
+  }
+}
+
+@media (max-width: 340px) {
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-header {
+    gap: var(--vf-ref-size-3px) !important;
+    padding-top: var(--vf-ref-size-7px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-status-row {
+    display: none !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-title-block {
+    gap: var(--vf-ref-size-2px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-tabs-scroll {
+    margin-top: var(--vf-ref-size-2px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-tab {
+    height: var(--vf-ref-size-30px) !important;
+    min-height: var(--vf-ref-size-30px) !important;
+    padding-inline: var(--vf-ref-size-7px) !important;
+  }
+
+  .ops-shell.has-open-drawer:is(.surface-agent-actions, .surface-agent-submissions)
+    .v19-figma-drawer-close {
+    width: var(--vf-ref-size-34px) !important;
+    height: var(--vf-ref-size-34px) !important;
+  }
 }

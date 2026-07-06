@@ -1,0 +1,96 @@
+{
+  "results": [
+    {
+      "viewport": "390x844",
+      "screenshot": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/drawer-reference-interface/target-drawer-390x844.png",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "metrics": {
+        "shellClass": "vf-figma-surface v19-submission-drawer-frame v19-figma-drawer-shell",
+        "shellFontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "titleFontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "titleFontSize": "20px",
+        "titleFontWeight": "600",
+        "bodyFontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "overflowOk": true,
+        "dialogRect": {
+          "x": 0,
+          "y": 48,
+          "w": 390,
+          "h": 796
+        },
+        "headerRect": {
+          "x": 1,
+          "y": 79,
+          "w": 388,
+          "h": 126.390625
+        },
+        "footerRect": {
+          "x": 1,
+          "y": 771,
+          "w": 388,
+          "h": 73
+        },
+        "firstCardRect": null,
+        "headerRatio": 0.14975192535545023,
+        "tabs": [
+          "Обзор",
+          "Анкета",
+          "Файлы",
+          "Замечания2",
+          "История"
+        ],
+        "hasAiHelperText": false,
+        "bodyTextStart": "Мои действия\nМои действия\nВсе действия\n18\nОшибки\n3\nНа проверке\n2\nСемья Петровых\nSUB-1042\nСанкт-Петербург\n4 заявителя\nОткрыть\nАлина Смирнова\nSUB-1057\nМосква\n1 заявитель\nОткрыть\nСемья Орловых\nSUB-1061\nМосква\n4 заявителя\nОткрыть\nДмитрий Волков\nSUB-1078\nМосква\n1 заявитель\nОткрыть\nПД-1048\n·\nсемейная\nСемья Ивановых\nВОЗВРАЩЕНО\nОбзор\nАнкета\nФайлы\nЗамечания\n2\nИстория\nФайлы подачи\n4/12\nМария Иванова\n2/3 файлов готово · требуется 1\nСвернуть\nСкан паспорта\nПринято\nПринято\nСелфи 1\nНужна замена\nЗаменить\nСелфи 2\nПринято\nПринято\nАнтон Иванов\n0/3 файлов готово · требуется 3\nРаскрыть\nСофия Иванова\n2/3 файлов готово · требуется 1\nРаскрыть\nМарк Иванов\n0/3 файлов готово · требуется 3\nРаскрыть\nСначала отметьте замечания исправленными\nОтмена\nОтправить исправления"
+      }
+    },
+    {
+      "viewport": "1440x900",
+      "screenshot": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/drawer-reference-interface/target-drawer-1440x900.png",
+      "consoleErrors": [],
+      "pageErrors": [],
+      "metrics": {
+        "shellClass": "vf-figma-surface v19-submission-drawer-frame v19-figma-drawer-shell",
+        "shellFontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "titleFontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "titleFontSize": "24px",
+        "titleFontWeight": "600",
+        "bodyFontFamily": "Inter, ui-sans-serif, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "overflowOk": true,
+        "dialogRect": {
+          "x": 592,
+          "y": 8,
+          "w": 840,
+          "h": 884
+        },
+        "headerRect": {
+          "x": 593,
+          "y": 9,
+          "w": 838,
+          "h": 164.1875
+        },
+        "footerRect": {
+          "x": 593,
+          "y": 818,
+          "w": 838,
+          "h": 73
+        },
+        "firstCardRect": null,
+        "headerRatio": 0.18243055555555557,
+        "tabs": [
+          "Обзор",
+          "Анкета",
+          "Файлы",
+          "Замечания2",
+          "История"
+        ],
+        "hasAiHelperText": false,
+        "bodyTextStart": "VisaFlow V-19\nWorkspace\nПоиск...\n⌘K\nРАБОТА\nМои действия\n12\nМои подачи\nНастройки\nВ админскую зону\nТН\nТатьяна Николаева\nVisa Center Spb\nМои действия\nЗагрузить\nСоздать пакет\nМои действия\nВсе действия\n18\nОшибки\n3\nНа проверке\n2\nПоиск по действиям\nСЕГОДНЯ\nСемья Петровых\nSUB-1042\nОбновлено: 12 мин назад\nСанкт-Петербург\n4 заявителя\n18–23 июл 2026\nДаты поездки\nОШИБКИ\nОткрыть\nАлина Смирнова\nSUB-1057\nОбновлено: 34 мин назад\nМосква\n1 заявитель\n02–09 авг 2026\nДаты поездки\nВ РАБОТЕ\nОткрыть\nСемья Орловых\nSUB-1061\nОбновлено: 1 ч назад\nМосква\n4 заявителя\n11–21 авг 2026\nДаты поездки\nНА ПРОВЕРКЕ\nОткрыть\nДмитрий Волков\nSUB-1078\nОбновлено: 2 ч назад\nМосква\n1 заявитель\n06–12 сен 2026\nДаты поездки\nГОТОВО\nОткрыть\nПД-1048\n·\nСЕМЕЙНАЯ\nСемья Ивановых\nВОЗВРАЩЕНО\nОбновлено 15.06\nОбзор\nАнкета\nФайлы\nЗамечания\n2\nИстория\nФайлы подачи\n4/12\nМария Иванова\n2/3 файлов готово · требуется 1\nСвернуть\nСкан паспорта\nПринято\nПринят"
+      }
+    }
+  ]
+}
