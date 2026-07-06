@@ -19954,6 +19954,386 @@ body,
   }
 }
 
+/* Admin drawer all-subscreens pass: overview, applicants, and history are real panels. */
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  :is(
+    .admin-review-overview-tab,
+    .admin-review-applicants-tab,
+    .admin-review-history-tab
+  ) {
+  display: grid !important;
+  min-width: var(--v19b-size-0) !important;
+  gap: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-hero {
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+  align-items: start !important;
+  gap: var(--v19b-size-16) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-panel) !important;
+  background: var(--v19b-color-panel) !important;
+  padding: var(--v19b-size-18) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-hero
+  > div {
+  display: grid !important;
+  min-width: var(--v19b-size-0) !important;
+  gap: var(--v19b-size-6) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-hero
+  span,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-hero
+  p,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-history-tab
+  small,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-history-tab
+  p {
+  margin: var(--v19b-size-0) !important;
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-12) !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-hero
+  h3 {
+  margin: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-24) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  line-height: var(--v19b-line-height-title) !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-hero
+  > strong {
+  display: inline-flex !important;
+  min-height: var(--v19b-size-36) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-deep-border) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-app) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+  font-size: var(--v19b-size-12) !important;
+  padding-inline: var(--v19b-size-12) !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-metrics {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  gap: var(--v19b-size-10) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-metrics
+  article,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-route
+  button,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-next
+  button,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  article,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-history-tab
+  article {
+  min-width: var(--v19b-size-0) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-row) !important;
+  background: var(--v19b-color-panel) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-metrics
+  article {
+  display: grid !important;
+  gap: var(--v19b-size-6) !important;
+  padding: var(--v19b-size-14) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-metrics
+  span,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  dt {
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-11) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+  text-transform: uppercase !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-metrics
+  strong {
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-22) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  line-height: var(--v19b-line-height-title) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  :is(.admin-review-overview-metrics article.is-warning, .admin-review-overview-route button.is-warning) {
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-route,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-next {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  gap: var(--v19b-size-10) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-route
+  button,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-next
+  button {
+  display: flex !important;
+  min-height: var(--v19b-size-56) !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--v19b-size-10) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-13) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-14) !important;
+  text-align: left !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-overview-route
+  button
+  strong {
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab {
+  grid-template-columns: repeat(auto-fit, minmax(var(--v19b-size-240), var(--v19b-grid-fr))) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  article {
+  display: grid !important;
+  gap: var(--v19b-size-14) !important;
+  padding: var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  article.is-selected {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  header {
+  display: grid !important;
+  grid-template-columns: var(--v19b-size-32) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-10) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  header
+  > span {
+  display: grid !important;
+  width: var(--v19b-size-32) !important;
+  height: var(--v19b-size-32) !important;
+  place-items: center !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  header
+  div {
+  display: grid !important;
+  min-width: var(--v19b-size-0) !important;
+  gap: var(--v19b-size-2) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  :is(strong, dd) {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  small {
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  em {
+  border-radius: var(--v19b-radius-pill) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+  font-size: var(--v19b-size-11) !important;
+  font-style: normal !important;
+  padding: var(--v19b-size-4) var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  dl {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  gap: var(--v19b-size-8) !important;
+  margin: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  dl
+  div {
+  display: grid !important;
+  gap: var(--v19b-size-4) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  footer {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicants-tab
+  footer
+  button {
+  min-height: var(--v19b-size-40) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-history-tab
+  article {
+  display: grid !important;
+  grid-template-columns: var(--v19b-size-76) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  align-items: start !important;
+  gap: var(--v19b-size-14) !important;
+  padding: var(--v19b-size-14) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-history-tab
+  article
+  > span {
+  display: inline-flex !important;
+  min-height: var(--v19b-size-28) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-muted) !important;
+  font-size: var(--v19b-size-11) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-history-tab
+  article
+  div {
+  display: grid !important;
+  min-width: var(--v19b-size-0) !important;
+  gap: var(--v19b-size-4) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-history-tab
+  strong {
+  min-width: var(--v19b-size-0) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-14) !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+@media (max-width: 767px) {
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-overview-hero,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-overview-metrics,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-overview-route,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-overview-next,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-applicants-tab,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-applicants-tab
+    dl,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-applicants-tab
+    footer {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-overview-hero
+    > strong {
+    justify-self: start !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-history-tab
+    article {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-history-tab
+    article
+    > span {
+    justify-self: start !important;
+  }
+}
+
 /* Admin mobile sheet backdrop: blur the workspace instead of covering it with a flat gray layer. */
 @media (max-width: 767px) {
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
