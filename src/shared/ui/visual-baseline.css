@@ -15958,6 +15958,604 @@ body,
   }
 }
 
+/* Reference ApplicantsScreen transfer: keep My submissions exactly on the old LinearStyle card model. */
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-submissions-panel {
+  display: grid !important;
+  gap: var(--v19b-size-24) !important;
+  padding: var(--v19b-size-0) !important;
+  border: var(--v19b-size-0) solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-mobile-toolbar {
+  display: none !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-submission-profile-stage.is-all {
+  display: grid !important;
+  gap: var(--v19b-size-24) !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow: visible !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-reference-profile-section {
+  display: grid !important;
+  gap: var(--v19b-size-16) !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow: visible !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-reference-profile-section
+  > h2 {
+  margin: var(--v19b-size-0) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-4) !important;
+  color: rgb(255 255 255 / 0.5) !important;
+  font-size: var(--v19b-size-13) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-label) !important;
+  letter-spacing: var(--v19b-letter-spacing-wide) !important;
+  text-transform: uppercase !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-reference-profile-divider {
+  width: var(--v19b-size-full) !important;
+  height: var(--v19b-size-1) !important;
+  background: var(--v19b-color-border) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-submission-profile-grid:is(.is-family, .is-single),
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-submission-profile-stage.is-all
+  .v19-submission-profile-grid:is(.is-family, .is-single) {
+  display: grid !important;
+  grid-auto-flow: row !important;
+  grid-auto-columns: auto !important;
+  width: var(--v19b-size-full) !important;
+  max-width: var(--v19b-size-full) !important;
+  min-width: var(--v19b-size-0) !important;
+  gap: var(--v19b-size-16) !important;
+  overflow: visible !important;
+  scroll-snap-type: none !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-submission-profile-grid.is-family,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-submission-profile-stage.is-all
+  .v19-submission-profile-grid.is-family {
+  grid-template-columns: repeat(
+    3,
+    minmax(var(--v19b-size-260), var(--v19b-grid-fr))
+  ) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-submission-profile-grid.is-single,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-submission-profile-stage.is-all
+  .v19-submission-profile-grid.is-single {
+  grid-template-columns: repeat(
+    4,
+    minmax(var(--v19b-size-220), var(--v19b-grid-fr))
+  ) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  :is(.vf-figma-family-card, .vf-figma-individual-card).v19-dossier-card {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  padding: var(--v19b-size-20) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-panel) !important;
+  background:
+    linear-gradient(180deg, #1a1a1d, #141416),
+    #141416 !important;
+  box-shadow:
+    inset 0 var(--v19b-size-1) var(--v19b-size-0) rgb(255 255 255 / 0.02),
+    0 var(--v19b-size-4) var(--v19b-size-20) rgb(0 0 0 / 0.2) !important;
+  color: var(--v19b-color-text) !important;
+  cursor: pointer !important;
+  transition:
+    border-color var(--v19b-motion-standard),
+    background var(--v19b-motion-standard),
+    transform var(--v19b-motion-fast) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  :is(.vf-figma-family-card, .vf-figma-individual-card).v19-dossier-card:hover {
+  border-color: rgb(111 100 255 / 0.4) !important;
+  transform: var(--v19b-transform-raise) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card {
+  display: flex !important;
+  min-height: var(--v19b-size-240) !important;
+  flex-direction: column !important;
+  gap: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-head {
+  order: 1 !important;
+  display: grid !important;
+  grid-template-columns:
+    var(--v19b-size-44)
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  align-items: center !important;
+  gap: var(--v19b-size-14) !important;
+  min-width: var(--v19b-size-0) !important;
+  margin: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-20) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-icon,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-avatar {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--v19b-size-44) !important;
+  height: var(--v19b-size-44) !important;
+  border: var(--v19b-size-1) solid rgb(255 255 255 / 0.05) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: rgb(255 255 255 / 0.05) !important;
+  color: rgb(255 255 255 / 0.7) !important;
+  box-shadow: inset 0 var(--v19b-size-2) var(--v19b-size-5) rgb(0 0 0 / 0.22) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-head
+  strong,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  strong {
+  display: block !important;
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-15) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  line-height: var(--v19b-line-height-title) !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-head
+  em,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  > span:not(.vf-figma-family-footer)
+  em {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--v19b-size-6) !important;
+  margin-top: var(--v19b-size-4) !important;
+  color: rgb(255 255 255 / 0.5) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-style: normal !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-member-list {
+  order: 2 !important;
+  display: grid !important;
+  gap: var(--v19b-size-6) !important;
+  margin: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-24) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-member-row {
+  display: grid !important;
+  grid-template-columns:
+    var(--v19b-size-26)
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr))
+    max-content
+    var(--v19b-size-20) !important;
+  align-items: center !important;
+  gap: var(--v19b-size-12) !important;
+  min-width: var(--v19b-size-0) !important;
+  min-height: var(--v19b-size-36) !important;
+  margin-inline: calc(var(--v19b-size-8) * -1) !important;
+  padding: var(--v19b-size-5) var(--v19b-size-8) !important;
+  border: var(--v19b-size-0) solid transparent !important;
+  border-radius: var(--v19b-size-8) !important;
+  background: transparent !important;
+  color: inherit !important;
+  text-align: left !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-member-row:hover {
+  background: rgb(255 255 255 / 0.03) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-member-row
+  em {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--v19b-size-26) !important;
+  height: var(--v19b-size-26) !important;
+  border: var(--v19b-size-1) solid rgb(255 255 255 / 0.05) !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background: #202024 !important;
+  color: rgb(255 255 255 / 0.6) !important;
+  font-size: var(--v19b-size-10) !important;
+  font-style: normal !important;
+  font-weight: var(--v19b-weight-title) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-member-row
+  strong {
+  color: rgb(255 255 255 / 0.8) !important;
+  font-size: var(--v19b-size-13) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-member-row
+  small {
+  color: rgb(255 255 255 / 0.4) !important;
+  font-size: var(--v19b-size-11) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-footer {
+  position: static !important;
+  inset: auto !important;
+  order: 3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: var(--v19b-size-full) !important;
+  max-width: var(--v19b-size-full) !important;
+  margin-top: auto !important;
+  padding-top: var(--v19b-size-16) !important;
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  color: rgb(255 255 255 / 0.4) !important;
+  font-size: 11.5px !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-footer
+  > span {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-footer
+  em {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--v19b-size-6) !important;
+  min-height: var(--v19b-size-24) !important;
+  padding: var(--v19b-size-2) var(--v19b-size-8) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-size-6) !important;
+  background: var(--v19b-color-control) !important;
+  color: rgb(255 255 255 / 0.5) !important;
+  font-size: 11.5px !important;
+  font-style: normal !important;
+  font-weight: var(--v19b-weight-control) !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card.v19-dossier-card {
+  display: grid !important;
+  grid-template-columns:
+    var(--v19b-size-44)
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  align-items: center !important;
+  column-gap: var(--v19b-size-14) !important;
+  row-gap: var(--v19b-size-24) !important;
+  min-height: var(--v19b-size-160) !important;
+  text-align: left !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  .vf-figma-avatar {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background:
+    linear-gradient(135deg, #2a2a30, #1a1a20),
+    #202024 !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  > span:not(.vf-figma-family-footer, .vf-figma-avatar) {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  .vf-figma-family-footer {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+}
+
+/* Minimal admin LinearStyle adapter: final owner for review/export/drawer only. */
+@media (min-width: 768px) {
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    ) {
+    grid-template-columns: var(--v19b-size-260) minmax(
+        var(--v19b-size-0),
+        var(--v19b-grid-fr)
+      ) !important;
+    width: var(--v19b-viewport-width) !important;
+    max-width: none !important;
+    padding: var(--v19b-size-0) !important;
+    overflow-x: hidden !important;
+    background: var(--v19b-color-app) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    > .workspace {
+    grid-column: 2 !important;
+    min-width: var(--v19b-size-0) !important;
+    width: var(--v19b-size-full) !important;
+    max-width: none !important;
+    height: var(--v19b-viewport-height) !important;
+    min-height: var(--v19b-viewport-height) !important;
+    margin: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-24) var(--v19b-size-24) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    background: var(--v19b-color-page) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    > .workspace
+    > .topbar {
+    min-height: var(--v19b-size-64) !important;
+    height: var(--v19b-size-64) !important;
+    padding: var(--v19b-size-0) !important;
+    border-bottom: var(--v19b-size-1) solid var(--v19b-color-border) !important;
+    background: var(--v19b-color-page) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit,
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-reference {
+    min-width: var(--v19b-size-0) !important;
+    width: var(--v19b-size-full) !important;
+    max-width: none !important;
+    min-height: var(--v19b-size-760) !important;
+    margin-top: var(--v19b-size-24) !important;
+    gap: var(--v19b-size-20) !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-reference {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-hero {
+    display: flex !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-metrics,
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-metrics {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-board,
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-list,
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-side {
+    min-width: var(--v19b-size-0) !important;
+    border-color: var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-panel) !important;
+    background: var(--v19b-color-panel) !important;
+    box-shadow: var(--v19b-shadow-admin-card) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-lanes {
+    display: grid !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    gap: var(--v19b-size-16) !important;
+    padding: var(--v19b-size-16) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-rail,
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-side {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(
+        --v19b-size-360
+      ) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-reference {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(
+        --v19b-size-390
+      ) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-metrics,
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-metrics {
+    grid-template-columns: repeat(4, minmax(var(--v19b-size-0), var(--v19b-grid-fr))) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-lanes {
+    grid-template-columns: repeat(2, minmax(var(--v19b-size-260), var(--v19b-grid-fr))) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-rail {
+    display: grid !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-side {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    ) {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    width: var(--v19b-viewport-width) !important;
+    max-width: var(--v19b-viewport-width) !important;
+    overflow-x: hidden !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    > .workspace {
+    grid-column: 1 !important;
+    min-width: var(--v19b-size-0) !important;
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+    padding: var(--v19b-size-0) var(--v19b-size-16) var(--v19b-size-84) !important;
+    overflow-x: hidden !important;
+    background: var(--v19b-color-page) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    > .workspace
+    > .topbar {
+    min-height: var(--v19b-size-60) !important;
+    height: var(--v19b-size-60) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit,
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    .v19-admin-export-reference {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    min-width: var(--v19b-size-0) !important;
+    width: var(--v19b-size-full) !important;
+    max-width: var(--v19b-size-full) !important;
+    margin-top: var(--v19b-size-12) !important;
+    gap: var(--v19b-size-12) !important;
+    overflow: visible !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    :is(.v19-admin-cockpit-hero, .v19-admin-cockpit-metrics, .v19-admin-cockpit-rail),
+  .ops-shell.has-unified-side-menu.role-admin.surface-export
+    :is(.v19-admin-export-metrics, .v19-admin-export-side) {
+    display: none !important;
+  }
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer-assist {
+  display: none !important;
+}
+
+@media (max-width: 1279px) {
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-grid.is-family,
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-stage.is-all
+    .v19-submission-profile-grid.is-family,
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-grid.is-single,
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-stage.is-all
+    .v19-submission-profile-grid.is-single {
+    grid-template-columns: repeat(
+      2,
+      minmax(var(--v19b-size-220), var(--v19b-grid-fr))
+    ) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-stage.is-all {
+    gap: var(--v19b-size-24) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-grid.is-family,
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-stage.is-all
+    .v19-submission-profile-grid.is-family,
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-grid.is-single,
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    .v19-submission-profile-stage.is-all
+    .v19-submission-profile-grid.is-single {
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.surface-agent-submissions
+    :is(.vf-figma-family-card, .vf-figma-individual-card).v19-dossier-card {
+    padding: var(--v19b-size-20) !important;
+  }
+}
+
 /* Agent tablet shell lock: keep navigation reachable when desktop sidebar collapses. */
 @media (min-width: 768px) and (max-width: 1023px) {
   .ops-shell.has-unified-side-menu:is(
@@ -17311,5 +17909,118 @@ body,
     min-width: var(--v19b-size-0) !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+  }
+}
+
+/* Absolute EOF lock: My submissions must stay on the reference ApplicantsScreen model. */
+.ops-shell.surface-agent-submissions .v19-agent-mobile-toolbar,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .v19-agent-mobile-toolbar {
+  display: none !important;
+  visibility: hidden !important;
+  width: var(--v19b-size-0) !important;
+  height: var(--v19b-size-0) !important;
+  min-height: var(--v19b-size-0) !important;
+  margin: var(--v19b-size-0) !important;
+  padding: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-card.v19-dossier-card {
+  display: flex !important;
+  min-height: var(--v19b-size-240) !important;
+  flex-direction: column !important;
+  gap: var(--v19b-size-0) !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-head,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-head {
+  order: 1 !important;
+  margin: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-20) !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-member-list,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-member-list {
+  order: 2 !important;
+  margin: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-24) !important;
+}
+
+.ops-shell.surface-agent-submissions .vf-figma-family-footer,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-family-footer {
+  position: static !important;
+  inset: auto !important;
+  order: 3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: var(--v19b-size-full) !important;
+  max-width: var(--v19b-size-full) !important;
+  margin-top: auto !important;
+  padding-top: var(--v19b-size-16) !important;
+  border-top: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-individual-card.v19-dossier-card,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card.v19-dossier-card {
+  display: grid !important;
+  grid-template-columns:
+    var(--v19b-size-44)
+    minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  align-items: center !important;
+  column-gap: var(--v19b-size-14) !important;
+  row-gap: var(--v19b-size-24) !important;
+  min-height: var(--v19b-size-160) !important;
+  text-align: left !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-individual-card
+  .vf-figma-avatar,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  .vf-figma-avatar {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-individual-card
+  > span:not(.vf-figma-family-footer, .vf-figma-avatar),
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  > span:not(.vf-figma-family-footer, .vf-figma-avatar) {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.surface-agent-submissions
+  .vf-figma-individual-card
+  .vf-figma-family-footer,
+.ops-shell.has-unified-side-menu.surface-agent-submissions
+  .vf-figma-individual-card
+  .vf-figma-family-footer {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+}
+
+/* Absolute admin EOF lock: keep reference mobile topbar height on admin surfaces. */
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .topbar,
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    > .workspace
+    > .topbar {
+    min-height: var(--v19b-size-60) !important;
+    height: var(--v19b-size-60) !important;
   }
 }

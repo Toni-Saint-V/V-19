@@ -43,8 +43,6 @@ import {
   V19FamilyProfileCard,
   V19IndividualProfileCard,
   V19LongListCell,
-  type V19DossierChip,
-  type V19DossierProgressItem,
   type V19EntityViewMode,
   type V19MemberStatusTone,
   type V19VisualTone,
@@ -979,11 +977,6 @@ export function AgentSubmissionsScreen({
   function renderSubmissionProfileCard(submission: Submission) {
     const footerLabel = `Акт: ${submission.updatedAt}`;
     const packageLabel = submissionPackageLabel();
-    const dossierChips = submissionDossierChips(submission);
-    const dossierMetaItems = submissionDossierMetaItems(submission);
-    const dossierProgressItems = submissionDossierProgressItems(submission);
-    const footerActivityLabel = submissionDossierActivityLabel(submission);
-    const nextActionLabel = submissionNextActionLabel(submission);
 
     if (submission.type === "family") {
       return (
@@ -991,9 +984,7 @@ export function AgentSubmissionsScreen({
           ariaLabel={`Открыть семейную подачу: ${formatApplicantProfileTitle(
             submission,
           )}, ${safeSubmissionId(submission.id)}`}
-          chips={dossierChips}
           dataSubmissionId={submission.id}
-          footerActivityLabel={footerActivityLabel}
           footerLabel={footerLabel}
           key={submission.id}
           members={submission.applicants.map((applicant) => ({
@@ -1002,10 +993,7 @@ export function AgentSubmissionsScreen({
             role: applicantRoleLabel(applicant.role ?? "main"),
             statusTone: applicantVisualStatus(submission, applicant),
           }))}
-          metaItems={dossierMetaItems}
-          nextActionLabel={nextActionLabel}
           packageLabel={packageLabel}
-          progressItems={dossierProgressItems}
           title={formatApplicantProfileTitle(submission)}
           totalLabel={applicantCountLabel(submission.applicants.length)}
           onMemberOpen={() => openSubmissionFromCard(submission)}
@@ -1021,16 +1009,11 @@ export function AgentSubmissionsScreen({
         ariaLabel={`Открыть заявителя: ${
           applicant?.fullName ?? formatSubmissionListTitle(submission)
         }, ${safeSubmissionId(submission.id)}`}
-        chips={dossierChips}
         dataSubmissionId={submission.id}
-        footerActivityLabel={footerActivityLabel}
         footerLabel={footerLabel}
         initials={applicantInitials(applicant?.fullName ?? submission.title)}
         key={submission.id}
-        metaItems={dossierMetaItems}
-        nextActionLabel={nextActionLabel}
         packageLabel={packageLabel}
-        progressItems={dossierProgressItems}
         statusLabel={individualProfileStatusLabel(submission)}
         statusTone={applicant ? applicantVisualStatus(submission, applicant) : "progress"}
         title={applicant?.fullName ?? formatSubmissionListTitle(submission)}
@@ -1040,6 +1023,7 @@ export function AgentSubmissionsScreen({
   }
 
   const railSubmission = visibleSubmission;
+  const renderLegacyToolbar = false;
 
   return (
     <>
@@ -1056,58 +1040,62 @@ export function AgentSubmissionsScreen({
           <span className="sr-only" id="agent-submissions-title">
             Мои подачи
           </span>
-          <CollectionToolbar<AgentTab>
-            activeFilters={activeFilters}
-            ariaLabel="Инструменты подач"
-            className="v19-agent-mobile-toolbar"
-            leadingControl={
-              <V19EntityTypeSwitch
-                allLabel="Все"
-                counts={entityCounts}
-                familyLabel="Семейные"
-                singleLabel="Одиночные"
-                value={entityMode}
-                onChange={changeEntityMode}
+          {renderLegacyToolbar ? (
+            <>
+              <CollectionToolbar<AgentTab>
+                activeFilters={activeFilters}
+                ariaLabel="Инструменты подач"
+                className="v19-agent-mobile-toolbar"
+                leadingControl={
+                  <V19EntityTypeSwitch
+                    allLabel="Все"
+                    counts={entityCounts}
+                    familyLabel="Семейные"
+                    singleLabel="Одиночные"
+                    value={entityMode}
+                    onChange={changeEntityMode}
+                  />
+                }
+                onClearActiveFilters={hasActiveFilters ? resetActiveFilters : undefined}
+                onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
+                search={searchControl}
+                summary={
+                  <OperationalSummaryStrip
+                    items={[
+                      { count: summary.draft, label: "Черновики" },
+                      { count: summary.requiresAction, label: "Замечания" },
+                      { count: summary.ready, label: "Готово" },
+                      {
+                        count: summary.inReview + summary.corrections,
+                        label: "На проверке",
+                      },
+                    ]}
+                  />
+                }
+                tabs={agentTabs}
+                tabsAriaLabel="Фильтр подач"
+                tools={toolbarTools}
+                value={activeTab}
+                variant="compact"
               />
-            }
-            onClearActiveFilters={hasActiveFilters ? resetActiveFilters : undefined}
-            onTabChange={(nextTab) => transitionUiState(() => onTab(nextTab))}
-            search={searchControl}
-            summary={
-              <OperationalSummaryStrip
-                items={[
-                  { count: summary.draft, label: "Черновики" },
-                  { count: summary.requiresAction, label: "Замечания" },
-                  { count: summary.ready, label: "Готово" },
-                  {
-                    count: summary.inReview + summary.corrections,
-                    label: "На проверке",
-                  },
-                ]}
+              <SubmissionFilterSheet
+                activeTab={activeTab}
+                cityFilter={cityFilter}
+                cityOptions={cityOptions}
+                onCityFilter={onCityFilter}
+                onClose={() => setFilterSheetOpen(false)}
+                onPanelToggle={hasContextRail ? togglePanel : undefined}
+                onReset={resetActiveFilters}
+                onSortModeChange={changeSortMode}
+                onTab={changeAgentTab}
+                open={filterSheetOpen}
+                panelOpen={panelOpen}
+                sheetId={filterSheetId}
+                sortMode={sortMode}
+                tabs={agentTabs}
               />
-            }
-            tabs={agentTabs}
-            tabsAriaLabel="Фильтр подач"
-            tools={toolbarTools}
-            value={activeTab}
-            variant="compact"
-          />
-          <SubmissionFilterSheet
-            activeTab={activeTab}
-            cityFilter={cityFilter}
-            cityOptions={cityOptions}
-            onCityFilter={onCityFilter}
-            onClose={() => setFilterSheetOpen(false)}
-            onPanelToggle={hasContextRail ? togglePanel : undefined}
-            onReset={resetActiveFilters}
-            onSortModeChange={changeSortMode}
-            onTab={changeAgentTab}
-            open={filterSheetOpen}
-            panelOpen={panelOpen}
-            sheetId={filterSheetId}
-            sortMode={sortMode}
-            tabs={agentTabs}
-          />
+            </>
+          ) : null}
 
           {loading ? (
             <AgentSubmissionsLoadingState />
@@ -1148,7 +1136,7 @@ export function AgentSubmissionsScreen({
                 className="v19-reference-profile-section"
                 aria-label="Семейные подачи"
               >
-                <h2>Семейные подачи</h2>
+                <h2>Семьи</h2>
                 {familySubmissions.length ? (
                   <div className="v19-submission-profile-grid is-family">
                     {familySubmissions.map(renderSubmissionProfileCard)}
@@ -1166,7 +1154,7 @@ export function AgentSubmissionsScreen({
                 className="v19-reference-profile-section"
                 aria-label="Индивидуальные подачи"
               >
-                <h2>Индивидуальные подачи</h2>
+                <h2>Одиночные профили</h2>
                 {singleSubmissions.length ? (
                   <div className="v19-submission-profile-grid is-single">
                     {singleSubmissions.map(renderSubmissionProfileCard)}
@@ -1288,130 +1276,6 @@ function individualProfileStatusLabel(submission: Submission) {
   }
 
   return "Профиль в работе";
-}
-
-function submissionDossierMetaItems(submission: Submission) {
-  return [
-    safeSubmissionId(submission.id),
-    safeSubmissionCity(submission.city),
-    safeTripDates(submission),
-  ];
-}
-
-function submissionDossierProgressItems(
-  submission: Submission,
-): V19DossierProgressItem[] {
-  return [
-    {
-      label: "Анкета",
-      tone: dossierProgressTone(submission.completeness.questionnaire),
-      value: submission.completeness.questionnaire,
-    },
-    {
-      label: "Файлы",
-      tone: dossierProgressTone(submissionDossierFileProgressValue(submission)),
-      value: submissionDossierFileProgressValue(submission),
-    },
-  ];
-}
-
-function submissionDossierFileProgressValue(submission: Submission) {
-  const files = submissionCanonicalMediaRows(submission);
-  if (!files.length) return 0;
-
-  const ready = files.filter(
-    (file) => file.status !== "не хватает" && file.status !== "заменить",
-  ).length;
-
-  return Math.round((ready / files.length) * 100);
-}
-
-function dossierProgressTone(value: number): V19DossierProgressItem["tone"] {
-  if (value >= 100) return "success";
-  if (value >= 80) return "accent";
-  if (value > 0) return "warning";
-  return "danger";
-}
-
-function submissionDossierChips(submission: Submission): V19DossierChip[] {
-  const openTotal = openIssueCount(submission);
-  const fixedTotal = fixedIssueCount(submission);
-  const fileTone = submissionFileTone(submission);
-  const chips: V19DossierChip[] = [
-    {
-      label: statusLabelFor(submission.status),
-      tone: submissionStatusDossierTone(submission),
-    },
-  ];
-
-  if (openTotal > 0) {
-    chips.push({
-      label: `+${openTotal}`,
-      tone: "danger",
-    });
-    chips.push({
-      label: `${openTotal} ${pluralRu(openTotal, "замечание", "замечания", "замечаний")}`,
-      tone: "danger",
-    });
-  } else if (fixedTotal > 0) {
-    chips.push({
-      label: `${fixedTotal} ${pluralRu(
-        fixedTotal,
-        "исправление",
-        "исправления",
-        "исправлений",
-      )}`,
-      tone: "warning",
-    });
-  }
-
-  chips.push({
-    label: `Файлы ${submissionFileStateLabel(submission)}`,
-    tone:
-      fileTone === "teal"
-        ? "success"
-        : fileTone === "amber"
-          ? "warning"
-          : "muted",
-  });
-
-  return chips;
-}
-
-function submissionStatusDossierTone(
-  submission: Submission,
-): NonNullable<V19DossierChip["tone"]> {
-  if (
-    submission.status === "returned" ||
-    submission.status === "requires_action" ||
-    openIssueCount(submission) > 0
-  ) {
-    return "danger";
-  }
-
-  if (submission.status === "draft" || submission.status === "in_progress") {
-    return "warning";
-  }
-
-  if (
-    submission.status === "submitted_for_review" ||
-    submission.status === "corrections_received"
-  ) {
-    return "primary";
-  }
-
-  if (submission.status === "ready_for_export" || submission.status === "exported") {
-    return "success";
-  }
-
-  return "muted";
-}
-
-function submissionDossierActivityLabel(submission: Submission) {
-  const event = submission.history[0];
-  if (!event) return submission.updatedAt;
-
-  return event.at;
 }
 
 function applicantRoleLabel(role: NonNullable<Submission["applicants"][number]["role"]>) {
@@ -1659,17 +1523,6 @@ function submissionReadinessLabel(submission: Submission) {
   return Number.isFinite(submission.completeness.total)
     ? `${submission.completeness.total}%`
     : "нет данных";
-}
-
-function submissionFileTone(submission: Submission): "amber" | "muted" | "teal" {
-  const files = submissionCanonicalMediaRows(submission);
-
-  if (!files.length) return "muted";
-  if (files.some((file) => file.status === "не хватает" || file.status === "заменить")) {
-    return "amber";
-  }
-
-  return "teal";
 }
 
 function submissionFileStateLabel(submission: Submission) {
