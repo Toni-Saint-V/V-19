@@ -275,37 +275,6 @@ function uploadSmokeDraftPayload(
   };
 }
 
-function uploadSmokeMissingMediaRows(): SmokeMediaRow[] {
-  return [
-    { id: `media-browser-upload-${browserSmokeTargetSuffix}-passport`, type: "passport_scan" },
-    { id: `media-browser-upload-${browserSmokeTargetSuffix}-selfie`, type: "selfie" },
-    { id: `media-browser-upload-${browserSmokeTargetSuffix}-selfie-2`, type: "selfie_2" },
-    { id: `media-browser-upload-${browserSmokeTargetSuffix}-legacy-photo`, type: "photo_white" },
-    { id: `media-browser-upload-${browserSmokeTargetSuffix}-legacy-video`, type: "video" },
-  ].map(({ id, type }) => ({
-    id,
-    applicant_id: uploadSmokeApplicantId,
-    submission_id: uploadSmokeSubmissionId,
-    type,
-    original_file_name: null,
-    generated_file_name: null,
-    storage_bucket: "submission-media",
-    storage_path: browserSmokeStoragePath(
-      uploadSmokeSubmissionId,
-      uploadSmokeApplicantId,
-      type,
-      `pending-${type}.placeholder`,
-    ),
-    mime_type: null,
-    size_bytes: null,
-    upload_status: "none",
-    review_status: "not_reviewed",
-    uploaded_at: null,
-    reviewed_at: null,
-    reviewed_by: null,
-  }));
-}
-
 function browserSmokeStoragePath(
   submissionId: string,
   applicantId: string,
