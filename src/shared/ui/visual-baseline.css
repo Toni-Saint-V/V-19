@@ -8405,10 +8405,16 @@ body,
 }
 
 .v19-admin-export-icon-button {
+  padding: var(--v19b-size-0);
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19b-size-12);
   background: var(--v19b-color-app);
   color: var(--v19b-color-text-muted);
+}
+
+.v19-admin-export-icon-button svg {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
 }
 
 .v19-admin-export-table-head,
@@ -8417,7 +8423,6 @@ body,
   grid-template-columns:
     var(--v19b-size-44)
     minmax(var(--v19b-size-220), var(--v19b-grid-fr))
-    var(--v19b-size-150)
     var(--v19b-size-130)
     var(--v19b-size-110);
   gap: var(--v19b-size-12);
@@ -8573,7 +8578,8 @@ body,
   flex-wrap: wrap;
   gap: var(--v19b-size-8);
   color: var(--v19b-admin-export-text-faint);
-  font-size: var(--v19b-size-12);
+  font-size: var(--v19b-size-8);
+  font-weight: var(--v19b-weight-control);
 }
 
 .v19-admin-export-row-meta i {
@@ -8592,7 +8598,7 @@ body,
 .v19-admin-export-slot {
   min-width: var(--v19b-size-0);
   color: var(--v19b-color-text-muted);
-  font-size: var(--v19b-size-13);
+  font-size: var(--v19b-size-12);
   line-height: var(--v19b-line-height-row);
 }
 
@@ -18042,7 +18048,6 @@ body,
     grid-template-columns:
       var(--v19b-size-44)
       minmax(var(--v19b-size-220), var(--v19b-grid-fr))
-      var(--v19b-size-150)
       var(--v19b-size-130) !important;
   }
 
@@ -18122,7 +18127,7 @@ body,
   .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
     .v19-admin-export-reference
     .v19-admin-export-progress {
-    grid-column: 4 !important;
+    grid-column: 3 !important;
   }
 
   .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
@@ -18143,7 +18148,7 @@ body,
     .v19-admin-export-row.is-history
     .v19-admin-export-row-end {
     display: flex !important;
-    grid-column: 4 !important;
+    grid-column: 3 !important;
     min-width: var(--v19b-size-0) !important;
   }
 }
@@ -18518,7 +18523,7 @@ body,
   flex: 0 1 auto !important;
   min-width: var(--v19b-size-0) !important;
   color: var(--v19b-color-text-strong) !important;
-  font-size: var(--v19b-size-16) !important;
+  font-size: var(--v19b-size-12) !important;
   font-weight: var(--v19b-weight-title) !important;
   line-height: var(--v19b-line-height-row) !important;
 }
@@ -18537,7 +18542,8 @@ body,
   background: var(--v19b-color-control-hover) !important;
   color: var(--v19b-color-text-muted) !important;
   font-family: var(--v19b-font-mono) !important;
-  font-size: var(--v19b-size-12) !important;
+  font-size: var(--v19b-size-8) !important;
+  font-weight: var(--v19b-weight-control) !important;
 }
 
 .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
@@ -18547,7 +18553,8 @@ body,
   align-items: center !important;
   gap: var(--v19b-size-10) !important;
   color: var(--v19b-color-text-faint) !important;
-  font-size: var(--v19b-size-13) !important;
+  font-size: var(--v19b-size-8) !important;
+  font-weight: var(--v19b-weight-control) !important;
   line-height: var(--v19b-line-height-row) !important;
 }
 
