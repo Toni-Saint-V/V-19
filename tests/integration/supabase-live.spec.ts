@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
+import { Blob as NodeBlob } from "node:buffer";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, test } from "vitest";
 import type { Database } from "../../src/lib/supabase/database.types";
@@ -116,6 +117,13 @@ function createSmokeClient(): SupabaseClient<Database> {
       storageKey: `visaflow-smoke-${randomUUID()}`,
     },
   });
+}
+
+function storageBlob(
+  parts: ConstructorParameters<typeof NodeBlob>[0],
+  options: BlobPropertyBag,
+): Blob {
+  return new NodeBlob(parts, options) as unknown as Blob;
 }
 
 async function signInAs(
@@ -325,7 +333,7 @@ describeLive("V-19 canonical Supabase live smoke", () => {
     const uploadedTargets = uploadedSlots.map((slot) => ({
       slot,
       target: storageTargetForSlot(submission.id, applicant.id ?? "", slot),
-      file: new Blob(["supabase-canonical-smoke-image"], { type: "image/jpeg" }),
+      file: storageBlob(["supabase-canonical-smoke-image"], { type: "image/jpeg" }),
     }));
     const selfieTarget =
       uploadedTargets.find(({ slot }) => slot.type === "selfie")?.target ??
@@ -405,7 +413,7 @@ describeLive("V-19 canonical Supabase live smoke", () => {
       .from(mediaStorageBucket)
       .upload(
         `${submission.id}/${submission.id}-WRONG/selfie/709002002_selfie.jpg`,
-        new Blob(["wrong-applicant"], { type: "image/jpeg" }),
+        storageBlob(["wrong-applicant"], { type: "image/jpeg" }),
         { contentType: "image/jpeg", upsert: false },
       );
     expect(wrongApplicantStorageError).toBeTruthy();
@@ -414,7 +422,7 @@ describeLive("V-19 canonical Supabase live smoke", () => {
       .from(mediaStorageBucket)
       .upload(
         `${submission.id}/${applicant.id}/photo_white/709002002_photo_white.jpg`,
-        new Blob(["legacy-photo"], { type: "image/jpeg" }),
+        storageBlob(["legacy-photo"], { type: "image/jpeg" }),
         { contentType: "image/jpeg", upsert: false },
       );
     expect(wrongMediaSlotError).toBeTruthy();
@@ -423,7 +431,7 @@ describeLive("V-19 canonical Supabase live smoke", () => {
       .from(mediaStorageBucket)
       .upload(
         `${submission.id}/${applicant.id}/selfie/709002002_selfie.mp4`,
-        new Blob(["wrong-extension"], { type: "video/mp4" }),
+        storageBlob(["wrong-extension"], { type: "video/mp4" }),
         { contentType: "video/mp4", upsert: false },
       );
     expect(wrongExtensionError).toBeTruthy();
@@ -432,7 +440,7 @@ describeLive("V-19 canonical Supabase live smoke", () => {
       .from(mediaStorageBucket)
       .upload(
         `${submission.id}/${applicant.id}/selfie/../709002002_selfie.jpg`,
-        new Blob(["path-traversal"], { type: "image/jpeg" }),
+        storageBlob(["path-traversal"], { type: "image/jpeg" }),
         { contentType: "image/jpeg", upsert: false },
       );
     expect(pathTraversalError).toBeTruthy();
@@ -581,8 +589,8 @@ describeLegacyArchiveLive(
         target: storageTargetForSlot(submission.id, applicant.id ?? "", slot),
         file:
           slot.type === "video"
-            ? new Blob(["supabase-smoke-video"], { type: "video/mp4" })
-            : new Blob(["supabase-smoke-image"], { type: "image/jpeg" }),
+            ? storageBlob(["supabase-smoke-video"], { type: "video/mp4" })
+            : storageBlob(["supabase-smoke-image"], { type: "image/jpeg" }),
       }));
       const photoTarget = uploadedTargets[0].target;
       const photoFile = uploadedTargets[0].file;

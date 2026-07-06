@@ -7,6 +7,8 @@ import "./shared/ui/visual-baseline.css";
 import "./shared/ui/linear-workspace.css";
 import "./shared/ui/v19-constructor.css";
 import "./shared/ui/v19-product-kit.css";
+import "./shared/ui/side-menu-button.css";
+import "./shared/ui/v19-workflow-premium.css";
 
 const root = document.getElementById("root");
 

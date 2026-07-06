@@ -1,0 +1,2046 @@
+diff -ruN v19_full_work/src/App.tsx v19_product_work/src/App.tsx
+--- v19_full_work/src/App.tsx	2026-07-06 13:30:45.000000000 +0000
++++ v19_product_work/src/App.tsx	2026-07-06 13:55:46.490769750 +0000
+@@ -101,6 +101,10 @@
+   normalizeVisaApplicationPdfUploadFile,
+ } from "./modules/submissions/pdfTextExtraction";
+ import {
++  validateSubmissionFileUpload,
++  validateVisaApplicationPdfUpload,
++} from "./modules/submissions/documentIntake";
++import {
+   applyVisaApplicationPdfReview,
+   confirmVisaApplicationPdfManualReview,
+   dismissVisaApplicationPdfReview,
+@@ -414,12 +418,6 @@
+   return names;
+ }
+ 
+-const passportScanUploadMimeTypes = new Set([
+-  "image/jpeg",
+-  "image/png",
+-  "application/pdf",
+-]);
+-
+ function firstSubmissionForRole(
+   submissions: Submission[],
+   role: Role,
+@@ -1294,48 +1292,6 @@
+     });
+   }
+ 
+-  function showAgentDrafts() {
+-    requestSettingsLeave(() => {
+-      setSurface("agent-drafts");
+-      setDrawerMode("closed");
+-      setAgentQuestionnaireOpen(false);
+-      const nextSubmission = searchedAgentQueue[0];
+-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+-    });
+-  }
+-
+-  function showAgentApplicants() {
+-    requestSettingsLeave(() => {
+-      setSurface("agent-applicants");
+-      setDrawerMode("closed");
+-      setAgentQuestionnaireOpen(false);
+-      const nextSubmission = searchedAgentQueue[0];
+-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+-    });
+-  }
+-
+-  function showAgentMedia() {
+-    requestSettingsLeave(() => {
+-      setSurface("agent-media");
+-      setDrawerMode("closed");
+-      setAgentQuestionnaireOpen(false);
+-      const nextSubmission =
+-        searchedAgentQueue.find((submission) => submission.files.length > 0) ?? searchedAgentQueue[0];
+-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+-    });
+-  }
+-
+-  function showAgentIssues() {
+-    requestSettingsLeave(() => {
+-      setSurface("agent-issues");
+-      setDrawerMode("closed");
+-      setAgentQuestionnaireOpen(false);
+-      const nextSubmission =
+-        searchedAgentQueue.find((submission) => submission.issues.some((issue) => issue.status !== "closed_by_admin")) ?? searchedAgentQueue[0];
+-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
+-    });
+-  }
+-
+   function resetAgentSubmissionFilters() {
+     requestSettingsLeave(() => {
+       setQuery("");
+@@ -1868,10 +1824,13 @@
+       ) ?? activeSubmission;
+     const targetFile = currentSubmission.files.find((file) => file.id === fileId);
+     if (!targetFile) return;
+-    if (
+-      targetFile.type === "passport_scan" &&
+-      !passportScanUploadMimeTypes.has(selectedFile.type)
+-    ) {
++    const uploadGuard = validateSubmissionFileUpload(selectedFile, targetFile.type);
++    if (!uploadGuard.ok) {
++      setRemoteSaveState("error");
++      setRemoteSaveError(uploadGuard.safeMessage);
++      setSubmissionActionError(null);
++      setActiveDrawerTab("files");
++      setDrawerMode("detail");
+       return;
+     }
+ 
+@@ -2017,11 +1976,9 @@
+       if (!targetFile) {
+         throw new Error("Media slot no longer exists for this upload.");
+       }
+-      if (
+-        targetFile.type === "passport_scan" &&
+-        !passportScanUploadMimeTypes.has(selectedFile.type)
+-      ) {
+-        throw new Error("Passport scan uploads accept only JPEG, PNG or PDF files.");
++      const uploadGuard = validateSubmissionFileUpload(selectedFile, targetFile.type);
++      if (!uploadGuard.ok) {
++        throw new Error(uploadGuard.safeMessage);
+       }
+       if (
+         targetFile.status !== "missing" &&
+@@ -2277,6 +2234,12 @@
+ 
+   async function reviewVisaApplicationPdfForActiveSubmission(file: File) {
+     if (!activeSubmission) return;
++    const pdfUploadGuard = validateVisaApplicationPdfUpload(file);
++    if (!pdfUploadGuard.ok) {
++      setRemoteSaveState("error");
++      setRemoteSaveError(pdfUploadGuard.safeMessage);
++      throw new Error(pdfUploadGuard.safeMessage);
++    }
+     const extracted = await extractPdfTextFromFile(file);
+     const artifact = {
+       extractedPageCount: extracted.extractedPageCount,
+@@ -2642,6 +2605,22 @@
+     preliminaryIntake?: PreliminaryIntakeDraft,
+     options?: { openQuestionnaire?: boolean },
+   ) {
++    const invalidPassportUpload = passportUploads.find((upload) => {
++      if (!upload.file) return false;
++      return !validateSubmissionFileUpload(upload.file, "passport_scan").ok;
++    });
++    if (invalidPassportUpload?.file) {
++      const guard = validateSubmissionFileUpload(
++        invalidPassportUpload.file,
++        "passport_scan",
++      );
++      if (!guard.ok) {
++        setRemoteSaveState("error");
++        setRemoteSaveError(guard.safeMessage);
++        return;
++      }
++    }
++
+     const applicantNames = applicantNamesForCreateDraft({
+       currentNames: createApplicantNames,
+       familyCount: createFamilyCount,
+diff -ruN v19_full_work/src/main.tsx v19_product_work/src/main.tsx
+--- v19_full_work/src/main.tsx	2026-07-06 13:01:07.000000000 +0000
++++ v19_product_work/src/main.tsx	2026-07-06 13:43:38.880455851 +0000
+@@ -7,6 +7,8 @@
+ import "./shared/ui/linear-workspace.css";
+ import "./shared/ui/v19-constructor.css";
+ import "./shared/ui/v19-product-kit.css";
++import "./shared/ui/side-menu-button.css";
++import "./shared/ui/v19-workflow-premium.css";
+ 
+ const root = document.getElementById("root");
+ 
+diff -ruN v19_full_work/src/modules/submissions/components/OperationalNavigation.tsx v19_product_work/src/modules/submissions/components/OperationalNavigation.tsx
+--- v19_full_work/src/modules/submissions/components/OperationalNavigation.tsx	2026-07-06 13:01:07.000000000 +0000
++++ v19_product_work/src/modules/submissions/components/OperationalNavigation.tsx	2026-07-06 13:43:24.913719610 +0000
+@@ -6,6 +6,7 @@
+   FileSpreadsheet,
+   ImageIcon,
+   Menu,
++  Plus,
+   Settings,
+   Search,
+   Users,
+@@ -15,7 +16,8 @@
+ } from "lucide-react";
+ import visaOpsLogo from "../../../assets/visaflow-logo.png";
+ import { cn } from "../../../shared/ui/cn";
+-import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
++import { IconButton } from "../../../shared/ui/primitives";
++import { SideMenuButton } from "../../../shared/ui/SideMenuButton";
+ 
+ export type OperationalNavTone = "default" | "danger" | "warning" | "success";
+ export type OperationalSideMenuMode = "regular" | "compact";
+@@ -105,49 +107,38 @@
+       <nav className="ops-nav opsu-nav" aria-label="Операционные разделы">
+         <span className="ops-nav-group-label">Работа</span>
+         {items.map((item) => (
+-          <Button
+-            aria-current={item.active ? "page" : undefined}
+-            aria-label={item.label}
++          <SideMenuButton
++            active={item.active}
+             className={cn(
+               "ops-nav-item opsu-nav-item",
+               item.active && "is-active",
+               item.tone && `tone-${item.tone}`,
+             )}
++            collapsed={displayMode === "compact"}
++            count={item.count}
+             data-nav-id={item.id}
++            description={item.meta}
+             disabled={item.disabled}
++            icon={<OperationalIcon id={item.id} fallback={item.icon} />}
+             key={item.id}
+-            variant="ghost"
++            label={item.label}
++            labelText={item.label}
++            shortcut={item.quickAction}
++            tone={item.tone}
+             onClick={item.onClick}
+-          >
+-            <span className="ops-nav-icon opsu-nav-icon" aria-hidden="true">
+-              <OperationalIcon id={item.id} fallback={item.icon} />
+-            </span>
+-            <span className="ops-nav-copy opsu-nav-copy">
+-              <strong>{item.label}</strong>
+-            </span>
+-            {typeof item.count === "number" ? (
+-              <NavCount label={`${item.count}`}>{item.count}</NavCount>
+-            ) : null}
+-            {item.quickAction ? (
+-              <em className="ops-nav-action opsu-nav-action">{item.quickAction}</em>
+-            ) : null}
+-          </Button>
++          />
+         ))}
+       </nav>
+       {createAction ? (
+-        <Button
++        <SideMenuButton
++          appearance="action"
+           className="ops-sidebar-create opsu-sidebar-create"
+-          aria-label={createAction.label}
+-          variant="plain"
++          collapsed={displayMode === "compact"}
++          icon={<Plus aria-hidden="true" focusable="false" size={17} strokeWidth={2} />}
++          label={createAction.label}
++          labelText={createAction.label}
+           onClick={createAction.onClick}
+-        >
+-          <span aria-hidden="true">
+-            <svg viewBox="0 0 24 24" focusable="false">
+-              <path d="M12 5v14M5 12h14" />
+-            </svg>
+-          </span>
+-          <strong>{createAction.label}</strong>
+-        </Button>
++        />
+       ) : null}
+       <div className="ops-sidebar-footer opsu-sidebar-footer">{footer}</div>
+     </aside>
+diff -ruN v19_full_work/src/modules/submissions/documentIntake.ts v19_product_work/src/modules/submissions/documentIntake.ts
+--- v19_full_work/src/modules/submissions/documentIntake.ts	1970-01-01 00:00:00.000000000 +0000
++++ v19_product_work/src/modules/submissions/documentIntake.ts	2026-07-06 13:52:30.626983468 +0000
+@@ -0,0 +1,221 @@
++import { maxVisaApplicationPdfBytes } from "./visaApplicationPdfReviewTypes";
++import type { Submission, SubmissionFile, SubmissionFileType } from "./types";
++
++export type IntakeFileKind = "image" | "pdf" | "unknown";
++
++export type UploadGuardCode =
++  | "file_empty"
++  | "file_too_large"
++  | "passport_type"
++  | "selfie_type"
++  | "unsupported_slot"
++  | "unsupported_type";
++
++export type UploadGuardResult =
++  | {
++      code?: never;
++      fileKind: IntakeFileKind;
++      ok: true;
++      safeMessage?: never;
++      sizeLabel: string;
++    }
++  | {
++      code: UploadGuardCode;
++      fileKind?: IntakeFileKind;
++      ok: false;
++      safeMessage: string;
++      sizeLabel: string;
++    };
++
++export type DocumentReadinessSummary = {
++  acceptedSlots: number;
++  applicantCount: number;
++  missingRequiredSlots: number;
++  ready: boolean;
++  replacementRequiredSlots: number;
++  requiredSlots: number;
++  trackedOptionalSlots: number;
++  uploadedSlots: number;
++};
++
++const defaultMaxUploadBytes = 50 * 1024 * 1024;
++
++export const requiredExportDocumentTypes = [
++  "passport_scan",
++  "selfie",
++] as const satisfies readonly SubmissionFileType[];
++
++export const optionalTrackedDocumentTypes = [
++  "selfie_2",
++] as const satisfies readonly SubmissionFileType[];
++
++const imageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
++const imageExtensions = [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
++const pdfExtensions = [".pdf"];
++
++export function formatFileSize(bytes: number) {
++  if (!Number.isFinite(bytes) || bytes <= 0) return "0 Б";
++  const units = ["Б", "КБ", "МБ", "ГБ"];
++  let value = bytes;
++  let index = 0;
++  while (value >= 1024 && index < units.length - 1) {
++    value /= 1024;
++    index += 1;
++  }
++  const rounded = value >= 10 || index === 0 ? Math.round(value) : Math.round(value * 10) / 10;
++  return `${rounded} ${units[index]}`;
++}
++
++export function intakeFileKind(file: File): IntakeFileKind {
++  const name = file.name.toLowerCase();
++  if (file.type === "application/pdf" || pdfExtensions.some((ext) => name.endsWith(ext))) {
++    return "pdf";
++  }
++  if (imageMimeTypes.has(file.type) || imageExtensions.some((ext) => name.endsWith(ext))) {
++    return "image";
++  }
++  return "unknown";
++}
++
++export function validateSubmissionFileUpload(
++  file: File,
++  slotType: SubmissionFile["type"],
++): UploadGuardResult {
++  const sizeLabel = formatFileSize(file.size);
++  const fileKind = intakeFileKind(file);
++
++  if (file.size <= 0) {
++    return {
++      code: "file_empty",
++      ok: false,
++      safeMessage: "Файл пустой. Загрузите исходный PDF или изображение заново.",
++      sizeLabel,
++    };
++  }
++
++  if (file.size > defaultMaxUploadBytes) {
++    return {
++      code: "file_too_large",
++      fileKind,
++      ok: false,
++      safeMessage: "Файл больше 50 МБ. Сожмите документ или загрузите отдельные страницы.",
++      sizeLabel,
++    };
++  }
++
++  if (slotType === "passport_scan") {
++    if (fileKind === "pdf" || fileKind === "image") {
++      return { fileKind, ok: true, sizeLabel };
++    }
++    return {
++      code: "passport_type",
++      fileKind,
++      ok: false,
++      safeMessage: "Для паспорта принимаются только PDF, JPG, PNG, WEBP, HEIC или HEIF.",
++      sizeLabel,
++    };
++  }
++
++  if (slotType === "selfie" || slotType === "selfie_2") {
++    if (fileKind === "image") {
++      return { fileKind, ok: true, sizeLabel };
++    }
++    return {
++      code: "selfie_type",
++      fileKind,
++      ok: false,
++      safeMessage: "Для селфи нужен файл изображения: JPG, PNG, WEBP, HEIC или HEIF.",
++      sizeLabel,
++    };
++  }
++
++  return {
++    code: "unsupported_slot",
++    fileKind,
++    ok: false,
++    safeMessage: "Этот слот документа не входит в канонический V-19 media contract.",
++    sizeLabel,
++  };
++}
++
++export function validateVisaApplicationPdfUpload(file: File): UploadGuardResult {
++  const sizeLabel = formatFileSize(file.size);
++  const fileKind = intakeFileKind(file);
++
++  if (file.size <= 0) {
++    return {
++      code: "file_empty",
++      ok: false,
++      safeMessage: "PDF анкеты пустой. Экспортируйте анкету ещё раз.",
++      sizeLabel,
++    };
++  }
++
++  if (fileKind !== "pdf") {
++    return {
++      code: "unsupported_type",
++      fileKind,
++      ok: false,
++      safeMessage: "Загрузите именно PDF анкеты, не изображение и не архив.",
++      sizeLabel,
++    };
++  }
++
++  if (file.size > maxVisaApplicationPdfBytes) {
++    return {
++      code: "file_too_large",
++      fileKind,
++      ok: false,
++      safeMessage: "PDF анкеты больше 25 МБ. Разделите файл или экспортируйте облегчённую версию.",
++      sizeLabel,
++    };
++  }
++
++  return { fileKind, ok: true, sizeLabel };
++}
++
++export function summarizeSubmissionDocumentReadiness(
++  submission: Submission,
++): DocumentReadinessSummary {
++  const requiredSlots = submission.applicants.length * requiredExportDocumentTypes.length;
++  const trackedOptionalSlots = submission.applicants.length * optionalTrackedDocumentTypes.length;
++  const acceptedSlots = submission.files.filter((file) => file.status === "accepted").length;
++  const uploadedSlots = submission.files.filter((file) =>
++    file.status === "uploaded" || file.status === "pending_review" || file.status === "accepted",
++  ).length;
++  const missingRequiredSlots = submission.applicants.reduce(
++    (sum, applicant) =>
++      sum +
++      requiredExportDocumentTypes.filter((type) => {
++        const slot = submission.files.find(
++          (file) => file.applicantId === applicant.id && file.type === type,
++        );
++        return !slot || slot.status === "missing";
++      }).length,
++    0,
++  );
++  const replacementRequiredSlots = submission.files.filter(
++    (file) => file.status === "needs_replacement",
++  ).length;
++
++  return {
++    acceptedSlots,
++    applicantCount: submission.applicants.length,
++    missingRequiredSlots,
++    ready: missingRequiredSlots === 0 && replacementRequiredSlots === 0,
++    replacementRequiredSlots,
++    requiredSlots,
++    trackedOptionalSlots,
++    uploadedSlots,
++  };
++}
++
++export function documentReadinessLabel(summary: DocumentReadinessSummary) {
++  if (summary.replacementRequiredSlots > 0) {
++    return `${summary.replacementRequiredSlots} на замену`;
++  }
++  if (summary.missingRequiredSlots > 0) {
++    return `${summary.missingRequiredSlots} не хватает`;
++  }
++  return `${summary.uploadedSlots}/${summary.requiredSlots} файлов`;
++}
+diff -ruN v19_full_work/src/modules/submissions/exportPackageZip.ts v19_product_work/src/modules/submissions/exportPackageZip.ts
+--- v19_full_work/src/modules/submissions/exportPackageZip.ts	2026-07-06 13:01:07.000000000 +0000
++++ v19_product_work/src/modules/submissions/exportPackageZip.ts	2026-07-06 13:51:53.241395013 +0000
+@@ -1,10 +1,16 @@
+ import { exportContractFingerprint, type ExportContractRow } from "../../lib/export/exportContractCore";
+ import { createExportWorkbookArtifact } from "./exportWorkbook";
++import { createMediaSignedUrl, mediaStorageBucket } from "./mediaStorage";
++import {
++  optionalTrackedDocumentTypes,
++  requiredExportDocumentTypes,
++  summarizeSubmissionDocumentReadiness,
++} from "./documentIntake";
+ import { fileTypeLabels } from "./status";
+ import type { ExportPackageIdentity, Submission, SubmissionFile } from "./types";
+ 
+ export type ExportPackageZipDownloadResult =
+-  | { ok: true; fileName: string; includedFiles: number; manifestFiles: number }
++  | { ok: true; fileName: string; includedFiles: number; manifestFiles: number; missingFiles: number }
+   | { ok: false; reason: "download_failed" | "export_not_ready" | "row_mismatch"; safeMessage: string };
+ 
+ type ExportPackageZipInput = {
+@@ -76,101 +82,214 @@
+ 
+   try {
+     const artifact = createExportWorkbookArtifact(rows, identity);
++    const createdAtIso = new Date().toISOString();
++    const selectedIds = new Set(identity.submissionIds);
++    const selectedSubmissions = submissions.filter((submission) =>
++      selectedIds.has(submission.id),
++    );
++    const packageIssues = selectedSubmissions.flatMap((submission) =>
++      submission.issues.map((issue) => ({ ...issue, submissionId: submission.id })),
++    );
++    const excelPath = `00_Excel/${sanitizeZipPath(artifact.fileName)}`;
+     const manifest: string[] = [];
+     const packageManifest = {
+-      createdAtIso: new Date().toISOString(),
+-      excel: artifact.fileName,
+-      format: identity.format,
+-      rows: rows.length,
+-      submissions: [] as Array<ReturnType<typeof buildSubmissionManifest>>,
++      schema: "visaflow.export_package.v2",
++      packageId: identity.idempotencyKey,
++      createdAtIso,
++      excel: {
++        fileName: artifact.fileName,
++        format: identity.format,
++        path: excelPath,
++        rows: rows.length,
++      },
++      rules: {
++        cityGrouping: true,
++        familyGroupedBySubmissionId: true,
++        manifestAlwaysGenerated: true,
++        missingFilesFolder: "__MISSING__",
++        oneSubmissionOneFolder: true,
++      },
++      totals: {
++        applicants: selectedSubmissions.reduce(
++          (sum, submission) => sum + submission.applicants.length,
++          0,
++        ),
++        documentsAvailable: 0,
++        documentsExpected: selectedSubmissions.reduce(
++          (sum, submission) =>
++            sum + summarizeSubmissionDocumentReadiness(submission).requiredSlots,
++          0,
++        ),
++        includedFiles: 1,
++        issues: packageIssues.length,
++        manifestFiles: 0,
++        missingFiles: 0,
++        submissions: selectedSubmissions.length,
++      },
++      submissions: [] as Array<ReturnType<typeof buildSubmissionManifest> & { folder: string }>,
+     };
+     const entries: ZipEntryInput[] = [
+       {
+-        name: `00_Excel/${sanitizeZipPath(artifact.fileName)}`,
++        name: excelPath,
+         data: artifact.blob,
+       },
+     ];
+     let includedFiles = 1;
+     let manifestFiles = 0;
+-
+-    const selectedIds = new Set(identity.submissionIds);
+-    const selectedSubmissions = submissions.filter((submission) =>
+-      selectedIds.has(submission.id),
+-    );
++    let missingFiles = 0;
++    let documentsAvailable = 0;
+ 
+     manifest.push("VisaFlow export package");
+-    manifest.push(`Excel: 00_Excel/${artifact.fileName}`);
++    manifest.push(`Schema: ${packageManifest.schema}`);
++    manifest.push(`Excel: ${excelPath}`);
+     manifest.push(`Packs: ${selectedSubmissions.length}`);
+     manifest.push(`Rows: ${rows.length}`);
+     manifest.push("");
+ 
+     for (const [submissionIndex, submission] of selectedSubmissions.entries()) {
+       const submissionFolder = `${String(submissionIndex + 1).padStart(2, "0")}_${safeSegment(
+-        submission.title,
+-      )}_${safeSegment(submission.id)}`;
++        submission.id,
++      )}_${safeSegment(submission.title)}`;
+       const cityPrefix = safeSegment(submission.city);
+-      const typePrefix = submission.type === "family" ? "01_Семьи" : "02_Заявители";
++      const typePrefix = submission.type === "family" ? "family" : "single";
+       const folderRoot = `${cityPrefix}/${typePrefix}/${submissionFolder}`;
+       const submissionManifest = buildSubmissionManifest(submission);
+-      packageManifest.submissions.push(submissionManifest);
++      const submissionIssues = buildSubmissionIssuesManifest(submission);
++      packageManifest.submissions.push({ ...submissionManifest, folder: folderRoot });
+ 
+       entries.push({
+         name: `${folderRoot}/submission.json`,
+         data: JSON.stringify(submissionManifest, null, 2),
+       });
+-      includedFiles += 1;
++      entries.push({
++        name: `${folderRoot}/manifest.json`,
++        data: JSON.stringify({ ...submissionManifest, folder: folderRoot }, null, 2),
++      });
++      entries.push({
++        name: `${folderRoot}/issues.json`,
++        data: JSON.stringify(submissionIssues, null, 2),
++      });
++      includedFiles += 3;
+ 
+       manifest.push(`${submission.id} · ${submission.title}`);
+       manifest.push(`  City: ${submission.city}`);
++      manifest.push(`  Type: ${submission.type}`);
++      manifest.push(`  Folder: ${folderRoot}`);
+       manifest.push(`  Applicants: ${submission.applicants.length}`);
+ 
+       for (const [applicantIndex, applicant] of submission.applicants.entries()) {
+-        const applicantFolder = `${folderRoot}/${String(applicantIndex + 1).padStart(2, "0")}_${safeSegment(
+-          applicant.fullName,
+-        )}`;
++        const applicantFolder = `${folderRoot}/applicant_${String(
++          applicantIndex + 1,
++        ).padStart(2, "0")}_${safeSegment(applicant.fullName)}`;
+         const applicantFiles = submission.files.filter(
+           (file) => file.applicantId === applicant.id,
+         );
++        const handledFileIds = new Set<string>();
+         const applicantManifest: string[] = [];
++        const applicantJsonManifest = {
++          applicantId: applicant.id,
++          applicantName: applicant.fullName,
++          required: requiredExportDocumentTypes.map((type) => ({
++            type,
++            present: applicantFiles.some((file) => file.type === type),
++          })),
++          optionalTracked: optionalTrackedDocumentTypes.map((type) => ({
++            type,
++            present: applicantFiles.some((file) => file.type === type),
++          })),
++          files: [] as Array<{
++            id: string;
++            path: string;
++            status: SubmissionFile["status"];
++            type: SubmissionFile["type"];
++          }>,
++          missing: [] as Array<{ path: string; type: SubmissionFile["type"] }>,
++        };
+         applicantManifest.push(`Applicant: ${applicant.fullName}`);
+         applicantManifest.push(`Submission: ${submission.id}`);
+         applicantManifest.push("");
+ 
+-        for (const file of applicantFiles) {
+-          const localFile = localFilesById.get(file.id);
+-          const displayName = zipDocumentFileName(file, localFile?.name);
++        for (const requiredType of requiredExportDocumentTypes) {
++          const typedFiles = applicantFiles.filter((file) => file.type === requiredType);
+ 
+-          if (localFile) {
++          if (!typedFiles.length) {
++            const missingPath = `${applicantFolder}/__MISSING__/${safeSegment(
++              fileTypeLabels[requiredType] ?? requiredType,
++            )}_missing.txt`;
+             entries.push({
+-              name: `${applicantFolder}/${displayName}`,
+-              data: localFile,
++              name: missingPath,
++              data: missingSourceFileNote({
++                applicantName: applicant.fullName,
++                displayName: `${fileTypeLabels[requiredType] ?? requiredType}.missing`,
++                fileType: requiredType,
++                reason: "required media slot is absent in submission.files",
++                status: "missing",
++                submissionId: submission.id,
++              }),
+             });
++            missingFiles += 1;
++            manifestFiles += 1;
+             includedFiles += 1;
+-            applicantManifest.push(`OK: ${displayName}`);
++            applicantJsonManifest.missing.push({ path: missingPath, type: requiredType });
++            applicantManifest.push(`MISSING_SLOT: ${fileTypeLabels[requiredType] ?? requiredType} · see ${missingPath}`);
+             continue;
+           }
+ 
+-          manifestFiles += 1;
+-          const missingPath = `${cityPrefix}/__MISSING__/${safeSegment(submission.id)}/${safeSegment(
+-            applicant.fullName,
+-          )}/${displayName}.txt`;
+-          entries.push({
+-            name: missingPath,
+-            data: [
+-              `Missing source file: ${displayName}`,
+-              `Submission: ${submission.id}`,
+-              `Applicant: ${applicant.fullName}`,
+-              `Type: ${fileTypeLabels[file.type] ?? file.type}`,
+-              `Status: ${file.status}`,
+-              `Storage bucket: ${file.storageBucket ?? ""}`,
+-              `Storage path: ${file.storagePath ?? ""}`,
+-              "Reason: actual Blob was not available in this browser session.",
+-            ].join("\n"),
++          for (const file of typedFiles) {
++            handledFileIds.add(file.id);
++            const result = await addSubmissionFileEntry({
++              applicantFolder,
++              applicantName: applicant.fullName,
++              applicantManifest,
++              entries,
++              file,
++              localFilesById,
++              submissionId: submission.id,
++            });
++            includedFiles += result.includedFiles;
++            manifestFiles += result.manifestFiles;
++            missingFiles += result.missingFiles;
++            documentsAvailable += result.documentsAvailable;
++            if (result.path) {
++              applicantJsonManifest.files.push({
++                id: file.id,
++                path: result.path,
++                status: file.status,
++                type: file.type,
++              });
++            }
++            if (result.missingPath) {
++              applicantJsonManifest.missing.push({ path: result.missingPath, type: file.type });
++            }
++          }
++        }
++
++        for (const file of applicantFiles) {
++          if (handledFileIds.has(file.id)) continue;
++          const result = await addSubmissionFileEntry({
++            applicantFolder,
++            applicantName: applicant.fullName,
++            applicantManifest,
++            entries,
++            file,
++            localFilesById,
++            submissionId: submission.id,
+           });
+-          includedFiles += 1;
+-          applicantManifest.push(
+-            `NEEDS_SOURCE: ${displayName} · ${fileTypeLabels[file.type] ?? file.type} · ${file.status} · see ${missingPath}`,
+-          );
++          includedFiles += result.includedFiles;
++          manifestFiles += result.manifestFiles;
++          missingFiles += result.missingFiles;
++          documentsAvailable += result.documentsAvailable;
++          if (result.path) {
++            applicantJsonManifest.files.push({
++              id: file.id,
++              path: result.path,
++              status: file.status,
++              type: file.type,
++            });
++          }
++          if (result.missingPath) {
++            applicantJsonManifest.missing.push({ path: result.missingPath, type: file.type });
++          }
+         }
+ 
+         const review = submission.visaApplicationPdfReviews?.find(
+@@ -186,7 +305,11 @@
+           name: `${applicantFolder}/manifest.txt`,
+           data: applicantManifest.join("\n"),
+         });
+-        includedFiles += 1;
++        entries.push({
++          name: `${applicantFolder}/manifest.json`,
++          data: JSON.stringify(applicantJsonManifest, null, 2),
++        });
++        includedFiles += 2;
+       }
+ 
+       if (submission.returnedPdfPackage?.commonAppointmentPdf?.fileName) {
+@@ -205,16 +328,35 @@
+       manifest.push("");
+     }
+ 
++    packageManifest.totals.documentsAvailable = documentsAvailable;
++    packageManifest.totals.includedFiles = includedFiles + 4;
++    packageManifest.totals.manifestFiles = manifestFiles;
++    packageManifest.totals.missingFiles = missingFiles;
++
+     entries.push({ name: "manifest.txt", data: manifest.join("\n") });
+     entries.push({ name: "manifest.json", data: JSON.stringify(packageManifest, null, 2) });
+     entries.push({
++      name: "issues.json",
++      data: JSON.stringify(
++        {
++          createdAtIso,
++          issues: packageIssues,
++          schema: "visaflow.export_issues.v1",
++          total: packageIssues.length,
++        },
++        null,
++        2,
++      ),
++    });
++    entries.push({
+       name: "README_ПАКЕТ.txt",
+       data: [
+         "В этом ZIP лежит Excel для программистов и документы выбранных подач.",
+         "Excel хранится в 00_Excel/.",
+-        "Дальше структура идет по городам: Город/01_Семьи/Подача/Заявитель и Город/02_Заявители/Подача/Заявитель.",
+-        "Фактические файлы попадают в ZIP, если они загружены в текущей браузерной сессии.",
+-        "Если файл хранится только в Supabase/private storage или был загружен раньше, диагностика лежит в Город/__MISSING__/ и в manifest указан NEEDS_SOURCE.",
++        "Каноническая структура: Город/family/Подача/applicant_01_Имя и Город/single/Подача/applicant_01_Имя.",
++        "manifest.json всегда создаётся на корне, в каждой подаче и у каждого заявителя.",
++        "issues.json всегда создаётся на корне и внутри каждой подачи.",
++        "Если исходный Blob недоступен в текущей браузерной сессии, диагностика лежит в __MISSING__ рядом с заявителем.",
+         "После обработки программисты возвращают PDF анкет и список записи. Это импортируется отдельно в админском экране загрузки.",
+       ].join("\n"),
+     });
+@@ -223,7 +365,13 @@
+     const zipFileName = exportZipFileName(identity.fileName);
+     downloadBlob(blob, zipFileName);
+ 
+-    return { ok: true, fileName: zipFileName, includedFiles, manifestFiles };
++    return {
++      ok: true,
++      fileName: zipFileName,
++      includedFiles: packageManifest.totals.includedFiles,
++      manifestFiles,
++      missingFiles,
++    };
+   } catch {
+     return {
+       ok: false,
+@@ -233,15 +381,210 @@
+   }
+ }
+ 
++type AddSubmissionFileEntryInput = {
++  applicantFolder: string;
++  applicantManifest: string[];
++  applicantName: string;
++  entries: ZipEntryInput[];
++  file: SubmissionFile;
++  localFilesById: ReadonlyMap<string, File>;
++  submissionId: string;
++};
++
++async function addSubmissionFileEntry({
++  applicantFolder,
++  applicantManifest,
++  applicantName,
++  entries,
++  file,
++  localFilesById,
++  submissionId,
++}: AddSubmissionFileEntryInput) {
++  const localFile = localFilesById.get(file.id);
++  const displayName = zipDocumentFileName(file, localFile?.name);
++  const path = `${applicantFolder}/${displayName}`;
++
++  if (localFile) {
++    entries.push({
++      name: path,
++      data: localFile,
++    });
++    applicantManifest.push(`OK_LOCAL: ${displayName}`);
++    return {
++      documentsAvailable: 1,
++      includedFiles: 1,
++      manifestFiles: 0,
++      missingFiles: 0,
++      path,
++    };
++  }
++
++  const storageBlob = await fetchStoredSubmissionFile(file);
++  if (storageBlob) {
++    entries.push({
++      name: path,
++      data: storageBlob,
++    });
++    applicantManifest.push(`OK_STORAGE: ${displayName}`);
++    return {
++      documentsAvailable: 1,
++      includedFiles: 1,
++      manifestFiles: 0,
++      missingFiles: 0,
++      path,
++    };
++  }
++
++  const missingPath = `${applicantFolder}/__MISSING__/${displayName}.txt`;
++  entries.push({
++    name: missingPath,
++    data: missingSourceFileNote({
++      applicantName,
++      displayName,
++      fileType: file.type,
++      reason: "actual Blob and signed storage download were not available",
++      status: file.status,
++      storageBucket: file.storageBucket,
++      storagePath: file.storagePath,
++      submissionId,
++    }),
++  });
++  applicantManifest.push(
++    `NEEDS_SOURCE: ${displayName} · ${fileTypeLabels[file.type] ?? file.type} · ${file.status} · see ${missingPath}`,
++  );
++
++  return {
++    documentsAvailable: 0,
++    includedFiles: 1,
++    manifestFiles: 1,
++    missingFiles: 1,
++    missingPath,
++  };
++}
++
++async function fetchStoredSubmissionFile(file: SubmissionFile) {
++  if (!file.storagePath) return null;
++  if (file.storageBucket && file.storageBucket !== mediaStorageBucket) return null;
++
++  try {
++    const signedUrl = await createMediaSignedUrl(
++      { bucket: mediaStorageBucket, path: file.storagePath },
++      60 * 5,
++    );
++    if (!signedUrl) return null;
++
++    const response = await fetch(signedUrl);
++    if (!response.ok) return null;
++
++    const blob = await response.blob();
++    return blob.size > 0 ? blob : null;
++  } catch {
++    return null;
++  }
++}
++
++function missingSourceFileNote({
++  applicantName,
++  displayName,
++  fileType,
++  reason,
++  status,
++  storageBucket = "",
++  storagePath = "",
++  submissionId,
++}: {
++  applicantName: string;
++  displayName: string;
++  fileType: SubmissionFile["type"];
++  reason: string;
++  status: string;
++  storageBucket?: string;
++  storagePath?: string;
++  submissionId: string;
++}) {
++  return [
++    `Missing source file: ${displayName}`,
++    `Submission: ${submissionId}`,
++    `Applicant: ${applicantName}`,
++    `Type: ${fileTypeLabels[fileType] ?? fileType}`,
++    `Status: ${status}`,
++    `Storage bucket: ${storageBucket}`,
++    `Storage path: ${storagePath}`,
++    `Reason: ${reason}.`,
++  ].join("\n");
++}
++
++function buildSubmissionIssuesManifest(submission: Submission) {
++  return {
++    schema: "visaflow.submission_issues.v1",
++    submissionId: submission.id,
++    total: submission.issues.length,
++    open: submission.issues.filter((issue) => issue.status === "open").length,
++    fixedByAgent: submission.issues.filter((issue) => issue.status === "fixed_by_agent").length,
++    closedByAdmin: submission.issues.filter((issue) => issue.status === "closed_by_admin").length,
++    issues: submission.issues.map((issue) => ({
++      id: issue.id,
++      type: issue.type,
++      severity: issue.severity,
++      status: issue.status,
++      reason: issue.reason,
++      comment: issue.comment,
++      createdAt: issue.createdAt,
++      createdBy: issue.createdBy,
++      target: issue.target,
++    })),
++  };
++}
++
+ function buildSubmissionManifest(submission: Submission) {
++  const readiness = summarizeSubmissionDocumentReadiness(submission);
++  const issues = buildSubmissionIssuesManifest(submission);
++
+   return {
+     id: submission.id,
+     title: submission.title,
+     type: submission.type,
+     city: submission.city,
++    country: submission.country,
++    countryCode: submission.countryCode,
+     tripDateFrom: submission.tripDateFrom,
+     tripDateTo: submission.tripDateTo,
+     status: submission.status,
++    exportState: submission.exportState ?? "not_ready",
++    readinessScore: submission.completeness.total,
++    documentsBundle: {
++      acceptedSlots: readiness.acceptedSlots,
++      applicants: submission.applicants.map((applicant) => ({
++        applicantId: applicant.id,
++        applicantName: applicant.fullName,
++        required: requiredExportDocumentTypes.map((type) => ({
++          type,
++          status:
++            submission.files.find(
++              (file) => file.applicantId === applicant.id && file.type === type,
++            )?.status ?? "missing",
++        })),
++        optionalTracked: optionalTrackedDocumentTypes.map((type) => ({
++          type,
++          status:
++            submission.files.find(
++              (file) => file.applicantId === applicant.id && file.type === type,
++            )?.status ?? "missing",
++        })),
++      })),
++      missingRequiredSlots: readiness.missingRequiredSlots,
++      ready: readiness.ready,
++      replacementRequiredSlots: readiness.replacementRequiredSlots,
++      requiredSlots: readiness.requiredSlots,
++      trackedOptionalSlots: readiness.trackedOptionalSlots,
++      uploadedSlots: readiness.uploadedSlots,
++    },
++    issuesSummary: {
++      closedByAdmin: issues.closedByAdmin,
++      fixedByAgent: issues.fixedByAgent,
++      open: issues.open,
++      total: issues.total,
++    },
+     applicants: submission.applicants.map((applicant) => ({
+       id: applicant.id,
+       fullName: applicant.fullName,
+@@ -291,7 +634,7 @@
+ }
+ 
+ function safeSegment(value: string) {
+-  return value
++  return stripZipControlCharacters(value)
+     .trim()
+     .replace(/[\\/:*?"<>|]+/g, "-")
+     .replace(/\s+/g, "_")
+@@ -299,13 +642,20 @@
+     .slice(0, 96) || "item";
+ }
+ 
++function stripZipControlCharacters(value: string) {
++  return Array.from(value, (character) => {
++    const codePoint = character.codePointAt(0) ?? 0;
++    return codePoint <= 31 ? "-" : character;
++  }).join("");
++}
++
+ function sanitizeZipPath(path: string) {
+   return path
+     .split("/")
+     .map((segment) => safeSegment(segment))
++    .filter((segment) => segment !== "." && segment !== "..")
+     .join("/");
+ }
+-
+ async function createZipBlob(entries: ZipEntryInput[]): Promise<Blob> {
+   const preparedEntries: PreparedZipEntry[] = [];
+   const localParts: Uint8Array[] = [];
+diff -ruN v19_full_work/src/modules/submissions/pages/OperationsScreens.tsx v19_product_work/src/modules/submissions/pages/OperationsScreens.tsx
+--- v19_full_work/src/modules/submissions/pages/OperationsScreens.tsx	2026-07-06 13:30:50.000000000 +0000
++++ v19_product_work/src/modules/submissions/pages/OperationsScreens.tsx	2026-07-06 13:56:15.076509275 +0000
+@@ -63,6 +63,10 @@
+   type ExportSummary,
+ } from "../exportRules";
+ import { agentOwnerDisplayName } from "../ownership";
++import {
++  documentReadinessLabel,
++  summarizeSubmissionDocumentReadiness,
++} from "../documentIntake";
+ import { formatSubmissionListTitle } from "../listFormatters";
+ import {
+   adminTriageRadarItem,
+@@ -2823,7 +2827,6 @@
+   historyList,
+   onDownload,
+   onGenerate,
+-  onChoosePackage,
+   onMarkExported,
+   onOpen,
+   onTab,
+@@ -3514,7 +3517,6 @@
+   historyList,
+   onDownload,
+   onGenerate,
+-  onChoosePackage,
+   onMarkExported,
+   onOpen,
+   onTab,
+@@ -3558,10 +3560,27 @@
+     null;
+   const selectedSubmissionCount = selectedReadySubmissions.length;
+   const selectedApplicantCount = exportPlan.rowCount;
+-  const selectedFiles = selectedReadySubmissions.reduce(
+-    (sum, submission) => sum + submission.files.length,
+-    0,
++  const selectedDocumentSummary = selectedReadySubmissions.reduce(
++    (summary, submission) => {
++      const next = summarizeSubmissionDocumentReadiness(submission);
++      return {
++        missingRequiredSlots:
++          summary.missingRequiredSlots + next.missingRequiredSlots,
++        replacementRequiredSlots:
++          summary.replacementRequiredSlots + next.replacementRequiredSlots,
++        requiredSlots: summary.requiredSlots + next.requiredSlots,
++        uploadedSlots: summary.uploadedSlots + next.uploadedSlots,
++      };
++    },
++    {
++      missingRequiredSlots: 0,
++      replacementRequiredSlots: 0,
++      requiredSlots: 0,
++      uploadedSlots: 0,
++    },
+   );
++  const selectedFiles = selectedDocumentSummary.uploadedSlots;
++  const selectedRequiredFiles = selectedDocumentSummary.requiredSlots;
+   const selectedWarnings = exportPlan.warnings.length;
+   const hasExportBlockers = exportPlan.blockers.length > 0;
+   const allReadySelected =
+@@ -3572,6 +3591,9 @@
+     exportError ||
+     (exportBusy ? "Формируем и проверяем Excel-файл..." : exportActionHint(exportPlan));
+   const activeBlockers = activeSubmission ? getExportBlockers([activeSubmission]) : [];
++  const activeDocumentSummary = activeSubmission
++    ? summarizeSubmissionDocumentReadiness(activeSubmission)
++    : null;
+   const showingHistory = exportTab === "history";
+   const selectedComposition =
+     selectedReadySubmissions.length > 0
+@@ -3669,8 +3691,8 @@
+           <AdminExportMetricCard
+             icon={FileArchive}
+             label="Документы"
+-            value={selectedFiles}
+-            detail="файлов в пакете"
++            value={`${selectedFiles}/${selectedRequiredFiles || 0}`}
++            detail="обязательных слотов"
+           />
+           <AdminExportMetricCard
+             icon={hasExportBlockers ? XCircle : ShieldCheck}
+@@ -3837,8 +3859,20 @@
+                   <strong>{activeSubmission.city}</strong>
+                 </span>
+                 <span>
+-                  <small>Файлы</small>
+-                  <strong>{activeSubmission.files.length}</strong>
++                  <small>Документы</small>
++                  <strong>
++                    {activeDocumentSummary ? (
++                      <span
++                        className={`v19-document-readiness-pill ${
++                          activeDocumentSummary.ready ? "is-success" : "is-warning"
++                        }`}
++                      >
++                        {documentReadinessLabel(activeDocumentSummary)}
++                      </span>
++                    ) : (
++                      activeSubmission.files.length
++                    )}
++                  </strong>
+                 </span>
+                 <span>
+                   <small>Слот</small>
+@@ -3848,6 +3882,13 @@
+             ) : null}
+           </section>
+ 
++          <section className="v19-export-package-blueprint" aria-label="Структура ZIP пакета">
++            <strong>ZIP структура</strong>
++            <code>00_Excel/{exportPlan.downloadPackageIdentity?.fileName ?? "Excel.xlsx"}</code>
++            <code>city/family/submission/applicant_01/documents</code>
++            <code>manifest.json + issues.json + __MISSING__</code>
++          </section>
++
+           <section className="v19-admin-export-rail-card">
+             <div className="v19-admin-export-card-head">
+               <h4>Проверки перед выгрузкой</h4>
+diff -ruN v19_full_work/src/modules/submissions/pdfTextExtraction.ts v19_product_work/src/modules/submissions/pdfTextExtraction.ts
+--- v19_full_work/src/modules/submissions/pdfTextExtraction.ts	2026-07-06 13:01:07.000000000 +0000
++++ v19_product_work/src/modules/submissions/pdfTextExtraction.ts	2026-07-06 13:45:30.210662960 +0000
+@@ -18,6 +18,10 @@
+   text: string;
+ };
+ 
++export type PdfUploadReadiness =
++  | { ok: true; sourceLabel: string }
++  | { ok: false; safeMessage: string };
++
+ type PdfTextItem = {
+   str?: unknown;
+ };
+@@ -79,6 +83,26 @@
+   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+ }
+ 
++export function validateVisaApplicationPdfFile(file: File): PdfUploadReadiness {
++  if (!isVisaApplicationPdfFile(file)) {
++    return { ok: false, safeMessage: "Загрузите PDF анкеты." };
++  }
++  if (file.size <= 0) {
++    return { ok: false, safeMessage: "PDF анкеты пустой. Экспортируйте файл повторно." };
++  }
++  if (file.size > maxVisaApplicationPdfBytes) {
++    return {
++      ok: false,
++      safeMessage: "PDF анкеты слишком большой. Максимальный размер: 25 МБ.",
++    };
++  }
++  return { ok: true, sourceLabel: "PDF анкеты готов к локальной сверке" };
++}
++
++export function pdfExtractionSourceLabel(source: VisaApplicationPdfExtractionSource) {
++  return source === "text_layer" ? "Текстовый слой PDF" : "Локальный OCR";
++}
++
+ export function normalizeVisaApplicationPdfUploadFile(file: File) {
+   if (file.type === "application/pdf") return file;
+   return new File([file], file.name, {
+@@ -88,11 +112,9 @@
+ }
+ 
+ export async function extractPdfTextFromFile(file: File): Promise<ExtractedPdfText> {
+-  if (!isVisaApplicationPdfFile(file)) {
+-    throw new Error("Загрузите PDF анкеты.");
+-  }
+-  if (file.size > maxVisaApplicationPdfBytes) {
+-    throw new Error("PDF анкеты слишком большой. Максимальный размер: 25 МБ.");
++  const readiness = validateVisaApplicationPdfFile(file);
++  if (!readiness.ok) {
++    throw new Error(readiness.safeMessage);
+   }
+ 
+   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+@@ -108,7 +130,12 @@
+     data: bytes,
+     isEvalSupported: false,
+   } as unknown as Parameters<typeof pdfjs.getDocument>[0]);
+-  const document = (await loadingTask.promise) as unknown as PdfDocumentProxy;
++  let document: PdfDocumentProxy;
++  try {
++    document = (await loadingTask.promise) as unknown as PdfDocumentProxy;
++  } catch (error) {
++    throw new Error(pdfLoadFailureMessage(error));
++  }
+   const pages: string[] = [];
+ 
+   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+@@ -121,10 +148,14 @@
+     pages.push(pageText);
+   }
+ 
+-  const textLayerText = pages.join("\n\n").trim();
++  const textLayerText = normalizeExtractedPdfText(pages.join("\n\n"));
+   const source = textLayerText ? "text_layer" : "local_ocr";
+   const ocrResult = textLayerText ? null : await extractPdfTextWithLocalOcr(document);
+-  const text = textLayerText || ocrResult?.text || "";
++  const text = normalizeExtractedPdfText(textLayerText || ocrResult?.text || "");
++
++  if (!text) {
++    throw new Error("PDF анкеты не содержит читаемого текста. Загрузите сформированный PDF или более качественный скан.");
++  }
+ 
+   return {
+     extractedPageCount: textLayerText
+@@ -177,7 +208,7 @@
+     if (response.data.text?.trim()) recognizedPages.push(response.data.text.trim());
+   }
+ 
+-  const text = recognizedPages.join("\n\n").trim();
++  const text = normalizeExtractedPdfText(recognizedPages.join("\n\n"));
+   if (!text) {
+     throw new Error(
+       "В PDF нет текстового слоя, а локальный OCR не смог прочитать анкету. Загрузите сформированную PDF-анкету.",
+@@ -189,6 +220,28 @@
+   };
+ }
+ 
++function normalizeExtractedPdfText(value: string) {
++  return value
++    .replace(/\r\n?/g, "\n")
++    .split("\n")
++    .map((line) => line.replace(/\s+/g, " ").trim())
++    .filter(Boolean)
++    .join("\n")
++    .trim();
++}
++
++function pdfLoadFailureMessage(error: unknown) {
++  const message = error instanceof Error ? error.message.toLowerCase() : "";
++
++  if (message.includes("password") || message.includes("encrypted")) {
++    return "PDF анкеты защищён паролем. Снимите защиту и загрузите файл повторно.";
++  }
++  if (message.includes("invalid") || message.includes("damaged") || message.includes("corrupt")) {
++    return "PDF анкеты повреждён или не читается. Экспортируйте файл заново.";
++  }
++  return "PDF анкеты не удалось открыть. Проверьте файл и повторите загрузку.";
++}
++
+ function getBrowserDocument() {
+   return (globalThis as typeof globalThis & { document?: BrowserDocument }).document;
+ }
+diff -ruN v19_full_work/src/shared/ui/SideMenuButton.tsx v19_product_work/src/shared/ui/SideMenuButton.tsx
+--- v19_full_work/src/shared/ui/SideMenuButton.tsx	1970-01-01 00:00:00.000000000 +0000
++++ v19_product_work/src/shared/ui/SideMenuButton.tsx	2026-07-06 13:43:07.205954176 +0000
+@@ -0,0 +1,88 @@
++import type { ButtonHTMLAttributes, ReactNode } from "react";
++
++import { cn } from "./cn";
++
++export type SideMenuButtonTone = "default" | "danger" | "warning" | "success";
++export type SideMenuButtonAppearance = "navigation" | "action" | "utility";
++
++export interface SideMenuButtonProps
++  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
++  active?: boolean;
++  appearance?: SideMenuButtonAppearance;
++  badge?: ReactNode;
++  collapsed?: boolean;
++  count?: number;
++  description?: ReactNode;
++  icon: ReactNode;
++  label: ReactNode;
++  labelText?: string;
++  shortcut?: ReactNode;
++  tone?: SideMenuButtonTone;
++}
++
++export function SideMenuButton({
++  active = false,
++  appearance = "navigation",
++  badge,
++  className,
++  collapsed = false,
++  count,
++  description,
++  disabled,
++  icon,
++  label,
++  labelText,
++  shortcut,
++  tone = "default",
++  type = "button",
++  ...props
++}: SideMenuButtonProps) {
++  const accessibleLabel =
++    labelText ?? (typeof label === "string" ? label : undefined);
++  const visibleBadge = badge ?? (typeof count === "number" ? count : null);
++
++  return (
++    <button
++      {...props}
++      aria-current={props["aria-current"] ?? (active ? "page" : undefined)}
++      aria-label={props["aria-label"] ?? accessibleLabel}
++      className={cn(
++        "vf-side-menu-button",
++        `appearance-${appearance}`,
++        `tone-${tone}`,
++        active && "is-active",
++        collapsed && "is-collapsed",
++        disabled && "is-disabled",
++        className,
++      )}
++      data-active={active ? "true" : "false"}
++      data-collapsed={collapsed ? "true" : "false"}
++      disabled={disabled}
++      type={type}
++    >
++      <span className="vf-side-menu-button__rail" aria-hidden="true" />
++      <span className="vf-side-menu-button__icon" aria-hidden="true">
++        {icon}
++      </span>
++      <span className="vf-side-menu-button__copy">
++        <strong>{label}</strong>
++        {description ? <small>{description}</small> : null}
++      </span>
++      {visibleBadge !== null && visibleBadge !== undefined ? (
++        <span className="vf-side-menu-button__badge" aria-hidden="true">
++          {visibleBadge}
++        </span>
++      ) : null}
++      {shortcut ? (
++        <kbd className="vf-side-menu-button__shortcut" aria-hidden="true">
++          {shortcut}
++        </kbd>
++      ) : null}
++      {collapsed && accessibleLabel ? (
++        <span className="vf-side-menu-button__tooltip" role="tooltip">
++          {accessibleLabel}
++        </span>
++      ) : null}
++    </button>
++  );
++}
+diff -ruN v19_full_work/src/shared/ui/side-menu-button.css v19_product_work/src/shared/ui/side-menu-button.css
+--- v19_full_work/src/shared/ui/side-menu-button.css	1970-01-01 00:00:00.000000000 +0000
++++ v19_product_work/src/shared/ui/side-menu-button.css	2026-07-06 13:43:07.218377565 +0000
+@@ -0,0 +1,327 @@
++.vf-side-menu-button {
++  --vf-side-menu-accent: var(--vf-accent, rgb(58 69 180));
++  --vf-side-menu-accent-rgb: var(--accent, 58 69 180);
++  position: relative;
++  display: grid;
++  grid-template-columns: 36px minmax(0, 1fr) auto auto;
++  align-items: center;
++  width: 100%;
++  min-height: 46px;
++  gap: 10px;
++  padding: 6px 10px;
++  border: 1px solid transparent;
++  border-radius: 14px;
++  color: rgb(255 255 255 / 0.68);
++  background:
++    linear-gradient(180deg, rgb(255 255 255 / 0.018), rgb(255 255 255 / 0)),
++    transparent;
++  font: inherit;
++  text-align: left;
++  cursor: pointer;
++  isolation: isolate;
++  -webkit-tap-highlight-color: transparent;
++  transition:
++    background-color 160ms ease,
++    border-color 160ms ease,
++    box-shadow 160ms ease,
++    color 160ms ease,
++    transform 160ms ease;
++}
++
++.vf-side-menu-button::before {
++  position: absolute;
++  inset: 1px;
++  z-index: -1;
++  border-radius: inherit;
++  content: "";
++  background:
++    radial-gradient(circle at 22% 0%, rgb(var(--vf-side-menu-accent-rgb) / 0.14), transparent 42%),
++    linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0));
++  opacity: 0;
++  transition: opacity 160ms ease;
++}
++
++.vf-side-menu-button:hover {
++  color: rgb(255 255 255 / 0.92);
++  border-color: rgb(255 255 255 / 0.08);
++  background-color: rgb(255 255 255 / 0.045);
++  transform: translateY(-1px);
++}
++
++.vf-side-menu-button:focus-visible {
++  outline: 0;
++  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.54);
++  box-shadow:
++    0 0 0 3px rgb(var(--vf-side-menu-accent-rgb) / 0.22),
++    inset 0 1px 0 rgb(255 255 255 / 0.035);
++}
++
++.vf-side-menu-button:disabled,
++.vf-side-menu-button.is-disabled {
++  cursor: not-allowed;
++  opacity: 0.48;
++  transform: none;
++}
++
++.vf-side-menu-button.is-active {
++  color: rgb(255 255 255 / 0.96);
++  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.42);
++  background:
++    radial-gradient(circle at 14px 50%, rgb(var(--vf-side-menu-accent-rgb) / 0.22), transparent 32%),
++    linear-gradient(180deg, rgb(255 255 255 / 0.074), rgb(255 255 255 / 0.024));
++  box-shadow:
++    0 12px 28px rgb(0 0 0 / 0.24),
++    0 0 26px rgb(var(--vf-side-menu-accent-rgb) / 0.14),
++    inset 0 1px 0 rgb(255 255 255 / 0.045);
++}
++
++.vf-side-menu-button.is-active::before,
++.vf-side-menu-button:hover::before {
++  opacity: 1;
++}
++
++.vf-side-menu-button__rail {
++  position: absolute;
++  left: -1px;
++  top: 10px;
++  bottom: 10px;
++  width: 3px;
++  border-radius: 999px;
++  background: var(--vf-side-menu-accent);
++  box-shadow: 0 0 20px rgb(var(--vf-side-menu-accent-rgb) / 0.58);
++  opacity: 0;
++  transform: scaleY(0.54);
++  transition:
++    opacity 160ms ease,
++    transform 160ms ease;
++}
++
++.vf-side-menu-button.is-active .vf-side-menu-button__rail {
++  opacity: 1;
++  transform: scaleY(1);
++}
++
++.vf-side-menu-button__icon {
++  display: grid;
++  place-items: center;
++  width: 34px;
++  height: 34px;
++  border: 1px solid rgb(255 255 255 / 0.06);
++  border-radius: 11px;
++  background: rgb(255 255 255 / 0.04);
++  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.024);
++  color: currentColor;
++  transition:
++    background-color 160ms ease,
++    border-color 160ms ease,
++    color 160ms ease;
++}
++
++.vf-side-menu-button.is-active .vf-side-menu-button__icon {
++  color: #fff;
++  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.26);
++  background: rgb(var(--vf-side-menu-accent-rgb) / 0.18);
++}
++
++.vf-side-menu-button__copy {
++  display: grid;
++  min-width: 0;
++  gap: 1px;
++}
++
++.vf-side-menu-button__copy strong {
++  overflow: hidden;
++  color: inherit;
++  font-size: 13px;
++  font-weight: 650;
++  letter-spacing: -0.01em;
++  line-height: 1.18;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.vf-side-menu-button__copy small {
++  overflow: hidden;
++  color: rgb(255 255 255 / 0.4);
++  font-size: 11px;
++  font-weight: 500;
++  line-height: 1.2;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.vf-side-menu-button__badge,
++.vf-side-menu-button__shortcut {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  min-width: 24px;
++  height: 22px;
++  padding: 0 7px;
++  border: 1px solid rgb(255 255 255 / 0.075);
++  border-radius: 999px;
++  background: rgb(255 255 255 / 0.055);
++  color: rgb(255 255 255 / 0.62);
++  font-size: 11px;
++  font-weight: 700;
++  line-height: 1;
++}
++
++.vf-side-menu-button__shortcut {
++  min-width: 0;
++  height: 20px;
++  padding: 0 6px;
++  border-radius: 7px;
++  font-size: 10px;
++  font-weight: 600;
++}
++
++.vf-side-menu-button.is-active .vf-side-menu-button__badge {
++  color: #fff;
++  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.3);
++  background: rgb(var(--vf-side-menu-accent-rgb) / 0.22);
++}
++
++.vf-side-menu-button.tone-danger {
++  --vf-side-menu-accent: var(--vf-red, rgb(239 68 68));
++  --vf-side-menu-accent-rgb: var(--danger, 239 68 68);
++}
++
++.vf-side-menu-button.tone-warning {
++  --vf-side-menu-accent: var(--vf-yellow, rgb(249 115 22));
++  --vf-side-menu-accent-rgb: var(--warning, 249 115 22);
++}
++
++.vf-side-menu-button.tone-success {
++  --vf-side-menu-accent: var(--vf-green, rgb(16 185 129));
++  --vf-side-menu-accent-rgb: var(--success, 16 185 129);
++}
++
++.vf-side-menu-button.appearance-action {
++  margin-top: auto;
++  min-height: 48px;
++  color: #fff;
++  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.34);
++  background:
++    radial-gradient(circle at 16% 0%, rgb(255 255 255 / 0.16), transparent 38%),
++    linear-gradient(135deg, rgb(var(--vf-side-menu-accent-rgb) / 0.9), rgb(72 85 212 / 0.82));
++  box-shadow:
++    0 16px 34px rgb(var(--vf-side-menu-accent-rgb) / 0.2),
++    inset 0 1px 0 rgb(255 255 255 / 0.18);
++}
++
++.vf-side-menu-button.appearance-action:hover {
++  border-color: rgb(255 255 255 / 0.18);
++  transform: translateY(-2px);
++}
++
++.vf-side-menu-button.appearance-action .vf-side-menu-button__icon {
++  color: #fff;
++  background: rgb(255 255 255 / 0.14);
++  border-color: rgb(255 255 255 / 0.16);
++}
++
++.vf-side-menu-button.appearance-utility {
++  min-height: 40px;
++  grid-template-columns: 32px minmax(0, 1fr) auto auto;
++}
++
++.vf-side-menu-button.is-collapsed {
++  grid-template-columns: 36px;
++  justify-content: center;
++  min-height: 46px;
++  padding: 6px;
++}
++
++.vf-side-menu-button.is-collapsed .vf-side-menu-button__copy,
++.vf-side-menu-button.is-collapsed .vf-side-menu-button__shortcut {
++  position: absolute;
++  width: 1px;
++  height: 1px;
++  overflow: hidden;
++  clip: rect(0 0 0 0);
++  white-space: nowrap;
++}
++
++.vf-side-menu-button.is-collapsed .vf-side-menu-button__badge {
++  position: absolute;
++  right: 4px;
++  top: 4px;
++  min-width: 17px;
++  height: 17px;
++  padding: 0 4px;
++  font-size: 9px;
++}
++
++.vf-side-menu-button__tooltip {
++  position: absolute;
++  left: calc(100% + 10px);
++  top: 50%;
++  z-index: 60;
++  width: max-content;
++  max-width: 220px;
++  padding: 7px 9px;
++  border: 1px solid rgb(255 255 255 / 0.1);
++  border-radius: 9px;
++  background: rgb(20 20 22 / 0.96);
++  box-shadow: 0 16px 40px rgb(0 0 0 / 0.42);
++  color: rgb(255 255 255 / 0.9);
++  font-size: 12px;
++  font-weight: 650;
++  opacity: 0;
++  pointer-events: none;
++  transform: translate(-4px, -50%) scale(0.98);
++  transition:
++    opacity 140ms ease,
++    transform 140ms ease;
++}
++
++.vf-side-menu-button.is-collapsed:hover .vf-side-menu-button__tooltip,
++.vf-side-menu-button.is-collapsed:focus-visible .vf-side-menu-button__tooltip {
++  opacity: 1;
++  transform: translate(0, -50%) scale(1);
++}
++
++.ops-sidebar.is-compact .vf-side-menu-button,
++.opsu-sidebar.is-compact .vf-side-menu-button {
++  margin-inline: auto;
++}
++
++@media (max-width: 760px) {
++  .vf-side-menu-button,
++  .vf-side-menu-button.is-collapsed {
++    grid-template-columns: 36px minmax(0, 1fr) auto;
++    justify-content: stretch;
++    min-height: 48px;
++    padding: 7px 10px;
++  }
++
++  .vf-side-menu-button.is-collapsed .vf-side-menu-button__copy {
++    position: static;
++    width: auto;
++    height: auto;
++    overflow: visible;
++    clip: auto;
++    white-space: normal;
++  }
++
++  .vf-side-menu-button__tooltip,
++  .vf-side-menu-button.is-collapsed .vf-side-menu-button__shortcut {
++    display: none;
++  }
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .vf-side-menu-button,
++  .vf-side-menu-button::before,
++  .vf-side-menu-button__rail,
++  .vf-side-menu-button__icon,
++  .vf-side-menu-button__tooltip {
++    transition: none;
++  }
++
++  .vf-side-menu-button:hover,
++  .vf-side-menu-button.appearance-action:hover {
++    transform: none;
++  }
++}
+diff -ruN v19_full_work/src/shared/ui/v19-workflow-premium.css v19_product_work/src/shared/ui/v19-workflow-premium.css
+--- v19_full_work/src/shared/ui/v19-workflow-premium.css	1970-01-01 00:00:00.000000000 +0000
++++ v19_product_work/src/shared/ui/v19-workflow-premium.css	2026-07-06 13:44:13.857033424 +0000
+@@ -0,0 +1,312 @@
++/* V-19 workflow convergence layer.
++   Keeps the current custom-CSS stack, adds reference-inspired density, motion,
++   and export/upload readability without introducing Tailwind/runtime deps. */
++:root {
++  --v19-premium-bg: #0b0d12;
++  --v19-premium-surface: #11141b;
++  --v19-premium-surface-2: #161a24;
++  --v19-premium-border: #1c2230;
++  --v19-premium-accent: var(--vf-accent, rgb(58 69 180));
++  --v19-premium-shadow: 0 18px 50px rgb(0 0 0 / 0.32);
++  --v19-premium-card-shadow: 0 12px 34px rgb(0 0 0 / 0.22);
++}
++
++.ops-shell.has-unified-side-menu {
++  background:
++    radial-gradient(circle at 10% -10%, rgb(var(--accent, 58 69 180) / 0.13), transparent 30%),
++    radial-gradient(circle at 92% 8%, rgb(var(--warning, 249 115 22) / 0.06), transparent 22%),
++    var(--v19-premium-bg);
++}
++
++.workspace {
++  background:
++    linear-gradient(180deg, rgb(255 255 255 / 0.018), rgb(255 255 255 / 0)),
++    var(--vf-surface-main, #141416);
++}
++
++.v19-page-header,
++.topbar.v19-page-header {
++  border-bottom-color: rgb(255 255 255 / 0.075);
++  background:
++    linear-gradient(180deg, rgb(255 255 255 / 0.036), rgb(255 255 255 / 0.012)),
++    rgb(17 20 27 / 0.78);
++  backdrop-filter: blur(18px);
++}
++
++.v19-page-header .topbar-heading h1 {
++  letter-spacing: -0.026em;
++}
++
++.ops-sidebar.opsu-sidebar {
++  border-right-color: rgb(255 255 255 / 0.082);
++  background:
++    radial-gradient(circle at 50% -8%, rgb(var(--accent, 58 69 180) / 0.12), transparent 33%),
++    linear-gradient(180deg, rgb(255 255 255 / 0.038), rgb(255 255 255 / 0.008)),
++    rgb(11 13 18 / 0.92);
++  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.035);
++}
++
++.ops-brand.opsu-brand,
++.ops-sidebar-search {
++  border-color: rgb(255 255 255 / 0.075);
++  background-color: rgb(255 255 255 / 0.035);
++}
++
++.ops-sidebar-search:hover {
++  border-color: rgb(var(--accent, 58 69 180) / 0.34);
++  background-color: rgb(255 255 255 / 0.055);
++}
++
++.vf-linear-submission-card,
++.vf-linear-family-card,
++.vf-linear-person-card,
++.vf-linear-table-card,
++.vf-linear-issue-card,
++.v19-admin-export-rail-card,
++.v19-admin-export-list,
++.v19-admin-export-metrics article,
++.admin-review-drawer,
++.admin-passport-workspace,
++.admin-remark-form,
++.figma-questionnaire-shell,
++.figma-submission-drawer {
++  box-shadow:
++    var(--v19-premium-card-shadow),
++    inset 0 1px 0 rgb(255 255 255 / 0.026);
++}
++
++.vf-linear-submission-card,
++.vf-linear-family-card,
++.vf-linear-person-card,
++.vf-linear-issue-card,
++.v19-admin-export-row,
++.v19-admin-export-composition-item,
++.admin-review-field-row,
++.admin-review-check-card article,
++.admin-passport-checklist article {
++  transition:
++    border-color 160ms ease,
++    background-color 160ms ease,
++    box-shadow 160ms ease,
++    transform 160ms ease;
++}
++
++.vf-linear-submission-card:hover,
++.vf-linear-family-card:hover,
++.vf-linear-person-card:hover,
++.vf-linear-issue-card:hover,
++.v19-admin-export-row:hover,
++.v19-admin-export-composition-item:hover,
++.admin-review-field-row:hover,
++.admin-review-check-card article:hover,
++.admin-passport-checklist article:hover {
++  transform: translateY(-2px);
++  border-color: rgb(var(--accent, 58 69 180) / 0.32);
++  box-shadow:
++    0 18px 44px rgb(0 0 0 / 0.28),
++    0 0 22px rgb(var(--accent, 58 69 180) / 0.07),
++    inset 0 1px 0 rgb(255 255 255 / 0.035);
++}
++
++.vf-linear-screen,
++.v19-admin-export-reference,
++.v19-agent-screen,
++.v19-collection-workspace,
++.admin-review-drawer {
++  animation: v19-screen-in 180ms ease-out both;
++}
++
++.v19-admin-export-reference {
++  gap: 16px;
++}
++
++.v19-admin-export-side {
++  max-width: min(380px, 24vw);
++}
++
++.v19-admin-export-side-body {
++  scrollbar-gutter: stable;
++}
++
++.v19-admin-export-side-head h2,
++.v19-admin-export-side-head h3,
++.v19-admin-export-title-copy h2 {
++  letter-spacing: -0.025em;
++}
++
++.v19-admin-export-primary-action,
++.primary-button,
++.vf-linear-open {
++  box-shadow:
++    0 14px 28px rgb(var(--accent, 58 69 180) / 0.18),
++    inset 0 1px 0 rgb(255 255 255 / 0.12);
++}
++
++.v19-admin-export-guard-messages span,
++.v19-admin-export-check,
++.v19-admin-export-status,
++.vf-linear-status-pill,
++.status-chip,
++.mp-badge {
++  letter-spacing: -0.006em;
++}
++
++.v19-export-package-blueprint {
++  display: grid;
++  gap: 8px;
++  margin-top: 12px;
++  padding: 12px;
++  border: 1px solid rgb(255 255 255 / 0.075);
++  border-radius: 14px;
++  background:
++    radial-gradient(circle at 0 0, rgb(var(--accent, 58 69 180) / 0.12), transparent 44%),
++    rgb(255 255 255 / 0.028);
++}
++
++.v19-export-package-blueprint strong {
++  color: rgb(255 255 255 / 0.86);
++  font-size: 12px;
++  font-weight: 700;
++}
++
++.v19-export-package-blueprint code {
++  display: block;
++  overflow: hidden;
++  color: rgb(255 255 255 / 0.52);
++  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
++  font-size: 10.5px;
++  line-height: 1.55;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.v19-document-readiness-pill {
++  display: inline-flex;
++  align-items: center;
++  min-height: 22px;
++  padding: 0 8px;
++  border: 1px solid rgb(255 255 255 / 0.075);
++  border-radius: 999px;
++  background: rgb(255 255 255 / 0.045);
++  color: rgb(255 255 255 / 0.64);
++  font-size: 11px;
++  font-weight: 650;
++}
++
++.v19-document-readiness-pill.is-warning {
++  border-color: rgb(var(--warning, 249 115 22) / 0.34);
++  background: rgb(var(--warning, 249 115 22) / 0.11);
++  color: rgb(251 146 60 / 0.95);
++}
++
++.v19-document-readiness-pill.is-success {
++  border-color: rgb(var(--success, 16 185 129) / 0.34);
++  background: rgb(var(--success, 16 185 129) / 0.11);
++  color: rgb(52 211 153 / 0.95);
++}
++
++.excel-table.export-preview-sheet {
++  border-color: rgb(255 255 255 / 0.08);
++  background:
++    linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)),
++    rgb(12 14 18 / 0.62);
++}
++
++.mapping-audit-scroll,
++.v19-admin-export-composition,
++.v19-admin-export-history,
++.admin-passport-workspace-main,
++.admin-review-passport-fields,
++.admin-review-drawer-body {
++  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
++}
++
++.mapping-audit-scroll::-webkit-scrollbar,
++.v19-admin-export-composition::-webkit-scrollbar,
++.v19-admin-export-history::-webkit-scrollbar,
++.admin-passport-workspace-main::-webkit-scrollbar,
++.admin-review-passport-fields::-webkit-scrollbar,
++.admin-review-drawer-body::-webkit-scrollbar {
++  width: 8px;
++  height: 8px;
++}
++
++.mapping-audit-scroll::-webkit-scrollbar-thumb,
++.v19-admin-export-composition::-webkit-scrollbar-thumb,
++.v19-admin-export-history::-webkit-scrollbar-thumb,
++.admin-passport-workspace-main::-webkit-scrollbar-thumb,
++.admin-review-passport-fields::-webkit-scrollbar-thumb,
++.admin-review-drawer-body::-webkit-scrollbar-thumb {
++  border-radius: 999px;
++  background: rgb(255 255 255 / 0.14);
++}
++
++@keyframes v19-screen-in {
++  from {
++    opacity: 0;
++    transform: translateY(8px);
++  }
++  to {
++    opacity: 1;
++    transform: translateY(0);
++  }
++}
++
++@media (max-width: 1100px) {
++  .v19-admin-export-side {
++    max-width: none;
++  }
++}
++
++@media (max-width: 760px) {
++  .v19-page-header,
++  .topbar.v19-page-header {
++    backdrop-filter: blur(14px);
++  }
++
++  .v19-admin-export-reference,
++  .vf-linear-screen {
++    gap: 12px;
++  }
++
++  .vf-linear-submission-card:hover,
++  .vf-linear-family-card:hover,
++  .vf-linear-person-card:hover,
++  .vf-linear-issue-card:hover,
++  .v19-admin-export-row:hover,
++  .admin-review-field-row:hover {
++    transform: none;
++  }
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .vf-linear-screen,
++  .v19-admin-export-reference,
++  .v19-agent-screen,
++  .v19-collection-workspace,
++  .admin-review-drawer,
++  .vf-linear-submission-card,
++  .vf-linear-family-card,
++  .vf-linear-person-card,
++  .vf-linear-issue-card,
++  .v19-admin-export-row,
++  .v19-admin-export-composition-item,
++  .admin-review-field-row,
++  .admin-review-check-card article,
++  .admin-passport-checklist article {
++    animation: none;
++    transition: none;
++  }
++
++  .vf-linear-submission-card:hover,
++  .vf-linear-family-card:hover,
++  .vf-linear-person-card:hover,
++  .vf-linear-issue-card:hover,
++  .v19-admin-export-row:hover,
++  .v19-admin-export-composition-item:hover,
++  .admin-review-field-row:hover,
++  .admin-review-check-card article:hover,
++  .admin-passport-checklist article:hover {
++    transform: none;
++  }
++}

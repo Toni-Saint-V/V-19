@@ -1,0 +1,312 @@
+/* V-19 workflow convergence layer.
+   Keeps the current custom-CSS stack, adds reference-inspired density, motion,
+   and export/upload readability without introducing Tailwind/runtime deps. */
+:root {
+  --v19-premium-bg: #0b0d12;
+  --v19-premium-surface: #11141b;
+  --v19-premium-surface-2: #161a24;
+  --v19-premium-border: #1c2230;
+  --v19-premium-accent: var(--vf-accent, rgb(58 69 180));
+  --v19-premium-shadow: 0 18px 50px rgb(0 0 0 / 0.32);
+  --v19-premium-card-shadow: 0 12px 34px rgb(0 0 0 / 0.22);
+}
+
+.ops-shell.has-unified-side-menu {
+  background:
+    radial-gradient(circle at 10% -10%, rgb(var(--accent, 58 69 180) / 0.13), transparent 30%),
+    radial-gradient(circle at 92% 8%, rgb(var(--warning, 249 115 22) / 0.06), transparent 22%),
+    var(--v19-premium-bg);
+}
+
+.workspace {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.018), rgb(255 255 255 / 0)),
+    var(--vf-surface-main, #141416);
+}
+
+.v19-page-header,
+.topbar.v19-page-header {
+  border-bottom-color: rgb(255 255 255 / 0.075);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.036), rgb(255 255 255 / 0.012)),
+    rgb(17 20 27 / 0.78);
+  backdrop-filter: blur(18px);
+}
+
+.v19-page-header .topbar-heading h1 {
+  letter-spacing: -0.026em;
+}
+
+.ops-sidebar.opsu-sidebar {
+  border-right-color: rgb(255 255 255 / 0.082);
+  background:
+    radial-gradient(circle at 50% -8%, rgb(var(--accent, 58 69 180) / 0.12), transparent 33%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.038), rgb(255 255 255 / 0.008)),
+    rgb(11 13 18 / 0.92);
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.035);
+}
+
+.ops-brand.opsu-brand,
+.ops-sidebar-search {
+  border-color: rgb(255 255 255 / 0.075);
+  background-color: rgb(255 255 255 / 0.035);
+}
+
+.ops-sidebar-search:hover {
+  border-color: rgb(var(--accent, 58 69 180) / 0.34);
+  background-color: rgb(255 255 255 / 0.055);
+}
+
+.vf-linear-submission-card,
+.vf-linear-family-card,
+.vf-linear-person-card,
+.vf-linear-table-card,
+.vf-linear-issue-card,
+.v19-admin-export-rail-card,
+.v19-admin-export-list,
+.v19-admin-export-metrics article,
+.admin-review-drawer,
+.admin-passport-workspace,
+.admin-remark-form,
+.figma-questionnaire-shell,
+.figma-submission-drawer {
+  box-shadow:
+    var(--v19-premium-card-shadow),
+    inset 0 1px 0 rgb(255 255 255 / 0.026);
+}
+
+.vf-linear-submission-card,
+.vf-linear-family-card,
+.vf-linear-person-card,
+.vf-linear-issue-card,
+.v19-admin-export-row,
+.v19-admin-export-composition-item,
+.admin-review-field-row,
+.admin-review-check-card article,
+.admin-passport-checklist article {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.vf-linear-submission-card:hover,
+.vf-linear-family-card:hover,
+.vf-linear-person-card:hover,
+.vf-linear-issue-card:hover,
+.v19-admin-export-row:hover,
+.v19-admin-export-composition-item:hover,
+.admin-review-field-row:hover,
+.admin-review-check-card article:hover,
+.admin-passport-checklist article:hover {
+  transform: translateY(-2px);
+  border-color: rgb(var(--accent, 58 69 180) / 0.32);
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.28),
+    0 0 22px rgb(var(--accent, 58 69 180) / 0.07),
+    inset 0 1px 0 rgb(255 255 255 / 0.035);
+}
+
+.vf-linear-screen,
+.v19-admin-export-reference,
+.v19-agent-screen,
+.v19-collection-workspace,
+.admin-review-drawer {
+  animation: v19-screen-in 180ms ease-out both;
+}
+
+.v19-admin-export-reference {
+  gap: 16px;
+}
+
+.v19-admin-export-side {
+  max-width: min(380px, 24vw);
+}
+
+.v19-admin-export-side-body {
+  scrollbar-gutter: stable;
+}
+
+.v19-admin-export-side-head h2,
+.v19-admin-export-side-head h3,
+.v19-admin-export-title-copy h2 {
+  letter-spacing: -0.025em;
+}
+
+.v19-admin-export-primary-action,
+.primary-button,
+.vf-linear-open {
+  box-shadow:
+    0 14px 28px rgb(var(--accent, 58 69 180) / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+.v19-admin-export-guard-messages span,
+.v19-admin-export-check,
+.v19-admin-export-status,
+.vf-linear-status-pill,
+.status-chip,
+.mp-badge {
+  letter-spacing: -0.006em;
+}
+
+.v19-export-package-blueprint {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 0.075);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 0 0, rgb(var(--accent, 58 69 180) / 0.12), transparent 44%),
+    rgb(255 255 255 / 0.028);
+}
+
+.v19-export-package-blueprint strong {
+  color: rgb(255 255 255 / 0.86);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.v19-export-package-blueprint code {
+  display: block;
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.52);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v19-document-readiness-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgb(255 255 255 / 0.075);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.045);
+  color: rgb(255 255 255 / 0.64);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.v19-document-readiness-pill.is-warning {
+  border-color: rgb(var(--warning, 249 115 22) / 0.34);
+  background: rgb(var(--warning, 249 115 22) / 0.11);
+  color: rgb(251 146 60 / 0.95);
+}
+
+.v19-document-readiness-pill.is-success {
+  border-color: rgb(var(--success, 16 185 129) / 0.34);
+  background: rgb(var(--success, 16 185 129) / 0.11);
+  color: rgb(52 211 153 / 0.95);
+}
+
+.excel-table.export-preview-sheet {
+  border-color: rgb(255 255 255 / 0.08);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015)),
+    rgb(12 14 18 / 0.62);
+}
+
+.mapping-audit-scroll,
+.v19-admin-export-composition,
+.v19-admin-export-history,
+.admin-passport-workspace-main,
+.admin-review-passport-fields,
+.admin-review-drawer-body {
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+.mapping-audit-scroll::-webkit-scrollbar,
+.v19-admin-export-composition::-webkit-scrollbar,
+.v19-admin-export-history::-webkit-scrollbar,
+.admin-passport-workspace-main::-webkit-scrollbar,
+.admin-review-passport-fields::-webkit-scrollbar,
+.admin-review-drawer-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mapping-audit-scroll::-webkit-scrollbar-thumb,
+.v19-admin-export-composition::-webkit-scrollbar-thumb,
+.v19-admin-export-history::-webkit-scrollbar-thumb,
+.admin-passport-workspace-main::-webkit-scrollbar-thumb,
+.admin-review-passport-fields::-webkit-scrollbar-thumb,
+.admin-review-drawer-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+}
+
+@keyframes v19-screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1100px) {
+  .v19-admin-export-side {
+    max-width: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .v19-page-header,
+  .topbar.v19-page-header {
+    backdrop-filter: blur(14px);
+  }
+
+  .v19-admin-export-reference,
+  .vf-linear-screen {
+    gap: 12px;
+  }
+
+  .vf-linear-submission-card:hover,
+  .vf-linear-family-card:hover,
+  .vf-linear-person-card:hover,
+  .vf-linear-issue-card:hover,
+  .v19-admin-export-row:hover,
+  .admin-review-field-row:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-linear-screen,
+  .v19-admin-export-reference,
+  .v19-agent-screen,
+  .v19-collection-workspace,
+  .admin-review-drawer,
+  .vf-linear-submission-card,
+  .vf-linear-family-card,
+  .vf-linear-person-card,
+  .vf-linear-issue-card,
+  .v19-admin-export-row,
+  .v19-admin-export-composition-item,
+  .admin-review-field-row,
+  .admin-review-check-card article,
+  .admin-passport-checklist article {
+    animation: none;
+    transition: none;
+  }
+
+  .vf-linear-submission-card:hover,
+  .vf-linear-family-card:hover,
+  .vf-linear-person-card:hover,
+  .vf-linear-issue-card:hover,
+  .v19-admin-export-row:hover,
+  .v19-admin-export-composition-item:hover,
+  .admin-review-field-row:hover,
+  .admin-review-check-card article:hover,
+  .admin-passport-checklist article:hover {
+    transform: none;
+  }
+}

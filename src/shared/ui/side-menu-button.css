@@ -1,0 +1,327 @@
+.vf-side-menu-button {
+  --vf-side-menu-accent: var(--vf-accent, rgb(58 69 180));
+  --vf-side-menu-accent-rgb: var(--accent, 58 69 180);
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+  align-items: center;
+  width: 100%;
+  min-height: 46px;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: rgb(255 255 255 / 0.68);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.018), rgb(255 255 255 / 0)),
+    transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.vf-side-menu-button::before {
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  content: "";
+  background:
+    radial-gradient(circle at 22% 0%, rgb(var(--vf-side-menu-accent-rgb) / 0.14), transparent 42%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0));
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.vf-side-menu-button:hover {
+  color: rgb(255 255 255 / 0.92);
+  border-color: rgb(255 255 255 / 0.08);
+  background-color: rgb(255 255 255 / 0.045);
+  transform: translateY(-1px);
+}
+
+.vf-side-menu-button:focus-visible {
+  outline: 0;
+  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.54);
+  box-shadow:
+    0 0 0 3px rgb(var(--vf-side-menu-accent-rgb) / 0.22),
+    inset 0 1px 0 rgb(255 255 255 / 0.035);
+}
+
+.vf-side-menu-button:disabled,
+.vf-side-menu-button.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
+
+.vf-side-menu-button.is-active {
+  color: rgb(255 255 255 / 0.96);
+  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.42);
+  background:
+    radial-gradient(circle at 14px 50%, rgb(var(--vf-side-menu-accent-rgb) / 0.22), transparent 32%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.074), rgb(255 255 255 / 0.024));
+  box-shadow:
+    0 12px 28px rgb(0 0 0 / 0.24),
+    0 0 26px rgb(var(--vf-side-menu-accent-rgb) / 0.14),
+    inset 0 1px 0 rgb(255 255 255 / 0.045);
+}
+
+.vf-side-menu-button.is-active::before,
+.vf-side-menu-button:hover::before {
+  opacity: 1;
+}
+
+.vf-side-menu-button__rail {
+  position: absolute;
+  left: -1px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--vf-side-menu-accent);
+  box-shadow: 0 0 20px rgb(var(--vf-side-menu-accent-rgb) / 0.58);
+  opacity: 0;
+  transform: scaleY(0.54);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.vf-side-menu-button.is-active .vf-side-menu-button__rail {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.vf-side-menu-button__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgb(255 255 255 / 0.06);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.024);
+  color: currentColor;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.vf-side-menu-button.is-active .vf-side-menu-button__icon {
+  color: #fff;
+  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.26);
+  background: rgb(var(--vf-side-menu-accent-rgb) / 0.18);
+}
+
+.vf-side-menu-button__copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.vf-side-menu-button__copy strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-side-menu-button__copy small {
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.4);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vf-side-menu-button__badge,
+.vf-side-menu-button__shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid rgb(255 255 255 / 0.075);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.055);
+  color: rgb(255 255 255 / 0.62);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.vf-side-menu-button__shortcut {
+  min-width: 0;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.vf-side-menu-button.is-active .vf-side-menu-button__badge {
+  color: #fff;
+  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.3);
+  background: rgb(var(--vf-side-menu-accent-rgb) / 0.22);
+}
+
+.vf-side-menu-button.tone-danger {
+  --vf-side-menu-accent: var(--vf-red, rgb(239 68 68));
+  --vf-side-menu-accent-rgb: var(--danger, 239 68 68);
+}
+
+.vf-side-menu-button.tone-warning {
+  --vf-side-menu-accent: var(--vf-yellow, rgb(249 115 22));
+  --vf-side-menu-accent-rgb: var(--warning, 249 115 22);
+}
+
+.vf-side-menu-button.tone-success {
+  --vf-side-menu-accent: var(--vf-green, rgb(16 185 129));
+  --vf-side-menu-accent-rgb: var(--success, 16 185 129);
+}
+
+.vf-side-menu-button.appearance-action {
+  margin-top: auto;
+  min-height: 48px;
+  color: #fff;
+  border-color: rgb(var(--vf-side-menu-accent-rgb) / 0.34);
+  background:
+    radial-gradient(circle at 16% 0%, rgb(255 255 255 / 0.16), transparent 38%),
+    linear-gradient(135deg, rgb(var(--vf-side-menu-accent-rgb) / 0.9), rgb(72 85 212 / 0.82));
+  box-shadow:
+    0 16px 34px rgb(var(--vf-side-menu-accent-rgb) / 0.2),
+    inset 0 1px 0 rgb(255 255 255 / 0.18);
+}
+
+.vf-side-menu-button.appearance-action:hover {
+  border-color: rgb(255 255 255 / 0.18);
+  transform: translateY(-2px);
+}
+
+.vf-side-menu-button.appearance-action .vf-side-menu-button__icon {
+  color: #fff;
+  background: rgb(255 255 255 / 0.14);
+  border-color: rgb(255 255 255 / 0.16);
+}
+
+.vf-side-menu-button.appearance-utility {
+  min-height: 40px;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+}
+
+.vf-side-menu-button.is-collapsed {
+  grid-template-columns: 36px;
+  justify-content: center;
+  min-height: 46px;
+  padding: 6px;
+}
+
+.vf-side-menu-button.is-collapsed .vf-side-menu-button__copy,
+.vf-side-menu-button.is-collapsed .vf-side-menu-button__shortcut {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.vf-side-menu-button.is-collapsed .vf-side-menu-button__badge {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+.vf-side-menu-button__tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 60;
+  width: max-content;
+  max-width: 220px;
+  padding: 7px 9px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 9px;
+  background: rgb(20 20 22 / 0.96);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.42);
+  color: rgb(255 255 255 / 0.9);
+  font-size: 12px;
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%) scale(0.98);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.vf-side-menu-button.is-collapsed:hover .vf-side-menu-button__tooltip,
+.vf-side-menu-button.is-collapsed:focus-visible .vf-side-menu-button__tooltip {
+  opacity: 1;
+  transform: translate(0, -50%) scale(1);
+}
+
+.ops-sidebar.is-compact .vf-side-menu-button,
+.opsu-sidebar.is-compact .vf-side-menu-button {
+  margin-inline: auto;
+}
+
+@media (max-width: 760px) {
+  .vf-side-menu-button,
+  .vf-side-menu-button.is-collapsed {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    justify-content: stretch;
+    min-height: 48px;
+    padding: 7px 10px;
+  }
+
+  .vf-side-menu-button.is-collapsed .vf-side-menu-button__copy {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .vf-side-menu-button__tooltip,
+  .vf-side-menu-button.is-collapsed .vf-side-menu-button__shortcut {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf-side-menu-button,
+  .vf-side-menu-button::before,
+  .vf-side-menu-button__rail,
+  .vf-side-menu-button__icon,
+  .vf-side-menu-button__tooltip {
+    transition: none;
+  }
+
+  .vf-side-menu-button:hover,
+  .vf-side-menu-button.appearance-action:hover {
+    transform: none;
+  }
+}
