@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import { aiHelperIntents } from "../../supabase/functions/_shared/ai-helper-contract";
 
 function readProjectFile(relativePath: string): string {
   return readFileSync(`${process.cwd()}/${relativePath}`, "utf8");
@@ -894,5 +895,64 @@ describe("Supabase security contract", () => {
     expectNoQuotaExecuteGrantToRole(hardeningMigration, "public");
     expectNoQuotaExecuteGrantToRole(hardeningMigration, "anon");
     expectNoQuotaExecuteGrantToRole(hardeningMigration, "authenticated");
+  });
+
+  test("keeps AI helper SQL intent whitelists aligned with the shared Edge contract", () => {
+    const intentContractMigration = readProjectFile(
+      "supabase/migrations/20260706000100_ai_helper_admin_intent_quota_contract.sql",
+    );
+    const normalizedMigration = normalizeSql(intentContractMigration);
+    const statements = sqlStatements(intentContractMigration);
+    const auditConstraint = statements.find((statement) =>
+      statement.includes("add constraint ai_helper_audit_events_intent_check"),
+    );
+    const quotaConstraint = statements.find((statement) =>
+      statement.includes("add constraint ai_helper_quota_counters_intent_check"),
+    );
+    const quotaRpcStart = normalizedMigration.indexOf(
+      "create or replace function public.consume_ai_helper_quota",
+    );
+    const quotaRpcEnd = normalizedMigration.indexOf(
+      "revoke all on function public.consume_ai_helper_quota",
+      quotaRpcStart,
+    );
+    const quotaRpc =
+      quotaRpcStart >= 0 && quotaRpcEnd > quotaRpcStart
+        ? normalizedMigration.slice(quotaRpcStart, quotaRpcEnd)
+        : undefined;
+
+    expect(auditConstraint).toBeDefined();
+    expect(quotaConstraint).toBeDefined();
+    expect(quotaRpc).toBeDefined();
+
+    for (const intent of aiHelperIntents) {
+      expect(auditConstraint).toContain(`'${intent}'`);
+      expect(quotaConstraint).toContain(`'${intent}'`);
+      expect(quotaRpc).toContain(`'${intent}'`);
+    }
+
+    expect(auditConstraint).toContain("'passport_extraction'");
+    expect(quotaConstraint).not.toContain("'passport_extraction'");
+    expect(quotaRpc).not.toContain("'passport_extraction'");
+    expectSqlStatement(
+      intentContractMigration,
+      "alter table public.ai_helper_audit_events drop constraint if exists ai_helper_audit_events_intent_check",
+    );
+    expectSqlStatement(
+      intentContractMigration,
+      "alter table public.ai_helper_quota_counters drop constraint if exists ai_helper_quota_counters_intent_check",
+    );
+    expectSqlStatement(
+      intentContractMigration,
+      "revoke execute on function public.consume_ai_helper_quota(text, text, text, text) from anon, authenticated",
+    );
+    expectSqlStatement(
+      intentContractMigration,
+      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to service_role",
+    );
+    expectNoSqlStatement(
+      intentContractMigration,
+      "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public",
+    );
   });
 });
