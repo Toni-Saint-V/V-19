@@ -52,8 +52,12 @@ function generatedName(file: SubmissionFile, index: number): string {
     : `${prefix}_${file.type}.jpg`;
 }
 
-function generatedSelection(submission: Submission): Submission[] {
-  return applyExportStateToSelection([submission], [submission.id], "file_generated");
+function generatedSelection(...submissions: Submission[]): Submission[] {
+  return applyExportStateToSelection(
+    submissions,
+    submissions.map((submission) => submission.id),
+    "file_generated",
+  );
 }
 
 function identityFor(selection: Submission[]) {
@@ -69,35 +73,20 @@ function downloader(bytes = "private-media-bytes"): ExportMediaZipDownloader {
   });
 }
 
-async function nestedZipNames(blob: Blob): Promise<{
-  applicantFiles: string[];
-  outerNames: string[];
-  submissionNames: string[];
+async function zipEntryNames(blob: Blob): Promise<{
+  directoryNames: string[];
+  fileNames: string[];
 }> {
-  const outer = await JSZip.loadAsync(blob);
-  const outerNames = Object.keys(outer.files).filter((name) => !outer.files[name]?.dir);
-  const submissionZipBytes = await outer.file(outerNames[0] ?? "")?.async("uint8array");
-  if (!submissionZipBytes) throw new Error("Missing nested submission ZIP");
-
-  const submissionZip = await JSZip.loadAsync(submissionZipBytes);
-  const submissionNames = Object.keys(submissionZip.files).filter(
-    (name) => !submissionZip.files[name]?.dir,
-  );
-  const applicantZipBytes = await submissionZip
-    .file(submissionNames[0] ?? "")
-    ?.async("uint8array");
-  if (!applicantZipBytes) throw new Error("Missing nested applicant ZIP");
-
-  const applicantZip = await JSZip.loadAsync(applicantZipBytes);
-  const applicantFiles = Object.keys(applicantZip.files).filter(
-    (name) => !applicantZip.files[name]?.dir,
-  );
-
-  return { applicantFiles, outerNames, submissionNames };
+  const zip = await JSZip.loadAsync(blob);
+  const names = Object.keys(zip.files);
+  return {
+    directoryNames: names.filter((name) => zip.files[name]?.dir).sort(),
+    fileNames: names.filter((name) => !zip.files[name]?.dir).sort(),
+  };
 }
 
 describe("export media mega ZIP", () => {
-  test("builds one submission ZIP with one tourist ZIP for a single applicant", async () => {
+  test("puts a single applicant under the applicants folder", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
     const result = await createExportMediaZipArtifact(selection, {
       downloadMedia: downloader(),
@@ -113,17 +102,25 @@ describe("export media mega ZIP", () => {
       submissionCount: 1,
     });
 
-    const names = await nestedZipNames(result.artifact.blob);
-    expect(names.outerNames).toHaveLength(1);
-    expect(names.submissionNames).toHaveLength(1);
-    expect(names.applicantFiles.sort()).toEqual([
-      "01_passport_scan.pdf",
-      "02_selfie.jpg",
-      "03_selfie_2.jpg",
-    ]);
+    const names = await zipEntryNames(result.artifact.blob);
+    expect(names.directoryNames).toEqual(
+      expect.arrayContaining(["Заявители/", "Семьи/"]),
+    );
+    expect(names.fileNames).toHaveLength(3);
+    expect(names.fileNames).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(
+          /^Заявители\/01_ПД-1056_.+\/01_.+\/01_passport_scan\.pdf$/,
+        ),
+        expect.stringMatching(/^Заявители\/01_ПД-1056_.+\/01_.+\/02_selfie\.jpg$/),
+        expect.stringMatching(
+          /^Заявители\/01_ПД-1056_.+\/01_.+\/03_selfie_2\.jpg$/,
+        ),
+      ]),
+    );
   });
 
-  test("keeps a family together as one submission ZIP with tourist ZIPs inside", async () => {
+  test("keeps a family together under one family folder with tourist folders", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("SUB-1102")));
     const result = await createExportMediaZipArtifact(selection, {
       downloadMedia: downloader(),
@@ -138,10 +135,43 @@ describe("export media mega ZIP", () => {
       submissionCount: 1,
     });
 
-    const names = await nestedZipNames(result.artifact.blob);
-    expect(names.outerNames).toHaveLength(1);
-    expect(names.submissionNames).toHaveLength(3);
-    expect(names.submissionNames.every((name) => name.endsWith(".zip"))).toBe(true);
+    const names = await zipEntryNames(result.artifact.blob);
+    expect(names.directoryNames).toEqual(
+      expect.arrayContaining(["Заявители/", "Семьи/"]),
+    );
+    expect(names.fileNames).toHaveLength(9);
+    expect(
+      names.fileNames.every((name) => name.startsWith("Семьи/01_SUB-1102_")),
+    ).toBe(true);
+    expect(new Set(names.fileNames.map((name) => name.split("/")[2])).size).toBe(3);
+    expect(
+      names.fileNames.filter((name) => name.endsWith("/03_selfie_2.jpg")),
+    ).toHaveLength(3);
+  });
+
+  test("groups mixed export packages into families and applicants folders", async () => {
+    const selection = generatedSelection(
+      withCanonicalStorage(byId("SUB-1101")),
+      withCanonicalStorage(byId("SUB-1102")),
+    );
+    const result = await createExportMediaZipArtifact(selection, {
+      downloadMedia: downloader(),
+      expectedIdentity: identityFor(selection),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+
+    const names = await zipEntryNames(result.artifact.blob);
+    expect(names.fileNames).toHaveLength(12);
+    expect(names.fileNames.some((name) => name.startsWith("Заявители/"))).toBe(true);
+    expect(names.fileNames.some((name) => name.startsWith("Семьи/"))).toBe(true);
+    expect(
+      names.fileNames.filter((name) => name.startsWith("Заявители/")),
+    ).toHaveLength(3);
+    expect(names.fileNames.filter((name) => name.startsWith("Семьи/"))).toHaveLength(
+      9,
+    );
   });
 
   test("blocks packages with missing required media before touching storage", async () => {

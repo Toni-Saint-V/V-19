@@ -133,6 +133,7 @@ import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import type {
   City,
   DrawerTab,
+  ExportPackageIdentity,
   IssueInput,
   PassportUploadDraft,
   PreliminaryIntakeDraft,
@@ -2657,24 +2658,42 @@ function MainApp() {
       if (!result.ok) {
         return setExportError(result.safeMessage);
       }
+
+      const downloadedSubmissions = applyExportStateToSelection(
+        submissionsRef.current,
+        currentSelectedIds,
+        "file_downloaded",
+      );
+      submissionsRef.current = downloadedSubmissions;
+      setSubmissions(downloadedSubmissions);
+
+      await downloadMediaZipForSelection(
+        currentSelectedIds,
+        currentPlan.downloadPackageIdentity,
+        "Файл скачан. Можно отметить подачу выгруженной. ZIP файлов не сформирован",
+      );
     } catch {
       return setExportError("Не удалось скачать Excel. Повторите попытку.");
     }
-
-    setSubmissions((current) => {
-      const next = applyExportStateToSelection(
-        current,
-        selectedExportIdsRef.current,
-        "file_downloaded",
-      );
-      submissionsRef.current = next;
-      return next;
-    });
   }
 
   async function downloadMediaZip() {
     if (!canDownloadMediaZip || exportBusy || mediaZipBusy) return;
 
+    const currentSelectedIds = selectedExportIdsRef.current;
+    const currentSelection = selectedReadySubmissionsForExport(
+      submissionsRef.current,
+      currentSelectedIds,
+    );
+    const currentIdentity = buildExportPackageIdentity(currentSelection);
+    await downloadMediaZipForSelection(currentSelectedIds, currentIdentity);
+  }
+
+  async function downloadMediaZipForSelection(
+    selectedIds: readonly string[],
+    expectedIdentity: ExportPackageIdentity | null,
+    failurePrefix?: string,
+  ): Promise<boolean> {
     setMediaZipBusy(true);
     setExportError("");
 
@@ -2682,21 +2701,29 @@ function MainApp() {
       const { default: downloadExportMediaZip } = await import(
         "./modules/submissions/exportMediaZip"
       );
-      const currentSelectedIds = selectedExportIdsRef.current;
       const currentSelection = selectedReadySubmissionsForExport(
         submissionsRef.current,
-        currentSelectedIds,
+        selectedIds,
       );
-      const currentIdentity = buildExportPackageIdentity(currentSelection);
-      const result = await downloadExportMediaZip(currentSelection, currentIdentity);
+      const result = await downloadExportMediaZip(currentSelection, expectedIdentity);
       if (!result.ok) {
-        return setExportError(result.safeMessage);
+        setExportError(
+          failurePrefix ? `${failurePrefix}: ${result.safeMessage}` : result.safeMessage,
+        );
+        return false;
       }
     } catch {
-      return setExportError("Не удалось скачать ZIP файлов. Повторите попытку.");
+      setExportError(
+        failurePrefix
+          ? `${failurePrefix}: Не удалось скачать ZIP файлов. Повторите попытку.`
+          : "Не удалось скачать ZIP файлов. Повторите попытку.",
+      );
+      return false;
     } finally {
       setMediaZipBusy(false);
     }
+
+    return true;
   }
 
   async function markExported() {
