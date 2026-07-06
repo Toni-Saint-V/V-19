@@ -163,6 +163,7 @@ function mapMediaAssetRow(row: MediaAssetRow): MediaSlot {
     selfie: "Селфи 1",
     selfie_2: "Селфи 2",
     passport_scan: "Скан паспорта",
+    pdf: "PDF",
     video: "Видео",
   };
 

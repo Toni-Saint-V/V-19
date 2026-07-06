@@ -49,6 +49,12 @@ export type Database = {
         Update: Partial<MediaAssetInsert>;
         Relationships: [];
       };
+      submission_files: {
+        Row: SubmissionFileRow;
+        Insert: SubmissionFileInsert;
+        Update: Partial<SubmissionFileInsert>;
+        Relationships: [];
+      };
       corrections: {
         Row: CorrectionRow;
         Insert: CorrectionInsert;
@@ -296,6 +302,32 @@ export interface MediaAssetRow extends DbRecord {
 }
 
 export type MediaAssetInsert = MediaAssetRow;
+
+export interface SubmissionFileRow extends DbRecord {
+  id: string;
+  submission_id: string;
+  applicant_id: string;
+  uploaded_by: string;
+  document_type: "selfie" | "selfie_2" | "passport_scan" | "pdf";
+  passport_number: string;
+  original_file_name: string;
+  file_name: string;
+  file_path: string;
+  mime_type: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+  size_bytes: number;
+  status: "uploaded" | "error";
+  created_at: string;
+  updated_at: string;
+}
+
+export type SubmissionFileInsert = Omit<
+  SubmissionFileRow,
+  "created_at" | "id" | "updated_at"
+> & {
+  created_at?: string;
+  id?: string;
+  updated_at?: string;
+};
 
 export interface CorrectionRow extends DbRecord {
   id: string;

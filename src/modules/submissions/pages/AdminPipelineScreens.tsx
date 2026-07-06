@@ -1,32 +1,15 @@
 import { useMemo, useRef, type ChangeEvent } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  CheckCircle2,
-  FileArchive,
-  FileSpreadsheet,
-  FileText,
-  FolderUp,
-  Send,
-  ShieldCheck,
-  UploadCloud,
-  UserCheck,
-  UserX,
-  Users,
-} from "lucide-react";
+import { CheckCircle2, FileArchive, FolderUp, Send, ShieldCheck, UploadCloud, UserCheck, UserX } from "lucide-react";
 
-import { V19InfoStrip, V19ListCell, V19ProductButton } from "../../../shared/ui/v19-product-kit";
+import { V19InfoStrip, V19ProductButton } from "../../../shared/ui/v19-product-kit";
 import { agentOwnerDisplayName } from "../ownership";
 import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
-import { openIssueCount, statusLabelFor } from "../status";
+import { openIssueCount } from "../status";
 import type { City, DrawerTab, Submission } from "../types";
 import type { AccessRequest } from "../../../shared/authRegistration";
-import {
-  adminReturnPipelineSteps,
-  adminUploadKindLabel,
-  buildAdminPipelineAgentPlan,
-  buildAdminPipelineCityPlan,
-} from "../adminReturnPipeline";
+import { adminReturnPipelineSteps, adminUploadKindLabel, buildAdminPipelineAgentPlan, buildAdminPipelineCityPlan } from "../adminReturnPipeline";
 
 export type AdminUploadArtifactKind = "appointment_list" | "questionnaire_pdf";
 

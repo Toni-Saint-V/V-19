@@ -17,6 +17,7 @@ const mediaStorageObjectTypes = new Set<MediaStorageObjectType>([
   "application_pdf",
   "appointment_pdf",
   "passport_scan",
+  "pdf",
   "selfie",
   "selfie_2",
   "visa_application_pdf",
@@ -81,6 +82,7 @@ function extensionForFileName(fileName: string): string {
 function allowedExtensions(type: MediaStorageObjectType): Set<string> {
   if (type === "application_pdf") return new Set(["pdf"]);
   if (type === "appointment_pdf") return new Set(["pdf"]);
+  if (type === "pdf") return new Set(["pdf"]);
   if (type === "visa_application_pdf") return new Set(["pdf"]);
   if (type === "passport_scan")
     return new Set(["jpg", "jpeg", "png", "heic", "heif", "pdf"]);
@@ -94,6 +96,7 @@ function allowedLegacyArchiveExtensions(type: string): Set<string> {
 function allowedMimeTypes(type: MediaStorageObjectType): Set<string> {
   if (type === "application_pdf") return new Set(["application/pdf"]);
   if (type === "appointment_pdf") return new Set(["application/pdf"]);
+  if (type === "pdf") return new Set(["application/pdf"]);
   if (type === "visa_application_pdf") return new Set(["application/pdf"]);
   if (type === "passport_scan")
     return new Set([
@@ -230,6 +233,7 @@ function hasExpectedGeneratedSuffix(
     return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|heic|heif|pdf)$/.test(
       fileName,
     );
+  if (type === "pdf") return /^[a-zA-Z0-9]+_pdf\.pdf$/.test(fileName);
   if (type === "application_pdf")
     return /^[a-zA-Z0-9]+(?:_[a-zA-Z0-9]+)?_application_pdf\.pdf$/.test(fileName);
   if (type === "appointment_pdf")

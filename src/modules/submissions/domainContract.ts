@@ -31,6 +31,7 @@ export const CANONICAL_FRONTEND_MEDIA_TYPES = [
   "passport_scan",
   "selfie",
   "selfie_2",
+  "pdf",
 ] as const;
 
 export type CanonicalFrontendMediaType =
@@ -48,6 +49,7 @@ export const CANONICAL_STORAGE_MEDIA_TYPES = {
   passport_scan: "passport_scan",
   selfie: "selfie",
   selfie_2: "selfie_2",
+  pdf: "pdf",
 } as const satisfies Record<CanonicalFrontendMediaType, CanonicalFrontendMediaType>;
 
 export const CANONICAL_ISSUE_STATUSES = [

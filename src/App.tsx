@@ -53,22 +53,23 @@ import {
   addPreciseAdminIssue,
   applyActionToSubmissionListResult,
   applyUploadedFileMetadata,
-  cockpitUploadExtensionForMimeType,
   applyExportStateToSelection,
   completeQuestionnaire,
   createDraftSubmission,
-  generatedCockpitMediaFileName,
   markSubmissionFileAccepted,
   mergeUploadedFileMetadataIntoSubmissions,
-  mediaSlotTypeForSubmissionFileType,
   updateQuestionnaireField,
   type UploadedFileMetadata,
   uploadRequiredFile,
 } from "./modules/submissions/submissionActions";
 import {
-  buildApplicantDocumentFileName,
-  type ApplicantDocumentType,
-} from "./modules/submissions/filenamePolicy";
+  documentTypeForSubmissionFileType,
+  extensionForMimeType,
+  expectedSubmissionDocumentFileName,
+  missingPassportUploadMessage,
+  submissionFilesBucket,
+} from "./modules/submissions/documentUploadContract";
+import { uploadSubmissionDocument } from "./modules/submissions/api/documentUpload";
 import {
   createSubmissionActionErrorState,
   submissionActionErrorForSubmission,
@@ -100,6 +101,10 @@ import {
   extractPdfTextFromFile,
   normalizeVisaApplicationPdfUploadFile,
 } from "./modules/submissions/pdfTextExtraction";
+import {
+  validateSubmissionFileUpload,
+  validateVisaApplicationPdfUpload,
+} from "./modules/submissions/documentIntake";
 import {
   applyVisaApplicationPdfReview,
   confirmVisaApplicationPdfManualReview,
@@ -185,7 +190,6 @@ import {
 import { formatPersistenceFailureForUser } from "./services/persistenceObservability";
 import { invokePassportExtraction } from "./modules/submissions/passportExtractionService";
 import {
-  buildMediaStoragePath,
   buildVisaApplicationPdfStorageTarget,
   deleteMediaFromStorage,
   mediaStorageBucket,
@@ -244,23 +248,15 @@ function applicantFileDisplayName(input: {
   fileType: SubmissionFile["type"];
   mimeType: string;
 }): string {
-  const documentType = applicantDocumentTypeForFileType(input.fileType);
+  const documentType = documentTypeForSubmissionFileType(input.fileType);
   if (!documentType) return "";
 
-  return buildApplicantDocumentFileName({
+  const expected = expectedSubmissionDocumentFileName({
     applicant: input.applicant,
     documentType,
-    extension: cockpitUploadExtensionForMimeType(input.mimeType, input.fileType),
+    extension: extensionForMimeType(input.mimeType) ?? undefined,
   });
-}
-
-function applicantDocumentTypeForFileType(
-  fileType: SubmissionFile["type"],
-): ApplicantDocumentType | null {
-  if (fileType === "passport_scan") return "passport_scan";
-  if (fileType === "selfie") return "selfie";
-  if (fileType === "selfie_2") return "selfie_2";
-  return null;
+  return expected.ok ? expected.fileName : "";
 }
 
 function sameWorkspaceSettings(left: WorkspaceSettings, right: WorkspaceSettings) {
@@ -413,12 +409,6 @@ function applicantNamesForCreateDraft({
 
   return names;
 }
-
-const passportScanUploadMimeTypes = new Set([
-  "image/jpeg",
-  "image/png",
-  "application/pdf",
-]);
 
 function firstSubmissionForRole(
   submissions: Submission[],
@@ -1294,48 +1284,6 @@ function MainApp() {
     });
   }
 
-  function showAgentDrafts() {
-    requestSettingsLeave(() => {
-      setSurface("agent-drafts");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission = searchedAgentQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentApplicants() {
-    requestSettingsLeave(() => {
-      setSurface("agent-applicants");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission = searchedAgentQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentMedia() {
-    requestSettingsLeave(() => {
-      setSurface("agent-media");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission =
-        searchedAgentQueue.find((submission) => submission.files.length > 0) ?? searchedAgentQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentIssues() {
-    requestSettingsLeave(() => {
-      setSurface("agent-issues");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission =
-        searchedAgentQueue.find((submission) => submission.issues.some((issue) => issue.status !== "closed_by_admin")) ?? searchedAgentQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
   function resetAgentSubmissionFilters() {
     requestSettingsLeave(() => {
       setQuery("");
@@ -1868,11 +1816,35 @@ function MainApp() {
       ) ?? activeSubmission;
     const targetFile = currentSubmission.files.find((file) => file.id === fileId);
     if (!targetFile) return;
-    if (
-      targetFile.type === "passport_scan" &&
-      !passportScanUploadMimeTypes.has(selectedFile.type)
-    ) {
+    const uploadGuard = validateSubmissionFileUpload(selectedFile, targetFile.type);
+    if (!uploadGuard.ok) {
+      setRemoteSaveState("error");
+      setRemoteSaveError(uploadGuard.safeMessage);
+      setSubmissionActionError(null);
+      setActiveDrawerTab("files");
+      setDrawerMode("detail");
       return;
+    }
+    const targetApplicant = currentSubmission.applicants.find(
+      (item) => item.id === targetFile.applicantId,
+    );
+    const documentType = documentTypeForSubmissionFileType(targetFile.type);
+    if (documentType) {
+      const expectedName = targetApplicant
+        ? expectedSubmissionDocumentFileName({
+            applicant: targetApplicant,
+            documentType,
+            extension: extensionForMimeType(selectedFile.type) ?? undefined,
+          })
+        : { ok: false as const, safeMessage: missingPassportUploadMessage };
+      if (!expectedName.ok) {
+        setRemoteSaveState("error");
+        setRemoteSaveError(expectedName.safeMessage);
+        setSubmissionActionError(null);
+        setActiveDrawerTab("files");
+        setDrawerMode("detail");
+        return;
+      }
     }
 
     if (isSupabaseMode) {
@@ -1907,12 +1879,9 @@ function MainApp() {
       return;
     }
 
-    const applicant = currentSubmission.applicants.find(
-      (item) => item.id === targetFile.applicantId,
-    );
-    const generatedFileName = applicant
+    const generatedFileName = targetApplicant
       ? applicantFileDisplayName({
-          applicant,
+          applicant: targetApplicant,
           fileType: targetFile.type,
           mimeType: selectedFile.type,
         }) || selectedFile.name
@@ -2000,8 +1969,6 @@ function MainApp() {
   ): Promise<Submission | null> {
     setRemoteSaveState("saving");
     setRemoteSaveError("");
-    let uploadedStorageTarget: MediaStorageTarget | null = null;
-    let previousStorageTarget: MediaStorageTarget | null = null;
 
     try {
       await drainRemoteSavesBeforeExport(activeRemoteProfile, submissionsRef.current);
@@ -2017,11 +1984,9 @@ function MainApp() {
       if (!targetFile) {
         throw new Error("Media slot no longer exists for this upload.");
       }
-      if (
-        targetFile.type === "passport_scan" &&
-        !passportScanUploadMimeTypes.has(selectedFile.type)
-      ) {
-        throw new Error("Passport scan uploads accept only JPEG, PNG or PDF files.");
+      const uploadGuard = validateSubmissionFileUpload(selectedFile, targetFile.type);
+      if (!uploadGuard.ok) {
+        throw new Error(uploadGuard.safeMessage);
       }
       if (
         targetFile.status !== "missing" &&
@@ -2038,57 +2003,35 @@ function MainApp() {
       }
 
       const uploadedAtIso = new Date().toISOString();
-      const mediaSlotType = mediaSlotTypeForSubmissionFileType(targetFile.type);
-      const storageFileName = generatedCockpitMediaFileName({
-        applicantId: applicant.id,
-        fileType: targetFile.type,
-        mimeType: selectedFile.type,
-        submissionId: latestSubmission.id,
-        uploadNonce: createMediaUploadNonce(uploadedAtIso),
-      });
-      const generatedFileName =
-        applicantFileDisplayName({
-          applicant,
-          fileType: targetFile.type,
-          mimeType: selectedFile.type,
-        }) || storageFileName;
-      const storageTarget = buildMediaStoragePath(
-        latestSubmission.id,
-        applicant.id,
-        mediaSlotType,
-        storageFileName,
-      );
+      const documentType = documentTypeForSubmissionFileType(targetFile.type);
+      if (!documentType) {
+        throw new Error("Этот слот документа не входит в typed upload contract.");
+      }
 
       remoteOwnerIdsRef.current = await saveCockpitSubmissionsForProfile(
         activeRemoteProfile,
         [latestSubmission],
         remoteOwnerIdsRef.current,
       );
-      const uploaded = await uploadMediaToStorage(storageTarget, selectedFile);
+      const uploaded = await uploadSubmissionDocument({
+        applicant,
+        documentType,
+        file: selectedFile,
+        submissionId: latestSubmission.id,
+        uploadedBy: activeRemoteProfile.id,
+      });
       if (!uploaded) {
-        throw new Error("Supabase Storage upload did not return an object path.");
-      }
-
-      uploadedStorageTarget = storageTarget;
-      if (
-        targetFile.storageBucket === mediaStorageBucket &&
-        targetFile.storagePath &&
-        targetFile.storagePath !== uploaded.path
-      ) {
-        previousStorageTarget = {
-          bucket: mediaStorageBucket,
-          path: targetFile.storagePath,
-        };
+        throw new Error("Supabase Storage upload did not return document metadata.");
       }
 
       const uploadMetadata = {
-        generatedFileName,
-        mimeType: selectedFile.type,
-        originalFileName: selectedFile.name,
-        sizeBytes: selectedFile.size,
+        generatedFileName: uploaded.fileName,
+        mimeType: uploaded.mimeType,
+        originalFileName: uploaded.originalFileName,
+        sizeBytes: uploaded.sizeBytes,
         storageAdapter: "supabase-private" as const,
-        storageBucket: mediaStorageBucket,
-        storagePath: uploaded.path,
+        storageBucket: submissionFilesBucket,
+        storagePath: uploaded.filePath,
         uploadedAtIso,
       };
       const currentSubmission = submissionsRef.current.find(
@@ -2111,7 +2054,6 @@ function MainApp() {
         [updatedSubmission],
         remoteOwnerIdsRef.current,
       );
-      uploadedStorageTarget = null;
       commitUploadedSubmissionAfterRemoteSave(
         updatedSubmission,
         fileId,
@@ -2122,42 +2064,15 @@ function MainApp() {
       } else {
         rememberLocalDocumentFile(fileId, selectedFile);
       }
-
-      if (previousStorageTarget) {
-        try {
-          await deleteMediaFromStorage(previousStorageTarget);
-        } catch (error) {
-          setRemoteSaveState("error");
-          setRemoteSaveError(
-            formatPersistenceFailureForUser(
-              error,
-              "Новая загрузка сохранена, но старый приватный файл не удалён. Повторите проверку Storage перед пилотом.",
-            ),
-          );
-          return null;
-        }
-      }
       setRemoteSaveState("idle");
       return updatedSubmission;
     } catch (error) {
-      let cleanupFailed = false;
-      if (uploadedStorageTarget) {
-        try {
-          await deleteMediaFromStorage(uploadedStorageTarget);
-        } catch {
-          cleanupFailed = true;
-        }
-      }
       setRemoteSaveState("error");
       const message = formatPersistenceFailureForUser(
         error,
-        "Приватная загрузка не сохранена. Файл удалён из Storage, повторите попытку.",
+        "Приватная загрузка не сохранена. Повторите попытку.",
       );
-      setRemoteSaveError(
-        cleanupFailed
-          ? `${message} Загруженный файл не удалось удалить из Storage; нужна проверка оператора перед пилотом.`
-          : message,
-      );
+      setRemoteSaveError(message);
       return null;
     }
   }
@@ -2277,6 +2192,12 @@ function MainApp() {
 
   async function reviewVisaApplicationPdfForActiveSubmission(file: File) {
     if (!activeSubmission) return;
+    const pdfUploadGuard = validateVisaApplicationPdfUpload(file);
+    if (!pdfUploadGuard.ok) {
+      setRemoteSaveState("error");
+      setRemoteSaveError(pdfUploadGuard.safeMessage);
+      throw new Error(pdfUploadGuard.safeMessage);
+    }
     const extracted = await extractPdfTextFromFile(file);
     const artifact = {
       extractedPageCount: extracted.extractedPageCount,
@@ -2642,6 +2563,22 @@ function MainApp() {
     preliminaryIntake?: PreliminaryIntakeDraft,
     options?: { openQuestionnaire?: boolean },
   ) {
+    const invalidPassportUpload = passportUploads.find((upload) => {
+      if (!upload.file) return false;
+      return !validateSubmissionFileUpload(upload.file, "passport_scan").ok;
+    });
+    if (invalidPassportUpload?.file) {
+      const guard = validateSubmissionFileUpload(
+        invalidPassportUpload.file,
+        "passport_scan",
+      );
+      if (!guard.ok) {
+        setRemoteSaveState("error");
+        setRemoteSaveError(guard.safeMessage);
+        return;
+      }
+    }
+
     const applicantNames = applicantNamesForCreateDraft({
       currentNames: createApplicantNames,
       familyCount: createFamilyCount,

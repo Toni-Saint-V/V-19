@@ -1,0 +1,232 @@
+{
+  "baseURL": "http://127.0.0.1:5178/",
+  "qaDir": "/Users/user/Documents/V-19/docs/qa/side-menu-shared-20260706",
+  "desktop": {
+    "agentActions": {
+      "h1": "Мои действия",
+      "sidebarCount": 1,
+      "shellHasUnifiedSideMenu": true,
+      "nav": [
+        {
+          "id": "agent-actions",
+          "label": "Мои действия",
+          "active": true
+        },
+        {
+          "id": "agent-submissions",
+          "label": "Мои подачи",
+          "active": false
+        },
+        {
+          "id": "agent-settings",
+          "label": "Настройки",
+          "active": false
+        }
+      ],
+      "activeNavLabels": [
+        "Мои действия"
+      ],
+      "brand": "VisaFlow",
+      "hasSearch": true,
+      "hasFooter": true,
+      "sidebarWidth": 288,
+      "overflowX": false
+    },
+    "agentSubmissions": {
+      "h1": "Мои подачи",
+      "sidebarCount": 1,
+      "shellHasUnifiedSideMenu": true,
+      "nav": [
+        {
+          "id": "agent-actions",
+          "label": "Мои действия",
+          "active": false
+        },
+        {
+          "id": "agent-submissions",
+          "label": "Мои подачи",
+          "active": true
+        },
+        {
+          "id": "agent-settings",
+          "label": "Настройки",
+          "active": false
+        }
+      ],
+      "activeNavLabels": [
+        "Мои подачи"
+      ],
+      "brand": "VisaFlow",
+      "hasSearch": true,
+      "hasFooter": true,
+      "sidebarWidth": 288,
+      "overflowX": false
+    },
+    "agentSettings": {
+      "h1": "Настройки",
+      "sidebarCount": 1,
+      "shellHasUnifiedSideMenu": true,
+      "nav": [
+        {
+          "id": "agent-actions",
+          "label": "Мои действия",
+          "active": false
+        },
+        {
+          "id": "agent-submissions",
+          "label": "Мои подачи",
+          "active": false
+        },
+        {
+          "id": "agent-settings",
+          "label": "Настройки",
+          "active": true
+        }
+      ],
+      "activeNavLabels": [
+        "Настройки"
+      ],
+      "brand": "VisaFlow",
+      "hasSearch": true,
+      "hasFooter": true,
+      "sidebarWidth": 288,
+      "overflowX": false
+    },
+    "adminReview": {
+      "h1": "Проверка",
+      "sidebarCount": 1,
+      "shellHasUnifiedSideMenu": true,
+      "nav": [
+        {
+          "id": "admin-review",
+          "label": "Проверка",
+          "active": true
+        },
+        {
+          "id": "admin-export",
+          "label": "Выгрузка",
+          "active": false
+        },
+        {
+          "id": "admin-settings",
+          "label": "Настройки",
+          "active": false
+        }
+      ],
+      "activeNavLabels": [
+        "Проверка"
+      ],
+      "brand": "VisaFlow",
+      "hasSearch": true,
+      "hasFooter": true,
+      "sidebarWidth": 288,
+      "overflowX": false
+    },
+    "adminExport": {
+      "h1": "Выгрузка",
+      "sidebarCount": 1,
+      "shellHasUnifiedSideMenu": true,
+      "nav": [
+        {
+          "id": "admin-review",
+          "label": "Проверка",
+          "active": false
+        },
+        {
+          "id": "admin-export",
+          "label": "Выгрузка",
+          "active": true
+        },
+        {
+          "id": "admin-settings",
+          "label": "Настройки",
+          "active": false
+        }
+      ],
+      "activeNavLabels": [
+        "Выгрузка"
+      ],
+      "brand": "VisaFlow",
+      "hasSearch": true,
+      "hasFooter": true,
+      "sidebarWidth": 260,
+      "overflowX": false
+    },
+    "adminSettings": {
+      "h1": "Настройки",
+      "sidebarCount": 1,
+      "shellHasUnifiedSideMenu": true,
+      "nav": [
+        {
+          "id": "admin-review",
+          "label": "Проверка",
+          "active": false
+        },
+        {
+          "id": "admin-export",
+          "label": "Выгрузка",
+          "active": false
+        },
+        {
+          "id": "admin-settings",
+          "label": "Настройки",
+          "active": true
+        }
+      ],
+      "activeNavLabels": [
+        "Настройки"
+      ],
+      "brand": "VisaFlow",
+      "hasSearch": true,
+      "hasFooter": true,
+      "sidebarWidth": 288,
+      "overflowX": false
+    }
+  },
+  "mobile": {
+    "agentMenuOpen": {
+      "h1": "Мои действия",
+      "sidebarCount": 1,
+      "shellHasUnifiedSideMenu": true,
+      "nav": [
+        {
+          "id": "agent-actions",
+          "label": "Мои действия",
+          "active": true
+        },
+        {
+          "id": "agent-submissions",
+          "label": "Мои подачи",
+          "active": false
+        },
+        {
+          "id": "agent-settings",
+          "label": "Настройки",
+          "active": false
+        }
+      ],
+      "activeNavLabels": [
+        "Мои действия"
+      ],
+      "brand": "VisaFlow",
+      "hasSearch": true,
+      "hasFooter": true,
+      "sidebarWidth": 280,
+      "overflowX": false
+    },
+    "metrics": {
+      "sidebarCount": 1,
+      "mobileOpen": true,
+      "headerHeight": 56,
+      "headerRatio": 0.066,
+      "sidebarWidth": 280,
+      "overflowX": false
+    },
+    "closed": {
+      "mobileOpen": false,
+      "overflowX": false
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

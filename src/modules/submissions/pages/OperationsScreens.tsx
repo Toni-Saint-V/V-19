@@ -63,6 +63,10 @@ import {
   type ExportSummary,
 } from "../exportRules";
 import { agentOwnerDisplayName } from "../ownership";
+import {
+  documentReadinessLabel,
+  summarizeSubmissionDocumentReadiness,
+} from "../documentIntake";
 import { formatSubmissionListTitle } from "../listFormatters";
 import {
   adminTriageRadarItem,
@@ -2823,7 +2827,6 @@ export function LegacyExportScreen({
   historyList,
   onDownload,
   onGenerate,
-  onChoosePackage,
   onMarkExported,
   onOpen,
   onTab,
@@ -3514,7 +3517,6 @@ function AdminExportReferenceCockpit({
   historyList,
   onDownload,
   onGenerate,
-  onChoosePackage,
   onMarkExported,
   onOpen,
   onTab,
@@ -3558,10 +3560,27 @@ function AdminExportReferenceCockpit({
     null;
   const selectedSubmissionCount = selectedReadySubmissions.length;
   const selectedApplicantCount = exportPlan.rowCount;
-  const selectedFiles = selectedReadySubmissions.reduce(
-    (sum, submission) => sum + submission.files.length,
-    0,
+  const selectedDocumentSummary = selectedReadySubmissions.reduce(
+    (summary, submission) => {
+      const next = summarizeSubmissionDocumentReadiness(submission);
+      return {
+        missingRequiredSlots:
+          summary.missingRequiredSlots + next.missingRequiredSlots,
+        replacementRequiredSlots:
+          summary.replacementRequiredSlots + next.replacementRequiredSlots,
+        requiredSlots: summary.requiredSlots + next.requiredSlots,
+        uploadedSlots: summary.uploadedSlots + next.uploadedSlots,
+      };
+    },
+    {
+      missingRequiredSlots: 0,
+      replacementRequiredSlots: 0,
+      requiredSlots: 0,
+      uploadedSlots: 0,
+    },
   );
+  const selectedFiles = selectedDocumentSummary.uploadedSlots;
+  const selectedRequiredFiles = selectedDocumentSummary.requiredSlots;
   const selectedWarnings = exportPlan.warnings.length;
   const hasExportBlockers = exportPlan.blockers.length > 0;
   const allReadySelected =
@@ -3572,6 +3591,9 @@ function AdminExportReferenceCockpit({
     exportError ||
     (exportBusy ? "Формируем и проверяем Excel-файл..." : exportActionHint(exportPlan));
   const activeBlockers = activeSubmission ? getExportBlockers([activeSubmission]) : [];
+  const activeDocumentSummary = activeSubmission
+    ? summarizeSubmissionDocumentReadiness(activeSubmission)
+    : null;
   const showingHistory = exportTab === "history";
   const selectedComposition =
     selectedReadySubmissions.length > 0
@@ -3669,8 +3691,8 @@ function AdminExportReferenceCockpit({
           <AdminExportMetricCard
             icon={FileArchive}
             label="Документы"
-            value={selectedFiles}
-            detail="файлов в пакете"
+            value={`${selectedFiles}/${selectedRequiredFiles || 0}`}
+            detail="обязательных слотов"
           />
           <AdminExportMetricCard
             icon={hasExportBlockers ? XCircle : ShieldCheck}
@@ -3837,8 +3859,20 @@ function AdminExportReferenceCockpit({
                   <strong>{activeSubmission.city}</strong>
                 </span>
                 <span>
-                  <small>Файлы</small>
-                  <strong>{activeSubmission.files.length}</strong>
+                  <small>Документы</small>
+                  <strong>
+                    {activeDocumentSummary ? (
+                      <span
+                        className={`v19-document-readiness-pill ${
+                          activeDocumentSummary.ready ? "is-success" : "is-warning"
+                        }`}
+                      >
+                        {documentReadinessLabel(activeDocumentSummary)}
+                      </span>
+                    ) : (
+                      activeSubmission.files.length
+                    )}
+                  </strong>
                 </span>
                 <span>
                   <small>Слот</small>
@@ -3846,6 +3880,13 @@ function AdminExportReferenceCockpit({
                 </span>
               </div>
             ) : null}
+          </section>
+
+          <section className="v19-export-package-blueprint" aria-label="Структура ZIP пакета">
+            <strong>ZIP структура</strong>
+            <code>00_Excel/{exportPlan.downloadPackageIdentity?.fileName ?? "Excel.xlsx"}</code>
+            <code>city/family/submission/applicant_01/documents</code>
+            <code>manifest.json + issues.json + __MISSING__</code>
           </section>
 
           <section className="v19-admin-export-rail-card">
