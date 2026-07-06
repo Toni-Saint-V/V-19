@@ -39,6 +39,7 @@ export function OperationalSidebar({
   footer,
   id,
   items,
+  onCommandSearch,
   onMobileClose,
   mobileTitle,
 }: {
@@ -51,6 +52,7 @@ export function OperationalSidebar({
   footer: ReactNode;
   id?: string;
   items: OperationalNavItem[];
+  onCommandSearch?: () => void;
   onMobileClose?: () => void;
   mobileTitle?: string;
 }) {
@@ -90,7 +92,12 @@ export function OperationalSidebar({
           />
         ) : null}
       </div>
-      <button className="ops-sidebar-search" type="button" aria-label="Поиск">
+      <button
+        className="ops-sidebar-search"
+        type="button"
+        aria-label="Открыть командную палитру"
+        onClick={onCommandSearch}
+      >
         <Search aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
         <span>Поиск...</span>
         <kbd>⌘K</kbd>
