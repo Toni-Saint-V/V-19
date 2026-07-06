@@ -139,6 +139,7 @@ import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import type {
   City,
   DrawerTab,
+  ExportPackageIdentity,
   IssueInput,
   PassportUploadDraft,
   PreliminaryIntakeDraft,
@@ -500,6 +501,7 @@ function MainApp() {
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
   const [selectedExportIds, setSelectedExportIds] = useState<string[]>(["ПД-1056"]);
   const [exportBusy, setExportBusy] = useState(false);
+  const [mediaZipBusy, setMediaZipBusy] = useState(false);
   const [exportError, setExportError] = useState("");
   const [passportReviewRequest, setPassportReviewRequest] =
     useState<PassportReviewRequest | null>(null);
@@ -663,6 +665,10 @@ function MainApp() {
   );
   const selectedVisibleExportIds = selectedForExport.map((submission) => submission.id);
   const exportPlan = exportSummary(selectedForExport);
+  const canDownloadMediaZip =
+    exportPlan.ready &&
+    (exportPlan.exportState === "file_generated" ||
+      exportPlan.exportState === "file_downloaded");
   const showRoleSwitcher = canShowLocalDemoRoleSwitch({
     env: import.meta.env,
     isSupabaseMode,
@@ -2611,7 +2617,7 @@ function MainApp() {
   }
 
   function toggleExportSelection(id: string) {
-    if (exportBusy) return;
+    if (exportBusy || mediaZipBusy) return;
 
     setSelectedExportIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
@@ -2619,14 +2625,14 @@ function MainApp() {
   }
 
   function chooseExportPackage(id: string) {
-    if (exportBusy) return;
+    if (exportBusy || mediaZipBusy) return;
 
     selectedExportIdsRef.current = [id];
     setSelectedExportIds([id]);
   }
 
   async function generateExport() {
-    if (!exportPlan.canGenerate || exportBusy) return;
+    if (!exportPlan.canGenerate || exportBusy || mediaZipBusy) return;
 
     setExportBusy(true);
     setExportError("");
@@ -2698,7 +2704,7 @@ function MainApp() {
   }
 
   async function downloadExport() {
-    if (!exportPlan.canDownload) return;
+    if (!exportPlan.canDownload || mediaZipBusy) return;
 
     setExportError("");
 
@@ -2721,23 +2727,76 @@ function MainApp() {
       if (!result.ok) {
         return setExportError(result.safeMessage);
       }
+
+      const downloadedSubmissions = applyExportStateToSelection(
+        submissionsRef.current,
+        currentSelectedIds,
+        "file_downloaded",
+      );
+      submissionsRef.current = downloadedSubmissions;
+      setSubmissions(downloadedSubmissions);
+
+      await downloadMediaZipForSelection(
+        currentSelectedIds,
+        currentPlan.downloadPackageIdentity,
+        "Файл скачан. Можно отметить подачу выгруженной. ZIP файлов не сформирован",
+      );
     } catch {
       return setExportError("Не удалось скачать Excel. Повторите попытку.");
     }
+  }
 
-    setSubmissions((current) => {
-      const next = applyExportStateToSelection(
-        current,
-        selectedExportIdsRef.current,
-        "file_downloaded",
+  async function downloadMediaZip() {
+    if (!canDownloadMediaZip || exportBusy || mediaZipBusy) return;
+
+    const currentSelectedIds = selectedExportIdsRef.current;
+    const currentSelection = selectedReadySubmissionsForExport(
+      submissionsRef.current,
+      currentSelectedIds,
+    );
+    const currentIdentity = buildExportPackageIdentity(currentSelection);
+    await downloadMediaZipForSelection(currentSelectedIds, currentIdentity);
+  }
+
+  async function downloadMediaZipForSelection(
+    selectedIds: readonly string[],
+    expectedIdentity: ExportPackageIdentity | null,
+    failurePrefix?: string,
+  ): Promise<boolean> {
+    setMediaZipBusy(true);
+    setExportError("");
+
+    try {
+      const { default: downloadExportMediaZip } = await import(
+        "./modules/submissions/exportMediaZip"
       );
-      submissionsRef.current = next;
-      return next;
-    });
+      const currentSelection = selectedReadySubmissionsForExport(
+        submissionsRef.current,
+        selectedIds,
+      );
+      const result = await downloadExportMediaZip(currentSelection, expectedIdentity);
+      if (!result.ok) {
+        setExportError(
+          failurePrefix ? `${failurePrefix}: ${result.safeMessage}` : result.safeMessage,
+        );
+        return false;
+      }
+    } catch {
+      setExportError(
+        failurePrefix
+          ? `${failurePrefix}: Не удалось скачать ZIP файлов. Повторите попытку.`
+          : "Не удалось скачать ZIP файлов. Повторите попытку.",
+      );
+      return false;
+    } finally {
+      setMediaZipBusy(false);
+    }
+
+    return true;
   }
 
   async function markExported() {
-    if (!exportPlan.canMarkExported || exportBusy) return;
+    if (!exportPlan.canMarkExported || exportBusy || mediaZipBusy) return;
     const selectedIds = new Set(selectedVisibleExportIds);
     const selectedSubmissions = submissions.filter((submission) =>
       selectedIds.has(submission.id),
@@ -3571,12 +3630,14 @@ function MainApp() {
 
         {surface === "export" ? (
           <ExportScreen
+            canDownloadMediaZip={canDownloadMediaZip}
             exportPlan={exportPlan}
             exportTab={exportTab}
             exportBusy={exportBusy}
             exportError={exportError}
             historyList={historyList}
             onDownload={downloadExport}
+            onDownloadMediaZip={downloadMediaZip}
             onGenerate={generateExport}
             onChoosePackage={chooseExportPackage}
             onMarkExported={markExported}
@@ -3585,6 +3646,7 @@ function MainApp() {
             onToggle={toggleExportSelection}
             filterControl={adminFilterControl}
             readyList={readyList}
+            mediaZipBusy={mediaZipBusy}
             searchControl={adminSearchControl}
             selectedExportIds={selectedVisibleExportIds}
           />
