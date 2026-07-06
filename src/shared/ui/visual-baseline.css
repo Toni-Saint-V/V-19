@@ -19239,6 +19239,36 @@ body,
   }
 }
 
+/* Browser-comment export pass: keep mobile export list title centered with filter control. */
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-list-head {
+    display: grid !important;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--v19b-size-44) !important;
+    align-items: center !important;
+    gap: var(--v19b-size-12) !important;
+    min-height: var(--v19b-size-64) !important;
+    padding: var(--v19b-size-10) var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-title-copy {
+    display: flex !important;
+    min-height: var(--v19b-size-44) !important;
+    min-width: var(--v19b-size-0) !important;
+    align-items: center !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-title-copy
+    h2 {
+    display: flex !important;
+    min-height: var(--v19b-size-44) !important;
+    align-items: center !important;
+    line-height: var(--v19b-line-height-title) !important;
+  }
+}
+
 .vf-figma-questionnaire-screen .v19-questionnaire-complete-button,
 .vf-figma-questionnaire-screen .v19-questionnaire-next-action-card button {
   border: var(--v19b-size-1) solid var(--v19b-color-primary) !important;
