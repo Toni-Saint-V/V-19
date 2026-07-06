@@ -1,0 +1,499 @@
+{
+  "generatedAt": "2026-07-06T03:27:31.313Z",
+  "baseUrl": "http://127.0.0.1:5197/",
+  "screenshots": [
+    {
+      "label": "admin review 390x844",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-review-linear-390x844.png"
+    },
+    {
+      "label": "admin filter cities 390x844",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-filter-cities-linear-390x844.png"
+    },
+    {
+      "label": "admin export 390x844",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-export-linear-390x844.png"
+    },
+    {
+      "label": "admin drawer 390x844",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-drawer-linear-390x844.png"
+    },
+    {
+      "label": "admin review 768x1024",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-review-linear-768x1024.png"
+    },
+    {
+      "label": "admin export 768x1024",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-export-linear-768x1024.png"
+    },
+    {
+      "label": "admin drawer 768x1024",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-drawer-linear-768x1024.png"
+    },
+    {
+      "label": "admin review 1440x900",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-review-linear-1440x900.png"
+    },
+    {
+      "label": "admin export 1440x900",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-export-linear-1440x900.png"
+    },
+    {
+      "label": "admin drawer 1440x900",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-drawer-linear-1440x900.png"
+    },
+    {
+      "label": "admin passport workspace 390x844",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-passport-workspace-linear-390x844.png"
+    },
+    {
+      "label": "admin remark form 390x844",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-remark-form-linear-390x844.png"
+    },
+    {
+      "label": "admin passport workspace 1440x900",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-passport-workspace-linear-1440x900.png"
+    },
+    {
+      "label": "admin remark form 1440x900",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-remark-form-linear-1440x900.png"
+    },
+    {
+      "label": "admin settings 390x844",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-settings-linear-390x844.png"
+    },
+    {
+      "label": "admin settings 768x1024",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-settings-linear-768x1024.png"
+    },
+    {
+      "label": "admin settings 1440x900",
+      "file": "/Users/user/.codex/worktrees/v19-old-linearstyle-ui-adapter/V-19/docs/qa/v19-old-linearstyle-ui-adapter/admin-transfer-pass-1/admin-settings-linear-1440x900.png"
+    }
+  ],
+  "checks": [
+    {
+      "label": "review-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 11
+    },
+    {
+      "label": "admin-filter-cities-390x844",
+      "cities": [
+        "Все города",
+        "Москва",
+        "Санкт-Петербург",
+        "Казань",
+        "Екатеринбург",
+        "Новосибирск",
+        "Нижний Новгород",
+        "Самара",
+        "Ростов-на-Дону"
+      ],
+      "citiesOk": true
+    },
+    {
+      "label": "export-cta-390x844",
+      "exportCta": {
+        "text": "Сформировать Excel",
+        "background": "rgb(30, 30, 33)",
+        "borderColor": "rgb(58, 69, 180)",
+        "boxShadow": "rgba(58, 69, 180, 0.2) 0px 0px 20px 0px"
+      },
+      "exportCtaGreen": false
+    },
+    {
+      "label": "export-name-cell-390x844",
+      "exportNameCell": {
+        "titleDisplay": "flex",
+        "kindDisplay": "grid",
+        "id": "ПД-1056",
+        "meta": "Анкета + 3 документов",
+        "metaDisplay": "flex"
+      }
+    },
+    {
+      "label": "export-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 8
+    },
+    {
+      "label": "drawer-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 80
+    },
+    {
+      "label": "review-768x1024",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "scrollWidth": 768,
+      "clientWidth": 768,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 13
+    },
+    {
+      "label": "export-cta-768x1024",
+      "exportCta": {
+        "text": "Сформировать Excel",
+        "background": "rgb(30, 30, 33)",
+        "borderColor": "rgb(58, 69, 180)",
+        "boxShadow": "rgba(58, 69, 180, 0.2) 0px 0px 20px 0px"
+      },
+      "exportCtaGreen": false
+    },
+    {
+      "label": "export-name-cell-768x1024",
+      "exportNameCell": {
+        "titleDisplay": "flex",
+        "kindDisplay": "grid",
+        "id": "ПД-1056",
+        "meta": "Анкета + 3 документов",
+        "metaDisplay": "flex"
+      }
+    },
+    {
+      "label": "export-768x1024",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "scrollWidth": 768,
+      "clientWidth": 768,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 11
+    },
+    {
+      "label": "drawer-768x1024",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "scrollWidth": 768,
+      "clientWidth": 768,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 76
+    },
+    {
+      "label": "review-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 18
+    },
+    {
+      "label": "export-cta-1440x900",
+      "exportCta": {
+        "text": "Сформировать Excel",
+        "background": "rgb(30, 30, 33)",
+        "borderColor": "rgb(58, 69, 180)",
+        "boxShadow": "rgba(58, 69, 180, 0.2) 0px 0px 20px 0px"
+      },
+      "exportCtaGreen": false
+    },
+    {
+      "label": "export-name-cell-1440x900",
+      "exportNameCell": {
+        "titleDisplay": "flex",
+        "kindDisplay": "grid",
+        "id": "ПД-1056",
+        "meta": "Анкета + 3 документов",
+        "metaDisplay": "flex"
+      }
+    },
+    {
+      "label": "export-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-export is-v19-collection-surface role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 22
+    },
+    {
+      "label": "drawer-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 87
+    },
+    {
+      "label": "passport-frame-390x844",
+      "passportFrame": {
+        "display": "grid",
+        "width": 350.9266357421875,
+        "height": 167.33087158203125
+      }
+    },
+    {
+      "label": "passport-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 90
+    },
+    {
+      "label": "remark-form-390x844",
+      "remarkRect": {
+        "x": 19.269378662109375,
+        "y": 38.217437744140625,
+        "width": 351.46124267578125,
+        "height": 787.4268493652344
+      }
+    },
+    {
+      "label": "remark-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 90
+    },
+    {
+      "label": "passport-frame-1440x900",
+      "passportFrame": {
+        "display": "grid",
+        "width": 659.5460815429688,
+        "height": 719.68408203125
+      }
+    },
+    {
+      "label": "passport-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 96
+    },
+    {
+      "label": "remark-form-1440x900",
+      "remarkRect": {
+        "x": 360,
+        "y": 12,
+        "width": 720,
+        "height": 876
+      }
+    },
+    {
+      "label": "remark-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-admin-review is-v19-collection-surface role-admin is-side-menu-regular has-open-drawer",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 97
+    },
+    {
+      "label": "settings-nav-390x844",
+      "settingsNav": [
+        {
+          "text": "Профиль",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Заявки на доступ",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Команда и роли",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Уведомления",
+          "background": "rgb(39, 39, 43)",
+          "borderColor": "rgb(46, 47, 52)",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "label": "settings-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "clientWidth": 390,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 11
+    },
+    {
+      "label": "settings-nav-768x1024",
+      "settingsNav": [
+        {
+          "text": "Профиль",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Заявки на доступ",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Команда и роли",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Уведомления",
+          "background": "rgb(39, 39, 43)",
+          "borderColor": "rgb(46, 47, 52)",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "label": "settings-768x1024",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "scrollWidth": 768,
+      "clientWidth": 768,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 11
+    },
+    {
+      "label": "settings-nav-1440x900",
+      "settingsNav": [
+        {
+          "text": "Профиль",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Заявки на доступ",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Команда и роли",
+          "background": "rgb(30, 30, 33)",
+          "borderColor": "rgb(36, 37, 41)",
+          "color": "rgba(255, 255, 255, 0.94)"
+        },
+        {
+          "text": "Уведомления",
+          "background": "rgb(39, 39, 43)",
+          "borderColor": "rgb(46, 47, 52)",
+          "color": "rgb(255, 255, 255)"
+        }
+      ]
+    },
+    {
+      "label": "settings-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "overflowX": 0,
+      "shellClass": "ops-shell has-unified-side-menu surface-settings role-admin is-side-menu-regular",
+      "removedFootnoteVisible": false,
+      "greenButtons": [],
+      "visibleButtons": 17
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failures": []
+}

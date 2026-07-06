@@ -3037,10 +3037,10 @@ function MainApp() {
     }
   }
 
-  const searchControl = (
+  const adminSearchControl = (
     <SearchInput
       label="Поиск в текущем списке"
-      placeholder={V19_COLLECTION_SEARCH_PLACEHOLDER}
+      placeholder=""
       value={query}
       onChange={setQuery}
     />
@@ -3377,7 +3377,7 @@ function MainApp() {
             reviewList={reviewList}
             reviewSource={searchedReviewQueue}
             reviewTab={reviewTab}
-            searchControl={searchControl}
+            searchControl={adminSearchControl}
             visibleSubmission={activeSubmission ?? null}
           />
         ) : surface === "agent-submissions" && activeSubmission ? (
@@ -3425,7 +3425,7 @@ function MainApp() {
             onToggle={toggleExportSelection}
             filterControl={adminFilterControl}
             readyList={readyList}
-            searchControl={searchControl}
+            searchControl={adminSearchControl}
             selectedExportIds={selectedVisibleExportIds}
           />
         ) : null}

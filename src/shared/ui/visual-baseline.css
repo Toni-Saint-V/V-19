@@ -16928,11 +16928,17 @@ body,
   margin-top: var(--v19b-size-6) !important;
 }
 
-.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-  .v19-admin-cockpit-card-title
-  em {
-  margin-top: var(--v19b-size-4) !important;
-}
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-title
+    em {
+    margin-top: var(--v19b-size-4) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-agent-icon {
+    color: var(--v19b-color-text-muted) !important;
+    flex: 0 0 auto !important;
+  }
 
 .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
   .v19-admin-cockpit-next {
@@ -16948,12 +16954,25 @@ body,
   margin: var(--v19b-size-0) !important;
 }
 
-.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-  .v19-admin-cockpit-progress-grid,
-.ops-shell.has-unified-side-menu.role-admin.surface-admin-review
-  .v19-admin-cockpit-tags {
-  margin-top: var(--v19b-size-10) !important;
-}
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-progress-grid,
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-tags {
+    margin-top: var(--v19b-size-10) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-progress
+    i {
+    height: var(--v19b-size-2) !important;
+    min-height: var(--v19b-size-2) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-progress
+    b {
+    height: var(--v19b-size-full) !important;
+  }
 
 .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
   .v19-admin-cockpit-card-foot {
@@ -16963,9 +16982,19 @@ body,
 
 @media (max-width: 767px) {
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-board {
+    padding-top: var(--v19b-size-20) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
     .v19-admin-cockpit-lanes {
     gap: var(--v19b-size-12) !important;
-    padding: var(--v19b-size-10) var(--v19b-size-12) var(--v19b-size-14) !important;
+    padding: var(--v19b-size-16) var(--v19b-size-0) var(--v19b-size-14) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
+    .v19-admin-cockpit-lane:has(.v19-admin-cockpit-lane-empty) {
+    display: none !important;
   }
 
   .ops-shell.has-unified-side-menu.role-admin.surface-admin-review
@@ -18023,4 +18052,584 @@ body,
     min-height: var(--v19b-size-60) !important;
     height: var(--v19b-size-60) !important;
   }
+}
+
+@media (min-width: 1025px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-table-head,
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row {
+    grid-template-columns:
+      var(--v19b-size-44)
+      minmax(var(--v19b-size-220), var(--v19b-grid-fr))
+      var(--v19b-size-150)
+      var(--v19b-size-130) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-table-head
+    > div:last-child {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-checkbox-native {
+    position: absolute !important;
+    width: var(--v19b-size-1) !important;
+    height: var(--v19b-size-1) !important;
+    margin: var(--v19b-size-0) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-checkbox {
+    grid-column: 1 !important;
+    justify-self: center !important;
+    width: var(--v19b-size-20) !important;
+    min-width: var(--v19b-size-20) !important;
+    height: var(--v19b-size-20) !important;
+    padding: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row-main {
+    grid-column: 2 !important;
+    align-content: center !important;
+    width: var(--v19b-size-full) !important;
+    min-height: var(--v19b-size-0) !important;
+    height: auto !important;
+    gap: var(--v19b-size-0) !important;
+    padding: var(--v19b-size-0) !important;
+    border: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
+    border-radius: var(--v19b-size-0) !important;
+    background: var(--v19b-color-clear) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row-title {
+    gap: var(--v19b-size-8) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row-title
+    > svg,
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row-meta,
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row-reason {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-slot {
+    grid-column: 3 !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-progress {
+    grid-column: 4 !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+    .v19-admin-export-reference
+    .v19-admin-export-row-end {
+    display: none !important;
+  }
+}
+
+/* Browser-comment admin pass: desktop title, toolbar, cards, and export grid. */
+@media (min-width: 768px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    > .workspace
+    > .topbar {
+    width: var(--v19b-size-full) !important;
+    margin-inline: var(--v19b-size-0) !important;
+    padding-inline: var(--v19b-size-24) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    > .workspace
+    > .topbar
+    .topbar-heading {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin:is(
+      .surface-admin-review,
+      .surface-export
+    )
+    > .workspace
+    > .topbar
+    .topbar-heading
+    h1 {
+    width: auto !important;
+    max-width: var(--v19b-size-full) !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-cockpit-toolbar {
+    align-items: end !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-cockpit-tools {
+    align-self: end !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-cockpit-card-foot {
+    display: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-row-action {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: var(--v19b-size-full) !important;
+    min-height: var(--v19b-size-40) !important;
+    margin-top: var(--v19b-size-12) !important;
+    padding-inline: var(--v19b-size-12) !important;
+    border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+    border-radius: var(--v19b-radius-control) !important;
+    background: var(--v19b-color-control) !important;
+    color: var(--v19b-color-text-strong) !important;
+    font-weight: var(--v19b-weight-control) !important;
+    box-shadow: none !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-row-action:hover,
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-row-action:focus-visible {
+    background: var(--v19b-color-control-hover) !important;
+  }
+}
+
+/* Admin mobile comment lock: keep review board gutters on the lane container, not inside it. */
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-cockpit-lanes {
+    gap: var(--v19b-size-12) !important;
+    padding: var(--v19b-size-16) var(--v19b-size-0) var(--v19b-size-14) !important;
+  }
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+  .v19-admin-row-action {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--v19b-size-full) !important;
+  min-height: var(--v19b-size-40) !important;
+  margin-top: var(--v19b-size-12) !important;
+  padding-inline: var(--v19b-size-12) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+  .v19-admin-row-action:hover,
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+  .v19-admin-row-action:focus-visible {
+  background: var(--v19b-color-control-hover) !important;
+}
+
+/* Admin searchbar comment lock: black field, icon-only placeholder. */
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
+  :is(.v19-admin-cockpit-search, .v19-admin-export-search .mp-searchbar) {
+  background: var(--v19b-color-app) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
+  :is(.v19-admin-cockpit-search input, .v19-admin-export-search input) {
+  background: var(--v19b-color-app) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin:is(
+    .surface-admin-review,
+    .surface-export
+  )
+  :is(
+    .v19-admin-cockpit-search input::placeholder,
+    .v19-admin-export-search input::placeholder
+  ) {
+  color: var(--v19b-color-clear) !important;
+}
+
+/* Admin mobile search/topbar lock: keep the board below the title and the input inside its shell. */
+@media (max-width: 767px) {
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    > .workspace
+    > .v19-admin-cockpit {
+    margin-top: var(--v19b-size-12) !important;
+    gap: var(--v19b-size-12) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-cockpit-search {
+    align-items: center !important;
+    overflow: hidden !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-cockpit-search
+    .mp-searchbar {
+    display: flex !important;
+    align-items: center !important;
+    min-height: var(--v19b-size-0) !important;
+    height: var(--v19b-size-full) !important;
+    background: var(--v19b-color-clear) !important;
+  }
+
+  .ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-admin-review
+    .v19-admin-cockpit-search
+    input {
+    display: block !important;
+    min-height: var(--v19b-size-0) !important;
+    height: var(--v19b-size-full) !important;
+    line-height: var(--v19b-line-height-control) !important;
+    background: var(--v19b-color-clear) !important;
+  }
+}
+
+/* Admin Linear button lock: admin buttons use neutral design-system controls, never green CTAs. */
+.ops-shell.role-admin
+  :is(
+    button,
+    .mp-button,
+    .primary-button,
+    .secondary-button,
+    .ghost-button,
+    .compact-button,
+    .admin-review-primary,
+    .admin-review-secondary,
+    .v19-admin-export-primary-action,
+    .v19-admin-row-action,
+    .settings-small-button,
+    .settings-switch
+  ) {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.role-admin
+  :is(
+    button,
+    .mp-button,
+    .primary-button,
+    .secondary-button,
+    .ghost-button,
+    .compact-button,
+    .admin-review-primary,
+    .admin-review-secondary,
+    .v19-admin-export-primary-action,
+    .v19-admin-row-action,
+    .settings-small-button,
+    .settings-switch
+  ):not(:disabled):hover,
+.ops-shell.role-admin
+  :is(
+    button.is-active,
+    button.active,
+    button[aria-current="page"],
+    button[aria-selected="true"],
+    button[aria-pressed="true"]
+  ) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.role-admin
+  :is(
+    button,
+    .mp-button,
+    .primary-button,
+    .secondary-button,
+    .ghost-button,
+    .compact-button,
+    .admin-review-primary,
+    .admin-review-secondary,
+    .v19-admin-export-primary-action,
+    .v19-admin-row-action,
+    .settings-small-button,
+    .settings-switch
+  ):disabled {
+  border-color: var(--v19b-color-border) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-faint) !important;
+  opacity: 0.62 !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.role-admin
+  :is(
+    .admin-review-primary:not(.is-return),
+    .admin-passport-workspace-footer button:last-child,
+    .admin-remark-form > footer button:last-of-type,
+    .v19-admin-export-primary-action
+  ) {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.role-admin
+  :is(
+    .v19-admin-export-primary-action,
+    .admin-review-primary:not(.is-return),
+    .admin-passport-workspace-footer button:last-child,
+    .admin-remark-form > footer button:last-of-type,
+    .settings-save-actions .primary-button
+  ) {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+}
+
+.ops-shell.role-admin
+  :is(
+    .v19-admin-export-primary-action,
+    .admin-review-primary:not(.is-return),
+    .admin-passport-workspace-footer button:last-child,
+    .admin-remark-form > footer button:last-of-type,
+    .settings-save-actions .primary-button
+  ):not(:disabled):hover {
+  border-color: var(--v19b-color-primary) !important;
+  background: var(--v19b-color-control-hover) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+}
+
+.ops-shell.role-admin
+  :is(.admin-remark-targets button.is-active, .admin-remark-severity button.is-active) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-passport-workspace
+  .admin-review-media-pane
+  .admin-review-document-frame {
+  display: grid !important;
+  min-height: var(--v19b-size-160) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-passport-workspace
+  .admin-review-document-sheet {
+  display: grid !important;
+}
+
+/* Admin settings Linear lock: override legacy transparent settings nav buttons. */
+.ops-shell.has-unified-side-menu.role-admin.surface-settings
+  .settings-nav
+  button {
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell.has-unified-side-menu.role-admin.surface-settings
+  .settings-nav
+  button:is(:hover, :focus-visible, .active, [aria-current="page"]) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+/* Admin export name cell lock: package/applicant column follows Linear list rhythm. */
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-main {
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--v19b-size-10) !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-kind {
+  display: inline-grid !important;
+  flex: 0 0 var(--v19b-size-20) !important;
+  width: var(--v19b-size-20) !important;
+  height: var(--v19b-size-20) !important;
+  place-items: center !important;
+  color: var(--v19b-color-text-muted) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-kind
+  svg {
+  width: var(--v19b-size-16) !important;
+  height: var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-title
+  strong {
+  flex: 0 1 auto !important;
+  min-width: var(--v19b-size-0) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-16) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-title
+  small {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex: 0 0 auto !important;
+  min-height: var(--v19b-size-28) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-10) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-size-8) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-muted) !important;
+  font-family: var(--v19b-font-mono) !important;
+  font-size: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--v19b-size-10) !important;
+  color: var(--v19b-color-text-faint) !important;
+  font-size: var(--v19b-size-13) !important;
+  line-height: var(--v19b-line-height-row) !important;
+}
+
+.ops-shell.has-unified-side-menu.is-v19-collection-surface.role-admin.surface-export
+  .v19-admin-export-reference
+  .v19-admin-export-row-meta
+  svg {
+  flex: 0 0 var(--v19b-size-16) !important;
+  width: var(--v19b-size-16) !important;
+  height: var(--v19b-size-16) !important;
+  color: var(--v19b-color-text-faint) !important;
+}
+
+/* Linear Style final lock: keep agent/preload buttons dark, compact, and tokenized. */
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .vf-reference-topbar-actions
+  .mp-button,
+.workspace-empty-state,
+.workspace-empty-state :where(button, .mp-button) {
+  font-family: var(--v19-font-family) !important;
+  letter-spacing: 0 !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .vf-reference-topbar-actions
+  .mp-button,
+.workspace-empty-state :where(button, .mp-button) {
+  min-height: var(--v19b-size-40) !important;
+  border-radius: var(--v19-control-radius) !important;
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .vf-reference-topbar-actions
+  .vf-reference-upload-action,
+.workspace-empty-state :where(.secondary-button, .ghost-button) {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text) !important;
+  box-shadow: none !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .vf-reference-topbar-actions
+  .vf-reference-upload-action:is(:hover, :focus-visible),
+.workspace-empty-state :where(.secondary-button, .ghost-button):is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .vf-reference-topbar-actions
+  .vf-reference-create-action.primary-button,
+.workspace-empty-state .primary-button {
+  border-color: var(--v19b-color-primary) !important;
+  background: var(--v19b-color-app) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: 0 0 var(--v19b-size-24) var(--v19b-color-primary-soft-20) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions)
+  .vf-reference-topbar-actions
+  .vf-reference-create-action.primary-button:is(:hover, :focus-visible),
+.workspace-empty-state .primary-button:is(:hover, :focus-visible) {
+  border-color: var(--v19b-color-primary-bright) !important;
+  background: var(--v19b-color-page) !important;
+  box-shadow: 0 0 var(--v19b-size-28) var(--v19b-color-primary-soft-30) !important;
+}
+
+.workspace-empty-state {
+  border-radius: var(--v19b-radius-row) !important;
+}
+
+.mp-bottom-sheet-close svg {
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  stroke-width: var(--v19b-size-2) !important;
 }

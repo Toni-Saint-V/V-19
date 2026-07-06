@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Bot,
+  Building2,
   CheckCircle2,
   CheckSquare,
   ChevronRight,
@@ -78,7 +79,6 @@ import {
   nextProblem,
   openIssueCount,
   statusLabelFor,
-  statusLabels,
 } from "../status";
 import type { DrawerTab, Submission } from "../types";
 import {
@@ -1774,11 +1774,6 @@ function adminReviewAiFlagCount(submission: Submission) {
   );
 }
 
-function adminReviewLastEvent(submission: Submission) {
-  const latest = submission.history[submission.history.length - 1];
-  return latest?.text ?? `Обновлено ${submission.updatedAt}`;
-}
-
 function AdminReviewMetricCard({
   icon: Icon,
   label,
@@ -1886,6 +1881,12 @@ function AdminReviewQueueCard({
             )}
             {applicantCountLabel(submission.applicants.length)}
             <i aria-hidden="true" />
+            <Building2
+              aria-hidden="true"
+              className="v19-admin-agent-icon"
+              size={14}
+              strokeWidth={1.8}
+            />
             {agentOwnerDisplayName(submission.agentId)}
           </em>
         </div>
@@ -1922,11 +1923,10 @@ function AdminReviewQueueCard({
         ) : null}
         {aiFlagCount > 0 ? <span className="tone-blue">ИИ {aiFlagCount}</span> : null}
         {issueCount === 0 && warningCount === 0 ? (
-          <span className="tone-green">без замечаний</span>
+          <span className="tone-green">Чисто</span>
         ) : null}
       </div>
 
-      <div className="v19-admin-cockpit-card-foot">{adminReviewLastEvent(submission)}</div>
       <button
         className="v19-admin-row-action"
         type="button"
@@ -2490,7 +2490,7 @@ function adminReviewFacts(submission: Submission) {
   const issue = primarySubmissionIssue(submission) ?? adminReviewVisibleIssues(submission)[0];
   const openIssues = openIssueCount(submission);
   const fixedIssues = fixedIssueCount(submission);
-  const status = statusLabels[submission.status];
+  const status = statusLabelFor(submission.status, "compact");
   const reason = issue ? `${issue.reason} · ${issueTargetLine(issue)}` : nextProblem(submission);
   const owner =
     submission.status === "ready_for_export"
@@ -3528,7 +3528,7 @@ function AdminExportReferenceCockpit({
                 <CheckSquare aria-hidden="true" focusable="false" size={14} />
               ) : null}
             </button>
-            <div>Пакет</div>
+            <div>Пакет / заявитель</div>
             <div>Слот</div>
             <div>Готовность</div>
             <div>Размер</div>
@@ -3828,6 +3828,7 @@ function AdminExportRow({
     "файла",
     "файлов",
   )}`;
+  const documentLabel = `Анкета + ${submission.files.length} документов`;
   const historyPdfSummary = history ? returnedPdfPackageSummary(submission) : null;
   const rowStatus = history
     ? historyPdfSummary?.label
@@ -3881,20 +3882,19 @@ function AdminExportRow({
         onClick={blocked || history ? onOpen : (onChoose ?? onOpen)}
       >
         <span className="v19-admin-export-row-title">
-          {submission.type === "family" ? (
-            <Users aria-hidden="true" focusable="false" size={14} />
-          ) : (
-            <User aria-hidden="true" focusable="false" size={14} />
-          )}
+          <span className="v19-admin-export-row-kind" aria-hidden="true">
+            {submission.type === "family" ? (
+              <Users focusable="false" size={16} />
+            ) : (
+              <User focusable="false" size={16} />
+            )}
+          </span>
           <strong>{submission.title}</strong>
           <small>{submission.id}</small>
         </span>
         <span className="v19-admin-export-row-meta">
-          <span>{agentOwnerDisplayName(submission.agentId)}</span>
-          <i aria-hidden="true" />
-          <span>{submission.city}</span>
-          <i aria-hidden="true" />
-          <span>{fileLabel}</span>
+          <FileText aria-hidden="true" focusable="false" size={14} />
+          <span>{documentLabel}</span>
         </span>
         {blockedReason ? (
           <span className="v19-admin-export-row-reason">{blockedReason}</span>
