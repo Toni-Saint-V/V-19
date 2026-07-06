@@ -218,6 +218,10 @@
   --v19-agent-context-panel-sticky-top: 20px;
   --v19-agent-context-padding: var(--v19-space-lg);
   --v19-work-search-height: 40px;
+  --v19-command-palette-z: 80;
+  --v19-command-palette-width: var(--v19b-size-560);
+  --v19-command-palette-mobile-inset: var(--v19b-size-12);
+  --v19-command-palette-max-height: calc(100svh - var(--v19b-size-96));
   --v19-agent-search-width: 260px;
   --v19-agent-search-max-width: 332px;
   --v19-agent-search-padding-x: 11px;

@@ -117,6 +117,7 @@ import {
   PageHeader,
   PageHeaderMenuButton,
 } from "./modules/submissions/components/AppShell";
+import { CommandPalette } from "./modules/submissions/components/CommandPalette";
 import { OperationalSideMenu } from "./modules/submissions/components/OperationalSideMenu";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
@@ -485,6 +486,7 @@ function MainApp() {
   const [confirmClose, setConfirmClose] = useState(false);
   const [createCloseFocusToken, setCreateCloseFocusToken] = useState(0);
   const [query, setQuery] = useState("");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [cityFilter, setCityFilter] = useState<CityFilterValue>("Все города");
   const [agentFilter, setAgentFilter] = useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -532,6 +534,14 @@ function MainApp() {
       : localAgentOwnerIdForSession(localAuthSession);
   const visibleSubmissionsForRole =
     role === "agent" ? ownedSubmissions(submissions, currentAgentOwnerId) : submissions;
+  const commandPaletteSubmissions = useMemo(
+    () =>
+      highestPriorityFirst(visibleSubmissionsForRole).filter(
+        (submission, index, list) =>
+          list.findIndex((item) => item.id === submission.id) === index,
+      ),
+    [visibleSubmissionsForRole],
+  );
   const activeSubmission =
     visibleSubmissionsForRole.find(
       (submission) => submission.id === selectedSubmissionId,
@@ -1088,6 +1098,19 @@ function MainApp() {
   }, [exportReadyList]);
 
   useEffect(() => {
+    function handleCommandPaletteShortcut(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+
+      event.preventDefault();
+      if (event.repeat) return;
+      setCommandPaletteOpen((open) => !open);
+    }
+
+    window.addEventListener("keydown", handleCommandPaletteShortcut);
+    return () => window.removeEventListener("keydown", handleCommandPaletteShortcut);
+  }, []);
+
+  useEffect(() => {
     if (drawerMode !== "closed" || confirmClose) return;
 
     const node = returnFocusRef.current;
@@ -1288,6 +1311,20 @@ function MainApp() {
     setPendingWorkspaceTarget(target ?? null);
     setDrawerMode("detail");
     setAgentQuestionnaireOpen(false);
+  }
+
+  function openCommandPaletteSubmission(submission: Submission) {
+    requestSettingsLeave(() => {
+      if (role === "agent") {
+        setSurface("agent-submissions");
+        setAgentTab("all");
+      } else {
+        setSurface("admin-review");
+        setReviewTab("review");
+      }
+
+      openSubmission(submission);
+    });
   }
 
   function openApplicantsUploadTarget() {
@@ -3121,6 +3158,7 @@ function MainApp() {
       mobileOpen={mobileNavOpen}
       mobileTitle={workspaceSurfaceTitle}
       onChooseRole={chooseRole}
+      onCommandSearch={() => setCommandPaletteOpen(true)}
       onCloseMobile={() => setMobileNavOpen(false)}
       onResetWorkspace={resetWorkspaceEmail}
       role={role}
@@ -3210,6 +3248,18 @@ function MainApp() {
 
   const shellOverlays = (
     <>
+      <CommandPalette
+        onCreateSubmission={openCreateSubmissionDrawer}
+        onNavigateAgentActions={showAgentActions}
+        onNavigateAgentSubmissions={() => showAgentTab("all")}
+        onNavigateSettings={showSettingsSurface}
+        onOpenChange={setCommandPaletteOpen}
+        onOpenSubmission={openCommandPaletteSubmission}
+        open={commandPaletteOpen}
+        role={role}
+        submissions={commandPaletteSubmissions}
+      />
+
       {agentQuestionnaireOpen && activeSubmission && role === "agent" ? (
         <FigmaQuestionnaireScreen
           initialFocus={agentQuestionnaireFocus}
