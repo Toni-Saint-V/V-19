@@ -18633,3 +18633,673 @@ body,
   stroke-linejoin: round !important;
   stroke-width: var(--v19b-size-2) !important;
 }
+
+/* Linear Style final lock: fullscreen BLS questionnaire uses project font, compact radii, and dark DS buttons. */
+.vf-figma-questionnaire-screen,
+.vf-figma-questionnaire-screen :where(button, input, textarea, label) {
+  font-family: var(--v19-font-family) !important;
+  letter-spacing: 0 !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-submission-id, .v19-questionnaire-field-number) {
+  font-family: var(--v19-font-family) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(
+    .v19-questionnaire-back-button,
+    .v19-questionnaire-complete-button,
+    .v19-questionnaire-next-button,
+    .v19-questionnaire-next-action-card button,
+    .v19-questionnaire-field-control,
+    .v19-questionnaire-dropdown,
+    .v19-questionnaire-dropdown-option,
+    .v19-questionnaire-applicant-tab,
+    .v19-questionnaire-section-tab,
+    .v19-questionnaire-applicant-index,
+    .v19-questionnaire-progress-badge,
+    .v19-questionnaire-excel-map
+  ) {
+  border-radius: var(--v19-control-radius) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(
+    .v19-questionnaire-applicant-bar,
+    .v19-questionnaire-section-nav,
+    .v19-questionnaire-work-panel,
+    .v19-questionnaire-review-alert,
+    .v19-readiness-card,
+    .v19-questionnaire-context-rail > section
+  ) {
+  border-radius: var(--v19b-radius-control) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-back-button, .v19-questionnaire-next-button) {
+  border-color: var(--v19b-color-border-strong) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text) !important;
+  box-shadow: none !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-back-button, .v19-questionnaire-next-button):is(
+    :hover,
+    :focus-visible
+  ) {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-complete-button, .v19-questionnaire-next-action-card button) {
+  border: var(--v19b-size-1) solid var(--v19b-color-primary) !important;
+  background: var(--v19b-color-app) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: 0 0 var(--v19b-size-24) var(--v19b-color-primary-soft-20) !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(.v19-questionnaire-complete-button, .v19-questionnaire-next-action-card button):is(
+    :hover,
+    :focus-visible
+  ) {
+  border-color: var(--v19b-color-primary-bright) !important;
+  background: var(--v19b-color-page) !important;
+  box-shadow: 0 0 var(--v19b-size-28) var(--v19b-color-primary-soft-30) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-panel-footer > div {
+  min-width: var(--v19b-size-0) !important;
+  flex-wrap: wrap !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control[type="number"] {
+  appearance: textfield;
+}
+
+/* Admin ReviewDrawer source lock: clean 5 reference shell, rows, remark modal. */
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-backdrop {
+  background: var(--v19b-admin-drawer-backdrop) !important;
+  backdrop-filter: blur(var(--v19b-size-4)) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-drawer {
+  inset-block: var(--v19b-size-8) !important;
+  right: var(--v19b-size-8) !important;
+  left: auto !important;
+  width: min(
+    var(--v19b-size-860),
+    calc(var(--v19b-viewport-width) - (var(--v19b-size-8) * 2))
+  ) !important;
+  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border) !important;
+  border-radius: var(--v19b-size-16) !important;
+  background: var(--v19b-admin-drawer-bg) !important;
+  box-shadow: var(--v19b-admin-drawer-shadow) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer-header {
+  padding: var(--v19b-size-20) var(--v19b-size-32) var(--v19b-size-0) !important;
+  border-bottom: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint) !important;
+  background: var(--v19b-admin-drawer-bg) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-titlebar {
+  align-items: flex-start !important;
+  gap: var(--v19b-size-16) !important;
+  margin-bottom: var(--v19b-size-20) !important;
+  padding-bottom: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-titlecopy {
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-titlecopy
+  .admin-review-meta {
+  display: none !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-titlecopy
+  h2 {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--v19b-size-12) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-24) !important;
+  font-weight: var(--v19b-weight-title) !important;
+  line-height: var(--v19b-line-height-title) !important;
+  letter-spacing: 0 !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-close {
+  width: var(--v19b-size-40) !important;
+  min-width: var(--v19b-size-40) !important;
+  height: var(--v19b-size-40) !important;
+  border-color: var(--v19b-admin-drawer-border-faint) !important;
+  border-radius: var(--v19b-size-12) !important;
+  background: var(--v19b-admin-drawer-control-bg) !important;
+  color: var(--v19b-admin-drawer-text-70) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-tabs {
+  gap: var(--v19b-size-6) !important;
+  margin-inline: calc(var(--v19b-size-4) * -1) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-tabs
+  button {
+  min-height: var(--v19b-size-44) !important;
+  border: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
+  border-radius: var(--v19b-size-0) !important;
+  background: var(--v19b-color-clear) !important;
+  color: var(--v19b-admin-drawer-text-50) !important;
+  box-shadow: none !important;
+  font-size: var(--v19b-size-13) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  padding: var(--v19b-size-0) var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-tabs
+  button.is-active,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-tabs
+  button:hover,
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-tabs
+  button:focus-visible {
+  background: var(--v19b-color-clear) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-tabs
+  button
+  > i {
+  height: var(--v19b-size-2) !important;
+  background: var(--v19b-color-primary) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-content {
+  padding: var(--v19b-size-20) var(--v19b-size-32) !important;
+  background: var(--v19b-admin-drawer-bg) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-drawer-assist {
+  display: none !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-strip {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--v19b-size-16) !important;
+  margin-bottom: var(--v19b-size-24) !important;
+  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border-faint) !important;
+  border-radius: var(--v19b-size-16) !important;
+  background: rgb(255 255 255 / 0.02) !important;
+  padding: var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-select {
+  display: grid !important;
+  gap: var(--v19b-size-6) !important;
+  min-width: min(var(--v19b-size-240), var(--v19b-size-full)) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-select
+  > span {
+  color: var(--v19b-admin-drawer-text-50) !important;
+  font-size: var(--v19b-size-11) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  text-transform: uppercase !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-select
+  select {
+  width: var(--v19b-size-full) !important;
+  height: var(--v19b-size-40) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-size-12) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-13) !important;
+  padding-inline: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-stats {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: var(--v19b-size-16) !important;
+  color: var(--v19b-admin-drawer-text-50) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-stats
+  span {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--v19b-size-6) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-stats
+  i {
+  width: var(--v19b-size-8) !important;
+  height: var(--v19b-size-8) !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background: var(--v19b-admin-drawer-count-bg) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-stats
+  .is-ok {
+  color: var(--v19b-admin-drawer-blue-text) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-applicant-stats
+  .is-warning {
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-field-section
+  > h3 {
+  margin-bottom: var(--v19b-size-16) !important;
+  font-size: var(--v19b-size-15) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-field-table {
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-field-row {
+  display: flex !important;
+  min-height: var(--v19b-size-72) !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--v19b-size-16) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-size-12) !important;
+  background: var(--v19b-admin-drawer-field-bg) !important;
+  padding: var(--v19b-size-16) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-field-row.is-error {
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-main {
+  display: grid !important;
+  min-width: var(--v19b-size-0) !important;
+  flex: 1 1 auto !important;
+  gap: var(--v19b-size-4) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-kicker {
+  display: flex !important;
+  min-width: var(--v19b-size-0) !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-label {
+  color: var(--v19b-admin-drawer-text-40) !important;
+  font-size: var(--v19b-size-11-5) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  text-transform: uppercase !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-main
+  > strong {
+  min-width: var(--v19b-size-0) !important;
+  overflow: hidden !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-row) !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-clear) !important;
+  border-radius: var(--v19b-size-4) !important;
+  background: var(--v19b-admin-drawer-control-bg) !important;
+  color: var(--v19b-admin-drawer-text-50) !important;
+  font-size: var(--v19b-size-10) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  line-height: var(--v19b-line-height-control) !important;
+  padding: var(--v19b-size-2) var(--v19b-size-6) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-status.is-pending {
+  display: none !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-status.is-ok {
+  color: var(--v19b-admin-drawer-blue-text) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-status.is-error {
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-actions {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-8) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-actions
+  button {
+  min-height: var(--v19b-size-32) !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-size-8) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: none !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-verify {
+  width: auto !important;
+  min-width: var(--v19b-size-0) !important;
+  gap: var(--v19b-size-6) !important;
+  padding-inline: var(--v19b-size-12) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-row-remark {
+  width: var(--v19b-size-32) !important;
+  min-width: var(--v19b-size-32) !important;
+  padding: var(--v19b-size-0) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: var(--v19b-size-12) !important;
+  border-top: var(--v19b-size-1) solid var(--v19b-admin-drawer-border) !important;
+  background: var(--v19b-admin-drawer-bg) !important;
+  padding: var(--v19b-size-16) var(--v19b-size-32)
+    max(var(--v19b-size-16), env(safe-area-inset-bottom)) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-footer
+  > div {
+  display: none !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  :is(.admin-review-secondary, .admin-review-primary) {
+  width: auto !important;
+  min-height: var(--v19b-size-44) !important;
+  height: var(--v19b-size-44) !important;
+  border-radius: var(--v19b-size-12) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-strong) !important;
+  font-size: var(--v19b-size-13) !important;
+  font-weight: var(--v19b-weight-control) !important;
+  padding-inline: var(--v19b-size-20) !important;
+}
+
+.ops-shell.has-open-drawer.role-admin.surface-admin-review
+  .admin-review-primary:not(.is-return) {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  background: var(--v19b-color-app) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+}
+
+.admin-remark-layer {
+  position: fixed !important;
+  inset: var(--v19b-size-0) !important;
+  z-index: 920 !important;
+  background: var(--v19b-admin-drawer-backdrop) !important;
+  backdrop-filter: blur(var(--v19b-size-4)) !important;
+}
+
+.admin-remark-form {
+  width: min(var(--v19b-size-560), calc(100vw - var(--v19b-size-24))) !important;
+  max-height: calc(100svh - var(--v19b-size-24)) !important;
+  border: var(--v19b-size-1) solid var(--v19b-admin-drawer-border) !important;
+  border-radius: var(--v19b-size-24) !important;
+  background: var(--v19b-admin-drawer-bg) !important;
+  box-shadow: 0 var(--v19b-size-24) var(--v19b-size-100) rgb(0 0 0 / 0.65) !important;
+}
+
+.admin-remark-form > header > div > span {
+  border-color: var(--v19b-admin-drawer-border-faint) !important;
+  background: var(--v19b-admin-drawer-control-bg) !important;
+  color: var(--v19b-admin-drawer-text-70) !important;
+}
+
+.admin-remark-target-section,
+.admin-remark-edit-controls,
+.admin-remark-reason,
+.admin-remark-ai-label,
+.admin-remark-internal {
+  display: none !important;
+}
+
+.admin-remark-client-comment textarea {
+  min-height: var(--v19b-size-120) !important;
+}
+
+.admin-remark-templates {
+  display: grid !important;
+  gap: var(--v19b-size-8) !important;
+}
+
+.admin-remark-templates > span {
+  color: var(--v19b-admin-drawer-text-50) !important;
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.admin-remark-templates button {
+  width: var(--v19b-size-full) !important;
+  min-height: var(--v19b-size-40) !important;
+  justify-content: flex-start !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-size-12) !important;
+  background: var(--v19b-color-panel) !important;
+  color: var(--v19b-admin-drawer-text-70) !important;
+  box-shadow: none !important;
+  font-size: var(--v19b-size-12) !important;
+  padding: var(--v19b-size-10) var(--v19b-size-12) !important;
+  text-align: left !important;
+  white-space: normal !important;
+}
+
+.admin-remark-form > footer button:last-of-type {
+  border-color: var(--v19b-color-primary-deep-border) !important;
+  background: var(--v19b-color-app) !important;
+  box-shadow: var(--v19b-shadow-primary-soft) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+@media (max-width: 980px) {
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-drawer {
+    inset: var(--v19b-size-48) var(--v19b-size-0) var(--v19b-size-0) !important;
+    width: var(--v19b-viewport-width) !important;
+    border-top: var(--v19b-size-1) solid var(--v19b-admin-drawer-border) !important;
+    border-right: var(--v19b-size-1) solid var(--v19b-admin-drawer-border) !important;
+    border-left: var(--v19b-size-1) solid var(--v19b-admin-drawer-border) !important;
+    border-bottom: var(--v19b-size-0) solid var(--v19b-color-clear) !important;
+    border-radius: var(--v19b-size-28) var(--v19b-size-28) var(--v19b-size-0)
+      var(--v19b-size-0) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-drawer-header,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-content,
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-footer {
+    padding-inline: var(--v19b-size-20) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-titlecopy
+    h2 {
+    font-size: var(--v19b-size-20) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-applicant-strip {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-applicant-stats {
+    justify-content: flex-start !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-titlebar {
+    flex-direction: row !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-tabs {
+    margin-inline: calc(var(--v19b-size-20) * -1) !important;
+    padding-inline: var(--v19b-size-20) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-field-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: var(--v19b-size-14) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-row-actions {
+    width: var(--v19b-size-full) !important;
+    justify-content: flex-end !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    .admin-review-row-verify {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-footer {
+    padding-block: var(--v19b-size-12)
+      max(var(--v19b-size-12), env(safe-area-inset-bottom)) !important;
+  }
+
+  .ops-shell.has-open-drawer.role-admin.surface-admin-review
+    :is(.admin-review-secondary, .admin-review-primary) {
+    flex: 1 1 var(--v19b-size-0) !important;
+    min-width: var(--v19b-size-0) !important;
+    padding-inline: var(--v19b-size-10) !important;
+  }
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button,
+.vf-figma-questionnaire-screen .v19-questionnaire-next-action-card button {
+  border: var(--v19b-size-1) solid var(--v19b-color-primary) !important;
+  border-radius: var(--v19-control-radius) !important;
+  background: var(--v19b-color-app) !important;
+  color: var(--v19b-color-text-strong) !important;
+  box-shadow: 0 0 var(--v19b-size-24) var(--v19b-color-primary-soft-20) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-back-button,
+.vf-figma-questionnaire-screen .v19-questionnaire-next-button,
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control,
+.vf-figma-questionnaire-screen .v19-questionnaire-dropdown,
+.vf-figma-questionnaire-screen .v19-questionnaire-dropdown-option,
+.vf-figma-questionnaire-screen .v19-questionnaire-applicant-tab,
+.vf-figma-questionnaire-screen .v19-questionnaire-section-tab,
+.vf-figma-questionnaire-screen .v19-questionnaire-applicant-index,
+.vf-figma-questionnaire-screen .v19-questionnaire-progress-badge,
+.vf-figma-questionnaire-screen .v19-questionnaire-excel-map {
+  border-radius: var(--v19-control-radius) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-applicant-bar,
+.vf-figma-questionnaire-screen .v19-questionnaire-section-nav,
+.vf-figma-questionnaire-screen .v19-questionnaire-work-panel,
+.vf-figma-questionnaire-screen .v19-questionnaire-review-alert,
+.vf-figma-questionnaire-screen .v19-readiness-card,
+.vf-figma-questionnaire-screen .v19-questionnaire-context-rail > section {
+  border-radius: var(--v19b-radius-control) !important;
+}
+
+.vf-figma-questionnaire-screen.v19-questionnaire-screen-shell.vf-figma-surface {
+  position: fixed !important;
+  inset: var(--v19b-size-0) !important;
+  width: var(--v19b-viewport-width) !important;
+  height: var(--v19b-viewport-height) !important;
+  max-width: var(--v19b-viewport-width) !important;
+  max-height: var(--v19b-viewport-height) !important;
+  z-index: 2147483000 !important;
+  background: var(--v19b-color-app) !important;
+  pointer-events: auto !important;
+}
+
+.vf-figma-questionnaire-screen
+  :where(
+    .v19-questionnaire-screen-header,
+    .v19-questionnaire-progress-track,
+    .v19-questionnaire-scroll,
+    .v19-questionnaire-applicant-bar,
+    .v19-questionnaire-section-nav,
+    .v19-questionnaire-work-panel,
+    .v19-questionnaire-work-head,
+    .v19-questionnaire-work-grid,
+    .v19-questionnaire-panel-footer,
+    .v19-readiness-card,
+    .v19-questionnaire-context-rail > section
+  ) {
+  background: var(--v19b-color-app) !important;
+  background-image: none !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-excel-map {
+  display: none !important;
+}

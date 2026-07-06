@@ -17,6 +17,7 @@ import {
   Sparkles,
   User,
   Users,
+  X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "./cn";
@@ -945,22 +946,28 @@ export function V19SvgIcon({ children }: { children: ReactNode }) {
 
 export function V19DrawerHeader<T extends string>({
   activeTab,
+  closeLabel = "Закрыть подачу",
   layoutId = "drawerActiveTab",
   meta,
+  onClose,
   onTab,
   status,
   tabs,
   tabsRef,
   title,
+  updated,
 }: {
   activeTab: T;
+  closeLabel?: string;
   layoutId?: string;
   meta: [string, string];
+  onClose?: () => void;
   onTab: (tab: T) => void;
   status: string;
   tabs: Array<V19DrawerTab<T>>;
   tabsRef?: RefObject<HTMLDivElement | null>;
   title: string;
+  updated?: string;
 }) {
   return (
     <header className="v19-figma-drawer-header">
@@ -970,10 +977,28 @@ export function V19DrawerHeader<T extends string>({
             <span>{meta[0]}</span>
             <span aria-hidden="true">·</span>
             <span>{meta[1]}</span>
-            <span className="v19-figma-drawer-header-status">{status}</span>
           </div>
           <h2 className="v19-figma-drawer-heading">{title}</h2>
+          <div className="v19-figma-drawer-status-row">
+            <span className="v19-figma-drawer-header-status">{status}</span>
+            {updated ? (
+              <span className="v19-figma-drawer-updated">
+                <Clock aria-hidden="true" size={12} />
+                Обновлено {updated}
+              </span>
+            ) : null}
+          </div>
         </div>
+        {onClose ? (
+          <button
+            aria-label={closeLabel}
+            className="v19-figma-drawer-close"
+            type="button"
+            onClick={onClose}
+          >
+            <X aria-hidden="true" size={20} />
+          </button>
+        ) : null}
       </div>
 
       <div className="v19-figma-drawer-tabs-scroll" ref={tabsRef}>

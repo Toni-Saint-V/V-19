@@ -699,16 +699,28 @@ function SubmissionFilterSheet({
         ))}
       </FilterSheetSection>
 
-      <FilterSheetSection title="Город">
-        {sheetCityOptions.map((city) => (
-          <FilterSheetOption
-            active={cityFilter === city}
-            disabled={!onCityFilter}
-            key={city}
-            label={city}
-            onClick={() => onCityFilter?.(city)}
-          />
-        ))}
+      <FilterSheetSection className="v19-filter-sheet-section--city" title="Город">
+        <div className="v19-filter-sheet-city-carousel" role="listbox" aria-label="Город">
+          {sheetCityOptions.map((city) => {
+            const active = cityFilter === city;
+
+            return (
+              <button
+                aria-pressed={active}
+                aria-selected={active}
+                className={`v19-filter-sheet-city-chip ${active ? "is-active" : ""}`}
+                disabled={!onCityFilter}
+                key={city}
+                role="option"
+                type="button"
+                onClick={() => onCityFilter?.(city)}
+              >
+                <span className="v19-filter-sheet-city-dot" aria-hidden="true" />
+                <span>{city}</span>
+              </button>
+            );
+          })}
+        </div>
       </FilterSheetSection>
 
       <FilterSheetSection title="Дата">
@@ -743,13 +755,18 @@ function SubmissionFilterSheet({
 
 function FilterSheetSection({
   children,
+  className = "",
   title,
 }: {
   children: ReactNode;
+  className?: string;
   title: string;
 }) {
   return (
-    <section className="v19-filter-sheet-section" aria-label={title}>
+    <section
+      className={`v19-filter-sheet-section ${className}`.trim()}
+      aria-label={title}
+    >
       <h3>{title}</h3>
       <div className="v19-filter-sheet-options">{children}</div>
     </section>
@@ -957,6 +974,24 @@ export function AgentSubmissionsScreen({
       onClick={() => setFilterSheetOpen((open) => !open)}
     />
   );
+  const filterSheet = (
+    <SubmissionFilterSheet
+      activeTab={activeTab}
+      cityFilter={cityFilter}
+      cityOptions={cityOptions}
+      onCityFilter={onCityFilter}
+      onClose={() => setFilterSheetOpen(false)}
+      onPanelToggle={hasContextRail ? togglePanel : undefined}
+      onReset={resetActiveFilters}
+      onSortModeChange={changeSortMode}
+      onTab={changeAgentTab}
+      open={filterSheetOpen}
+      panelOpen={panelOpen}
+      sheetId={filterSheetId}
+      sortMode={sortMode}
+      tabs={agentTabs}
+    />
+  );
   const toolbarTools = (
     <CollectionToolbarTools
       desktopTools={renderQuickToolbarButtons()}
@@ -1095,7 +1130,28 @@ export function AgentSubmissionsScreen({
                 tabs={agentTabs}
               />
             </>
-          ) : null}
+          ) : (
+            <>
+              <div className="v19-submission-reference-filterbar">
+                <button
+                  aria-controls={filterSheetOpen ? filterSheetId : undefined}
+                  aria-expanded={filterSheetOpen}
+                  aria-haspopup="dialog"
+                  className={`v19-submission-reference-filter-trigger ${
+                    hasCityFilter || hasSortFilter || activeTab !== "all"
+                      ? "is-active"
+                      : ""
+                  }`}
+                  type="button"
+                  onClick={() => setFilterSheetOpen((open) => !open)}
+                >
+                  <Filter aria-hidden="true" />
+                  <span>{hasCityFilter ? cityFilter : "Фильтры"}</span>
+                </button>
+              </div>
+              {filterSheet}
+            </>
+          )}
 
           {loading ? (
             <AgentSubmissionsLoadingState />

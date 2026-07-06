@@ -28,14 +28,17 @@ type SectionTab = {
   title: string;
 };
 type SectionId =
+  | "files"
   | "appointment"
   | "personal"
   | "passport"
+  | "euRelative"
   | "contact"
   | "employment"
   | "trip"
   | "hotel"
-  | "payment";
+  | "payment"
+  | "filler";
 
 type FormFieldProps = {
   excelMap?: string;
@@ -45,10 +48,11 @@ type FormFieldProps = {
   number?: string;
   onChange?: (value: string) => void;
   options?: string[];
+  readOnly?: boolean;
   required?: boolean;
   reviewSource?: string;
   state?: FieldState;
-  type?: "input" | "textarea";
+  type?: "email" | "input" | "number" | "textarea";
   value: string;
 };
 
@@ -78,9 +82,13 @@ type QuestionnaireFormData = {
   appointmentCity: string;
   appointmentNote: string;
   birthCountry: string;
+  birthCitizenship: string;
   birthPlace: string;
   category: string;
   citizenship: string;
+  companyContactPerson: string;
+  companyOrgDetails: string;
+  companyPhone: string;
   contactAddress: string;
   contactEmail: string;
   contactPhone: string;
@@ -93,8 +101,18 @@ type QuestionnaireFormData = {
   employerContact: string;
   employerName: string;
   entryCount: string;
+  euRelationship: string;
+  euRelativeDetails: string;
   firstEntryCountry: string;
   firstName: string;
+  finalEntryPermit: string;
+  finalEntryPermitIssuedBy: string;
+  finalEntryPermitValidFrom: string;
+  finalEntryPermitValidTo: string;
+  formFillerContact: string;
+  formFillerName: string;
+  formFillerPhone: string;
+  guardianInfo: string;
   hotelAddress: string;
   hotelCity: string;
   hotelContact: string;
@@ -104,18 +122,35 @@ type QuestionnaireFormData = {
   hotelPostalCode: string;
   homeCountry: string;
   invitingPartyType: string;
+  livesOutsideCitizenship: string;
   maritalStatus: string;
+  mainDestination: string;
+  nationalId: string;
   occupation: string;
+  otherCitizenship: string;
+  otherSponsor: string;
   passportExpiry: string;
   passportIssued: string;
   passportIssueCountry: string;
   passportIssuePlace: string;
   passportNumber: string;
   passportType: string;
+  previousSurname: string;
+  previousVisaNumber: string;
+  previousBiometrics: string;
+  previousBiometricsDate: string;
+  residenceCity: string;
+  residencePermitNumber: string;
+  residencePermitType: string;
+  residencePermitValidUntil: string;
+  residencePostalCode: string;
   paymentSponsor: string;
   paymentType: string;
   sex: string;
+  sponsorInHostFields: string;
+  sponsorMeans: string;
   stayDuration: string;
+  stayPurposeDetails: string;
   stayPurpose: string;
   stayRoute: string;
   surname: string;
@@ -131,14 +166,122 @@ type FocusableQuestionnaireField = {
   sectionId: SectionId;
 };
 
+const BLS_CITY_OPTIONS = [
+  "Москва",
+  "Санкт-Петербург",
+  "Казань",
+  "Екатеринбург",
+  "Новосибирск",
+  "Нижний Новгород",
+  "Самара",
+  "Ростов-на-Дону",
+];
+
+const BLS_COUNTRY_OPTIONS = [
+  "Russian Federation",
+  "USSR",
+  "Belarus",
+  "Kazakhstan",
+  "Armenia",
+  "Azerbaijan",
+  "Georgia",
+  "Kyrgyzstan",
+  "Tajikistan",
+  "Turkmenistan",
+  "Uzbekistan",
+  "Ukraine",
+  "Moldova",
+  "Spain",
+  "France",
+  "Germany",
+  "Italy",
+  "Portugal",
+  "Netherlands",
+  "Belgium",
+  "Austria",
+  "Switzerland",
+  "Greece",
+  "Czech Republic",
+  "Poland",
+  "Hungary",
+  "Sweden",
+  "Norway",
+  "Finland",
+  "Denmark",
+  "United Kingdom",
+  "United States",
+  "Turkey",
+  "China",
+  "India",
+  "Israel",
+  "United Arab Emirates",
+  "Other",
+];
+
+const BLS_OCCUPATION_OPTIONS = [
+  "UNEMPLOYED",
+  "ACCOUNTANT",
+  "ACTOR",
+  "ARCHITECT",
+  "ARTISAN",
+  "ARTIST",
+  "BANKER",
+  "BUSINESSMAN",
+  "CHEF",
+  "CIVIL SERVANT",
+  "COMPANY DIRECTOR",
+  "CONSULTANT",
+  "DENTIST",
+  "DESIGNER",
+  "DOCTOR",
+  "DRIVER",
+  "ECONOMIST",
+  "ENGINEER",
+  "FARMER",
+  "FINANCIER",
+  "FISHERMAN",
+  "HOUSEWIFE",
+  "IT PROFESSIONAL",
+  "JOURNALIST",
+  "JUDGE",
+  "LABOURER",
+  "LAWYER",
+  "MANAGER",
+  "MILITARY",
+  "MINOR",
+  "NURSE",
+  "PENSIONER",
+  "PHARMACIST",
+  "PHOTOGRAPHER",
+  "PILOT",
+  "POLICE OFFICER",
+  "PROFESSOR",
+  "RETIRED",
+  "SAILOR",
+  "SALESPERSON",
+  "SCIENTIST",
+  "SECRETARY",
+  "SELF EMPLOYED",
+  "STAGIAIRE (STUDENT/INTERN)",
+  "STUDENT",
+  "TEACHER",
+  "TECHNICIAN (OTHER)",
+  "TRADER",
+  "TRANSLATOR",
+  "WRITER",
+  "OTHER",
+];
+
+const YES_NO_OPTIONS = ["Нет", "Да"];
+
 function FormField({
-  excelMap,
   focused,
   fullWidth,
   label,
   number,
   onChange,
   options,
+  readOnly,
   required,
   reviewSource,
   state = "normal",
@@ -231,6 +374,7 @@ function FormField({
       ) : type === "textarea" ? (
         <textarea
           className={`${baseClasses} is-textarea ${stateClasses}`}
+          readOnly={readOnly ?? !onChange}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
         />
@@ -238,32 +382,29 @@ function FormField({
         <input
           aria-label={label}
           className={`${baseClasses} ${stateClasses}`}
+          type={type === "email" || type === "number" ? type : "text"}
+          readOnly={readOnly ?? !onChange}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
         />
       )}
 
-      <div className="flex items-start gap-1.5 min-h-[var(--v19b-size-18)] text-[var(--v19b-size-10-5)] text-white/40 mt-1">
+      {state === "needs_review" || state === "invalid" ? (
+      <div className="flex items-start gap-1.5 text-[var(--v19b-size-10-5)] text-white/40 mt-1">
         {state === "needs_review" ? (
           <span className="text-orange-400 flex items-center gap-1.5 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-            Требует проверки ({reviewSource})
+            Проверить{reviewSource ? `: ${reviewSource}` : ""}
           </span>
         ) : null}
         {state === "invalid" ? (
           <span className="text-red-400 flex items-center gap-1.5 font-medium">
             <AlertCircle className="w-3.5 h-3.5" />
-            Несоответствие с PDF
-          </span>
-        ) : null}
-        {excelMap ? (
-          <span className="v19-questionnaire-excel-map">
-            <span className="font-medium text-white/60 tracking-wide text-[var(--v19b-size-10)]">
-              {excelMap}
-            </span>
+            Не совпадает с PDF
           </span>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }
@@ -310,9 +451,13 @@ function fallbackQuestionnaireFormData(
     appointmentCity: "Москва",
     appointmentNote: "",
     birthCountry: "USSR",
+    birthCitizenship: "Russian Federation",
     birthPlace: "MOSCOW",
-    category: "Normal (Нормал)",
-    citizenship: "RUSSIAN FEDERATION",
+    category: "Normal",
+    citizenship: "Russian Federation",
+    companyContactPerson: "",
+    companyOrgDetails: "",
+    companyPhone: "",
     contactAddress: "LENINSKY PROSPECT 10-24",
     contactEmail: "petrov@example.com",
     contactPhone: "+7 921 555-44-33",
@@ -324,9 +469,19 @@ function fallbackQuestionnaireFormData(
     employerAddress: "MOSCOW, TVERSKAYA 7",
     employerContact: "+7 495 000-00-00",
     employerName: "OOO VECTOR",
-    entryCount: "Multiple Entry - Многократный",
-    firstEntryCountry: "SPAIN",
+    entryCount: "Многократная",
+    euRelationship: "Иное",
+    euRelativeDetails: "",
+    firstEntryCountry: "Spain",
     firstName: nameParts.firstName || "IVAN",
+    finalEntryPermit: "",
+    finalEntryPermitIssuedBy: "",
+    finalEntryPermitValidFrom: "",
+    finalEntryPermitValidTo: "",
+    formFillerContact: "",
+    formFillerName: "",
+    formFillerPhone: "",
+    guardianInfo: "",
     hotelAddress: "BARCELONA, CARRER DE MALLORCA 401",
     hotelCity: "BARCELONA",
     hotelContact: "+34 900 111 222",
@@ -334,21 +489,38 @@ function fallbackQuestionnaireFormData(
     hotelEmail: "hotel@example.com",
     hotelName: "HOTEL DIAGONAL",
     hotelPostalCode: "08005",
-    homeCountry: "RUSSIAN FEDERATION",
-    invitingPartyType: "Гостиница/временное жильё",
-    maritalStatus: "Женат / Замужем (Married)",
-    occupation: "OTHER",
+    homeCountry: "Russian Federation",
+    invitingPartyType: "Гостиница/временное жилье",
+    livesOutsideCitizenship: "Нет",
+    mainDestination: "Spain",
+    maritalStatus: "Женат/замужем",
+    nationalId: "",
+    occupation: "IT PROFESSIONAL",
+    otherCitizenship: "",
+    otherSponsor: "",
     passportExpiry: "18.09.2032",
     passportIssued: "18.09.2022",
     passportIssueCountry: "Russian Federation",
     passportIssuePlace: "FMS 770-001",
     passportNumber: "751234567",
-    passportType: "Обычный паспорт (Ordinary passport)",
+    passportType: "Ordinary Passport",
     paymentSponsor: "Сам заявитель",
     paymentType: "Кредитная карта",
-    sex: "Мужской (Male)",
+    previousSurname: "",
+    previousVisaNumber: "",
+    previousBiometrics: "Нет",
+    previousBiometricsDate: "",
+    residenceCity: "MOSCOW",
+    residencePermitNumber: "",
+    residencePermitType: "",
+    residencePermitValidUntil: "",
+    residencePostalCode: "119991",
+    sex: "Мужской",
+    sponsorInHostFields: "Нет",
+    sponsorMeans: "",
     stayDuration: "9",
-    stayPurpose: "Туризм",
+    stayPurposeDetails: "",
+    stayPurpose: "TOURISM",
     stayRoute: "MADRID - BARCELONA",
     surname: nameParts.surname || "PETROV",
     travelEnd: "31.07.2026",
@@ -365,6 +537,19 @@ function submissionFieldValue(
   const value = questionnaireField(applicant, fieldId)?.value.trim();
 
   return value || fallback;
+}
+
+function submissionFieldValueAny(
+  applicant: Submission["applicants"][number] | undefined,
+  fieldIds: string[],
+  fallback: string,
+) {
+  for (const fieldId of fieldIds) {
+    const value = questionnaireField(applicant, fieldId)?.value.trim();
+    if (value) return value;
+  }
+
+  return fallback;
 }
 
 function questionnaireField(
@@ -407,9 +592,29 @@ function questionnaireFormDataFromSubmission(
       fallback.appointmentNote,
     ),
     birthCountry: submissionFieldValue(applicant, "birth-country", fallback.birthCountry),
+    birthCitizenship: submissionFieldValueAny(
+      applicant,
+      ["birth-citizenship", "birth-nationality", "nationality-at-birth"],
+      fallback.birthCitizenship,
+    ),
     birthPlace: submissionFieldValue(applicant, "birth-place", fallback.birthPlace),
     category: submissionFieldValue(applicant, "category", fallback.category),
     citizenship: submissionFieldValue(applicant, "nationality", fallback.citizenship),
+    companyContactPerson: submissionFieldValueAny(
+      applicant,
+      ["company-contact-person", "organization-contact-person"],
+      fallback.companyContactPerson,
+    ),
+    companyOrgDetails: submissionFieldValueAny(
+      applicant,
+      ["company-org-details", "organization-details"],
+      fallback.companyOrgDetails,
+    ),
+    companyPhone: submissionFieldValueAny(
+      applicant,
+      ["company-phone", "organization-phone"],
+      fallback.companyPhone,
+    ),
     contactAddress: submissionFieldValue(
       applicant,
       "home-address",
@@ -458,12 +663,62 @@ function questionnaireFormDataFromSubmission(
       fallback.employerName,
     ),
     entryCount: submissionFieldValue(applicant, "entry-count", fallback.entryCount),
+    euRelationship: submissionFieldValueAny(
+      applicant,
+      ["eu-relationship", "eu-relative-relationship"],
+      fallback.euRelationship,
+    ),
+    euRelativeDetails: submissionFieldValueAny(
+      applicant,
+      ["eu-relative-details", "eu-citizen-relative-details"],
+      fallback.euRelativeDetails,
+    ),
     firstEntryCountry: submissionFieldValue(
       applicant,
       "first-entry-country",
       fallback.firstEntryCountry,
     ),
     firstName: submissionFieldValue(applicant, "first-name", fallback.firstName),
+    finalEntryPermit: submissionFieldValueAny(
+      applicant,
+      ["final-entry-permit", "entry-permit-final-country"],
+      fallback.finalEntryPermit,
+    ),
+    finalEntryPermitIssuedBy: submissionFieldValueAny(
+      applicant,
+      ["final-entry-permit-issued-by", "entry-permit-issued-by"],
+      fallback.finalEntryPermitIssuedBy,
+    ),
+    finalEntryPermitValidFrom: submissionFieldValueAny(
+      applicant,
+      ["final-entry-permit-valid-from", "entry-permit-valid-from"],
+      fallback.finalEntryPermitValidFrom,
+    ),
+    finalEntryPermitValidTo: submissionFieldValueAny(
+      applicant,
+      ["final-entry-permit-valid-to", "entry-permit-valid-to"],
+      fallback.finalEntryPermitValidTo,
+    ),
+    formFillerContact: submissionFieldValueAny(
+      applicant,
+      ["form-filler-contact", "filler-contact"],
+      fallback.formFillerContact,
+    ),
+    formFillerName: submissionFieldValueAny(
+      applicant,
+      ["form-filler-name", "filler-name"],
+      fallback.formFillerName,
+    ),
+    formFillerPhone: submissionFieldValueAny(
+      applicant,
+      ["form-filler-phone", "filler-phone"],
+      fallback.formFillerPhone,
+    ),
+    guardianInfo: submissionFieldValueAny(
+      applicant,
+      ["guardian-info", "minor-guardian"],
+      fallback.guardianInfo,
+    ),
     hotelAddress: submissionFieldValue(applicant, "hotel-address", fallback.hotelAddress),
     hotelCity: submissionFieldValue(applicant, "hotel-city", fallback.hotelCity),
     hotelContact: submissionFieldValue(applicant, "hotel-contact", fallback.hotelContact),
@@ -481,12 +736,33 @@ function questionnaireFormDataFromSubmission(
       "inviting-party-type",
       fallback.invitingPartyType,
     ),
+    livesOutsideCitizenship: submissionFieldValueAny(
+      applicant,
+      ["lives-outside-citizenship", "residence-not-nationality"],
+      fallback.livesOutsideCitizenship,
+    ),
+    mainDestination: submissionFieldValueAny(
+      applicant,
+      ["main-destination", "destination-country"],
+      fallback.mainDestination,
+    ),
     maritalStatus: submissionFieldValue(
       applicant,
       "marital-status",
       fallback.maritalStatus,
     ),
+    nationalId: submissionFieldValueAny(applicant, ["national-id"], fallback.nationalId),
     occupation: submissionFieldValue(applicant, "occupation", fallback.occupation),
+    otherCitizenship: submissionFieldValueAny(
+      applicant,
+      ["other-citizenship", "additional-nationality"],
+      fallback.otherCitizenship,
+    ),
+    otherSponsor: submissionFieldValueAny(
+      applicant,
+      ["other-sponsor", "sponsor-name"],
+      fallback.otherSponsor,
+    ),
     passportExpiry: submissionFieldValue(
       applicant,
       "passport-expiry-date",
@@ -515,8 +791,68 @@ function questionnaireFormDataFromSubmission(
       fallback.paymentSponsor,
     ),
     paymentType: submissionFieldValue(applicant, "means-of-support", fallback.paymentType),
+    previousSurname: submissionFieldValueAny(
+      applicant,
+      ["previous-surname", "surname-at-birth", "maiden-name"],
+      fallback.previousSurname,
+    ),
+    previousVisaNumber: submissionFieldValueAny(
+      applicant,
+      ["previous-visa-number", "visa-number"],
+      fallback.previousVisaNumber,
+    ),
+    previousBiometrics: submissionFieldValueAny(
+      applicant,
+      ["previous-biometrics", "fingerprints-collected"],
+      fallback.previousBiometrics,
+    ),
+    previousBiometricsDate: submissionFieldValueAny(
+      applicant,
+      ["previous-biometrics-date", "fingerprints-date"],
+      fallback.previousBiometricsDate,
+    ),
+    residenceCity: submissionFieldValueAny(
+      applicant,
+      ["residence-city", "home-city"],
+      fallback.residenceCity,
+    ),
+    residencePermitNumber: submissionFieldValueAny(
+      applicant,
+      ["residence-permit-number", "residence-document-number"],
+      fallback.residencePermitNumber,
+    ),
+    residencePermitType: submissionFieldValueAny(
+      applicant,
+      ["residence-permit-type", "residence-document-type"],
+      fallback.residencePermitType,
+    ),
+    residencePermitValidUntil: submissionFieldValueAny(
+      applicant,
+      ["residence-permit-valid-until", "residence-document-valid-until"],
+      fallback.residencePermitValidUntil,
+    ),
+    residencePostalCode: submissionFieldValueAny(
+      applicant,
+      ["residence-postal-code", "postal-code"],
+      fallback.residencePostalCode,
+    ),
     sex: submissionFieldValue(applicant, "gender", fallback.sex),
+    sponsorInHostFields: submissionFieldValueAny(
+      applicant,
+      ["sponsor-in-host-fields", "sponsor-fields-30-31"],
+      fallback.sponsorInHostFields,
+    ),
+    sponsorMeans: submissionFieldValueAny(
+      applicant,
+      ["sponsor-means", "means-of-sponsor-support"],
+      fallback.sponsorMeans,
+    ),
     stayDuration: submissionFieldValue(applicant, "stay-duration", fallback.stayDuration),
+    stayPurposeDetails: submissionFieldValueAny(
+      applicant,
+      ["stay-purpose-details", "purpose-details"],
+      fallback.stayPurposeDetails,
+    ),
     stayPurpose: submissionFieldValue(applicant, "purpose", fallback.stayPurpose),
     stayRoute: submissionFieldValue(applicant, "route", fallback.stayRoute),
     surname: submissionFieldValue(applicant, "surname", fallback.surname),
@@ -592,11 +928,16 @@ function sectionForFocus(
 ): SectionId {
   if (target) return target.sectionId;
   const section = normalizeFocusLabel(focus?.section);
+  if (section.includes("файл") || section.includes("медиа") || section.includes("документ")) return "files";
   if (section.includes("запис")) return "appointment";
   if (section.includes("паспорт")) return "passport";
+  if (section.includes("родствен")) return "euRelative";
   if (section.includes("поезд") || section.includes("маршрут")) return "trip";
   if (section.includes("адрес") || section.includes("контакт")) return "contact";
   if (section.includes("работ")) return "employment";
+  if (section.includes("отел") || section.includes("приглаш")) return "hotel";
+  if (section.includes("оплат")) return "payment";
+  if (section.includes("заполн")) return "filler";
   return "personal";
 }
 
@@ -639,121 +980,153 @@ export function FigmaQuestionnaireScreen({
 
   const selectOptions = useMemo(
     () => ({
-      appointmentCity: submissionFieldOptions(activeApplicantModel, "appointment-city", [
-        "Москва",
-        "Санкт-Петербург",
-        "Казань",
-      ]),
-      birthCountry: submissionFieldOptions(activeApplicantModel, "birth-country", [
-        "Russian Federation",
-        "USSR",
-        "Spain",
-      ]),
-      category: submissionFieldOptions(activeApplicantModel, "category", [
-        "Normal (Нормал)",
-        "Premium",
-        "Family",
-      ]),
-      citizenship: submissionFieldOptions(activeApplicantModel, "nationality", [
-        "Russian Federation",
-        "Spain",
-        "Other",
-      ]),
+      appointmentCity: submissionFieldOptions(
+        activeApplicantModel,
+        "appointment-city",
+        BLS_CITY_OPTIONS,
+      ),
+      birthCountry: submissionFieldOptions(
+        activeApplicantModel,
+        "birth-country",
+        BLS_COUNTRY_OPTIONS,
+      ),
+      birthCitizenship: BLS_COUNTRY_OPTIONS,
+      category: submissionFieldOptions(activeApplicantModel, "category", ["Premium", "Normal"]),
+      citizenship: submissionFieldOptions(
+        activeApplicantModel,
+        "nationality",
+        BLS_COUNTRY_OPTIONS,
+      ),
+      country: BLS_COUNTRY_OPTIONS,
       costCoveredBy: submissionFieldOptions(activeApplicantModel, "cost-covered-by", [
-        "By the applicant - Самим заявителем",
-        "By a Sponsor - Спонсором",
+        "Сам заявитель",
+        "Спонсор",
       ]),
       entryCount: submissionFieldOptions(activeApplicantModel, "entry-count", [
-        "Single Entry - Однократный",
-        "Two Entry - Двукратный",
-        "Multiple Entry - Многократный",
+        "Однократная",
+        "Двукратная",
+        "Многократная",
       ]),
+      euRelationship: [
+        "Супруг(а)",
+        "Ребенок",
+        "Внук/внучка",
+        "Иждивенец по восходящей линии",
+        "Зарегистрированный партнер",
+        "Иное",
+      ],
       gender: submissionFieldOptions(activeApplicantModel, "gender", [
-        "Male - Мужской",
-        "Female - Женский",
+        "Мужской",
+        "Женский",
+        "Другое",
       ]),
-      homeCountry: submissionFieldOptions(activeApplicantModel, "home-country", [
-        "Russian Federation",
-        "Spain",
-        "Other",
-      ]),
-      hotelCountry: submissionFieldOptions(activeApplicantModel, "hotel-country", [
-        "Spain",
-        "France",
-        "Italy",
-        "Other",
-      ]),
+      homeCountry: submissionFieldOptions(
+        activeApplicantModel,
+        "home-country",
+        BLS_COUNTRY_OPTIONS,
+      ),
+      hotelCountry: submissionFieldOptions(
+        activeApplicantModel,
+        "hotel-country",
+        BLS_COUNTRY_OPTIONS,
+      ),
       invitingPartyType: submissionFieldOptions(
         activeApplicantModel,
         "inviting-party-type",
-        ["Гостиница/временное жильё", "Частное лицо", "Компания"],
+        [
+          "Приглашающая компания/организация",
+          "Гостиница/временное жилье",
+          "Приглашающее лицо",
+        ],
       ),
       maritalStatus: submissionFieldOptions(activeApplicantModel, "marital-status", [
-        "Single - Холост/не замужем",
-        "Married - Женат/замужем",
-        "Divorced - Разведен(а)",
+        "Холост/не замужем",
+        "Женат/замужем",
+        "Зарегистрированное партнерство",
+        "Раздельно",
+        "Разведен(а)",
+        "Вдовец/вдова",
+        "Иное",
       ]),
       meansOfSupport: submissionFieldOptions(activeApplicantModel, "means-of-support", [
-        "Cash - Наличные",
-        "Credit card - Кредитная карта",
-        "Prepaid accommodation - Оплаченное жильё",
-        "Other - Другое",
+        "Наличные",
+        "Дорожные чеки",
+        "Кредитная карта",
+        "Жилье предоплачено",
+        "Транспорт предоплачен",
+        "Иное",
       ]),
-      occupation: submissionFieldOptions(activeApplicantModel, "occupation", [
-        "MANAGER",
-        "ENGINEER",
-        "STUDENT",
-        "TEACHER",
-        "SELF EMPLOYED",
-        "OTHER",
-      ]),
+      occupation: submissionFieldOptions(activeApplicantModel, "occupation", BLS_OCCUPATION_OPTIONS),
+      otherCitizenship: BLS_COUNTRY_OPTIONS,
       passportIssueCountry: submissionFieldOptions(
         activeApplicantModel,
         "passport-issue-country",
-        ["Russian Federation", "Spain", "Other"],
+        BLS_COUNTRY_OPTIONS,
       ),
       passportType: submissionFieldOptions(activeApplicantModel, "passport-type", [
         "Ordinary Passport",
         "Diplomatic Passport",
         "Service Passport",
         "Official Passport",
+        "Special Passport",
         "Travel Document",
+        "Other",
       ]),
       purpose: submissionFieldOptions(activeApplicantModel, "purpose", [
         "TOURISM",
         "BUSINESS",
-        "VISIT FAMILY OR FRIENDS",
+        "VISITING FAMILY OR FRIENDS",
+        "STUDY",
+        "MEDICAL TREATMENT",
+        "OFFICIAL VISIT",
+        "CULTURAL",
+        "SPORTS",
+        "TRANSIT",
         "OTHER",
       ]),
+      sponsorInHostFields: YES_NO_OPTIONS,
+      sponsorMeans: [
+        "Наличные",
+        "Жилье предоставляется",
+        "Все расходы оплачиваются",
+        "Транспорт предоплачен",
+        "Иное",
+      ],
       visaType: submissionFieldOptions(activeApplicantModel, "visa-type", [
-        "Шенгенская",
         "Национальная",
+        "Шенгенская",
       ]),
+      yesNo: YES_NO_OPTIONS,
     }),
     [activeApplicantModel],
   );
 
   const sections: Array<SectionTab & { id: SectionId }> = [
+    { id: "files", meta: "3 файла", status: "complete", title: "Файлы" },
     { id: "appointment", meta: "7 полей", status: "pending", title: "Запись" },
-    { id: "personal", meta: "11 полей", status: "issue", title: "Личные данные" },
+    { id: "personal", meta: "13 полей", status: "issue", title: "Личные данные" },
     { id: "passport", meta: "6 полей", status: "complete", title: "Паспорт" },
+    { id: "euRelative", meta: "2 поля", status: "pending", title: "Родственник ЕС" },
     { id: "contact", meta: "10 полей", status: "complete", title: "Адрес и контакты" },
-    { id: "employment", meta: "4 поля", status: "pending", title: "Работа / учеба" },
-    { id: "trip", meta: "Shared", status: "complete", title: "Поездка" },
-    { id: "hotel", meta: "Shared", status: "complete", title: "Отель / Приглашение" },
-    { id: "payment", meta: "Shared", status: "complete", title: "Оплата поездки" },
+    { id: "employment", meta: "5 полей", status: "pending", title: "Работа / учеба" },
+    { id: "trip", meta: "15 полей", status: "complete", title: "Поездка" },
+    { id: "hotel", meta: "8 полей", status: "complete", title: "Отель / приглашение" },
+    { id: "payment", meta: "5 полей", status: "complete", title: "Оплата поездки" },
+    { id: "filler", meta: "3 поля", status: "pending", title: "Кто заполнил" },
   ];
 
   const sectionDescriptions: Record<SectionId, string> = {
-    appointment: "Проверьте город подачи, тип визы, категорию и желаемые даты записи.",
-    contact: "Проверьте адрес проживания, телефон и email для связи по заявке.",
-    employment: "Укажите текущую занятость и данные работодателя или учебного заведения.",
-    hotel: "Сверьте размещение, приглашение и адрес принимающей стороны.",
-    passport: "Сверьте номер паспорта, тип документа, даты выдачи и срок действия.",
-    payment: "Проверьте, кто оплачивает поездку и какие подтверждения приложены.",
-    personal:
-      "Убедитесь, что все данные в точности совпадают с паспортом. Особое внимание обратите на транслитерацию.",
-    trip: "Проверьте маршрут, даты, цель поездки и страну первого въезда.",
+    appointment: "Город, тип визы, категория и даты.",
+    contact: "Адрес, email и телефон.",
+    euRelative: "Данные родственника из ЕС/ЕЭЗ.",
+    employment: "Работа, учеба и контакты.",
+    files: "Три обязательных файла BLS.",
+    filler: "Кто заполнял анкету.",
+    hotel: "Отель или приглашение.",
+    passport: "Документ, номер и сроки.",
+    payment: "Оплата и спонсор.",
+    personal: "Данные как в паспорте.",
+    trip: "Цель, страны, даты и биометрия.",
   };
 
   function updateField(key: keyof typeof formData, value: string) {
@@ -790,6 +1163,40 @@ export function FigmaQuestionnaireScreen({
       : undefined;
 
   function renderSectionFields() {
+    if (activeSection === "files") {
+      return (
+        <>
+          <FormField
+            excelMap="BLS files: passport-main-page"
+            fullWidth
+            label="Загранпаспорт"
+            number="F1"
+            readOnly
+            required
+            value="Скан или фото главной страницы с фото"
+          />
+          <FormField
+            excelMap="BLS files: selfie-front"
+            fullWidth
+            label="Селфи 1"
+            number="F2"
+            readOnly
+            required
+            value="Лицом / анфас"
+          />
+          <FormField
+            excelMap="BLS files: selfie-profile"
+            fullWidth
+            label="Селфи 2"
+            number="F3"
+            readOnly
+            required
+            value="Боком / профиль"
+          />
+        </>
+      );
+    }
+
     if (activeSection === "appointment") {
       return (
         <>
@@ -881,7 +1288,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: C4"
             focused={fieldReviewState("Дата выдачи") === "needs_review"}
             label="Дата выдачи"
-            number="14"
+            number="3"
             required
             reviewSource={fieldReviewSource("Дата выдачи")}
             state={fieldReviewState("Дата выдачи")}
@@ -892,7 +1299,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: C5"
             focused={fieldReviewState("Действителен до") === "needs_review"}
             label="Действителен до"
-            number="15"
+            number="4"
             required
             reviewSource={fieldReviewSource("Действителен до")}
             state={fieldReviewState("Действителен до")}
@@ -900,19 +1307,43 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("passportExpiry", value)}
           />
           <FormField
-            excelMap="Cell: C6"
-            label="Кем выдан"
-            number="16"
-            value={formData.passportIssuePlace}
-            onChange={(value) => updateField("passportIssuePlace", value)}
-          />
-          <FormField
             excelMap="Анкета: passport-issue-country"
             label="Страна выдачи паспорта"
-            number="17"
+            number="5"
             options={selectOptions.passportIssueCountry}
             value={formData.passportIssueCountry}
             onChange={(value) => updateField("passportIssueCountry", value)}
+          />
+          <FormField
+            excelMap="Cell: C6"
+            label="Место выдачи"
+            number="6"
+            value={formData.passportIssuePlace}
+            onChange={(value) => updateField("passportIssuePlace", value)}
+          />
+        </>
+      );
+    }
+
+    if (activeSection === "euRelative") {
+      return (
+        <>
+          <FormField
+            excelMap="Анкета: eu-relative-details"
+            fullWidth
+            label="Родственник ЕС / ЕЭЗ"
+            number="1"
+            type="textarea"
+            value={formData.euRelativeDetails}
+            onChange={(value) => updateField("euRelativeDetails", value)}
+          />
+          <FormField
+            excelMap="Анкета: eu-relationship"
+            label="Родственная связь"
+            number="2"
+            options={selectOptions.euRelationship}
+            value={formData.euRelationship}
+            onChange={(value) => updateField("euRelationship", value)}
           />
         </>
       );
@@ -925,33 +1356,78 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: D2"
             fullWidth
             label="Домашний адрес"
-            number="17"
+            number="1"
             required
+            type="textarea"
             value={formData.contactAddress}
             onChange={(value) => updateField("contactAddress", value)}
           />
           <FormField
+            excelMap="Cell: D4"
+            label="Email"
+            number="2"
+            required
+            type="email"
+            value={formData.contactEmail}
+            onChange={(value) => updateField("contactEmail", value)}
+          />
+          <FormField
             excelMap="Cell: D3"
             label="Телефон"
-            number="18"
+            number="3"
             required
             value={formData.contactPhone}
             onChange={(value) => updateField("contactPhone", value)}
           />
           <FormField
-            excelMap="Cell: D4"
-            label="Email"
-            number="19"
-            required
-            value={formData.contactEmail}
-            onChange={(value) => updateField("contactEmail", value)}
-          />
-          <FormField
             label="Страна проживания"
-            number="20"
+            number="4"
             options={selectOptions.homeCountry}
             value={formData.homeCountry}
             onChange={(value) => updateField("homeCountry", value)}
+          />
+          <FormField
+            excelMap="Анкета: residence-city"
+            label="Город проживания"
+            number="5"
+            value={formData.residenceCity}
+            onChange={(value) => updateField("residenceCity", value)}
+          />
+          <FormField
+            excelMap="Анкета: residence-postal-code"
+            label="Почтовый индекс"
+            number="6"
+            value={formData.residencePostalCode}
+            onChange={(value) => updateField("residencePostalCode", value)}
+          />
+          <FormField
+            excelMap="Анкета: lives-outside-citizenship"
+            label="Живет не в стране гражданства"
+            number="7"
+            options={selectOptions.yesNo}
+            value={formData.livesOutsideCitizenship}
+            onChange={(value) => updateField("livesOutsideCitizenship", value)}
+          />
+          <FormField
+            excelMap="Анкета: residence-permit-type"
+            label="ВНЖ / документ"
+            number="8"
+            value={formData.residencePermitType}
+            onChange={(value) => updateField("residencePermitType", value)}
+          />
+          <FormField
+            excelMap="Анкета: residence-permit-number"
+            label="Номер документа"
+            number="9"
+            value={formData.residencePermitNumber}
+            onChange={(value) => updateField("residencePermitNumber", value)}
+          />
+          <FormField
+            excelMap="Анкета: residence-permit-valid-until"
+            label="Действителен до"
+            number="10"
+            value={formData.residencePermitValidUntil}
+            onChange={(value) => updateField("residencePermitValidUntil", value)}
           />
         </>
       );
@@ -963,7 +1439,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: E2"
             label="Профессия"
-            number="21"
+            number="1"
             options={selectOptions.occupation}
             required
             reviewSource="employment_doc"
@@ -974,22 +1450,24 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: occupation-specify"
             label="Уточнение профессии"
-            number="22"
+            number="2"
             value={formData.currentJob}
             onChange={(value) => updateField("currentJob", value)}
           />
           <FormField
             excelMap="Cell: E3"
-            label="Работодатель / учебное заведение"
-            number="23"
+            fullWidth
+            label="Работа / учеба"
+            number="3"
             required
+            type="textarea"
             value={formData.employerName}
             onChange={(value) => updateField("employerName", value)}
           />
           <FormField
             excelMap="Анкета: employer-contact"
             label="Телефон работодателя"
-            number="24"
+            number="4"
             value={formData.employerContact}
             onChange={(value) => updateField("employerContact", value)}
           />
@@ -997,7 +1475,8 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: E4"
             fullWidth
             label="Адрес работодателя"
-            number="25"
+            number="5"
+            type="textarea"
             value={formData.employerAddress}
             onChange={(value) => updateField("employerAddress", value)}
           />
@@ -1010,24 +1489,42 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: F2"
-            label="Основная цель поездки"
-            number="24"
+            label="Цель поездки"
+            number="1"
             options={selectOptions.purpose}
             required
             value={formData.stayPurpose}
             onChange={(value) => updateField("stayPurpose", value)}
           />
           <FormField
-            excelMap="Анкета: stay-duration"
-            label="Длительность, дней"
-            number="24.1"
-            value={formData.stayDuration}
-            onChange={(value) => updateField("stayDuration", value)}
+            excelMap="Анкета: stay-purpose-details"
+            fullWidth
+            label="Уточнение цели"
+            number="2"
+            type="textarea"
+            value={formData.stayPurposeDetails}
+            onChange={(value) => updateField("stayPurposeDetails", value)}
+          />
+          <FormField
+            excelMap="Анкета: main-destination"
+            label="Страна назначения"
+            number="3"
+            options={selectOptions.country}
+            value={formData.mainDestination}
+            onChange={(value) => updateField("mainDestination", value)}
+          />
+          <FormField
+            excelMap="Cell: F5"
+            label="Страна первого въезда"
+            number="4"
+            options={selectOptions.country}
+            value={formData.firstEntryCountry}
+            onChange={(value) => updateField("firstEntryCountry", value)}
           />
           <FormField
             excelMap="Анкета: entry-count"
             label="Количество въездов"
-            number="24.2"
+            number="5"
             options={selectOptions.entryCount}
             value={formData.entryCount}
             onChange={(value) => updateField("entryCount", value)}
@@ -1036,7 +1533,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: F3"
             focused={fieldReviewState("Дата въезда") === "needs_review"}
             label="Дата въезда"
-            number="25"
+            number="6"
             required
             reviewSource={fieldReviewSource("Дата въезда")}
             state={fieldReviewState("Дата въезда")}
@@ -1047,7 +1544,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: F4"
             focused={fieldReviewState("Дата выезда") === "needs_review"}
             label="Дата выезда"
-            number="26"
+            number="7"
             required
             reviewSource={fieldReviewSource("Дата выезда")}
             state={fieldReviewState("Дата выезда")}
@@ -1055,22 +1552,62 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("travelEnd", value)}
           />
           <FormField
-            excelMap="Cell: F5"
-            label="Страна первого въезда"
-            number="27"
-            options={selectOptions.hotelCountry}
-            value={formData.firstEntryCountry}
-            onChange={(value) => updateField("firstEntryCountry", value)}
+            excelMap="Анкета: stay-duration"
+            label="Длительность пребывания"
+            number="8"
+            type="number"
+            value={formData.stayDuration}
+            onChange={(value) => updateField("stayDuration", value)}
           />
           <FormField
-            focused={fieldReviewState("Маршрут поездки") === "needs_review"}
-            fullWidth
-            label="Маршрут поездки"
-            number="28"
-            reviewSource={fieldReviewSource("Маршрут поездки")}
-            state={fieldReviewState("Маршрут поездки")}
-            value={formData.stayRoute}
-            onChange={(value) => updateField("stayRoute", value)}
+            excelMap="Анкета: previous-biometrics"
+            label="Биометрия уже сдавалась"
+            number="9"
+            options={selectOptions.yesNo}
+            value={formData.previousBiometrics}
+            onChange={(value) => updateField("previousBiometrics", value)}
+          />
+          <FormField
+            excelMap="Анкета: previous-biometrics-date"
+            label="Дата биометрии"
+            number="10"
+            value={formData.previousBiometricsDate}
+            onChange={(value) => updateField("previousBiometricsDate", value)}
+          />
+          <FormField
+            excelMap="Анкета: previous-visa-number"
+            label="Номер визы"
+            number="11"
+            value={formData.previousVisaNumber}
+            onChange={(value) => updateField("previousVisaNumber", value)}
+          />
+          <FormField
+            excelMap="Анкета: final-entry-permit"
+            label="Разрешение на въезд"
+            number="12"
+            value={formData.finalEntryPermit}
+            onChange={(value) => updateField("finalEntryPermit", value)}
+          />
+          <FormField
+            excelMap="Анкета: final-entry-permit-issued-by"
+            label="Кем выдано"
+            number="13"
+            value={formData.finalEntryPermitIssuedBy}
+            onChange={(value) => updateField("finalEntryPermitIssuedBy", value)}
+          />
+          <FormField
+            excelMap="Анкета: final-entry-permit-valid-from"
+            label="Действительно с"
+            number="14"
+            value={formData.finalEntryPermitValidFrom}
+            onChange={(value) => updateField("finalEntryPermitValidFrom", value)}
+          />
+          <FormField
+            excelMap="Анкета: final-entry-permit-valid-to"
+            label="Действительно до"
+            number="15"
+            value={formData.finalEntryPermitValidTo}
+            onChange={(value) => updateField("finalEntryPermitValidTo", value)}
           />
         </>
       );
@@ -1082,62 +1619,67 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: inviting-party-type"
             fullWidth
-            label="Тип принимающей стороны"
-            number="28.1"
+            label="Принимающая сторона"
+            number="1"
             options={selectOptions.invitingPartyType}
             value={formData.invitingPartyType}
             onChange={(value) => updateField("invitingPartyType", value)}
           />
           <FormField
             excelMap="Cell: G2"
-            label="Название отеля / приглашающая сторона"
-            number="29"
+            label="Отель / приглашающий"
+            number="2"
             required
             value={formData.hotelName}
             onChange={(value) => updateField("hotelName", value)}
           />
           <FormField
-            excelMap="Анкета: hotel-country"
-            label="Страна отеля"
-            number="29.1"
-            options={selectOptions.hotelCountry}
-            value={formData.hotelCountry}
-            onChange={(value) => updateField("hotelCountry", value)}
-          />
-          <FormField
-            excelMap="Анкета: hotel-city"
-            label="Город отеля"
-            number="29.2"
-            value={formData.hotelCity}
-            onChange={(value) => updateField("hotelCity", value)}
-          />
-          <FormField
-            excelMap="Анкета: hotel-postal-code"
-            label="Почтовый индекс отеля"
-            number="29.3"
-            value={formData.hotelPostalCode}
-            onChange={(value) => updateField("hotelPostalCode", value)}
-          />
-          <FormField
             excelMap="Cell: G3"
             fullWidth
-            label="Адрес размещения"
-            number="30"
+            label="Адрес"
+            number="3"
             required
+            type="textarea"
             value={formData.hotelAddress}
             onChange={(value) => updateField("hotelAddress", value)}
           />
           <FormField
-            label="Email отеля / приглашающей стороны"
-            number="30.1"
+            label="Email"
+            number="4"
+            type="email"
             value={formData.hotelEmail}
             onChange={(value) => updateField("hotelEmail", value)}
           />
           <FormField
-            label="Телефон отеля / приглашающей стороны"
-            number="31"
+            label="Телефон"
+            number="5"
             value={formData.hotelContact}
             onChange={(value) => updateField("hotelContact", value)}
+          />
+          <FormField
+            excelMap="Анкета: company-org-details"
+            fullWidth
+            label="Компания и адрес"
+            number="6"
+            type="textarea"
+            value={formData.companyOrgDetails}
+            onChange={(value) => updateField("companyOrgDetails", value)}
+          />
+          <FormField
+            excelMap="Анкета: company-contact-person"
+            fullWidth
+            label="Контакт компании"
+            number="7"
+            type="textarea"
+            value={formData.companyContactPerson}
+            onChange={(value) => updateField("companyContactPerson", value)}
+          />
+          <FormField
+            excelMap="Анкета: company-phone"
+            label="Телефон компании"
+            number="8"
+            value={formData.companyPhone}
+            onChange={(value) => updateField("companyPhone", value)}
           />
         </>
       );
@@ -1148,8 +1690,8 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: H2"
-            label="Кто оплачивает поездку"
-            number="32"
+            label="Кто оплачивает"
+            number="1"
             options={selectOptions.costCoveredBy}
             required
             value={formData.paymentSponsor}
@@ -1157,24 +1699,73 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Cell: H3"
-            label="Средство оплаты"
-            number="33"
+            label="Средства заявителя"
+            number="2"
             options={selectOptions.meansOfSupport}
             required
             value={formData.paymentType}
             onChange={(value) => updateField("paymentType", value)}
           />
           <FormField
+            excelMap="Анкета: sponsor-in-host-fields"
+            label="Спонсор из 30/31"
+            number="3"
+            options={selectOptions.sponsorInHostFields}
+            value={formData.sponsorInHostFields}
+            onChange={(value) => updateField("sponsorInHostFields", value)}
+          />
+          <FormField
+            excelMap="Анкета: other-sponsor"
+            label="Другой спонсор"
+            number="4"
+            value={formData.otherSponsor}
+            onChange={(value) => updateField("otherSponsor", value)}
+          />
+          <FormField
+            excelMap="Анкета: sponsor-means"
             fullWidth
-            label="Подтверждающие документы"
-            number="34"
-            value="Bank statement, booking confirmation"
+            label="Средства спонсора"
+            number="5"
+            options={selectOptions.sponsorMeans}
+            value={formData.sponsorMeans}
+            onChange={(value) => updateField("sponsorMeans", value)}
           />
         </>
       );
     }
 
-    return (
+    if (activeSection === "filler") {
+      return (
+        <>
+          <FormField
+            excelMap="Анкета: form-filler-name"
+            label="Кто заполнил"
+            number="1"
+            value={formData.formFillerName}
+            onChange={(value) => updateField("formFillerName", value)}
+          />
+          <FormField
+            excelMap="Анкета: form-filler-contact"
+            fullWidth
+            label="Адрес или email"
+            number="2"
+            type="textarea"
+            value={formData.formFillerContact}
+            onChange={(value) => updateField("formFillerContact", value)}
+          />
+          <FormField
+            excelMap="Анкета: form-filler-phone"
+            label="Телефон заполнившего"
+            number="3"
+            value={formData.formFillerPhone}
+            onChange={(value) => updateField("formFillerPhone", value)}
+          />
+        </>
+      );
+    }
+
+    if (activeSection === "personal") {
+      return (
       <>
         <FormField
           excelMap="Cell: B2"
@@ -1184,7 +1775,13 @@ export function FigmaQuestionnaireScreen({
           value={formData.surname}
           onChange={(value) => updateField("surname", value)}
         />
-        <FormField label="Фамилия при рождении / предыдущая" number="2" value="" />
+        <FormField
+          excelMap="Анкета: previous-surname"
+          label="Прежняя фамилия"
+          number="2"
+          value={formData.previousSurname}
+          onChange={(value) => updateField("previousSurname", value)}
+        />
         <FormField
           excelMap="Cell: B3"
           label="Имя"
@@ -1231,9 +1828,25 @@ export function FigmaQuestionnaireScreen({
           onChange={(value) => updateField("citizenship", value)}
         />
         <FormField
+          excelMap="Анкета: birth-citizenship"
+          label="Гражданство при рождении"
+          number="8"
+          options={selectOptions.birthCitizenship}
+          value={formData.birthCitizenship}
+          onChange={(value) => updateField("birthCitizenship", value)}
+        />
+        <FormField
+          excelMap="Анкета: other-citizenship"
+          label="Иное гражданство"
+          number="9"
+          options={selectOptions.otherCitizenship}
+          value={formData.otherCitizenship}
+          onChange={(value) => updateField("otherCitizenship", value)}
+        />
+        <FormField
           excelMap="Cell: B8"
           label="Пол"
-          number="8"
+          number="10"
           options={selectOptions.gender}
           required
           value={formData.sex}
@@ -1243,14 +1856,33 @@ export function FigmaQuestionnaireScreen({
           excelMap="Cell: B9"
           fullWidth
           label="Семейное положение"
-          number="9"
+          number="11"
           options={selectOptions.maritalStatus}
           required
           value={formData.maritalStatus}
           onChange={(value) => updateField("maritalStatus", value)}
         />
+        <FormField
+          excelMap="Анкета: guardian-info"
+          fullWidth
+          label="Родитель / опекун"
+          number="12"
+          type="textarea"
+          value={formData.guardianInfo}
+          onChange={(value) => updateField("guardianInfo", value)}
+        />
+        <FormField
+          excelMap="Анкета: national-id"
+          label="Национальный ID"
+          number="13"
+          value={formData.nationalId}
+          onChange={(value) => updateField("nationalId", value)}
+        />
       </>
-    );
+      );
+    }
+
+    return null;
   }
 
   return (
@@ -1423,14 +2055,11 @@ export function FigmaQuestionnaireScreen({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
-                      Несоответствие даты рождения
+                      Дата рождения не совпадает
                     </div>
                     <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
-                      В загруженном приложении PDF дата рождения{" "}
-                      <strong className="text-white/90 font-medium">15.05.1985</strong>,
-                      а в анкете указано{" "}
-                      <strong className="text-white/90 font-medium">12.05.1985</strong>.
-                      Подтвердите правильное значение.
+                      PDF: <strong className="text-white/90 font-medium">15.05.1985</strong>.
+                      Анкета: <strong className="text-white/90 font-medium">12.05.1985</strong>.
                     </p>
                   </div>
                 </div>

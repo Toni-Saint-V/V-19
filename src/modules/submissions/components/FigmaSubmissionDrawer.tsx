@@ -31,14 +31,11 @@ import {
   type V19DrawerTab,
 } from "../../../shared/ui/v19-design-system";
 import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
-import { AiHelperSurfacePanel } from "./AiHelperSurfacePanel";
-import { AiReadinessQueuePanel } from "./AiReadinessQueuePanel";
 import {
   targetElementId,
   tabForTarget,
   type WorkspaceTarget,
 } from "../workspaceModel";
-import type { SubmissionNextStepAction } from "../submissionNextStepEngine";
 import type {
   DrawerTab,
   Role,
@@ -321,29 +318,16 @@ function documentPackageItems(submission: Submission) {
 
 const OverviewTab = ({
   data,
-  onPrimaryAction,
-  role,
   submission,
-  surface,
 }: {
   data: FigmaSubmissionDetail;
-  onPrimaryAction: (action: SubmissionNextStepAction) => void;
-  role: Role;
   submission: Submission;
-  surface: "agent" | "review" | "export";
 }) => {
   const documentItems = documentPackageItems(submission);
   const readyFilesCount = submission.files.filter(isFileReady).length;
 
   return (
     <div className="space-y-6">
-      <AiHelperSurfacePanel
-        role={role}
-        submission={submission}
-        surface={surface}
-        onPrimaryAction={onPrimaryAction}
-      />
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors">
           <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider mb-5">
@@ -374,7 +358,7 @@ const OverviewTab = ({
             <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider">
               Пакет документов
             </h3>
-            <span className="text-[var(--v19b-size-11)] font-mono text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md">
+            <span className="v19-drawer-package-count">
               {readyFilesCount}/{submission.files.length}
             </span>
           </div>
@@ -382,7 +366,7 @@ const OverviewTab = ({
             {documentItems.map((doc) => (
               <div key={doc.label} className="flex items-center gap-3">
                 {doc.status === "done" ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <CheckCircle2 className="v19-drawer-package-check" />
                 ) : doc.status === "in_progress" ? (
                   <div className="v19-document-package-dot is-progress" />
                 ) : (
@@ -401,37 +385,39 @@ const OverviewTab = ({
         </div>
       </div>
 
-    <div className="space-y-3">
-      <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider pl-1">
-        Участники ({data.applicantsCount})
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {data.applicants.map((applicant, index) => (
-          <div
-            key={`${applicant.name}-${index}`}
-            className="flex items-center p-3 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-xl transition-all group"
-          >
-            <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[var(--v19b-color-control-hover)] to-[var(--v19b-color-panel-strong)] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
-              {applicant.name
-                .split(" ")
-                .map((part) => part[0])
-                .join("")}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[var(--v19b-size-14)] text-white font-medium truncate group-hover:text-[var(--v19b-color-primary-text)] transition-colors">
-                {applicant.name}
+      <div className="space-y-3">
+        <h3 className="text-[var(--v19b-size-11)] font-medium text-white/40 uppercase tracking-wider pl-1">
+          Участники ({data.applicantsCount})
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {data.applicants.map((applicant, index) => (
+            <div
+              key={`${applicant.name}-${index}`}
+              className="flex items-center p-3 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-xl transition-all group"
+            >
+              <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-[var(--v19b-color-control-hover)] to-[var(--v19b-color-panel-strong)] border border-white/10 flex items-center justify-center text-xs font-semibold text-white/70 shadow-inner mr-3">
+                {applicant.name
+                  .split(" ")
+                  .map((part) => part[0])
+                  .join("")}
               </div>
-              <div className="text-[var(--v19b-size-11)] text-white/50 mt-0.5">{applicant.role}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-[var(--v19b-size-12)] font-mono font-medium text-emerald-400">
-                {applicant.completeness}%
+              <div className="flex-1 min-w-0">
+                <div className="text-[var(--v19b-size-14)] text-white font-medium truncate group-hover:text-[var(--v19b-color-primary-text)] transition-colors">
+                  {applicant.name}
+                </div>
+                <div className="text-[var(--v19b-size-11)] text-white/50 mt-0.5">
+                  {applicant.role}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="v19-drawer-applicant-score">
+                  {applicant.completeness}%
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
     </div>
   );
 };
@@ -692,22 +678,25 @@ const IssuesTab = ({
   data,
   onMarkIssueFixed,
   onOpenQuestionnaire,
-  onOpenTarget,
   role,
   submission,
 }: {
   data: FigmaSubmissionDetail;
   onMarkIssueFixed?: (issueId: string) => void;
   onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
-  onOpenTarget: (target: WorkspaceTarget) => void;
   role: Role;
   submission: Submission;
 }) => (
-  <div className="space-y-6">
-    <AiReadinessQueuePanel submission={submission} onOpenTarget={onOpenTarget} />
-    <h3 className="text-[var(--v19b-size-16)] font-semibold text-white">Замечания</h3>
+  <div className="v19-drawer-issues">
+    <div className="v19-drawer-issues-head">
+      <div>
+        <h3>Список задач по замечаниям</h3>
+        <p>Ошибки, выявленные администратором при проверке</p>
+      </div>
+      <span>Требуют исправления: {data.issuesCount}</span>
+    </div>
     {data.issuesCount > 0 ? (
-      <div className="space-y-3">
+      <div className="v19-drawer-issues-list">
         {submission.issues
           .filter((issue) => issue.status !== "closed_by_admin")
           .map((issue) => {
@@ -719,66 +708,62 @@ const IssuesTab = ({
             <div
               id={targetElementId({ issueId: issue.id, tab: "issues" })}
               key={issue.id}
-              className="relative p-4 bg-white/[0.02] border border-orange-500/15 rounded-xl hover:bg-orange-500/[0.03] transition-colors"
+              className="v19-drawer-issue-card"
             >
-              <span className="absolute right-4 top-4 px-1.5 py-0.5 rounded-md text-[var(--v19b-size-10)] bg-orange-500/10 text-orange-400 font-medium border border-orange-500/20">
-                {issue.status === "fixed_by_agent" ? "Исправлено" : "Blocker"}
-              </span>
-              <div className="grid grid-cols-[40px_minmax(0,1fr)] gap-x-3 gap-y-3 pr-20">
-                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20 row-span-2">
-                  <Icon className="w-5 h-5 text-orange-400" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-[var(--v19b-size-14)] font-semibold text-white">
-                    {issue.reason}
-                  </h4>
-                  <div className="text-[var(--v19b-size-11)] font-medium text-orange-400/70 mt-1.5">
-                    {issueTargetLine(issue)}
-                  </div>
-                </div>
-                <p className="col-start-2 text-[var(--v19b-size-13)] text-white/50 leading-relaxed">
-                  {issue.comment}
-                </p>
+              <span className="v19-drawer-issue-accent" aria-hidden="true" />
+              <div className="v19-drawer-issue-icon">
+                <Icon className="w-5 h-5" />
               </div>
-              {issue.type === "field" && issue.status === "open" ? (
-                <button
-                  className="mt-4 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[var(--v19b-size-13)] font-medium text-white/80 hover:text-white transition-colors"
-                  type="button"
-                  onClick={() =>
-                    onOpenQuestionnaire({
-                      applicantId: issue.target.applicantId,
-                      field: issue.target.field,
-                      section: issue.target.section,
-                    })
-                  }
-                >
-                  Исправить
-                </button>
-              ) : null}
-              {canMarkFixed ? (
-                <button
-                  className="mt-2 w-full h-9 px-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-lg text-[var(--v19b-size-13)] font-medium text-white/80 hover:text-white transition-colors"
-                  type="button"
-                  onClick={() => onMarkIssueFixed?.(issue.id)}
-                >
-                  Отметить исправленным
-                </button>
-              ) : null}
+              <div className="v19-drawer-issue-copy">
+                <div className="v19-drawer-issue-title-row">
+                  <h4>{issue.reason}</h4>
+                  <span>{issue.status === "fixed_by_agent" ? "Исправлено" : "Blocker"}</span>
+                </div>
+                <div className="v19-drawer-issue-target">
+                  {issueTargetLine(issue)}
+                </div>
+                <p>{issue.comment}</p>
+              </div>
+              <div className="v19-drawer-issue-actions">
+                {issue.type === "field" && issue.status === "open" ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenQuestionnaire({
+                        applicantId: issue.target.applicantId,
+                        field: issue.target.field,
+                        section: issue.target.section,
+                      })
+                    }
+                  >
+                    Исправить в анкете
+                  </button>
+                ) : null}
+                {canMarkFixed ? (
+                  <button
+                    type="button"
+                    onClick={() => onMarkIssueFixed?.(issue.id)}
+                  >
+                    Отметить исправленным
+                  </button>
+                ) : null}
+                {!canMarkFixed && !(issue.type === "field" && issue.status === "open") ? (
+                  <span className="v19-drawer-issue-state">
+                    {issue.status === "fixed_by_agent" ? "Ждет проверки" : "Документ"}
+                  </span>
+                ) : null}
+              </div>
             </div>
           );
         })}
       </div>
     ) : (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/20">
-          <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+      <div className="v19-drawer-issues-empty">
+        <div>
+          <CheckCircle2 className="w-8 h-8" />
         </div>
-        <h4 className="text-[var(--v19b-size-16)] font-semibold text-white mb-2">
-          Ошибок не найдено
-        </h4>
-        <p className="text-[var(--v19b-size-13)] text-white/50 max-w-sm">
-          Все данные проверены администратором. Замечаний к анкете и документам нет.
-        </p>
+        <h4>Ошибок не найдено</h4>
+        <p>Все данные проверены администратором. Замечаний к анкете и документам нет.</p>
       </div>
     )}
   </div>
@@ -926,17 +911,6 @@ export function FigmaSubmissionDrawer({
 
     setTab(tabIdForWorkspaceTarget(target));
   }, [onOpenQuestionnaireWorkspace, role]);
-
-  function handleAiPrimaryAction(action: SubmissionNextStepAction) {
-    if (action.disabled) return;
-
-    if (action.target) {
-      openWorkspaceTarget(action.target);
-      return;
-    }
-
-    if (action.submissionAction) onAction(action.submissionAction);
-  }
 
   useEffect(() => {
     previouslyFocusedElementRef.current =
@@ -1139,11 +1113,13 @@ export function FigmaSubmissionDrawer({
               activeTab={tab}
               layoutId="drawerAgentActiveTab"
               meta={[data.id, data.type === "family" ? "семейная" : "индивидуальная"]}
+              onClose={onClose}
               onTab={setTab}
               status={compactStatusLabel(data.status)}
               tabs={drawerTabs}
               tabsRef={drawerTabsRef}
               title={data.title}
+              updated={data.updated}
             />
             <div className="v19-submission-drawer-body flex-1 min-h-0 overflow-y-auto p-5 lg:p-8 scrollbar-thin scrollbar-thumb-white/10">
               <AnimatePresence mode="wait">
@@ -1157,10 +1133,7 @@ export function FigmaSubmissionDrawer({
                   {tab === "overview" ? (
                     <OverviewTab
                       data={data}
-                      role={role}
                       submission={submission}
-                      surface={surface}
-                      onPrimaryAction={handleAiPrimaryAction}
                     />
                   ) : null}
                   {tab === "questionnaire" ? (
@@ -1179,7 +1152,6 @@ export function FigmaSubmissionDrawer({
                       data={data}
                       onMarkIssueFixed={onMarkIssueFixed}
                       onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
-                      onOpenTarget={openWorkspaceTarget}
                       role={role}
                       submission={submission}
                     />
@@ -1200,7 +1172,7 @@ export function FigmaSubmissionDrawer({
                   type="button"
                   onClick={onClose}
                 >
-                  Закрыть
+                  Отмена
                 </button>
                 {footerAction}
               </div>
