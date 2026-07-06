@@ -1,0 +1,1357 @@
+{
+  "baseUrl": "http://127.0.0.1:5179/",
+  "generatedAt": "2026-07-06T17:44:39.344Z",
+  "viewports": [
+    {
+      "viewport": {
+        "name": "desktop",
+        "width": 1440,
+        "height": 900
+      },
+      "errors": [],
+      "states": [
+        {
+          "slug": "overview",
+          "activeTab": "Обзор",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 257,
+            "top": 171,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": true
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-overview.png"
+        },
+        {
+          "slug": "applicants",
+          "activeTab": "Заявители1",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 170,
+            "top": 171,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": true
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-applicants.png"
+        },
+        {
+          "slug": "questionnaire",
+          "activeTab": "Анкета51",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 4758,
+            "top": 320,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": true
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-questionnaire.png"
+        },
+        {
+          "slug": "files",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 484,
+            "top": 171,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-files.png"
+        },
+        {
+          "slug": "issues",
+          "activeTab": "Замечания0",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 179,
+            "top": 171,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": true
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-issues.png"
+        },
+        {
+          "slug": "history",
+          "activeTab": "История2",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 142,
+            "top": 171,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": true
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-history.png"
+        },
+        {
+          "slug": "passport",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 1223,
+            "top": 320,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-passport.png"
+        },
+        {
+          "slug": "selfie",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 892,
+            "height": 884,
+            "left": 572,
+            "right": 1432,
+            "top": 8,
+            "width": 860
+          },
+          "footer": {
+            "bottom": 891,
+            "height": 77,
+            "top": 814
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 754,
+            "top": 320,
+            "visible": true,
+            "width": 794
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 900,
+            "width": 1440
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/desktop-selfie.png"
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "name": "tablet",
+        "width": 768,
+        "height": 1024
+      },
+      "errors": [],
+      "states": [
+        {
+          "slug": "overview",
+          "activeTab": "Обзор",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 257,
+            "top": 208,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": true
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-overview.png"
+        },
+        {
+          "slug": "applicants",
+          "activeTab": "Заявители1",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 170,
+            "top": 208,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": true
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-applicants.png"
+        },
+        {
+          "slug": "questionnaire",
+          "activeTab": "Анкета51",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 4758,
+            "top": 357,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": true
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-questionnaire.png"
+        },
+        {
+          "slug": "files",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 484,
+            "top": 208,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-files.png"
+        },
+        {
+          "slug": "issues",
+          "activeTab": "Замечания0",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 244,
+            "top": 208,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": true
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-issues.png"
+        },
+        {
+          "slug": "history",
+          "activeTab": "История2",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 142,
+            "top": 208,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": true
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-history.png"
+        },
+        {
+          "slug": "passport",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 1241,
+            "top": 357,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-passport.png"
+        },
+        {
+          "slug": "selfie",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 1024,
+            "height": 976,
+            "left": 0,
+            "right": 768,
+            "top": 48,
+            "width": 768
+          },
+          "footer": {
+            "bottom": 1024,
+            "height": 77,
+            "top": 947
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 754,
+            "top": 357,
+            "visible": true,
+            "width": 726
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 1024,
+            "width": 768
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/tablet-selfie.png"
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "states": [
+        {
+          "slug": "overview",
+          "activeTab": "Обзор",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 886,
+            "top": 202,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": true
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-overview.png"
+        },
+        {
+          "slug": "applicants",
+          "activeTab": "Заявители1",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 348,
+            "top": 202,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": true
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-applicants.png"
+        },
+        {
+          "slug": "questionnaire",
+          "activeTab": "Анкета51",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 6726,
+            "top": 383,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": true
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-questionnaire.png"
+        },
+        {
+          "slug": "files",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 508,
+            "top": 202,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-files.png"
+        },
+        {
+          "slug": "issues",
+          "activeTab": "Замечания0",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 277,
+            "top": 202,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": true
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-issues.png"
+        },
+        {
+          "slug": "history",
+          "activeTab": "История2",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 226,
+            "top": 202,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": false
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": true
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-history.png"
+        },
+        {
+          "slug": "passport",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 1794,
+            "top": -119,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-passport.png"
+        },
+        {
+          "slug": "selfie",
+          "activeTab": "Файлы",
+          "drawer": {
+            "bottom": 856,
+            "height": 808,
+            "left": 0,
+            "right": 390,
+            "top": 48,
+            "width": 390
+          },
+          "footer": {
+            "bottom": 856,
+            "height": 69,
+            "top": 787
+          },
+          "horizontalOverflow": 0,
+          "panel": {
+            "height": 1064,
+            "top": -119,
+            "visible": true,
+            "width": 348
+          },
+          "tabs": [
+            {
+              "name": "Обзор",
+              "selected": false
+            },
+            {
+              "name": "Заявители1",
+              "selected": false
+            },
+            {
+              "name": "Анкета51",
+              "selected": false
+            },
+            {
+              "name": "Файлы",
+              "selected": true
+            },
+            {
+              "name": "Замечания0",
+              "selected": false
+            },
+            {
+              "name": "История2",
+              "selected": false
+            }
+          ],
+          "viewport": {
+            "height": 844,
+            "width": 390
+          },
+          "screenshot": "/Users/user/Documents/V-19/docs/qa/admin-drawer-all-subscreens-20260706/mobile-selfie.png"
+        }
+      ]
+    }
+  ],
+  "consoleErrors": []
+}
