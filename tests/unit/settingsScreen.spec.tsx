@@ -126,7 +126,7 @@ describe("SettingsScreen", () => {
 
     fireEvent.click(screen.getByRole("switch", { name: "Новые замечания" }));
     expect(props.onSettings).toHaveBeenCalledWith({ drawerHints: false });
-    expect(screen.queryByRole("switch", { name: "Ошибки выгрузки" })).toBeNull();
+    expect(screen.getByRole("switch", { name: "Ошибки выгрузки" })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Интерфейс" }));
     fireEvent.change(screen.getByLabelText("Плотность списков"), {

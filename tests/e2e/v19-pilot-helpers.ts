@@ -247,31 +247,16 @@ export async function selectSubmissionStatus(page: Page, label: string | RegExp)
     }
   }
 
-  await clickFirstVisible(
-    page
-      .getByRole("button", { name: "Фильтры подач" })
-      .or(page.getByRole("button", { name: "Фильтры" }))
-      .or(page.locator(".v19-submission-reference-filter-trigger")),
-  );
-  const statusDialog = page
-    .getByRole("dialog", { name: "Статус подач" })
-    .or(page.getByRole("dialog", { name: "Фильтры" }));
+  await page.getByRole("button", { name: "Фильтры подач" }).click();
+  const statusDialog = page.getByRole("dialog", { name: "Статус подач" });
 
   for (const candidate of labels) {
     const statusOption = statusDialog
-      .locator(".v19-mobile-filter-options, .v19-filter-sheet-options")
-      .getByRole("button", { name: candidate })
-      .or(statusDialog.getByRole("button", { name: candidate }));
+      .locator(".v19-mobile-filter-options")
+      .getByRole("button", { name: candidate });
 
     if (await isVisible(statusOption.first())) {
       await statusOption.first().click();
-      const doneButton = statusDialog
-        .locator(".v19-submission-filter-sheet-footer")
-        .getByRole("button", { name: "Готово" })
-        .first();
-      if (await isVisible(doneButton)) {
-        await doneButton.click();
-      }
       await expect(statusDialog).toHaveCount(0);
       return;
     }

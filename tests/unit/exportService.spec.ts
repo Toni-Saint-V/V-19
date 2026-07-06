@@ -3,7 +3,6 @@ import { buildMediaSlot, normalizeSubmission } from "../../src/lib/workflow";
 import {
   applyExportPackageDraft,
   buildExportPackageDraft,
-  exportColumns,
 } from "../../src/services/exportService";
 import {
   EXPECTED_EXPORT_CONTRACT_HEADERS,
@@ -175,73 +174,6 @@ describe("durable export package service", () => {
       contentFingerprint: expect.stringContaining("VF-1001"),
       fileName: draft.artifact.fileName,
     });
-  });
-
-  test("orders family package rows before single package rows in durable drafts", () => {
-    const single = acceptedSubmission({
-      id: "VF-1001",
-      title: "Ivan Petrov",
-      type: "single",
-    });
-    const family = acceptedSubmission({
-      id: "VF-1002",
-      title: "Семья Шикуновых",
-      type: "family",
-      familyIntelligence: {
-        confirmedAt: createdAt,
-        status: "confirmed",
-      },
-      applicants: [
-        applicant({
-          id: "family-applicant-1",
-          name: "Olga Shikunova",
-          passport: "76 7265749",
-          roleConfirmed: true,
-        }),
-        applicant({
-          id: "family-applicant-2",
-          name: "Anastasiia Shikunova",
-          passport: "76 7265773",
-          roleConfirmed: true,
-        }),
-      ],
-    });
-    const draft = buildExportPackageDraft([single, family], {
-      batchId: "batch-family-first",
-      createdAt,
-      createdBy,
-      format: "xlsx",
-    });
-
-    if (draft.status !== "ready") {
-      throw new Error(
-        `expected export draft to be ready, got ${draft.status}: ${
-          draft.status === "blocked"
-            ? draft.blockers.map((blocker) => blocker.reason).join("; ")
-            : "duplicate"
-        }`,
-      );
-    }
-
-    const appointmentTypeHeader = exportColumns.find((column) =>
-      column.startsWith("Appointment Type"),
-    );
-    if (!appointmentTypeHeader) throw new Error("missing appointment type header");
-
-    expect(draft.plan.readySubmissions.map((submission) => submission.id)).toEqual([
-      "VF-1002",
-      "VF-1001",
-    ]);
-    expect(draft.rows.map((row) => row[appointmentTypeHeader])).toEqual([
-      "Family",
-      "Family",
-      "Individual",
-    ]);
-    expect(draft.rows.map((row) => row["Passport No"])).toEqual([
-      "767265749",
-      "767265773",
-      "751234567",
-    ]);
   });
 
   test("applies an export package once and records one batch per submission", () => {

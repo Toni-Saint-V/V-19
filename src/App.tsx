@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Plus, UploadCloud } from "lucide-react";
 import visaOpsLogo from "./assets/visaflow-logo.png";
 import { supabaseRuntimeConfig } from "./lib/supabase/config";
 import { Button, SearchInput } from "./shared/ui/primitives";
@@ -117,7 +117,6 @@ import {
   PageHeader,
   PageHeaderMenuButton,
 } from "./modules/submissions/components/AppShell";
-import { CommandPalette } from "./modules/submissions/components/CommandPalette";
 import { OperationalSideMenu } from "./modules/submissions/components/OperationalSideMenu";
 import { ConfirmationDialog } from "./modules/submissions/components/Primitives";
 import { FigmaQuestionnaireScreen } from "./modules/submissions/components/FigmaQuestionnaireScreen";
@@ -486,14 +485,10 @@ function MainApp() {
   const [confirmClose, setConfirmClose] = useState(false);
   const [createCloseFocusToken, setCreateCloseFocusToken] = useState(0);
   const [query, setQuery] = useState("");
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [cityFilter, setCityFilter] = useState<CityFilterValue>("Все города");
   const [agentFilter, setAgentFilter] = useState<AgentFilterValue>("Все агенты");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sideMenuMode, setSideMenuMode] = useState<"regular" | "compact">("regular");
-  const [isDesktopShell, setIsDesktopShell] = useState(() =>
-    typeof window === "undefined" ? true : window.innerWidth > 760,
-  );
   const [agentTab, setAgentTab] = useState<AgentTab>("all");
   const [reviewTab, setReviewTab] = useState<AdminWorkTab>("review");
   const [exportTab, setExportTab] = useState<ExportTab>("ready");
@@ -534,14 +529,6 @@ function MainApp() {
       : localAgentOwnerIdForSession(localAuthSession);
   const visibleSubmissionsForRole =
     role === "agent" ? ownedSubmissions(submissions, currentAgentOwnerId) : submissions;
-  const commandPaletteSubmissions = useMemo(
-    () =>
-      highestPriorityFirst(visibleSubmissionsForRole).filter(
-        (submission, index, list) =>
-          list.findIndex((item) => item.id === submission.id) === index,
-      ),
-    [visibleSubmissionsForRole],
-  );
   const activeSubmission =
     visibleSubmissionsForRole.find(
       (submission) => submission.id === selectedSubmissionId,
@@ -1098,19 +1085,6 @@ function MainApp() {
   }, [exportReadyList]);
 
   useEffect(() => {
-    function handleCommandPaletteShortcut(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
-
-      event.preventDefault();
-      if (event.repeat) return;
-      setCommandPaletteOpen((open) => !open);
-    }
-
-    window.addEventListener("keydown", handleCommandPaletteShortcut);
-    return () => window.removeEventListener("keydown", handleCommandPaletteShortcut);
-  }, []);
-
-  useEffect(() => {
     if (drawerMode !== "closed" || confirmClose) return;
 
     const node = returnFocusRef.current;
@@ -1313,20 +1287,6 @@ function MainApp() {
     setAgentQuestionnaireOpen(false);
   }
 
-  function openCommandPaletteSubmission(submission: Submission) {
-    requestSettingsLeave(() => {
-      if (role === "agent") {
-        setSurface("agent-submissions");
-        setAgentTab("all");
-      } else {
-        setSurface("admin-review");
-        setReviewTab("review");
-      }
-
-      openSubmission(submission);
-    });
-  }
-
   function openApplicantsUploadTarget() {
     const selectedSubmission = agentList.find(
       (submission) => submission.id === selectedSubmissionId,
@@ -1477,19 +1437,15 @@ function MainApp() {
   }, [drawerMode]);
 
   useEffect(() => {
-    function syncShellViewport() {
-      const desktopShell = window.innerWidth > 760;
-
-      setIsDesktopShell(desktopShell);
-
-      if (desktopShell) {
+    function closeMobileNavAbovePhone() {
+      if (window.innerWidth > 760) {
         setMobileNavOpen(false);
       }
     }
 
-    syncShellViewport();
-    window.addEventListener("resize", syncShellViewport);
-    return () => window.removeEventListener("resize", syncShellViewport);
+    closeMobileNavAbovePhone();
+    window.addEventListener("resize", closeMobileNavAbovePhone);
+    return () => window.removeEventListener("resize", closeMobileNavAbovePhone);
   }, []);
 
   function updateActiveSubmission(transform: (submission: Submission) => Submission) {
@@ -3158,8 +3114,10 @@ function MainApp() {
       mobileOpen={mobileNavOpen}
       mobileTitle={workspaceSurfaceTitle}
       onChooseRole={chooseRole}
-      onCommandSearch={() => setCommandPaletteOpen(true)}
       onCloseMobile={() => setMobileNavOpen(false)}
+      onDisplayModeToggle={() =>
+        setSideMenuMode((mode) => (mode === "compact" ? "regular" : "compact"))
+      }
       onResetWorkspace={resetWorkspaceEmail}
       role={role}
       sessionDisplayName={sessionDisplayName}
@@ -3179,6 +3137,15 @@ function MainApp() {
     </div>
   ) : surface === "agent-actions" || surface === "agent-submissions" ? (
     <div className="topbar-actions vf-reference-topbar-actions">
+      <Button
+        aria-label="Загрузить"
+        className="vf-reference-upload-action"
+        variant="secondary"
+        onClick={openCreateSubmissionDrawer}
+      >
+        <UploadCloud aria-hidden="true" focusable="false" size={16} strokeWidth={1.8} />
+        <span>Загрузить</span>
+      </Button>
       <Button
         aria-label="Новая подача"
         className="vf-reference-create-action"
@@ -3228,16 +3195,9 @@ function MainApp() {
         <PageHeaderMenuButton
           controls={V19_OPERATIONAL_SIDEBAR_ID}
           disabled={drawerMode !== "closed"}
-          open={isDesktopShell ? sideMenuMode === "regular" : mobileNavOpen}
+          open={mobileNavOpen}
           onClick={() => {
             if (drawerMode !== "closed") return;
-
-            if (isDesktopShell) {
-              setMobileNavOpen(false);
-              setSideMenuMode((mode) => (mode === "compact" ? "regular" : "compact"));
-              return;
-            }
-
             setMobileNavOpen((open) => !open);
           }}
         />
@@ -3248,18 +3208,6 @@ function MainApp() {
 
   const shellOverlays = (
     <>
-      <CommandPalette
-        onCreateSubmission={openCreateSubmissionDrawer}
-        onNavigateAgentActions={showAgentActions}
-        onNavigateAgentSubmissions={() => showAgentTab("all")}
-        onNavigateSettings={showSettingsSurface}
-        onOpenChange={setCommandPaletteOpen}
-        onOpenSubmission={openCommandPaletteSubmission}
-        open={commandPaletteOpen}
-        role={role}
-        submissions={commandPaletteSubmissions}
-      />
-
       {agentQuestionnaireOpen && activeSubmission && role === "agent" ? (
         <FigmaQuestionnaireScreen
           initialFocus={agentQuestionnaireFocus}

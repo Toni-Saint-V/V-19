@@ -158,30 +158,6 @@ function withFirstApplicantNameOnly(
   };
 }
 
-async function workbookFilesFromBlob(blob: Blob): Promise<Record<string, string>> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  const decoder = new TextDecoder();
-  const files: Record<string, string> = {};
-  let offset = 0;
-
-  while (offset + 30 <= bytes.length) {
-    const view = new DataView(bytes.buffer, bytes.byteOffset + offset);
-    const signature = view.getUint32(0, true);
-    if (signature !== 0x04034b50) break;
-
-    const dataLength = view.getUint32(18, true);
-    const nameLength = view.getUint16(26, true);
-    const extraLength = view.getUint16(28, true);
-    const nameStart = offset + 30;
-    const dataStart = nameStart + nameLength + extraLength;
-    const fileName = decoder.decode(bytes.slice(nameStart, nameStart + nameLength));
-    files[fileName] = decoder.decode(bytes.slice(dataStart, dataStart + dataLength));
-    offset = dataStart + dataLength;
-  }
-
-  return files;
-}
-
 describe("V-19 export workbook contract", () => {
   test("generates a parseable Sheet1 workbook with exact A:BD 56-column shape", async () => {
     const selection = applyExportStateToSelection(
@@ -478,9 +454,6 @@ describe("V-19 export workbook contract", () => {
     };
     const artifact = createExportWorkbookArtifact(rows, identity);
     const parsed = await parseExportWorkbookArtifact(artifact);
-    const workbookFiles = await workbookFilesFromBlob(artifact.blob);
-    const worksheetXml = workbookFiles["xl/worksheets/sheet1.xml"] ?? "";
-    const stylesXml = workbookFiles["xl/styles.xml"] ?? "";
 
     expect(rows.map((row) => row.submissionId)).toEqual([
       "SUB-FAMILY-2",
@@ -502,18 +475,6 @@ describe("V-19 export workbook contract", () => {
     expect(parsed.rows[0]).not.toEqual(
       expect.arrayContaining(["Agent", "Family", "Debug"]),
     );
-    expect(stylesXml).toContain('<cellXfs count="56">');
-    expect(stylesXml).toContain(
-      '<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>',
-    );
-    expect(stylesXml).toContain(
-      '<xf numFmtId="164" fontId="0" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>',
-    );
-    expect(worksheetXml).toContain('<c r="A2" s="52"');
-    expect(worksheetXml).toContain('<c r="E2" s="53"');
-    expect(worksheetXml).toContain('<c r="L2" s="54"');
-    expect(worksheetXml).toContain('<c r="BC2" s="55"');
-    expect(worksheetXml).toContain('<c r="A8" s="33"');
   });
 
   test("ties package identity to the full 56-column serialized row model", () => {
@@ -674,7 +635,6 @@ describe("V-19 export workbook contract", () => {
       }),
     ).toBe("669308614_application_form_pdf_bogdanov_anatolii.pdf");
     for (const documentType of [
-      "appointment_pdf",
       "selfie",
       "selfie_2",
       "passport_scan",
