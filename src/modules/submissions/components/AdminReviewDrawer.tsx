@@ -245,6 +245,12 @@ export function AdminReviewDrawer({
       ) {
         return current;
       }
+      if (
+        activeTab === "files" &&
+        (current === "passport" || current === "selfie" || current === "files")
+      ) {
+        return current;
+      }
       return mappedTab;
     });
   }, [activeTab]);
