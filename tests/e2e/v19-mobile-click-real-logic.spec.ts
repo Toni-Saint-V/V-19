@@ -54,13 +54,38 @@ type BrowserGlobal = {
 };
 
 async function clickOperationalNav(page: Page, name: string | RegExp) {
+  const mobileMenuButton = page.getByRole("button", { exact: true, name: "Меню" });
+  const mobileShellOpen = page.locator(".ops-shell.is-mobile-nav-open .ops-sidebar");
+
+  if ((await hasVisible(mobileMenuButton)) || (await hasVisible(mobileShellOpen))) {
+    if (!(await hasVisible(mobileShellOpen))) {
+      await openMobileMenu(page);
+    }
+
+    const mobileButton = mobileShellOpen.getByRole("button", { name }).first();
+    await mobileButton.waitFor({ state: "visible", timeout: 2_000 });
+    await mobileButton.click({ timeout: 10_000 });
+    return;
+  }
+
   const button = page.getByRole("button", { name });
 
   if (!(await isVisible(button.first()))) {
     await openMobileMenu(page);
+    await button.first().waitFor({ state: "visible", timeout: 2_000 });
   }
 
   await clickFirstVisible(button);
+}
+
+async function hasVisible(locator: Locator) {
+  const count = await locator.count();
+
+  for (let index = 0; index < count; index += 1) {
+    if (await isVisible(locator.nth(index))) return true;
+  }
+
+  return false;
 }
 
 async function expectCenterHitTarget(target: Locator, context: string) {
@@ -338,24 +363,37 @@ test.describe("V-19 mobile click real logic", () => {
     await expectNoHorizontalOverflow(page, "390 export");
     await expectNoFixedLayerOverControls(page, "390 export");
 
-    await expect(page.getByText(/1 \/ 4\s+Выбрать пакет/)).toBeVisible();
-    const olgaPackage = page
-      .locator(".v19-export-mobile-package")
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Пакеты к выгрузке" }),
+    ).toBeVisible();
+    const exportScreen = page.getByTestId("admin-export-reference-screen");
+    const olgaPackage = exportScreen
+      .locator(".v19-admin-export-row")
       .filter({ hasText: "Ольга Фролова" });
-    const choosePackage = olgaPackage.getByRole("button", { name: "Выбрать пакет" });
+    const choosePackage = olgaPackage.getByRole("checkbox", {
+      name: "Выбрать Ольга Фролова",
+    });
 
     await expectCenterHitTarget(choosePackage, "390 export choose package");
     await choosePackage.click();
-    await expect(page.getByText(/2 \/ 4\s+Проверить условия/)).toBeVisible();
+    await expect(
+      olgaPackage.getByRole("button", {
+        name: "Убрать Ольга Фролова из выгрузки",
+      }),
+    ).toBeVisible();
 
-    const continueExport = page.getByRole("button", { name: "Продолжить" });
+    const continueExport = page.getByRole("button", { name: "Выгрузить" });
     await expectCenterHitTarget(
       continueExport,
-      "390 export continue after fail-closed validation",
+      "390 export generate CTA",
     );
-    await expect(continueExport).toBeEnabled();
-    await continueExport.click();
-    await expect(page.getByText(/3 \/ 4\s+Предпросмотр строк/)).toBeVisible();
+    const summaryButton = page.getByRole("button", { name: "Сводка" });
+    await expectCenterHitTarget(summaryButton, "390 export summary sheet");
+    await summaryButton.click();
+    await expect(page.locator(".v19-admin-export-mobile-sheet")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.locator(".v19-admin-export-mobile-sheet button[aria-label='Закрыть']").click();
+    await expect(page.locator(".v19-admin-export-mobile-sheet")).toHaveCount(0);
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
