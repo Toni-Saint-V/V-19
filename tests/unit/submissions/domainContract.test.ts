@@ -15,11 +15,11 @@ import {
 } from "../../../src/modules/submissions/domainContract";
 import {
   applyActionToSubmissionListResult,
-  completeQuestionnaire,
   createDraftSubmission,
   uploadRequiredFiles,
 } from "../../../src/modules/submissions/submissionActions";
 import { applySubmissionAction } from "../../../src/modules/submissions/status";
+import { fillRequiredQuestionnaireForTest } from "../helpers/questionnaireTestFill";
 
 describe("Package 1 canonical domain contract", () => {
   test("exports the exact canonical status list", () => {
@@ -197,7 +197,7 @@ describe("Package 1 canonical domain contract", () => {
       type: "single",
     });
     const inProgress = applySubmissionAction(
-      uploadRequiredFiles(completeQuestionnaire(draft)),
+      uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
       "save_progress",
       "agent",
     );

@@ -589,10 +589,10 @@ function visualGender(lines: string[]) {
   const sexIndex = lines.findIndex((line) => line.includes("SEX"));
   const nearby = sexIndex >= 0 ? lines.slice(sexIndex, sexIndex + 3) : lines;
   if (nearby.some((line) => /(^|[^A-Z])M([^A-Z]|$)|MM/.test(line))) {
-    return "Male - Мужской";
+    return "Мужской";
   }
   if (nearby.some((line) => /(^|[^A-Z])F([^A-Z]|$)|FF/.test(line))) {
-    return "Female - Женский";
+    return "Женский";
   }
   return "";
 }
@@ -713,7 +713,7 @@ export function parsePassportMrzText(text: string): PassportExtractionField[] {
     ),
     mrzField(
       "gender",
-      gender === "M" ? "Male - Мужской" : gender === "F" ? "Female - Женский" : "",
+      gender === "M" ? "Мужской" : gender === "F" ? "Женский" : "",
       "medium",
     ),
     mrzField("passportType", "Ordinary Passport", "low"),

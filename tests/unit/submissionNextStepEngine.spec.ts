@@ -5,7 +5,6 @@ import {
   startPassportExtraction,
 } from "../../src/modules/submissions/passportExtraction";
 import {
-  completeQuestionnaire,
   createDraftSubmission,
   updateQuestionnaireField,
   uploadRequiredFiles,
@@ -13,6 +12,7 @@ import {
 import { buildSubmissionNextStepBrief } from "../../src/modules/submissions/submissionNextStepEngine";
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import type { Issue, Submission } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const forbiddenTrustCopy =
   /approved|guaranteed|officially verified|approval odds|visa odds|одобрен|гарантир|официально провер|ш[а]нс[а-я\s]+визы/i;
@@ -72,7 +72,7 @@ function sectionIdForField(submission: Submission, fieldId: string) {
 function readyForReviewSubmission(): Submission {
   const draft = draftSubmission();
   return {
-    ...uploadRequiredFiles(completeQuestionnaire(draft)),
+    ...uploadRequiredFiles(fillRequiredQuestionnaireForTest(draft)),
     status: "in_progress",
     tripDateFrom: "2026-07-10",
     tripDateTo: "2026-07-18",

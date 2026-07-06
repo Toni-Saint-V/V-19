@@ -297,6 +297,13 @@ function applyPreliminaryIntakeToSection(
     };
   }
 
+  if (section.id.endsWith("-hotel")) {
+    return {
+      ...section,
+      fields: section.fields.map((field) => applyPreliminaryTripField(field, intake)),
+    };
+  }
+
   return section;
 }
 
@@ -325,12 +332,12 @@ function applyPreliminaryTripField(
     field.id === "inviting-party-type" &&
     hasSpainStayInput(intake)
   ) {
-    return { ...field, value: "Гостиница/временное жильё" };
+    return { ...field, value: "Гостиница/временное жилье" };
   }
 
   if (
     intake.sameSpainStay &&
-    field.id === "hotel-country" &&
+    field.id === "main-destination" &&
     hasSpainStayInput(intake)
   ) {
     return { ...field, value: "Spain" };
@@ -346,21 +353,17 @@ function applyPreliminaryTripField(
 
   if (
     intake.sameSpainStay &&
-    field.id === "hotel-city" &&
-    intake.spainStayCity.trim()
-  ) {
-    return { ...field, value: intake.spainStayCity.trim() };
-  }
-
-  if (
-    intake.sameSpainStay &&
     field.id === "hotel-address" &&
     intake.spainStayAddress.trim()
   ) {
     return { ...field, value: intake.spainStayAddress.trim() };
   }
 
-  if (intake.sameArrivalPlace && field.id === "route" && intake.arrivalPlace.trim()) {
+  if (
+    intake.sameArrivalPlace &&
+    field.id === "first-entry-country" &&
+    intake.arrivalPlace.trim()
+  ) {
     return { ...field, value: intake.arrivalPlace.trim() };
   }
 
@@ -382,7 +385,7 @@ export function completeQuestionnaire(submission: Submission): Submission {
     history: [
       {
         id: `и-${submission.id}-анкета`,
-        text: "Анкета заполнена",
+        text: "Анкета сохранена",
         at: "сейчас",
         source: "agent",
       },
@@ -600,7 +603,7 @@ export function addPreciseAdminIssue(
   const hasExplicitIssueTarget = Boolean(input.fileType || input.field);
   const issueInput = hasExplicitIssueTarget
     ? input
-    : { ...input, field: "Маршрут поездки" };
+    : { ...input, field: "Страна первого въезда" };
   const applicant =
     submission.applicants.find((item) => item.id === issueInput.applicantId) ??
     firstApplicant;
@@ -631,7 +634,7 @@ export function addPreciseAdminIssue(
       : flagQuestionnaireField(
           submission,
           applicant.id,
-          newIssue.target.field ?? "Маршрут поездки",
+          newIssue.target.field ?? "Страна первого въезда",
           newIssue.reason,
         );
 

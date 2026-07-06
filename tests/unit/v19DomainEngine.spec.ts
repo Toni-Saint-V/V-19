@@ -29,6 +29,7 @@ import type {
   IssueInput,
   Submission,
 } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -70,7 +71,7 @@ function firstIssueInput(submission: Submission): IssueInput {
 
 function completeInProgressSubmission(): Submission {
   return {
-    ...canonicalMediaSubmission(byId("ПД-1056")),
+    ...fillRequiredQuestionnaireForTest(canonicalMediaSubmission(byId("ПД-1056"))),
     id: "ПД-DOMAIN-READY",
     status: "in_progress",
     exportState: "not_ready",

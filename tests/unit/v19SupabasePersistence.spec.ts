@@ -3,6 +3,7 @@ import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { AppProfile } from "../../src/types/session";
 import type { Json } from "../../src/lib/supabase/database.types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 const mockState = vi.hoisted(() => ({
   applicantRows: [] as unknown[],
@@ -587,7 +588,9 @@ describe("V-19 Supabase cockpit persistence", () => {
   });
 
   it("hydrates fallback submissions from normalized questionnaire answers", async () => {
-    const submission = initialSubmissions[0] as Submission;
+    const submission = fillRequiredQuestionnaireForTest(
+      initialSubmissions[0] as Submission,
+    );
     const payload = toCockpitDraftPersistencePayload(
       submission,
       agentProfile.id,

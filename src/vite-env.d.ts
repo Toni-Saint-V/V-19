@@ -31,3 +31,6 @@ declare global {
     readonly env: ImportMetaEnv;
   }
 }
+
+
+declare module '*.css';

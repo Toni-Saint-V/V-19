@@ -33,7 +33,7 @@ const adminSections: SettingsSectionId[] = [
 ];
 
 const sectionLabels: Record<SettingsSectionId, string> = {
-  "access-requests": "Входящие заявки на регистрацию",
+  "access-requests": "Заявки на доступ",
   "export-defaults": "Выгрузка",
   interface: "Интерфейс",
   notifications: "Уведомления",
@@ -98,27 +98,12 @@ export default function SettingsScreen({
           {sections.map((section) => (
             <button
               aria-current={activeSectionSafe === section ? "page" : undefined}
-              aria-label={
-                section === "access-requests"
-                  ? `${sectionLabels[section]}, новых: ${accessRequests.length}`
-                  : undefined
-              }
               className={activeSectionSafe === section ? "active" : undefined}
               key={section}
               type="button"
               onClick={() => setActiveSection(section)}
             >
-              <span className="settings-nav-label">{sectionLabels[section]}</span>
-              {section === "access-requests" ? (
-                <span
-                  aria-hidden="true"
-                  className={`settings-nav-badge ${
-                    accessRequests.length > 0 ? "has-items" : ""
-                  }`}
-                >
-                  {accessRequests.length}
-                </span>
-              ) : null}
+              {sectionLabels[section]}
             </button>
           ))}
           {activeSectionSafe !== "profile" ? (
@@ -420,8 +405,8 @@ function AccessRequestsSection({
     >
       <div className="settings-access-head">
         <div>
-          <h2 id="settings-title">Входящие заявки на регистрацию</h2>
-          <p>Администратор одобряет регистрацию агента до входа в рабочий кабинет.</p>
+          <h2 id="settings-title">Заявки на доступ</h2>
+          <p>Администратор одобряет доступ агента до входа в рабочий кабинет.</p>
         </div>
         <span aria-label={`Новых заявок: ${requests.length}`}>{requests.length}</span>
       </div>

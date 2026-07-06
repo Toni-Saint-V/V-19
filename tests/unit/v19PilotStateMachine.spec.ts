@@ -23,6 +23,7 @@ import type {
   IssueInput,
   Submission,
 } from "../../src/modules/submissions/types";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -48,10 +49,14 @@ function canonicalMediaSubmission(submission: Submission): Submission {
 }
 
 function readyInProgressSubmission(): Submission {
+  const ready = fillRequiredQuestionnaireForTest(
+    canonicalMediaSubmission(byId("ПД-1056")),
+  );
+
   return {
-    ...canonicalMediaSubmission(byId("ПД-1056")),
+    ...ready,
     id: "ПД-PILOT-READY",
-    files: canonicalMediaSubmission(byId("ПД-1056")).files.map((file) => ({
+    files: ready.files.map((file) => ({
       ...file,
       status: "uploaded",
     })),

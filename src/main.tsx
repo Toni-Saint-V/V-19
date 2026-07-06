@@ -1,25 +1,13 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import App from "./App";
-import "./shared/ui/tokens/index.css";
-import "./shared/ui/system.css";
-import "./shared/ui/visual-baseline.css";
-import "./shared/ui/linear-workspace.css";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+import { createVisaflowRuntimeBridge } from './integration/createVisaflowRuntimeBridge';
 
-const root = document.getElementById("root");
+const bridge = createVisaflowRuntimeBridge();
 
-if (!root) {
-  throw new Error("Root element not found");
-}
-
-const appRoot = root;
-
-function renderApp() {
-  createRoot(appRoot).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  );
-}
-
-renderApp();
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App bridge={bridge} />
+  </React.StrictMode>,
+);

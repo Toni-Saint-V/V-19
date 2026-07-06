@@ -1,4 +1,5 @@
 import type { Applicant, ExportBatch, Submission } from "../types/domain";
+import JSZip from "jszip";
 import {
   digitsOnly,
   exportDurationDays,
@@ -51,6 +52,12 @@ export interface ExportPackageOptions {
 export interface ExportPackageArtifact {
   blob: Blob;
   contentType: string;
+  fileName: string;
+}
+
+export interface ExportPackageArchiveArtifact {
+  blob: Blob;
+  contentType: "application/zip";
   fileName: string;
 }
 
@@ -211,6 +218,33 @@ export function applyExportPackageDraft(
         )
       : submission,
   );
+}
+
+export async function buildExportPackageArchiveArtifact(
+  draft: ExportPackageReady | ExportPackageDuplicate,
+): Promise<ExportPackageArchiveArtifact> {
+  const zip = new JSZip();
+  zip.file(draft.artifact.fileName, await draft.artifact.blob.arrayBuffer());
+  zip.file(
+    "manifest.json",
+    JSON.stringify(
+      {
+        batchId: draft.batch.id,
+        excelFileName: draft.artifact.fileName,
+        idempotencyKey: draft.idempotencyKey,
+        rowCount: draft.batch.rowCount,
+        submissionIds: draft.batch.submissionIds,
+      },
+      null,
+      2,
+    ),
+  );
+
+  return {
+    blob: await zip.generateAsync({ type: "blob" }),
+    contentType: "application/zip",
+    fileName: `visaflow-export-${draft.idempotencyKey}_documents.zip`,
+  };
 }
 
 export function exportBlockers(submission: Submission): string[] {
