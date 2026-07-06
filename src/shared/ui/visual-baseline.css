@@ -20434,3 +20434,14 @@ body,
   :is(.text-red-400, [class*="text-red-400"]) {
   font-size: var(--v19b-size-12) !important;
 }
+
+.ops-shell.surface-agent-submissions .v19-submission-profile-grid.is-family article.vf-figma-family-card.v19-dossier-card {
+  padding-top: var(--v19b-size-18) !important;
+  padding-right: var(--v19b-size-18) !important;
+  padding-bottom: var(--v19b-size-4) !important;
+  padding-left: var(--v19b-size-18) !important;
+}
+
+.ops-shell.surface-agent-submissions .v19-submission-profile-grid.is-family article.vf-figma-family-card.v19-dossier-card .vf-figma-family-footer {
+  margin-top: auto !important;
+}
