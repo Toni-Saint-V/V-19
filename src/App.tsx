@@ -3787,17 +3787,6 @@ function WorkspaceAccessGate({
         <section className="access-brand-panel" aria-label="VisaFlow">
           <div className="access-brand-lockup">
             <img className="access-brand-logo" src={visaOpsLogo} alt="" />
-            <div className="access-brand-name">
-              <span>VisaFlow</span>
-              <small>V-19</small>
-            </div>
-          </div>
-          <div className="access-brand-message">
-            <div className="access-brand-cues" aria-label="Рабочие зоны">
-              <span>Подачи</span>
-              <span>Проверка</span>
-              <span>Выгрузка</span>
-            </div>
           </div>
         </section>
 

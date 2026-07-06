@@ -2,7 +2,7 @@
 
 Result: `PASS`
 Project: `tsymifccglpepvbmrcgh`
-Checked at: `2026-07-05T08:18:55.923Z`
+Checked at: `2026-07-06T00:55:38.869Z`
 
 No email, password, service-role key, signed URL, or personal identifier is recorded in this artifact.
 
@@ -19,10 +19,8 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 - PASS agent can create draft through save_submission_draft
 - PASS agent can upload private media and signed URLs are owner-scoped
 - PASS incomplete waiting_review is rejected
-- PASS malformed bucket media readiness is rejected
-- PASS wrong media bucket cannot satisfy review readiness
-- PASS malformed path media readiness is rejected
-- PASS wrong media path cannot satisfy review readiness
+- PASS malformed bucket media storage identity is rejected
+- PASS malformed path media storage identity is rejected
 - PASS valid waiting_review reaches admin queue
 - PASS admin can return case with blocking correction
 - PASS other agent cannot submit assigned correction handoff

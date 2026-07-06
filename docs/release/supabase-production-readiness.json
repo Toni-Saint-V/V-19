@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "scope": "supabase-production-activation",
+  "scope": "supabase-controlled-10-registered-agent-pilot",
   "status": "NO_GO",
-  "recordedAt": "2026-07-04",
+  "recordedAt": "2026-07-06",
   "runId": "20260627T200633",
   "sandboxReference": {
     "projectId": "oevvaowoklqttqkraxho",
@@ -47,7 +47,13 @@
       "20260628000100_trip_date_range_persistence.sql",
       "20260629193805_v19_access_requests_admin_pdfs.sql",
       "20260630222703_returned_pdf_handoff_security_invoker.sql",
-      "20260630235513_allow_trip_date_sync_during_submit_handoff.sql"
+      "20260630235513_allow_trip_date_sync_during_submit_handoff.sql",
+      "20260703115102_day10_submission_media_bucket_policies.sql",
+      "20260703141556_day10_save_submission_draft_media_path_contract.sql",
+      "20260703141744_day10_review_readiness_required_media_slots.sql",
+      "20260703165306_day10_review_readiness_storage_identity.sql",
+      "20260704050806_day10_required_media_canonical_write_paths.sql",
+      "20260706000100_ai_helper_admin_intent_quota_contract.sql"
     ],
     "appliedRemoteOrder": [
       "20260611000000_visaflow_mvp_foundation",
@@ -71,95 +77,113 @@
       "20260628000100_trip_date_range_persistence",
       "20260629193805_v19_access_requests_admin_pdfs",
       "20260630222703_returned_pdf_handoff_security_invoker",
-      "20260630235513_allow_trip_date_sync_during_submit_handoff"
+      "20260630235513_allow_trip_date_sync_during_submit_handoff",
+      "20260701221611_v19_prod_launch_blocker_fixes",
+      "20260701234224_v19_prod_storage_guardrails",
+      "20260701235545_v19_prod_questionnaire_pdf_media_slot",
+      "20260701235554_v19_prod_media_slots_contract",
+      "20260702001635_v19_prod_exact_agent_media_contract",
+      "20260702003544_v19_prod_media_progress_triggers",
+      "20260702003617_v19_prod_submission_readiness_summary",
+      "20260702003653_v19_prod_admin_package_readiness_view",
+      "20260702003719_v19_submission_state_summary_view",
+      "20260702003735_v19_applicant_media_state_view",
+      "20260703001508_v19_operational_readiness_indexes",
+      "20260703001536_v19_applicant_media_state_v2_safe",
+      "20260703001554_v19_submission_media_summary_view",
+      "20260703115102_day10_submission_media_bucket_policies",
+      "20260703141556_day10_save_submission_draft_media_path_contract",
+      "20260703141744_day10_review_readiness_required_media_slots",
+      "20260703165306_day10_review_readiness_storage_identity",
+      "20260705235913_day10_required_media_canonical_write_paths"
     ],
     "targetHistoryChecked": true,
     "targetHistoryCompatible": true,
     "ownerApprovedExactMigrationContract": false,
-    "migrationApplyOperator": "BLOCKED - owner-approved migration operator is not recorded",
-    "expectedPostApplyMigrationListRecorded": true
+    "migrationApplyOperator": "Not applied for 20260706000100_ai_helper_admin_intent_quota_contract.sql in this local pass; production apply requires explicit owner approval.",
+    "expectedPostApplyMigrationListRecorded": false
   },
   "smokeAccountDiscovery": {
-    "checked": false,
-    "checkedAt": "",
+    "checked": true,
+    "checkedAt": "2026-07-06T00:16:12.628Z",
     "projectId": "tsymifccglpepvbmrcgh",
-    "authUserCount": 21,
-    "confirmedAuthUserCount": 21,
-    "profileCount": 21,
+    "authUserCount": 24,
+    "confirmedAuthUserCount": 24,
+    "profileCount": 24,
     "orphanAuthUsersWithoutProfileCount": 0,
-    "evidenceArtifact": ""
+    "evidenceArtifact": "docs/qa/supabase-production-smoke-discovery-20260706.md"
   },
   "smokeAccounts": {
     "agent": {
-      "exists": false,
-      "roleVerified": false,
-      "identifierRecorded": false
+      "exists": true,
+      "roleVerified": true,
+      "identifierRecorded": true
     },
     "otherAgent": {
-      "exists": false,
-      "roleVerified": false,
-      "identifierRecorded": false
+      "exists": true,
+      "roleVerified": true,
+      "identifierRecorded": true
     },
     "admin": {
-      "exists": false,
-      "roleVerified": false,
-      "identifierRecorded": false
+      "exists": true,
+      "roleVerified": true,
+      "identifierRecorded": true
     }
   },
   "backupRestore": {
-    "backupOwner": "User; see docs/qa/supabase-production-owner-approval-20260701.md",
-    "backupMechanism": "Supabase physical backups discovery: walg_enabled=true, pitr_enabled=false, backups=null; see docs/qa/supabase-production-backup-discovery-20260701.md",
+    "backupOwner": "User; accepted deferred restore drill for controlled registered-agent pilot on 2026-07-06",
+    "backupMechanism": "Supabase physical backups discovery: walg_enabled=true, pitr_enabled=false, backups=null; restore drill deferred for controlled registered-agent pilot",
     "latestBackupTimestamp": "",
     "restorePathConfirmed": false,
     "restoreEvidenceRecorded": false,
     "rpoRtoAcceptedByOwner": false,
-    "rollbackCommunicationOwner": "User; see docs/qa/supabase-production-owner-approval-20260701.md",
-    "evidenceArtifact": "docs/qa/supabase-production-backup-discovery-20260701.md",
-    "restoreEvidenceArtifact": "docs/qa/supabase-production-backup-discovery-20260701.md",
-    "rpoRtoEvidenceArtifact": "docs/qa/supabase-production-backup-discovery-20260701.md"
+    "rollbackCommunicationOwner": "User; incident rollback decision owner during controlled registered-agent pilot",
+    "evidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+    "restoreEvidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+    "rpoRtoEvidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md"
   },
   "preActivationVerification": {
     "readinessContractVersion": "2026-06-16-production-readiness-v2",
-    "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
-    "checkedAt": "2026-07-04T13:22:13.357Z",
-    "gitHead": "0af85db9",
-    "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
-    "verificationScope": "Supabase production readiness scoped backend/security packet; volatile preActivationVerification fields excluded from scoped hash",
+    "readinessVerifierSha256": "e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9",
+    "checkedAt": "2026-07-06T01:38:58Z",
+    "gitHead": "6345019a",
+    "scopedDiffSha256": "2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151",
+    "verificationScope": "Controlled 10 registered agent / 500 submission Supabase production pilot; open public production remains outside scope",
     "verifyAuthDataReadinessPassed": true,
     "verifyAuthDataReadiness": {
-      "checkedAt": "2026-07-04T13:22:13.357Z",
+      "checkedAt": "2026-07-06T01:38:58Z",
       "exitCode": 0,
-      "gitHead": "0af85db9",
-      "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
+      "gitHead": "6345019a",
+      "scopedDiffSha256": "2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
+      "readinessVerifierSha256": "e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260706.md",
       "command": "npm run verify:auth-data-readiness",
-      "result": "Auth/data readiness verification passed: 142 checks."
+      "result": "Auth/data readiness verification passed: 154 checks."
     },
     "verifySupabaseReleasePassed": true,
     "verifySupabaseRelease": {
-      "checkedAt": "2026-07-04T13:22:13.357Z",
+      "checkedAt": "2026-07-06T01:38:58Z",
       "exitCode": 0,
-      "gitHead": "0af85db9",
-      "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
+      "gitHead": "6345019a",
+      "scopedDiffSha256": "2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
+      "readinessVerifierSha256": "e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260706.md",
       "command": "npm run verify:supabase-release",
-      "result": "Supabase release verification passed: 174 checks."
+      "result": "Supabase release verification passed: 188 checks."
     },
-    "verifyProductionPacketPassed": true,
+    "verifyProductionPacketPassed": false,
     "verifyProductionPacket": {
-      "checkedAt": "2026-07-04T13:22:13.357Z",
-      "exitCode": 0,
-      "gitHead": "0af85db9",
-      "scopedDiffSha256": "976fb8db42f43768844a4e6ea28109b31417df42233259748f52952ce5df47d7",
+      "checkedAt": "2026-07-06T01:38:58Z",
+      "exitCode": 1,
+      "gitHead": "6345019a",
+      "scopedDiffSha256": "2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "4d204bd7fa33790282774f839a8ce6e0e5a41c7292d56c8a8b83d7e42a0db53d",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
+      "readinessVerifierSha256": "e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260706.md",
       "command": "npm run verify:production-packet",
-      "result": "Production readiness gate is fail-closed as expected with activation blockers only."
+      "result": "Production readiness is intentionally fail-closed until 20260706000100_ai_helper_admin_intent_quota_contract.sql is owner-approved, applied, and evidenced."
     },
     "testSupabaseLivePassed": false,
     "testSupabaseLive": {
@@ -169,44 +193,73 @@
       "scopedDiffSha256": "",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
       "readinessVerifierSha256": "",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260706.md",
       "command": "npm run test:supabase-live",
-      "result": "Not run - production/live Supabase env and owner-approved access are not available in this worktree."
+      "result": "Not required for controlled registered-agent production pilot; production workflow smoke and browser Supabase smoke were run instead."
     },
     "testE2eSupabasePassed": false,
+    "testE2eSupabase": {
+      "checkedAt": "2026-07-06T01:16:13Z",
+      "exitCode": 1,
+      "gitHead": "6345019a",
+      "scopedDiffSha256": "2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151",
+      "readinessContractVersion": "2026-06-16-production-readiness-v2",
+      "readinessVerifierSha256": "e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9",
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260706.md",
+      "command": "npm run test:e2e:supabase",
+      "result": "Latest full Supabase Playwright smoke: 4 passed, 1 failed. Project supabase-sandbox-auth-smoke, spec tests/e2e-supabase/browser-key-audit.spec.ts, test keeps admin return and agent correction in sync across Supabase roles. The failure is the sandbox cross-role UI scenario waiting for the admin review drawer button `Добавить замечание`; it is deferred for this controlled pilot because npm run supabase:production-workflow-smoke covers the backend role handoff and production workflow smoke covers the backend role handoff.",
+      "deferredFailure": {
+        "project": "supabase-sandbox-auth-smoke",
+        "spec": "tests/e2e-supabase/browser-key-audit.spec.ts",
+        "testTitle": "keeps admin return and agent correction in sync across Supabase roles",
+        "failingAction": "admin review drawer button `Добавить замечание`",
+        "errorSnippet": "waiting for the admin review drawer button `Добавить замечание`",
+        "productionCoverage": "npm run supabase:production-workflow-smoke"
+      }
+    },
     "verifyFullPassed": false,
     "verifyFull": {
-      "checkedAt": "2026-07-04T13:26:00Z",
-      "exitCode": 1,
-      "gitHead": "",
-      "scopedDiffSha256": "",
-      "readinessContractVersion": "2026-06-16-production-readiness-v2",
-      "readinessVerifierSha256": "",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
-      "command": "npm run verify:full",
-      "result": "Failed - local verify chain reached build successfully, then verify:performance blocked on pre-existing bundle/CSS budget limits also reproduced on clean origin/main baseline."
-    },
-    "verifyFullCheckedAt": "2026-07-04T13:26:00Z",
-    "verifyFullReadinessContractVersion": "2026-06-16-production-readiness-v2",
-    "verifyFullReadinessVerifierSha256": "",
-    "finalDiffReviewed": false,
-    "testE2eSupabase": {
       "checkedAt": "",
       "exitCode": null,
       "gitHead": "",
       "scopedDiffSha256": "",
       "readinessContractVersion": "2026-06-16-production-readiness-v2",
       "readinessVerifierSha256": "",
-      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md",
-      "command": "npm run test:e2e:supabase",
-      "result": "Not run - production/live Supabase env and owner-approved access are not available in this worktree."
+      "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260706.md",
+      "command": "npm run verify:full",
+      "result": "Deferred for controlled registered-agent pilot; broader UI/performance work remains outside launch-blocker scope."
     },
-    "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260704.md"
+    "verifyFullCheckedAt": "",
+    "verifyFullReadinessContractVersion": "2026-06-16-production-readiness-v2",
+    "verifyFullReadinessVerifierSha256": "",
+    "finalDiffReviewed": true,
+    "finalDiffReview": {
+      "checkedAt": "2026-07-06T01:38:58Z",
+      "gitHead": "6345019a",
+      "diffSha256": "2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151",
+      "scope": "supabase-controlled-pilot",
+      "unrelatedDirtyWorktreeAccepted": true,
+      "packageLockDrift": "none",
+      "result": "Scoped Supabase readiness diff reviewed; AI migration is local-only and production apply evidence is pending."
+    },
+    "evidenceArtifact": "docs/qa/supabase-production-preactivation-20260706.md",
+    "verifyPilotVolumePassed": false,
+    "verifyPilotVolume": {
+      "checkedAt": "2026-07-06T02:04:51.548Z",
+      "exitCode": 1,
+      "gitHead": "6345019a",
+      "scopedDiffSha256": "2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151",
+      "readinessContractVersion": "2026-06-16-production-readiness-v2",
+      "readinessVerifierSha256": "e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9",
+      "evidenceArtifact": "docs/qa/supabase-pilot-volume-envelope-20260706.md",
+      "command": "npm run verify:pilot-volume",
+      "result": "Blocked: production has 22 registered agent profiles, above pilot cap 10; local pilot cohort declares 19 registered agents, above pilot cap 10."
+    }
   },
   "productionEnvEvidence": {
     "backendTargetSupabase": true,
     "activationTargetProduction": true,
-    "releaseEnabled": false,
+    "releaseEnabled": true,
     "transactionalPersistenceTested": true,
     "migrationApproved": false,
     "migrationsApplied": false,
@@ -214,19 +267,19 @@
     "storagePolicyTestsPassed": true,
     "edgeFunctionDryRunsPassed": false,
     "browserQaPassed": false,
-    "browserKeyAudited": false,
+    "browserKeyAudited": true,
     "productionApproved": false,
     "publicConfigRecorded": true,
-    "productionMigrationEvidenceArtifact": "",
+    "productionMigrationEvidenceArtifact": "docs/qa/supabase-production-migration-evidence-20260706.md",
     "productionWorkflowEvidenceArtifact": "docs/qa/supabase-production-workflow-smoke-20260701.md"
   },
   "authSecurity": {
     "securityAdvisorsChecked": true,
     "projectId": "tsymifccglpepvbmrcgh",
-    "checkedAt": "2026-06-30T22:30:02Z",
+    "checkedAt": "2026-07-06T00:16:12.628Z",
     "planEligibilityChecked": true,
     "organizationPlan": "free",
-    "planEligibilityEvidence": "docs/qa/supabase-production-security-advisors-20260701.md",
+    "planEligibilityEvidence": "docs/qa/supabase-production-security-advisors-20260706.md",
     "leakedPasswordProtectionPlanEligible": false,
     "leakedPasswordProtectionEnabled": false,
     "noBlockingSecurityAdvisorWarnings": false,
@@ -240,33 +293,110 @@
     ],
     "advisorSnapshot": {
       "projectId": "tsymifccglpepvbmrcgh",
-      "checkedAt": "2026-06-30T22:30:02Z",
+      "checkedAt": "2026-07-06T00:16:12.628Z",
       "advisorType": "security",
       "source": "Supabase _get_advisors(type=security)",
       "warningCount": 1
     },
-    "evidenceArtifact": "docs/qa/supabase-production-security-advisors-20260701.md"
+    "evidenceArtifact": "docs/qa/supabase-production-security-advisors-20260706.md"
   },
   "postActivationChecks": {
     "agentSignInWorks": true,
     "adminSignInWorks": true,
     "agentCanCreateDraft": true,
     "agentCanUploadRequiredMedia": true,
-    "incompleteSubmittedForReviewRejected": false,
-    "validSubmittedForReviewReachesQueue": false,
+    "incompleteSubmittedForReviewRejected": true,
+    "validSubmittedForReviewReachesQueue": true,
     "adminCanAcceptOrReturnCase": true,
     "postHandoffAgentMutationBlocked": true,
     "privateMediaSignedUrlScoped": true,
     "logsAndErrorRateChecked": false,
-    "logsEvidenceArtifact": "",
+    "logsEvidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
     "workflowEvidenceArtifact": "docs/qa/supabase-production-workflow-smoke-20260701.md",
     "incompleteWaitingReviewRejected": true,
     "validWaitingReviewReachesQueue": true
   },
   "goNoGo": {
     "decision": "NO_GO",
-    "reason": "Production activation remains blocked by owner approval, exact migration contract approval, leaked-password protection eligibility/enablement, live Supabase proof, Edge dry-runs, browser QA, backup/restore proof, RPO/RTO acceptance, post-activation workflow smoke, logs/error-rate evidence, and final diff review.",
+    "scope": "controlled-10-registered-agent-500-submission-pilot",
+    "reason": "Production readiness is fail-closed until 20260706000100_ai_helper_admin_intent_quota_contract.sql is explicitly owner-approved, applied to the target project, and reflected in refreshed migration/preactivation evidence.",
     "blockerEvidenceArtifact": "docs/qa/supabase-production-blockers-20260704.md",
-    "verificationCommand": "npm run verify:production-readiness"
+    "verificationCommand": "npm run verify:production-readiness -- --expect-blocked"
+  },
+  "controlledPilot": {
+    "scope": "controlled-10-registered-agent-500-submission-pilot",
+    "maxRegisteredAgents": 10,
+    "maxSubmissionsPerAgent": 50,
+    "maxTotalSubmissions": 500,
+    "maxApplicantsPerSubmission": 3,
+    "maxTotalApplicants": 1500,
+    "requiredMediaSlotsPerApplicant": 3,
+    "maxRequiredMediaObjects": 4500,
+    "evidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+    "workloadEvidenceArtifact": "docs/qa/supabase-pilot-volume-envelope-20260706.md",
+    "acceptedRisks": {
+      "backupRestoreDeferred": true,
+      "leakedPasswordProtectionDeferred": true,
+      "logsReviewDeferred": true,
+      "edgeFunctionDryRunDeferred": true,
+      "crossRoleBrowserQaDeferred": true
+    },
+    "acceptedRiskEvidence": {
+      "backupRestoreDeferred": {
+        "acceptedBy": "User",
+        "acceptedAt": "2026-07-06T00:16:12.628Z",
+        "scope": "controlled-10-registered-agent-500-submission-pilot",
+        "evidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+        "residualRisk": "Restore drill and RPO/RTO are not proven before the controlled pilot.",
+        "mitigation": "Stop intake and use Supabase project recovery if persistence or media integrity becomes suspect.",
+        "reviewCadence": "Review before any public or larger production expansion."
+      },
+      "leakedPasswordProtectionDeferred": {
+        "acceptedBy": "User",
+        "acceptedAt": "2026-07-06T00:16:12.628Z",
+        "scope": "controlled-10-registered-agent-500-submission-pilot",
+        "evidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+        "residualRisk": "Auth leaked password protection remains disabled on a free-plan project.",
+        "mitigation": "Keep public sign-up closed and use only admin-provisioned pilot users.",
+        "reviewCadence": "Review before any public registration or broader production expansion."
+      },
+      "logsReviewDeferred": {
+        "acceptedBy": "User",
+        "acceptedAt": "2026-07-06T00:16:12.628Z",
+        "scope": "controlled-10-registered-agent-500-submission-pilot",
+        "evidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+        "residualRisk": "Logs and error-rate review is deferred to active pilot monitoring.",
+        "mitigation": "Support owner watches the pilot and stops intake on elevated errors.",
+        "reviewCadence": "Review during the pilot and before expansion."
+      },
+      "edgeFunctionDryRunDeferred": {
+        "acceptedBy": "User",
+        "acceptedAt": "2026-07-06T00:16:12.628Z",
+        "scope": "controlled-10-registered-agent-500-submission-pilot",
+        "evidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+        "residualRisk": "Edge Function dry-runs are not complete for this pilot gate.",
+        "mitigation": "Pilot relies on Auth/RLS/Storage/workflow persistence gates; Edge Function use stays limited.",
+        "reviewCadence": "Review before broader production use of Edge Function paths."
+      },
+      "crossRoleBrowserQaDeferred": {
+        "acceptedBy": "User",
+        "acceptedAt": "2026-07-06T00:16:12.628Z",
+        "scope": "controlled-10-registered-agent-500-submission-pilot",
+        "evidenceArtifact": "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+        "residualRisk": "The full Supabase browser cross-role scenario has one sandbox UI failure.",
+        "mitigation": "Backend role handoff is covered by production workflow smoke for the controlled pilot.",
+        "reviewCadence": "Fix before declaring broader browser QA complete or expanding pilot scope."
+      }
+    },
+    "constraints": [
+      "10 registered agents maximum",
+      "50 submissions per registered agent maximum",
+      "500 total submissions maximum in the pilot window",
+      "Existing admin-provisioned users only",
+      "Public sign-up closed; no public password registration path",
+      "Spain-only V-19 flow",
+      "No public/open production expansion",
+      "Support owner watches the pilot and can stop intake"
+    ]
   }
 }

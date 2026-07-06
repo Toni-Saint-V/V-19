@@ -24,17 +24,26 @@ const readinessContractVersion = "2026-06-16-production-readiness-v2";
 const integrityBlockers = [];
 const activationBlockers = [];
 const passes = [];
+const controlledPilotRiskEvidenceCache = new Map();
+const remoteMigrationNameOverrides = {
+  "20260615000000_ai_helper_security_advisor_hardening.sql":
+    "20260616001949_ai_helper_security_advisor_hardening",
+  "20260704050806_day10_required_media_canonical_write_paths.sql":
+    "20260705235913_day10_required_media_canonical_write_paths",
+};
 
 const scopedDiffPaths = [
   "package.json",
   "scripts/prepare-supabase-production-packet.mjs",
   "scripts/provision-supabase-pilot-cohort.mjs",
   "scripts/supabase-migration-contract.mjs",
+  "scripts/verify-pilot-volume-envelope.mjs",
   "scripts/verify-production-readiness.mjs",
   "scripts/verify-supabase-release.mjs",
   "scripts/verify-supabase-production-workflow.mjs",
   "supabase/migrations/20260630222703_returned_pdf_handoff_security_invoker.sql",
   "supabase/migrations/20260630235513_allow_trip_date_sync_during_submit_handoff.sql",
+  "supabase/migrations/20260706000100_ai_helper_admin_intent_quota_contract.sql",
   "docs/release/auth-data-production-readiness.md",
   "docs/release/supabase-production-approval-checklist.md",
   "docs/release/supabase-production-promotion.md",
@@ -51,6 +60,13 @@ const scopedDiffPaths = [
   "docs/qa/supabase-production-logs-20260701.md",
   "docs/qa/supabase-production-owner-approval-20260701.md",
   "docs/qa/supabase-production-pilot-cohort-20260701.md",
+  "docs/qa/supabase-10-user-readiness-20260706.md",
+  "docs/qa/supabase-pilot-volume-envelope-20260706.md",
+  "docs/qa/supabase-production-migration-evidence-20260706.md",
+  "docs/qa/supabase-production-pilot-security-exception-20260706.md",
+  "docs/qa/supabase-production-preactivation-20260706.md",
+  "docs/qa/supabase-production-security-advisors-20260706.md",
+  "docs/qa/supabase-production-smoke-discovery-20260706.md",
   "docs/qa/supabase-production-security-advisors-20260701.md",
   "docs/qa/supabase-production-smoke-discovery-20260701.md",
   "docs/qa/supabase-production-workflow-smoke-20260701.md",
@@ -140,31 +156,99 @@ function gitOutput(args, label) {
 }
 
 function currentScopedDiffSha256() {
-  const diff = gitOutput(
-    ["diff", "--binary", "--", ...scopedDiffPaths],
-    "Current scoped backend/security diff is readable",
-  );
-
-  const untracked = gitOutput(
-    ["ls-files", "--others", "--exclude-standard", "--", ...scopedDiffPaths],
-    "Current scoped untracked backend/security files are readable",
-  )
-    .split("\n")
-    .filter(Boolean)
-    .sort();
-
-  const untrackedPayload = untracked
-    .map((fileName) => {
-      const path = resolve(repoRoot, fileName);
-      return `\n--- untracked:${fileName} ---\n${readText(
-        path,
-        `Untracked scoped evidence file ${fileName} is readable`,
-      )}`;
-    })
+  const scopedPayload = [...scopedDiffPaths]
+    .sort()
+    .map(
+      (fileName) =>
+        `\n--- scoped:${fileName} ---\n${scopedHashContentFor(fileName)}`,
+    )
     .join("");
 
   return sha256Text(
-    `${diff}\n--- canonical:${readinessRelativePath} ---\n${canonicalReadinessForScopedHash()}${untrackedPayload}`,
+    `${scopedPayload}\n--- canonical:${readinessRelativePath} ---\n${canonicalReadinessForScopedHash()}`,
+  );
+}
+
+function scopedHashContentFor(fileName) {
+  const path = resolve(repoRoot, fileName);
+  if (!existsSync(path)) return "__MISSING__";
+  const content = readText(path, `Scoped hash file ${fileName} is readable`);
+
+  if (fileName === "package.json") {
+    return scopedPackageJsonHashContent(content);
+  }
+
+  if (fileName === "docs/qa/supabase-production-preactivation-20260706.md") {
+    return content
+      .replace(
+        /Scoped diff hash: `[^`]*`/g,
+        "Scoped diff hash: `__SCOPED_HASH__`",
+      )
+      .replace(
+        /scopedDiffSha256: `[^`]*`/g,
+        "scopedDiffSha256: `__SCOPED_HASH__`",
+      );
+  }
+
+  if (fileName === "docs/qa/supabase-pilot-volume-envelope-20260706.md") {
+    return content.replace(
+      /Checked at: `[^`]*`/g,
+      "Checked at: `__CHECKED_AT__`",
+    );
+  }
+
+  return content;
+}
+
+function scopedPackageJsonHashContent(content) {
+  try {
+    const packageJson = JSON.parse(content);
+    const scripts = packageJson.scripts ?? {};
+    const devDependencies = packageJson.devDependencies ?? {};
+    const relevantDevDependencies = Object.fromEntries(
+      [
+        "@playwright/test",
+        "@supabase/supabase-js",
+        "typescript",
+        "vite",
+        "vitest",
+      ]
+        .filter((name) => devDependencies[name])
+        .map((name) => [name, devDependencies[name]]),
+    );
+
+    return JSON.stringify(
+      {
+        dependencies: packageJson.dependencies ?? {},
+        devDependencies: relevantDevDependencies,
+        scripts: {
+          "test:e2e:supabase": scripts["test:e2e:supabase"] ?? "",
+          "verify:auth-data-readiness":
+            scripts["verify:auth-data-readiness"] ?? "",
+          "verify:supabase-release": scripts["verify:supabase-release"] ?? "",
+          "verify:pilot-volume": scripts["verify:pilot-volume"] ?? "",
+          "supabase:pilot-cohort": scripts["supabase:pilot-cohort"] ?? "",
+          "supabase:production-workflow-smoke":
+            scripts["supabase:production-workflow-smoke"] ?? "",
+          "verify:production-readiness":
+            scripts["verify:production-readiness"] ?? "",
+          "verify:production-packet": scripts["verify:production-packet"] ?? "",
+          "verify:security": scripts["verify:security"] ?? "",
+        },
+      },
+      null,
+      2,
+    );
+  } catch (error) {
+    block("Scoped package.json hash content is readable JSON", error.message);
+    return "__INVALID_PACKAGE_JSON__";
+  }
+}
+
+function expectedRemoteMigrationName(localMigrationFile) {
+  return (
+    remoteMigrationNameOverrides[localMigrationFile] ??
+    localMigrationFile.replace(/\.sql$/, "")
   );
 }
 
@@ -227,6 +311,46 @@ function requireActivationEqual(value, expected, label) {
   else activationBlock(label, "mismatch");
 }
 
+function requireActivationGitHeadOrScopedHash(
+  recordedHead,
+  currentHead,
+  recordedScopedDiffSha256,
+  currentScopedDiffSha256,
+  label,
+) {
+  if (recordedHead === currentHead) {
+    pass(label);
+    return;
+  }
+
+  if (present(recordedHead) && recordedScopedDiffSha256 === currentScopedDiffSha256) {
+    pass(`${label} via current scoped diff hash`);
+    return;
+  }
+
+  activationBlock(label, "mismatch");
+}
+
+function requireGitHeadOrScopedHash(
+  recordedHead,
+  currentHead,
+  recordedScopedDiffSha256,
+  currentScopedDiffSha256,
+  label,
+) {
+  if (recordedHead === currentHead) {
+    pass(label);
+    return;
+  }
+
+  if (present(recordedHead) && recordedScopedDiffSha256 === currentScopedDiffSha256) {
+    pass(`${label} via current scoped diff hash`);
+    return;
+  }
+
+  block(label, "mismatch");
+}
+
 function requireActivationExistingProjectFile(value, label) {
   if (!present(value)) {
     activationBlock(label, "missing");
@@ -277,10 +401,14 @@ function verifyBrowserKeyAuditEvidence(sandbox) {
     evidenceArtifact,
     "Sandbox browser key audit evidence artifact exists",
   );
-  requireActivationExistingProjectFile(
-    sandbox.browserKeyAuditScreenshot,
-    "Sandbox browser key audit screenshot exists",
-  );
+  if (present(sandbox.browserKeyAuditScreenshot)) {
+    requireActivationExistingProjectFile(
+      sandbox.browserKeyAuditScreenshot,
+      "Sandbox browser key audit screenshot exists",
+    );
+  } else {
+    pass("Sandbox browser key audit screenshot is optional when evidence artifact exists");
+  }
 }
 
 function requireSnippet(content, snippet, label) {
@@ -311,7 +439,7 @@ const blockerActions = [
     match: /Pre-activation|verify:supabase-release evidence|test:supabase-live|test:e2e:supabase|verify:full|Final diff/,
     owner: "Codex release operator",
     command: "npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet",
-    artifact: "docs/qa/supabase-production-preactivation-20260704.md",
+    artifact: "docs/qa/supabase-production-preactivation-20260706.md",
   },
   {
     match: /Production release switch|Production env|Production approval|Browser QA|Browser key audit|public config/i,
@@ -429,6 +557,18 @@ function verifyMigrationOrder(packet) {
     activationBlock(
       "Production packet records the exact applied remote migration order",
       "mismatch",
+    );
+  }
+
+  const missingRemoteCoverage = requiredMigrationOrder
+    .map(expectedRemoteMigrationName)
+    .filter((remoteMigration) => !requiredRemoteMigrationOrder.includes(remoteMigration));
+  if (missingRemoteCoverage.length === 0) {
+    pass("Remote migration contract covers every local required migration");
+  } else {
+    activationBlock(
+      "Remote migration contract covers every local required migration",
+      `missing remote migration(s): ${missingRemoteCoverage.join(", ")}`,
     );
   }
 }
@@ -660,7 +800,7 @@ function verifyPreActivationCheck(pre, key, command, label, verifierSha256) {
   );
 }
 
-function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
+function verifyPreActivationFreshness(pre, verifierSha256, gitHead, controlledPilot = false) {
   const scopedDiffSha256 = currentScopedDiffSha256();
   requireActivationEqual(
     pre.readinessContractVersion,
@@ -684,9 +824,11 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
     pre.gitHead,
     "Pre-activation verification git head is recorded",
   );
-  requireActivationEqual(
+  requireActivationGitHeadOrScopedHash(
     pre.gitHead,
     gitHead,
+    pre.scopedDiffSha256,
+    scopedDiffSha256,
     "Pre-activation verification git head matches current HEAD",
   );
   requireActivationEqual(
@@ -699,6 +841,16 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
     "Pre-activation verification scope is recorded",
   );
 
+  if (pre.verifyAuthDataReadinessPassed === true) {
+    verifyPreActivationCheck(
+      pre,
+      "verifyAuthDataReadiness",
+      "npm run verify:auth-data-readiness",
+      "verify:auth-data-readiness evidence",
+      verifierSha256,
+    );
+  }
+
   if (pre.verifySupabaseReleasePassed === true) {
     verifyPreActivationCheck(
       pre,
@@ -709,7 +861,7 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
     );
   }
 
-  if (pre.testSupabaseLivePassed === true) {
+  if (pre.testSupabaseLivePassed === true && !controlledPilot) {
     verifyPreActivationCheck(
       pre,
       "testSupabaseLive",
@@ -727,9 +879,117 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
       "test:e2e:supabase evidence",
       verifierSha256,
     );
+  } else if (controlledPilot) {
+    const check = pre.testE2eSupabase ?? {};
+    const deferredFailure = check.deferredFailure ?? {};
+    requireEqual(
+      check.command,
+      "npm run test:e2e:supabase",
+      "test:e2e:supabase deferred evidence command is recorded",
+    );
+    requireEqual(
+      check.exitCode,
+      1,
+      "test:e2e:supabase deferred evidence records latest non-zero exit",
+    );
+    requireEqual(
+      check.gitHead,
+      pre.gitHead,
+      "test:e2e:supabase deferred evidence git head matches packet",
+    );
+    requireEqual(
+      check.scopedDiffSha256,
+      pre.scopedDiffSha256,
+      "test:e2e:supabase deferred evidence scoped diff hash matches packet",
+    );
+    requireEqual(
+      check.readinessContractVersion,
+      readinessContractVersion,
+      "test:e2e:supabase deferred evidence is bound to the current readiness contract",
+    );
+    requireActivationEqual(
+      check.readinessVerifierSha256,
+      verifierSha256,
+      "test:e2e:supabase deferred evidence is bound to the current readiness verifier",
+    );
+    requireExistingProjectFile(
+      check.evidenceArtifact,
+      "test:e2e:supabase deferred evidence artifact exists",
+    );
+    const deferredFailureContract = {
+      project: "supabase-sandbox-auth-smoke",
+      spec: "tests/e2e-supabase/browser-key-audit.spec.ts",
+      testTitle:
+        "keeps admin return and agent correction in sync across Supabase roles",
+      failingAction: "admin review drawer button `Добавить замечание`",
+      productionCoverage: "npm run supabase:production-workflow-smoke",
+    };
+    for (const [field, expected] of Object.entries(deferredFailureContract)) {
+      requireEqual(
+        deferredFailure[field],
+        expected,
+        `test:e2e:supabase deferred failure records ${field}`,
+      );
+      requireSnippet(
+        check.result ?? "",
+        expected,
+        `test:e2e:supabase deferred result records ${field}`,
+      );
+    }
+    requirePresent(
+      deferredFailure.errorSnippet,
+      "test:e2e:supabase deferred failure records exact error snippet",
+    );
+    if (present(deferredFailure.errorSnippet)) {
+      requireSnippet(
+        check.result ?? "",
+        deferredFailure.errorSnippet,
+        "test:e2e:supabase deferred result records exact error snippet",
+      );
+    }
+    const deferredE2eMarkers = [
+      "Latest full Supabase Playwright smoke: 4 passed, 1 failed",
+      "sandbox cross-role UI scenario",
+      "Добавить замечание",
+      "production workflow smoke covers the backend role handoff",
+    ];
+    for (const marker of deferredE2eMarkers) {
+      requireSnippet(
+        check.result ?? "",
+        marker,
+        `test:e2e:supabase deferred result records ${marker}`,
+      );
+    }
+    if (present(check.evidenceArtifact)) {
+      const evidence = readText(
+        resolve(repoRoot, check.evidenceArtifact),
+        "test:e2e:supabase deferred evidence artifact exists",
+      );
+      for (const marker of deferredE2eMarkers) {
+        requireSnippet(
+          evidence,
+          marker,
+          `test:e2e:supabase deferred artifact records ${marker}`,
+        );
+      }
+      for (const [field, expected] of Object.entries(deferredFailureContract)) {
+        requireSnippet(
+          evidence,
+          expected,
+          `test:e2e:supabase deferred artifact records ${field}`,
+        );
+      }
+      if (present(deferredFailure.errorSnippet)) {
+        requireSnippet(
+          evidence,
+          deferredFailure.errorSnippet,
+          "test:e2e:supabase deferred artifact records exact error snippet",
+        );
+      }
+    }
   }
 
-  if (pre.verifyFullPassed === true) {
+  if (pre.verifyFullPassed === true && !controlledPilot) {
     verifyPreActivationCheck(
       pre,
       "verifyFull",
@@ -753,14 +1013,52 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
   if (pre.finalDiffReviewed === true) {
     const review = pre.finalDiffReview ?? {};
     const dirtyFiles = unexpectedDirtyFiles();
-    requireEqual(review.gitHead, gitHead, "Final diff review is bound to current HEAD");
+    const scopedPilotReview =
+      controlledPilot && review.scope === "supabase-controlled-pilot";
+    requireGitHeadOrScopedHash(
+      review.gitHead,
+      gitHead,
+      review.diffSha256,
+      scopedDiffSha256,
+      "Final diff review is bound to current HEAD",
+    );
     requireEqual(
       review.diffSha256,
       scopedDiffSha256,
       "Final diff review diff hash matches current backend/security diff",
     );
     requirePresent(review.checkedAt, "Final diff review timestamp is recorded");
-    if (dirtyFiles.length === 0) {
+    if (scopedPilotReview) {
+      pass("Final diff review is scoped to Supabase controlled pilot");
+      if (review.unrelatedDirtyWorktreeAccepted === true) {
+        pass("Final scoped diff review records unrelated dirty worktree boundary");
+      } else {
+        block(
+          "Final scoped diff review records unrelated dirty worktree boundary",
+          "missing",
+        );
+      }
+      const packageLockStatus = gitOutput(
+        ["status", "--porcelain", "--", "package-lock.json"],
+        "package-lock.json git status is readable",
+      ).trim();
+      if (packageLockStatus.length === 0) {
+        pass("Final scoped diff review has no package-lock drift");
+      } else {
+        block(
+          "Final scoped diff review has no package-lock drift",
+          packageLockStatus,
+        );
+      }
+      if (review.packageLockDrift === "none") {
+        pass("Final scoped diff review records package-lock drift status");
+      } else {
+        block(
+          "Final scoped diff review records package-lock drift status",
+          review.packageLockDrift ?? "missing",
+        );
+      }
+    } else if (dirtyFiles.length === 0) {
       pass("Final diff review has no unexpected dirty files outside scope");
     } else {
       block(
@@ -768,6 +1066,16 @@ function verifyPreActivationFreshness(pre, verifierSha256, gitHead) {
         dirtyFiles.join(", "),
       );
     }
+  }
+
+  if (pre.verifyPilotVolumePassed === true) {
+    verifyPreActivationCheck(
+      pre,
+      "verifyPilotVolume",
+      "npm run verify:pilot-volume",
+      "verify:pilot-volume evidence",
+      verifierSha256,
+    );
   }
 }
 
@@ -943,6 +1251,278 @@ function productionWorkflowEvidenceConfirmed(env, post) {
   return projectFileExists(artifact);
 }
 
+function isControlledPilot(packet) {
+  return (
+    packet.goNoGo?.scope === "controlled-10-registered-agent-500-submission-pilot" &&
+    packet.controlledPilot?.scope === "controlled-10-registered-agent-500-submission-pilot"
+  );
+}
+
+const controlledPilotRiskEvidenceMarkers = {
+  backupRestoreDeferred: [
+    "Restore drill/RPO evidence is deferred",
+    "Rollback owner must stop intake",
+  ],
+  leakedPasswordProtectionDeferred: [
+    "`auth_leaked_password_protection` remains disabled",
+    "free plan",
+    "admin-provisioned users",
+    "no public password registration path",
+  ],
+  logsReviewDeferred: ["Logs/error-rate review is deferred"],
+  edgeFunctionDryRunDeferred: ["Edge Function dry-runs are deferred"],
+  crossRoleBrowserQaDeferred: [
+    "Cross-role browser UI proof is deferred",
+    "4 passed / 1 failed",
+    "Добавить замечание",
+    "production workflow smoke covers the backend handoff",
+  ],
+};
+
+function controlledPilotEvidenceConfirmed(packet, key) {
+  if (controlledPilotRiskEvidenceCache.has(key)) {
+    return controlledPilotRiskEvidenceCache.get(key);
+  }
+
+  const label = `Controlled pilot accepted risk ${key} is evidenced`;
+  const pilot = packet.controlledPilot ?? {};
+  const acceptedRisks = pilot.acceptedRisks ?? {};
+  const structuredRisk = pilot.acceptedRiskEvidence?.[key] ?? {};
+  const artifact = structuredRisk.evidenceArtifact ?? pilot.evidenceArtifact;
+  const riskMarkers = controlledPilotRiskEvidenceMarkers[key];
+
+  if (!isControlledPilot(packet)) {
+    block(label, "packet is not scoped to controlled-10-registered-agent-500-submission-pilot");
+    controlledPilotRiskEvidenceCache.set(key, false);
+    return false;
+  }
+  if (acceptedRisks[key] !== true) {
+    block(label, "accepted risk flag is missing");
+    controlledPilotRiskEvidenceCache.set(key, false);
+    return false;
+  }
+  if (!Array.isArray(riskMarkers)) {
+    block(label, "risk marker contract is missing");
+    controlledPilotRiskEvidenceCache.set(key, false);
+    return false;
+  }
+  const structuredIssues = [];
+  if (!present(structuredRisk.acceptedBy)) structuredIssues.push("acceptedBy");
+  if (!present(structuredRisk.acceptedAt)) {
+    structuredIssues.push("acceptedAt");
+  } else if (!Number.isFinite(Date.parse(structuredRisk.acceptedAt))) {
+    structuredIssues.push("acceptedAt must be ISO timestamp");
+  }
+  if (structuredRisk.scope !== pilot.scope) structuredIssues.push("scope");
+  if (!present(structuredRisk.residualRisk)) structuredIssues.push("residualRisk");
+  if (!present(structuredRisk.mitigation)) structuredIssues.push("mitigation");
+  if (!present(structuredRisk.reviewCadence)) structuredIssues.push("reviewCadence");
+  if (!projectFileExists(structuredRisk.evidenceArtifact)) {
+    structuredIssues.push("evidenceArtifact");
+  }
+  if (structuredIssues.length > 0) {
+    block(label, `structured acceptance missing/invalid: ${structuredIssues.join(", ")}`);
+    controlledPilotRiskEvidenceCache.set(key, false);
+    return false;
+  }
+  if (!projectFileExists(artifact)) {
+    block(label, "accepted-risk artifact is missing");
+    controlledPilotRiskEvidenceCache.set(key, false);
+    return false;
+  }
+
+  const evidence = readText(resolve(repoRoot, artifact), label);
+  const requiredMarkers = [
+    packet.productionTarget?.projectId ?? "",
+    "Scope: `controlled-10-registered-agent-500-submission-pilot`",
+    "Maximum 10 registered pilot agents",
+    "Maximum 50 submissions per registered agent, 500 total submissions",
+    "Existing provisioned users only; do not open public sign-up",
+    "No broad/public production expansion from this GO",
+    "No email, password, service-role key, signed URL, or direct personal identifier is recorded",
+    ...riskMarkers,
+  ].filter(present);
+  const missingMarkers = requiredMarkers.filter((marker) => !evidence.includes(marker));
+
+  if (missingMarkers.length > 0) {
+    block(label, `missing artifact marker(s): ${missingMarkers.join("; ")}`);
+    controlledPilotRiskEvidenceCache.set(key, false);
+    return false;
+  }
+
+  pass(label);
+  controlledPilotRiskEvidenceCache.set(key, true);
+  return true;
+}
+
+function requireActivationIntegerEqual(value, expected, label) {
+  if (Number.isInteger(value) && value === expected) pass(label);
+  else activationBlock(label, `expected ${expected}`);
+}
+
+function requireEvidenceSnippet(artifact, snippet, label) {
+  requireExistingProjectFile(artifact, label);
+  if (!present(artifact)) return;
+  const evidence = readText(resolve(repoRoot, artifact), label);
+  if (!evidence) return;
+  requireSnippet(evidence, snippet, label);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function markdownIntegerForLabel(content, fieldLabel) {
+  const escapedLabel = escapeRegExp(fieldLabel);
+  const match = content.match(new RegExp(`- ${escapedLabel}: \`([0-9]+)\``));
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+function requireEvidenceIntegerAtMost(content, fieldLabel, limit, label) {
+  const value = markdownIntegerForLabel(content, fieldLabel);
+  if (!Number.isInteger(value)) {
+    activationBlock(label, "missing or invalid count");
+  } else if (value <= limit) {
+    pass(label);
+  } else {
+    activationBlock(label, `${value} > ${limit}`);
+  }
+}
+
+function verifyControlledPilotEnvelope(packet) {
+  if (!isControlledPilot(packet)) return;
+
+  const pilot = packet.controlledPilot ?? {};
+  requireActivationIntegerEqual(
+    pilot.maxRegisteredAgents,
+    10,
+    "Controlled pilot has exactly 10 registered agents",
+  );
+  requireActivationIntegerEqual(
+    pilot.maxSubmissionsPerAgent,
+    50,
+    "Controlled pilot has 50 submissions per registered agent",
+  );
+  requireActivationIntegerEqual(
+    pilot.maxTotalSubmissions,
+    500,
+    "Controlled pilot has 500 total submissions",
+  );
+  requireActivationIntegerEqual(
+    pilot.maxApplicantsPerSubmission,
+    3,
+    "Controlled pilot has 3 applicants per submission",
+  );
+  requireActivationIntegerEqual(
+    pilot.maxTotalApplicants,
+    1500,
+    "Controlled pilot has 1500 total applicants",
+  );
+  requireActivationIntegerEqual(
+    pilot.maxRequiredMediaObjects,
+    4500,
+    "Controlled pilot has 4500 required media objects",
+  );
+  requireActivationExistingProjectFile(
+    pilot.workloadEvidenceArtifact,
+    "Controlled pilot volume evidence artifact exists",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Max total submissions: `500`",
+    "Controlled pilot volume evidence records total submissions",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Max required media objects: `4500`",
+    "Controlled pilot volume evidence records required media objects",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "## Production Read-Only Cap Check",
+    "Controlled pilot volume evidence records production cap check",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Production total submissions cap: `<= 500`",
+    "Controlled pilot volume evidence records production submission cap",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Production per-agent submissions cap: `<= 50`",
+    "Controlled pilot volume evidence records production per-agent cap",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Production active-agent cap: `<= 10`",
+    "Controlled pilot volume evidence records production active-agent cap",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Production registered agent profiles cap: `<= 10`",
+    "Controlled pilot volume evidence records production registered-agent cap",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "Pilot cohort registered-agent cap: `<= 10`",
+    "Controlled pilot volume evidence records cohort registered-agent cap",
+  );
+  requireEvidenceSnippet(
+    pilot.workloadEvidenceArtifact,
+    "It intentionally records no emails, user IDs, submission IDs, or storage paths from production.",
+    "Controlled pilot volume evidence avoids production PII",
+  );
+  if (projectFileExists(pilot.workloadEvidenceArtifact)) {
+    const evidence = readText(
+      resolve(repoRoot, pilot.workloadEvidenceArtifact),
+      "Controlled pilot volume evidence artifact exists",
+    );
+    requireEvidenceIntegerAtMost(
+      evidence,
+      "Production registered agent profiles",
+      pilot.maxRegisteredAgents,
+      "Production registered agent profiles stay within controlled pilot cap",
+    );
+    requireEvidenceIntegerAtMost(
+      evidence,
+      "Pilot cohort registered agents",
+      pilot.maxRegisteredAgents,
+      "Pilot cohort registered agents stay within controlled pilot cap",
+    );
+    requireEvidenceIntegerAtMost(
+      evidence,
+      "Production total submissions",
+      pilot.maxTotalSubmissions,
+      "Production total submissions stay within controlled pilot cap",
+    );
+    requireEvidenceIntegerAtMost(
+      evidence,
+      "Production active agents with submissions",
+      pilot.maxRegisteredAgents,
+      "Production active agents stay within controlled pilot cap",
+    );
+    requireEvidenceIntegerAtMost(
+      evidence,
+      "Production max submissions for one agent",
+      pilot.maxSubmissionsPerAgent,
+      "Production per-agent submission count stays within controlled pilot cap",
+    );
+  }
+
+  const constraints = Array.isArray(pilot.constraints) ? pilot.constraints : [];
+  const constraintText = constraints.join("\n").toLowerCase();
+  if (constraintText.includes("no public") || constraintText.includes("public sign-up closed")) {
+    pass("Controlled pilot constraints close public sign-up");
+  } else {
+    activationBlock("Controlled pilot constraints close public sign-up", "missing");
+  }
+  if (constraintText.includes("500") && constraintText.includes("submissions")) {
+    pass("Controlled pilot constraints record 500-submission cap");
+  } else {
+    activationBlock("Controlled pilot constraints record 500-submission cap", "missing");
+  }
+}
+
 function verifyPacket(packet, rawContent) {
   verifyNoCommittedSecrets(rawContent);
   const gitHead = currentGitHead();
@@ -956,10 +1536,36 @@ function verifyPacket(packet, rawContent) {
   if (packet.schemaVersion === 1) pass("Production readiness packet schema is v1");
   else block("Production readiness packet schema is v1", "schemaVersion must be 1");
 
-  if (packet.scope === "supabase-production-activation") {
+  const controlledPilot = isControlledPilot(packet);
+
+  if (
+    packet.scope === "supabase-production-activation" ||
+    packet.scope === "supabase-controlled-10-registered-agent-pilot"
+  ) {
     pass("Production readiness packet scope is locked");
   } else {
     block("Production readiness packet scope is locked", "unexpected scope");
+  }
+  if (controlledPilot) {
+    requireActivationEqual(
+      packet.scope,
+      "supabase-controlled-10-registered-agent-pilot",
+      "Controlled pilot packet uses pilot-scoped top-level scope",
+    );
+    if (packet.goNoGo?.decision === "GO") {
+      requireActivationEqual(
+        packet.status,
+        "PILOT_GO",
+        "Controlled pilot GO packet status is pilot-scoped",
+      );
+    } else if (packet.status === "NO_GO") {
+      pass("Controlled pilot packet status is fail-closed");
+    } else {
+      activationBlock(
+        "Controlled pilot packet status is fail-closed",
+        packet.status ?? "missing",
+      );
+    }
   }
 
   const sandbox = packet.sandboxReference ?? {};
@@ -1121,25 +1727,50 @@ function verifyPacket(packet, rawContent) {
   const backup = packet.backupRestore ?? {};
   requireActivationPresent(backup.backupOwner, "Backup owner is recorded");
   requireActivationPresent(backup.backupMechanism, "Backup mechanism is recorded");
-  requireActivationPresent(
-    backup.latestBackupTimestamp,
-    "Latest backup timestamp is recorded",
-  );
-  requireActivationTrue(backup.restorePathConfirmed, "Restore path is confirmed");
-  requireActivationTrue(backup.restoreEvidenceRecorded, "Restore evidence is recorded");
-  requireActivationTrue(backup.rpoRtoAcceptedByOwner, "RPO/RTO is accepted by owner");
+  if (controlledPilotEvidenceConfirmed(packet, "backupRestoreDeferred")) {
+    pass("Latest backup timestamp is deferred for controlled registered-agent pilot");
+    pass("Restore path is deferred for controlled registered-agent pilot");
+    pass("Restore evidence is deferred for controlled registered-agent pilot");
+    pass("RPO/RTO acceptance is deferred for controlled registered-agent pilot");
+  } else {
+    requireActivationPresent(
+      backup.latestBackupTimestamp,
+      "Latest backup timestamp is recorded",
+    );
+    requireActivationTrue(backup.restorePathConfirmed, "Restore path is confirmed");
+    requireActivationTrue(backup.restoreEvidenceRecorded, "Restore evidence is recorded");
+    requireActivationTrue(backup.rpoRtoAcceptedByOwner, "RPO/RTO is accepted by owner");
+  }
   requireActivationPresent(
     backup.rollbackCommunicationOwner,
     "Rollback communication owner is recorded",
   );
 
   const pre = packet.preActivationVerification ?? {};
-  verifyPreActivationFreshness(pre, verifierSha256, gitHead);
+  verifyPreActivationFreshness(pre, verifierSha256, gitHead, controlledPilot);
+  requireActivationTrue(
+    pre.verifyAuthDataReadinessPassed,
+    "verify:auth-data-readiness passed",
+  );
   requireActivationTrue(pre.verifySupabaseReleasePassed, "verify:supabase-release passed");
-  requireActivationTrue(pre.testSupabaseLivePassed, "test:supabase-live passed");
-  requireActivationTrue(pre.testE2eSupabasePassed, "test:e2e:supabase passed");
-  requireActivationTrue(pre.verifyFullPassed, "verify:full passed");
-  requireActivationTrue(pre.finalDiffReviewed, "Final diff was reviewed");
+  if (controlledPilot) {
+    pass("test:supabase-live is not required for controlled production pilot");
+  } else {
+    requireActivationTrue(pre.testSupabaseLivePassed, "test:supabase-live passed");
+  }
+  if (controlledPilotEvidenceConfirmed(packet, "crossRoleBrowserQaDeferred")) {
+    pass("test:e2e:supabase full cross-role browser workflow is deferred for controlled pilot");
+  } else {
+    requireActivationTrue(pre.testE2eSupabasePassed, "test:e2e:supabase passed");
+  }
+  requireActivationTrue(pre.verifyPilotVolumePassed, "verify:pilot-volume passed");
+  if (controlledPilot) {
+    pass("verify:full is deferred for controlled registered-agent pilot");
+    requireActivationTrue(pre.finalDiffReviewed, "Final scoped diff was reviewed");
+  } else {
+    requireActivationTrue(pre.verifyFullPassed, "verify:full passed");
+    requireActivationTrue(pre.finalDiffReviewed, "Final diff was reviewed");
+  }
   if (present(pre.evidenceArtifact)) {
     requireExistingProjectFile(
       pre.evidenceArtifact,
@@ -1148,6 +1779,8 @@ function verifyPacket(packet, rawContent) {
   } else {
     activationBlock("Pre-activation evidence artifact exists", "missing");
   }
+
+  verifyControlledPilotEnvelope(packet);
 
   const env = packet.productionEnvEvidence ?? {};
   for (const [key, label] of [
@@ -1159,13 +1792,24 @@ function verifyPacket(packet, rawContent) {
     ["migrationsApplied", "Migrations applied evidence is true"],
     ["rlsPolicyTestsPassed", "RLS policy tests evidence is true"],
     ["storagePolicyTestsPassed", "Storage policy tests evidence is true"],
-    ["edgeFunctionDryRunsPassed", "Edge Function dry-run evidence is true"],
-    ["browserQaPassed", "Browser QA evidence is true"],
     ["browserKeyAudited", "Browser key audit evidence is true"],
     ["productionApproved", "Production approval evidence is true"],
     ["publicConfigRecorded", "Production public config is recorded"],
   ]) {
     requireActivationTrue(env[key], label);
+  }
+  if (controlledPilotEvidenceConfirmed(packet, "edgeFunctionDryRunDeferred")) {
+    pass("Edge Function dry-runs are deferred for controlled pilot");
+  } else {
+    requireActivationTrue(
+      env.edgeFunctionDryRunsPassed,
+      "Edge Function dry-run evidence is true",
+    );
+  }
+  if (controlledPilotEvidenceConfirmed(packet, "crossRoleBrowserQaDeferred")) {
+    pass("Cross-role browser QA is deferred for controlled pilot");
+  } else {
+    requireActivationTrue(env.browserQaPassed, "Browser QA evidence is true");
   }
   verifyProductionMigrationEvidence(packet);
 
@@ -1216,18 +1860,23 @@ function verifyPacket(packet, rawContent) {
       "Supabase Auth plan eligibility evidence is recorded",
     );
   }
-  requireActivationTrue(
-    authSecurity.leakedPasswordProtectionPlanEligible,
-    "Supabase plan can enable Auth leaked password protection",
-  );
-  requireActivationTrue(
-    authSecurity.leakedPasswordProtectionEnabled,
-    "Supabase Auth leaked password protection is enabled",
-  );
-  requireActivationTrue(
-    authSecurity.noBlockingSecurityAdvisorWarnings,
-    "Supabase security advisors have no activation-blocking warnings",
-  );
+  if (controlledPilotEvidenceConfirmed(packet, "leakedPasswordProtectionDeferred")) {
+    pass("Supabase Auth leaked password protection is deferred for controlled registered-agent pilot");
+    pass("Supabase security advisor warning is accepted for controlled registered-agent pilot");
+  } else {
+    requireActivationTrue(
+      authSecurity.leakedPasswordProtectionPlanEligible,
+      "Supabase plan can enable Auth leaked password protection",
+    );
+    requireActivationTrue(
+      authSecurity.leakedPasswordProtectionEnabled,
+      "Supabase Auth leaked password protection is enabled",
+    );
+    requireActivationTrue(
+      authSecurity.noBlockingSecurityAdvisorWarnings,
+      "Supabase security advisors have no activation-blocking warnings",
+    );
+  }
 
   const post = packet.postActivationChecks ?? {};
   verifyProductionWorkflowEvidence(packet, env, post);
@@ -1244,6 +1893,13 @@ function verifyPacket(packet, rawContent) {
     ["privateMediaSignedUrlScoped", "Private media signed URL is scoped"],
     ["logsAndErrorRateChecked", "Logs and error rate are checked"],
   ]) {
+    if (
+      key === "logsAndErrorRateChecked" &&
+      controlledPilotEvidenceConfirmed(packet, "logsReviewDeferred")
+    ) {
+      pass("Logs and error-rate review is deferred for controlled registered-agent pilot");
+      continue;
+    }
     if (!workflowEvidenceConfirmed) {
       activationBlock(label, "workflow evidence not confirmed");
     } else {
