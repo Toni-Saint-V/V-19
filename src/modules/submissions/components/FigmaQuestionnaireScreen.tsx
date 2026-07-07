@@ -1092,6 +1092,7 @@ export function FigmaQuestionnaireScreen({
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
+  const workPanelRef = useRef<HTMLDivElement | null>(null);
   const sourceFormData = useMemo(
     () => questionnaireFormDataFromSubmission(submission, activeApplicant),
     [activeApplicant, submission],
@@ -1404,7 +1405,16 @@ export function FigmaQuestionnaireScreen({
   function goToNextSection() {
     const currentIndex = sections.findIndex((section) => section.id === activeSection);
     const nextSection = sections[(currentIndex + 1) % sections.length];
-    setActiveSection(nextSection.id);
+    selectSection(nextSection.id);
+  }
+
+  function selectSection(sectionId: SectionId) {
+    setActiveSection(sectionId);
+
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    window.requestAnimationFrame(() => {
+      workPanelRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
   }
 
   const focusedApplicantId = initialFocus?.applicantId ?? activeApplicant;
@@ -2250,13 +2260,14 @@ export function FigmaQuestionnaireScreen({
           <div className="v19-questionnaire-section-list v19-questionnaire-section-list--pinned">
             {sections.map((section) => (
               <button
+                aria-expanded={activeSection === section.id}
                 aria-selected={activeSection === section.id}
                 className={`v19-questionnaire-section-tab ${
                   activeSection === section.id ? "is-active" : ""
                 }`}
                 key={`pinned-${section.id}`}
                 type="button"
-                onClick={() => setActiveSection(section.id)}
+                onClick={() => selectSection(section.id)}
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-[var(--v19b-size-12)] font-semibold truncate">
@@ -2277,6 +2288,10 @@ export function FigmaQuestionnaireScreen({
                     "-"
                   )}
                 </QuestionnaireProgressBadge>
+                <ChevronDown
+                  aria-hidden="true"
+                  className="v19-questionnaire-section-chevron"
+                />
               </button>
             ))}
           </div>
@@ -2295,13 +2310,14 @@ export function FigmaQuestionnaireScreen({
               <div className="v19-questionnaire-section-list v19-questionnaire-section-list--sidebar">
                 {sections.map((section) => (
                   <button
+                    aria-expanded={activeSection === section.id}
                     aria-selected={activeSection === section.id}
                     className={`v19-questionnaire-section-tab ${
                       activeSection === section.id ? "is-active" : ""
                     }`}
                     key={section.id}
                     type="button"
-                    onClick={() => setActiveSection(section.id)}
+                    onClick={() => selectSection(section.id)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-[var(--v19b-size-12)] font-semibold truncate">
@@ -2323,12 +2339,16 @@ export function FigmaQuestionnaireScreen({
                         "-"
                       )}
                     </QuestionnaireProgressBadge>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="v19-questionnaire-section-chevron"
+                    />
                   </button>
                 ))}
               </div>
             </aside>
 
-            <div className="v19-questionnaire-work-panel">
+            <div className="v19-questionnaire-work-panel" ref={workPanelRef}>
               <div className="v19-questionnaire-work-head">
                 <h3 className="text-[var(--v19b-size-15)] lg:text-[var(--v19b-size-16)] font-semibold text-white leading-snug">
                   {sections.find((section) => section.id === activeSection)?.title}

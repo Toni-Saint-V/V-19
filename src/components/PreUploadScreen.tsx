@@ -311,7 +311,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         <div className="grid h-full min-h-full w-full grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] xl:gap-6 xl:p-6">
           <section className="flex h-full min-h-0 flex-col">
             <motion.div
-              className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-5 pb-2 pt-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)] lg:p-6 xl:rounded-3xl xl:border xl:border-[#242529]"
+              className="relative grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-none border-0 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-5 pb-2 pt-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)] lg:p-6 xl:rounded-3xl xl:border xl:border-[#242529]"
             >
               <motion.div
                 aria-hidden
@@ -320,7 +320,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               />
 
-              <div className="mb-6 flex justify-center relative z-10">
+              <div className="relative z-10 mb-4 flex min-h-[126px] justify-center">
                 <div className="relative w-full max-w-[560px] space-y-3">
                   <div className="mx-auto flex w-fit rounded-full border border-[#242529] bg-[#141416]/76 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
                     {[
@@ -351,8 +351,8 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   <AnimatePresence mode="wait" initial={false}>
                     {extractionIsDone ? (
                       <motion.div
-                        key="recognized-fields-form"
-                        initial={{ opacity: 0, y: 10, scale: 0.985 }}
+                        key="recognized-status"
+                        initial={{ opacity: 0, y: 8, scale: 0.985 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.985 }}
                         transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -364,27 +364,6 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                           <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-white/35">
                             {previewFields.length} полей
                           </span>
-                        </div>
-
-                        <div className="mt-3 grid max-h-[158px] grid-cols-2 gap-x-4 gap-y-2 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                          {previewFields.length > 0 ? (
-                            previewFields.map((field, index) => (
-                              <motion.div
-                                key={`${field.key}-${field.value}-${index}`}
-                                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                transition={{ delay: index * 0.025 }}
-                                className="min-w-0 border-b border-white/10 px-0 pb-2.5 pt-1"
-                              >
-                                <div className="truncate text-[9.5px] font-medium uppercase tracking-wide text-white/35">{field.label}</div>
-                                <div className="mt-1 truncate text-[13px] font-semibold text-white">{field.value}</div>
-                              </motion.div>
-                            ))
-                          ) : (
-                            <div className="col-span-2 rounded-xl border border-dashed border-white/10 bg-white/[0.025] px-3 py-2 text-[11px] leading-relaxed text-white/45">
-                              Поля появятся здесь сразу после распознавания паспорта.
-                            </div>
-                          )}
                         </div>
                       </motion.div>
                     ) : packageType === 'family' ? (
@@ -464,7 +443,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 }}
                 onDragLeave={() => setDropActive(false)}
                 onDrop={handleDrop}
-                className={`relative mt-8 min-h-[258px] flex-1 rounded-3xl border border-dashed p-6 lg:p-10 flex flex-col items-center justify-center text-center group transition-colors cursor-pointer overflow-hidden ${dropActive ? 'border-[#8fa3ff] bg-[#6f64ff]/[0.14]' : 'border-[#6f64ff]/40 bg-[#6f64ff]/5 hover:bg-[#6f64ff]/10'}`}
+                className={`relative min-h-[180px] rounded-3xl border border-dashed p-6 lg:min-h-[258px] lg:p-10 flex flex-col items-center justify-center text-center group transition-colors cursor-pointer overflow-hidden ${dropActive ? 'border-[#8fa3ff] bg-[#6f64ff]/[0.14]' : 'border-[#6f64ff]/40 bg-[#6f64ff]/5 hover:bg-[#6f64ff]/10'}`}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <motion.div
@@ -495,18 +474,18 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" onChange={handleFileInput} />
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="mt-4 flex shrink-0 justify-start gap-2">
                 <button
                   type="button"
                   onClick={saveDraft}
-                  className="h-11 rounded-[8px] border border-white/10 bg-transparent px-3 text-[13px] font-medium text-white/62 transition-colors hover:border-white/18 hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  className="h-11 min-w-[180px] rounded-[8px] border border-white/10 bg-transparent px-4 text-[13px] font-medium text-white/62 transition-colors hover:border-white/18 hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] max-sm:min-w-0 max-sm:flex-1"
                 >
                   Сохранить черновик
                 </button>
                 <button
                   type="button"
                   onClick={completeDraft}
-                  className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="h-11 min-w-[180px] rounded-[8px] bg-[#3a45b4] px-4 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white max-sm:min-w-0 max-sm:flex-1"
                 >
                   Далее
                 </button>

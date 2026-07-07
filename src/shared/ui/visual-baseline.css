@@ -5105,6 +5105,20 @@ body,
   background: var(--v19b-color-control-hover) !important;
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-section-chevron {
+  width: var(--v19b-size-16);
+  height: var(--v19b-size-16);
+  flex: 0 0 auto;
+  color: var(--v19b-color-text-faint);
+  transition: transform var(--v19-motion-fast) var(--v19-motion-ease);
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-section-tab[aria-expanded="true"]
+  .v19-questionnaire-section-chevron {
+  transform: rotate(180deg);
+}
+
 .vf-figma-questionnaire-screen .v19-questionnaire-work-head {
   background: var(--v19b-color-page) !important;
 }
@@ -5406,7 +5420,7 @@ body,
 
   .vf-figma-questionnaire-screen .v19-questionnaire-workspace-shell {
     display: grid !important;
-    grid-template-columns: var(--v19b-size-340) minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+    grid-template-columns: minmax(var(--v19b-size-220), 20%) minmax(var(--v19b-size-0), 80%) !important;
     gap: var(--v19b-size-20) !important;
   }
 
@@ -5417,6 +5431,10 @@ body,
     width: var(--v19b-size-full) !important;
     padding: var(--v19b-size-16) !important;
     border-radius: var(--v19-radius-card) !important;
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-section-list--pinned {
+    display: none !important;
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-readiness-card,

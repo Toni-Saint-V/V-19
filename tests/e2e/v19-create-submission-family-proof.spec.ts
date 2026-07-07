@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { collectBrowserProblems, openFreshWorkspace } from "./v19-pilot-helpers";
 
 const qaDir = "docs/qa/pipeline-premium-ui-mobile-20260628/fix-findings";
 
@@ -30,7 +31,7 @@ async function clickFirstVisible(locator: Locator) {
 }
 
 async function openMySubmissions(page: Page, mobile: boolean) {
-  await page.goto("/");
+  await openFreshWorkspace(page, { heading: "Мои действия" });
 
   if (mobile) {
     const menu = page.getByRole("button", { name: "Меню" });
@@ -56,57 +57,33 @@ async function openCreateSubmission(page: Page, mobile: boolean) {
   return dialog;
 }
 
-async function uploadPassportToApplicant(
-  familyPanel: Locator,
-  dialog: Locator,
-  applicantLabel: string,
-  fileName: string,
-) {
-  await familyPanel.locator("button").filter({ hasText: applicantLabel }).first().click();
-  await dialog.locator(".pi-file-input").setInputFiles(e2ePassportFile(fileName));
-  await expect(familyPanel.getByText(`e2e-passport-${fileName}.jpg`)).toBeVisible();
-}
-
 async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   const dialog = await openCreateSubmission(page, mobile);
-  const nextButton = dialog.locator(".create-passport-next");
-  const familyPanel = dialog.getByLabel(
-    mobile
-      ? "Заявители семьи и общие ответы"
-      : "Заявители и общие семейные ответы",
-  );
+  const nextButton = dialog.getByRole("button", { exact: true, name: "Далее" });
+  const initialFooterTop = await footerTop(dialog);
+
+  await expectActionButtonsInViewport(page, dialog);
+
+  await dialog.getByRole("button", { exact: true, name: "Один" }).click();
+  await expectActionButtonsInViewport(page, dialog);
+  expect(Math.abs((await footerTop(dialog)) - initialFooterTop)).toBeLessThanOrEqual(4);
 
   await dialog.getByRole("button", { exact: true, name: "Семья" }).click();
-  await expect(dialog.getByText("2 чел.")).toBeVisible();
-  await expect(familyPanel.getByText("Основной заявитель")).toBeVisible();
-  await expect(familyPanel.getByText("Заявитель 2")).toBeVisible();
+  await expectActionButtonsInViewport(page, dialog);
+  expect(Math.abs((await footerTop(dialog)) - initialFooterTop)).toBeLessThanOrEqual(4);
   await expect(
-    familyPanel.getByText("Один адрес проживания в России у всех?"),
+    dialog.getByText("У вас одинаковый адрес проживания в России?"),
   ).toBeVisible();
-  await expect(
-    familyPanel.getByText("Одно проживание в Испании у всех?"),
-  ).toBeVisible();
-  await expect(familyPanel.getByRole("button", { name: "Да" }).first()).toBeVisible();
-  await expect(familyPanel.getByRole("button", { name: "Нет" }).first()).toBeVisible();
-  await expect(nextButton).toBeDisabled();
+  await expect(dialog.getByText("В Испании?")).toBeVisible();
+  if (!mobile) {
+    await expect(dialog.getByText("Prefill-поля")).toBeVisible();
+  }
+  await expect(dialog.getByRole("button", { name: "Выбрать файлы" })).toBeVisible();
 
-  await uploadPassportToApplicant(familyPanel, dialog, "Основной заявитель", "Ivan_Petrov");
-  await expect(nextButton).toBeDisabled();
-
-  await uploadPassportToApplicant(familyPanel, dialog, "Заявитель 2", "Anna_Petrova");
+  await dialog.locator('input[type="file"]').setInputFiles(e2ePassportFile("family"));
+  await expect(dialog.getByText("Заменить набор файлов")).toBeVisible();
   await expect(nextButton).toBeEnabled();
-
-  await dialog.getByRole("button", { exact: true, name: "Заявитель" }).click();
-  await expect(dialog.getByText("1 чел.")).toBeVisible();
-  await expect(dialog.getByText("e2e-passport-Anna_Petrova.jpg")).toHaveCount(0);
-  await expect(nextButton).toBeEnabled();
-
-  await dialog.getByRole("button", { exact: true, name: "Семья" }).click();
-  await expect(dialog.getByText("2 чел.")).toBeVisible();
-  await expect(nextButton).toBeDisabled();
-
-  await uploadPassportToApplicant(familyPanel, dialog, "Заявитель 2", "Anna_Petrova");
-  await expect(nextButton).toBeEnabled();
+  await expectActionButtonsInViewport(page, dialog);
 
   await page.screenshot({
     fullPage: true,
@@ -115,7 +92,65 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
   await expectHorizontalOverflow(page, 0);
 
   await nextButton.click();
-  await expect(dialog.getByRole("button", { name: "Сохранить черновик" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Анкета: Семейный пакет" }),
+  ).toBeVisible();
+  if (mobile) {
+    await expect(page.getByRole("button", { name: "2 Заявитель 2" })).toBeVisible();
+  } else {
+    await expect(page.getByText("Семья, 2 чел.")).toBeVisible();
+    await expectQuestionnaireDesktopLayout(page);
+  }
+  await expect(dialog).toHaveCount(0);
+}
+
+async function footerTop(dialog: Locator) {
+  const box = await dialog
+    .getByRole("button", { exact: true, name: "Далее" })
+    .boundingBox();
+  expect(box).not.toBeNull();
+  return box?.y ?? 0;
+}
+
+async function expectActionButtonsInViewport(page: Page, dialog: Locator) {
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+
+  for (const name of ["Сохранить черновик", "Далее"]) {
+    const button = dialog.getByRole("button", { exact: true, name });
+    await expect(button).toBeVisible();
+
+    const box = await button.boundingBox();
+    expect(box, `${name} should have a layout box`).not.toBeNull();
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewportHeight);
+  }
+}
+
+async function expectQuestionnaireDesktopLayout(page: Page) {
+  const applicantBar = page.locator(".v19-questionnaire-applicant-bar");
+  const sectionNav = page.locator(".v19-questionnaire-section-nav");
+  const workPanel = page.locator(".v19-questionnaire-work-panel");
+
+  await expect(applicantBar).toBeVisible();
+  await expect(sectionNav).toBeVisible();
+  await expect(workPanel).toBeVisible();
+
+  const pinnedDisplay = await page
+    .locator(".v19-questionnaire-section-list--pinned")
+    .evaluate((element) => getComputedStyle(element).display);
+  expect(pinnedDisplay).toBe("none");
+
+  const applicantBox = await applicantBar.boundingBox();
+  const sectionBox = await sectionNav.boundingBox();
+  const workBox = await workPanel.boundingBox();
+  expect(applicantBox).not.toBeNull();
+  expect(sectionBox).not.toBeNull();
+  expect(workBox).not.toBeNull();
+
+  expect(applicantBox?.y ?? 0).toBeLessThan(sectionBox?.y ?? 0);
+  expect(sectionBox?.x ?? 0).toBeLessThan(workBox?.x ?? 0);
+
+  const contentWidth = (workBox?.width ?? 0) + (sectionBox?.width ?? 0);
+  expect((workBox?.width ?? 0) / contentWidth).toBeGreaterThanOrEqual(0.74);
 }
 
 async function expectHorizontalOverflow(page: Page, expected: number) {
@@ -144,32 +179,17 @@ test.describe("V-19 create submission family proof", () => {
     mkdirSync(qaDir, { recursive: true });
   });
 
-  test("family passports are required per applicant on desktop", async ({ page }) => {
-    const consoleProblems = collectConsoleProblems(page);
+  test("family upload opens the questionnaire on desktop", async ({ page }) => {
+    const consoleProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 960, width: 1440 });
     await verifyFamilyCreateFlow(page, false);
     expect(consoleProblems).toEqual([]);
   });
 
-  test("family passports are required per applicant on mobile", async ({ page }) => {
-    const consoleProblems = collectConsoleProblems(page);
+  test("family upload opens the questionnaire on mobile", async ({ page }) => {
+    const consoleProblems = collectBrowserProblems(page);
     await page.setViewportSize({ height: 844, width: 390 });
     await verifyFamilyCreateFlow(page, true);
     expect(consoleProblems).toEqual([]);
   });
 });
-
-function collectConsoleProblems(page: Page) {
-  const problems: string[] = [];
-
-  page.on("console", (message) => {
-    if (message.type() === "error") {
-      problems.push(`console: ${message.text()}`);
-    }
-  });
-  page.on("pageerror", (error) => {
-    problems.push(`pageerror: ${error.message}`);
-  });
-
-  return problems;
-}
