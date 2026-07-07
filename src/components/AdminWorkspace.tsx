@@ -391,7 +391,7 @@ export function AdminWorkspace({
   };
 
   return (
-    <div className="flex h-full w-full bg-[#101011] relative overflow-hidden">
+    <div className="v19-admin-workspace flex h-full w-full bg-[#101011] relative overflow-hidden">
       
       {currentView === 'review_workspace' && selectedRow && (
         <ReviewWorkspace 
@@ -437,7 +437,7 @@ export function AdminWorkspace({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 flex flex-col bg-[#141416]">
+      <main className="v19-admin-main flex-1 min-w-0 flex flex-col bg-[#141416]">
         {/* Topbar */}
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
           <div className="flex items-center gap-3">
@@ -451,9 +451,14 @@ export function AdminWorkspace({
         </header>
 
         {/* Dynamic View Content */}
-        <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
-          <div className="max-w-[1460px] mx-auto h-full">
-            {activeNav === 'review' && <ReviewScreen onOpenDrawer={handleOpenReviewDrawer} />}
+        <div className="v19-admin-main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
+          <div className="v19-admin-main-inner mx-auto h-full max-w-[1460px]">
+            {activeNav === 'review' && (
+              <ReviewScreen
+                submissions={submissions}
+                onOpenDrawer={handleOpenReviewDrawer}
+              />
+            )}
             {activeNav === 'export' && <AdminExportScreen submissions={submissions} />}
             {activeNav === 'users' && (
               <AdminUsersAccessPanel

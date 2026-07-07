@@ -54,89 +54,65 @@ export type AdminToolbarTab<T extends string> = {
   tone?: string;
 };
 
-export function AdminQueueToolbar<T extends string>({
-  activeTab,
+export function AdminToolbarSelect<T extends string>({
+  ariaLabel,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  ariaLabel?: string;
+  label: string;
+  onChange: (value: T) => void;
+  options: Array<{ label: string; value: T }>;
+  value: T;
+}) {
+  return (
+    <label className="flex h-10 shrink-0 items-center gap-2 rounded-[10px] border border-[#242529] bg-[#111113] px-3 text-[11px] font-medium text-white/55 hover:bg-white/5 hover:text-white">
+      <span className="hidden text-white/35 sm:inline">{label}</span>
+      <select
+        aria-label={ariaLabel ?? label}
+        className="h-full min-w-[112px] appearance-none bg-transparent text-[11px] font-semibold text-white/72 outline-none"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value as T)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function AdminQueueToolbar({
   cityFilter,
   cityOptions,
+  controls,
   filterLabel = 'Фильтры',
   onCityFilterChange,
   onFilterClick,
   onSearchChange,
-  onTabChange,
   searchPlaceholder,
   searchValue,
-  tabs,
 }: {
-  activeTab: T;
   cityFilter: string;
   cityOptions: string[];
+  controls?: ReactNode;
   filterLabel?: string;
   onCityFilterChange: (city: string) => void;
   onFilterClick?: () => void;
   onSearchChange: (value: string) => void;
-  onTabChange: (tab: T) => void;
   searchPlaceholder: string;
   searchValue: string;
-  tabs: AdminToolbarTab<T>[];
 }) {
   const cityActive = cityFilter !== 'Все города';
 
   return (
     <div className="flex flex-col gap-3 border-b border-[#242529] p-4 sm:gap-5 lg:p-5">
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
-          <div className="flex w-max items-center gap-2 pr-1 sm:w-auto sm:flex-wrap sm:gap-3">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => onTabChange(tab.id)}
-                  className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-[10px] border px-3 text-[10px] font-medium transition-colors ${
-                    active
-                      ? tab.tone
-                        ? tab.tone
-                        : 'border-[#6f64ff]/60 bg-[#6f64ff]/18 text-[#c9c6ff]'
-                      : 'border-white/10 bg-white/[0.045] text-white/55 hover:text-white'
-                  }`}
-                  type="button"
-                >
-                  {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-                  {tab.label}
-                  {typeof tab.count === 'number' ? <span className="text-white/35">{tab.count}</span> : null}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <label
-          className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border shadow-[0_0_18px_rgba(111,100,255,0.14)] sm:hidden ${
-            cityActive
-              ? 'border-[#6f64ff]/70 bg-[#6f64ff]/25 text-[#dfe4ff]'
-              : 'border-[#6f64ff]/45 bg-[#6f64ff]/16 text-[#b8baff]'
-          }`}
-          title="Фильтр городов"
-        >
-          <MapPin className="h-3.5 w-3.5" />
-          <span className="sr-only">Фильтр городов</span>
-          <select
-            aria-label="Фильтр городов"
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            value={cityFilter}
-            onChange={(event) => onCityFilterChange(event.currentTarget.value)}
-          >
-            {cityOptions.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="flex items-center gap-2 lg:gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
+        <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/38" />
           <input
             className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[11px] font-medium text-white/70 placeholder:text-[#525151] outline-none focus:border-[#6f64ff]/55"
@@ -145,7 +121,16 @@ export function AdminQueueToolbar<T extends string>({
             onChange={(event) => onSearchChange(event.currentTarget.value)}
           />
         </div>
-        <label className="relative hidden h-10 shrink-0 items-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white sm:flex">
+        {controls ? (
+          <div className="v19-admin-toolbar-controls flex min-w-0 flex-wrap items-center gap-2">
+            {controls}
+          </div>
+        ) : null}
+        <label
+          className={`relative flex h-10 shrink-0 items-center rounded-[10px] border bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white ${
+            cityActive ? 'border-[#6f64ff]/55 text-[#dfe4ff]' : 'border-[#242529]'
+          }`}
+        >
           <MapPin className="pointer-events-none absolute left-3 h-3.5 w-3.5" />
           <span className="sr-only">Фильтр городов</span>
           <select

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
@@ -15,13 +15,21 @@ import {
   User,
   Users,
 } from 'lucide-react';
-import { AdminMetricCard, AdminQueueToolbar } from './AdminSurfaceCommon';
+import { AdminMetricCard, AdminQueueToolbar, AdminToolbarSelect } from './AdminSurfaceCommon';
+import {
+  buildAdminTriageRadar,
+  type AdminTriageRadarItem,
+} from '../modules/submissions/adminTriageRadar';
+import type { Submission } from '../modules/submissions/types';
 
 interface AdminScreenProps {
   onOpenDrawer: (id: string) => void;
+  submissions?: Submission[];
 }
 
 type Lane = 'urgent' | 'review' | 'returned' | 'ready';
+type AdminReviewSort = 'tripDate' | 'createdAt';
+type AdminReviewTypeFilter = 'all' | 'family' | 'single';
 
 interface ReviewCard {
   id: string;
@@ -40,6 +48,8 @@ interface ReviewCard {
   aiFlags: number;
   nextAction: string;
   lastEvent: string;
+  createdAtIso: string;
+  tripDateIso: string;
 }
 
 const reviews: ReviewCard[] = [
@@ -60,6 +70,8 @@ const reviews: ReviewCard[] = [
     aiFlags: 1,
     nextAction: 'Проверить паспорт основного заявителя',
     lastEvent: 'Агент загрузил исправленный scan 14 мин назад',
+    createdAtIso: '2026-07-06T10:30:00.000Z',
+    tripDateIso: '2026-08-11T00:00:00.000Z',
   },
   {
     id: 'SUB-1082',
@@ -78,6 +90,8 @@ const reviews: ReviewCard[] = [
     aiFlags: 1,
     nextAction: 'Сверить место рождения в анкете и паспорте',
     lastEvent: 'OCR отметил расхождение 8 мин назад',
+    createdAtIso: '2026-07-07T08:40:00.000Z',
+    tripDateIso: '2026-08-02T00:00:00.000Z',
   },
   {
     id: 'FAM-005',
@@ -96,6 +110,8 @@ const reviews: ReviewCard[] = [
     aiFlags: 0,
     nextAction: 'Ждём новые справки по детям',
     lastEvent: 'Админ вернул 2 замечания сегодня в 11:42',
+    createdAtIso: '2026-07-05T15:10:00.000Z',
+    tripDateIso: '2026-08-19T00:00:00.000Z',
   },
   {
     id: 'SUB-1078',
@@ -114,6 +130,8 @@ const reviews: ReviewCard[] = [
     aiFlags: 0,
     nextAction: 'Подтвердить и отправить в выгрузку',
     lastEvent: 'Все замечания закрыты 18 мин назад',
+    createdAtIso: '2026-07-07T09:20:00.000Z',
+    tripDateIso: '2026-09-06T00:00:00.000Z',
   },
 ];
 
@@ -209,26 +227,97 @@ function ReviewQueueCard({ item, onOpenDrawer }: { item: ReviewCard; onOpenDrawe
   );
 }
 
-export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
+type ReviewAiWatchItem =
+  | {
+      agent?: string;
+      id: string;
+      reason: string;
+      title: string;
+      tone: AdminTriageRadarItem["band"];
+      score?: number;
+    }
+  | {
+      agent: string;
+      id: string;
+      reason: string;
+      title: string;
+      tone: "attention" | "critical";
+      score?: number;
+    };
+
+function watchToneClass(tone: ReviewAiWatchItem["tone"]) {
+  if (tone === "critical") {
+    return "border-[#5b2b32]/45 bg-[#24191b]/50";
+  }
+  if (tone === "ready") {
+    return "border-[#244238]/40 bg-[#14251f]/35";
+  }
+  return "border-[#6f64ff]/25 bg-[#6f64ff]/10";
+}
+
+function buildReviewAiWatchlist(
+  submissions: Submission[] | undefined,
+): ReviewAiWatchItem[] {
+  if (submissions?.length) {
+    const radarItems = buildAdminTriageRadar(submissions).items;
+    const signalItems = radarItems.filter(
+      (item) => item.band === "critical" || item.band === "attention",
+    );
+    const visibleItems = signalItems.length ? signalItems : radarItems;
+
+    return visibleItems
+      .slice(0, 3)
+      .map((item) => ({
+        id: item.submissionId,
+        reason: item.reasons[0] ?? item.nextAction,
+        score: item.score,
+        title: item.title,
+        tone: item.band,
+      }));
+  }
+
+  return reviews
+    .filter((item) => item.aiFlags > 0 || item.blockers > 0)
+    .slice(0, 3)
+    .map((item) => ({
+      agent: item.agent,
+      id: item.id,
+      reason: item.nextAction,
+      title: item.title,
+      tone: item.blockers > 0 ? "critical" : "attention",
+    }));
+}
+
+export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
   const [activeLane, setActiveLane] = useState<Lane | 'all'>('all');
   const [cityFilter, setCityFilter] = useState('Все города');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<AdminReviewSort>('tripDate');
+  const [typeFilter, setTypeFilter] = useState<AdminReviewTypeFilter>('all');
   const [showIntro, setShowIntro] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.sessionStorage.getItem(reviewIntroStorageKey) !== 'true';
   });
   const cityOptions = ['Все города', ...Array.from(new Set(reviews.map((item) => item.city)))];
   const searchNeedle = searchQuery.trim().toLowerCase();
-  const filteredReviews = reviews.filter((item) => {
-    const cityMatches = cityFilter === 'Все города' || item.city === cityFilter;
-    const searchMatches =
-      !searchNeedle ||
-      [item.id, item.title, item.agent, item.city]
-        .join(' ')
-        .toLowerCase()
-        .includes(searchNeedle);
-    return cityMatches && searchMatches;
-  });
+  const filteredReviews = reviews
+    .filter((item) => {
+      const cityMatches = cityFilter === 'Все города' || item.city === cityFilter;
+      const typeMatches = typeFilter === 'all' || item.type === typeFilter;
+      const searchMatches =
+        !searchNeedle ||
+        [item.id, item.title, item.agent, item.city]
+          .join(' ')
+          .toLowerCase()
+          .includes(searchNeedle);
+      return cityMatches && typeMatches && searchMatches;
+    })
+    .sort((left, right) => {
+      if (sortBy === 'createdAt') {
+        return Date.parse(right.createdAtIso) - Date.parse(left.createdAtIso);
+      }
+      return Date.parse(left.tripDateIso) - Date.parse(right.tripDateIso);
+    });
   const visibleReviews =
     activeLane === 'all'
       ? filteredReviews
@@ -236,6 +325,10 @@ export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
   const totalBlockers = filteredReviews.reduce((sum, item) => sum + item.blockers, 0);
   const totalWarnings = filteredReviews.reduce((sum, item) => sum + item.warnings, 0);
   const readyCount = filteredReviews.filter((item) => item.lane === 'ready').length;
+  const aiWatchlist = useMemo(
+    () => buildReviewAiWatchlist(submissions),
+    [submissions],
+  );
 
   useEffect(() => {
     if (!showIntro) return;
@@ -249,7 +342,7 @@ export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
   }, [showIntro]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid h-full min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="v19-admin-screen grid h-full min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <section className="min-w-0 space-y-5">
         {showIntro && (
           <motion.div
@@ -304,29 +397,43 @@ export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
 
         <div className="rounded-[10px] border border-[#242529] bg-[#161617]">
           <AdminQueueToolbar
-            activeTab={activeLane}
             cityFilter={cityFilter}
             cityOptions={cityOptions}
             filterLabel="Фильтры проверки"
+            controls={
+              <>
+                <AdminToolbarSelect<AdminReviewSort>
+                  label="Сортировка"
+                  value={sortBy}
+                  onChange={setSortBy}
+                  options={[
+                    { value: 'tripDate', label: 'Дата поездки' },
+                    { value: 'createdAt', label: 'Дата создания' },
+                  ]}
+                />
+                <AdminToolbarSelect<AdminReviewTypeFilter>
+                  label="Тип"
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  options={[
+                    { value: 'all', label: 'Семьи и заявители' },
+                    { value: 'family', label: 'Семьи' },
+                    { value: 'single', label: 'Заявители' },
+                  ]}
+                />
+              </>
+            }
             onCityFilterChange={setCityFilter}
             onFilterClick={() => {
+              setActiveLane('all');
               setCityFilter('Все города');
               setSearchQuery('');
+              setSortBy('tripDate');
+              setTypeFilter('all');
             }}
             onSearchChange={setSearchQuery}
-            onTabChange={setActiveLane}
             searchPlaceholder="Поиск: ID, агент, семья"
             searchValue={searchQuery}
-            tabs={[
-              { id: 'all', label: 'Все' },
-              ...lanes.map((lane) => ({
-                count: filteredReviews.filter((item) => item.lane === lane.id).length,
-                icon: lane.icon,
-                id: lane.id,
-                label: lane.title,
-                tone: toneClasses(lane.tone),
-              })),
-            ]}
           />
 
           <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2 2xl:grid-cols-4">
@@ -368,17 +475,48 @@ export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
         <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
           <div className="mb-4 flex items-center gap-2">
             <Bot className="h-4 w-4 text-[#b8baff]" />
-            <h3 className="text-[15px] font-semibold text-white">AI / OCR watchlist</h3>
+            <h3 className="text-[15px] font-semibold text-white">Тихая AI-помощь</h3>
           </div>
-          <div className="space-y-3">
-            <div className="rounded-[10px] border border-[#6f64ff]/25 bg-[#6f64ff]/10 p-3">
-              <div className="text-[12px] font-medium text-white">SUB-1082 · место рождения</div>
-              <p className="mt-1 text-[11.5px] leading-relaxed text-white/45">OCR видит MOSCOW, анкета содержит MOSKVA. Нужно решение админа.</p>
-            </div>
-            <div className="rounded-[10px] border border-white/10 bg-white/[0.045] p-3">
-              <div className="text-[12px] font-medium text-white">SUB-1061 · файл страховки</div>
-              <p className="mt-1 text-[11.5px] leading-relaxed text-white/45">Срок покрытия меньше периода поездки на 1 день.</p>
-            </div>
+          <div className="space-y-2.5">
+            {aiWatchlist.length ? (
+              aiWatchlist.map((item) => (
+                <button
+                  className={`w-full rounded-[10px] border p-3 text-left transition-colors hover:border-[#6f64ff]/45 ${watchToneClass(item.tone)}`}
+                  key={item.id}
+                  type="button"
+                  onClick={() => onOpenDrawer(item.id)}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-[12px] font-semibold text-white">
+                      {item.id} · {item.title}
+                    </span>
+                    {typeof item.score === "number" ? (
+                      <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/45">
+                        {item.score}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-white/48">
+                    {item.reason}
+                  </p>
+                  {"agent" in item && item.agent ? (
+                    <small className="mt-2 block text-[10.5px] text-white/35">
+                      {item.agent}
+                    </small>
+                  ) : null}
+                </button>
+              ))
+            ) : (
+              <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
+                <div className="text-[12px] font-medium text-white">Активных AI/OCR сигналов нет</div>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-white/42">
+                  Очередь можно разбирать по фильтрам и ручным правилам.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="mt-3 rounded-[10px] border border-white/5 bg-white/[0.025] px-3 py-2 text-[11px] leading-relaxed text-white/38">
+            Подсказка не принимает решение и не закрывает замечания.
           </div>
         </div>
 
