@@ -1,14 +1,8 @@
 import type { ReactNode } from "react";
 import {
-  AlertTriangle,
-  CheckCircle2,
   ChevronRight,
-  FileCheck2,
   FileText,
   FolderOpen,
-  ImageIcon,
-  MessageSquareWarning,
-  UploadCloud,
   User,
   Users,
 } from "lucide-react";
@@ -19,14 +13,11 @@ import { formatSubmissionListTitle } from "../listFormatters";
 import { applicantCountLabel, tripDates } from "../selectors";
 import {
   blockerCount,
-  fileStatusLabels,
-  fileTypeLabels,
-  fixedIssueCount,
   nextProblem,
   openIssueCount,
   statusLabelFor,
 } from "../status";
-import type { DrawerTab, Issue, Submission, SubmissionFile } from "../types";
+import type { DrawerTab, Submission, SubmissionFile } from "../types";
 
 type LinearOpenHandler = (submission: Submission, tab?: DrawerTab) => void;
 
@@ -49,15 +40,6 @@ function fileIsReady(file: SubmissionFile) {
 
 function fileNeedsWork(file: SubmissionFile) {
   return file.status === "missing" || file.status === "needs_replacement";
-}
-
-function applicantInitials(name: string) {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-  return parts.map((part) => part[0]?.toUpperCase()).join("") || "З";
 }
 
 function EmptyLinearState({
@@ -154,7 +136,7 @@ function SubmissionOpenButton({
   );
 }
 
-export function AgentDraftsScreen({
+export function AgentDocumentCollectionScreen({
   hasSearchQuery = false,
   onClearSearch,
   onCreate,
@@ -263,298 +245,5 @@ export function AgentDraftsScreen({
         })}
       </div>
     </section>
-  );
-}
-
-export function AgentApplicantsScreen({
-  hasSearchQuery = false,
-  onClearSearch,
-  onCreate,
-  onOpen,
-  submissions,
-}: LinearAgentScreenProps) {
-  if (!submissions.length) {
-    return (
-      <section className="vf-linear-screen vf-linear-screen--applicants">
-        <EmptyLinearState
-          action={hasSearchQuery ? "Сбросить поиск" : "Создать заявителя"}
-          body={
-            hasSearchQuery
-              ? "Поиск не нашёл заявителей или семей."
-              : "Заявители появятся после создания подачи."
-          }
-          title={hasSearchQuery ? "Заявители не найдены" : "Нет заявителей"}
-          onAction={hasSearchQuery ? onClearSearch : onCreate}
-        />
-      </section>
-    );
-  }
-
-  const familySubmissions = submissions.filter((submission) => submission.type === "family");
-  const singleSubmissions = submissions.filter((submission) => submission.type === "single");
-
-  return (
-    <section className="vf-linear-screen vf-linear-screen--applicants">
-      <LinearSectionHeader
-        icon={<Users size={18} strokeWidth={1.8} />}
-        kicker="Профили"
-        title="Семьи"
-      />
-      <div className="vf-linear-family-grid">
-        {familySubmissions.length ? (
-          familySubmissions.map((submission) => (
-            <article className="vf-linear-family-card" key={submission.id}>
-              <div className="vf-linear-family-head">
-                <div>
-                  <small>{submission.id}</small>
-                  <h3>{formatSubmissionListTitle(submission)}</h3>
-                  <LinearSubmissionMeta submission={submission} />
-                </div>
-                <span>{submission.applicants.length}</span>
-              </div>
-              <div className="vf-linear-member-stack">
-                {submission.applicants.map((applicant) => (
-                  <button
-                    className="vf-linear-member-row"
-                    key={applicant.id}
-                    type="button"
-                    onClick={() => onOpen(submission, "applicants")}
-                  >
-                    <span>{applicantInitials(applicant.fullName)}</span>
-                    <strong>{applicant.fullName}</strong>
-                    <em>{applicant.questionnaireStatus === "complete" ? "Анкета готова" : "Нужно заполнить"}</em>
-                  </button>
-                ))}
-              </div>
-              <SubmissionOpenButton label="Открыть семью" onClick={() => onOpen(submission, "applicants")} />
-            </article>
-          ))
-        ) : (
-          <div className="vf-linear-soft-empty">Семейных подач в текущей выборке нет.</div>
-        )}
-      </div>
-
-      <LinearSectionHeader
-        icon={<User size={18} strokeWidth={1.8} />}
-        kicker="Профили"
-        title="Индивидуальные заявители"
-      />
-      <div className="vf-linear-individual-grid">
-        {singleSubmissions.length ? (
-          singleSubmissions.map((submission) => {
-            const applicant = submission.applicants[0];
-            return (
-              <article className="vf-linear-person-card" key={submission.id}>
-                <span className="vf-linear-avatar" aria-hidden="true">
-                  {applicantInitials(applicant?.fullName ?? submission.title)}
-                </span>
-                <div>
-                  <small>{submission.id}</small>
-                  <h3>{applicant?.fullName ?? formatSubmissionListTitle(submission)}</h3>
-                  <LinearSubmissionMeta submission={submission} />
-                </div>
-                <SubmissionOpenButton onClick={() => onOpen(submission, "applicants")} />
-              </article>
-            );
-          })
-        ) : (
-          <div className="vf-linear-soft-empty">Индивидуальных подач в текущей выборке нет.</div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-export function AgentMediaScreen({
-  hasSearchQuery = false,
-  onClearSearch,
-  onCreate,
-  onOpen,
-  submissions,
-}: LinearAgentScreenProps) {
-  const rows = submissions.flatMap((submission) =>
-    submission.files.map((file) => ({ file, submission })),
-  );
-
-  if (!rows.length) {
-    return (
-      <section className="vf-linear-screen vf-linear-screen--media">
-        <EmptyLinearState
-          action={hasSearchQuery ? "Сбросить поиск" : "Загрузить"}
-          body={
-            hasSearchQuery
-              ? "Поиск не нашёл файлов."
-              : "Файлы появятся после создания подачи и выбора документов."
-          }
-          title={hasSearchQuery ? "Файлы не найдены" : "Файлов пока нет"}
-          onAction={hasSearchQuery ? onClearSearch : onCreate}
-        />
-      </section>
-    );
-  }
-
-  const missing = rows.filter(({ file }) => fileNeedsWork(file)).length;
-  const accepted = rows.filter(({ file }) => file.status === "accepted").length;
-  const review = rows.filter(({ file }) => file.status === "uploaded" || file.status === "pending_review").length;
-
-  return (
-    <section className="vf-linear-screen vf-linear-screen--media">
-      <div className="vf-linear-metrics">
-        <article>
-          <small>Нужно загрузить/заменить</small>
-          <strong>{missing}</strong>
-          <span>слотов документов</span>
-        </article>
-        <article>
-          <small>На проверке</small>
-          <strong>{review}</strong>
-          <span>файлов ожидают решения</span>
-        </article>
-        <article>
-          <small>Принято</small>
-          <strong>{accepted}</strong>
-          <span>подтверждено админом</span>
-        </article>
-      </div>
-
-      <LinearSectionHeader
-        icon={<ImageIcon size={18} strokeWidth={1.8} />}
-        kicker="Очередь"
-        title="Файлы документов"
-        action={
-          onCreate ? (
-            <Button variant="secondary" onClick={onCreate}>
-              Загрузить
-            </Button>
-          ) : null
-        }
-      />
-
-      <div className="vf-linear-table-card">
-        {rows.map(({ file, submission }) => {
-          const applicant = submission.applicants.find((item) => item.id === file.applicantId);
-          return (
-            <button
-              className="vf-linear-media-row"
-              key={`${submission.id}-${file.id}`}
-              type="button"
-              onClick={() => onOpen(submission, "files")}
-            >
-              <span className="vf-linear-media-icon" aria-hidden="true">
-                {fileNeedsWork(file) ? <UploadCloud size={17} /> : <FileCheck2 size={17} />}
-              </span>
-              <span className="vf-linear-media-main">
-                <strong>{file.generatedFileName || file.originalFileName || fileTypeLabels[file.type]}</strong>
-                <em>{formatSubmissionListTitle(submission)} · {applicant?.fullName ?? "Заявитель"}</em>
-              </span>
-              <span className={cn("vf-linear-file-status", `is-${file.status}`)}>
-                {fileStatusLabels[file.status]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-export function AgentIssuesScreen({
-  hasSearchQuery = false,
-  onClearSearch,
-  onOpen,
-  submissions,
-}: LinearAgentScreenProps) {
-  const issueRows = submissions.flatMap((submission) =>
-    submission.issues.map((issue) => ({ issue, submission })),
-  );
-
-  if (!issueRows.length) {
-    return (
-      <section className="vf-linear-screen vf-linear-screen--issues">
-        <EmptyLinearState
-          body={
-            hasSearchQuery
-              ? "Поиск не нашёл замечаний."
-              : "Замечаний нет. Когда администратор вернёт пакет, задачи появятся здесь."
-          }
-          title={hasSearchQuery ? "Замечания не найдены" : "Открытых замечаний нет"}
-          onAction={hasSearchQuery ? onClearSearch : undefined}
-        />
-      </section>
-    );
-  }
-
-  const open = issueRows.filter(({ issue }) => issue.status === "open").length;
-  const fixed = submissions.reduce((sum, submission) => sum + fixedIssueCount(submission), 0);
-  const blockers = issueRows.filter(({ issue }) => issue.severity === "blocker" && issue.status === "open").length;
-
-  return (
-    <section className="vf-linear-screen vf-linear-screen--issues">
-      <div className="vf-linear-metrics">
-        <article>
-          <small>Открыто</small>
-          <strong>{open}</strong>
-          <span>ждут исправления</span>
-        </article>
-        <article>
-          <small>Блокеры</small>
-          <strong>{blockers}</strong>
-          <span>нельзя отправлять дальше</span>
-        </article>
-        <article>
-          <small>Исправлено</small>
-          <strong>{fixed}</strong>
-          <span>ожидают закрытия админом</span>
-        </article>
-      </div>
-
-      <LinearSectionHeader
-        icon={<MessageSquareWarning size={18} strokeWidth={1.8} />}
-        kicker="Контроль качества"
-        title="Замечания и ошибки"
-      />
-
-      <div className="vf-linear-card-list">
-        {issueRows.map(({ issue, submission }) => (
-          <IssueCard
-            issue={issue}
-            key={`${submission.id}-${issue.id}`}
-            onOpen={() => onOpen(submission, "issues")}
-            submission={submission}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function IssueCard({
-  issue,
-  onOpen,
-  submission,
-}: {
-  issue: Issue;
-  onOpen: () => void;
-  submission: Submission;
-}) {
-  const isClosed = issue.status === "closed_by_admin";
-  const isFixed = issue.status === "fixed_by_agent";
-  return (
-    <article className={cn("vf-linear-issue-card", isClosed && "is-closed", isFixed && "is-fixed")}>
-      <span className={cn("vf-linear-issue-icon", issue.severity === "blocker" && "tone-danger")} aria-hidden="true">
-        {isClosed ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-      </span>
-      <div className="vf-linear-issue-main">
-        <small>{submission.id} · {issue.target.applicantName}</small>
-        <h3>{issue.reason}</h3>
-        <p>{issue.comment || "Комментарий не указан."}</p>
-        <div className="vf-linear-meta-row">
-          <span>{issue.target.section || issue.type}</span>
-          <span>{issue.status === "open" ? "Открыто" : isFixed ? "Исправлено агентом" : "Закрыто"}</span>
-          <span>{issue.severity}</span>
-        </div>
-      </div>
-      <SubmissionOpenButton label="Исправить" onClick={onOpen} />
-    </article>
   );
 }

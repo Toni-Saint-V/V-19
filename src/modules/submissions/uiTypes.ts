@@ -1,9 +1,26 @@
-import type { Submission, Surface } from "./types";
+import type { DrawerTab, Role, Submission, Surface } from "./types";
 
 export type AgentTab = "all" | "action" | "progress" | "review" | "done";
 export type ReviewTab = "all" | "review" | "corrections" | "ready";
 export type ExportTab = "ready" | "history";
 export type DrawerMode = "closed" | "detail" | "create";
+
+export type LegacySurfaceRoute =
+  | "agent-drafts"
+  | "agent-media"
+  | "agent-applicants"
+  | "agent-issues"
+  | "drafts"
+  | "media"
+  | "files"
+  | "applicants"
+  | "issues";
+
+export type LegacyRouteResolution = {
+  agentTab?: AgentTab;
+  drawerTab?: DrawerTab;
+  surface: Surface;
+};
 
 export function matchesAgentTab(tab: AgentTab) {
   return (submission: Submission) => {
@@ -37,10 +54,7 @@ export function matchesReviewTab(tab: ReviewTab) {
 
 export function surfaceTitle(surface: Surface) {
   if (surface === "agent-actions") return "Мои действия";
-  if (surface === "agent-drafts") return "Сбор документов";
-  if (surface === "agent-applicants") return "Заявители / Семьи";
-  if (surface === "agent-media") return "Сбор документов";
-  if (surface === "agent-issues") return "Замечания";
+  if (surface === "agent-documents") return "Сбор документов";
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка";
   if (surface === "settings") return "Настройки";
@@ -52,20 +66,8 @@ export function surfaceDescription(surface: Surface) {
     return "Очередь задач по подачам: блокеры, приоритет и следующий шаг.";
   }
 
-  if (surface === "agent-drafts") {
+  if (surface === "agent-documents") {
     return "Документы по каждой подаче: что собрано, что заменить и где открыт блокер.";
-  }
-
-  if (surface === "agent-applicants") {
-    return "Семьи и индивидуальные заявители с быстрым переходом в карточку и анкету.";
-  }
-
-  if (surface === "agent-media") {
-    return "Совместимый маршрут: файлы и слоты медиа показываются внутри сбора документов, чтобы не дробить прогресс.";
-  }
-
-  if (surface === "agent-issues") {
-    return "Открытые замечания администратора и исправления, ожидающие закрытия.";
   }
 
   if (surface === "agent-submissions") {
@@ -81,4 +83,43 @@ export function surfaceDescription(surface: Surface) {
   }
 
   return "Пакеты Excel: готовые подачи, блокеры и состав выгрузки.";
+}
+
+export function resolveLegacySurfaceRoute(
+  route: string | null | undefined,
+  role: Role,
+): LegacyRouteResolution | null {
+  if (!route) return null;
+
+  const normalized = route.trim().toLowerCase().replace(/^#\/?/, "");
+  if (!normalized) return null;
+
+  if (
+    normalized === "agent-media" ||
+    normalized === "media" ||
+    normalized === "files"
+  ) {
+    return { drawerTab: "files", surface: "agent-documents" };
+  }
+
+  if (normalized === "agent-drafts") {
+    return { drawerTab: "files", surface: "agent-documents" };
+  }
+
+  if (normalized === "drafts") {
+    return { agentTab: "progress", surface: "agent-submissions" };
+  }
+
+  if (normalized === "agent-applicants" || normalized === "applicants") {
+    return { drawerTab: "applicants", surface: "agent-submissions" };
+  }
+
+  if (normalized === "agent-issues" || normalized === "issues") {
+    return {
+      drawerTab: "issues",
+      surface: role === "admin" ? "admin-review" : "agent-actions",
+    };
+  }
+
+  return null;
 }

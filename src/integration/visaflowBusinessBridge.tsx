@@ -1,9 +1,9 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { SubmissionStatus } from '../components/Drawer';
+import type { SubmissionStatus } from '../modules/submissions/types';
 
 export type VisaflowWorkspace = 'agent' | 'admin';
-export type AgentNavSection = 'submissions' | 'drafts' | 'applicants' | 'media' | 'issues';
-export type AdminNavSection = 'review' | 'export' | 'users' | 'settings';
+export type AgentNavSection = 'actions' | 'documents' | 'submissions' | 'settings';
+export type AdminNavSection = 'review' | 'export' | 'settings';
 
 export interface VisaflowSubmissionSummary {
   id: string;
