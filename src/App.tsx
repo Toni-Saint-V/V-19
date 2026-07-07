@@ -149,6 +149,25 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     setOwnerIdsBySubmissionId(nextOwnerIds);
   }, [ownerIdsBySubmissionId, supabaseEnabled, supabaseProfile]);
 
+  const persistVisibleAgentSubmissions = useCallback(
+    async (nextVisibleSubmissions: Submission[]) => {
+      const nextById = new Map(
+        nextVisibleSubmissions.map((submission) => [submission.id, submission]),
+      );
+      const existingIds = new Set(submissions.map((submission) => submission.id));
+      const additions = nextVisibleSubmissions.filter(
+        (submission) => !existingIds.has(submission.id),
+      );
+      await persistSubmissions(
+        [
+          ...additions,
+          ...submissions.map((submission) => nextById.get(submission.id) ?? submission),
+        ],
+      );
+    },
+    [persistSubmissions, submissions],
+  );
+
   const handleLogin = useCallback(async (email: string, password: string) => {
     setAuthError('');
     const nextSession = await authRepository.loginApprovedUser(email, password);
@@ -320,6 +339,8 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
           >
             {workspace === 'agent' ? (
               <CommandCenter
+                agentId={activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId}
+                onSubmissionsChange={persistVisibleAgentSubmissions}
                 submissions={visibleSubmissions}
                 onSignOut={handleSignOut}
                 onSwitchWorkspace={activeApprovedSession.role === 'admin' ? switchWorkspace : undefined}

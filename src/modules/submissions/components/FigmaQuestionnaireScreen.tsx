@@ -41,6 +41,20 @@ type SectionId =
   | "payment"
   | "filler";
 
+const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionId }> = [
+  { canonicalId: "files", id: "files", meta: "0 файлов", status: "pending", title: "Файлы" },
+  { canonicalId: "appointment", id: "appointment", meta: "0 из 0", status: "pending", title: "Запись" },
+  { canonicalId: "personal", id: "personal", meta: "0 из 0", status: "pending", title: "Личные данные" },
+  { canonicalId: "passport", id: "passport", meta: "0 из 0", status: "pending", title: "Паспорт" },
+  { canonicalId: "euRelative", id: "euRelative", meta: "0 из 0", status: "pending", title: "Родственник ЕС" },
+  { canonicalId: "contacts", id: "contact", meta: "0 из 0", status: "pending", title: "Адрес и контакты" },
+  { canonicalId: "employment", id: "employment", meta: "0 из 0", status: "pending", title: "Работа / учеба" },
+  { canonicalId: "trip", id: "trip", meta: "0 из 0", status: "pending", title: "Поездка" },
+  { canonicalId: "hotel", id: "hotel", meta: "0 из 0", status: "pending", title: "Отель / приглашение" },
+  { canonicalId: "payment", id: "payment", meta: "0 из 0", status: "pending", title: "Оплата поездки" },
+  { canonicalId: "filler", id: "filler", meta: "0 из 0", status: "pending", title: "Кто заполнил" },
+];
+
 type FormFieldProps = {
   excelMap?: string;
   errorMessage?: string;
@@ -539,6 +553,34 @@ function questionnaireField(
   return applicant?.sections
     .flatMap((section) => section.fields)
     .find((field) => field.id === fieldId);
+}
+
+function fieldIsReady(field: Submission["applicants"][number]["sections"][number]["fields"][number]) {
+  return !field.required || Boolean(field.value.trim() && !field.error);
+}
+
+function riskLabel(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) return `${count} риск`;
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) {
+    return `${count} риска`;
+  }
+
+  return `${count} рисков`;
+}
+
+function fileCountLabel(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) return `${count} файл`;
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) {
+    return `${count} файла`;
+  }
+
+  return `${count} файлов`;
 }
 
 function submissionFieldOptions(
@@ -1184,20 +1226,6 @@ export function FigmaQuestionnaireScreen({
     [activeApplicantModel],
   );
 
-  const sections: Array<SectionTab & { id: SectionId }> = [
-    { id: "files", meta: "3 файла", status: "complete", title: "Файлы" },
-    { id: "appointment", meta: "7 полей", status: "pending", title: "Запись" },
-    { id: "personal", meta: "13 полей", status: "issue", title: "Личные данные" },
-    { id: "passport", meta: "6 полей", status: "complete", title: "Паспорт" },
-    { id: "euRelative", meta: "2 поля", status: "pending", title: "Родственник ЕС" },
-    { id: "contact", meta: "10 полей", status: "complete", title: "Адрес и контакты" },
-    { id: "employment", meta: "5 полей", status: "pending", title: "Работа / учеба" },
-    { id: "trip", meta: "15 полей", status: "complete", title: "Поездка" },
-    { id: "hotel", meta: "8 полей", status: "complete", title: "Отель / приглашение" },
-    { id: "payment", meta: "5 полей", status: "complete", title: "Оплата поездки" },
-    { id: "filler", meta: "3 поля", status: "pending", title: "Кто заполнил" },
-  ];
-
   const sectionDescriptions: Record<SectionId, string> = {
     appointment: "Город, тип визы, категория и даты.",
     contact: "Адрес, email и телефон.",
@@ -1221,6 +1249,58 @@ export function FigmaQuestionnaireScreen({
           issue.target.field,
       ),
     [activeApplicant, submission.issues],
+  );
+
+  const questionnaireStats = useMemo(() => {
+    const fields = activeApplicantModel?.sections.flatMap((section) => section.fields) ?? [];
+    const total = fields.length;
+    const completed = fields.filter(fieldIsReady).length;
+    const fieldRisks = fields.filter(
+      (field) => field.error || field.reviewState === "needs_review",
+    ).length;
+    const percent = total ? Math.round((completed / total) * 100) : 0;
+
+    return {
+      completed,
+      percent,
+      risks: fieldRisks + openFieldIssues.length,
+      total,
+    };
+  }, [activeApplicantModel, openFieldIssues.length]);
+
+  const sections = useMemo(
+    () =>
+      sectionDefinitions.map(({ canonicalId, ...definition }) => {
+        if (definition.id === "files") {
+          return {
+            ...definition,
+            meta: fileCountLabel(submission.files.length),
+            status: submission.completeness.files >= 100 ? "complete" : "pending",
+          } satisfies SectionTab & { id: SectionId };
+        }
+
+        const sourceSection = activeApplicantModel?.sections.find(
+          (section) => section.id === canonicalId,
+        );
+
+        if (!sourceSection) return definition;
+
+        const total = sourceSection.fields.length;
+        const completed = sourceSection.fields.filter(fieldIsReady).length;
+        const hasRisk =
+          sourceSection.status === "needs_fix" ||
+          sourceSection.fields.some(
+            (field) => field.error || field.reviewState === "needs_review",
+          );
+
+        return {
+          ...definition,
+          meta: `${completed} из ${total}`,
+          status:
+            hasRisk ? "issue" : total > 0 && completed === total ? "complete" : "pending",
+        } satisfies SectionTab & { id: SectionId };
+      }),
+    [activeApplicantModel, submission.completeness.files, submission.files.length],
   );
 
   const currentSectionIssue = useMemo(() => {
@@ -2104,7 +2184,7 @@ export function FigmaQuestionnaireScreen({
 
       <div className="v19-questionnaire-progress-track">
         <motion.div
-          animate={{ width: "68%" }}
+          animate={{ width: `${questionnaireStats.percent}%` }}
           className="v19-questionnaire-progress-fill"
           initial={{ width: 0 }}
           transition={{ delay: 0.1, duration: 1.2, ease: "easeOut" }}
@@ -2156,9 +2236,9 @@ export function FigmaQuestionnaireScreen({
             <aside className="v19-questionnaire-section-nav">
               <V19ReadinessCard
                 description="Пакет можно отправлять после сверки полей, отмеченных администратором."
-                detail="2 риска"
-                scoreLabel="68%"
-                value={68}
+                detail={riskLabel(questionnaireStats.risks)}
+                scoreLabel={`${questionnaireStats.percent}%`}
+                value={questionnaireStats.percent}
               />
 
               <V19SearchField label="Поиск поля анкеты" placeholder="Найти поле..." />
@@ -2277,7 +2357,8 @@ export function FigmaQuestionnaireScreen({
                   </div>
                   <div className="v19-questionnaire-completion-pill">
                     <span className="v19-questionnaire-completion-dot" />
-                    Заполнено 8 из 12 (68%)
+                    Заполнено {questionnaireStats.completed} из {questionnaireStats.total} (
+                    {questionnaireStats.percent}%)
                   </div>
                 </div>
                 <button
