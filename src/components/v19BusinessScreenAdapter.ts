@@ -2,7 +2,7 @@ import type { AgentNavSection } from '../integration/visaflowBusinessBridge';
 import type { Issue, Submission, SubmissionAction, SubmissionFile, SubmissionStatus } from '../modules/submissions/types';
 import { canPerformAction, fixedIssueCount, nextProblem, openIssueCount, statusLabelFor } from '../modules/submissions/status';
 
-export type LegacyAgentNavSection = AgentNavSection | 'applicants' | 'media' | 'issues';
+export type LegacyAgentNavSection = AgentNavSection | 'applicants' | 'files' | 'media' | 'issues';
 
 export type LegacySubmissionListItem = {
   id: string;
@@ -75,6 +75,7 @@ export function legacySectionLabel(section: LegacyAgentNavSection) {
     case 'applicants':
       return 'Заявители / Семьи';
     case 'media':
+    case 'files':
       return 'Файлы / Медиа';
     case 'issues':
       return 'Замечания';

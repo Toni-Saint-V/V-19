@@ -3,8 +3,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeftRight,
   FileText,
-  FileWarning,
-  Image as ImageIcon,
   Menu,
   Plus,
   Search,
@@ -18,8 +16,6 @@ import { QuestionnaireScreen } from './QuestionnaireScreen';
 import { ApplicantsScreen } from './ApplicantsScreen';
 import { DraftsScreen } from './DraftsScreen';
 import { PreUploadScreen } from './PreUploadScreen';
-import { MediaScreen } from './MediaScreen';
-import { IssuesScreen } from './IssuesScreen';
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
@@ -45,14 +41,14 @@ import {
 export type SubmissionListItem = LegacySubmissionListItem;
 
 type ViewState = 'main' | 'questionnaire' | 'upload';
-type SubmissionFilter = 'all' | 'issues' | 'review' | 'ready';
 
 type CommandCenterProps = {
+  agentId?: Submission['agentId'];
+  onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   submissions?: Submission[];
   onSignOut?: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
   onNavigateSettings?: () => void;
-  showCompatibilityScreens?: boolean;
 };
 
 const fallbackSubmissions: SubmissionListItem[] = [
@@ -131,13 +127,6 @@ function intakeDraftToListItem(draft: ProductIntakeDraft): SubmissionListItem {
   };
 }
 
-function submissionMatchesFilter(submission: SubmissionListItem, filter: SubmissionFilter) {
-  if (filter === 'issues') return ['returned', 'corrections_received'].includes(submission.status) || (submission.issueCount ?? 0) > 0;
-  if (filter === 'review') return submission.status === 'submitted_for_review';
-  if (filter === 'ready') return submission.status === 'ready_for_export';
-  return true;
-}
-
 function canonicalBridgeNav(section: LegacyAgentNavSection): AgentNavSection | null {
   if (section === 'actions' || section === 'documents' || section === 'submissions' || section === 'settings') return section;
   return null;
@@ -155,6 +144,7 @@ function navLabel(section: LegacyAgentNavSection) {
       return 'Настройки';
     case 'applicants':
       return 'Заявители / Семьи';
+    case 'files':
     case 'media':
       return 'Файлы / Медиа';
     case 'issues':
@@ -162,12 +152,19 @@ function navLabel(section: LegacyAgentNavSection) {
   }
 }
 
+function normalizeAgentNav(section: LegacyAgentNavSection): LegacyAgentNavSection {
+  if (section === 'files' || section === 'media') return 'documents';
+  if (section === 'issues') return 'actions';
+  return section;
+}
+
 export function CommandCenter({
+  agentId,
+  onSubmissionsChange,
   submissions: canonicalSubmissions,
   onSignOut,
   onSwitchWorkspace,
   onNavigateSettings,
-  showCompatibilityScreens = true,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
   const [activeNav, setActiveNav] = useState<LegacyAgentNavSection>('actions');
@@ -195,8 +192,6 @@ export function CommandCenter({
     [intakeDrafts, selectedRow],
   );
 
-  const issueCount = rows.filter((submission) => submissionMatchesFilter(submission, 'issues')).length;
-
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) setMobileNavOpen(false);
@@ -210,13 +205,14 @@ export function CommandCenter({
   }, [intakeDrafts]);
 
   const navigateTo = (nav: LegacyAgentNavSection) => {
-    const canonicalNav = canonicalBridgeNav(nav);
+    const normalizedNav = normalizeAgentNav(nav);
+    const canonicalNav = canonicalBridgeNav(normalizedNav);
     if (canonicalNav) {
       bridge.onAgentNavChange?.(canonicalNav);
       emitVisaflowUiEvent(bridge, { type: 'agent.nav', section: canonicalNav });
       if (canonicalNav === 'settings') onNavigateSettings?.();
     }
-    setActiveNav(nav);
+    setActiveNav(normalizedNav);
     setMobileNavOpen(false);
   };
 
@@ -270,6 +266,9 @@ export function CommandCenter({
     setIntakeDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8));
   };
 
+  const persistQuestionnaireSubmission = (nextSubmission: Submission) =>
+    onSubmissionsChange?.([nextSubmission]);
+
   const renderNavButton = (section: LegacyAgentNavSection, icon: ReactNode, count?: number, warning?: boolean) => (
     <button
       onClick={() => navigateTo(section)}
@@ -309,14 +308,6 @@ export function CommandCenter({
           {renderNavButton('submissions', <Users className="w-4 h-4" />, rows.length)}
           {renderNavButton('settings', <Settings className="w-4 h-4" />)}
         </nav>
-
-        {showCompatibilityScreens && (
-          <nav className="space-y-0.5">
-            <div className="px-2 pb-1 text-[11px] text-white/30 font-medium tracking-wide uppercase">Восстановленные экраны</div>
-            {renderNavButton('media', <ImageIcon className="w-4 h-4" />)}
-            {renderNavButton('issues', <FileWarning className="w-4 h-4" />, issueCount, issueCount > 0)}
-          </nav>
-        )}
       </div>
 
       {onSwitchWorkspace ? (
@@ -456,10 +447,12 @@ export function CommandCenter({
         {currentView === 'questionnaire' && selectedRow && (
           <QuestionnaireScreen
             key={`questionnaire-${selectedRow}`}
+            agentId={agentId}
             submissionId={selectedRow}
             draft={selectedIntakeDraft}
             submission={selectedCanonicalSubmission}
             onBack={() => setCurrentView('main')}
+            onSubmissionChange={persistQuestionnaireSubmission}
           />
         )}
         {currentView === 'upload' && (
@@ -502,10 +495,14 @@ export function CommandCenter({
 
         <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           <div className="max-w-[1460px] mx-auto h-full">
-            {activeNav === 'documents' && <DraftsScreen onOpenDrawer={handleRowClick} submissions={canonicalSubmissions} />}
+            {activeNav === 'documents' && (
+              <DraftsScreen
+                onOpenDrawer={handleRowClick}
+                onSubmissionsChange={onSubmissionsChange}
+                submissions={canonicalSubmissions}
+              />
+            )}
             {activeNav === 'applicants' && <ApplicantsScreen onOpenDrawer={handleRowClick} submissions={canonicalSubmissions} />}
-            {activeNav === 'media' && <MediaScreen submissions={canonicalSubmissions} />}
-            {activeNav === 'issues' && <IssuesScreen onOpenDrawer={handleRowClick} submissions={canonicalSubmissions} />}
             {activeNav === 'settings' && renderSettings()}
             {activeNav === 'actions' && renderActionsList()}
             {activeNav === 'submissions' && <ApplicantsScreen onOpenDrawer={handleRowClick} submissions={canonicalSubmissions} />}
