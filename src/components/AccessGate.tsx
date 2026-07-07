@@ -461,7 +461,6 @@ export function AccessGate({
       </button>
       <div className="access-card-header">
         <div>
-          <p className="access-kicker">Первый вход</p>
           <h1 id="workspace-register-title">Заявка на доступ</h1>
         </div>
         <ShieldCheck aria-hidden="true" />
@@ -541,11 +540,7 @@ export function AccessGate({
           <p className="access-success" role="status">
             {success}
           </p>
-        ) : (
-          <p className="access-note">
-            Регистрация не активирует аккаунт автоматически. Заявка ожидает подтверждения администратора.
-          </p>
-        )}
+        ) : null}
 
         <PrimaryButton busy={busy}>{busy ? 'Отправляем...' : 'Подать заявку на доступ'}</PrimaryButton>
       </form>

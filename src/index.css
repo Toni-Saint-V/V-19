@@ -184,6 +184,19 @@ button {
   background: var(--v19b-color-primary);
 }
 
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-screen-header
+  > div:last-child
+  > span {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button > span {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
 .vf-figma-questionnaire-screen .v19-questionnaire-complete-button:hover,
 .vf-figma-questionnaire-screen .v19-questionnaire-next-action-card button:hover {
   background: var(--v19b-color-primary-hover);
@@ -259,6 +272,14 @@ button {
   align-items: center;
   gap: 12px;
   padding: 8px;
+}
+
+.vf-figma-questionnaire-screen
+  .v19-questionnaire-applicant-bar
+  > div:last-child
+  span {
+  font-size: 14px !important;
+  font-weight: 500 !important;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-applicant-tab,
@@ -419,6 +440,11 @@ button {
   line-height: 1.45;
 }
 
+.vf-figma-questionnaire-screen .v19-readiness-card p {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+}
+
 .vf-figma-questionnaire-screen .v19-questionnaire-panel-footer {
   position: sticky;
   bottom: 0;
@@ -550,12 +576,13 @@ button {
 
 .vf-figma-questionnaire-screen .v19-readiness-score-row strong {
   color: var(--v19b-color-text-strong);
-  font-size: 24px;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .vf-figma-questionnaire-screen .v19-readiness-score-row span {
   color: #f59e0b;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -591,6 +618,8 @@ button {
   border: 0;
   color: var(--v19b-color-text-strong);
   background: transparent;
+  font-size: 12px;
+  font-weight: 500;
   outline: none;
 }
 
@@ -618,12 +647,12 @@ button {
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-section-nav {
-    width: 100%;
-    flex-direction: column;
+    display: none;
   }
 
-  .vf-figma-questionnaire-screen .v19-readiness-card {
-    height: 140px;
+  .vf-figma-questionnaire-screen .v19-readiness-card,
+  .vf-figma-questionnaire-screen .v19-search-field {
+    display: none;
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-section-list {
@@ -643,7 +672,8 @@ button {
 
   .vf-figma-questionnaire-screen .v19-questionnaire-section-tab {
     width: 148px;
-    min-height: 64px;
+    min-height: 60px;
+    height: 60px;
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-work-grid {
@@ -655,13 +685,30 @@ button {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label,
+  .vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label .flex-1 {
+    color: #817e7e !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-field-control:not(.is-textarea) {
+    min-height: 40px;
+    height: 40px;
+  }
+
   .vf-figma-questionnaire-screen .v19-questionnaire-context-rail {
     display: none;
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-panel-footer {
+    position: static;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .vf-figma-questionnaire-screen .v19-questionnaire-panel-footer > div {
+    display: none;
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-next-button {
@@ -788,11 +835,11 @@ body:has(.access-shell) #root {
   width: min(100%, 460px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 20px 28px;
+  gap: 12px;
+  padding: 24px 32px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 18px;
-  background: #151518;
+  background: #1e1e1f;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
 }
 
@@ -826,28 +873,34 @@ body:has(.access-shell) #root {
 .access-intro {
   margin: 0;
   color: rgba(255, 255, 255, 0.62);
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1.36;
+}
+
+#workspace-register-copy {
+  margin-right: 10px;
+  margin-bottom: 2px;
 }
 
 .access-form {
   width: 100%;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .access-field {
   width: 100%;
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .access-field-label,
 .access-field > label {
   display: block;
   margin: 0;
+  padding-left: 2px;
   color: rgba(255, 255, 255, 0.88);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.25;
 }
@@ -859,8 +912,9 @@ body:has(.access-shell) #root {
   padding: 0 12px;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 10px;
-  background: #1e1e21;
+  background: #000;
   color: #f7f7f8;
+  font-size: 12px;
   outline: none;
   box-shadow: none;
 }
@@ -871,7 +925,7 @@ body:has(.access-shell) #root {
 
 .access-card input:focus {
   border-color: rgba(143, 163, 255, 0.72);
-  background: #242428;
+  background: #000;
 }
 
 .access-password-control {
@@ -887,18 +941,26 @@ body:has(.access-shell) #root {
   position: absolute;
   top: 50%;
   right: 4px;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
   display: inline-grid;
   place-items: center;
-  padding: 0;
+  padding: 0 50px 0 1px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.72);
+  color: #55555e;
+  font-size: 14px;
+  font-weight: 500;
   transform: translateY(-50%);
+}
+
+#workspace-email,
+#workspace-password {
+  color: #6d6d74;
+  font-size: 14px;
 }
 
 .access-password-toggle span {
@@ -942,6 +1004,9 @@ body:has(.access-shell) #root {
   width: auto;
   min-width: 0;
   padding: 0 12px;
+  background: #000;
+  color: #7e7ed3;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -954,9 +1019,14 @@ body:has(.access-shell) #root {
 
 .access-submit {
   width: 100%;
-  border-color: rgba(143, 163, 255, 0.62);
-  background: #3a45b4;
+  height: 40px;
+  min-height: 40px;
+  margin-top: 4px;
+  border-color: #111218;
+  background: #1e2352;
   color: #fff;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .access-note,
@@ -1020,7 +1090,8 @@ body:has(.access-shell) #root {
   }
 
   .access-brand-logo {
-    width: min(220px, 68vw);
+    width: 180px;
+    height: 180px;
   }
 
   .access-card {
