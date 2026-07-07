@@ -845,7 +845,11 @@ function questionnaireFormDataFromSubmission(
       fallback.stayPurposeDetails,
     ),
     stayPurpose: submissionFieldValue(applicant, "purpose", fallback.stayPurpose),
-    stayRoute: submissionFieldValue(applicant, "route", fallback.stayRoute),
+    stayRoute: submissionFieldValueAny(
+      applicant,
+      ["first-entry-country", "route"],
+      fallback.stayRoute,
+    ),
     surname: submissionFieldValue(applicant, "surname", fallback.surname),
     travelEnd: submissionFieldValue(applicant, "departure-date", fallback.travelEnd),
     travelStart: submissionFieldValue(applicant, "arrival-date", fallback.travelStart),
@@ -891,9 +895,9 @@ const focusableQuestionnaireFields: FocusableQuestionnaireField[] = [
     sectionId: "trip",
   },
   {
-    fieldId: "route",
-    formKey: "stayRoute",
-    labels: ["Маршрут поездки"],
+    fieldId: "first-entry-country",
+    formKey: "firstEntryCountry",
+    labels: ["Маршрут поездки", "Страна первого въезда"],
     sectionId: "trip",
   },
 ];
