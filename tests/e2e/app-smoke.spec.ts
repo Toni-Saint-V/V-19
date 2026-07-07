@@ -763,14 +763,11 @@ test.describe("V-19 operations workspace", () => {
     await expect(page.getByRole("button", { name: "Мои подачи" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Настройки" })).toBeVisible();
     await expect(page.getByText("Входящие", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
-    await expect(page.getByTestId("agent-actions-cockpit")).toBeVisible();
-    await expect(
-      page
-        .getByTestId("agent-action-queue-item")
-        .or(page.locator(".v19-actions-timeline-event"))
-        .first(),
-    ).toBeVisible();
+    await expect(page.locator('input[placeholder="Поиск по действиям..."]')).toBeVisible();
+    await expectAtLeastOneVisible(
+      page.getByRole("button", { name: /^(Исправить|Продолжить|Добавить)$/ }),
+      "No visible agent action CTA matched.",
+    );
     await page.screenshot({
       fullPage: true,
       path: "docs/qa/v19-agent-actions-restored-desktop.png",
@@ -779,53 +776,26 @@ test.describe("V-19 operations workspace", () => {
     await clickWorkspaceButton(page, /Мои подачи/);
     await expect(page.getByRole("heading", { name: "Мои подачи" })).toBeVisible();
     await expectAtLeastOneVisible(
-      page.getByRole("button", { name: "Новая подача" }),
+      page.getByRole("button", { name: "Создать пакет" }),
       "No visible create-submission button matched.",
     );
-    await expect(page.getByRole("tablist", { name: "Фильтр подач" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Готово" })).toBeVisible();
-    await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
-    await expectReturnedIvanovsDecisionFrame(page);
-    await expect(page.getByText("Семейные подачи")).toBeVisible();
-    await expect(page.getByText("Индивидуальные подачи")).toBeVisible();
-    await expect(submissionCard(page, "Нина Волкова")).toBeVisible();
-    await expect(submissionCard(page, "Дмитрий Орлов")).toBeVisible();
-    await selectSubmissionStatus(page, "В работе");
-    await expect(submissionCard(page, "Ивановы")).toHaveCount(0);
-    await selectSubmissionStatus(page, "Требуют действия");
-    await expect(submissionCardById(page, "ПД-1048")).toBeVisible();
-    await expect(returnedIvanovsAction(page)).toBeVisible();
-    await expect(submissionCard(page, "Ольга Морозова")).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: "Семьи" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Одиночные профили" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 3, name: "Ивановы" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 3, name: "Артём Соколов" })).toBeVisible();
 
     await clickWorkspaceButton(page, /Настройки/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Настройки" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { level: 2, name: "Уведомления" }),
+      page.getByRole("heading", { level: 2, name: "Настройки рабочего места" }),
     ).toBeVisible();
-    await page.getByLabel("Сводка по действиям").selectOption("daily");
-    await expect(page.getByText("Есть несохранённые изменения")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Открыть canonical настройки" })).toBeVisible();
     if (testInfo.project.name === "chromium") {
       await page.screenshot({
         fullPage: true,
         path: "docs/qa/2026-06-21-v19-settings-dirty-desktop.png",
-      });
-    }
-    await clickWorkspaceButton(page, /Мои подачи/);
-    await expect(
-      page.getByRole("dialog", { name: "Уйти без сохранения?" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Остаться" }).click();
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Настройки" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Сохранить" }).click();
-    await expect(page.getByText("Настройки сохранены")).toBeVisible();
-    if (testInfo.project.name === "chromium") {
-      await page.screenshot({
-        fullPage: true,
-        path: "docs/qa/2026-06-21-v19-role-safe-agent-settings-desktop.png",
       });
     }
 

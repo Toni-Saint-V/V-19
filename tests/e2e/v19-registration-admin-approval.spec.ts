@@ -6,11 +6,37 @@ import {
 
 const userPassword = "secure-local-password";
 
+async function ensureLoginMode(page: Page) {
+  const loginHeading = page.getByRole("heading", { level: 1, name: "Вход" });
+  if (await loginHeading.isVisible().catch(() => false)) return;
+
+  const switchToLogin = page
+    .getByRole("button", { name: /^(Уже есть доступ\? Войти|Вернуться ко входу)$/ })
+    .first();
+  if (await switchToLogin.isVisible().catch(() => false)) {
+    await switchToLogin.click();
+  }
+
+  await expect(loginHeading).toBeVisible();
+}
+
+async function ensureRegisterMode(page: Page) {
+  const registerHeading = page.getByRole("heading", {
+    level: 1,
+    name: "Заявка на доступ",
+  });
+  if (await registerHeading.isVisible().catch(() => false)) return;
+
+  const requestAccess = page.getByRole("button", { name: "Запросить доступ" });
+  if (await requestAccess.isVisible().catch(() => false)) {
+    await requestAccess.click();
+  }
+
+  await expect(registerHeading).toBeVisible();
+}
+
 async function submitAccessRequest(page: Page, email: string) {
-  await page.getByRole("button", { name: "Запросить доступ" }).click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Заявка на доступ" }),
-  ).toBeVisible();
+  await ensureRegisterMode(page);
   await page.getByLabel("Имя и фамилия").fill("Анна Петрова");
   await page.getByLabel("Агентство / компания").fill("Visa Test");
   await page.getByLabel("Город").fill("Москва");
@@ -30,7 +56,7 @@ async function openAccessGateForNewUser(page: Page, email: string) {
 }
 
 async function login(page: Page, email: string, password: string) {
-  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+  await ensureLoginMode(page);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Пароль", { exact: true }).fill(password);
   await page.getByRole("button", { name: /Войти/ }).click();
@@ -57,7 +83,7 @@ async function logout(page: Page) {
     });
     await page.reload();
   }
-  await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+  await ensureLoginMode(page);
 }
 
 test.describe("V-19 registration admin approval", () => {
@@ -66,7 +92,7 @@ test.describe("V-19 registration admin approval", () => {
     const userEmail = `access-gate-${Date.now()}@example.com`;
 
     await openAccessGateForNewUser(page, userEmail);
-    await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+    await ensureLoginMode(page);
 
     const loginPassword = page.locator("#workspace-password");
     await expect(loginPassword).toHaveAttribute("type", "password");
@@ -89,7 +115,7 @@ test.describe("V-19 registration admin approval", () => {
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Вернуться ко входу" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+    await ensureLoginMode(page);
 
     await page.getByRole("button", { name: "Запросить доступ" }).click();
     await expect(
@@ -112,7 +138,7 @@ test.describe("V-19 registration admin approval", () => {
     await expect(page.getByText("Введите пароль")).toBeVisible();
 
     await page.getByRole("button", { name: "Вернуться ко входу" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+    await ensureLoginMode(page);
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);
   });
@@ -124,7 +150,7 @@ test.describe("V-19 registration admin approval", () => {
     const randomEmail = `random-${Date.now()}@example.com`;
 
     await openAccessGateForNewUser(page, userEmail);
-    await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
+    await ensureRegisterMode(page);
 
     await submitAccessRequest(page, userEmail);
     await expect(

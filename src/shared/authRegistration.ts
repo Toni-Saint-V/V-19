@@ -493,11 +493,8 @@ export class LocalDevAuthRegistrationAdapter
 
   async listPendingAccessRequests(): Promise<AccessRequest[]> {
     return [...readLocalDevState().accessRequests]
-      .sort((a, b) => {
-        if (a.status === "pending" && b.status !== "pending") return -1;
-        if (a.status !== "pending" && b.status === "pending") return 1;
-        return b.createdAt.localeCompare(a.createdAt);
-      });
+      .filter((request) => request.status === "pending")
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async approveAccessRequest(id: string, adminId: string): Promise<User> {

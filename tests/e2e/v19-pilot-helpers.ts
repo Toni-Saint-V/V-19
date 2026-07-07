@@ -39,6 +39,13 @@ export async function openFreshWorkspace(
   }, workspaceEmail);
   await page.reload();
 
+  const switchToLogin = page.getByRole("button", {
+    name: "Уже есть доступ? Войти",
+  });
+  if (await isVisible(switchToLogin)) {
+    await switchToLogin.click();
+  }
+
   const emailField = page.locator("#workspace-email");
   if (await isVisible(emailField)) {
     try {
