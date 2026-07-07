@@ -2,10 +2,12 @@ import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
   FileWarning,
   Loader2,
+  MapPin,
   Plus,
   ScanLine,
   UploadCloud,
@@ -55,11 +57,13 @@ type MatrixApplicant = {
 
 type MatrixSubmission = {
   applicants: MatrixApplicant[];
+  city: string;
   country: string;
   deadline: string;
   id: string;
   progress: number;
   title: string;
+  tripDates: string;
   type: 'single' | 'family';
 };
 
@@ -92,6 +96,16 @@ function applicantRoleLabel(applicant: Submission['applicants'][number]) {
   return 'Заявитель';
 }
 
+function mobileApplicantRoleLabel(applicant: MatrixApplicant) {
+  if (applicant.role === 'Основной') return '';
+  if (applicant.role === 'Ребёнок') return 'Ребенок';
+  if (applicant.role === 'Супруг(а)') {
+    const lastNamePart = applicant.name.trim().split(/\s+/).at(-1)?.toLowerCase() ?? '';
+    return /[ая]$/.test(lastNamePart) ? 'Супруга' : 'Супруг';
+  }
+  return applicant.role;
+}
+
 function docStatusClass(status: DocStatus) {
   if (status === 'verified') return 'bg-white/[0.045] border-white/10 text-[#b8baff]';
   if (status === 'processing') return 'bg-white/[0.045] border-white/10 text-[#b8baff]';
@@ -102,7 +116,7 @@ function docStatusClass(status: DocStatus) {
 function docStatusLabel(status: DocStatus) {
   if (status === 'verified') return 'Загружено';
   if (status === 'processing') return 'В обработке';
-  if (status === 'error') return 'Требует проверки';
+  if (status === 'error') return 'Проверить';
   return 'Загрузить документ';
 }
 
@@ -141,6 +155,12 @@ function submissionDeadline(submission: Submission) {
   return 'В работе';
 }
 
+function compactTripDates(submission: Submission) {
+  const from = submission.tripDateFrom.replace(/\.2026/g, '');
+  const to = submission.tripDateTo.replace(/\.2026/g, '');
+  return from && to ? `${from}–${to}` : from || to || 'Даты не указаны';
+}
+
 function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
   return submissions.map((submission) => {
     const applicants = submission.applicants.map((applicant) => ({
@@ -155,11 +175,13 @@ function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
 
     return {
       applicants,
+      city: submission.city,
       country: `${submission.country} (V-19)`,
       deadline: submissionDeadline(submission),
       id: submission.id,
       progress: statuses.length ? Math.round((ready / statuses.length) * 100) : 0,
       title: submission.listTitle ?? submission.title,
+      tripDates: compactTripDates(submission),
       type: submission.type,
     };
   });
@@ -343,6 +365,40 @@ const DocCell = ({
   );
 };
 
+const MobileDocSlot = ({
+  label,
+  onUpload,
+  status,
+}: {
+  label: string;
+  onUpload: () => void;
+  status: DocStatus;
+}) => {
+  const isMissing = status === 'missing';
+
+  return (
+    <button
+      className={`flex min-h-[64px] items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${docStatusClass(status)}`}
+      type="button"
+      onClick={onUpload}
+      title={docStatusLabel(status)}
+    >
+      <span className="min-w-0">
+        <span className="block truncate text-[12px] font-semibold text-white/80">{label}</span>
+        <span className="mt-1 block truncate text-[10px] font-medium text-current opacity-75">
+          {isMissing ? 'Добавить' : docStatusLabel(status)}
+        </span>
+      </span>
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#101011]/70">
+        {status === 'verified' ? <CheckCircle2 className="h-4 w-4" /> : null}
+        {status === 'processing' ? <ScanLine className="h-4 w-4 animate-pulse" /> : null}
+        {status === 'error' ? <AlertCircle className="h-4 w-4" /> : null}
+        {isMissing ? <Plus className="h-4 w-4" /> : null}
+      </span>
+    </button>
+  );
+};
+
 export function DraftsScreen({
   onOpenDrawer,
   onSubmissionsChange,
@@ -352,6 +408,7 @@ export function DraftsScreen({
   const [bulkBusy, setBulkBusy] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [pendingCellTarget, setPendingCellTarget] = useState<PendingCellTarget | null>(null);
+  const [mobileApplicantIndex, setMobileApplicantIndex] = useState<Record<string, number>>({});
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
   const visibleDrafts = useMemo(() => buildMatrixSubmissions(submissions), [submissions]);
@@ -522,6 +579,12 @@ export function DraftsScreen({
     );
   };
 
+  const updateMobileApplicantIndex = (submissionId: string, index: number) => {
+    setMobileApplicantIndex((current) =>
+      current[submissionId] === index ? current : { ...current, [submissionId]: index },
+    );
+  };
+
   if (!submissions.length) {
     return (
       <motion.div
@@ -606,12 +669,12 @@ export function DraftsScreen({
         <div className="flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
           <div>
             <h2 className="text-[15px] font-semibold text-white">Матрица сбора документов</h2>
-            <p className="mt-1 text-[12px] text-white/50">
+            <p className="mt-1 text-[11px] text-white/50 sm:text-[12px]">
               Загрузка по заявителю, массовое распределение по номеру паспорта.
             </p>
           </div>
           <button
-            className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-white/5 px-3 text-[12px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
+            className="flex h-9 shrink-0 items-center gap-2 rounded-[8px] border border-white/5 bg-[#301e39] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#3a2645] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
             type="button"
             onClick={() => bulkInputRef.current?.click()}
             disabled={bulkBusy}
@@ -628,7 +691,99 @@ export function DraftsScreen({
           </div>
         ) : null}
 
-        <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        <div className="space-y-4 p-3 sm:hidden">
+          {visibleDrafts.map((sub) => (
+            <section key={sub.id} className="overflow-hidden rounded-2xl border border-[#242529] bg-[#141416]">
+              <div className="flex items-start justify-between gap-3 border-b border-[#242529] bg-[#1a1a1d] p-3">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  {sub.type === 'family' ? <Users className="mt-0.5 h-4 w-4 shrink-0 text-white/45" /> : <User className="mt-0.5 h-4 w-4 shrink-0 text-white/45" />}
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h3 className="min-w-0 truncate text-[14px] font-semibold text-white">{sub.title}</h3>
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#8fa3ff]/20 bg-[#8fa3ff]/10 px-2 py-0.5 text-[10px] font-medium text-[#b8baff]">
+                        <MapPin className="h-3 w-3" />
+                        {sub.city}
+                      </span>
+                    </div>
+                    <div className="mt-1 inline-flex min-w-0 items-center gap-1 text-[11px] text-white/48">
+                      <CalendarDays className="h-3 w-3 shrink-0 text-white/35" />
+                      <span className="truncate">{sub.tripDates}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onOpenDrawer(sub.id)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  type="button"
+                  title="Открыть пакет"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="px-3 pt-3">
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                  <div className="h-full rounded-full bg-[#6f64ff]/55" style={{ width: `${sub.progress}%` }} />
+                </div>
+              </div>
+
+              <div
+                className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth scrollbar-hide"
+                onScroll={(event) => {
+                  const width = event.currentTarget.clientWidth;
+                  if (!width) return;
+                  updateMobileApplicantIndex(sub.id, Math.round(event.currentTarget.scrollLeft / width));
+                }}
+              >
+                {sub.applicants.map((app) => (
+                  <div key={app.id} className="w-full shrink-0 snap-start space-y-3 p-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#202024] text-white/55">
+                        <Users className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-[14px] font-medium text-white/85">{app.name}</div>
+                        {mobileApplicantRoleLabel(app) ? (
+                          <div className="mt-0.5 truncate text-[10px] font-medium text-white/40">
+                            {mobileApplicantRoleLabel(app)}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {docTypes.map((doc) => (
+                        <MobileDocSlot
+                          key={`${app.id}-${doc.key}`}
+                          label={doc.label}
+                          status={app.docs[doc.key]}
+                          onUpload={() =>
+                            triggerCellUpload({
+                              applicantId: app.id,
+                              docType: doc.key,
+                              submissionId: sub.id,
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {sub.applicants.length > 1 ? (
+                <div className="flex items-center justify-between border-t border-[#242529] px-3 py-2 text-[11px] font-medium text-white/45">
+                  <span>Заявитель</span>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/62">
+                    {(mobileApplicantIndex[sub.id] ?? 0) + 1} / {sub.applicants.length}
+                  </span>
+                </div>
+              ) : null}
+            </section>
+          ))}
+        </div>
+
+        <div className="hidden w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent sm:block">
           <div className="min-w-[700px]">
             <div className="flex items-center border-b border-[#242529] bg-[#111113]/50">
               <div className="sticky left-0 z-20 w-[280px] shrink-0 border-r border-[#242529] bg-[#111113] px-5 py-3 text-[11px] font-medium uppercase tracking-wider text-white/40 lg:w-[320px]">

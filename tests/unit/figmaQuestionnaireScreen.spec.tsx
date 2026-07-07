@@ -31,6 +31,15 @@ function setField(submission: Submission, fieldId: string, value: string) {
   });
 }
 
+function fillEveryQuestionnaireField(submission: Submission) {
+  const applicant = submission.applicants[0];
+  if (!applicant) throw new Error("expected applicant");
+
+  return applicant.sections
+    .flatMap((section) => section.fields.map((field) => field.id))
+    .reduce((current, fieldId) => setField(current, fieldId, "READY"), submission);
+}
+
 function setFieldReview(
   submission: Submission,
   fieldId: string,
@@ -174,6 +183,34 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.click(cityTrigger);
 
     expect(screen.getByRole("button", { name: "Екатеринбург" })).toBeInTheDocument();
+  });
+
+  test("disables review handoff while the questionnaire is incomplete", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onComplete = vi.fn();
+
+    render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={onComplete}
+        submission={submission}
+      />,
+    );
+
+    const completeButton = screen.getByRole("button", {
+      name: /Готово к проверке|Готово/,
+    });
+    expect(completeButton).toBeDisabled();
+
+    fireEvent.click(completeButton);
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   test("renders BLS sections in the archived order without changing the shell", () => {
@@ -469,7 +506,10 @@ describe("FigmaQuestionnaireScreen", () => {
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={onComplete}
-        submission={draft}
+        submission={{
+          ...fillEveryQuestionnaireField(draft),
+          completeness: { files: 100, questionnaire: 100, total: 100 },
+        }}
       />,
     );
 
