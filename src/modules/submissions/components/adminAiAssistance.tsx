@@ -1,0 +1,2980 @@
+import {
+  type ChangeEvent,
+  type DragEvent as ReactDragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  AlertCircle,
+  Briefcase,
+  Calendar,
+  CheckCircle2,
+  CreditCard,
+  Edit3,
+  FileDigit,
+  FileText,
+  History,
+  Image as ImageIcon,
+  MapPin,
+  Plane,
+  UploadCloud,
+  User,
+} from "lucide-react";
+import { getPrimaryAction, statusLabels } from "../status";
+import {
+  targetElementId,
+  tabForTarget,
+  type WorkspaceTarget,
+} from "../workspaceModel";
+import type {
+  DrawerTab,
+  Role,
+  Submission,
+  SubmissionAction,
+  SubmissionFile,
+} from "../types";
+
+type SourceStatus =
+  | "draft"
+  | "in_progress"
+  | "submitted_for_review"
+  | "returned"
+  | "corrections_received"
+  | "ready_for_export"
+  | "exported";
+
+type TabId = "overview" | "questionnaire" | "files" | "issues" | "history";
+
+type DrawerTabConfig = {
+  getCount?: (detail: FigmaSubmissionDetail) => number;
+  id: TabId;
+  isWarning?: boolean;
+  label: string;
+};
+
+type IconComponent = typeof FileText;
+
+const drawerFocusableSelector = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+const figmaSubmissionDrawerStyles = `
+  :root {
+    --v20-screen-bg: #101012;
+    --v20-panel-bg: #131315;
+    --v20-card-bg: rgba(255, 255, 255, 0.025);
+    --v20-card-bg-strong: rgba(255, 255, 255, 0.045);
+    --v20-border: rgba(255, 255, 255, 0.105);
+    --v20-border-strong: rgba(255, 255, 255, 0.155);
+    --v20-text: #f4f2f8;
+    --v20-muted: rgba(244, 242, 248, 0.54);
+    --v20-muted-soft: rgba(244, 242, 248, 0.36);
+    --v20-accent: #6f63ff;
+    --v20-accent-soft: rgba(111, 99, 255, 0.18);
+    --v20-accent-border: rgba(111, 99, 255, 0.54);
+    --v20-warning: #eca5b5;
+    --v20-success: #bfc5ff;
+    --v20-radius-xl: 28px;
+    --v20-radius-lg: 22px;
+    --v20-radius-md: 16px;
+  }
+
+  .v20-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(4, 4, 6, 0.72);
+    backdrop-filter: blur(14px);
+  }
+
+  .v20-submission-drawer {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 50;
+    display: flex;
+    width: min(100vw, 1024px);
+    height: 100dvh;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--v20-text);
+    background:
+      radial-gradient(circle at 76% 10%, rgba(111, 99, 255, 0.10), transparent 36%),
+      linear-gradient(180deg, #151518 0%, var(--v20-screen-bg) 46%, #101012 100%);
+    border-left: 1px solid var(--v20-border);
+    box-shadow: -34px 0 96px rgba(0, 0, 0, 0.52);
+    outline: none;
+  }
+
+  .v20-submission-drawer *,
+  .v20-submission-drawer *::before,
+  .v20-submission-drawer *::after {
+    box-sizing: border-box;
+  }
+
+  .v20-drawer-topbar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 30px;
+    min-height: 118px;
+    padding: 24px 30px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+    background: rgba(17, 17, 20, 0.76);
+    backdrop-filter: blur(18px);
+  }
+
+  .v20-icon-button {
+    display: inline-flex;
+    width: 66px;
+    height: 66px;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border: 1px solid var(--v20-border);
+    border-radius: 19px;
+    color: rgba(255, 255, 255, 0.82);
+    background: rgba(255, 255, 255, 0.045);
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+
+  .v20-icon-button:hover {
+    background: rgba(255, 255, 255, 0.075);
+    border-color: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
+  }
+
+  .v20-icon-button:focus-visible,
+  .v20-tab-button:focus-visible,
+  .v20-action-button:focus-visible,
+  .v20-upload-button:focus-visible,
+  .v20-file-action:focus-visible,
+  .v20-questionnaire-open:focus-visible,
+  .v20-issue-button:focus-visible {
+    outline: 2px solid rgba(191, 197, 255, 0.95);
+    outline-offset: 3px;
+  }
+
+  .v20-icon-button.is-close {
+    border-color: rgba(255, 255, 255, 0.88);
+    color: rgba(255, 255, 255, 0.74);
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .v20-icon-glyph {
+    display: block;
+    font-size: 46px;
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  .v20-icon-glyph.is-close {
+    margin-top: -3px;
+    font-size: 48px;
+  }
+
+  .v20-title-wrap {
+    min-width: 0;
+  }
+
+  .v20-title {
+    margin: 0;
+    overflow: hidden;
+    color: #fbf9ff;
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 760;
+    letter-spacing: -0.045em;
+    line-height: 1.08;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 8px;
+    color: var(--v20-muted-soft);
+    font-size: 13px;
+    font-weight: 560;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .v20-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.045);
+    font-size: 11px;
+    font-weight: 690;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .v20-status-pill::before {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--v20-accent);
+    content: "";
+  }
+
+  .v20-status-pill.is-warning {
+    color: var(--v20-warning);
+    border-color: rgba(236, 165, 181, 0.36);
+    background: rgba(236, 165, 181, 0.08);
+  }
+
+  .v20-status-pill.is-warning::before {
+    background: var(--v20-warning);
+  }
+
+  .v20-tabbar-wrap {
+    padding: 20px 30px 0;
+  }
+
+  .v20-tabbar {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .v20-tabbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .v20-tab-button {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    flex: 0 0 auto;
+    padding: 0 19px;
+    border: 1px solid var(--v20-border);
+    border-radius: 999px;
+    color: var(--v20-muted);
+    background: rgba(255, 255, 255, 0.028);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .v20-tab-button:hover {
+    color: rgba(255, 255, 255, 0.86);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  .v20-tab-button.is-active {
+    color: #ffffff;
+    border-color: rgba(111, 99, 255, 0.28);
+    background: linear-gradient(180deg, rgba(111, 99, 255, 0.21), rgba(111, 99, 255, 0.08));
+    box-shadow: 0 0 0 1px rgba(111, 99, 255, 0.10), 0 18px 36px rgba(111, 99, 255, 0.10);
+  }
+
+  .v20-tab-count {
+    display: inline-flex;
+    min-width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 7px;
+    border-radius: 999px;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.10);
+    font-size: 12px;
+    font-weight: 760;
+  }
+
+  .v20-tab-button.is-warning:not(.is-active) .v20-tab-count {
+    color: #211418;
+    background: var(--v20-warning);
+  }
+
+  .v20-drawer-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 30px 30px 118px;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    scrollbar-width: thin;
+  }
+
+  .v20-drawer-body::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .v20-drawer-body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .v20-drawer-body::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    background-clip: content-box;
+  }
+
+  .v20-section-stack {
+    display: grid;
+    gap: 30px;
+  }
+
+  .v20-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .v20-stat-card {
+    position: relative;
+    min-height: 112px;
+    overflow: hidden;
+    padding: 21px 20px 18px;
+    border: 1px solid var(--v20-border);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.024);
+  }
+
+  .v20-stat-card::before {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 50%);
+    content: "";
+  }
+
+  .v20-stat-icon {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    width: 23px;
+    height: 23px;
+    color: rgba(255, 255, 255, 0.48);
+  }
+
+  .v20-stat-icon.is-accent {
+    color: var(--v20-success);
+  }
+
+  .v20-stat-icon.is-warning {
+    color: var(--v20-warning);
+  }
+
+  .v20-stat-value {
+    position: relative;
+    margin-top: 25px;
+    color: #ffffff;
+    font-size: 42px;
+    font-weight: 520;
+    letter-spacing: -0.06em;
+    line-height: 0.95;
+  }
+
+  .v20-stat-label {
+    position: relative;
+    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 12px;
+    font-weight: 720;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .v20-section-label {
+    margin: 0 0 18px 8px;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 24px;
+    font-weight: 650;
+    letter-spacing: 0.16em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .v20-card {
+    border: 1px solid var(--v20-border);
+    border-radius: var(--v20-radius-xl);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.018)),
+      rgba(255, 255, 255, 0.018);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  }
+
+  .v20-two-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .v20-info-card {
+    min-height: 210px;
+    padding: 27px 30px;
+  }
+
+  .v20-info-title {
+    margin: 0 0 25px;
+    color: rgba(255, 255, 255, 0.46);
+    font-size: 12px;
+    font-weight: 760;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .v20-info-title--compact {
+    margin-bottom: 0;
+  }
+
+  .v20-info-list {
+    display: grid;
+    gap: 21px;
+  }
+
+  .v20-info-line {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 15px;
+    align-items: start;
+  }
+
+  .v20-info-line svg {
+    width: 24px;
+    height: 24px;
+    color: rgba(255, 255, 255, 0.34);
+  }
+
+  .v20-info-main {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+  }
+
+  .v20-info-meta {
+    margin-top: 5px;
+    color: rgba(255, 255, 255, 0.40);
+    font-size: 13px;
+    font-weight: 560;
+  }
+
+  .v20-package-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .v20-package-count {
+    color: var(--v20-success);
+    font-size: 20px;
+    font-weight: 760;
+    letter-spacing: -0.04em;
+  }
+
+  .v20-package-list {
+    display: grid;
+    gap: 15px;
+  }
+
+  .v20-package-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 28px;
+  }
+
+  .v20-package-row svg {
+    width: 22px;
+    height: 22px;
+    color: var(--v20-success);
+  }
+
+  .v20-package-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  .v20-package-dot.is-progress {
+    background: var(--v20-accent);
+    box-shadow: 0 0 0 5px rgba(111, 99, 255, 0.11);
+  }
+
+  .v20-package-label {
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 15px;
+    font-weight: 620;
+  }
+
+  .v20-family-card {
+    padding: 38px;
+  }
+
+  .v20-family-head {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    margin-bottom: 34px;
+  }
+
+  .v20-family-icon {
+    display: inline-flex;
+    width: 82px;
+    height: 82px;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .v20-family-icon svg {
+    width: 36px;
+    height: 36px;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .v20-family-title {
+    margin: 0;
+    color: #ffffff;
+    font-size: 30px;
+    font-weight: 760;
+    letter-spacing: -0.045em;
+    line-height: 1.08;
+  }
+
+  .v20-family-meta {
+    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.47);
+    font-size: 18px;
+    font-weight: 560;
+  }
+
+  .v20-person-list {
+    display: grid;
+    gap: 30px;
+  }
+
+  .v20-person-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 23px;
+    min-height: 60px;
+  }
+
+  .v20-avatar {
+    display: inline-flex;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.085);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.54);
+    background: rgba(255, 255, 255, 0.055);
+    font-size: 18px;
+    font-weight: 650;
+    letter-spacing: -0.05em;
+    text-transform: uppercase;
+  }
+
+  .v20-person-name {
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.80);
+    font-size: 24px;
+    font-weight: 650;
+    letter-spacing: -0.032em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-person-role {
+    justify-self: end;
+    color: rgba(255, 255, 255, 0.43);
+    font-size: 19px;
+    font-weight: 520;
+    letter-spacing: -0.025em;
+  }
+
+  .v20-mini-status {
+    width: 25px;
+    height: 25px;
+    color: var(--v20-success);
+  }
+
+  .v20-mini-status.is-danger {
+    color: var(--v20-warning);
+  }
+
+  .v20-mini-dot {
+    display: inline-block;
+    width: 19px;
+    height: 19px;
+    border-radius: 999px;
+    background: var(--v20-accent);
+  }
+
+  .v20-mini-dot.is-muted {
+    background: rgba(255, 255, 255, 0.26);
+  }
+
+  .v20-card-divider {
+    height: 1px;
+    margin: 35px 0 30px;
+    background: rgba(255, 255, 255, 0.09);
+  }
+
+  .v20-family-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    color: rgba(255, 255, 255, 0.44);
+    font-size: 20px;
+    font-weight: 560;
+  }
+
+  .v20-package-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    background: rgba(255, 255, 255, 0.045);
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 19px;
+    font-weight: 650;
+  }
+
+  .v20-package-pill svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .v20-upload-stage {
+    display: grid;
+    gap: 28px;
+  }
+
+  .v20-mode-toggle {
+    display: flex;
+    width: max-content;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.025);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  }
+
+  .v20-mode-button {
+    display: inline-flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 0 26px;
+    border: 0;
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.92);
+    background: transparent;
+    font-size: 22px;
+    font-weight: 760;
+    letter-spacing: -0.035em;
+  }
+
+  .v20-mode-button svg {
+    width: 25px;
+    height: 25px;
+    color: var(--v20-success);
+  }
+
+  .v20-mode-button.is-active {
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 0 0 1px rgba(111, 99, 255, 0.15);
+  }
+
+  .v20-question-card {
+    display: grid;
+    gap: 17px;
+    padding: 26px 24px;
+  }
+
+  .v20-question-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    min-height: 62px;
+  }
+
+  .v20-question-text {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 23px;
+    font-weight: 520;
+    letter-spacing: -0.026em;
+  }
+
+  .v20-yes-no {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 144px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.028);
+  }
+
+  .v20-yes-no span {
+    display: inline-flex;
+    min-height: 61px;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 21px;
+    font-weight: 690;
+    letter-spacing: -0.025em;
+  }
+
+  .v20-yes-no span.is-active {
+    color: rgba(255, 255, 255, 0.86);
+    background: rgba(111, 99, 255, 0.35);
+  }
+
+  .v20-dropzone {
+    position: relative;
+    display: grid;
+    min-height: 600px;
+    place-items: center;
+    overflow: hidden;
+    padding: 64px 34px;
+    border: 1.5px dashed var(--v20-accent-border);
+    border-radius: 42px;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(111, 99, 255, 0.105), transparent 54%),
+      rgba(255, 255, 255, 0.018);
+    cursor: default;
+  }
+
+  .v20-dropzone.is-disabled {
+    opacity: 0.62;
+  }
+
+  .v20-dropzone::before {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.030), transparent 42%);
+    content: "";
+  }
+
+  .v20-dropzone-inner {
+    position: relative;
+    display: flex;
+    max-width: 820px;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .v20-upload-icon-box {
+    display: inline-flex;
+    width: 118px;
+    height: 118px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 46px;
+    border: 2px solid rgba(111, 99, 255, 0.40);
+    border-radius: 28px;
+    background: rgba(111, 99, 255, 0.18);
+    color: var(--v20-success);
+  }
+
+  .v20-upload-icon-box svg {
+    width: 58px;
+    height: 58px;
+  }
+
+  .v20-dropzone-title {
+    margin: 0;
+    color: #ffffff;
+    font-size: 33px;
+    font-weight: 760;
+    letter-spacing: -0.045em;
+    line-height: 1.16;
+  }
+
+  .v20-dropzone-helper {
+    max-width: 720px;
+    margin: 24px 0 0;
+    color: rgba(255, 255, 255, 0.43);
+    font-size: 24px;
+    font-weight: 480;
+    letter-spacing: -0.035em;
+    line-height: 1.55;
+  }
+
+  .v20-upload-button {
+    display: inline-flex;
+    min-height: 82px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 38px;
+    padding: 0 39px;
+    border: 0;
+    border-radius: 14px;
+    color: #111114;
+    background: #ffffff;
+    font-size: 25px;
+    font-weight: 760;
+    letter-spacing: -0.04em;
+    cursor: pointer;
+    transition: transform 160ms ease, opacity 160ms ease;
+  }
+
+  .v20-upload-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .v20-upload-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    transform: none;
+  }
+
+  .v20-hidden-file-input,
+  .v20-row-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .v20-file-sections {
+    display: grid;
+    gap: 16px;
+  }
+
+  .v20-file-section {
+    overflow: hidden;
+    border: 1px solid var(--v20-border);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.024);
+  }
+
+  .v20-file-section-head {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 18px;
+    padding: 22px 24px;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .v20-file-section-title {
+    display: block;
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 730;
+    letter-spacing: -0.04em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-file-section-meta {
+    display: block;
+    margin-top: 7px;
+    color: rgba(255, 255, 255, 0.43);
+    font-size: 15px;
+    font-weight: 560;
+  }
+
+  .v20-file-section-toggle {
+    color: var(--v20-success);
+    font-size: 15px;
+    font-weight: 760;
+  }
+
+  .v20-file-list {
+    display: grid;
+    gap: 1px;
+    border-top: 1px solid rgba(255, 255, 255, 0.075);
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .v20-file-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 22px;
+    background: #151517;
+  }
+
+  .v20-file-icon {
+    display: inline-flex;
+    width: 46px;
+    height: 46px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.54);
+  }
+
+  .v20-file-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .v20-file-title {
+    display: block;
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 17px;
+    font-weight: 690;
+    letter-spacing: -0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-file-meta {
+    display: block;
+    overflow: hidden;
+    margin-top: 5px;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 13px;
+    font-weight: 520;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-file-action,
+  .v20-file-status {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    border: 1px solid rgba(191, 197, 255, 0.35);
+    border-radius: 999px;
+    color: var(--v20-success);
+    background: rgba(111, 99, 255, 0.09);
+    font-size: 13px;
+    font-weight: 760;
+    cursor: pointer;
+  }
+
+  .v20-file-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .v20-file-status.is-ready {
+    color: rgba(255, 255, 255, 0.62);
+    border-color: rgba(255, 255, 255, 0.11);
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .v20-questionnaire-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 18px;
+    padding: 28px;
+  }
+
+  .v20-questionnaire-title {
+    margin: 0;
+    color: #ffffff;
+    font-size: 26px;
+    font-weight: 760;
+    letter-spacing: -0.045em;
+  }
+
+  .v20-questionnaire-helper {
+    margin: 9px 0 0;
+    color: rgba(255, 255, 255, 0.46);
+    font-size: 16px;
+    font-weight: 520;
+  }
+
+  .v20-questionnaire-open,
+  .v20-issue-button {
+    display: inline-flex;
+    min-height: 52px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 18px;
+    border: 1px solid rgba(191, 197, 255, 0.35);
+    border-radius: 16px;
+    color: #ffffff;
+    background: var(--v20-accent);
+    font-size: 15px;
+    font-weight: 760;
+    cursor: pointer;
+  }
+
+  .v20-questionnaire-open svg,
+  .v20-issue-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .v20-questionnaire-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .v20-questionnaire-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 17px;
+    align-items: center;
+    min-height: 112px;
+    padding: 20px;
+    border: 1px solid var(--v20-border);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.024);
+    cursor: pointer;
+  }
+
+  .v20-questionnaire-card:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .v20-questionnaire-icon {
+    display: inline-flex;
+    width: 52px;
+    height: 52px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 16px;
+    color: rgba(255, 255, 255, 0.42);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .v20-questionnaire-icon.is-done {
+    color: var(--v20-success);
+    border-color: rgba(191, 197, 255, 0.26);
+    background: rgba(111, 99, 255, 0.10);
+  }
+
+  .v20-questionnaire-icon.is-progress {
+    color: #ffffff;
+    border-color: rgba(111, 99, 255, 0.38);
+    background: rgba(111, 99, 255, 0.20);
+  }
+
+  .v20-questionnaire-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .v20-questionnaire-card-title {
+    display: block;
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-progress-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    margin-top: 11px;
+  }
+
+  .v20-progress-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.075);
+  }
+
+  .v20-progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--v20-accent);
+  }
+
+  .v20-progress-fill.is-p-0 {
+    width: 0%;
+  }
+
+  .v20-progress-fill.is-p-40 {
+    width: 40%;
+  }
+
+  .v20-progress-fill.is-p-100 {
+    width: 100%;
+  }
+
+  .v20-progress-fill.is-done {
+    background: var(--v20-success);
+  }
+
+  .v20-progress-percent {
+    color: rgba(255, 255, 255, 0.44);
+    font-size: 12px;
+    font-weight: 760;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .v20-issues-screen {
+    display: grid;
+    gap: 28px;
+  }
+
+  .v20-search-row {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    gap: 17px;
+    padding: 0 22px;
+    border: 1px solid var(--v20-border);
+    border-radius: 18px;
+    color: rgba(255, 255, 255, 0.42);
+    background: rgba(255, 255, 255, 0.045);
+    font-size: 23px;
+    font-weight: 520;
+    letter-spacing: -0.03em;
+  }
+
+  .v20-search-row svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .v20-empty-state {
+    display: grid;
+    min-height: 156px;
+    place-items: center;
+    padding: 30px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 26px;
+    color: rgba(255, 255, 255, 0.46);
+    background: rgba(255, 255, 255, 0.014);
+    text-align: center;
+    font-size: 25px;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+  }
+
+  .v20-issue-list {
+    display: grid;
+    gap: 16px;
+  }
+
+  .v20-issue-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: start;
+    overflow: hidden;
+    padding: 22px;
+    border: 1px solid var(--v20-border);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.024);
+  }
+
+  .v20-issue-card::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--v20-warning);
+    content: "";
+  }
+
+  .v20-issue-icon {
+    display: inline-flex;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(236, 165, 181, 0.22);
+    border-radius: 14px;
+    color: var(--v20-warning);
+    background: rgba(236, 165, 181, 0.08);
+  }
+
+  .v20-issue-icon svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .v20-issue-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .v20-issue-title {
+    margin: 0;
+    color: #ffffff;
+    font-size: 19px;
+    font-weight: 740;
+    letter-spacing: -0.03em;
+  }
+
+  .v20-issue-badge {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    padding: 0 11px;
+    border-radius: 999px;
+    color: var(--v20-warning);
+    background: rgba(236, 165, 181, 0.09);
+    font-size: 12px;
+    font-weight: 790;
+  }
+
+  .v20-issue-target {
+    display: block;
+    margin-top: 7px;
+    color: rgba(255, 255, 255, 0.44);
+    font-size: 13px;
+    font-weight: 630;
+  }
+
+  .v20-issue-text {
+    margin: 12px 0 0;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 15px;
+    font-weight: 510;
+    line-height: 1.5;
+  }
+
+  .v20-issue-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .v20-issue-button.is-ghost {
+    color: rgba(255, 255, 255, 0.72);
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  .v20-issue-state {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 13px;
+    font-weight: 720;
+  }
+
+  .v20-history-list {
+    display: grid;
+    gap: 16px;
+  }
+
+  .v20-history-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 17px;
+    align-items: center;
+    padding: 20px;
+    border: 1px solid var(--v20-border);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.024);
+  }
+
+  .v20-history-icon {
+    display: inline-flex;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    color: rgba(255, 255, 255, 0.50);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .v20-history-icon.is-warning {
+    color: var(--v20-warning);
+    border-color: rgba(236, 165, 181, 0.22);
+    background: rgba(236, 165, 181, 0.08);
+  }
+
+  .v20-history-icon.is-info {
+    color: var(--v20-success);
+    border-color: rgba(191, 197, 255, 0.22);
+    background: rgba(111, 99, 255, 0.10);
+  }
+
+  .v20-history-title {
+    display: block;
+    color: rgba(255, 255, 255, 0.86);
+    font-size: 18px;
+    font-weight: 720;
+    letter-spacing: -0.025em;
+  }
+
+  .v20-history-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    color: rgba(255, 255, 255, 0.44);
+    font-size: 13px;
+    font-weight: 560;
+  }
+
+  .v20-history-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  .v20-footer {
+    position: absolute;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 30px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.075);
+    background: linear-gradient(180deg, rgba(16, 16, 18, 0.76), rgba(16, 16, 18, 0.98));
+    backdrop-filter: blur(16px);
+  }
+
+  .v20-footer-note {
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.40);
+    font-size: 13px;
+    font-weight: 560;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v20-footer-note.is-error {
+    color: var(--v20-warning);
+  }
+
+  .v20-footer-actions {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+    gap: 16px;
+  }
+
+  .v20-action-button {
+    display: inline-flex;
+    min-height: 80px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 28px;
+    border-radius: 14px;
+    font-size: 21px;
+    font-weight: 760;
+    letter-spacing: -0.035em;
+    cursor: pointer;
+    transition: transform 160ms ease, opacity 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+
+  .v20-action-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .v20-action-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .v20-action-button.is-ghost {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.012);
+  }
+
+  .v20-action-button.is-primary {
+    border: 1px solid rgba(111, 99, 255, 0.72);
+    color: #ffffff;
+    background: var(--v20-accent);
+    box-shadow: 0 20px 46px rgba(111, 99, 255, 0.18);
+  }
+
+  .v20-action-button.is-warning {
+    border-color: rgba(236, 165, 181, 0.38);
+    background: linear-gradient(135deg, #7b5560, #6f63ff);
+  }
+
+  .v20-skeleton-screen {
+    display: grid;
+    gap: 18px;
+    padding: 30px;
+  }
+
+  .v20-skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .v20-skeleton.is-title {
+    width: 224px;
+    height: 48px;
+  }
+
+  .v20-skeleton.is-stat {
+    height: 112px;
+  }
+
+  .v20-skeleton.is-panel {
+    height: 384px;
+  }
+
+  .v20-skeleton::after {
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.09), transparent);
+    animation: v20SkeletonSweep 1.4s infinite;
+    content: "";
+  }
+
+  @keyframes v20SkeletonSweep {
+    to { transform: translateX(100%); }
+  }
+
+  .is-ai-focus {
+    border-color: rgba(191, 197, 255, 0.82) !important;
+    box-shadow: 0 0 0 4px rgba(111, 99, 255, 0.18) !important;
+  }
+
+  @media (max-width: 760px) {
+    .v20-submission-drawer {
+      width: 100vw;
+      border-left: 0;
+    }
+
+    .v20-drawer-topbar {
+      gap: 16px;
+      min-height: 92px;
+      padding: 18px 16px;
+    }
+
+    .v20-icon-button {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+    }
+
+    .v20-icon-glyph {
+      font-size: 38px;
+    }
+
+    .v20-icon-glyph.is-close {
+      font-size: 40px;
+    }
+
+    .v20-title {
+      font-size: 25px;
+    }
+
+    .v20-subtitle {
+      display: none;
+    }
+
+    .v20-tabbar-wrap {
+      padding: 14px 16px 0;
+    }
+
+    .v20-tab-button {
+      min-height: 42px;
+      padding: 0 15px;
+      font-size: 14px;
+    }
+
+    .v20-drawer-body {
+      padding: 22px 16px 124px;
+    }
+
+    .v20-stat-grid,
+    .v20-two-col,
+    .v20-questionnaire-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .v20-stat-card {
+      min-height: 96px;
+      border-radius: 18px;
+    }
+
+    .v20-stat-value {
+      font-size: 34px;
+    }
+
+    .v20-section-label {
+      margin-left: 2px;
+      font-size: 16px;
+    }
+
+    .v20-family-card {
+      padding: 24px;
+      border-radius: 24px;
+    }
+
+    .v20-family-head {
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .v20-family-icon {
+      width: 62px;
+      height: 62px;
+    }
+
+    .v20-family-title {
+      font-size: 24px;
+    }
+
+    .v20-family-meta {
+      font-size: 15px;
+    }
+
+    .v20-person-list {
+      gap: 18px;
+    }
+
+    .v20-person-row {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 14px;
+    }
+
+    .v20-person-role {
+      display: none;
+    }
+
+    .v20-person-name {
+      font-size: 18px;
+    }
+
+    .v20-family-foot {
+      align-items: flex-start;
+      flex-direction: column;
+      font-size: 15px;
+    }
+
+    .v20-info-card {
+      min-height: auto;
+      padding: 22px;
+    }
+
+    .v20-question-text {
+      font-size: 17px;
+    }
+
+    .v20-question-row {
+      grid-template-columns: 1fr;
+    }
+
+    .v20-yes-no {
+      width: 132px;
+    }
+
+    .v20-yes-no span {
+      min-height: 48px;
+      font-size: 17px;
+    }
+
+    .v20-dropzone {
+      min-height: 440px;
+      padding: 44px 24px;
+      border-radius: 30px;
+    }
+
+    .v20-upload-icon-box {
+      width: 96px;
+      height: 96px;
+      margin-bottom: 34px;
+    }
+
+    .v20-dropzone-title {
+      font-size: 26px;
+    }
+
+    .v20-dropzone-helper {
+      font-size: 18px;
+    }
+
+    .v20-upload-button {
+      min-height: 64px;
+      font-size: 20px;
+    }
+
+    .v20-file-item,
+    .v20-issue-card {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .v20-file-action,
+    .v20-file-status,
+    .v20-issue-actions {
+      grid-column: 1 / -1;
+      justify-self: stretch;
+      align-items: stretch;
+    }
+
+    .v20-file-action,
+    .v20-file-status,
+    .v20-issue-button {
+      width: 100%;
+    }
+
+    .v20-footer {
+      grid-template-columns: 1fr;
+      padding: 14px 16px 18px;
+    }
+
+    .v20-footer-note {
+      display: none;
+    }
+
+    .v20-footer-actions {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .v20-action-button {
+      min-height: 64px;
+      padding: 0 14px;
+      font-size: 17px;
+    }
+  }
+
+  @media (max-width: 460px) {
+    .v20-stat-grid,
+    .v20-two-col,
+    .v20-questionnaire-grid,
+    .v20-footer-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .v20-drawer-topbar {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .v20-icon-button.is-close {
+      display: none;
+    }
+  }
+`;
+
+function getDrawerFocusableElements(container: HTMLElement | null) {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>(drawerFocusableSelector)).filter(
+    (element) =>
+      !element.hasAttribute("disabled") &&
+      element.getAttribute("aria-hidden") !== "true" &&
+      element.offsetParent !== null,
+  );
+}
+
+function useDrawerDesktopQuery() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 1024px)").matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(media.matches);
+    update();
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isDesktop;
+}
+
+type QuestionnaireFocusTarget = {
+  applicantId?: string;
+  field?: string;
+  section?: string;
+};
+
+type FigmaApplicant = {
+  completeness: number;
+  name: string;
+  role: string;
+  status: string;
+};
+
+type FigmaSubmissionDetail = {
+  applicants: FigmaApplicant[];
+  applicantsCount: number;
+  city: string;
+  completeness: number;
+  id: string;
+  issuesCount: number;
+  owner: string;
+  status: SourceStatus;
+  title: string;
+  tripDates: string;
+  type: "family" | "single";
+  updated: string;
+};
+
+type FigmaSubmissionDrawerProps = {
+  activeTab: DrawerTab;
+  actionError?: string;
+  focusTarget?: WorkspaceTarget;
+  onClearFocusTarget?: () => void;
+  onAction: (action: SubmissionAction) => void;
+  onClose: () => void;
+  onMarkIssueFixed?: (issueId: string) => void;
+  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
+  onOpenQuestionnaireWorkspace: (target?: QuestionnaireFocusTarget) => void;
+  role: Role;
+  submission: Submission;
+  surface: "agent" | "review" | "export";
+  [key: string]: unknown;
+};
+
+function sourceStatus(submission: Submission): SourceStatus {
+  if (submission.status === "draft") return "draft";
+  if (submission.status === "returned") return "returned";
+  if (submission.status === "submitted_for_review") return "submitted_for_review";
+  if (submission.status === "ready_for_export") return "ready_for_export";
+  if (submission.status === "exported") return "exported";
+  return "in_progress";
+}
+
+function applicantRoleLabel(role: string) {
+  if (role === "main") return "Основной";
+  if (role === "spouse") return "Супруга";
+  if (role === "child") return "Ребенок";
+  return role;
+}
+
+function applicantQuestionnairePercent(
+  applicant: Submission["applicants"][number],
+) {
+  if (applicant.questionnaireStatus === "complete") return 100;
+  if (applicant.questionnaireStatus === "empty") return 0;
+
+  const sections = applicant.sections;
+  if (!sections.length) return applicant.questionnaireStatus === "needs_fix" ? 65 : 40;
+
+  const completeCount = sections.filter((section) => section.status === "complete").length;
+  return Math.round((completeCount / sections.length) * 100);
+}
+
+function buildDetail(submission: Submission): FigmaSubmissionDetail {
+  return {
+    applicants: submission.applicants.map((applicant) => ({
+      completeness: applicantQuestionnairePercent(applicant),
+      name: applicant.fullName,
+      role: applicantRoleLabel(applicant.role ?? "main"),
+      status: applicant.questionnaireStatus,
+    })),
+    applicantsCount: submission.applicants.length,
+    city: `${submission.city} (VFS Global)`,
+    completeness: submission.completeness.total,
+    id: submission.id,
+    issuesCount: submission.issues.filter(
+      (issue) => issue.status !== "closed_by_admin",
+    ).length,
+    owner: "Татьяна Н.",
+    status: sourceStatus(submission),
+    title: submission.title,
+    tripDates: `${submission.tripDateFrom.replace("-", "–")} – ${submission.tripDateTo.replace("-", "–")}`,
+    type: submission.type,
+    updated: submission.updatedAt,
+  };
+}
+
+function fileTypeLabel(type: SubmissionFile["type"]) {
+  if (type === "passport_scan") return "Скан паспорта";
+  if (type === "selfie") return "Селфи 1";
+  if (type === "selfie_2") return "Селфи 2";
+  return "Документ";
+}
+
+function fileStatusLabel(file: SubmissionFile) {
+  if (file.status === "missing") return "Не загружено";
+  if (file.status === "needs_replacement") return "Нужна замена";
+  if (file.status === "pending_review") return "На проверке";
+  if (file.status === "accepted") return "Принято";
+  if (file.status === "uploaded") return "Загружено";
+  return "Не загружено";
+}
+
+function fileActionLabel(file: SubmissionFile) {
+  return file.status === "needs_replacement" ? "Заменить" : "Загрузить";
+}
+
+function fileAccept(file: SubmissionFile) {
+  if (file.type === "passport_scan") return "image/jpeg,image/png,application/pdf";
+  if (file.type === "selfie" || file.type === "selfie_2") return "image/*";
+  return "image/jpeg,image/png,application/pdf";
+}
+
+function fileSummary(file: SubmissionFile) {
+  const uploadedName = file.originalFileName ?? file.generatedFileName;
+  if (!uploadedName) return fileStatusLabel(file);
+  return `${fileStatusLabel(file)} · ${uploadedName}`;
+}
+
+function fileReadyBadgeLabel(file: SubmissionFile) {
+  if (file.status === "pending_review") return "На проверке";
+  if (file.status === "accepted") return "Принято";
+  if (file.status === "uploaded") return "Загружено";
+  return "Готово";
+}
+
+type FileApplicantSection = {
+  files: SubmissionFile[];
+  id: string;
+  name: string;
+};
+
+function fileApplicantSections(submission: Submission): FileApplicantSection[] {
+  const applicantNameById = new Map<string, string>(
+    submission.applicants.map((applicant) => [applicant.id, applicant.fullName] as [string, string]),
+  );
+  const applicantOrder = new Map<string, number>(
+    submission.applicants.map((applicant, index) => [applicant.id, index] as [string, number]),
+  );
+  const filesByApplicantId = new Map<string, SubmissionFile[]>();
+
+  for (const file of submission.files) {
+    const files = filesByApplicantId.get(file.applicantId) ?? [];
+    files.push(file);
+    filesByApplicantId.set(file.applicantId, files);
+  }
+
+  return Array.from(filesByApplicantId.entries())
+    .sort(
+      ([leftId], [rightId]) =>
+        (applicantOrder.get(leftId) ?? Number.MAX_SAFE_INTEGER) -
+          (applicantOrder.get(rightId) ?? Number.MAX_SAFE_INTEGER) ||
+        leftId.localeCompare(rightId),
+    )
+    .map(([applicantId, files], index) => ({
+      files,
+      id: applicantId,
+      name: applicantNameById.get(applicantId) ?? `Заявитель ${index + 1}`,
+    }));
+}
+
+const Skeleton = ({
+  className = "",
+  variant = "panel",
+}: {
+  className?: string;
+  variant?: "panel" | "stat" | "title";
+}) => <div className={`v20-skeleton is-${variant} ${className}`} />;
+
+function compactStatusLabel(status: SourceStatus) {
+  if (status === "returned") return "возвращено";
+  if (status === "submitted_for_review") return "проверка";
+  if (status === "ready_for_export") return "готово";
+  if (status === "exported") return "выгружено";
+  if (status === "in_progress") return "в работе";
+  return "черновик";
+}
+
+function isFileReady(file: SubmissionFile) {
+  return file.status !== "missing" && file.status !== "needs_replacement";
+}
+
+function documentPackageItems(submission: Submission) {
+  const byType = new Map<
+    SubmissionFile["type"],
+    { ready: number; total: number; type: SubmissionFile["type"] }
+  >();
+
+  for (const file of submission.files) {
+    const current = byType.get(file.type) ?? { ready: 0, total: 0, type: file.type };
+    byType.set(file.type, {
+      ...current,
+      ready: current.ready + (isFileReady(file) ? 1 : 0),
+      total: current.total + 1,
+    });
+  }
+
+  return Array.from(byType.values()).map((item) => ({
+    label:
+      item.total > 1
+        ? `${fileTypeLabel(item.type)} (${item.ready}/${item.total})`
+        : fileTypeLabel(item.type),
+    status:
+      item.ready === item.total
+        ? "done"
+        : item.ready > 0
+          ? "in_progress"
+          : "pending",
+  }));
+}
+
+function personCountLabel(count: number) {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+
+  if (lastDigit === 1 && lastTwoDigits !== 11) return `${count} человек`;
+  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) {
+    return `${count} человека`;
+  }
+  return `${count} человек`;
+}
+
+function initials(name: string) {
+  const value = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("");
+
+  return value || "—";
+}
+
+function applicantStatusMark(status: string) {
+  if (status === "complete") return <CheckCircle2 className="v20-mini-status" aria-hidden="true" />;
+  if (status === "needs_fix") {
+    return <AlertCircle className="v20-mini-status is-danger" aria-hidden="true" />;
+  }
+  if (status === "empty") return <span className="v20-mini-dot is-muted" aria-hidden="true" />;
+  return <span className="v20-mini-dot" aria-hidden="true" />;
+}
+
+const MetricCard = ({
+  Icon,
+  label,
+  tone,
+  value,
+}: {
+  Icon: IconComponent;
+  label: string;
+  tone?: "accent" | "warning";
+  value: number | string;
+}) => (
+  <div className="v20-stat-card">
+    <Icon className={`v20-stat-icon ${tone ? `is-${tone}` : ""}`} aria-hidden="true" />
+    <div className="v20-stat-value">{value}</div>
+    <div className="v20-stat-label">{label}</div>
+  </div>
+);
+
+const YesNoToggle = ({ active = true }: { active?: boolean }) => (
+  <span className="v20-yes-no" aria-hidden="true">
+    <span className={active ? "is-active" : ""}>Да</span>
+    <span className={!active ? "is-active" : ""}>Нет</span>
+  </span>
+);
+
+const OverviewTab = ({
+  data,
+  submission,
+}: {
+  data: FigmaSubmissionDetail;
+  submission: Submission;
+}) => {
+  const documentItems = documentPackageItems(submission);
+  const readyFilesCount = submission.files.filter(isFileReady).length;
+  const closedIssuesCount = submission.issues.filter(
+    (issue) => issue.status === "closed_by_admin",
+  ).length;
+  const packageCount = Math.max(1, Math.ceil(submission.files.length / Math.max(data.applicantsCount, 1)));
+
+  return (
+    <div className="v20-section-stack">
+      <div className="v20-stat-grid">
+        <MetricCard Icon={FileText} label="документы" value={submission.files.length} />
+        <MetricCard Icon={AlertCircle} label="замечания" tone="warning" value={data.issuesCount} />
+        <MetricCard Icon={CheckCircle2} label="готово" tone="accent" value={readyFilesCount} />
+        <MetricCard Icon={History} label="закрыто" value={closedIssuesCount} />
+      </div>
+
+      <section>
+        <h3 className="v20-section-label">Подача</h3>
+        <div className="v20-two-col">
+          <div className="v20-card v20-info-card">
+            <h4 className="v20-info-title">Маршрут и подача</h4>
+            <div className="v20-info-list">
+              <div className="v20-info-line">
+                <Calendar aria-hidden="true" />
+                <div>
+                  <div className="v20-info-main">{data.tripDates}</div>
+                  <div className="v20-info-meta">Даты поездки</div>
+                </div>
+              </div>
+              <div className="v20-info-line">
+                <MapPin aria-hidden="true" />
+                <div>
+                  <div className="v20-info-main">{data.city}</div>
+                  <div className="v20-info-meta">Визовый центр подачи</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="v20-card v20-info-card">
+            <div className="v20-package-head">
+              <h4 className="v20-info-title v20-info-title--compact">Пакет документов</h4>
+              <span className="v20-package-count">
+                {readyFilesCount}/{submission.files.length}
+              </span>
+            </div>
+            <div className="v20-package-list">
+              {documentItems.map((doc) => (
+                <div key={doc.label} className="v20-package-row">
+                  {doc.status === "done" ? (
+                    <CheckCircle2 aria-hidden="true" />
+                  ) : (
+                    <span
+                      className={`v20-package-dot ${doc.status === "in_progress" ? "is-progress" : ""}`}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span className="v20-package-label">{doc.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="v20-section-label">Участники</h3>
+        <div className="v20-card v20-family-card">
+          <div className="v20-family-head">
+            <div className="v20-family-icon">
+              <User aria-hidden="true" />
+            </div>
+            <div>
+              <h3 className="v20-family-title">{data.title}</h3>
+              <div className="v20-family-meta">{personCountLabel(data.applicantsCount)}</div>
+            </div>
+          </div>
+
+          <div className="v20-person-list">
+            {data.applicants.map((applicant, index) => (
+              <div key={`${applicant.name}-${index}`} className="v20-person-row">
+                <span className="v20-avatar">{initials(applicant.name)}</span>
+                <span className="v20-person-name">{applicant.name}</span>
+                <span className="v20-person-role">{applicant.role}</span>
+                {applicantStatusMark(applicant.status)}
+              </div>
+            ))}
+          </div>
+
+          <div className="v20-card-divider" />
+
+          <div className="v20-family-foot">
+            <span>Обновлено: {data.updated}</span>
+            <span className="v20-package-pill">
+              <FileText aria-hidden="true" />
+              {packageCount} {packageCount === 1 ? "пакет" : "пакета"}
+            </span>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const QuestionnaireTab = ({
+  onOpenQuestionnaire,
+}: {
+  onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
+}) => {
+  const sections = [
+    { title: "Личные данные", icon: User, progress: 100, status: "done" },
+    { title: "Паспортные данные", icon: FileDigit, progress: 100, status: "done" },
+    {
+      title: "Место работы / Учебы",
+      icon: Briefcase,
+      progress: 40,
+      remaining: "3 поля",
+      status: "in_progress",
+    },
+    { title: "Спонсоры и финансы", icon: CreditCard, progress: 0, status: "pending" },
+    { title: "Детали поездки", icon: Plane, progress: 100, status: "done" },
+    { title: "Визовая история", icon: History, progress: 100, status: "done" },
+  ];
+
+  return (
+    <div className="v20-section-stack">
+      <div className="v20-card v20-questionnaire-head">
+        <div>
+          <h3 className="v20-questionnaire-title">Прогресс заполнения</h3>
+          <p className="v20-questionnaire-helper">Осталось заполнить 2 блока данных</p>
+        </div>
+        <button
+          className="v20-questionnaire-open"
+          onClick={() => onOpenQuestionnaire()}
+          type="button"
+        >
+          <Edit3 aria-hidden="true" />
+          Открыть анкету
+        </button>
+      </div>
+
+      <div className="v20-questionnaire-grid">
+        {sections.map((section) => (
+          <button
+            className="v20-questionnaire-card"
+            key={section.title}
+            type="button"
+            onClick={() => onOpenQuestionnaire()}
+          >
+            <span
+              className={`v20-questionnaire-icon ${
+                section.status === "done"
+                  ? "is-done"
+                  : section.status === "in_progress"
+                    ? "is-progress"
+                    : ""
+              }`}
+            >
+              <section.icon aria-hidden="true" />
+            </span>
+            <span>
+              <span className="v20-questionnaire-card-title">{section.title}</span>
+              <span className="v20-progress-line">
+                <span className="v20-progress-track">
+                  <span
+                    className={`v20-progress-fill is-p-${section.progress} ${
+                      section.status === "done" ? "is-done" : ""
+                    }`}
+                  />
+                </span>
+                <span className="v20-progress-percent">{section.progress}%</span>
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const FilesTab = ({
+  onUploadFile,
+  submission,
+}: {
+  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
+  submission: Submission;
+}) => {
+  const applicantSections = fileApplicantSections(submission);
+  const firstUploadableApplicant =
+    applicantSections.find((section) =>
+      section.files.some(
+        (file) =>
+          file.status === "needs_replacement" ||
+          (submission.status !== "returned" && file.status === "missing"),
+      ),
+    )?.id ?? applicantSections[0]?.id;
+  const [expandedApplicantIds, setExpandedApplicantIds] = useState<string[]>(
+    firstUploadableApplicant ? [firstUploadableApplicant] : [],
+  );
+  const fileInputsRef = useRef(new Map<string, HTMLInputElement>());
+  const dropInputRef = useRef<HTMLInputElement | null>(null);
+  const firstActionFile = useMemo(
+    () =>
+      submission.files.find(
+        (file) =>
+          file.status === "needs_replacement" ||
+          (submission.status !== "returned" && file.status === "missing"),
+      ) ?? submission.files[0],
+    [submission.files, submission.status],
+  );
+  const canDropUpload = Boolean(onUploadFile && firstActionFile);
+
+  useEffect(() => {
+    setExpandedApplicantIds(firstUploadableApplicant ? [firstUploadableApplicant] : []);
+  }, [firstUploadableApplicant, submission.id]);
+
+  function toggleApplicant(applicantId: string) {
+    setExpandedApplicantIds((current) =>
+      current.includes(applicantId)
+        ? current.filter((id) => id !== applicantId)
+        : [...current, applicantId],
+    );
+  }
+
+  function uploadToFileSlot(fileId: string, selectedFile: File) {
+    void onUploadFile?.(fileId, selectedFile);
+  }
+
+  function handleFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+    fileId: string,
+  ) {
+    const selectedFile = event.currentTarget.files?.[0];
+    if (!selectedFile) return;
+
+    uploadToFileSlot(fileId, selectedFile);
+    event.currentTarget.value = "";
+  }
+
+  function handleDropInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.currentTarget.files?.[0];
+    if (!selectedFile || !firstActionFile) return;
+
+    uploadToFileSlot(firstActionFile.id, selectedFile);
+    event.currentTarget.value = "";
+  }
+
+  function handleDrop(event: ReactDragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (!firstActionFile) return;
+
+    const selectedFile = event.dataTransfer.files?.[0];
+    if (!selectedFile) return;
+
+    uploadToFileSlot(firstActionFile.id, selectedFile);
+  }
+
+  return (
+    <div className="v20-upload-stage">
+      <div className="v20-mode-toggle" aria-label="Тип подачи">
+        <span className={`v20-mode-button ${submission.type === "family" ? "is-active" : ""}`}>
+          <User aria-hidden="true" />
+          Семья
+        </span>
+        <span className={`v20-mode-button ${submission.type === "single" ? "is-active" : ""}`}>
+          <User aria-hidden="true" />
+          Один
+        </span>
+      </div>
+
+      <div className="v20-card v20-question-card">
+        <div className="v20-question-row">
+          <span className="v20-question-text">У вас одинаковый адрес проживания в России?</span>
+          <YesNoToggle active />
+        </div>
+        <div className="v20-question-row">
+          <span className="v20-question-text">В Испании?</span>
+          <YesNoToggle active />
+        </div>
+      </div>
+
+      <div
+        className={`v20-dropzone ${canDropUpload ? "" : "is-disabled"}`}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDrop}
+      >
+        <input
+          accept={firstActionFile ? fileAccept(firstActionFile) : "image/jpeg,image/png,application/pdf"}
+          className="v20-hidden-file-input"
+          disabled={!canDropUpload}
+          ref={dropInputRef}
+          type="file"
+          onChange={handleDropInputChange}
+        />
+        <div className="v20-dropzone-inner">
+          <span className="v20-upload-icon-box">
+            <UploadCloud aria-hidden="true" />
+          </span>
+          <h3 className="v20-dropzone-title">Перетащи документы сюда</h3>
+          <p className="v20-dropzone-helper">
+            PDF, JPG, PNG. После выбора файлы автоматически пройдут upload → OCR → prefill mapping.
+          </p>
+          <button
+            className="v20-upload-button"
+            disabled={!canDropUpload}
+            type="button"
+            onClick={() => dropInputRef.current?.click()}
+          >
+            Выбрать файлы
+          </button>
+        </div>
+      </div>
+
+      <section>
+        <h3 className="v20-section-label">Файлы подачи</h3>
+        <div className="v20-file-sections">
+          {applicantSections.map((section) => {
+            const isExpanded = expandedApplicantIds.includes(section.id);
+            const uploadedCount = section.files.filter(
+              (file) => file.status !== "missing" && file.status !== "needs_replacement",
+            ).length;
+            const actionCount = section.files.length - uploadedCount;
+
+            return (
+              <section className="v20-file-section" key={section.id}>
+                <button
+                  aria-expanded={isExpanded}
+                  className="v20-file-section-head"
+                  type="button"
+                  onClick={() => toggleApplicant(section.id)}
+                >
+                  <span>
+                    <span className="v20-file-section-title">{section.name}</span>
+                    <span className="v20-file-section-meta">
+                      {uploadedCount}/{section.files.length} файлов готово
+                      {actionCount > 0 ? ` · требуется ${actionCount}` : ""}
+                    </span>
+                  </span>
+                  <span className="v20-file-section-toggle">
+                    {isExpanded ? "Свернуть" : "Раскрыть"}
+                  </span>
+                </button>
+
+                {isExpanded ? (
+                  <div className="v20-file-list">
+                    {section.files.map((file) => {
+                      const canUpload =
+                        file.status === "missing" || file.status === "needs_replacement";
+                      const actionLabel = `${fileActionLabel(file)} ${fileTypeLabel(file.type)} — ${section.name}`;
+
+                      return (
+                        <div
+                          id={targetElementId({
+                            applicantId: file.applicantId,
+                            fileType: file.type,
+                            tab: "files",
+                          })}
+                          className="v20-file-item"
+                          key={file.id}
+                        >
+                          <span className="v20-file-icon">
+                            <UploadCloud aria-hidden="true" />
+                          </span>
+                          <span>
+                            <span className="v20-file-title">{fileTypeLabel(file.type)}</span>
+                            <span className="v20-file-meta">{fileSummary(file)}</span>
+                          </span>
+                          {canUpload ? (
+                            <>
+                              <input
+                                accept={fileAccept(file)}
+                                aria-label={actionLabel}
+                                className="v20-row-file-input"
+                                disabled={!onUploadFile}
+                                ref={(node) => {
+                                  if (node) fileInputsRef.current.set(file.id, node);
+                                  else fileInputsRef.current.delete(file.id);
+                                }}
+                                type="file"
+                                onChange={(event) => handleFileChange(event, file.id)}
+                              />
+                              <button
+                                aria-label={actionLabel}
+                                className="v20-file-action"
+                                disabled={!onUploadFile}
+                                type="button"
+                                onClick={() => fileInputsRef.current.get(file.id)?.click()}
+                              >
+                                {fileActionLabel(file)}
+                              </button>
+                            </>
+                          ) : (
+                            <span className="v20-file-status is-ready">
+                              {fileReadyBadgeLabel(file)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const IssuesTab = ({
+  data,
+  onMarkIssueFixed,
+  onOpenQuestionnaire,
+  role,
+  submission,
+}: {
+  data: FigmaSubmissionDetail;
+  onMarkIssueFixed?: (issueId: string) => void;
+  onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
+  role: Role;
+  submission: Submission;
+}) => {
+  const openIssues = submission.issues.filter((issue) => issue.status !== "closed_by_admin");
+  const fixedIssues = submission.issues.filter((issue) => issue.status === "fixed_by_agent");
+  const closedIssues = submission.issues.filter((issue) => issue.status === "closed_by_admin");
+
+  return (
+    <div className="v20-issues-screen">
+      <div className="v20-stat-grid">
+        <MetricCard Icon={AlertCircle} label="открыто" tone="warning" value={openIssues.length} />
+        <MetricCard Icon={History} label="сегодня" value={fixedIssues.length} />
+        <MetricCard Icon={FileText} label="на неделе" value={data.issuesCount} />
+        <MetricCard Icon={CheckCircle2} label="закрыто" tone="accent" value={closedIssues.length} />
+      </div>
+
+      <div className="v20-search-row" aria-hidden="true">
+        <FileText aria-hidden="true" />
+        Поиск по действиям...
+      </div>
+
+      {openIssues.length > 0 ? (
+        <div className="v20-issue-list">
+          {openIssues.map((issue) => {
+            const Icon = issue.type === "file" ? ImageIcon : FileText;
+            const canMarkFixed =
+              role === "agent" && issue.status === "open" && Boolean(onMarkIssueFixed);
+
+            return (
+              <article
+                id={targetElementId({ issueId: issue.id, tab: "issues" })}
+                key={issue.id}
+                className="v20-issue-card"
+              >
+                <span className="v20-issue-icon">
+                  <Icon aria-hidden="true" />
+                </span>
+                <span>
+                  <span className="v20-issue-title-row">
+                    <h4 className="v20-issue-title">{issue.reason}</h4>
+                    <span className="v20-issue-badge">
+                      {issue.status === "fixed_by_agent" ? "Исправлено" : "Blocker"}
+                    </span>
+                  </span>
+                  <span className="v20-issue-target">{issueTargetLine(issue)}</span>
+                  <p className="v20-issue-text">{issue.comment}</p>
+                </span>
+                <span className="v20-issue-actions">
+                  {issue.type === "field" && issue.status === "open" ? (
+                    <button
+                      className="v20-issue-button"
+                      type="button"
+                      onClick={() =>
+                        onOpenQuestionnaire({
+                          applicantId: issue.target.applicantId,
+                          field: issue.target.field,
+                          section: issue.target.section,
+                        })
+                      }
+                    >
+                      Исправить в анкете
+                    </button>
+                  ) : null}
+                  {canMarkFixed ? (
+                    <button
+                      className="v20-issue-button is-ghost"
+                      type="button"
+                      onClick={() => onMarkIssueFixed?.(issue.id)}
+                    >
+                      Отметить исправленным
+                    </button>
+                  ) : null}
+                  {!canMarkFixed && !(issue.type === "field" && issue.status === "open") ? (
+                    <span className="v20-issue-state">
+                      {issue.status === "fixed_by_agent" ? "Ждет проверки" : "Документ"}
+                    </span>
+                  ) : null}
+                </span>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="v20-empty-state">Нет открытых действий по текущим подачам.</div>
+      )}
+    </div>
+  );
+};
+
+function issueTargetLine(issue: Submission["issues"][number]) {
+  const parts = [
+    issue.target.applicantName,
+    issue.target.fileType ? "Файлы" : (issue.target.section ?? "Анкета"),
+    issue.target.field,
+  ];
+  return parts.filter(Boolean).join(" · ");
+}
+
+const HistoryTab = () => {
+  const events = [
+    {
+      Icon: AlertCircle,
+      time: "Сегодня, 14:30",
+      title: "Возвращено с замечаниями",
+      tone: "warning",
+      user: "Система",
+    },
+    {
+      Icon: UploadCloud,
+      time: "Вчера, 18:45",
+      title: "Отправлено на проверку",
+      tone: "info",
+      user: "Вы",
+    },
+    {
+      Icon: ImageIcon,
+      time: "Вчера, 15:10",
+      title: "Загружены сканы паспортов",
+      tone: "neutral",
+      user: "Вы",
+    },
+    {
+      Icon: FileText,
+      time: "Вчера, 12:00",
+      title: "Создан черновик",
+      tone: "neutral",
+      user: "Вы",
+    },
+  ];
+
+  return (
+    <section className="v20-history-list" aria-label="История подачи">
+      {events.map((event) => (
+        <div className="v20-history-item" key={event.title}>
+          <span className={`v20-history-icon is-${event.tone}`}>
+            <event.Icon aria-hidden="true" />
+          </span>
+          <span>
+            <span className="v20-history-title">{event.title}</span>
+            <span className="v20-history-meta">
+              {event.time}
+              <i className="v20-history-dot" aria-hidden="true" />
+              {event.user}
+            </span>
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+};
+
+function initialTab(tab: DrawerTab): TabId {
+  if (tab === "files") return "files";
+  if (tab === "issues") return "issues";
+  if (tab === "history") return "history";
+  if (tab === "questionnaire") return "questionnaire";
+  return "overview";
+}
+
+function tabIdForWorkspaceTarget(target: WorkspaceTarget): TabId {
+  return initialTab(tabForTarget(target));
+}
+
+function questionnaireFocusFromTarget(target: WorkspaceTarget): QuestionnaireFocusTarget | undefined {
+  if (target.tab !== "questionnaire") return undefined;
+  return {
+    applicantId: target.applicantId,
+    field: target.field,
+    section: target.section,
+  };
+}
+
+function screenTitle(tab: TabId, data: FigmaSubmissionDetail) {
+  if (tab === "files") return "Загрузка и первичная сборка";
+  if (tab === "issues") return "Мои действия";
+  return data.title;
+}
+
+function screenMeta(data: FigmaSubmissionDetail) {
+  return [
+    data.id,
+    data.type === "family" ? "семейная" : "индивидуальная",
+    compactStatusLabel(data.status),
+  ].join(" · ");
+}
+
+export function FigmaSubmissionDrawer({
+  activeTab,
+  actionError = "",
+  focusTarget,
+  onClearFocusTarget,
+  onAction,
+  onClose,
+  onMarkIssueFixed,
+  onOpenQuestionnaireWorkspace,
+  onUploadFile,
+  role,
+  submission,
+  surface,
+}: FigmaSubmissionDrawerProps) {
+  const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
+  const [status, setStatus] = useState<"loading" | "success">("loading");
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerTabsRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const isDesktopDrawer = useDrawerDesktopQuery();
+  const prefersReducedMotion = useReducedMotion();
+  const data = useMemo(() => buildDetail(submission), [submission]);
+  const primaryAction = getPrimaryAction(submission, role, surface);
+  const pendingTargetRef = useRef<WorkspaceTarget | null>(null);
+  const shouldReduceMotion = Boolean(prefersReducedMotion);
+  const drawerPanelInitial = shouldReduceMotion
+    ? { opacity: 0, x: 0, y: 0 }
+    : {
+        opacity: 0.5,
+        x: isDesktopDrawer ? "100%" : 0,
+        y: isDesktopDrawer ? 0 : "100%",
+      };
+  const drawerPanelExit = shouldReduceMotion
+    ? { opacity: 0, x: 0, y: 0 }
+    : {
+        opacity: 0,
+        x: isDesktopDrawer ? "100%" : 0,
+        y: isDesktopDrawer ? 0 : "100%",
+      };
+  const drawerPanelTransition = shouldReduceMotion
+    ? { duration: 0.01 }
+    : { damping: 28, mass: 0.8, stiffness: 240, type: "spring" as const };
+  const tabContentInitial = shouldReduceMotion
+    ? { opacity: 0, y: 0 }
+    : { opacity: 0, y: 10 };
+  const tabContentExit = shouldReduceMotion
+    ? { opacity: 0, y: 0 }
+    : { opacity: 0, y: -10 };
+
+  const openWorkspaceTarget = useCallback((target: WorkspaceTarget) => {
+    pendingTargetRef.current = target;
+
+    if (target.tab === "questionnaire") {
+      setTab("questionnaire");
+      if (role === "agent") onOpenQuestionnaireWorkspace(questionnaireFocusFromTarget(target));
+      return;
+    }
+
+    setTab(tabIdForWorkspaceTarget(target));
+  }, [onOpenQuestionnaireWorkspace, role]);
+
+  useEffect(() => {
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      previouslyFocusedElementRef.current?.focus({ preventScroll: true });
+    };
+  }, [submission.id]);
+
+  useEffect(() => {
+    setStatus("loading");
+    setTab(initialTab(activeTab));
+    const timer = window.setTimeout(() => setStatus("success"), 260);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, submission.id]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    if (initialTab(activeTab) === "issues" && focusTarget.tab !== "issues") {
+      pendingTargetRef.current = null;
+      onClearFocusTarget?.();
+      return;
+    }
+    openWorkspaceTarget(focusTarget);
+  }, [activeTab, focusTarget, onClearFocusTarget, openWorkspaceTarget, submission.id]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+    const target = pendingTargetRef.current;
+    if (!target) return;
+
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(targetElementId(target));
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        element.classList.add("is-ai-focus");
+        window.setTimeout(() => element.classList.remove("is-ai-focus"), 1800);
+      }
+      pendingTargetRef.current = null;
+      onClearFocusTarget?.();
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [onClearFocusTarget, status, tab, submission.id]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+    const activeButton = drawerTabsRef.current?.querySelector<HTMLButtonElement>(
+      `[data-drawer-tab="${tab}"]`,
+    );
+    activeButton?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [status, tab]);
+
+  useEffect(() => {
+    if (status !== "success") return;
+    window.requestAnimationFrame(() => {
+      drawerRef.current?.focus({ preventScroll: true });
+    });
+  }, [status, submission.id]);
+
+  function handleDrawerKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+
+    const focusableElements = getDrawerFocusableElements(drawerRef.current);
+    if (focusableElements.length === 0) {
+      event.preventDefault();
+      drawerRef.current?.focus({ preventScroll: true });
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+
+    if (event.shiftKey && activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus({ preventScroll: true });
+      return;
+    }
+
+    if (!event.shiftKey && activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus({ preventScroll: true });
+      return;
+    }
+
+    if (!drawerRef.current?.contains(activeElement)) {
+      event.preventDefault();
+      firstElement.focus({ preventScroll: true });
+    }
+  }
+
+  const tabs: DrawerTabConfig[] = [
+    { id: "overview", label: "Обзор" },
+    { id: "questionnaire", label: "Анкета" },
+    { id: "files", label: "Файлы" },
+    {
+      getCount: (detail) => detail.issuesCount,
+      id: "issues",
+      isWarning: true,
+      label: "Замечания",
+    },
+    { id: "history", label: "История" },
+  ];
+
+  const footerStatusText =
+    actionError ||
+    primaryAction.reason ||
+    (data.status === "returned"
+      ? "Исправьте замечания перед повторной отправкой."
+      : statusLabels[submission.status]);
+  const primaryFooterLabel =
+    data.status === "returned" ? "Отправить исправления" : (primaryAction.label || "Далее");
+  const currentScreenTitle = screenTitle(tab, data);
+
+  return (
+    <>
+      <style>{figmaSubmissionDrawerStyles}</style>
+      <AnimatePresence>
+        <motion.div
+          animate={{ opacity: 1 }}
+          className="v20-drawer-overlay"
+          exit={{ opacity: 0 }}
+          initial={{ opacity: 0 }}
+          key="figma-drawer-overlay"
+          onClick={onClose}
+          transition={{ duration: shouldReduceMotion ? 0.01 : 0.25 }}
+        />
+
+        <motion.div
+          animate={{ opacity: 1, x: 0, y: 0 }}
+          className="v20-submission-drawer"
+          exit={drawerPanelExit}
+          initial={drawerPanelInitial}
+          key="figma-drawer-panel"
+          ref={drawerRef}
+          role="dialog"
+          aria-label={`Подача ${data.id}`}
+          aria-modal="true"
+          tabIndex={-1}
+          transition={drawerPanelTransition}
+          onKeyDown={handleDrawerKeyDown}
+        >
+          <header className="v20-drawer-topbar">
+            <button className="v20-icon-button" aria-label="Назад" type="button" onClick={onClose}>
+              <span className="v20-icon-glyph" aria-hidden="true">←</span>
+            </button>
+            <div className="v20-title-wrap">
+              <h2 className="v20-title">{currentScreenTitle}</h2>
+              <div className="v20-subtitle">
+                <span>{screenMeta(data)}</span>
+                <span className={`v20-status-pill ${data.status === "returned" ? "is-warning" : ""}`}>
+                  {compactStatusLabel(data.status)}
+                </span>
+              </div>
+            </div>
+            <button className="v20-icon-button is-close" aria-label="Закрыть" type="button" onClick={onClose}>
+              <span className="v20-icon-glyph is-close" aria-hidden="true">×</span>
+            </button>
+          </header>
+
+          <div className="v20-tabbar-wrap">
+            <nav className="v20-tabbar" ref={drawerTabsRef} aria-label="Разделы подачи">
+              {tabs.map((item) => {
+                const count = item.getCount ? item.getCount(data) : undefined;
+                const isActive = tab === item.id;
+
+                return (
+                  <button
+                    aria-selected={isActive}
+                    className={`v20-tab-button ${isActive ? "is-active" : ""} ${item.isWarning ? "is-warning" : ""}`}
+                    data-drawer-tab={item.id}
+                    key={item.id}
+                    role="tab"
+                    type="button"
+                    onClick={() => setTab(item.id)}
+                  >
+                    {item.label}
+                    {typeof count === "number" && count > 0 ? (
+                      <span className="v20-tab-count">{count}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {status === "loading" ? (
+            <div className="v20-skeleton-screen" aria-hidden="true">
+              <Skeleton variant="title" />
+              <div className="v20-stat-grid">
+                <Skeleton variant="stat" />
+                <Skeleton variant="stat" />
+                <Skeleton variant="stat" />
+                <Skeleton variant="stat" />
+              </div>
+              <Skeleton variant="panel" />
+            </div>
+          ) : (
+            <>
+              <main className="v20-drawer-body">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={tabContentExit}
+                    initial={tabContentInitial}
+                    key={tab}
+                    transition={{ duration: shouldReduceMotion ? 0.01 : 0.2 }}
+                  >
+                    {tab === "overview" ? (
+                      <OverviewTab data={data} submission={submission} />
+                    ) : null}
+                    {tab === "questionnaire" ? (
+                      <QuestionnaireTab onOpenQuestionnaire={onOpenQuestionnaireWorkspace} />
+                    ) : null}
+                    {tab === "files" ? (
+                      <FilesTab onUploadFile={onUploadFile} submission={submission} />
+                    ) : null}
+                    {tab === "issues" ? (
+                      <IssuesTab
+                        data={data}
+                        onMarkIssueFixed={onMarkIssueFixed}
+                        onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
+                        role={role}
+                        submission={submission}
+                      />
+                    ) : null}
+                    {tab === "history" ? <HistoryTab /> : null}
+                  </motion.div>
+                </AnimatePresence>
+              </main>
+
+              <footer className="v20-footer">
+                <div className={`v20-footer-note ${actionError ? "is-error" : ""}`}>
+                  {footerStatusText}
+                </div>
+                <div className="v20-footer-actions">
+                  <button
+                    className="v20-action-button is-ghost"
+                    type="button"
+                    onClick={onClose}
+                  >
+                    Сохранить черновик
+                  </button>
+                  <button
+                    className={`v20-action-button ${data.status === "returned" ? "is-warning" : "is-primary"}`}
+                    disabled={primaryAction.disabled}
+                    type="button"
+                    onClick={() => {
+                      if (!primaryAction.disabled) onAction(primaryAction.action);
+                    }}
+                  >
+                    {primaryFooterLabel}
+                  </button>
+                </div>
+              </footer>
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </>
+  );
+}

@@ -395,6 +395,7 @@
   --vf-ref-color-hexneg-fff: #ffffff;
   --vf-ref-color-hexneg-ffffff: #ffffff;
   --vf-ref-color-rgb-0-0-0-0neg-1: rgb(0 0 0 / 0.1);
+  --vf-ref-color-rgb-0-0-0-0neg-13: rgb(0 0 0 / 0.13);
   --vf-ref-color-rgb-0-0-0-0neg-18: rgb(0 0 0 / 0.18);
   --vf-ref-color-rgb-0-0-0-0neg-2: rgb(0 0 0 / 0.2);
   --vf-ref-color-rgb-0-0-0-0neg-22: rgb(0 0 0 / 0.22);
@@ -457,6 +458,7 @@
   --vf-ref-color-rgb-255-255-255-0neg-012: rgb(255 255 255 / 0.012);
   --vf-ref-color-rgb-255-255-255-0neg-018: rgb(255 255 255 / 0.018);
   --vf-ref-color-rgb-255-255-255-0neg-02: rgb(255 255 255 / 0.02);
+  --vf-ref-color-rgb-255-255-255-0neg-024: rgb(255 255 255 / 0.024);
   --vf-ref-color-rgb-255-255-255-0neg-025: rgb(255 255 255 / 0.025);
   --vf-ref-color-rgb-255-255-255-0neg-026: rgb(255 255 255 / 0.026);
   --vf-ref-color-rgb-255-255-255-0neg-03: rgb(255 255 255 / 0.03);
@@ -479,8 +481,10 @@
   --vf-ref-color-rgb-255-255-255-0neg-15: rgb(255 255 255 / 0.15);
   --vf-ref-color-rgb-255-255-255-0neg-16: rgb(255 255 255 / 0.16);
   --vf-ref-color-rgb-255-255-255-0neg-18: rgb(255 255 255 / 0.18);
+  --vf-ref-color-rgb-255-255-255-0neg-20: rgb(255 255 255 / 0.2);
   --vf-ref-color-rgb-255-255-255-0neg-2: rgb(255 255 255 / 0.2);
   --vf-ref-color-rgb-255-255-255-0neg-24: rgb(255 255 255 / 0.24);
+  --vf-ref-color-rgb-255-255-255-0neg-28: rgb(255 255 255 / 0.28);
   --vf-ref-color-rgb-255-255-255-0neg-3: rgb(255 255 255 / 0.3);
   --vf-ref-color-rgb-255-255-255-0neg-4: rgb(255 255 255 / 0.4);
   --vf-ref-color-rgb-255-255-255-0neg-42: rgb(255 255 255 / 0.42);
@@ -1135,7 +1139,9 @@
   --v19b-size-122: 122px;
   --v19b-size-128: 128px;
   --v19b-size-130: 130px;
+  --v19b-size-132: 132px;
   --v19b-size-136: 136px;
+  --v19b-size-144: 144px;
   --v19b-size-148: 148px;
   --v19b-size-150: 150px;
   --v19b-size-152: 152px;
@@ -1184,6 +1190,7 @@
   --v19b-z-base: 1;
 
   --v19b-weight-body: 400;
+  --v19b-weight-regular: var(--v19b-weight-body);
   --v19b-weight-control: 500;
   --v19b-weight-title: 600;
   --v19b-weight-row-title: 600;

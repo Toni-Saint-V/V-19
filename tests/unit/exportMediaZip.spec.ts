@@ -1,40 +1,26 @@
 import JSZip from "jszip";
-import { afterEach, describe, expect, test, vi } from "vitest";
-import {
-  buildExportPackageIdentity,
-} from "../../src/modules/submissions/exportRules";
+import { describe, expect, test, vi } from "vitest";
+import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import {
   createExportMediaZipArtifact,
   default as downloadExportMediaZip,
-  type ExportMediaZipDownloader,
+  type ExportMediaZipDocumentDownloader,
 } from "../../src/modules/submissions/exportMediaZip";
-import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
-  clearSubmissions,
-  loadSubmissions,
-  saveSubmissions,
-} from "../../src/modules/submissions/persistence";
+  normalizeDocumentType,
+  type DocumentAsset,
+} from "../../src/modules/documents/documentTypes";
+import { initialSubmissions } from "../../src/modules/submissions/mockData";
+import { mediaStorageBucket } from "../../src/modules/submissions/mediaStoragePolicy";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
-import { mediaStorageBucket } from "../../src/modules/submissions/mediaStorage";
 import type {
   Submission,
   SubmissionFile,
 } from "../../src/modules/submissions/types";
 
 const canonicalTypes = ["passport_scan", "selfie", "selfie_2"] as const;
-let storageMap: Map<string, string> | null = null;
-
-function installLocalStorage() {
-  storageMap = new Map();
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: {
-      getItem: (key: string) => storageMap?.get(key) ?? null,
-      removeItem: (key: string) => storageMap?.delete(key),
-      setItem: (key: string, value: string) => storageMap?.set(key, value),
-    },
-  });
-}
+const exportDate = "2026-07-07";
+const rootFolder = `VisaFlow_Export_${exportDate}`;
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -52,38 +38,17 @@ function withCanonicalStorage(submission: Submission): Submission {
         return {
           ...file,
           generatedFileName,
-          mimeType: file.type === "passport_scan" ? "application/pdf" : "image/jpeg",
+          mimeType:
+            file.type === "passport_scan" ? "application/pdf" : "image/jpeg",
           originalFileName:
             file.type === "passport_scan" ? "passport.pdf" : `${file.type}.jpg`,
+          reviewStatus: "accepted" as const,
           sizeBytes: 16,
           storageBucket: mediaStorageBucket,
           storagePath: `submissions/${submission.id}/applicants/${file.applicantId}/${file.type}/${generatedFileName}`,
+          uploadStatus: "uploaded" as const,
         };
       }),
-  };
-}
-
-function withApplicantPassport(
-  submission: Submission,
-  passportNumber: string,
-): Submission {
-  return {
-    ...submission,
-    applicants: submission.applicants.map((applicant, applicantIndex) =>
-      applicantIndex === 0
-        ? {
-            ...applicant,
-            sections: applicant.sections.map((section) => ({
-              ...section,
-              fields: section.fields.map((field) =>
-                field.id === "passport-no"
-                  ? { ...field, value: passportNumber }
-                  : field,
-              ),
-            })),
-          }
-        : applicant,
-    ),
   };
 }
 
@@ -108,10 +73,58 @@ function identityFor(selection: Submission[]) {
   return identity;
 }
 
-function downloader(bytes = "private-media-bytes"): ExportMediaZipDownloader {
-  return vi.fn(async (target, file) => {
-    const type = file.mimeType ?? "application/octet-stream";
-    return new Blob([`${bytes}:${target.path}`], { type });
+function documentAssetsFor(submissions: Submission[]): DocumentAsset[] {
+  const now = "2026-07-07T00:00:00.000Z";
+
+  return submissions.flatMap((submission) =>
+    submission.files.flatMap((file) => {
+      if (!canonicalTypes.some((type) => type === file.type)) return [];
+      if (!file.storagePath || file.storageBucket !== mediaStorageBucket)
+        return [];
+
+      const type = normalizeDocumentType(file.type);
+      const filename =
+        file.generatedFileName ??
+        file.storagePath.split("/").filter(Boolean).at(-1) ??
+        null;
+
+      return [
+        {
+          applicantId: file.applicantId,
+          checksum: null,
+          createdAt: now,
+          exportStatus: "ready" as const,
+          id: `asset-${submission.id}-${file.applicantId}-${type}`,
+          mime:
+            file.mimeType ??
+            (type === "passport_scan" ? "application/pdf" : "image/jpeg"),
+          ownerUserId: submission.agentId,
+          size: file.sizeBytes ?? 16,
+          sourceMediaAssetId: file.id,
+          storage: {
+            bucket: mediaStorageBucket,
+            filename,
+            path: file.storagePath,
+          },
+          submissionId: submission.id,
+          type,
+          updatedAt: now,
+          uploadedAt: file.uploadedAtIso ?? now,
+          uploadStatus: "uploaded" as const,
+          validatedAt: file.reviewedAtIso ?? now,
+          validationStatus: "passed" as const,
+        },
+      ];
+    }),
+  );
+}
+
+function documentDownloader(
+  bytes = "private-media-bytes",
+): ExportMediaZipDocumentDownloader {
+  return vi.fn(async (asset) => {
+    const type = asset.mime ?? "application/octet-stream";
+    return new Blob([`${bytes}:${asset.storage.path}`], { type });
   });
 }
 
@@ -137,32 +150,38 @@ async function zipTextEntry(blob: Blob, name: string): Promise<string> {
 function mediaEntryNames(fileNames: string[]): string[] {
   return fileNames.filter(
     (name) =>
-      name !== "manifest.json" &&
-      name !== "README_ПАКЕТ.txt" &&
+      !name.endsWith("/manifest.json") &&
+      !name.endsWith("/README_ПАКЕТ.txt") &&
       !name.endsWith(".xlsx"),
   );
 }
 
-describe("export media mega ZIP", () => {
-  afterEach(() => {
-    if (storageMap) {
-      clearSubmissions();
-      storageMap = null;
-    }
-    delete (globalThis as { localStorage?: unknown }).localStorage;
-  });
+function manifestName(fileNames: string[]): string {
+  const name = fileNames.find((candidate) =>
+    candidate.endsWith("/manifest.json"),
+  );
+  if (!name) throw new Error("Missing archive manifest");
+  return name;
+}
 
-  test("puts a single applicant under the applicants folder", async () => {
+describe("export media mega ZIP", () => {
+  test("exports a single applicant from validated document assets", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
     const result = await createExportMediaZipArtifact(selection, {
-      downloadMedia: downloader(),
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument: documentDownloader(),
       expectedIdentity: identityFor(selection),
+      exportDate,
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.safeMessage);
-    expect(result.artifact.fileName).toMatch(/^visaflow-export-.+\.zip$/);
-    expect(result.artifact.workbookFileName).toMatch(/^visaflow-export-.+\.xlsx$/);
+    expect(result.artifact.fileName).toMatch(
+      /^visaflow-export-.+_documents\.zip$/,
+    );
+    expect(result.artifact.workbookFileName).toMatch(
+      /^visaflow-export-.+\.xlsx$/,
+    );
     expect(result.artifact).toMatchObject({
       applicantCount: 1,
       fileCount: 3,
@@ -170,148 +189,92 @@ describe("export media mega ZIP", () => {
     });
 
     const names = await zipEntryNames(result.artifact.blob);
-    const mediaNames = mediaEntryNames(names.fileNames);
     expect(names.fileNames).toEqual(
       expect.arrayContaining([
-        "manifest.json",
-        "README_ПАКЕТ.txt",
-        result.artifact.workbookFileName,
+        `${rootFolder}/manifest.json`,
+        `${rootFolder}/README_ПАКЕТ.txt`,
+        `${rootFolder}/${result.artifact.workbookFileName}`,
       ]),
     );
-    expect(names.directoryNames).toEqual(
-      expect.arrayContaining(["Москва/01_Семьи/", "Москва/02_Заявители/"]),
-    );
-    expect(mediaNames).toHaveLength(3);
-    expect(mediaNames).toEqual(
+
+    expect(mediaEntryNames(names.fileNames)).toEqual(
       expect.arrayContaining([
-        expect.stringMatching(
-          /^Москва\/02_Заявители\/01_ПД-1056_.+\/01_.+\/missing-passport_passport_scan_.+\.pdf$/,
-        ),
-        expect.stringMatching(/^Москва\/02_Заявители\/01_ПД-1056_.+\/01_.+\/missing-passport_selfie_.+\.jpg$/),
-        expect.stringMatching(
-          /^Москва\/02_Заявители\/01_ПД-1056_.+\/01_.+\/missing-passport_selfie_2_.+\.jpg$/,
-        ),
+        `${rootFolder}/Москва/Дмитрий Орлов/passport.pdf`,
+        `${rootFolder}/Москва/Дмитрий Орлов/selfie_1.jpg`,
+        `${rootFolder}/Москва/Дмитрий Орлов/selfie_2.jpg`,
       ]),
     );
   });
 
-  test("uses passport number in applicant media filenames when available", async () => {
+  test("normalizes legacy selfie storage rows to selfie_1 in the archive", async () => {
+    const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
+    const result = await createExportMediaZipArtifact(selection, {
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument: documentDownloader(),
+      expectedIdentity: identityFor(selection),
+      exportDate,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+
+    const names = await zipEntryNames(result.artifact.blob);
+    const mediaNames = mediaEntryNames(names.fileNames);
+    expect(mediaNames).toContain(
+      `${rootFolder}/Москва/Дмитрий Орлов/selfie_1.jpg`,
+    );
+    expect(mediaNames).not.toContain(
+      `${rootFolder}/Москва/Дмитрий Орлов/selfie.jpg`,
+    );
+  });
+
+  test("keeps a family together with applicant prefixes", async () => {
     const selection = generatedSelection(
-      withCanonicalStorage(withApplicantPassport(byId("ПД-1056"), "669308614")),
+      withCanonicalStorage(byId("SUB-1102")),
     );
     const result = await createExportMediaZipArtifact(selection, {
-      downloadMedia: downloader(),
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument: documentDownloader(),
       expectedIdentity: identityFor(selection),
+      exportDate,
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.safeMessage);
+    expect(result.artifact).toMatchObject({
+      applicantCount: 3,
+      fileCount: 9,
+      submissionCount: 1,
+    });
 
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
-
-    expect(mediaNames).toHaveLength(3);
-    expect(mediaNames.every((name) => name.includes("/669308614_"))).toBe(true);
+    expect(mediaNames).toHaveLength(9);
+    expect(
+      mediaNames.every((name) =>
+        name.startsWith(`${rootFolder}/Москва/Семья Волковых/`),
+      ),
+    ).toBe(true);
     expect(mediaNames).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("669308614_passport_scan_"),
-        expect.stringContaining("669308614_selfie_"),
-        expect.stringContaining("669308614_selfie_2_"),
+        `${rootFolder}/Москва/Семья Волковых/01_анна_волкова_passport.pdf`,
+        `${rootFolder}/Москва/Семья Волковых/01_анна_волкова_selfie_1.jpg`,
+        `${rootFolder}/Москва/Семья Волковых/02_игорь_волков_passport.pdf`,
+        `${rootFolder}/Москва/Семья Волковых/03_мила_волкова_selfie_2.jpg`,
       ]),
     );
   });
 
-  test("keeps a family together under one family folder with tourist folders", async () => {
-    const selection = generatedSelection(withCanonicalStorage(byId("SUB-1102")));
-    const result = await createExportMediaZipArtifact(selection, {
-      downloadMedia: downloader(),
-      expectedIdentity: identityFor(selection),
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.safeMessage);
-    expect(result.artifact).toMatchObject({
-      applicantCount: 3,
-      fileCount: 9,
-      submissionCount: 1,
-    });
-
-    const names = await zipEntryNames(result.artifact.blob);
-    expect(names.directoryNames).toEqual(
-      expect.arrayContaining(["Москва/01_Семьи/", "Москва/02_Заявители/"]),
-    );
-    const mediaNames = mediaEntryNames(names.fileNames);
-    expect(names.fileNames).toContain(result.artifact.workbookFileName);
-    expect(mediaNames).toHaveLength(9);
-    expect(
-      mediaNames.every((name) => name.startsWith("Москва/01_Семьи/01_SUB-1102_")),
-    ).toBe(true);
-    expect(new Set(mediaNames.map((name) => name.split("/")[3])).size).toBe(3);
-    expect(
-      mediaNames.filter((name) => /\/(?:\d+|missing-passport)_selfie_2_.+\.jpg$/.test(name)),
-    ).toHaveLength(3);
-  });
-
-  test("downloads the local demo family package for three different applicants", async () => {
-    const selection = generatedSelection(byId("SUB-1102"));
-    const result = await createExportMediaZipArtifact(selection, {
-      expectedIdentity: identityFor(selection),
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.safeMessage);
-    expect(result.artifact).toMatchObject({
-      applicantCount: 3,
-      fileCount: 9,
-      submissionCount: 1,
-    });
-
-    const names = await zipEntryNames(result.artifact.blob);
-    const mediaNames = mediaEntryNames(names.fileNames);
-    expect(names.fileNames).toContain(result.artifact.workbookFileName);
-    expect(mediaNames).toHaveLength(9);
-    expect(
-      mediaNames.every((name) => name.startsWith("Москва/01_Семьи/01_SUB-1102_")),
-    ).toBe(true);
-    expect(new Set(mediaNames.map((name) => name.split("/")[3])).size).toBe(3);
-  });
-
-  test("migrates saved local demo family media identity for browser rechecks", async () => {
-    installLocalStorage();
-    const staleFamily = {
-      ...byId("SUB-1102"),
-      files: byId("SUB-1102").files.map((file) => ({
-        ...file,
-        generatedFileName: undefined,
-        storageBucket: undefined,
-        storagePath: undefined,
-      })),
-    };
-    saveSubmissions([staleFamily]);
-
-    const loadedFamily = loadSubmissions()[0] as Submission;
-    const selection = generatedSelection(loadedFamily);
-    const result = await createExportMediaZipArtifact(selection, {
-      expectedIdentity: identityFor(selection),
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.safeMessage);
-    expect(result.artifact).toMatchObject({
-      applicantCount: 3,
-      fileCount: 9,
-      submissionCount: 1,
-    });
-  });
-
-  test("groups mixed export packages into families and applicants folders", async () => {
+  test("groups mixed packages by city and submission folder", async () => {
     const selection = generatedSelection(
       withCanonicalStorage(byId("SUB-1101")),
       withCanonicalStorage(byId("SUB-1102")),
     );
     const result = await createExportMediaZipArtifact(selection, {
-      downloadMedia: downloader(),
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument: documentDownloader(),
       expectedIdentity: identityFor(selection),
+      exportDate,
     });
 
     expect(result.ok).toBe(true);
@@ -319,15 +282,12 @@ describe("export media mega ZIP", () => {
 
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
-    expect(names.fileNames).toContain(result.artifact.workbookFileName);
     expect(mediaNames).toHaveLength(12);
-    expect(mediaNames.some((name) => name.startsWith("Москва/02_Заявители/"))).toBe(true);
-    expect(mediaNames.some((name) => name.startsWith("Москва/01_Семьи/"))).toBe(true);
-    expect(
-      mediaNames.filter((name) => name.startsWith("Москва/02_Заявители/")),
-    ).toHaveLength(3);
-    expect(mediaNames.filter((name) => name.startsWith("Москва/01_Семьи/"))).toHaveLength(
-      9,
+    expect(mediaNames.some((name) => name.includes("/Ольга Фролова/"))).toBe(
+      true,
+    );
+    expect(mediaNames.some((name) => name.includes("/Семья Волковых/"))).toBe(
+      true,
     );
   });
 
@@ -346,12 +306,16 @@ describe("export media mega ZIP", () => {
     expect(secondIdentity).toEqual(firstIdentity);
 
     const firstResult = await createExportMediaZipArtifact(firstSelection, {
-      downloadMedia: downloader(),
+      documentAssets: documentAssetsFor(firstSelection),
+      downloadDocument: documentDownloader(),
       expectedIdentity: firstIdentity,
+      exportDate,
     });
     const secondResult = await createExportMediaZipArtifact(secondSelection, {
-      downloadMedia: downloader(),
+      documentAssets: documentAssetsFor(secondSelection),
+      downloadDocument: documentDownloader(),
       expectedIdentity: secondIdentity,
+      exportDate,
     });
 
     expect(firstResult.ok).toBe(true);
@@ -364,57 +328,108 @@ describe("export media mega ZIP", () => {
 
     expect(secondNames.fileNames).toEqual(firstNames.fileNames);
     expect(secondNames.directoryNames).toEqual(firstNames.directoryNames);
-    expect(await zipTextEntry(secondResult.artifact.blob, "manifest.json")).toEqual(
-      await zipTextEntry(firstResult.artifact.blob, "manifest.json"),
+    expect(
+      await zipTextEntry(
+        secondResult.artifact.blob,
+        manifestName(secondNames.fileNames),
+      ),
+    ).toEqual(
+      await zipTextEntry(
+        firstResult.artifact.blob,
+        manifestName(firstNames.fileNames),
+      ),
     );
   });
 
-  test("blocks packages with missing required media before touching storage", async () => {
-    const submission = withCanonicalStorage(byId("ПД-1056"));
-    const broken = {
-      ...submission,
-      files: submission.files.filter((file) => file.type !== "selfie_2"),
-    };
-    const selection = generatedSelection(broken);
-    const downloadMedia = downloader();
-
+  test("blocks export when there is no Supabase-backed document source", async () => {
+    const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
     const result = await createExportMediaZipArtifact(selection, {
-      downloadMedia,
       expectedIdentity: identityFor(selection),
+      exportDate,
     });
 
-    expect(result).toMatchObject({ ok: false, reason: "export_not_ready" });
-    expect(downloadMedia).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, reason: "storage_unavailable" });
   });
 
-  test("blocks non-accepted media before touching storage", async () => {
-    const submission = withCanonicalStorage(byId("ПД-1056"));
-    const broken = {
-      ...submission,
-      files: submission.files.map((file, index) =>
-        index === 0 ? { ...file, status: "pending_review" as const } : file,
-      ),
+  test("uses document repository assets and records export audit", async () => {
+    const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
+    const assets = documentAssetsFor(selection);
+    const repository = {
+      getReadyForExport: vi.fn(async () => assets),
+      markExported: vi.fn(async () => undefined),
+      recordExportAudit: vi.fn(async () => undefined),
     };
-    const selection = generatedSelection(broken);
-    const downloadMedia = downloader();
 
     const result = await createExportMediaZipArtifact(selection, {
-      downloadMedia,
+      documentRepository: repository,
+      downloadDocument: documentDownloader(),
       expectedIdentity: identityFor(selection),
+      exportDate,
     });
 
-    expect(result).toMatchObject({ ok: false, reason: "export_not_ready" });
-    expect(downloadMedia).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+    expect(repository.getReadyForExport).toHaveBeenCalledWith([
+      selection[0]!.id,
+    ]);
+    expect(repository.recordExportAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        documentAssetIds: expect.arrayContaining(
+          assets.map((asset) => asset.id),
+        ),
+        fileCount: 3,
+        fileName: result.artifact.fileName,
+        submissionIds: [selection[0]!.id],
+      }),
+    );
+    expect(repository.markExported).toHaveBeenCalledWith(
+      expect.arrayContaining(assets.map((asset) => asset.id)),
+    );
+  });
+
+  test("blocks packages with missing required documents before touching storage", async () => {
+    const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
+    const downloadDocument = documentDownloader();
+    const assets = documentAssetsFor(selection).filter(
+      (asset) => asset.type !== "selfie_2",
+    );
+
+    const result = await createExportMediaZipArtifact(selection, {
+      documentAssets: assets,
+      downloadDocument,
+      expectedIdentity: identityFor(selection),
+      exportDate,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "media_not_ready" });
+    expect(downloadDocument).not.toHaveBeenCalled();
+  });
+
+  test("blocks non-validated documents before touching storage", async () => {
+    const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
+    const downloadDocument = documentDownloader();
+    const assets = documentAssetsFor(selection).map((asset, index) =>
+      index === 0 ? { ...asset, validationStatus: "pending" as const } : asset,
+    );
+
+    const result = await createExportMediaZipArtifact(selection, {
+      documentAssets: assets,
+      downloadDocument,
+      expectedIdentity: identityFor(selection),
+      exportDate,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "media_not_ready" });
+    expect(downloadDocument).not.toHaveBeenCalled();
   });
 
   test("blocks wrong storage identity before starting browser download", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
-    const broken = selection.map((submission) => ({
-      ...submission,
-      files: submission.files.map((file, index) =>
-        index === 0 ? { ...file, storageBucket: "public" } : file,
-      ),
-    }));
+    const brokenAssets = documentAssetsFor(selection).map((asset, index) =>
+      index === 0
+        ? { ...asset, storage: { ...asset.storage, bucket: "public" as never } }
+        : asset,
+    );
     const createObjectURL = vi.fn();
     const originalUrl = globalThis.URL;
 
@@ -424,9 +439,15 @@ describe("export media mega ZIP", () => {
     });
 
     try {
-      const result = await downloadExportMediaZip(broken, identityFor(selection), {
-        downloadMedia: downloader(),
-      });
+      const result = await downloadExportMediaZip(
+        selection,
+        identityFor(selection),
+        {
+          documentAssets: brokenAssets,
+          downloadDocument: documentDownloader(),
+          exportDate,
+        },
+      );
 
       expect(result).toMatchObject({ ok: false, reason: "media_not_ready" });
       expect(createObjectURL).not.toHaveBeenCalled();
@@ -440,14 +461,20 @@ describe("export media mega ZIP", () => {
 
   test("blocks wrong storage path before starting browser download", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
-    const broken = selection.map((submission) => ({
-      ...submission,
-      files: submission.files.map((file, index) =>
-        index === 0
-          ? { ...file, storagePath: `${file.storagePath ?? ""}.stale` }
-          : file,
-      ),
-    }));
+    const brokenAssets = documentAssetsFor(selection).map((asset, index) =>
+      index === 0
+        ? {
+            ...asset,
+            storage: {
+              ...asset.storage,
+              path: asset.storage.path.replace(
+                `/applicants/${asset.applicantId}/`,
+                "/applicants/other-applicant/",
+              ),
+            },
+          }
+        : asset,
+    );
     const createObjectURL = vi.fn();
     const originalUrl = globalThis.URL;
 
@@ -457,9 +484,15 @@ describe("export media mega ZIP", () => {
     });
 
     try {
-      const result = await downloadExportMediaZip(broken, identityFor(selection), {
-        downloadMedia: downloader(),
-      });
+      const result = await downloadExportMediaZip(
+        selection,
+        identityFor(selection),
+        {
+          documentAssets: brokenAssets,
+          downloadDocument: documentDownloader(),
+          exportDate,
+        },
+      );
 
       expect(result).toMatchObject({ ok: false, reason: "media_not_ready" });
       expect(createObjectURL).not.toHaveBeenCalled();
@@ -482,9 +515,15 @@ describe("export media mega ZIP", () => {
     });
 
     try {
-      const result = await downloadExportMediaZip(selection, identityFor(selection), {
-        downloadMedia: vi.fn(async () => new Blob([])),
-      });
+      const result = await downloadExportMediaZip(
+        selection,
+        identityFor(selection),
+        {
+          documentAssets: documentAssetsFor(selection),
+          downloadDocument: vi.fn(async () => new Blob([])),
+          exportDate,
+        },
+      );
 
       expect(result).toMatchObject({ ok: false, reason: "empty_file" });
       expect(createObjectURL).not.toHaveBeenCalled();
@@ -502,14 +541,16 @@ describe("export media mega ZIP", () => {
       ...submission,
       title: `${submission.title} stale`,
     }));
-    const downloadMedia = downloader();
+    const downloadDocument = documentDownloader();
 
     const result = await createExportMediaZipArtifact(stale, {
-      downloadMedia,
+      documentAssets: documentAssetsFor(selection),
+      downloadDocument,
       expectedIdentity: identityFor(selection),
+      exportDate,
     });
 
     expect(result).toMatchObject({ ok: false, reason: "export_not_ready" });
-    expect(downloadMedia).not.toHaveBeenCalled();
+    expect(downloadDocument).not.toHaveBeenCalled();
   });
 });

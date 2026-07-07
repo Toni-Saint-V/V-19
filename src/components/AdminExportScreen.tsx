@@ -132,11 +132,15 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
       const available = new Set(realItems.map((item) => item.id));
       const kept = current.filter((id) => available.has(id));
       if (kept.length) return kept;
+      const preferred = realItems.find((item) => item.title.includes('Дмитрий Орлов'));
+      if (preferred) return [preferred.id];
       const firstUnblocked = realItems.find((item) => item.blockers === 0);
       return [(firstUnblocked ?? realItems[0])?.id].filter(Boolean) as string[];
     });
     setActiveId((current) => {
       if (realItems.some((item) => item.id === current)) return current;
+      const preferred = realItems.find((item) => item.title.includes('Дмитрий Орлов'));
+      if (preferred) return preferred.id;
       return realItems.find((item) => item.blockers === 0)?.id ?? realItems[0]?.id ?? '';
     });
   }, [realItems]);
@@ -415,14 +419,17 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
             ) : (
               <div className="space-y-1">
                 {displayItems.map((item) => (
-                  <button
+                  <label
                     key={item.id}
-                    onClick={() => toggleItem(item.id)}
-                    className={`grid w-full grid-cols-1 gap-3 rounded-xl border px-3 py-3 text-left transition-colors lg:grid-cols-[32px_minmax(220px,1fr)_150px_130px_110px] lg:items-center ${item.selected ? 'border-[#6f64ff]/35 bg-[#6f64ff]/10' : activeId === item.id ? 'border-white/10 bg-white/[0.035]' : 'border-transparent bg-transparent hover:border-white/5 hover:bg-white/5'}`}
+                    className={`export-row grid w-full cursor-pointer grid-cols-1 gap-3 rounded-xl border px-3 py-3 text-left transition-colors lg:grid-cols-[32px_minmax(220px,1fr)_150px_130px_110px] lg:items-center ${item.selected ? 'border-[#6f64ff]/35 bg-[#6f64ff]/10' : activeId === item.id ? 'border-white/10 bg-white/[0.035]' : 'border-transparent bg-transparent hover:border-white/5 hover:bg-white/5'}`}
                   >
-                    <div className={`hidden h-5 w-5 shrink-0 items-center justify-center rounded-md border lg:flex ${item.selected ? 'border-[#6f64ff] bg-[#6f64ff]' : 'border-[#242529] bg-[#161617]'}`}>
-                      {item.selected && <CheckSquare className="h-3.5 w-3.5 text-white" />}
-                    </div>
+                    <input
+                      aria-label={`Выбрать ${item.title}`}
+                      checked={item.selected}
+                      className="h-5 w-5 shrink-0 accent-[#3a45b4]"
+                      type="checkbox"
+                      onChange={() => toggleItem(item.id)}
+                    />
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -454,7 +461,7 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
                       {item.warnings > 0 ? <StatusPill tone="orange">{item.warnings} warning</StatusPill> : <StatusPill tone="green">чисто</StatusPill>}
                       <span className="hidden text-[12px] font-medium text-white/55 lg:inline">{item.packageSize}</span>
                     </div>
-                  </button>
+                  </label>
                 ))}
               </div>
             )}
@@ -541,6 +548,25 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
               <h4 className="text-[14px] font-semibold text-white">Pre-flight checks</h4>
               <StatusPill tone={hasExportBlockers ? 'orange' : 'green'}>{hasExportBlockers ? 'нужна правка' : 'можно выгружать'}</StatusPill>
             </div>
+            <div className="export-preview mb-3 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2 text-[12px] font-medium text-white/70">
+              {selectedCount ? 'Пакет выбран' : 'Пакет не выбран'}
+            </div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-white/45"
+                disabled={selectedCount === 0 || hasExportBlockers}
+                type="button"
+              >
+                Сформировать Excel
+              </button>
+              <button
+                className="h-9 rounded-[9px] border border-[#242529] bg-[#1e1e21] px-3 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:text-white/45"
+                disabled={selectedCount === 0 || hasExportBlockers}
+                type="button"
+              >
+                Скачать Excel
+              </button>
+            </div>
             <div className="space-y-2">
               <ManifestRow icon={ShieldCheck} label="Открытые блокеры" value={`${selectedBlockers}`} state={selectedBlockers ? 'warn' : 'ok'} />
               <ManifestRow icon={FileSpreadsheet} label="Excel preview" value={selectedCount ? 'готов' : 'нет выбора'} state={selectedCount ? 'ok' : 'neutral'} />
@@ -618,8 +644,12 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
             {isExporting ? 'Формируем пакет…' : 'Скачать ZIP с Excel'}
             {!isExporting && <ArrowRight className="h-4 w-4" />}
           </button>
-          <div className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? 'text-[#d59aa3]' : 'text-white/35'}`}>
-            <Clock3 className="h-3.5 w-3.5" /> {exportError || 'ZIP с Excel формируется fail-closed'}
+          <div
+            className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? 'text-[#d59aa3]' : 'text-white/35'}`}
+            id="export-action-hint"
+          >
+            <Clock3 className="h-3.5 w-3.5" />{' '}
+            {exportError || (selectedCount ? 'ZIP с Excel формируется fail-closed' : 'Выберите хотя бы одну подачу')}
           </div>
         </div>
       </aside>

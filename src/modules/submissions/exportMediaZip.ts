@@ -1,8 +1,16 @@
 import JSZip from "jszip";
+import { DocumentRepository } from "../documents/documentRepository";
 import {
-  CANONICAL_FRONTEND_MEDIA_TYPES,
-  type CanonicalFrontendMediaType,
-} from "./domainContract";
+  buildDocumentsZip,
+  DocumentZipBuilderError,
+  type DocumentZipDownloader,
+} from "../documents/documentExport";
+import {
+  DOCUMENT_TYPES,
+  documentTypeToFrontendMediaType,
+  tryNormalizeDocumentType,
+  type DocumentAsset,
+} from "../documents/documentTypes";
 import {
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
@@ -10,16 +18,20 @@ import {
   exportSummary,
 } from "./exportRules";
 import { createExportWorkbookArtifact } from "./exportWorkbook";
-import { buildApplicantDocumentFileName } from "./filenamePolicy";
 import {
   downloadMediaFromStorage,
   mediaStorageBucket,
-  validateMediaStorageTarget,
   type MediaStorageTarget,
 } from "./mediaStorage";
-import type { Applicant, ExportPackageIdentity, Submission, SubmissionFile } from "./types";
+import type {
+  Applicant,
+  ExportPackageIdentity,
+  Submission,
+  SubmissionFile,
+} from "./types";
 
 export type ExportMediaZipBlockedReason =
+  | "audit_failed"
   | "download_failed"
   | "empty_file"
   | "export_not_ready"
@@ -68,9 +80,25 @@ export type ExportMediaZipDownloader = (
   context: {
     applicant: Applicant;
     submission: Submission;
-    type: CanonicalFrontendMediaType;
+    type: "passport_scan" | "selfie" | "selfie_2";
   },
 ) => Promise<Blob | null>;
+
+export type ExportMediaZipDocumentDownloader = DocumentZipDownloader;
+
+type DocumentExportRepository = Pick<
+  DocumentRepository,
+  "getReadyForExport" | "markExported" | "recordExportAudit"
+>;
+
+type ExportMediaZipOptions = {
+  documentAssets?: DocumentAsset[];
+  documentRepository?: DocumentExportRepository;
+  downloadDocument?: ExportMediaZipDocumentDownloader;
+  downloadMedia?: ExportMediaZipDownloader;
+  expectedIdentity?: ExportPackageIdentity | null;
+  exportDate?: Date | string;
+};
 
 type BrowserDownloadRuntime = typeof globalThis & {
   URL: {
@@ -90,13 +118,6 @@ type BrowserDownloadRuntime = typeof globalThis & {
   setTimeout(callback: () => void, timeout: number): unknown;
 };
 
-type ArchiveGroup = "family" | "single";
-
-const archiveSectionFolders: Record<ArchiveGroup, string> = {
-  family: "01_Семьи",
-  single: "02_Заявители",
-};
-
 export function canDownloadExportMediaZip(submissions: Submission[]): boolean {
   const summary = exportSummary(submissions);
   return (
@@ -109,20 +130,17 @@ export function canDownloadExportMediaZip(submissions: Submission[]): boolean {
 export async function prepareExportMediaZip(
   submissions: Submission[],
   expectedIdentity: ExportPackageIdentity | null,
-  options: { downloadMedia?: ExportMediaZipDownloader } = {},
+  options: Omit<ExportMediaZipOptions, "expectedIdentity"> = {},
 ): Promise<ExportMediaZipArtifactResult> {
   return createExportMediaZipArtifact(submissions, {
-    downloadMedia: options.downloadMedia,
+    ...options,
     expectedIdentity,
   });
 }
 
 export async function createExportMediaZipArtifact(
   submissions: Submission[],
-  options: {
-    downloadMedia?: ExportMediaZipDownloader;
-    expectedIdentity?: ExportPackageIdentity | null;
-  } = {},
+  options: ExportMediaZipOptions = {},
 ): Promise<ExportMediaZipArtifactResult> {
   const identityResult = validateExportMediaZipIdentity(
     submissions,
@@ -130,12 +148,18 @@ export async function createExportMediaZipArtifact(
   );
   if (!identityResult.ok) return identityResult;
 
-  const downloadMedia = options.downloadMedia ?? defaultDownloadMedia;
   const orderedSubmissions = orderSubmissionsForExportPackage(submissions);
+  const documentAssetsResult = await resolveDocumentAssetsForZip(
+    orderedSubmissions,
+    options,
+  );
+  if (!documentAssetsResult.ok) return documentAssetsResult;
+
+  const downloadAsset = documentDownloaderForOptions(
+    orderedSubmissions,
+    options,
+  );
   const outerZip = new JSZip();
-  const cityIndexes = new Map<string, Record<ArchiveGroup, number>>();
-  let applicantCount = 0;
-  let fileCount = 0;
 
   try {
     const summary = exportSummary(submissions);
@@ -143,73 +167,27 @@ export async function createExportMediaZipArtifact(
       summary.rows,
       identityResult.identity,
     );
-    outerZip.file(workbookArtifact.fileName, workbookArtifact.blob);
 
-    for (const submission of orderedSubmissions) {
-      const cityFolder = safeArchiveName(submission.city, "city");
-      const group = archiveGroupForSubmission(submission);
-      const counters = ensureCityCounters(cityIndexes, cityFolder);
-      counters[group] += 1;
-
-      outerZip.folder(`${cityFolder}/${archiveSectionFolders.family}`);
-      outerZip.folder(`${cityFolder}/${archiveSectionFolders.single}`);
-
-      const submissionFolder = `${cityFolder}/${archiveSectionFolders[group]}/${numberPrefix(
-        counters[group],
-      )}_${safeArchiveName(`${submission.id}_${submission.title}`, "submission")}`;
-
-      for (const [applicantIndex, applicant] of submission.applicants.entries()) {
-        const applicantFolder = `${submissionFolder}/${numberPrefix(
-          applicantIndex + 1,
-        )}_${safeArchiveName(applicant.fullName, "applicant")}`;
-
-        for (const type of CANONICAL_FRONTEND_MEDIA_TYPES) {
-          const prepared = prepareMediaFile(submission, applicant, type);
-          if (!prepared.ok) return prepared;
-
-          let blob: Blob | null;
-          try {
-            blob = await downloadMedia(prepared.target, prepared.file, {
-              applicant,
-              submission,
-              type,
-            });
-          } catch {
-            return blocked(
-              "storage_download_failed",
-              "Не удалось скачать файлы из приватного хранилища. Повторите после синхронизации.",
-            );
-          }
-
-          if (!blob) {
-            return blocked(
-              "storage_unavailable",
-              "Приватное хранилище недоступно. ZIP можно собрать только из реальных файлов Supabase.",
-            );
-          }
-          if (blob.size <= 0) {
-            return blocked(
-              "empty_file",
-              "В приватном хранилище найден пустой файл. ZIP не сформирован.",
-            );
-          }
-
-          outerZip.file(
-            `${applicantFolder}/${archiveMediaFileName(type, prepared.file, applicant)}`,
-            blob,
-          );
-          fileCount += 1;
-        }
-        applicantCount += 1;
-      }
-    }
+    const documents = await buildDocumentsZip({
+      assets: documentAssetsResult.assets,
+      downloadAsset,
+      exportDate: options.exportDate,
+      submissions: orderedSubmissions,
+      zip: outerZip,
+    });
 
     outerZip.file(
-      "manifest.json",
+      `${documents.rootFolder}/${workbookArtifact.fileName}`,
+      workbookArtifact.blob,
+    );
+    outerZip.file(
+      `${documents.rootFolder}/manifest.json`,
       JSON.stringify(
         buildArchiveManifest(orderedSubmissions, identityResult.identity, {
-          applicantCount,
-          fileCount,
+          applicantCount: documents.applicantCount,
+          documentEntries: documents.entries,
+          fileCount: documents.fileCount,
+          rootFolder: documents.rootFolder,
           workbookFileName: workbookArtifact.fileName,
         }),
         null,
@@ -217,15 +195,15 @@ export async function createExportMediaZipArtifact(
       ),
     );
     outerZip.file(
-      "README_ПАКЕТ.txt",
+      `${documents.rootFolder}/README_ПАКЕТ.txt`,
       [
-        "Visaflow export package",
+        "VisaFlow export package",
         `Submissions: ${orderedSubmissions.length}`,
-        `Applicants: ${applicantCount}`,
-        `Media files: ${fileCount}`,
+        `Applicants: ${documents.applicantCount}`,
+        `Document files: ${documents.fileCount}`,
         `Workbook: ${workbookArtifact.fileName}`,
-        "Required files per applicant: passport_scan, selfie, selfie_2",
-        "Archive structure: city / families first / single applicants second.",
+        "Required files per applicant: passport_scan, selfie_1, selfie_2",
+        "Archive structure: VisaFlow_Export_YYYY-MM-DD / city / family-or-applicant / documents.",
       ].join("\n"),
     );
 
@@ -234,20 +212,48 @@ export async function createExportMediaZipArtifact(
       type: "blob",
     });
 
-    return {
-      ok: true,
-      artifact: {
-        applicantCount,
-        blob,
-        contentType: "application/zip",
-        fileCount,
-        fileName: `visaflow-export-${identityResult.identity.idempotencyKey}.zip`,
-        packageIdentity: identityResult.identity,
-        submissionCount: orderedSubmissions.length,
-        workbookFileName: workbookArtifact.fileName,
-      },
+    const artifact: ExportMediaZipArtifact = {
+      applicantCount: documents.applicantCount,
+      blob,
+      contentType: "application/zip",
+      fileCount: documents.fileCount,
+      fileName: `visaflow-export-${identityResult.identity.idempotencyKey}_documents.zip`,
+      packageIdentity: identityResult.identity,
+      submissionCount: orderedSubmissions.length,
+      workbookFileName: workbookArtifact.fileName,
     };
-  } catch {
+
+    if (documentAssetsResult.repository) {
+      try {
+        await documentAssetsResult.repository.recordExportAudit({
+          documentAssetIds: documents.documentAssetIds,
+          fileCount: documents.fileCount,
+          fileName: artifact.fileName,
+          metadata: {
+            applicantCount: documents.applicantCount,
+            rootFolder: documents.rootFolder,
+            workbookFileName: workbookArtifact.fileName,
+          },
+          packageId: identityResult.identity.idempotencyKey,
+          submissionIds: identityResult.identity.submissionIds,
+        });
+        await documentAssetsResult.repository.markExported(documents.documentAssetIds);
+      } catch {
+        return blocked(
+          "audit_failed",
+          "ZIP сформирован, но audit event не записан. Экспорт остановлен.",
+        );
+      }
+    }
+
+    return { ok: true, artifact };
+  } catch (error) {
+    if (error instanceof DocumentZipBuilderError) {
+      return blocked(
+        error.reason,
+        safeMessageForDocumentZipError(error.reason),
+      );
+    }
     return blocked("zip_failed", "Не удалось сформировать ZIP-файл.");
   }
 }
@@ -277,18 +283,23 @@ export function downloadPreparedExportMediaZip(
     };
   } catch {
     if (url) runtime.URL.revokeObjectURL(url);
-    return blocked("download_failed", "Не удалось скачать ZIP-файл. Повторите попытку.");
+    return blocked(
+      "download_failed",
+      "Не удалось скачать ZIP-файл. Повторите попытку.",
+    );
   }
 }
 
 export default async function downloadExportMediaZip(
   submissions: Submission[],
   expectedIdentity: ExportPackageIdentity | null,
-  options: { downloadMedia?: ExportMediaZipDownloader } = {},
+  options: Omit<ExportMediaZipOptions, "expectedIdentity"> = {},
 ): Promise<ExportMediaZipResult> {
-  const artifactResult = await prepareExportMediaZip(submissions, expectedIdentity, {
-    downloadMedia: options.downloadMedia,
-  });
+  const artifactResult = await prepareExportMediaZip(
+    submissions,
+    expectedIdentity,
+    options,
+  );
   if (!artifactResult.ok) return artifactResult;
 
   return downloadPreparedExportMediaZip(artifactResult.artifact);
@@ -340,141 +351,180 @@ function validateExportMediaZipIdentity(
   return { ok: true, identity };
 }
 
-function prepareMediaFile(
-  submission: Submission,
-  applicant: Applicant,
-  type: CanonicalFrontendMediaType,
-):
-  | { ok: true; file: SubmissionFile; target: MediaStorageTarget }
+async function resolveDocumentAssetsForZip(
+  submissions: Submission[],
+  options: ExportMediaZipOptions,
+): Promise<
   | {
-      ok: false;
-      reason: ExportMediaZipBlockedReason;
-      safeMessage: string;
-    } {
-  const file = submission.files.find(
-    (candidate) => candidate.applicantId === applicant.id && candidate.type === type,
-  );
-  if (!file || file.status !== "accepted") {
-    return blocked(
-      "media_not_ready",
-      "В выбранном пакете не все обязательные файлы приняты администратором.",
-    );
+      ok: true;
+      assets: DocumentAsset[];
+      repository: DocumentExportRepository | null;
+    }
+  | { ok: false; reason: ExportMediaZipBlockedReason; safeMessage: string }
+> {
+  const submissionIds = submissions.map((submission) => submission.id);
+  const submissionIdSet = new Set(submissionIds);
+
+  if (options.documentAssets) {
+    return {
+      ok: true,
+      assets: options.documentAssets.filter((asset) =>
+        submissionIdSet.has(asset.submissionId),
+      ),
+      repository: null,
+    };
   }
-  if (
-    file.storageBucket !== mediaStorageBucket ||
-    !file.storagePath ||
-    !file.generatedFileName
-  ) {
+
+  if (options.downloadMedia) {
+    return {
+      ok: true,
+      assets: documentAssetsFromSubmissionFiles(submissions),
+      repository: null,
+    };
+  }
+
+  const repository =
+    options.documentRepository ?? DocumentRepository.optional();
+  if (!repository) {
     return blocked(
-      "media_not_ready",
-      "В выбранном пакете есть файлы без канонического private storage identity.",
+      "storage_unavailable",
+      "Приватное хранилище недоступно. ZIP можно собрать только из реальных файлов Supabase.",
     );
   }
 
-  const expectedPath = `submissions/${submission.id}/applicants/${applicant.id}/${type}/${file.generatedFileName}`;
-  if (file.storagePath !== expectedPath) {
-    return blocked(
-      "media_not_ready",
-      "В выбранном пакете есть файлы с устаревшим storage path.",
-    );
-  }
-
-  const target: MediaStorageTarget = {
-    bucket: mediaStorageBucket,
-    path: file.storagePath,
-  };
   try {
-    validateMediaStorageTarget({ target });
+    const assets = await repository.getReadyForExport(submissionIds);
+    return { ok: true, assets, repository };
   } catch {
     return blocked(
-      "media_not_ready",
-      "В выбранном пакете есть файлы с невалидным private storage path.",
+      "storage_unavailable",
+      "Не удалось получить проверенные документы из базы. ZIP не сформирован.",
     );
   }
-
-  return { ok: true, file, target };
 }
 
-async function defaultDownloadMedia(target: MediaStorageTarget): Promise<Blob | null> {
-  return downloadMediaFromStorage(target);
+function documentDownloaderForOptions(
+  submissions: Submission[],
+  options: ExportMediaZipOptions,
+): DocumentZipDownloader {
+  if (options.downloadDocument) return options.downloadDocument;
+
+  if (options.downloadMedia) {
+    const legacyDownload = options.downloadMedia;
+    return async (asset, context) => {
+      const frontendType = documentTypeToFrontendMediaType(asset.type);
+      const file = submissions
+        .find((submission) => submission.id === asset.submissionId)
+        ?.files.find(
+          (candidate) =>
+            candidate.applicantId === asset.applicantId &&
+            candidate.type === frontendType &&
+            candidate.storagePath === asset.storage.path,
+        );
+
+      if (!file) {
+        throw new Error("Document asset has no matching legacy media file.");
+      }
+
+      return legacyDownload(
+        { bucket: mediaStorageBucket, path: asset.storage.path },
+        file,
+        {
+          applicant: context.applicant,
+          submission: context.submission,
+          type: frontendType,
+        },
+      );
+    };
+  }
+
+  return async (asset) =>
+    downloadMediaFromStorage({
+      bucket: mediaStorageBucket,
+      path: asset.storage.path,
+    });
 }
 
-function archiveGroupForSubmission(submission: Submission): ArchiveGroup {
-  return submission.type === "family" ? "family" : "single";
-}
+function documentAssetsFromSubmissionFiles(
+  submissions: Submission[],
+): DocumentAsset[] {
+  const now = "1970-01-01T00:00:00.000Z";
+  return submissions.flatMap((submission) =>
+    submission.files.flatMap((file) => {
+      const type = tryNormalizeDocumentType(file.type);
+      if (
+        !type ||
+        file.storageBucket !== mediaStorageBucket ||
+        !file.storagePath
+      ) {
+        return [];
+      }
 
-function ensureCityCounters(
-  cityIndexes: Map<string, Record<ArchiveGroup, number>>,
-  cityFolder: string,
-): Record<ArchiveGroup, number> {
-  const existing = cityIndexes.get(cityFolder);
-  if (existing) return existing;
+      const filename =
+        file.generatedFileName ??
+        file.storagePath.split("/").filter(Boolean).at(-1) ??
+        null;
 
-  const counters = { family: 0, single: 0 };
-  cityIndexes.set(cityFolder, counters);
-  return counters;
-}
-
-function archiveMediaFileName(
-  type: CanonicalFrontendMediaType,
-  file: SubmissionFile,
-  applicant: Applicant,
-): string {
-  return buildApplicantDocumentFileName({
-    applicant,
-    documentType: type,
-    extension: fileExtension(file),
-  });
-}
-
-function fileExtension(file: SubmissionFile): string {
-  const fileName = file.generatedFileName ?? file.originalFileName ?? "";
-  const extension = fileName.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
-  if (extension) return extension;
-  if (file.mimeType === "application/pdf") return "pdf";
-  if (file.mimeType === "image/png") return "png";
-  if (file.mimeType === "image/heic") return "heic";
-  if (file.mimeType === "image/heif") return "heif";
-  return "jpg";
-}
-
-function safeArchiveName(value: string, fallback: string): string {
-  const safe = value
-    .normalize("NFKC")
-    .split("")
-    .map(replaceUnsafeArchiveCharacter)
-    .join("")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 96);
-  return safe || fallback;
-}
-
-function replaceUnsafeArchiveCharacter(character: string): string {
-  const codePoint = character.codePointAt(0) ?? 0;
-  if (codePoint < 32) return "_";
-  return /[\\/:*?"<>|]/.test(character) ? "_" : character;
-}
-
-function numberPrefix(value: number): string {
-  return String(value).padStart(2, "0");
+      return [
+        {
+          id: file.id,
+          sourceMediaAssetId: file.id,
+          submissionId: submission.id,
+          applicantId: file.applicantId,
+          ownerUserId: submission.agentId,
+          type,
+          storage: {
+            bucket: mediaStorageBucket,
+            path: file.storagePath,
+            filename,
+          },
+          uploadStatus: "uploaded" as const,
+          validationStatus:
+            file.status === "accepted"
+              ? ("passed" as const)
+              : ("pending" as const),
+          exportStatus:
+            file.status === "accepted"
+              ? ("ready" as const)
+              : ("not_ready" as const),
+          mime:
+            file.mimeType ??
+            (type === "passport_scan" ? "application/pdf" : "image/jpeg"),
+          size: file.sizeBytes ?? 1,
+          checksum: null,
+          uploadedAt: file.uploadedAtIso ?? now,
+          validatedAt: file.reviewedAtIso ?? null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+    }),
+  );
 }
 
 function buildArchiveManifest(
   submissions: Submission[],
   identity: ExportPackageIdentity,
-  counts: { applicantCount: number; fileCount: number; workbookFileName: string },
+  counts: {
+    applicantCount: number;
+    documentEntries: string[];
+    fileCount: number;
+    rootFolder: string;
+    workbookFileName: string;
+  },
 ) {
   return {
     applicantCount: counts.applicantCount,
+    documentEntries: counts.documentEntries,
     fileCount: counts.fileCount,
     package: identity,
-    requiredMediaTypes: CANONICAL_FRONTEND_MEDIA_TYPES,
+    requiredDocumentTypes: DOCUMENT_TYPES,
+    rootFolder: counts.rootFolder,
     workbookFileName: counts.workbookFileName,
     submissions: submissions.map((submission) => ({
       applicants: submission.applicants.map((applicant) => ({
         id: applicant.id,
-        mediaTypes: CANONICAL_FRONTEND_MEDIA_TYPES,
+        documentTypes: DOCUMENT_TYPES,
         name: applicant.fullName,
       })),
       city: submission.city,
@@ -483,6 +533,21 @@ function buildArchiveManifest(
       type: submission.type,
     })),
   };
+}
+
+function safeMessageForDocumentZipError(
+  reason: ExportMediaZipBlockedReason,
+): string {
+  if (reason === "empty_file") {
+    return "В приватном хранилище найден пустой файл. ZIP не сформирован.";
+  }
+  if (reason === "storage_download_failed") {
+    return "Не удалось скачать файлы из приватного хранилища. Повторите после синхронизации.";
+  }
+  if (reason === "storage_unavailable") {
+    return "Приватное хранилище недоступно. ZIP можно собрать только из реальных файлов Supabase.";
+  }
+  return "В выбранном пакете не все обязательные документы прошли проверку.";
 }
 
 function blocked(reason: ExportMediaZipBlockedReason, safeMessage: string) {

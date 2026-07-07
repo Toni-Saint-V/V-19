@@ -266,21 +266,30 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18, scale: 0.992 }}
+      aria-labelledby="create-submission-title"
+      aria-modal="true"
+      initial={{ opacity: 1, y: 0, scale: 1 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 18, scale: 0.992 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-50 bg-[#101011] text-white flex flex-col overflow-hidden"
+      role="dialog"
     >
       <header className="h-[64px] shrink-0 border-b border-[#202124] bg-[#141416]/95 backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
         <button
+          aria-label="Назад"
           onClick={onBack}
           className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#242529] bg-[#1e1e21] text-white/70 transition-colors hover:bg-[#27272b] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
         >
           <ArrowLeft className="h-4.5 w-4.5" />
         </button>
         <div>
-          <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight leading-none mt-1">Загрузка и первичная сборка</h1>
+          <h1
+            className="text-[19px] lg:text-[21px] font-semibold tracking-tight leading-none mt-1"
+            id="create-submission-title"
+          >
+            Новая подача
+          </h1>
         </div>
         <div className="ml-auto hidden sm:flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[12px] text-white/55">
           <span className="relative flex h-2 w-2">
@@ -290,6 +299,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
           {productIntakePhaseLabel(phase)} · {averageProgress}%
         </div>
         <button
+          aria-label="Закрыть создание"
           onClick={onBack}
           className="ml-auto flex h-8 w-8 items-center justify-center rounded-[9px] border border-transparent bg-transparent text-white/45 transition-colors hover:text-white/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
         >
@@ -496,7 +506,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 <button
                   type="button"
                   onClick={completeDraft}
-                  className="h-11 rounded-[8px] bg-[#6f64ff] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
                   Далее
                 </button>
@@ -566,7 +576,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
               <button
                 onClick={completeDraft}
-                className="mt-5 w-full h-11 rounded-[8px] bg-[#6f64ff] hover:bg-[#4855d4] text-white text-[14px] font-semibold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="mt-5 w-full h-11 rounded-[8px] bg-[#3a45b4] hover:bg-[#4855d4] text-white text-[14px] font-semibold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 {phase === 'ready' ? 'Перейти в анкету' : 'Идёт извлечение'} <ArrowRight className="w-4 h-4" />
               </button>

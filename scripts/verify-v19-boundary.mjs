@@ -22,6 +22,7 @@ const forbiddenRuntimeRoots = [
   path.join(root, "src/types/domain.ts"),
 ];
 const promotedRuntimeFiles = [
+  path.join(root, "src/assets/v-logo-premium-black-style.png"),
   path.join(root, "src/assets/visaflow-logo.png"),
   path.join(root, "src/lib/export/exportContractCore.ts"),
   path.join(root, "src/lib/supabase/activation.ts"),

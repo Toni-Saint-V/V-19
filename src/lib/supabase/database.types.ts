@@ -49,6 +49,12 @@ export type Database = {
         Update: Partial<MediaAssetInsert>;
         Relationships: [];
       };
+      document_assets: {
+        Row: DocumentAssetRow;
+        Insert: DocumentAssetInsert;
+        Update: Partial<DocumentAssetInsert>;
+        Relationships: [];
+      };
       corrections: {
         Row: CorrectionRow;
         Insert: CorrectionInsert;
@@ -77,6 +83,12 @@ export type Database = {
         Row: ExportBatchRow;
         Insert: ExportBatchInsert;
         Update: Partial<ExportBatchInsert>;
+        Relationships: [];
+      };
+      document_export_events: {
+        Row: DocumentExportEventRow;
+        Insert: DocumentExportEventInsert;
+        Update: Partial<DocumentExportEventInsert>;
         Relationships: [];
       };
       appointments: {
@@ -272,7 +284,10 @@ export interface ApplicantRow extends DbRecord {
   updated_at: string;
 }
 
-export type ApplicantInsert = Omit<ApplicantRow, "created_at" | "updated_at"> & {
+export type ApplicantInsert = Omit<
+  ApplicantRow,
+  "created_at" | "updated_at"
+> & {
   created_at?: string;
   updated_at?: string;
 };
@@ -289,13 +304,53 @@ export interface MediaAssetRow extends DbRecord {
   mime_type: string | null;
   size_bytes: number | null;
   upload_status: "none" | "uploaded";
-  review_status: "not_reviewed" | "accepted" | "replace_required" | "poor_quality";
+  review_status:
+    | "not_reviewed"
+    | "accepted"
+    | "replace_required"
+    | "poor_quality";
   uploaded_at: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
 }
 
 export type MediaAssetInsert = MediaAssetRow;
+
+export type DocumentAssetType = "passport_scan" | "selfie_1" | "selfie_2";
+export type DocumentUploadStatus = "pending" | "uploaded" | "failed";
+export type DocumentValidationStatus = "pending" | "passed" | "failed";
+export type DocumentExportStatus = "not_ready" | "ready" | "exported";
+
+export interface DocumentAssetRow extends DbRecord {
+  id: string;
+  source_media_asset_id: string | null;
+  submission_id: string;
+  applicant_id: string;
+  owner_user_id: string | null;
+  type: DocumentAssetType;
+  bucket: "submission-media";
+  storage_path: string;
+  filename: string | null;
+  upload_status: DocumentUploadStatus;
+  validation_status: DocumentValidationStatus;
+  export_status: DocumentExportStatus;
+  mime: string | null;
+  size: number | null;
+  checksum: string | null;
+  uploaded_at: string | null;
+  validated_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export type DocumentAssetInsert = Omit<
+  DocumentAssetRow,
+  "id" | "created_at" | "updated_at"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string | null;
+};
 
 export interface CorrectionRow extends DbRecord {
   id: string;
@@ -312,7 +367,10 @@ export interface CorrectionRow extends DbRecord {
   fixed_at: string | null;
 }
 
-export type CorrectionInsert = Omit<CorrectionRow, "id" | "created_at" | "fixed_at"> & {
+export type CorrectionInsert = Omit<
+  CorrectionRow,
+  "id" | "created_at" | "fixed_at"
+> & {
   id?: string;
   created_at?: string;
   fixed_at?: string | null;
@@ -412,6 +470,27 @@ export type ExportBatchInsert = Omit<
   idempotency_key?: string | null;
 };
 
+export interface DocumentExportEventRow extends DbRecord {
+  id: string;
+  event_type: "DOCUMENT_EXPORT_CREATED";
+  submission_ids: string[];
+  asset_ids: string[];
+  zip_file_name: string;
+  file_count: number;
+  package_identity_key: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type DocumentExportEventInsert = Omit<
+  DocumentExportEventRow,
+  "id" | "created_by" | "created_at"
+> & {
+  id?: string;
+  created_by?: string | null;
+  created_at?: string;
+};
+
 export interface ExportPackageCommitPayload extends DbRecord {
   batch: {
     id?: string;
@@ -471,7 +550,10 @@ export interface StatusHistoryRow extends DbRecord {
   changed_at: string;
 }
 
-export type StatusHistoryInsert = Omit<StatusHistoryRow, "id" | "changed_at"> & {
+export type StatusHistoryInsert = Omit<
+  StatusHistoryRow,
+  "id" | "changed_at"
+> & {
   id?: string;
   changed_at?: string;
 };
