@@ -75,31 +75,60 @@ export function AdminQueueToolbar<T extends string>({
   searchValue: string;
   tabs: AdminToolbarTab<T>[];
 }) {
+  const cityActive = cityFilter !== 'Все города';
+
   return (
-    <div className="flex flex-col gap-5 border-b border-[#242529] p-4 lg:p-5">
-      <div className="flex flex-wrap items-center gap-3">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`inline-flex h-8 items-center gap-2 rounded-[10px] border px-3 text-[10px] font-medium transition-colors ${
-                active
-                  ? tab.tone
-                    ? tab.tone
-                    : 'border-[#6f64ff]/60 bg-[#6f64ff]/18 text-[#c9c6ff]'
-                  : 'border-white/10 bg-white/[0.045] text-white/55 hover:text-white'
-              }`}
-              type="button"
-            >
-              {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-              {tab.label}
-              {typeof tab.count === 'number' ? <span className="text-white/35">{tab.count}</span> : null}
-            </button>
-          );
-        })}
+    <div className="flex flex-col gap-3 border-b border-[#242529] p-4 sm:gap-5 lg:p-5">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+          <div className="flex w-max items-center gap-2 pr-1 sm:w-auto sm:flex-wrap sm:gap-3">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onTabChange(tab.id)}
+                  className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-[10px] border px-3 text-[10px] font-medium transition-colors ${
+                    active
+                      ? tab.tone
+                        ? tab.tone
+                        : 'border-[#6f64ff]/60 bg-[#6f64ff]/18 text-[#c9c6ff]'
+                      : 'border-white/10 bg-white/[0.045] text-white/55 hover:text-white'
+                  }`}
+                  type="button"
+                >
+                  {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                  {tab.label}
+                  {typeof tab.count === 'number' ? <span className="text-white/35">{tab.count}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <label
+          className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border shadow-[0_0_18px_rgba(111,100,255,0.14)] sm:hidden ${
+            cityActive
+              ? 'border-[#6f64ff]/70 bg-[#6f64ff]/25 text-[#dfe4ff]'
+              : 'border-[#6f64ff]/45 bg-[#6f64ff]/16 text-[#b8baff]'
+          }`}
+          title="Фильтр городов"
+        >
+          <MapPin className="h-3.5 w-3.5" />
+          <span className="sr-only">Фильтр городов</span>
+          <select
+            aria-label="Фильтр городов"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            value={cityFilter}
+            onChange={(event) => onCityFilterChange(event.currentTarget.value)}
+          >
+            {cityOptions.map((city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="flex items-center gap-2 lg:gap-3">
@@ -112,7 +141,7 @@ export function AdminQueueToolbar<T extends string>({
             onChange={(event) => onSearchChange(event.currentTarget.value)}
           />
         </div>
-        <label className="relative flex h-10 shrink-0 items-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white">
+        <label className="relative hidden h-10 shrink-0 items-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white sm:flex">
           <MapPin className="pointer-events-none absolute left-3 h-3.5 w-3.5" />
           <span className="sr-only">Фильтр городов</span>
           <select
