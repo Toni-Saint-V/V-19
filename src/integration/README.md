@@ -1,19 +1,43 @@
-# VisaFlow integration layer
+# VisaFlow UI integration layer
 
-The active application entry point now runs the canonical V-19 cockpit from `src/App.tsx` and `src/main.tsx`.
+This folder keeps the new top-product UI decoupled from the existing V-19 business logic.
 
-## Active flow
+## Main entry point
 
-The production flow is wired through `src/modules/submissions` and includes:
+`visaflowBusinessBridge.tsx` exposes a small bridge contract. The UI calls bridge handlers for important user intents:
 
-- agent document collection and questionnaire progress;
-- canonical file slots: `passport_scan`, `selfie`, `selfie_2`;
-- admin review, precise issues, correction handoff, and acceptance;
-- Supabase cockpit persistence and private `submission-media` storage;
-- export package generation and exported terminal state.
+- workspace switch: agent/admin;
+- agent navigation;
+- admin navigation;
+- submission open;
+- questionnaire open;
+- package creation/upload screen;
+- admin document review;
+- remark open/submit;
+- export start.
 
-## Bridge/prototype files
+## How to connect real logic
 
-`visaflowBusinessBridge.tsx` and `createVisaflowRuntimeBridge.ts` are kept as a compatibility/prototype bridge for standalone UI experiments. They are not the primary source of truth for the V-19 cockpit.
+Open `src/main.tsx` and pass a bridge to `<App />`:
 
-Legacy text snapshots of the old root shell were removed so `src/main.tsx` has a single reachable app path.
+```tsx
+<App
+  bridge={{
+    onSubmissionOpen: (submissionId) => {
+      // Load submission from src/modules/submissions or Supabase service.
+      console.log('open submission', submissionId);
+    },
+    onExportPackages: async (submissionIds) => {
+      // Call exportWorkflow/exportService here.
+      console.log('export', submissionIds);
+    },
+  }}
+/>
+```
+
+The previous V-19 source files are preserved in their original paths (`src/modules`, `src/services`, `src/lib`, `src/types`, etc.) so they can be connected without restoring the old UI.
+
+The previous `App.tsx` and `main.tsx` are saved as text-only references:
+
+- `legacy-current-App.tsx.txt`
+- `legacy-current-main.tsx.txt`

@@ -6,6 +6,9 @@ const entry = path.join(root, "src/main.tsx");
 const allowedSourceRoots = [
   path.join(root, "src/App.tsx"),
   path.join(root, "src/main.tsx"),
+  path.join(root, "src/components"),
+  path.join(root, "src/integration"),
+  path.join(root, "src/index.css"),
   path.join(root, "src/modules/submissions"),
   path.join(root, "src/shared"),
   path.join(root, "src/shared/ui/system.css"),
@@ -113,6 +116,12 @@ function assertAllowedRuntimeFile(filePath) {
 function scanV19Source() {
   const files = [
     path.join(root, "src/App.tsx"),
+    ...listFiles(path.join(root, "src/components")).filter((file) =>
+      /\.(ts|tsx)$/.test(file),
+    ),
+    ...listFiles(path.join(root, "src/integration")).filter((file) =>
+      /\.(ts|tsx)$/.test(file),
+    ),
     ...listFiles(path.join(root, "src/modules/submissions")).filter((file) =>
       /\.(ts|tsx)$/.test(file),
     ),

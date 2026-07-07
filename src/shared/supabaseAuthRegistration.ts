@@ -82,6 +82,7 @@ export class SupabaseAccessRequestAdapter implements AccessRequestRepository {
             companyName: input.companyName,
             email: normalizeAuthEmail(input.email),
             fullName: input.fullName,
+            password: input.password,
             phone: input.phone,
           },
         },
