@@ -1,9 +1,18 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { SubmissionStatus } from '../modules/submissions/types';
+import type { SubmissionAction } from '../modules/submissions/types';
+import type { SubmissionStatus } from '../components/Drawer';
 
 export type VisaflowWorkspace = 'agent' | 'admin';
-export type AgentNavSection = 'actions' | 'documents' | 'submissions' | 'settings';
-export type AdminNavSection = 'review' | 'export' | 'settings';
+export type AgentNavSection =
+  | 'actions'
+  | 'documents'
+  | 'submissions'
+  | 'settings'
+  | 'drafts'
+  | 'applicants'
+  | 'media'
+  | 'issues';
+export type AdminNavSection = 'review' | 'export' | 'users' | 'settings';
 
 export interface VisaflowSubmissionSummary {
   id: string;
@@ -32,10 +41,12 @@ export type VisaflowUiEvent =
   | { type: 'admin.nav'; section: AdminNavSection }
   | { type: 'submission.open'; submissionId: string }
   | { type: 'questionnaire.open'; submissionId: string }
+  | { type: 'submission.action'; payload: { submissionId: string; action: SubmissionAction; source: 'agent' | 'admin' } }
   | { type: 'package.create' }
   | { type: 'upload.open' }
   | { type: 'admin.review.open'; submissionId: string }
   | { type: 'admin.document.verify'; submissionId: string | null }
+  | { type: 'returned-pdf-handoff.publish'; submissionId: string }
   | { type: 'remark.open'; payload: RemarkBridgePayload }
   | { type: 'remark.submit'; payload: RemarkBridgePayload }
   | { type: 'export.start'; submissionIds: string[] };
@@ -46,10 +57,12 @@ export interface VisaflowBusinessBridge {
   onAdminNavChange?: (section: AdminNavSection) => void;
   onSubmissionOpen?: (submissionId: string) => void;
   onQuestionnaireOpen?: (submissionId: string) => void;
+  onSubmissionAction?: (payload: { submissionId: string; action: SubmissionAction; source: 'agent' | 'admin' }) => void | Promise<void>;
   onCreatePackage?: () => void;
   onUploadOpen?: () => void;
   onAdminReviewOpen?: (submissionId: string) => void;
   onVerifyDocument?: (submissionId: string | null) => void;
+  onPublishReturnedPdfHandoff?: (submissionId: string) => void | Promise<void>;
   onRemarkOpen?: (payload: RemarkBridgePayload) => void;
   onRemarkSubmit?: (payload: RemarkBridgePayload) => void | Promise<void>;
   onExportPackages?: (submissionIds: string[]) => void | Promise<void>;
