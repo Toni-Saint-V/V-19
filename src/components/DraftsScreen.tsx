@@ -18,6 +18,16 @@ import {
   type UploadedFileMetadata,
 } from '../modules/submissions/submissionActions';
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
+import {
+  canonicalCollectionDocTypes,
+  collectionDocTypes,
+  detectCollectionDocType,
+  isCollectionDocType,
+  normalizeCollectionPassportNumber,
+  passportNumberFromCollectionText,
+  resolveCollectionUploadTarget,
+  type CollectionDocType,
+} from '../modules/submissions/documentCollectionIntake';
 import { fileToDocumentStatus } from './v19BusinessScreenAdapter';
 
 interface DraftsScreenProps {
@@ -27,11 +37,6 @@ interface DraftsScreenProps {
 }
 
 type DocStatus = 'verified' | 'processing' | 'error' | 'missing';
-type CollectionDocType =
-  | 'passport'
-  | 'selfie'
-  | 'selfie2'
-  | 'questionnaire';
 
 type CollectionUploadRecord = {
   applicantId: string;
@@ -81,15 +86,7 @@ type UnmatchedUpload = {
 
 const collectionStorageKey = 'visaflow.v19.collectionDocumentUploads.v2';
 
-const docTypes: Array<{ key: CollectionDocType; label: string }> = [
-  { key: 'passport', label: 'Загран' },
-  { key: 'selfie', label: 'Селфи 1' },
-  { key: 'selfie2', label: 'Селфи 2' },
-  { key: 'questionnaire', label: 'Анкета' },
-];
-
-const canonicalDocTypes = new Set<CollectionDocType>(['passport', 'selfie', 'selfie2']);
-const collectionDocTypeSet = new Set<CollectionDocType>(docTypes.map((doc) => doc.key));
+const docTypes = collectionDocTypes;
 
 function loadCollectionUploads(): CollectionUploadRecord[] {
   try {
@@ -118,29 +115,9 @@ function isCollectionUploadRecord(value: unknown): value is CollectionUploadReco
       candidate.submissionId &&
       candidate.applicantId &&
       typeof candidate.docType === 'string' &&
-      collectionDocTypeSet.has(candidate.docType as CollectionDocType) &&
+      isCollectionDocType(candidate.docType) &&
       candidate.fileName,
   );
-}
-
-function normalizePassportNumber(value: string | undefined) {
-  const digits = value?.replace(/\D+/g, '') ?? '';
-  if (digits.length < 7 || digits.length > 10) return '';
-  return digits;
-}
-
-function passportNumberFromText(value: string) {
-  const match = value.replace(/\D+/g, ' ').match(/\b\d{7,10}\b/);
-  return normalizePassportNumber(match?.[0]);
-}
-
-function detectDocType(fileName: string): CollectionDocType | 'unknown' {
-  const lower = fileName.toLowerCase();
-  if (/passport|паспорт|загран|mrz/.test(lower)) return 'passport';
-  if (/selfie[\s_-]*2|селфи[\s_-]*2|photo[\s_-]*2|фото[\s_-]*2/.test(lower)) return 'selfie2';
-  if (/selfie|селфи|photo|фото/.test(lower)) return 'selfie';
-  if (/questionnaire|application|form|анкета|заявлен/.test(lower)) return 'questionnaire';
-  return 'unknown';
 }
 
 function roleLabel(role: MatrixApplicant['role']) {
@@ -226,7 +203,7 @@ function buildMatrixSubmissions(
       docs: applicantDocs(submission, applicant, uploads),
       id: applicant.id,
       name: applicant.fullName,
-      passportNumber: normalizePassportNumber(passportNumberFromApplicant(applicant)),
+      passportNumber: normalizeCollectionPassportNumber(passportNumberFromApplicant(applicant)),
       role: applicantRoleLabel(applicant),
     }));
     const statuses = applicants.flatMap((applicant) => docTypes.map((doc) => applicant.docs[doc.key]));
@@ -336,7 +313,7 @@ async function passportNumberFromPassportOcr(file: File) {
       openAiFallbackAllowed: false,
     });
     const passportField = result.fields.find((field) => field.key === 'passportNumber');
-    return normalizePassportNumber(passportField?.value);
+    return normalizeCollectionPassportNumber(passportField?.value);
   } catch {
     return '';
   }
@@ -347,14 +324,14 @@ function applicantIndex(submissions: Submission[]) {
     submission.applicants.map((applicant) => ({
       applicantId: applicant.id,
       applicantName: applicant.fullName,
-      passportNumber: normalizePassportNumber(passportNumberFromApplicant(applicant)),
+      passportNumber: normalizeCollectionPassportNumber(passportNumberFromApplicant(applicant)),
       submissionId: submission.id,
     })),
   );
 }
 
 async function detectedPassportNumber(file: File, detectedDocType: CollectionDocType | 'unknown') {
-  const fromName = passportNumberFromText(file.name);
+  const fromName = passportNumberFromCollectionText(file.name);
   if (fromName) return fromName;
   if (detectedDocType !== 'passport') return '';
   return passportNumberFromPassportOcr(file);
@@ -458,7 +435,7 @@ export function DraftsScreen({
     file: File,
     passportNumber?: string,
   ) => {
-    if (canonicalDocTypes.has(target.docType)) {
+    if (canonicalCollectionDocTypes.has(target.docType)) {
       const result = applyCanonicalUpload(submissions, target, file);
       if (result.applied) {
         commitSubmissions(result.nextSubmissions);
@@ -480,7 +457,7 @@ export function DraftsScreen({
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file || !pendingCellTarget) return;
-    assignFileToTarget(pendingCellTarget, file, passportNumberFromText(file.name));
+    assignFileToTarget(pendingCellTarget, file, passportNumberFromCollectionText(file.name));
     setPendingCellTarget(null);
   };
 
@@ -488,54 +465,35 @@ export function DraftsScreen({
     const uploadFiles = Array.from(files);
     if (!uploadFiles.length) return;
     setBulkBusy(true);
-    const index = applicantIndex(submissions);
     const unmatched: UnmatchedUpload[] = [];
     let workingSubmissions = submissions;
     let submissionsChanged = false;
 
     for (const file of uploadFiles) {
-      const detectedDocType = detectDocType(file.name);
+      const detectedDocType = detectCollectionDocType(file.name);
       const passportNumber = await detectedPassportNumber(file, detectedDocType);
+      const resolution = resolveCollectionUploadTarget({
+        applicants: applicantIndex(submissions),
+        detectedDocType,
+        passportNumber,
+      });
 
-      if (detectedDocType === 'unknown') {
+      if (resolution.status === 'unmatched') {
         unmatched.push({
           ...firstApplicantTarget(submissions),
           detectedDocType,
           file,
           id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           passportNumber,
-          reason: 'Тип документа не определён по имени файла.',
+          reason: resolution.reason,
         });
         continue;
       }
 
-      const matches = passportNumber
-        ? index.filter((item) => item.passportNumber === passportNumber)
-        : [];
-
-      if (matches.length !== 1) {
-        unmatched.push({
-          ...firstApplicantTarget(submissions),
-          detectedDocType,
-          file,
-          id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          passportNumber,
-          reason: passportNumber
-            ? 'Номер паспорта не дал одного точного совпадения.'
-            : 'Номер паспорта не найден в имени файла или OCR.',
-        });
-        continue;
-      }
-
-      const match = matches[0];
-      const target = {
-        applicantId: match.applicantId,
-        docType: detectedDocType,
-        submissionId: match.submissionId,
-      };
+      const target = resolution.target;
       let applied = false;
 
-      if (canonicalDocTypes.has(detectedDocType)) {
+      if (canonicalCollectionDocTypes.has(target.docType)) {
         const result = applyCanonicalUpload(workingSubmissions, target, file);
         applied = result.applied;
         if (result.applied) {
@@ -548,13 +506,13 @@ export function DraftsScreen({
 
       if (!applied) {
         unmatched.push({
-          applicantId: match.applicantId,
+          applicantId: target.applicantId,
           detectedDocType,
           file,
           id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           passportNumber,
           reason: 'В canonical слот нельзя загрузить файл в текущем статусе.',
-          submissionId: match.submissionId,
+          submissionId: target.submissionId,
         });
       }
     }
