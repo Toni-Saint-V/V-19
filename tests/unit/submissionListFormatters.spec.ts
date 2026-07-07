@@ -46,7 +46,7 @@ describe("submission list formatters", () => {
 
   it("shortens submission statuses without clipped blocker copy", () => {
     expect(formatSubmissionListStatus(fixture("ПД-1048"))).toBe("Возвращено 2");
-    expect(formatSubmissionListStatus(fixture("ПД-1054"))).toBe("Исправление");
+    expect(formatSubmissionListStatus(fixture("ПД-1055"))).toBe("Исправление");
     expect(formatSubmissionListStatus(fixture("ПД-1053"))).toBe("Проверка");
   });
 

@@ -6,6 +6,7 @@ import {
 import {
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
+  orderSubmissionsForExportPackage,
   exportSummary,
 } from "./exportRules";
 import { createExportWorkbookArtifact } from "./exportWorkbook";
@@ -130,7 +131,7 @@ export async function createExportMediaZipArtifact(
   if (!identityResult.ok) return identityResult;
 
   const downloadMedia = options.downloadMedia ?? defaultDownloadMedia;
-  const orderedSubmissions = orderSubmissionsForMediaArchive(submissions);
+  const orderedSubmissions = orderSubmissionsForExportPackage(submissions);
   const outerZip = new JSZip();
   const cityIndexes = new Map<string, Record<ArchiveGroup, number>>();
   let applicantCount = 0;
@@ -400,36 +401,6 @@ async function defaultDownloadMedia(target: MediaStorageTarget): Promise<Blob | 
 
 function archiveGroupForSubmission(submission: Submission): ArchiveGroup {
   return submission.type === "family" ? "family" : "single";
-}
-
-function orderSubmissionsForMediaArchive(submissions: Submission[]): Submission[] {
-  const cityOrder = new Map<string, number>();
-  submissions.forEach((submission) => {
-    if (!cityOrder.has(submission.city)) {
-      cityOrder.set(submission.city, cityOrder.size);
-    }
-  });
-
-  return submissions
-    .map((submission, index) => ({ index, submission }))
-    .sort((left, right) => {
-      const leftCityOrder = cityOrder.get(left.submission.city) ?? left.index;
-      const rightCityOrder = cityOrder.get(right.submission.city) ?? right.index;
-
-      if (leftCityOrder !== rightCityOrder) {
-        return leftCityOrder - rightCityOrder;
-      }
-
-      const leftFamilyOrder = left.submission.type === "family" ? 0 : 1;
-      const rightFamilyOrder = right.submission.type === "family" ? 0 : 1;
-
-      if (leftFamilyOrder !== rightFamilyOrder) {
-        return leftFamilyOrder - rightFamilyOrder;
-      }
-
-      return left.index - right.index;
-    })
-    .map((item) => item.submission);
 }
 
 function ensureCityCounters(

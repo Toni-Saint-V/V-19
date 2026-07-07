@@ -110,9 +110,10 @@ function canUseLocalDemoMediaBlob(): boolean {
 }
 
 function isLocalDemoMediaPath(path: string): boolean {
-  return /^submissions\/SUB-1102\/applicants\/з-1102-[1-3]\/(passport_scan|selfie|selfie_2)\/demo1102[1-3]_(passport_scan|selfie|selfie_2)\.jpg$/.test(
-    path,
+  const match = path.match(
+    /^submissions\/[^/]+\/applicants\/[^/]+\/(passport_scan|selfie|selfie_2)\/demo\d+_(passport_scan|selfie|selfie_2)\.jpg$/,
   );
+  return Boolean(match && match[1] === match[2]);
 }
 
 export async function createMediaSignedUrl(

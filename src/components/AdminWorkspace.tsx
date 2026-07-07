@@ -161,7 +161,7 @@ export function AdminWorkspace({
 
   const getPageTitle = () => {
     switch (activeNav) {
-      case 'review': return 'Очередь на проверку';
+      case 'review': return 'Проверка';
       case 'export': return 'Центр выгрузки';
       case 'users': return 'Управление пользователями';
       case 'settings': return 'Системные настройки';

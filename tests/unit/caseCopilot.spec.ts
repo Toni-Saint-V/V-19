@@ -171,7 +171,7 @@ describe("local Case Copilot", () => {
       {
         expectedOwner: "admin",
         expectedStatus: "waiting",
-        submission: byId("ПД-1054"),
+      submission: byId("ПД-1055"),
         surface: "agent",
       },
       {
@@ -414,7 +414,7 @@ describe("local Case Copilot", () => {
     });
     const correctionsBrief = buildCaseCopilotBrief({
       role: "admin",
-      submission: fillRequiredQuestionnaireForTest(byId("ПД-1054")),
+      submission: fillRequiredQuestionnaireForTest(byId("ПД-1055")),
       surface: "review",
     });
 
@@ -429,7 +429,7 @@ describe("local Case Copilot", () => {
   test("keeps agent waiting states read-only and not executable", () => {
     const waitingStates = [
       byId("ПД-1053"),
-      byId("ПД-1054"),
+      byId("ПД-1055"),
       byId("ПД-1056"),
     ];
 

@@ -127,6 +127,13 @@ async function zipEntryNames(blob: Blob): Promise<{
   };
 }
 
+async function zipTextEntry(blob: Blob, name: string): Promise<string> {
+  const zip = await JSZip.loadAsync(blob);
+  const entry = zip.file(name);
+  if (!entry) throw new Error(`Missing ZIP entry ${name}`);
+  return entry.async("string");
+}
+
 function mediaEntryNames(fileNames: string[]): string[] {
   return fileNames.filter(
     (name) =>
@@ -321,6 +328,44 @@ describe("export media mega ZIP", () => {
     ).toHaveLength(3);
     expect(mediaNames.filter((name) => name.startsWith("Москва/01_Семьи/"))).toHaveLength(
       9,
+    );
+  });
+
+  test("keeps ZIP entries and manifest deterministic for reversed input order", async () => {
+    const firstSelection = generatedSelection(
+      withCanonicalStorage(byId("SUB-1101")),
+      withCanonicalStorage(byId("SUB-1102")),
+    );
+    const secondSelection = generatedSelection(
+      withCanonicalStorage(byId("SUB-1102")),
+      withCanonicalStorage(byId("SUB-1101")),
+    );
+    const firstIdentity = identityFor(firstSelection);
+    const secondIdentity = identityFor(secondSelection);
+
+    expect(secondIdentity).toEqual(firstIdentity);
+
+    const firstResult = await createExportMediaZipArtifact(firstSelection, {
+      downloadMedia: downloader(),
+      expectedIdentity: firstIdentity,
+    });
+    const secondResult = await createExportMediaZipArtifact(secondSelection, {
+      downloadMedia: downloader(),
+      expectedIdentity: secondIdentity,
+    });
+
+    expect(firstResult.ok).toBe(true);
+    expect(secondResult.ok).toBe(true);
+    if (!firstResult.ok) throw new Error(firstResult.safeMessage);
+    if (!secondResult.ok) throw new Error(secondResult.safeMessage);
+
+    const firstNames = await zipEntryNames(firstResult.artifact.blob);
+    const secondNames = await zipEntryNames(secondResult.artifact.blob);
+
+    expect(secondNames.fileNames).toEqual(firstNames.fileNames);
+    expect(secondNames.directoryNames).toEqual(firstNames.directoryNames);
+    expect(await zipTextEntry(secondResult.artifact.blob, "manifest.json")).toEqual(
+      await zipTextEntry(firstResult.artifact.blob, "manifest.json"),
     );
   });
 
