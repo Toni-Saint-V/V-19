@@ -487,12 +487,12 @@ describe("V-19 export workbook contract", () => {
     const stylesXml = workbookFiles["xl/styles.xml"] ?? "";
 
     expect(rows.map((row) => row.submissionId)).toEqual([
-      "SUB-FAMILY-2",
-      "SUB-FAMILY-2",
-      "SUB-FAMILY-2",
       "SUB-1102",
       "SUB-1102",
       "SUB-1102",
+      "SUB-FAMILY-2",
+      "SUB-FAMILY-2",
+      "SUB-FAMILY-2",
       "ПД-1056",
     ]);
     expect(new Set(artifact.rowFills.slice(1, 4)).size).toBe(1);
@@ -518,6 +518,27 @@ describe("V-19 export workbook contract", () => {
     expect(worksheetXml).toContain('<c r="L2" s="54"');
     expect(worksheetXml).toContain('<c r="BC2" s="55"');
     expect(worksheetXml).toContain('<c r="A8" s="33"');
+  });
+
+  test("keeps row order and package identity deterministic for the same selected set", () => {
+    const family = withApplicantPassports(byId("SUB-1102"), [
+      "111111111",
+      "222222222",
+      "333333333",
+    ]);
+    const single = withApplicantPassports(readySubmission(), ["669308614"]);
+    const firstOrder = [single, family];
+    const secondOrder = [family, single];
+
+    expect(buildExportRows(firstOrder).map((row) => row.submissionId)).toEqual(
+      buildExportRows(secondOrder).map((row) => row.submissionId),
+    );
+    expect(buildExportWorkbookRows(buildExportRows(firstOrder))).toEqual(
+      buildExportWorkbookRows(buildExportRows(secondOrder)),
+    );
+    expect(buildExportPackageIdentity(firstOrder)).toEqual(
+      buildExportPackageIdentity(secondOrder),
+    );
   });
 
   test("ties package identity to the full 56-column serialized row model", () => {

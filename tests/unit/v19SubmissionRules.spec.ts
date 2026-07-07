@@ -363,13 +363,13 @@ describe("V-19 submission status rules", () => {
 
   it("keeps admin work presentation decisions outside React screens", () => {
     expect(adminWorkDrawerTabFor(byId("ПД-1053"))).toBe("overview");
-    expect(adminWorkDrawerTabFor(byId("ПД-1054"))).toBe("issues");
+    expect(adminWorkDrawerTabFor(byId("ПД-1055"))).toBe("issues");
     expect(adminWorkPresentation(byId("ПД-1053"))).toEqual({
       actionLabel: "Открыть",
       stage: "Новая проверка",
       tone: "info",
     });
-    expect(adminWorkPresentation(byId("ПД-1054"))).toEqual({
+    expect(adminWorkPresentation(byId("ПД-1055"))).toEqual({
       actionLabel: "Проверить",
       stage: "Исправления",
       tone: "warning",
@@ -379,7 +379,7 @@ describe("V-19 submission status rules", () => {
       stage: "К выгрузке",
       tone: "success",
     });
-    expect(adminWorkEventTitle(byId("ПД-1054"), "fallback")).toBe(
+    expect(adminWorkEventTitle(byId("ПД-1055"), "fallback")).toBe(
       "Исправления получены",
     );
     expect(adminWorkEventTitle(byId("ПД-1053"), "fallback")).toBe(

@@ -39,8 +39,8 @@ function PasswordToggle({
   const [visible, setVisible] = useState(false);
 
   return (
-    <label className="access-field" htmlFor={id}>
-      <span>{label}</span>
+    <div className="access-field">
+      <label htmlFor={id}>{label}</label>
       <span className="access-password-row">
         <input
           id={id}
@@ -58,7 +58,7 @@ function PasswordToggle({
           {visible ? 'Скрыть пароль' : 'Показать пароль'}
         </button>
       </span>
-    </label>
+    </div>
   );
 }
 
@@ -122,6 +122,10 @@ export function AccessGate({
 
   async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!password.trim()) {
+      setLocalError('Введите пароль.');
+      return;
+    }
     setBusy(true);
     setLocalError('');
     setSuccess('');
@@ -140,7 +144,6 @@ export function AccessGate({
     setLocalError('');
     setSuccess('');
     if (validationErrors.length) {
-      setLocalError(validationErrors.join(' '));
       return;
     }
     setBusy(true);

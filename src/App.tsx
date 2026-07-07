@@ -133,7 +133,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     };
   }, [activeApprovedSession, supabaseEnabled]);
 
-  const persistSubmissions = useCallback((nextSubmissions: Submission[]) => {
+  const persistSubmissions = useCallback(async (nextSubmissions: Submission[]) => {
     setSubmissions(nextSubmissions);
     if (!supabaseEnabled) {
       saveSubmissions(nextSubmissions);
@@ -141,11 +141,12 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     }
     if (!supabaseProfile) return;
 
-    void saveCockpitSubmissionsForProfile(
+    const nextOwnerIds = await saveCockpitSubmissionsForProfile(
       supabaseProfile,
       nextSubmissions,
       ownerIdsBySubmissionId,
-    ).then(setOwnerIdsBySubmissionId);
+    );
+    setOwnerIdsBySubmissionId(nextOwnerIds);
   }, [ownerIdsBySubmissionId, supabaseEnabled, supabaseProfile]);
 
   const handleLogin = useCallback(async (email: string, password: string) => {
@@ -211,7 +212,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
       source,
       source === 'admin' ? 'local-admin' : 'local-agent-tony',
     );
-    if (result.ok) persistSubmissions(result.data);
+    if (result.ok) void persistSubmissions(result.data);
   }, [persistSubmissions, submissions]);
 
   const appBridge = useMemo<VisaflowBusinessBridge>(
@@ -222,8 +223,14 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
         applySubmissionAction(submissionId, action, source);
       },
       onExportPackages: async (submissionIds) => {
-        await bridge.onExportPackages?.(submissionIds);
-        if (workspace !== 'admin') return;
+        if (
+          workspace !== 'admin' ||
+          activeApprovedSession?.role !== 'admin' ||
+          activeApprovedSession.status !== 'active' ||
+          activeApprovedSession.approvalStatus !== 'approved'
+        ) {
+          throw new Error('Only an approved admin session can complete export packages.');
+        }
 
         const generatedSubmissions = applyExportStateToSelection(
           submissions,
@@ -244,7 +251,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
         );
         const completed = await completeExportPackage(selectedDownloaded, {
           createdAt: new Date().toISOString(),
-          createdBy: supabaseProfile?.id ?? 'local-admin',
+          createdBy: activeApprovedSession.userId,
           format: 'xlsx',
         });
         if (completed.status === 'blocked') {
@@ -257,10 +264,15 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
         const nextSubmissions = downloadedSubmissions.map(
           (submission) => exportedById.get(submission.id) ?? submission,
         );
-        persistSubmissions(nextSubmissions);
+        await persistSubmissions(nextSubmissions);
+        try {
+          await bridge.onExportPackages?.(submissionIds);
+        } catch {
+          // External bridge/tracking is deliberately non-transactional after persistence.
+        }
       },
     }),
-    [applySubmissionAction, bridge, persistSubmissions, submissions, supabaseProfile?.id, workspace],
+    [activeApprovedSession, applySubmissionAction, bridge, persistSubmissions, submissions, workspace],
   );
 
   const switchWorkspace = () => {

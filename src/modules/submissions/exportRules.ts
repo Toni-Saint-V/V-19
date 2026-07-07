@@ -212,7 +212,7 @@ export function buildExportMappingAudit(
 }
 
 export function buildExportRows(submissions: Submission[]): ExportContractRow[] {
-  return buildExportContractRows(orderSubmissionsForExportRows(submissions));
+  return buildExportContractRows(orderSubmissionsForExportPackage(submissions));
 }
 
 export function buildExportInternalMappings(
@@ -239,23 +239,12 @@ export function buildExportInternalMappings(
   }));
 }
 
-function orderSubmissionsForExportRows(submissions: Submission[]): Submission[] {
-  const cityOrder = new Map<City, number>();
-  submissions.forEach((submission) => {
-    if (!cityOrder.has(submission.city)) {
-      cityOrder.set(submission.city, cityOrder.size);
-    }
-  });
-
+export function orderSubmissionsForExportPackage(submissions: Submission[]): Submission[] {
   return submissions
     .map((submission, index) => ({ index, submission }))
     .sort((left, right) => {
-      const leftCityOrder = cityOrder.get(left.submission.city) ?? left.index;
-      const rightCityOrder = cityOrder.get(right.submission.city) ?? right.index;
-
-      if (leftCityOrder !== rightCityOrder) {
-        return leftCityOrder - rightCityOrder;
-      }
+      const cityOrder = compareExportText(left.submission.city, right.submission.city);
+      if (cityOrder !== 0) return cityOrder;
 
       const leftFamilyOrder = left.submission.type === "family" ? 0 : 1;
       const rightFamilyOrder = right.submission.type === "family" ? 0 : 1;
@@ -264,9 +253,22 @@ function orderSubmissionsForExportRows(submissions: Submission[]): Submission[] 
         return leftFamilyOrder - rightFamilyOrder;
       }
 
-      return left.index - right.index;
+      return (
+        compareExportText(left.submission.tripDateFrom, right.submission.tripDateFrom) ||
+        compareExportText(left.submission.tripDateTo, right.submission.tripDateTo) ||
+        compareExportText(
+          left.submission.listTitle ?? left.submission.title,
+          right.submission.listTitle ?? right.submission.title,
+        ) ||
+        compareExportText(left.submission.id, right.submission.id) ||
+        left.index - right.index
+      );
     })
     .map((item) => item.submission);
+}
+
+function compareExportText(left: string, right: string): number {
+  return left.localeCompare(right, "ru", { numeric: true, sensitivity: "base" });
 }
 
 function tripDateRangeKey(submission: Submission): string {

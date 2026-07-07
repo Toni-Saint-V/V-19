@@ -84,15 +84,16 @@ function normalizeLoadedSubmissions(submissions: Submission[]): Submission[] {
 function seedLocalDemoStoredMedia(submissions: Submission[]): Submission[] {
   if (!canSeedLocalDemoStoredMedia()) return submissions;
 
-  const demoSubmission = initialSubmissions.find(
-    (submission) => submission.id === "SUB-1102",
+  const demoFilesBySubmissionId = new Map(
+    initialSubmissions.map((submission) => [
+      submission.id,
+      new Map(submission.files.map((file) => [file.id, file])),
+    ]),
   );
-  if (!demoSubmission) return submissions;
-
-  const demoFilesById = new Map(demoSubmission.files.map((file) => [file.id, file]));
 
   return submissions.map((submission) => {
-    if (submission.id !== demoSubmission.id) return submission;
+    const demoFilesById = demoFilesBySubmissionId.get(submission.id);
+    if (!demoFilesById) return submission;
 
     return {
       ...submission,

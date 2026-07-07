@@ -176,7 +176,6 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
       const [
         {
           createExportWorkbookArtifact,
-          default: downloadExportWorkbook,
           verifyExportWorkbookArtifact,
         },
         { prepareExportMediaZip, downloadPreparedExportMediaZip },
@@ -203,22 +202,21 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
         setExportError('Excel preview не совпал с XLSX. Файл не скачан.');
         return;
       }
-      const workbookResult = downloadExportWorkbook(plan.rows, identity);
-      if (!workbookResult.ok) {
-        setExportError(workbookResult.safeMessage);
-        return;
-      }
       const zipArtifactResult = await prepareExportMediaZip(selectedGenerated, identity);
       if (!zipArtifactResult.ok) {
         setExportError(zipArtifactResult.safeMessage);
         return;
       }
+      if (!bridge.onExportPackages) {
+        setExportError('Пакет выгрузки не завершен: нет защищенного обработчика выгрузки.');
+        return;
+      }
+      await bridge.onExportPackages(submissionIds);
       const zipResult = downloadPreparedExportMediaZip(zipArtifactResult.artifact);
       if (!zipResult.ok) {
         setExportError(zipResult.safeMessage);
         return;
       }
-      await bridge.onExportPackages?.(submissionIds);
       emitVisaflowUiEvent(bridge, { type: 'export.start', submissionIds });
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Не удалось завершить выгрузку.');
@@ -466,11 +464,11 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
           >
             {isExporting ? <UploadCloud className="h-4 w-4 animate-pulse" /> : <Download className="h-4 w-4" />}
-            {isExporting ? 'Формируем пакет…' : 'Скачать Excel + ZIP'}
+            {isExporting ? 'Формируем пакет…' : 'Скачать ZIP с Excel'}
             {!isExporting && <ArrowRight className="h-4 w-4" />}
           </button>
           <div className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? 'text-[#d59aa3]' : 'text-white/35'}`}>
-            <Clock3 className="h-3.5 w-3.5" /> {exportError || 'Excel и ZIP файлов формируются fail-closed'}
+            <Clock3 className="h-3.5 w-3.5" /> {exportError || 'ZIP с Excel формируется fail-closed'}
           </div>
         </div>
       </aside>
