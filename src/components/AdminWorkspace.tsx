@@ -289,11 +289,11 @@ export function AdminWorkspace({
       <div className="flex-1 overflow-y-auto px-2 py-4 space-y-5 scrollbar-hide">
         <nav className="space-y-0.5">
           <div className="px-2 pb-1 text-[11px] text-white/40 font-medium tracking-wide uppercase">Очередь</div>
-          <button onClick={() => navigateTo('review')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'review' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button aria-label="Проверка" onClick={() => navigateTo('review')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'review' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <ShieldCheck className="w-4 h-4 text-white/55" /> <span className="flex-1 text-left">Проверка</span>
             <span className="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/62 text-[11px] font-medium">2</span>
           </button>
-          <button onClick={() => navigateTo('export')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'export' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button aria-label="Выгрузка" onClick={() => navigateTo('export')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'export' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <DownloadCloud className="w-4 h-4 text-[#b8baff]/75" /> <span className="flex-1 text-left">Выгрузка</span>
             <span className="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-[#b8baff] text-[11px] font-medium">3</span>
           </button>
@@ -301,7 +301,7 @@ export function AdminWorkspace({
 
         <nav className="space-y-0.5">
           <div className="px-2 pb-1 text-[11px] text-white/40 font-medium tracking-wide uppercase">Система</div>
-          <button onClick={() => navigateTo('users')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'users' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button aria-label="Пользователи" onClick={() => navigateTo('users')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'users' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <Users className="w-4 h-4" /> <span className="flex-1 text-left">Пользователи</span>
             {pendingAccessRequestCount ? (
               <span className="px-1.5 py-0.5 rounded-md bg-[#5a1f2a] text-[#ffccd1] text-[11px] font-medium">
@@ -309,7 +309,7 @@ export function AdminWorkspace({
               </span>
             ) : null}
           </button>
-          <button onClick={() => navigateTo('settings')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'settings' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button aria-label="Настройки" onClick={() => navigateTo('settings')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'settings' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <Settings className="w-4 h-4" /> <span className="flex-1 text-left">Настройки</span>
           </button>
         </nav>
@@ -384,7 +384,7 @@ export function AdminWorkspace({
   const getPageTitle = () => {
     switch (activeNav) {
       case 'review': return 'Проверка';
-      case 'export': return 'Центр выгрузки';
+      case 'export': return 'Выгрузка';
       case 'users': return 'Управление пользователями';
       case 'settings': return 'Системные настройки';
     }

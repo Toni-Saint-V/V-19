@@ -179,6 +179,7 @@ function ReviewQueueCard({ item, onOpenDrawer }: { item: ReviewCard; onOpenDrawe
 
   return (
     <button
+      aria-label={`Ручная проверка заявки ${item.title}`}
       onClick={() => onOpenDrawer(item.id)}
       className={`group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${hasBlocker ? 'border-[#5b2b32]/45 bg-[#1d1719]/80 hover:border-[#74414a]/55' : 'border-[#242529] bg-[#161617] hover:border-[#6f64ff]/40'}`}
     >
@@ -355,7 +356,7 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
                 <ShieldCheck className="h-3.5 w-3.5" /> Admin review cockpit
               </div>
-              <h2 className="text-[24px] font-semibold tracking-tight text-white lg:text-[32px]">Проверка пакетов</h2>
+              <h2 className="text-[24px] font-semibold tracking-tight text-white lg:text-[32px]">Пакеты на проверку</h2>
               <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/50">Не просто карточки: очередь показывает приоритет, блокеры, следующее действие, AI-флаги и готовность к выгрузке за 3 секунды.</p>
             </div>
           </motion.div>
@@ -380,7 +381,7 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
           <AdminMetricCard
             active={activeLane === 'review'}
             icon={AlertCircle}
-            label="Проверить"
+            label="К проверке"
             value={`${totalWarnings}`}
             tone="orange"
             onClick={() => setActiveLane('review')}

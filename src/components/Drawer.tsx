@@ -459,7 +459,7 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
           
           <motion.div
             role="dialog"
-            initial={{ x: isDesktop ? '100%' : 0, y: isDesktop ? 0 : '100%', opacity: 0.5 }}
+            initial={{ x: 0, y: 0, opacity: 1 }}
             animate={{ x: 0, y: 0, opacity: 1 }}
             exit={{ x: isDesktop ? '100%' : 0, y: isDesktop ? 0 : '100%', opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 240, mass: 0.8 }}

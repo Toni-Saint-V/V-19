@@ -6,6 +6,7 @@ export type ApplicantDocumentType =
   | "passport_scan"
   | "questionnaire"
   | "selfie"
+  | "selfie_1"
   | "selfie_2";
 
 const defaultExtensions: Record<ApplicantDocumentType, string> = {
@@ -14,6 +15,7 @@ const defaultExtensions: Record<ApplicantDocumentType, string> = {
   passport_scan: "pdf",
   questionnaire: "pdf",
   selfie: "jpg",
+  selfie_1: "jpg",
   selfie_2: "jpg",
 };
 
@@ -38,26 +40,25 @@ export function buildApplicantDocumentFileName(input: {
   }
 
   const name = applicantFileNameParts(input.applicant.fullName);
-  return [
-    passportNumber,
-    input.documentType,
-    name.lastName,
-    name.firstName,
-  ]
+  return [passportNumber, input.documentType, name.lastName, name.firstName]
     .filter(Boolean)
     .join("_")
     .concat(`.${extension}`);
 }
 
 export function passportNumberFromApplicant(applicant: Applicant): string {
-  return applicant.sections
-    .flatMap((section) => section.fields)
-    .find((field) => field.id === "passport-no")
-    ?.value.trim() ?? "";
+  return (
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .find((field) => field.id === "passport-no")
+      ?.value.trim() ?? ""
+  );
 }
 
 export function applicantHasPassportNumber(applicant: Applicant): boolean {
-  return Boolean(sanitizeFilenameSegment(passportNumberFromApplicant(applicant)));
+  return Boolean(
+    sanitizeFilenameSegment(passportNumberFromApplicant(applicant)),
+  );
 }
 
 export function sanitizeFilenameSegment(value: string): string {

@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import type { Submission } from '../modules/submissions/types';
 import { applicantInitials, updatedLabel } from './v19BusinessScreenAdapter';
 import { 
-  Users, ChevronRight, Folder, CheckCircle2, AlertCircle, FileText, Flame
+  Users, ChevronRight, Folder, CheckCircle2, AlertCircle, FileText, Flame, Search
 } from 'lucide-react';
 import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
 
@@ -166,12 +166,14 @@ function metricsFromSubmissions(submissions: Submission[] | undefined, fallbackT
 
 export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreenProps) {
   const [applicantSummaryFilter, setApplicantSummaryFilter] = useState<ApplicantSummaryFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const families = useMemo(() => runtimeFamiliesFromSubmissions(submissions), [submissions]);
   const individuals = useMemo(() => runtimeIndividualsFromSubmissions(submissions), [submissions]);
   const metrics = useMemo(
     () => metricsFromSubmissions(submissions, families.length + individuals.length),
     [families.length, individuals.length, submissions],
   );
+  const searchNeedle = searchQuery.trim().toLowerCase();
   const displayFamilies = useMemo(
     () =>
       families.filter((family) => {
@@ -183,8 +185,18 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           return family.members.some((member) => member.status === 'in_progress');
         }
         return family.members.every((member) => member.status === 'ready');
+      }).filter((family) => {
+        if (!searchNeedle) return true;
+        return [
+          family.id,
+          family.title,
+          ...family.members.map((member) => member.name),
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(searchNeedle);
       }),
-    [applicantSummaryFilter, families],
+    [applicantSummaryFilter, families, searchNeedle],
   );
   const displayIndividuals = useMemo(
     () =>
@@ -193,9 +205,20 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
         if (applicantSummaryFilter === 'blockers') return individual.status === 'missing_docs';
         if (applicantSummaryFilter === 'review') return individual.status === 'in_progress';
         return individual.status === 'ready';
+      }).filter((individual) => {
+        if (!searchNeedle) return true;
+        return [individual.id, individual.name]
+          .join(' ')
+          .toLowerCase()
+          .includes(searchNeedle);
       }),
-    [applicantSummaryFilter, individuals],
+    [applicantSummaryFilter, individuals, searchNeedle],
   );
+  const hasVisibleApplicants = displayFamilies.length > 0 || displayIndividuals.length > 0;
+  const resetFilters = () => {
+    setApplicantSummaryFilter('all');
+    setSearchQuery('');
+  };
 
   return (
     <motion.div 
@@ -242,7 +265,43 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
         />
       </V19SummaryTileGrid>
 
+      <label className="relative block max-w-[360px]">
+        <span className="sr-only">Поиск по подачам</span>
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
+        />
+        <input
+          aria-label="Поиск по подачам"
+          className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#1e1e21] pl-9 pr-3 text-[13px] font-medium text-white outline-none transition-colors placeholder:text-white/50 focus:border-[#6f64ff]/55 focus:ring-1 focus:ring-[#3a45b4]/35"
+          placeholder="Поиск по подачам"
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.currentTarget.value)}
+        />
+      </label>
+
+      {!hasVisibleApplicants ? (
+        <div
+          className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#242529] bg-[#161617] p-8 text-center"
+          role="status"
+        >
+          <h2 className="m-0 text-[18px] font-semibold text-white">Ничего не найдено</h2>
+          <p className="m-0 mt-2 max-w-[420px] text-[13px] leading-5 text-white/60">
+            Измените поисковый запрос или фильтр готовности.
+          </p>
+          <button
+            className="mt-4 h-10 rounded-[10px] border border-[#242529] bg-[#1e1e21] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#27272b]"
+            type="button"
+            onClick={resetFilters}
+          >
+            Сбросить фильтры
+          </button>
+        </div>
+      ) : null}
+
       {/* Families Section */}
+      {displayFamilies.length ? (
       <div>
         <h2 className="text-[13px] font-medium text-white/50 uppercase tracking-wider mb-4 px-1">
           Семьи
@@ -250,6 +309,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {displayFamilies.map((family) => (
             <div 
+              data-submission-id={family.id}
               key={family.id}
               onClick={() => onOpenDrawer(family.id)}
               tabIndex={0}
@@ -304,10 +364,14 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           ))}
         </div>
       </div>
+      ) : null}
 
-      <div className="h-px w-full bg-[#202124] my-2" />
+      {displayFamilies.length && displayIndividuals.length ? (
+        <div className="h-px w-full bg-[#202124] my-2" />
+      ) : null}
 
       {/* Individuals Section */}
+      {displayIndividuals.length ? (
       <div>
         <h2 className="text-[13px] font-medium text-white/50 uppercase tracking-wider mb-4 px-1">
           Одиночные профили
@@ -315,6 +379,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {displayIndividuals.map((ind) => (
             <div 
+              data-submission-id={ind.id}
               key={ind.id}
               onClick={() => onOpenDrawer(ind.id)}
               tabIndex={0}
@@ -347,6 +412,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           ))}
         </div>
       </div>
+      ) : null}
     </motion.div>
   );
 }

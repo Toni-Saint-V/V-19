@@ -1,16 +1,10 @@
 import { getSupabaseClient } from "../../lib/supabase/client";
 import { mapSupabasePersistenceError } from "../../services/persistenceObservability";
+import { DocumentRepository } from "../documents/documentRepository";
 import {
   validateMediaStorageTarget,
   type MediaStorageTarget,
 } from "./mediaStoragePolicy";
-
-interface MediaStorageImportMeta {
-  env: {
-    readonly DEV?: boolean;
-    readonly VITE_SUPABASE_BACKEND_TARGET?: string;
-  };
-}
 
 export {
   assertVisaApplicationPdfSha256,
@@ -56,6 +50,14 @@ export async function uploadMediaToStorage(
       fallbackKind: "upload",
     });
   }
+
+  await persistUploadedDocumentAsset({
+    bucket: target.bucket,
+    client,
+    file,
+    path: data.path,
+  });
+
   return { path: data.path };
 }
 
@@ -67,7 +69,9 @@ export async function deleteMediaFromStorage(
   const client = getSupabaseClient();
   if (!client) return;
 
-  const { error } = await client.storage.from(target.bucket).remove([target.path]);
+  const { error } = await client.storage
+    .from(target.bucket)
+    .remove([target.path]);
   if (error) {
     throw mapSupabasePersistenceError(error, {
       operation: "storage.delete_media",
@@ -82,9 +86,13 @@ export async function downloadMediaFromStorage(
   validateMediaStorageTarget({ target });
 
   const client = getSupabaseClient();
-  if (!client) return localDemoMediaBlob(target);
+  if (!client) {
+    throw new Error("Production storage unavailable");
+  }
 
-  const { data, error } = await client.storage.from(target.bucket).download(target.path);
+  const { data, error } = await client.storage
+    .from(target.bucket)
+    .download(target.path);
   if (error) {
     throw mapSupabasePersistenceError(error, {
       operation: "storage.download_media",
@@ -94,26 +102,38 @@ export async function downloadMediaFromStorage(
   return data;
 }
 
-function localDemoMediaBlob(target: MediaStorageTarget): Blob | null {
-  if (!canUseLocalDemoMediaBlob() || !isLocalDemoMediaPath(target.path)) {
-    return null;
+async function persistUploadedDocumentAsset(input: {
+  bucket: typeof import("./mediaStoragePolicy").mediaStorageBucket;
+  client: NonNullable<ReturnType<typeof getSupabaseClient>>;
+  file: File;
+  path: string;
+}): Promise<void> {
+  const hasDatabaseClient =
+    typeof (input.client as { from?: unknown }).from === "function";
+
+  if (!hasDatabaseClient) {
+    return;
   }
 
-  return new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], {
-    type: "image/jpeg",
-  });
-}
-
-function canUseLocalDemoMediaBlob(): boolean {
-  const env = (import.meta as unknown as MediaStorageImportMeta).env;
-  return Boolean(env.DEV) && env.VITE_SUPABASE_BACKEND_TARGET !== "supabase";
-}
-
-function isLocalDemoMediaPath(path: string): boolean {
-  const match = path.match(
-    /^submissions\/[^/]+\/applicants\/[^/]+\/(passport_scan|selfie|selfie_2)\/demo\d+_(passport_scan|selfie|selfie_2)\.jpg$/,
+  await new DocumentRepository(input.client).saveUploadedStorageAsset(
+    { bucket: input.bucket, path: input.path },
+    input.file,
+    { checksum: await sha256Hex(input.file) },
   );
-  return Boolean(match && match[1] === match[2]);
+}
+
+async function sha256Hex(file: File): Promise<string | null> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return null;
+
+  try {
+    const digest = await subtle.digest("SHA-256", await file.arrayBuffer());
+    return [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return null;
+  }
 }
 
 export async function createMediaSignedUrl(

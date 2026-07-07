@@ -77,6 +77,7 @@ const QuestionnaireTab = ({ onVerifyDocument, onAddRemark }: any) => {
         <div>
           <div className="text-[11px] text-white/50 uppercase tracking-wider font-medium mb-1.5">Заявитель</div>
           <select 
+            aria-label="Заявитель"
             value={applicant}
             onChange={(e) => setApplicant(e.target.value)}
             className="h-10 w-full sm:w-[240px] bg-[#1e1e21] border border-[#242529] rounded-xl px-3 text-[13px] text-white outline-none focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30"
@@ -244,6 +245,7 @@ export function AdminReviewDrawer({
                 </div>
                 
                 <button 
+                  aria-label="Закрыть проверку"
                   onClick={onClose}
                   className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded-xl transition-colors border border-white/5 hover:border-white/10 focus-visible:ring-2 focus-visible:ring-[#3a45b4] outline-none"
                 >

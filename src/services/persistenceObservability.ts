@@ -15,6 +15,11 @@ export type SupabasePersistenceOperation =
   | "applicants.list"
   | "questionnaire_answers.list"
   | "media_assets.list"
+  | "document_assets.get_applicant_documents"
+  | "document_assets.get_ready_for_export"
+  | "document_assets.save"
+  | "document_assets.mark_exported"
+  | "document_export_events.insert"
   | "corrections.list"
   | "appointments.list"
   | "export_batches.insert"
@@ -67,7 +72,8 @@ interface SupabaseErrorShape {
 
 const userMessages: Record<PersistenceFailureKind, string> = {
   auth: "Unable to sign in. Check email, password, and Supabase profile.",
-  database: "Supabase data could not be loaded. No private details were exposed.",
+  database:
+    "Supabase data could not be loaded. No private details were exposed.",
   rls: "Access was denied by Supabase policy. Ask an operator to confirm access.",
   rpc: "Supabase could not complete the save request. Try again after reload.",
   save: "Remote save failed. Last saved Supabase data was reloaded.",
@@ -179,7 +185,11 @@ function safeCodeFor(
 ): string {
   const code =
     supabaseCode ??
-    (status ? `HTTP_${status}` : networkOrTimeoutFailure ? "NETWORK" : "UNKNOWN");
+    (status
+      ? `HTTP_${status}`
+      : networkOrTimeoutFailure
+        ? "NETWORK"
+        : "UNKNOWN");
   return `${operation}:${kind}:${code}`;
 }
 

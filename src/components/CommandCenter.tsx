@@ -184,6 +184,9 @@ export function CommandCenter({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [actionSummaryFilter, setActionSummaryFilter] = useState<ActionSummaryFilter>('open');
   const [searchQuery, setSearchQuery] = useState('');
+  const [settingsDigest, setSettingsDigest] = useState<'instant' | 'daily'>('instant');
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
   const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() => loadProductIntakeDrafts());
 
   const canonicalRows = useMemo(() => listItemsFromSubmissions(canonicalSubmissions), [canonicalSubmissions]);
@@ -288,6 +291,7 @@ export function CommandCenter({
 
   const renderNavButton = (section: LegacyAgentNavSection, icon: ReactNode, count?: number, warning?: boolean) => (
     <button
+      aria-label={navLabel(normalizeAgentNav(section))}
       onClick={() => navigateTo(section)}
       className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${activeNav === section ? 'bg-[#27272b] text-white' : 'hover:bg-white/5 text-white/70 hover:text-white'}`}
     >
@@ -298,12 +302,12 @@ export function CommandCenter({
     </button>
   );
 
-  const actionStatusTagClass = (action: AgentActionItem) => {
-    if (action.severity === 'blocker') return 'border-[#d59aa3]/30 bg-[#d59aa3]/10 text-[#e3b5bd]';
-    if (action.severity === 'warning') return 'border-[#f59e0b]/25 bg-[#f59e0b]/10 text-[#f3c97a]';
-    if (action.severity === 'ready') return 'border-[#34d399]/25 bg-[#34d399]/10 text-[#8fe6c0]';
-    return 'border-[#8fa3ff]/22 bg-[#8fa3ff]/10 text-[#b8baff]';
-  };
+  const actionStatusTagClass = (action: AgentActionItem) => `tone-${action.severity}`;
+
+  const actionPeopleLabel = (action: AgentActionItem) =>
+    action.submission.type === 'family'
+      ? `${action.submission.applicants.length} чел.`
+      : '';
 
   const renderNavContent = () => (
     <>
@@ -371,8 +375,12 @@ export function CommandCenter({
   );
 
   const renderActionsList = () => (
-    <div className="space-y-4 lg:space-y-6">
-      <V19SummaryTileGrid>
+    <section
+      aria-label="Мои действия"
+      className="v19-legacy-actions-screen"
+      data-testid="agent-actions-screen"
+    >
+      <V19SummaryTileGrid className="v19-legacy-actions-summary">
         <V19SummaryTile
           active={actionSummaryFilter === 'open'}
           detail="в работе"
@@ -411,23 +419,25 @@ export function CommandCenter({
         />
       </V19SummaryTileGrid>
 
-      <div className="flex items-center gap-2">
-        <div className="relative w-full sm:w-[320px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+      <div className="v19-legacy-actions-searchbar">
+        <div className="v19-legacy-actions-search-field">
+          <Search className="v19-legacy-actions-search-icon" />
           <input
+            aria-label="Поиск по действиям"
+            className="v19-legacy-actions-search-input"
+            data-testid="agent-action-search"
             type="text"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.currentTarget.value)}
             placeholder="Поиск по действиям..."
-            className="w-full h-10 bg-[#1e1e21] border border-[#242529] rounded-[10px] pl-9 pr-3 text-sm text-white placeholder-white/40 focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none"
           />
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="v19-legacy-actions-list">
         <AnimatePresence mode="popLayout">
           {visibleActions.length === 0 ? (
-            <motion.div key="empty-actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-[15px] border border-dashed border-[#242529] bg-[#161617] p-8 text-center text-sm text-white/45">
+            <motion.div key="empty-actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="v19-legacy-actions-empty">
               Нет открытых действий по текущим подачам.
             </motion.div>
           ) : (
@@ -447,35 +457,51 @@ export function CommandCenter({
                     handleActionOpen(action);
                   }
                 }}
-                className="min-h-[104px] p-4 border rounded-[15px] cursor-pointer transition-all flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] bg-gradient-to-b from-[#161617] to-[#0e0e10] border-[#242529] hover:border-[#2e2f34] hover:from-[#1a1a1d] shadow-[inset_0_1px_0_rgba(255,255,255,0.026)]"
+                className={`v19-legacy-action-row severity-${action.severity}`}
+                data-testid="agent-action-row"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="text-[14.5px] font-semibold text-white truncate leading-snug">{action.title}</div>
-                    <span className="rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/45">{action.submission.id}</span>
+                <div className="v19-legacy-action-main">
+                  <div className="v19-legacy-action-title-line">
+                    <strong className="v19-legacy-action-title">{action.title}</strong>
+                    <span className="v19-legacy-action-id">{action.submission.id}</span>
                   </div>
-                  <div className="text-[11px] text-white/40 mt-1 truncate">{action.context}</div>
+                  <span className="v19-legacy-action-context">{action.context}</span>
                 </div>
-                <div className="lg:w-[190px] shrink-0 lg:border-l border-[#202124] lg:pl-4">
-                  <span className={`inline-flex max-w-full items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${actionStatusTagClass(action)}`}>
+                <div className="v19-legacy-action-meta">
+                  <span
+                    className={`v19-legacy-action-status ${actionStatusTagClass(action)}`}
+                    data-testid="agent-action-status"
+                  >
                     <span className="truncate">{action.dueLabel}</span>
                   </span>
-                  <div className="text-[10.5px] text-white/40 mt-0.5">{action.submission.city}</div>
+                  <span className="v19-legacy-action-city">
+                    <span aria-hidden="true" />
+                    {action.submission.city}
+                  </span>
                 </div>
-                <div className="hidden lg:flex min-w-[160px] shrink-0 items-center gap-1.5">
+                <div className="v19-legacy-action-badges">
                   {action.badges.slice(0, 2).map((badge) => (
-                    <span key={`${action.id}-${badge.label}`} className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10.5px] font-medium uppercase tracking-wide text-white/62">
+                    <span
+                      key={`${action.id}-${badge.label}`}
+                      className="v19-legacy-action-badge is-desktop-badge"
+                    >
                       {badge.label}
                     </span>
                   ))}
+                  {actionPeopleLabel(action) ? (
+                    <span className="v19-legacy-action-badge is-people-badge">
+                      {actionPeopleLabel(action)}
+                    </span>
+                  ) : null}
                 </div>
-                <div className="lg:w-[180px] shrink-0 flex items-center justify-end lg:justify-center mt-2 lg:mt-0">
+                <div className="v19-legacy-action-cta-wrap">
                   <button
+                    className="v19-legacy-action-cta"
+                    data-testid="agent-action-cta"
                     onClick={(event) => {
                       event.stopPropagation();
                       handleActionOpen(action);
                     }}
-                    className="h-10 px-4 w-full lg:w-auto bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] text-sm text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                   >
                     {action.cta}
                   </button>
@@ -485,22 +511,81 @@ export function CommandCenter({
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </section>
   );
 
   const renderSettings = () => (
-    <div className="rounded-2xl border border-[#242529] bg-[#161617] p-6 max-w-3xl">
-      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62 mb-4">
-        <Settings className="w-3.5 h-3.5" /> Canonical V19
+    <section
+      aria-labelledby="agent-settings-title"
+      className="grid max-w-3xl gap-5 rounded-2xl border border-[#242529] bg-[#161617] p-6"
+    >
+      <div>
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
+          <Settings className="w-3.5 h-3.5" /> Canonical V19
+        </div>
+        <h2
+          className="m-0 text-[24px] font-semibold tracking-tight text-white"
+          id="agent-settings-title"
+        >
+          Настройки рабочего места
+        </h2>
+        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/60">
+          Основные параметры рабочего места агента сохраняются в этом контуре.
+        </p>
       </div>
-      <h2 className="text-[24px] font-semibold text-white tracking-tight">Настройки рабочего места</h2>
-      <p className="mt-2 text-[13px] leading-relaxed text-white/50">
-        Этот экран оставлен как compatibility entry. Основные настройки, доступы и Supabase-профиль ведутся в canonical Settings surface.
-      </p>
-      <button onClick={onNavigateSettings} className="mt-5 h-10 px-4 rounded-xl bg-[#6f64ff] hover:bg-[#4855d4] text-[13px] font-semibold text-white transition-colors">
-        Открыть canonical настройки
-      </button>
-    </div>
+
+      <label className="grid max-w-sm gap-2">
+        <h2 className="m-0 text-[18px] font-semibold text-white">Уведомления</h2>
+        <span className="text-[13px] font-semibold text-white">Сводка по действиям</span>
+        <select
+          aria-label="Сводка по действиям"
+          className="h-10 rounded-[10px] border border-[#242529] bg-[#1e1e21] px-3 text-[13px] font-medium text-white outline-none focus:border-[#6f64ff]/55"
+          value={settingsDigest}
+          onChange={(event) => {
+            setSettingsDigest(event.currentTarget.value as 'instant' | 'daily');
+            setSettingsDirty(true);
+            setSettingsSaved(false);
+          }}
+        >
+          <option value="instant">Сразу</option>
+          <option value="daily">Раз в день</option>
+        </select>
+      </label>
+
+      <label className="flex max-w-sm items-center justify-between gap-3 rounded-[12px] border border-[#242529] bg-[#1e1e21] p-3">
+        <span className="text-[13px] font-semibold text-white">Возврат подачи</span>
+        <input
+          aria-label="Возврат подачи"
+          className="h-5 w-9 accent-[#3a45b4]"
+          defaultChecked
+          role="switch"
+          type="checkbox"
+        />
+      </label>
+
+      {settingsDirty ? (
+        <div
+          className="flex flex-col gap-3 rounded-[12px] border border-[#3b321d] bg-[#221d13] p-4 text-[13px] font-medium text-[#f6c66b] sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <span>Есть несохранённые изменения</span>
+          <button
+            className="h-10 rounded-[10px] border border-[#4450c5] bg-[#3a45b4] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#4855d4]"
+            type="button"
+            onClick={() => {
+              setSettingsDirty(false);
+              setSettingsSaved(true);
+            }}
+          >
+            Сохранить
+          </button>
+        </div>
+      ) : (
+        <div className="text-[13px] font-medium text-white/60" role="status">
+          {settingsSaved ? 'Настройки сохранены' : 'Изменений нет'}
+        </div>
+      )}
+    </section>
   );
 
   const title = navLabel(activeNav);
@@ -546,7 +631,11 @@ export function CommandCenter({
             <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight text-white m-0 leading-none">{title}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={createPackage} className="h-[36px] lg:h-10 px-3.5 bg-[#6f64ff] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            <button
+              aria-label="Новая подача"
+              onClick={createPackage}
+              className="h-[36px] lg:h-10 px-3.5 bg-[#3a45b4] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Создать пакет</span>
             </button>
