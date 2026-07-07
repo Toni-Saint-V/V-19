@@ -21025,15 +21025,33 @@ body,
 
 .vf-figma-questionnaire-screen .v19-questionnaire-screen-header > div:last-child {
   font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
 }
 
 .vf-figma-questionnaire-screen .v19-questionnaire-applicant-bar > div:last-child {
   font-size: var(--v19b-size-14) !important;
+  font-weight: var(--v19b-weight-control) !important;
 }
 
 .vf-figma-questionnaire-screen .v19-readiness-score-row strong,
 .vf-figma-questionnaire-screen .v19-questionnaire-readiness-score-row strong {
-  font-size: var(--v19b-size-24) !important;
+  font-size: var(--v19b-size-20) !important;
+  font-weight: var(--v19b-weight-title) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-readiness-score-row span,
+.vf-figma-questionnaire-screen .v19-questionnaire-readiness-score-row span {
+  font-size: var(--v19b-size-12) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-readiness-card p {
+  font-size: var(--v19b-size-10) !important;
+  font-weight: var(--v19b-weight-control) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-search-field input {
+  font-size: var(--v19b-size-12) !important;
+  font-weight: var(--v19b-weight-control) !important;
 }
 
 .vf-figma-questionnaire-screen
@@ -21049,6 +21067,7 @@ body,
 
 .vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label,
 .vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label .flex-1 {
+  color: #817e7e !important;
   font-size: var(--v19b-size-13) !important;
   font-weight: var(--v19b-weight-control) !important;
 }

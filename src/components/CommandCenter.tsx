@@ -15,6 +15,7 @@ import { QuestionnaireScreen } from './QuestionnaireScreen';
 import { ApplicantsScreen } from './ApplicantsScreen';
 import { DraftsScreen } from './DraftsScreen';
 import { PreUploadScreen } from './PreUploadScreen';
+import visaflowLogo from '../assets/visaflow-logo.png';
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
@@ -284,7 +285,11 @@ export function CommandCenter({
   const renderNavContent = () => (
     <>
       <div className="flex items-center gap-2.5 px-2 pb-4 mb-2">
-        <div className="w-8 h-8 rounded-lg bg-white text-[#0a0a0b] flex items-center justify-center font-bold text-sm">V</div>
+        <img
+          src={visaflowLogo}
+          alt="VisaFlow"
+          className="h-8 w-8 shrink-0 rounded-lg object-cover"
+        />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold tracking-tight">VisaFlow V-19</div>
           <div className="text-[11px] text-white/50">Agent workspace</div>

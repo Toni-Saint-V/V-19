@@ -892,7 +892,7 @@ const focusableQuestionnaireFields: FocusableQuestionnaireField[] = [
   {
     fieldId: "passport-type",
     formKey: "passportType",
-    labels: ["Тип паспорта", "Тип проездного документа"],
+    labels: ["Тип паспорта", "Тип документа", "Тип проездного документа"],
     sectionId: "passport",
   },
   {
@@ -1021,10 +1021,32 @@ function sameFieldLabel(left?: string, right?: string) {
 const questionnaireFieldLabelAliases: Record<string, string[]> = {
   "birth-date": ["Дата рождения"],
   "birth-place": ["Место рождения"],
+  "company-contact-person": ["Контакт компании"],
+  "company-org-details": ["Компания и адрес"],
+  "cost-covered-by": ["Кто оплачивает"],
+  "employer-address": ["Адрес работодателя"],
+  "employer-contact": ["Телефон работодателя"],
+  "employer-name": ["Работа / учеба"],
+  "eu-relative-details": ["Родственник ЕС / ЕЭЗ"],
+  "final-entry-permit": ["Разрешение на въезд"],
+  "form-filler-contact": ["Адрес или email"],
+  "form-filler-name": ["Кто заполнил"],
+  "guardian-info": ["Родитель / опекун"],
+  "hotel-name": ["Отель / приглашающий"],
+  "inviting-party-type": ["Принимающая сторона"],
+  "lives-outside-citizenship": ["Живет не в стране гражданства"],
+  "main-destination": ["Страна назначения"],
   "passport-expiry-date": ["Дата окончания паспорта", "Действителен до"],
   "passport-issue-date": ["Дата выдачи паспорта", "Дата выдачи"],
+  "passport-issue-country": ["Страна выдачи паспорта"],
   "passport-no": ["Номер паспорта"],
   "passport-type": ["Тип паспорта", "Тип документа", "Тип проездного документа"],
+  "previous-biometrics": ["Биометрия уже сдавалась"],
+  "previous-biometrics-date": ["Дата биометрии"],
+  "previous-surname": ["Прежняя фамилия"],
+  "residence-permit-type": ["ВНЖ / документ"],
+  "sponsor-in-host-fields": ["Спонсор из 30/31"],
+  "stay-purpose-details": ["Уточнение цели"],
 };
 
 function issueFieldMatches(fieldId: string, label: string, target?: string) {
@@ -1463,7 +1485,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: category"
-            label="Категория"
+            label="Категория обслуживания"
             number="A3"
             options={selectOptions.category}
             required
@@ -1506,14 +1528,14 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: C2"
-            errorMessage={fieldErrorMessage("passport-type", "Тип проездного документа")}
-            focused={fieldReviewState("passport-type", "Тип проездного документа") === "needs_review"}
-            label="Тип проездного документа"
-            number="12"
+            errorMessage={fieldErrorMessage("passport-type", "Тип документа")}
+            focused={fieldReviewState("passport-type", "Тип документа") === "needs_review"}
+            label="Тип документа"
+            number="1"
             options={selectOptions.passportType}
             required
-            reviewSource={fieldReviewSource("passport-type", "Тип проездного документа")}
-            state={fieldReviewState("passport-type", "Тип проездного документа")}
+            reviewSource={fieldReviewSource("passport-type", "Тип документа")}
+            state={fieldReviewState("passport-type", "Тип документа")}
             value={formData.passportType}
             onChange={(value) => updateField("passportType", value)}
           />
@@ -1522,7 +1544,7 @@ export function FigmaQuestionnaireScreen({
             errorMessage={fieldErrorMessage("passport-no", "Номер паспорта")}
             focused={fieldReviewState("passport-no", "Номер паспорта") === "needs_review"}
             label="Номер паспорта"
-            number="13"
+            number="2"
             required
             reviewSource={fieldReviewSource("passport-no", "Номер паспорта")}
             state={fieldReviewState("passport-no", "Номер паспорта")}
@@ -1555,7 +1577,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: passport-issue-country"
-            label="Страна выдачи паспорта"
+            label="Страна выдачи"
             number="5"
             options={selectOptions.passportIssueCountry}
             value={formData.passportIssueCountry}
@@ -1578,7 +1600,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: eu-relative-details"
             fullWidth
-            label="Родственник ЕС / ЕЭЗ"
+            label="Данные родственника-гражданина ЕС / ЕЭЗ / Швейцарии"
             number="1"
             type="textarea"
             value={formData.euRelativeDetails}
@@ -1649,7 +1671,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: lives-outside-citizenship"
-            label="Живет не в стране гражданства"
+            label="Проживание не в стране гражданства"
             number="7"
             options={selectOptions.yesNo}
             value={formData.livesOutsideCitizenship}
@@ -1657,7 +1679,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: residence-permit-type"
-            label="ВНЖ / документ"
+            label="Вид на жительство / документ"
             number="8"
             value={formData.residencePermitType}
             onChange={(value) => updateField("residencePermitType", value)}
@@ -1705,7 +1727,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: E3"
             fullWidth
-            label="Работа / учеба"
+            label="Работодатель / учебное заведение"
             number="3"
             required
             type="textarea"
@@ -1714,7 +1736,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: employer-contact"
-            label="Телефон работодателя"
+            label="Телефон работодателя / учебного заведения"
             number="4"
             value={formData.employerContact}
             onChange={(value) => updateField("employerContact", value)}
@@ -1722,7 +1744,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: E4"
             fullWidth
-            label="Адрес работодателя"
+            label="Адрес работодателя / учебного заведения"
             number="5"
             type="textarea"
             value={formData.employerAddress}
@@ -1747,7 +1769,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: stay-purpose-details"
             fullWidth
-            label="Уточнение цели"
+            label="Дополнительные сведения о цели"
             number="2"
             type="textarea"
             value={formData.stayPurposeDetails}
@@ -1755,7 +1777,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: main-destination"
-            label="Страна назначения"
+            label="Основная страна назначения"
             number="3"
             options={selectOptions.country}
             value={formData.mainDestination}
@@ -1811,7 +1833,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: previous-biometrics"
-            label="Биометрия уже сдавалась"
+            label="Отпечатки ранее сдавались"
             number="9"
             options={selectOptions.yesNo}
             value={formData.previousBiometrics}
@@ -1819,7 +1841,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: previous-biometrics-date"
-            label="Дата биометрии"
+            label="Дата сдачи отпечатков"
             number="10"
             value={formData.previousBiometricsDate}
             onChange={(value) => updateField("previousBiometricsDate", value)}
@@ -1833,7 +1855,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: final-entry-permit"
-            label="Разрешение на въезд"
+            label="Разрешение на въезд в конечную страну"
             number="12"
             value={formData.finalEntryPermit}
             onChange={(value) => updateField("finalEntryPermit", value)}
@@ -1869,7 +1891,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: inviting-party-type"
             fullWidth
-            label="Принимающая сторона"
+            label="Тип принимающей стороны"
             number="1"
             options={selectOptions.invitingPartyType}
             value={formData.invitingPartyType}
@@ -1877,7 +1899,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Cell: G2"
-            label="Отель / приглашающий"
+            label="ФИО приглашающего лица или название отеля"
             number="2"
             required
             value={formData.hotelName}
@@ -1909,7 +1931,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: company-org-details"
             fullWidth
-            label="Компания и адрес"
+            label="Название и адрес компании/организации"
             number="6"
             type="textarea"
             value={formData.companyOrgDetails}
@@ -1918,7 +1940,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: company-contact-person"
             fullWidth
-            label="Контакт компании"
+            label="Контактное лицо компании"
             number="7"
             type="textarea"
             value={formData.companyContactPerson}
@@ -1940,7 +1962,7 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: H2"
-            label="Кто оплачивает"
+            label="Кто оплачивает поездку"
             number="1"
             options={selectOptions.costCoveredBy}
             required
@@ -1958,7 +1980,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Анкета: sponsor-in-host-fields"
-            label="Спонсор из 30/31"
+            label="Спонсор указан в полях 30/31"
             number="3"
             options={selectOptions.sponsorInHostFields}
             value={formData.sponsorInHostFields}
@@ -1989,7 +2011,7 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Анкета: form-filler-name"
-            label="Кто заполнил"
+            label="ФИО заполнившего, если не заявитель"
             number="1"
             value={formData.formFillerName}
             onChange={(value) => updateField("formFillerName", value)}
@@ -1997,7 +2019,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: form-filler-contact"
             fullWidth
-            label="Адрес или email"
+            label="Адрес/email заполнившего"
             number="2"
             type="textarea"
             value={formData.formFillerContact}
@@ -2027,7 +2049,7 @@ export function FigmaQuestionnaireScreen({
         />
         <FormField
           excelMap="Анкета: previous-surname"
-          label="Прежняя фамилия"
+          label="Фамилия при рождении / предыдущая"
           number="2"
           value={formData.previousSurname}
           onChange={(value) => updateField("previousSurname", value)}
@@ -2081,7 +2103,7 @@ export function FigmaQuestionnaireScreen({
         />
         <FormField
           excelMap="Анкета: birth-citizenship"
-          label="Гражданство при рождении"
+          label="Гражданство при рождении, если отличается"
           number="8"
           options={selectOptions.birthCitizenship}
           value={formData.birthCitizenship}
@@ -2117,7 +2139,7 @@ export function FigmaQuestionnaireScreen({
         <FormField
           excelMap="Анкета: guardian-info"
           fullWidth
-          label="Родитель / опекун"
+          label="Родитель/опекун несовершеннолетнего"
           number="12"
           type="textarea"
           value={formData.guardianInfo}
