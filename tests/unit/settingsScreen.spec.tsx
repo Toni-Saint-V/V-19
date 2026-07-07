@@ -64,7 +64,7 @@ describe("SettingsScreen", () => {
     });
 
     expect(sections).toHaveTextContent("Профиль");
-    expect(sections).toHaveTextContent("Заявки на доступ");
+    expect(sections).toHaveTextContent("Входящие заявки на регистрацию");
     expect(sections).toHaveTextContent("Команда и роли");
     expect(sections).toHaveTextContent("Уведомления");
     expect(sections).toHaveTextContent("Выгрузка");
@@ -72,7 +72,7 @@ describe("SettingsScreen", () => {
     expect(screen.getByRole("heading", { name: "Уведомления" })).toBeVisible();
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Заявки на доступ/ }),
+      screen.getByRole("button", { name: /Входящие заявки на регистрацию/ }),
     );
 
     expect(screen.getByRole("heading", { name: "Заявки на доступ" })).toBeVisible();
@@ -106,7 +106,7 @@ describe("SettingsScreen", () => {
   test("renders admin access requests and fires review actions", () => {
     const props = renderSettings({ accessRequests: sampleAccessRequests });
     const accessRequestNavButton = screen.getByRole("button", {
-      name: /Заявки на доступ/,
+      name: /Входящие заявки на регистрацию/,
     });
 
     fireEvent.click(accessRequestNavButton);

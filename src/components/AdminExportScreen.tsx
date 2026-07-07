@@ -176,11 +176,12 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
       const [
         {
           createExportWorkbookArtifact,
-          verifyExportWorkbookArtifact,
         },
+        { verifyExportWorkbookArtifact },
         { prepareExportMediaZip, downloadPreparedExportMediaZip },
       ] = await Promise.all([
         import('../modules/submissions/exportWorkbook'),
+        import('../modules/submissions/exportWorkbookVerification'),
         import('../modules/submissions/exportMediaZip'),
       ]);
       const generated = applyExportStateToSelection(

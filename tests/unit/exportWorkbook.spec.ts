@@ -12,9 +12,11 @@ import {
   buildExportWorkbookRows,
   createExportWorkbookArtifact,
   default as downloadExportWorkbook,
+} from "../../src/modules/submissions/exportWorkbook";
+import {
   parseExportWorkbookArtifact,
   verifyExportWorkbookArtifact,
-} from "../../src/modules/submissions/exportWorkbook";
+} from "../../src/modules/submissions/exportWorkbookVerification";
 import {
   buildExportContractRows,
   EXPORT_WORKBOOK_COLUMN_COUNT,

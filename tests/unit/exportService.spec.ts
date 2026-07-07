@@ -11,7 +11,7 @@ import {
   EXPECTED_EXPORT_CONTRACT_HEADERS,
   exportContractHeaders,
 } from "../../src/modules/submissions/exportContract";
-import { parseExportWorkbookArtifact } from "../../src/modules/submissions/exportWorkbook";
+import { parseExportWorkbookArtifact } from "../../src/modules/submissions/exportWorkbookVerification";
 import type { Applicant, ExportBatch, Submission } from "../../src/types/domain";
 
 const createdAt = "2026-06-16T06:30:00.000Z";
