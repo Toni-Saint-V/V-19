@@ -27,7 +27,6 @@ import {
 import {
   applySubmissionActionResult,
   canPerformAction,
-  markSubmissionIssueFixedResult,
   transitionMatrix,
 } from "../../src/modules/submissions/status";
 import type {
@@ -205,13 +204,7 @@ describe("V-19 business click contract", () => {
     if (!fileToReplace) throw new Error("Missing issue target file.");
 
     const fixedFile = uploadRequiredFile(returned.data, fileToReplace.id);
-    const fixed = markSubmissionIssueFixedResult(
-      fixedFile,
-      returned.data.issues[0]?.id ?? "",
-      "agent",
-    );
-    expect(fixed.ok).toBe(true);
-    if (fixed.ok) expect(fixed.data.issues[0]?.status).toBe("fixed_by_agent");
+    expect(fixedFile.issues[0]?.status).toBe("fixed_by_agent");
 
     const reviewedFile = markSubmissionFileAccepted(submitted, {
       applicantId: submitted.applicants[0]?.id ?? "",

@@ -22,7 +22,11 @@ import {
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
   applySubmissionAction,
+  canAdminApproveForExport,
+  canAgentSubmitForReview,
   canPerformAction,
+  hasRequiredDocuments,
+  transitionSubmissionStatus,
 } from "../../src/modules/submissions/status";
 import type {
   CommandResult,
@@ -379,6 +383,124 @@ describe("V-19 domain engine", () => {
       disabled: true,
       label: "Отправить",
       reason: "Укажите даты поездки перед отправкой",
+    });
+  });
+
+  it("uses typed status transition helper for allowed draft to in_progress", () => {
+    const draft = unwrap(
+      createDraft({
+        city: "Москва",
+        familyCount: 1,
+        submissions: [],
+        type: "single",
+      }),
+    );
+
+    const transitioned = unwrap(
+      transitionSubmissionStatus(draft, {
+        actorId: "agent-typed",
+        actorRole: "agent",
+        nextStatus: "in_progress",
+        source: "agent",
+      }),
+    );
+
+    expect(transitioned.status).toBe("in_progress");
+    expect(transitioned.history[0]).toMatchObject({
+      actorId: "agent-typed",
+      createdAt: "сейчас",
+      fromStatus: "draft",
+      source: "agent",
+      toStatus: "in_progress",
+    });
+  });
+
+  it("rejects forbidden role and direct status transitions", () => {
+    const ready = completeInProgressSubmission();
+
+    expect(
+      transitionSubmissionStatus(ready, {
+        actorRole: "agent",
+        nextStatus: "ready_for_export",
+        source: "agent",
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "INVALID_TRANSITION" },
+    });
+    expect(
+      transitionSubmissionStatus(ready, {
+        actorRole: "admin",
+        nextStatus: "exported",
+        source: "admin",
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "INVALID_TRANSITION" },
+    });
+  });
+
+  it("blocks review/export transitions on bad required documents and open issues", () => {
+    const ready = completeInProgressSubmission();
+    const badFile = {
+      ...ready,
+      files: ready.files.map((file, index) =>
+        index === 0
+          ? {
+              ...file,
+              reviewStatus: "replace_required" as const,
+              status: "needs_replacement" as const,
+            }
+          : file,
+      ),
+    };
+
+    expect(hasRequiredDocuments(badFile)).toBe(false);
+    expect(canAgentSubmitForReview(badFile)).toBe(false);
+
+    const submittedWithIssue = {
+      ...ready,
+      issues: [
+        {
+          ...firstIssueInput(ready),
+          createdAt: "сейчас",
+          createdBy: "admin" as const,
+          id: "open-warning",
+          severity: "warning" as const,
+          status: "open" as const,
+          target: {
+            applicantId: ready.applicants[0]?.id ?? "",
+            applicantName: ready.applicants[0]?.fullName ?? "",
+            field: "Маршрут поездки",
+            section: "Анкета",
+          },
+        },
+      ],
+      status: "submitted_for_review" as const,
+    };
+
+    expect(canAdminApproveForExport(submittedWithIssue)).toBe(false);
+    expect(acceptSubmission(submittedWithIssue, "admin")).toMatchObject({
+      ok: false,
+      error: { code: "ACCEPTANCE_BLOCKED" },
+    });
+  });
+
+  it("keeps exported terminal in the shared transition helper", () => {
+    const exported = byId("ПД-1057");
+
+    expect(
+      transitionSubmissionStatus(exported, {
+        actorRole: "admin",
+        nextStatus: "returned",
+        source: "admin",
+      }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Exported is terminal for V-19.",
+      },
     });
   });
 });

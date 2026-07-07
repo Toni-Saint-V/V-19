@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ShieldCheck, DownloadCloud, Settings, 
-  Users, Menu, X, SlidersHorizontal, ArrowLeftRight
+import {
+  ShieldCheck, DownloadCloud, Settings,
+  Users, Menu, X, ArrowLeftRight
 } from 'lucide-react';
 import { ReviewScreen } from './AdminScreens';
 import { AdminExportScreen } from './AdminExportScreen';
 import { ReviewWorkspace } from './ReviewWorkspace';
 import { AdminReviewDrawer } from './AdminReviewDrawer';
 import { RemarkForm } from './RemarkForm';
+import SettingsScreen from '../modules/submissions/pages/SettingsScreen';
+import visaflowLogo from '../assets/visaflow-logo.png';
+import type { AccessRequest } from '../shared/authRegistration';
+import type { Submission } from '../modules/submissions/types';
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
@@ -18,12 +22,31 @@ import {
 type AdminNavSection = BridgeAdminNavSection | 'users';
 type AdminViewState = 'main' | 'review_workspace';
 
-export function AdminWorkspace({ onSwitchWorkspace }: { onSwitchWorkspace: () => void }) {
+export function AdminWorkspace({
+  accessRequests = [],
+  accessRequestsBusy = false,
+  currentEmail = '',
+  onApproveAccessRequest = () => undefined,
+  onRejectAccessRequest = () => undefined,
+  onSignOut,
+  onSwitchWorkspace,
+  submissions,
+}: {
+  accessRequests?: AccessRequest[];
+  accessRequestsBusy?: boolean;
+  currentEmail?: string;
+  onApproveAccessRequest?: (requestId: string) => void;
+  onRejectAccessRequest?: (requestId: string) => void;
+  onSignOut: () => void | Promise<void>;
+  onSwitchWorkspace?: () => void;
+  submissions?: Submission[];
+}) {
   const bridge = useVisaflowBusinessBridge();
   const [activeNav, setActiveNav] = useState<AdminNavSection>('review');
   const [currentView, setCurrentView] = useState<AdminViewState>('main');
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   
   // Drawer & Form State
   const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
@@ -72,15 +95,19 @@ export function AdminWorkspace({ onSwitchWorkspace }: { onSwitchWorkspace: () =>
     }
     setActiveNav(nav);
     setMobileNavOpen(false);
+    setUserMenuOpen(false);
   };
 
   const renderNavContent = () => (
     <>
       <div className="flex items-center gap-2.5 px-2 pb-4 mb-2 border-b border-[#242529]">
-        <div className="w-8 h-8 rounded-lg bg-[#24242a] text-white flex items-center justify-center font-bold text-sm shadow-[0_0_24px_rgba(111,100,255,0.10)]">A</div>
+        <img
+          src={visaflowLogo}
+          alt="VisaFlow"
+          className="h-8 w-8 rounded-lg object-cover shadow-[0_0_24px_rgba(111,100,255,0.10)]"
+        />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold tracking-tight">VisaFlow V-19</div>
-          <div className="text-[11px] text-white/62 font-medium">Admin Zone</div>
         </div>
         <button onClick={() => setMobileNavOpen(false)} className="md:hidden p-2 text-white/50 hover:text-white">
           <X className="w-5 h-5" />
@@ -90,11 +117,11 @@ export function AdminWorkspace({ onSwitchWorkspace }: { onSwitchWorkspace: () =>
       <div className="flex-1 overflow-y-auto px-2 py-4 space-y-5 scrollbar-hide">
         <nav className="space-y-0.5">
           <div className="px-2 pb-1 text-[11px] text-white/40 font-medium tracking-wide uppercase">Очередь</div>
-          <button onClick={() => navigateTo('review')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[6px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'review' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button onClick={() => navigateTo('review')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'review' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <ShieldCheck className="w-4 h-4 text-white/55" /> <span className="flex-1 text-left">Проверка</span>
             <span className="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-white/62 text-[11px] font-medium">2</span>
           </button>
-          <button onClick={() => navigateTo('export')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'export' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button onClick={() => navigateTo('export')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'export' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <DownloadCloud className="w-4 h-4 text-[#b8baff]/75" /> <span className="flex-1 text-left">Выгрузка</span>
             <span className="px-1.5 py-0.5 rounded-md bg-white/[0.06] text-[#b8baff] text-[11px] font-medium">3</span>
           </button>
@@ -102,23 +129,32 @@ export function AdminWorkspace({ onSwitchWorkspace }: { onSwitchWorkspace: () =>
 
         <nav className="space-y-0.5">
           <div className="px-2 pb-1 text-[11px] text-white/40 font-medium tracking-wide uppercase">Система</div>
-          <button onClick={() => navigateTo('users')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'users' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button onClick={() => navigateTo('users')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'users' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <Users className="w-4 h-4" /> <span className="flex-1 text-left">Пользователи</span>
           </button>
-          <button onClick={() => navigateTo('settings')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'settings' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
+          <button onClick={() => navigateTo('settings')} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === 'settings' ? 'bg-[#27272b] text-white border border-[#2e2f34]' : 'hover:bg-white/5 text-white/70 hover:text-white border border-transparent'}`}>
             <Settings className="w-4 h-4" /> <span className="flex-1 text-left">Настройки</span>
           </button>
         </nav>
       </div>
 
       <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
-        <button 
-          onClick={onSwitchWorkspace}
-          className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-        >
-          <ArrowLeftRight className="w-4 h-4 text-white/50" />
-          В агентскую зону
-        </button>
+        {onSwitchWorkspace ? (
+          <button
+            onClick={onSwitchWorkspace}
+            aria-label="В агентскую зону"
+            className="w-full h-12 px-3 bg-transparent hover:bg-white/[0.04] border border-[#242529] rounded-xl text-left transition-colors flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#27272b] text-[11px] font-semibold text-white/80">
+              АД
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium text-white">Алексей Дмитриев</span>
+              <span className="block truncate text-[10.5px] font-medium text-white/42">Администратор</span>
+            </span>
+            <ArrowLeftRight className="w-4 h-4 shrink-0 text-white/42" />
+          </button>
+        ) : null}
       </div>
     </>
   );
@@ -190,10 +226,38 @@ export function AdminWorkspace({ onSwitchWorkspace }: { onSwitchWorkspace: () =>
               {getPageTitle()}
             </h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-medium text-white/70 shadow-inner">
+          <div className="relative ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Профиль администратора"
+              aria-expanded={userMenuOpen}
+              onClick={() => setUserMenuOpen((open) => !open)}
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-medium text-white/70 shadow-inner transition-colors hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+            >
               АД
-            </div>
+            </button>
+            <AnimatePresence>
+              {userMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 top-10 z-30 w-36 rounded-[8px] border border-[#242529] bg-[#1a1a1d] p-1 shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      void onSignOut();
+                    }}
+                    className="w-full rounded-[6px] px-3 py-2 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+                  >
+                    Выйти
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </header>
 
@@ -201,7 +265,7 @@ export function AdminWorkspace({ onSwitchWorkspace }: { onSwitchWorkspace: () =>
         <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           <div className="max-w-[1460px] mx-auto h-full">
             {activeNav === 'review' && <ReviewScreen onOpenDrawer={handleOpenReviewDrawer} />}
-            {activeNav === 'export' && <AdminExportScreen />}
+            {activeNav === 'export' && <AdminExportScreen submissions={submissions} />}
             {activeNav === 'users' && (
               <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-[#242529] rounded-2xl bg-[#161617]">
                 <Users className="w-10 h-10 text-white/20 mb-4" />
@@ -210,11 +274,25 @@ export function AdminWorkspace({ onSwitchWorkspace }: { onSwitchWorkspace: () =>
               </div>
             )}
             {activeNav === 'settings' && (
-              <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-[#242529] rounded-2xl bg-[#161617]">
-                <SlidersHorizontal className="w-10 h-10 text-white/20 mb-4" />
-                <h3 className="text-white font-medium">Настройки системы</h3>
-                <p className="text-[13px] text-white/50 mt-1">Управление справочниками и правилами экспорта</p>
-              </div>
+              <SettingsScreen
+                accessRequests={accessRequests}
+                accessRequestsBusy={accessRequestsBusy}
+                confirmLeave={false}
+                dirty={false}
+                email={currentEmail}
+                isSupabaseMode={false}
+                onApproveAccessRequest={onApproveAccessRequest}
+                onCancelLeave={() => undefined}
+                onConfirmLeave={() => undefined}
+                onRejectAccessRequest={onRejectAccessRequest}
+                onReset={() => undefined}
+                onSave={() => undefined}
+                onSettings={() => undefined}
+                onSignOut={onSignOut}
+                role="admin"
+                saveState="idle"
+                settings={{ compactLists: true, digest: 'instant', drawerHints: true }}
+              />
             )}
           </div>
         </div>

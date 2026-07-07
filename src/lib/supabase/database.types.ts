@@ -465,6 +465,8 @@ export interface StatusHistoryRow extends DbRecord {
   from_status: string | null;
   to_status: string;
   comment: string;
+  source: "agent" | "admin" | "bb" | "system";
+  note: string | null;
   changed_by: string;
   changed_at: string;
 }

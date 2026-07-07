@@ -182,6 +182,8 @@ export interface StatusHistoryItem {
   fromStatus?: string;
   toStatus: string;
   comment: string;
+  source?: "agent" | "admin" | "bb" | "system";
+  note?: string;
   changedBy: string;
   changedAt: string;
 }

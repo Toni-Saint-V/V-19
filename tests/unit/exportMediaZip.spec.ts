@@ -63,6 +63,30 @@ function withCanonicalStorage(submission: Submission): Submission {
   };
 }
 
+function withApplicantPassport(
+  submission: Submission,
+  passportNumber: string,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant, applicantIndex) =>
+      applicantIndex === 0
+        ? {
+            ...applicant,
+            sections: applicant.sections.map((section) => ({
+              ...section,
+              fields: section.fields.map((field) =>
+                field.id === "passport-no"
+                  ? { ...field, value: passportNumber }
+                  : field,
+              ),
+            })),
+          }
+        : applicant,
+    ),
+  };
+}
+
 function generatedName(file: SubmissionFile, index: number): string {
   const prefix = `v19${String(index).padStart(4, "0")}`;
   return file.type === "passport_scan"
@@ -103,6 +127,15 @@ async function zipEntryNames(blob: Blob): Promise<{
   };
 }
 
+function mediaEntryNames(fileNames: string[]): string[] {
+  return fileNames.filter(
+    (name) =>
+      name !== "manifest.json" &&
+      name !== "README_ПАКЕТ.txt" &&
+      !name.endsWith(".xlsx"),
+  );
+}
+
 describe("export media mega ZIP", () => {
   afterEach(() => {
     if (storageMap) {
@@ -121,7 +154,8 @@ describe("export media mega ZIP", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.safeMessage);
-    expect(result.artifact.fileName).toMatch(/^visaflow-media-.+\.zip$/);
+    expect(result.artifact.fileName).toMatch(/^visaflow-export-.+\.zip$/);
+    expect(result.artifact.workbookFileName).toMatch(/^visaflow-export-.+\.xlsx$/);
     expect(result.artifact).toMatchObject({
       applicantCount: 1,
       fileCount: 3,
@@ -129,19 +163,53 @@ describe("export media mega ZIP", () => {
     });
 
     const names = await zipEntryNames(result.artifact.blob);
-    expect(names.directoryNames).toEqual(
-      expect.arrayContaining(["Заявители/", "Семьи/"]),
-    );
-    expect(names.fileNames).toHaveLength(3);
+    const mediaNames = mediaEntryNames(names.fileNames);
     expect(names.fileNames).toEqual(
       expect.arrayContaining([
+        "manifest.json",
+        "README_ПАКЕТ.txt",
+        result.artifact.workbookFileName,
+      ]),
+    );
+    expect(names.directoryNames).toEqual(
+      expect.arrayContaining(["Москва/01_Семьи/", "Москва/02_Заявители/"]),
+    );
+    expect(mediaNames).toHaveLength(3);
+    expect(mediaNames).toEqual(
+      expect.arrayContaining([
         expect.stringMatching(
-          /^Заявители\/01_ПД-1056_.+\/01_.+\/01_passport_scan\.pdf$/,
+          /^Москва\/02_Заявители\/01_ПД-1056_.+\/01_.+\/missing-passport_passport_scan_.+\.pdf$/,
         ),
-        expect.stringMatching(/^Заявители\/01_ПД-1056_.+\/01_.+\/02_selfie\.jpg$/),
+        expect.stringMatching(/^Москва\/02_Заявители\/01_ПД-1056_.+\/01_.+\/missing-passport_selfie_.+\.jpg$/),
         expect.stringMatching(
-          /^Заявители\/01_ПД-1056_.+\/01_.+\/03_selfie_2\.jpg$/,
+          /^Москва\/02_Заявители\/01_ПД-1056_.+\/01_.+\/missing-passport_selfie_2_.+\.jpg$/,
         ),
+      ]),
+    );
+  });
+
+  test("uses passport number in applicant media filenames when available", async () => {
+    const selection = generatedSelection(
+      withCanonicalStorage(withApplicantPassport(byId("ПД-1056"), "669308614")),
+    );
+    const result = await createExportMediaZipArtifact(selection, {
+      downloadMedia: downloader(),
+      expectedIdentity: identityFor(selection),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.safeMessage);
+
+    const names = await zipEntryNames(result.artifact.blob);
+    const mediaNames = mediaEntryNames(names.fileNames);
+
+    expect(mediaNames).toHaveLength(3);
+    expect(mediaNames.every((name) => name.includes("/669308614_"))).toBe(true);
+    expect(mediaNames).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("669308614_passport_scan_"),
+        expect.stringContaining("669308614_selfie_"),
+        expect.stringContaining("669308614_selfie_2_"),
       ]),
     );
   });
@@ -163,15 +231,17 @@ describe("export media mega ZIP", () => {
 
     const names = await zipEntryNames(result.artifact.blob);
     expect(names.directoryNames).toEqual(
-      expect.arrayContaining(["Заявители/", "Семьи/"]),
+      expect.arrayContaining(["Москва/01_Семьи/", "Москва/02_Заявители/"]),
     );
-    expect(names.fileNames).toHaveLength(9);
+    const mediaNames = mediaEntryNames(names.fileNames);
+    expect(names.fileNames).toContain(result.artifact.workbookFileName);
+    expect(mediaNames).toHaveLength(9);
     expect(
-      names.fileNames.every((name) => name.startsWith("Семьи/01_SUB-1102_")),
+      mediaNames.every((name) => name.startsWith("Москва/01_Семьи/01_SUB-1102_")),
     ).toBe(true);
-    expect(new Set(names.fileNames.map((name) => name.split("/")[2])).size).toBe(3);
+    expect(new Set(mediaNames.map((name) => name.split("/")[3])).size).toBe(3);
     expect(
-      names.fileNames.filter((name) => name.endsWith("/03_selfie_2.jpg")),
+      mediaNames.filter((name) => /\/(?:\d+|missing-passport)_selfie_2_.+\.jpg$/.test(name)),
     ).toHaveLength(3);
   });
 
@@ -190,11 +260,13 @@ describe("export media mega ZIP", () => {
     });
 
     const names = await zipEntryNames(result.artifact.blob);
-    expect(names.fileNames).toHaveLength(9);
+    const mediaNames = mediaEntryNames(names.fileNames);
+    expect(names.fileNames).toContain(result.artifact.workbookFileName);
+    expect(mediaNames).toHaveLength(9);
     expect(
-      names.fileNames.every((name) => name.startsWith("Семьи/01_SUB-1102_")),
+      mediaNames.every((name) => name.startsWith("Москва/01_Семьи/01_SUB-1102_")),
     ).toBe(true);
-    expect(new Set(names.fileNames.map((name) => name.split("/")[2])).size).toBe(3);
+    expect(new Set(mediaNames.map((name) => name.split("/")[3])).size).toBe(3);
   });
 
   test("migrates saved local demo family media identity for browser rechecks", async () => {
@@ -239,13 +311,15 @@ describe("export media mega ZIP", () => {
     if (!result.ok) throw new Error(result.safeMessage);
 
     const names = await zipEntryNames(result.artifact.blob);
-    expect(names.fileNames).toHaveLength(12);
-    expect(names.fileNames.some((name) => name.startsWith("Заявители/"))).toBe(true);
-    expect(names.fileNames.some((name) => name.startsWith("Семьи/"))).toBe(true);
+    const mediaNames = mediaEntryNames(names.fileNames);
+    expect(names.fileNames).toContain(result.artifact.workbookFileName);
+    expect(mediaNames).toHaveLength(12);
+    expect(mediaNames.some((name) => name.startsWith("Москва/02_Заявители/"))).toBe(true);
+    expect(mediaNames.some((name) => name.startsWith("Москва/01_Семьи/"))).toBe(true);
     expect(
-      names.fileNames.filter((name) => name.startsWith("Заявители/")),
+      mediaNames.filter((name) => name.startsWith("Москва/02_Заявители/")),
     ).toHaveLength(3);
-    expect(names.fileNames.filter((name) => name.startsWith("Семьи/"))).toHaveLength(
+    expect(mediaNames.filter((name) => name.startsWith("Москва/01_Семьи/"))).toHaveLength(
       9,
     );
   });

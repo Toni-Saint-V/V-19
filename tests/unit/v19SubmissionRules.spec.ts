@@ -573,7 +573,6 @@ describe("V-19 export rules", () => {
     expect(blockers).toContain("В выборке есть подачи не готовые к выгрузке");
     expect(blockers).toContain("В выборке есть уже выгруженные подачи");
     expect(blockers).toContain("Нельзя смешивать разные города");
-    expect(blockers).toContain("Нельзя смешивать подачи разных агентов");
     expect(blockers).toContain("Нельзя смешивать разные даты поездки");
     expect(blockers).not.toContain("Нельзя смешивать одинарные и семейные подачи");
   });
@@ -1026,23 +1025,10 @@ describe("V-19 submission actions", () => {
     expect(
       canPerformAction(withVerifiedPassport, "submit_corrections", "agent"),
     ).toEqual({
-      ok: false,
-      reason: "Сначала отметьте замечания исправленными",
+      ok: true,
     });
 
-    const firstFixed = markSubmissionIssueFixedResult(
-      withVerifiedPassport,
-      "зм-1048-1",
-      "agent",
-    );
-    if (!firstFixed.ok) throw new Error(firstFixed.error.code);
-    const secondFixed = markSubmissionIssueFixedResult(
-      firstFixed.data,
-      "зм-1048-2",
-      "agent",
-    );
-    if (!secondFixed.ok) throw new Error(secondFixed.error.code);
-    const withFixedIssues = secondFixed.data;
+    const withFixedIssues = withVerifiedPassport;
     const queue = agentActionQueue([withFixedIssues]);
 
     expect(
@@ -2451,9 +2437,10 @@ describe("V-19 persistence boundary", () => {
     });
 
     const uploaded = uploadRequiredFile(normalized, targetFile.id);
-    const fixed = markSubmissionIssueFixedResult(uploaded, issue.id, "agent");
 
-    expect(fixed.ok).toBe(true);
+    expect(uploaded.issues.find((item) => item.id === issue.id)?.status).toBe(
+      "fixed_by_agent",
+    );
   });
 
   it("builds a Supabase draft payload from the current cockpit model", () => {

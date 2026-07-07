@@ -10,6 +10,7 @@ import type {
   QuestionnaireAnswerRow,
   QuestionnaireAnswerInsert,
   StatusHistoryInsert,
+  StatusHistoryRow,
   SubmissionDraftPersistencePayload,
   SubmissionRow,
 } from "../../lib/supabase/database.types";
@@ -74,6 +75,8 @@ const mediaAssetSelect =
   "id,applicant_id,submission_id,type,original_file_name,generated_file_name,storage_bucket,storage_path,mime_type,size_bytes,upload_status,review_status,uploaded_at,reviewed_at,reviewed_by" as const;
 const exportBatchSelect =
   "id,created_at,file_name,format,content_fingerprint,idempotency_key,row_count,submission_ids" as const;
+const statusHistorySelect =
+  "id,entity_type,entity_id,from_status,to_status,comment,source,note,changed_by,changed_at" as const;
 
 export interface CockpitLoadResult {
   ownerIdsBySubmissionId: Map<string, string>;
@@ -120,6 +123,19 @@ type CockpitMediaAssetRow = Pick<
   | "type"
   | "upload_status"
   | "uploaded_at"
+>;
+type CockpitStatusHistoryRow = Pick<
+  StatusHistoryRow,
+  | "changed_at"
+  | "changed_by"
+  | "comment"
+  | "entity_id"
+  | "entity_type"
+  | "from_status"
+  | "id"
+  | "note"
+  | "source"
+  | "to_status"
 >;
 type QuestionnaireAnswerValueEnvelope = {
   kind: typeof questionnaireAnswerEnvelopeKind;
@@ -345,6 +361,82 @@ function attachDurableMediaAssetRows(
     ...submission,
     files: [...overlayedFiles, ...missingDurableFiles],
   });
+}
+
+function submissionHistorySourceFromRow(value: unknown): SubmissionHistorySource {
+  if (value === "agent" || value === "admin" || value === "bb" || value === "system") {
+    return value;
+  }
+  return "system";
+}
+
+function submissionStatusFromHistoryValue(value: unknown): SubmissionStatus | null {
+  if (typeof value !== "string" || !value) return null;
+  const normalized = normalizeLegacySubmissionStatus(value);
+  return normalized.ok ? normalized.data : null;
+}
+
+function statusHistoryItemFromRow(
+  row: CockpitStatusHistoryRow,
+): Submission["history"][number] | null {
+  const fromStatus = submissionStatusFromHistoryValue(row.from_status);
+  const toStatus = submissionStatusFromHistoryValue(row.to_status);
+  if (!toStatus) return null;
+
+  return {
+    id: row.id,
+    actorId: row.changed_by,
+    at: row.changed_at,
+    createdAt: row.changed_at,
+    fromStatus: fromStatus ?? undefined,
+    note: row.note?.trim() || undefined,
+    source: submissionHistorySourceFromRow(row.source),
+    text: row.comment,
+    toStatus,
+  };
+}
+
+function statusHistoryMatchKey(item: Submission["history"][number]) {
+  return `${item.fromStatus ?? ""}:${item.toStatus ?? ""}:${item.source ?? ""}:${item.note ?? ""}`;
+}
+
+function attachDurableStatusHistoryRows(
+  submission: Submission,
+  historyRows: CockpitStatusHistoryRow[],
+): Submission {
+  const durableHistory = historyRows
+    .filter(
+      (row) => row.entity_type === "submission" && row.entity_id === submission.id,
+    )
+    .map(statusHistoryItemFromRow)
+    .filter((item): item is Submission["history"][number] => Boolean(item))
+    .sort((left, right) => right.at.localeCompare(left.at));
+
+  if (!durableHistory.length) return submission;
+
+  const durableStatusKeys = new Set(durableHistory.map(statusHistoryMatchKey));
+  const snapshotHistory = submission.history.filter(
+    (item) =>
+      !item.fromStatus ||
+      !item.toStatus ||
+      !durableStatusKeys.has(statusHistoryMatchKey(item)),
+  );
+
+  return {
+    ...submission,
+    history: [...durableHistory, ...snapshotHistory],
+  };
+}
+
+function latestSubmissionStatusFromHistoryRows(
+  historyRows: CockpitStatusHistoryRow[],
+): SubmissionStatus | undefined {
+  const latest = [...historyRows]
+    .filter((row) => row.entity_type === "submission")
+    .sort((left, right) => right.changed_at.localeCompare(left.changed_at))
+    .find((row) => submissionStatusFromHistoryValue(row.to_status));
+
+  return latest ? (submissionStatusFromHistoryValue(latest.to_status) ?? undefined) : undefined;
 }
 
 function exportPackageFromBatchRow(
@@ -691,6 +783,8 @@ function toStatusHistoryInsert(
     comment: item.detail ? `${item.text} — ${item.detail}` : item.text,
     changed_by: actorId,
     changed_at: timestampOrNow(item.at),
+    note: item.note ?? null,
+    source: item.source ?? "system",
   };
 }
 
@@ -1031,6 +1125,7 @@ function fallbackSubmissionFromRows(
   row: SubmissionRow,
   applicants: CockpitApplicantRow[],
   questionnaireAnswers: CockpitQuestionnaireAnswerRow[],
+  statusOverride?: SubmissionStatus,
 ): Submission {
   const tripDateRange = tripDateRangeFromRow(row);
   const applicantItems: Applicant[] = applicants.map((applicant) => ({
@@ -1045,6 +1140,11 @@ function fallbackSubmissionFromRows(
       questionnaireAnswers.filter((answer) => answer.applicant_id === applicant.id),
     ),
   }));
+  const questionnairePercent = applicantItems.some((applicant) =>
+    applicant.sections.some((section) => section.fields.length > 0),
+  )
+    ? row.readiness_percent
+    : 0;
 
   return normalizeSubmissionQuestionnaire({
     id: row.id,
@@ -1059,14 +1159,14 @@ function fallbackSubmissionFromRows(
     city: isCity(row.city) ? row.city : "Москва",
     tripDateFrom: tripDateRange.from,
     tripDateTo: tripDateRange.to,
-    status: fromSupabaseSubmissionRowStatus(row),
+    status: statusOverride ?? fromSupabaseSubmissionRowStatus(row),
     applicants: applicantItems,
     issues: [],
     files: [],
     completeness: {
-      questionnaire: row.readiness_percent,
+      questionnaire: questionnairePercent,
       files: 0,
-      total: row.readiness_percent,
+      total: questionnairePercent,
     },
     exportState: row.status === "exported" ? "marked_exported" : "not_ready",
     createdAt: row.created_at,
@@ -1254,6 +1354,18 @@ export async function loadCockpitSubmissionsForProfile(
     });
   }
 
+  const { data: statusHistoryRows, error: statusHistoryError } = await client
+    .from("status_history")
+    .select(statusHistorySelect)
+    .in("entity_id", submissionIds);
+
+  if (statusHistoryError) {
+    throw mapSupabasePersistenceError(statusHistoryError, {
+      operation: "status_history.list",
+      fallbackKind: "database",
+    });
+  }
+
   const exportBatchRows =
     profile.role === "admin"
       ? await loadExportBatchRowsForSubmissions(submissionIds)
@@ -1274,31 +1386,41 @@ export async function loadCockpitSubmissionsForProfile(
     const submissionMediaRows = (mediaRows ?? []).filter(
       (media) => media.submission_id === row.id,
     );
+    const submissionStatusHistoryRows = (statusHistoryRows ?? []).filter(
+      (history) => history.entity_type === "submission" && history.entity_id === row.id,
+    );
     const snapshot = readCockpitSnapshot(row.family_intelligence);
     if (snapshot) {
-      return attachDurableMediaAssetRows(
-        reconcileCockpitSnapshotWithSubmissionRow(
-          row,
-          snapshot,
-          submissionApplicants,
-          submissionQuestionnaireAnswers,
-          submissionExportBatches,
+      return attachDurableStatusHistoryRows(
+        attachDurableMediaAssetRows(
+          reconcileCockpitSnapshotWithSubmissionRow(
+            row,
+            snapshot,
+            submissionApplicants,
+            submissionQuestionnaireAnswers,
+            submissionExportBatches,
+          ),
+          submissionMediaRows,
         ),
-        submissionMediaRows,
+        submissionStatusHistoryRows,
       );
     }
 
-    return attachDurableMediaAssetRows(
-      attachExportPackageRow(
-        fallbackSubmissionFromRows(
-          row,
-          submissionApplicants,
-          submissionQuestionnaireAnswers,
+    return attachDurableStatusHistoryRows(
+      attachDurableMediaAssetRows(
+        attachExportPackageRow(
+          fallbackSubmissionFromRows(
+            row,
+            submissionApplicants,
+            submissionQuestionnaireAnswers,
+            latestSubmissionStatusFromHistoryRows(submissionStatusHistoryRows),
+          ),
+          fromSupabaseSubmissionRowStatus(row),
+          submissionExportBatches,
         ),
-        fromSupabaseSubmissionRowStatus(row),
-        submissionExportBatches,
+        submissionMediaRows,
       ),
-      submissionMediaRows,
+      submissionStatusHistoryRows,
     );
   });
 

@@ -49,7 +49,7 @@ const appointmentSelect =
 const exportBatchSelect =
   "id,created_by,created_at,format,content_fingerprint,idempotency_key,file_name,row_count,submission_ids" as const;
 const statusHistorySelect =
-  "id,entity_type,entity_id,from_status,to_status,comment,changed_by,changed_at" as const;
+  "id,entity_type,entity_id,from_status,to_status,comment,source,note,changed_by,changed_at" as const;
 const submissionListLimit = 100;
 const requiredMediaSlotsPerApplicant = 4;
 
@@ -216,6 +216,8 @@ function mapStatusHistoryRow(row: StatusHistoryRow): StatusHistoryItem {
     fromStatus: row.from_status ?? undefined,
     toStatus: row.to_status,
     comment: row.comment,
+    note: row.note ?? undefined,
+    source: row.source,
     changedBy: row.changed_by,
     changedAt: row.changed_at,
   };
@@ -434,6 +436,8 @@ export function toStatusHistoryInserts(
     from_status: item.fromStatus ?? null,
     to_status: item.toStatus,
     comment: item.comment,
+    note: item.note ?? null,
+    source: item.source ?? "system",
     changed_by: toNullableUuid(item.changedBy) ?? actorId,
     changed_at: timestampOrNow(item.changedAt),
   }));

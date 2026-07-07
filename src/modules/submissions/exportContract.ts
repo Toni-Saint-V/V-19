@@ -56,7 +56,7 @@ function buildExportContractRow(
   const surname = field("surname", nameParts.surname);
   const mobile = digitsOnly(field("contact-number"));
   const hotelName = field("hotel-name");
-  const hotelCountry = field("hotel-country", "Spain");
+  const hotelCountry = field("hotel-country");
   const hotelCity = field("hotel-city");
   const hotelPostalCode = field("hotel-postal-code");
   const hotelEmail = field("hotel-email");
@@ -75,7 +75,7 @@ function buildExportContractRow(
   return {
     addressCity: field("home-city"),
     addressContactNo: mobile,
-    addressCountry: field("home-country", "Russian Federation"),
+    addressCountry: field("home-country"),
     addressLine1: field("home-address"),
     addressPostalCode: field("postal-code"),
     applicantCount: submission.applicants.length,
@@ -84,7 +84,7 @@ function buildExportContractRow(
     applicantIndex: index + 1,
     applicantMobile: mobile,
     applicantName: applicant.fullName,
-    appointmentCategory: normalizeCategory(field("category", "Normal")),
+    appointmentCategory: normalizeCategory(field("category")),
     appointmentType: submission.type === "family" ? "Family" : "Individual",
     city: submission.city,
     contactPersonAddress: hotelAddress,
@@ -92,7 +92,7 @@ function buildExportContractRow(
     contactPersonCountry: hotelCountry,
     contactPersonEmail: hotelEmail,
     contactPersonFirstName: hotelName,
-    contactPersonLastName: "Reception",
+    contactPersonLastName: field("hotel-contact-last-name"),
     contactPersonMobile: hotelContact,
     contactPersonZipCode: hotelPostalCode,
     costCoveredBy: normalizeCost(field("cost-covered-by")),
@@ -133,9 +133,9 @@ function buildExportContractRow(
     passportIssueDate: normalizeExportContractDate(field("passport-issue-date")),
     passportIssuePlace: field("passport-issue-place"),
     passportNo: passportNumber,
-    passportType: field("passport-type", "Ordinary Passport"),
+    passportType: field("passport-type"),
     placeOfBirth: field("birth-place"),
-    purposeOfJourney: field("purpose", "TOURISM"),
+    purposeOfJourney: field("purpose"),
     stayDurationInDays:
       digitsOnly(field("stay-duration")) ||
       exportDurationDays(intendedDateOfArrival, intendedDateOfDeparture),
@@ -150,8 +150,8 @@ function buildExportContractRow(
     ),
     tripDates: `${submission.tripDateFrom}-${submission.tripDateTo}`,
     type: groupLabel,
-    visaSubType: "Tourism",
-    visaType: "Schengen",
+    visaSubType: field("visa-sub-type"),
+    visaType: field("visa-type"),
   };
 }
 
@@ -219,6 +219,7 @@ function normalizeEntryCount(value: string): string {
 }
 
 function normalizeCost(value: string): string {
+  if (!value.trim()) return "";
   return /sponsor/i.test(value) ? "Sponsor" : "Applicant";
 }
 

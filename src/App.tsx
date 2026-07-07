@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { AccessGate } from './components/AccessGate';
 import { CommandCenter } from './components/CommandCenter';
 import { AdminWorkspace } from './components/AdminWorkspace';
 import {
@@ -9,8 +10,22 @@ import {
   type VisaflowBusinessBridge,
 } from './integration/visaflowBusinessBridge';
 import { applyExportStateToSelection, applyActionToSubmissionListResult } from './modules/submissions/submissionActions';
+import { completeExportPackage } from './modules/submissions/exportWorkflow';
 import { loadSubmissions, saveSubmissions } from './modules/submissions/persistence';
+import {
+  loadCockpitSubmissionsForProfile,
+  saveCockpitSubmissionsForProfile,
+} from './modules/submissions/supabasePersistence';
+import { getSupabaseClient } from './lib/supabase/client';
+import {
+  accessRequestRepository,
+  authRepository,
+  type AccessRequest,
+  type AccessRequestRegistrationInput,
+  type Session,
+} from './shared/authRegistration';
 import type { Role, Submission, SubmissionAction } from './modules/submissions/types';
+import type { AppProfile } from './types/session';
 
 type Workspace = 'agent' | 'admin';
 
@@ -21,14 +36,170 @@ export interface AppProps {
 
 export default function App({ bridge = noopVisaflowBusinessBridge, initialWorkspace = 'agent' }: AppProps = {}) {
   const [workspace, setWorkspace] = useState<Workspace>(initialWorkspace);
-  const [submissions, setSubmissions] = useState<Submission[]>(() => loadSubmissions());
+  const [submissions, setSubmissions] = useState<Submission[]>(() =>
+    getSupabaseClient() ? [] : loadSubmissions(),
+  );
+  const [authSession, setAuthSession] = useState<Session | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [accessRequestsBusy, setAccessRequestsBusy] = useState(false);
+  const [supabaseProfile, setSupabaseProfile] = useState<AppProfile | null>(null);
+  const [ownerIdsBySubmissionId, setOwnerIdsBySubmissionId] = useState<
+    Map<string, string>
+  >(new Map());
+  const supabaseEnabled = Boolean(getSupabaseClient());
+  const activeApprovedSession =
+    authSession?.status === 'active' && authSession.approvalStatus === 'approved'
+      ? authSession
+      : null;
+  const visibleSubmissions = useMemo(() => {
+    if (!activeApprovedSession) return [];
+    if (activeApprovedSession.role === 'admin') return submissions;
+    const ownerAgentId = activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId;
+    return submissions.filter((submission) => submission.agentId === ownerAgentId);
+  }, [activeApprovedSession, submissions]);
 
-  const persistSubmissions = (nextSubmissions: Submission[]) => {
+  const refreshAccessRequests = useCallback(async () => {
+    setAccessRequests(await accessRequestRepository.listPendingAccessRequests());
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapLocalAuth() {
+      setAuthError('');
+      try {
+        const restored = await authRepository.restoreSession();
+        if (cancelled) return;
+        setAuthSession(restored);
+        if (restored?.role === 'admin' && restored.status === 'active' && restored.approvalStatus === 'approved') {
+          setWorkspace('admin');
+        } else {
+          setWorkspace('agent');
+        }
+        await refreshAccessRequests();
+      } catch (error) {
+        if (!cancelled) {
+          setAuthError(error instanceof Error ? error.message : 'Не удалось восстановить сессию.');
+        }
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    }
+
+    void bootstrapLocalAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshAccessRequests]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCanonicalSubmissions() {
+      if (!supabaseEnabled) {
+        setSubmissions(loadSubmissions());
+        return;
+      }
+
+      if (!activeApprovedSession) return;
+
+      const loaded = await loadCockpitSubmissionsForProfile({
+        displayName: activeApprovedSession.fullName,
+        email: activeApprovedSession.email,
+        id: activeApprovedSession.userId,
+        organizationName: activeApprovedSession.companyName,
+        role: activeApprovedSession.role,
+      });
+      if (cancelled) return;
+
+      setSupabaseProfile({
+        displayName: activeApprovedSession.fullName,
+        email: activeApprovedSession.email,
+        id: activeApprovedSession.userId,
+        organizationName: activeApprovedSession.companyName,
+        role: activeApprovedSession.role,
+      });
+      setOwnerIdsBySubmissionId(loaded.ownerIdsBySubmissionId);
+      setSubmissions(loaded.submissions);
+    }
+
+    void loadCanonicalSubmissions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeApprovedSession, supabaseEnabled]);
+
+  const persistSubmissions = useCallback((nextSubmissions: Submission[]) => {
     setSubmissions(nextSubmissions);
-    saveSubmissions(nextSubmissions);
-  };
+    if (!supabaseEnabled) {
+      saveSubmissions(nextSubmissions);
+      return;
+    }
+    if (!supabaseProfile) return;
 
-  const applySubmissionAction = (
+    void saveCockpitSubmissionsForProfile(
+      supabaseProfile,
+      nextSubmissions,
+      ownerIdsBySubmissionId,
+    ).then(setOwnerIdsBySubmissionId);
+  }, [ownerIdsBySubmissionId, supabaseEnabled, supabaseProfile]);
+
+  const handleLogin = useCallback(async (email: string, password: string) => {
+    setAuthError('');
+    const nextSession = await authRepository.loginApprovedUser(email, password);
+    setAuthSession(nextSession);
+    setWorkspace(nextSession.role === 'admin' && nextSession.status === 'active' && nextSession.approvalStatus === 'approved' ? 'admin' : 'agent');
+    await refreshAccessRequests();
+  }, [refreshAccessRequests]);
+
+  const handleRegister = useCallback(async (input: AccessRequestRegistrationInput) => {
+    setAuthError('');
+    await authRepository.submitAccessRequest(input);
+    const nextSession = await authRepository.restoreSession();
+    setAuthSession(nextSession);
+    setWorkspace('agent');
+    await refreshAccessRequests();
+  }, [refreshAccessRequests]);
+
+  const handleResetPassword = useCallback(async (email: string) => {
+    setAuthError('');
+    if (!email.trim()) return 'Введите email.';
+    return 'В local/dev режиме восстановление не отправляет email. Нужен Supabase Auth или email provider.';
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    await authRepository.logout();
+    setAuthSession(null);
+    setWorkspace('agent');
+  }, []);
+
+  const handleApproveAccessRequest = useCallback(async (requestId: string) => {
+    if (!activeApprovedSession || activeApprovedSession.role !== 'admin') return;
+    setAccessRequestsBusy(true);
+    try {
+      await accessRequestRepository.approveAccessRequest(requestId, activeApprovedSession.userId);
+      await refreshAccessRequests();
+    } finally {
+      setAccessRequestsBusy(false);
+    }
+  }, [activeApprovedSession, refreshAccessRequests]);
+
+  const handleRejectAccessRequest = useCallback(async (requestId: string) => {
+    if (!activeApprovedSession || activeApprovedSession.role !== 'admin') return;
+    setAccessRequestsBusy(true);
+    try {
+      await accessRequestRepository.rejectAccessRequest(requestId, activeApprovedSession.userId);
+      await refreshAccessRequests();
+    } finally {
+      setAccessRequestsBusy(false);
+    }
+  }, [activeApprovedSession, refreshAccessRequests]);
+
+  const applySubmissionAction = useCallback((
     submissionId: string,
     action: SubmissionAction,
     source: Role,
@@ -41,7 +212,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
       source === 'admin' ? 'local-admin' : 'local-agent-tony',
     );
     if (result.ok) persistSubmissions(result.data);
-  };
+  }, [persistSubmissions, submissions]);
 
   const appBridge = useMemo<VisaflowBusinessBridge>(
     () => ({
@@ -50,20 +221,50 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
         bridge.onSubmissionAction?.({ submissionId, action, source });
         applySubmissionAction(submissionId, action, source);
       },
-      onExportPackages: (submissionIds) => {
-        bridge.onExportPackages?.(submissionIds);
-        const nextSubmissions = applyExportStateToSelection(
+      onExportPackages: async (submissionIds) => {
+        await bridge.onExportPackages?.(submissionIds);
+        if (workspace !== 'admin') return;
+
+        const generatedSubmissions = applyExportStateToSelection(
           submissions,
           submissionIds,
-          'marked_exported',
+          'file_generated',
         );
-        if (nextSubmissions !== submissions) persistSubmissions(nextSubmissions);
+        const downloadedSubmissions = applyExportStateToSelection(
+          generatedSubmissions,
+          submissionIds,
+          'file_downloaded',
+        );
+        if (downloadedSubmissions === generatedSubmissions) {
+          throw new Error('Export download state was blocked by domain guards.');
+        }
+
+        const selectedDownloaded = downloadedSubmissions.filter((submission) =>
+          submissionIds.includes(submission.id),
+        );
+        const completed = await completeExportPackage(selectedDownloaded, {
+          createdAt: new Date().toISOString(),
+          createdBy: supabaseProfile?.id ?? 'local-admin',
+          format: 'xlsx',
+        });
+        if (completed.status === 'blocked') {
+          throw new Error(completed.blockers.join('; '));
+        }
+
+        const exportedById = new Map(
+          completed.submissions.map((submission) => [submission.id, submission]),
+        );
+        const nextSubmissions = downloadedSubmissions.map(
+          (submission) => exportedById.get(submission.id) ?? submission,
+        );
+        persistSubmissions(nextSubmissions);
       },
     }),
-    [bridge, submissions],
+    [applySubmissionAction, bridge, persistSubmissions, submissions, supabaseProfile?.id, workspace],
   );
 
   const switchWorkspace = () => {
+    if (activeApprovedSession?.role !== 'admin') return;
     setWorkspace((current) => {
       const nextWorkspace = current === 'agent' ? 'admin' : 'agent';
       appBridge.onWorkspaceSwitch?.(nextWorkspace);
@@ -71,6 +272,27 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
       return nextWorkspace;
     });
   };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-dvh bg-[#101011] text-white grid place-items-center">
+        <span className="text-sm text-white/50">Загрузка доступа...</span>
+      </div>
+    );
+  }
+
+  if (!activeApprovedSession) {
+    return (
+      <AccessGate
+        error={authError}
+        pendingSession={authSession}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        onResetPassword={handleResetPassword}
+        onSignOut={handleSignOut}
+      />
+    );
+  }
 
   return (
     <VisaflowBusinessBridgeProvider bridge={appBridge}>
@@ -85,9 +307,22 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
             className="h-full w-full"
           >
             {workspace === 'agent' ? (
-              <CommandCenter submissions={submissions} onSwitchWorkspace={switchWorkspace} />
+              <CommandCenter
+                submissions={visibleSubmissions}
+                onSignOut={handleSignOut}
+                onSwitchWorkspace={activeApprovedSession.role === 'admin' ? switchWorkspace : undefined}
+              />
             ) : (
-              <AdminWorkspace onSwitchWorkspace={switchWorkspace} />
+              <AdminWorkspace
+                accessRequests={accessRequests}
+                accessRequestsBusy={accessRequestsBusy}
+                currentEmail={activeApprovedSession.email}
+                onApproveAccessRequest={handleApproveAccessRequest}
+                onRejectAccessRequest={handleRejectAccessRequest}
+                onSignOut={handleSignOut}
+                onSwitchWorkspace={switchWorkspace}
+                submissions={submissions}
+              />
             )}
           </motion.div>
         </AnimatePresence>

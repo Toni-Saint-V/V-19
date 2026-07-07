@@ -391,8 +391,9 @@ describe("V-19 export workbook contract", () => {
     expect(plan.preview.headers).toEqual(parsed.rows[0]);
     expect(plan.preview.rows).toEqual(workbookDataRows);
     expect(buildExportWorkbookRows(plan.rows)).toEqual(parsed.rows);
-    expect(plan.preview.rows[0]).toEqual(
-      expect.arrayContaining(["Москва", "Schengen", "Tourism", "Normal"]),
+    expect(plan.preview.rows[0]?.[0]).toBe("Москва");
+    expect(plan.preview.rows[0]).not.toEqual(
+      expect.arrayContaining(["Schengen", "Tourism", "Normal"]),
     );
   });
 

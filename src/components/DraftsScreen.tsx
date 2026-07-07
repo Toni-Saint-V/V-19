@@ -169,44 +169,44 @@ export function DraftsScreen({ onOpenDrawer, submissions }: DraftsScreenProps) {
       className="space-y-6 lg:space-y-8"
     >
       {/* Top Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-        <div className="p-4 lg:p-5 rounded-2xl bg-gradient-to-br from-[#1a1a1d] to-[#141416] border border-[#242529] shadow-sm flex flex-col justify-between h-[110px]">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] font-medium text-white/50 uppercase tracking-wide">Ждут загрузки</span>
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-              <UploadCloud className="w-4 h-4 text-white/40" />
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
+        <div className="flex h-[60px] flex-col justify-between rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-3 py-1.5 shadow-sm sm:h-[110px] sm:p-4 lg:p-5">
+          <div className="flex items-center justify-end sm:justify-between">
+            <span className="hidden text-[12px] font-medium text-white/50 uppercase tracking-wide sm:block">Ждут загрузки</span>
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5 sm:h-8 sm:w-8">
+              <UploadCloud className="h-3.5 w-3.5 text-white/40 sm:h-4 sm:w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-semibold text-white">24</div>
-            <div className="text-[11px] text-white/40 mt-1">Документа по 8 пакетам</div>
+            <div className="text-[24px] font-medium leading-none text-white sm:text-2xl sm:font-semibold">24</div>
+            <div className="mt-1 hidden text-[11px] text-white/40 sm:block">Документа по 8 пакетам</div>
           </div>
         </div>
 
-        <div className="p-4 lg:p-5 rounded-2xl bg-gradient-to-br from-[#1a1a1d] to-[#141416] border border-[#242529] shadow-sm flex flex-col justify-between h-[110px]">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] font-medium text-white/50 uppercase tracking-wide">В обработке OCR</span>
-            <div className="w-8 h-8 rounded-full bg-white/[0.045] flex items-center justify-center">
-              <ScanLine className="w-4 h-4 text-[#b8baff]" />
+        <div className="flex h-[60px] flex-col justify-between rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-3 py-1.5 shadow-sm sm:h-[110px] sm:p-4 lg:p-5">
+          <div className="flex items-center justify-end sm:justify-between">
+            <span className="hidden text-[12px] font-medium text-white/50 uppercase tracking-wide sm:block">В обработке OCR</span>
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.045] sm:h-8 sm:w-8">
+              <ScanLine className="h-3.5 w-3.5 text-[#b8baff] sm:h-4 sm:w-4" />
             </div>
           </div>
           <div>
-            <div className="text-2xl font-semibold text-white">3</div>
-            <div className="text-[11px] text-white/40 mt-1">Распознаются системой</div>
+            <div className="text-[24px] font-medium leading-none text-white sm:text-2xl sm:font-semibold">3</div>
+            <div className="mt-1 hidden text-[11px] text-white/40 sm:block">Распознаются системой</div>
           </div>
         </div>
 
-        <div className="p-4 lg:p-5 rounded-2xl bg-gradient-to-br from-[#1a1a1d] to-[#141416] border border-[#5b2b32]/50 shadow-[0_4px_20px_rgba(239,68,68,0.05)] flex flex-col justify-between h-[110px] relative overflow-hidden group">
+        <div className="group relative flex h-[60px] flex-col justify-between overflow-hidden rounded-2xl border border-[#5b2b32]/50 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-3 py-1.5 shadow-[0_4px_20px_rgba(239,68,68,0.05)] sm:h-[110px] sm:p-4 lg:p-5">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#a35f69]/5 rounded-full blur-2xl -mr-10 -mt-10" />
-          <div className="flex items-center justify-between relative z-10">
-            <span className="text-[12px] font-medium text-[#d59aa3]/80 uppercase tracking-wide">Ошибки проверки</span>
-            <div className="w-8 h-8 rounded-full bg-[#24191b]/60 flex items-center justify-center">
-              <FileWarning className="w-4 h-4 text-[#d59aa3]" />
+          <div className="relative z-10 flex items-center justify-end sm:justify-between">
+            <span className="hidden text-[12px] font-medium text-[#d59aa3]/80 uppercase tracking-wide sm:block">Ошибки проверки</span>
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#24191b]/60 sm:h-8 sm:w-8">
+              <FileWarning className="h-3.5 w-3.5 text-[#d59aa3] sm:h-4 sm:w-4" />
             </div>
           </div>
           <div className="relative z-10">
-            <div className="text-2xl font-semibold text-white group-hover:text-[#d59aa3] transition-colors">2</div>
-            <div className="text-[11px] text-white/50 mt-1">Требуют ручного ревью</div>
+            <div className="text-[24px] font-medium leading-none text-white transition-colors group-hover:text-[#d59aa3] sm:text-2xl sm:font-semibold">2</div>
+            <div className="mt-1 hidden text-[11px] text-white/50 sm:block">Требуют ручного ревью</div>
           </div>
         </div>
       </div>

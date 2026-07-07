@@ -409,8 +409,11 @@ export type SubmissionHistoryItem = {
   id: string;
   text: string;
   at: string;
+  actorId?: string;
+  createdAt?: string;
   detail?: string;
   fromStatus?: SubmissionStatus;
+  note?: string;
   source?: SubmissionHistorySource;
   toStatus?: SubmissionStatus;
 };

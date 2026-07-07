@@ -53,6 +53,38 @@ export const aiHelperBaseGuardrails = [
   "Оператор принимает медиа и заявку вручную.",
 ] as const;
 
+const forbiddenOutputPatterns = [
+  /approval\s+odds/i,
+  /approval\s+probability/i,
+  /visa\s+odds/i,
+  /visa\s+guarantee/i,
+  /official\W+verification/i,
+  /official\W+validation/i,
+  /official\w*\s+verif/i,
+  /guaranteed/i,
+  /одобрен/i,
+  /гарантир/i,
+  /официальн\w*\s+провер/i,
+  /ш[а]нс\w*\s+виз/i,
+  /вероятност\w*\s+виз/i,
+  new RegExp(["виз", "[\\p{L}]*\\s+одобрен"].join(""), "iu"),
+  new RegExp(["официальн", "[\\p{L}]*\\s+провер"].join(""), "iu"),
+  new RegExp(["ш", "анс"].join(""), "i"),
+  new RegExp(["веро", "ятност"].join(""), "i"),
+  new RegExp(["гаран", "ти"].join(""), "i"),
+  new RegExp(["OCR", "\\s+подтверд"].join(""), "i"),
+  new RegExp(["AI", "\\s+решил"].join(""), "i"),
+  new RegExp(["ИИ", "\\s+решил"].join(""), "i"),
+];
+
+const sensitiveOutputPatterns = [
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  /\+?\d[\d\s().-]{9,}\d/,
+  /\b\d{2}\s?\d{7}\b/,
+];
+
+const maxVisibleOutputChars = 6000;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -80,23 +112,80 @@ export function parseAiHelperResult(value: unknown): AiHelperContractResult<AiHe
     return { ok: false, status: 502, safeMessage: "AI helper result is incomplete." };
   }
 
-  return {
-    ok: true,
-    data: {
-      intent: value.intent,
-      title: value.title,
-      summary: value.summary,
-      suggestions: value.suggestions,
-      blockers: value.blockers,
-      guardrails: value.guardrails,
-      source: value.source,
-      textReview: value.textReview,
-      operatorSummary: isStringArray(value.operatorSummary) ? value.operatorSummary : undefined,
-      agentFollowUpDrafts: isStringArray(value.agentFollowUpDrafts) ? value.agentFollowUpDrafts : undefined,
-      adminReviewChecklist: isStringArray(value.adminReviewChecklist) ? value.adminReviewChecklist : undefined,
-      nextAction: typeof value.nextAction === "string" ? value.nextAction : undefined,
-      issueRemarkDraft: typeof value.issueRemarkDraft === "string" ? value.issueRemarkDraft : undefined,
-      readinessExplanation: typeof value.readinessExplanation === "string" ? value.readinessExplanation : undefined,
-    },
+  const result: AiHelperResult = {
+    intent: value.intent,
+    title: value.title,
+    summary: value.summary,
+    suggestions: value.suggestions,
+    blockers: value.blockers,
+    guardrails: value.guardrails,
+    source: value.source,
+    textReview: value.textReview,
+    operatorSummary: isStringArray(value.operatorSummary)
+      ? value.operatorSummary
+      : undefined,
+    agentFollowUpDrafts: isStringArray(value.agentFollowUpDrafts)
+      ? value.agentFollowUpDrafts
+      : undefined,
+    adminReviewChecklist: isStringArray(value.adminReviewChecklist)
+      ? value.adminReviewChecklist
+      : undefined,
+    nextAction: typeof value.nextAction === "string" ? value.nextAction : undefined,
+    issueRemarkDraft:
+      typeof value.issueRemarkDraft === "string" ? value.issueRemarkDraft : undefined,
+    readinessExplanation:
+      typeof value.readinessExplanation === "string"
+        ? value.readinessExplanation
+        : undefined,
   };
+
+  const safety = validateAiHelperResult(result);
+  if (!safety.ok) return safety;
+
+  return { ok: true, data: result };
+}
+
+export function validateAiHelperResult(
+  result: AiHelperResult,
+): AiHelperContractResult<AiHelperResult> {
+  const visibleItems = [
+    result.title,
+    result.summary,
+    ...result.suggestions,
+    ...result.blockers,
+    ...result.guardrails,
+    ...(result.operatorSummary ?? []),
+    ...(result.agentFollowUpDrafts ?? []),
+    ...(result.adminReviewChecklist ?? []),
+    result.nextAction ?? "",
+    result.issueRemarkDraft ?? "",
+    result.readinessExplanation ?? "",
+  ];
+  const visibleCopy = visibleItems.join(" ");
+
+  if (
+    !result.title.trim() ||
+    !result.summary.trim() ||
+    visibleItems.some((item) => item.length > 0 && !item.trim()) ||
+    visibleCopy.length > maxVisibleOutputChars
+  ) {
+    return {
+      ok: false,
+      status: 502,
+      safeMessage: "AI helper result failed safety validation.",
+    };
+  }
+
+  if (
+    forbiddenOutputPatterns.some((pattern) => pattern.test(visibleCopy)) ||
+    sensitiveOutputPatterns.some((pattern) => pattern.test(visibleCopy))
+  ) {
+    return {
+      ok: false,
+      status: 502,
+      safeMessage: "AI helper result failed safety validation.",
+    };
+  }
+
+  return { ok: true, data: result };
 }

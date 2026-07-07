@@ -25,7 +25,7 @@ describe("Supabase auth registration adapter", () => {
     };
   });
 
-  test("submits the access request password through the edge function payload", async () => {
+  test("submits the access request without leaking the password through the edge function payload", async () => {
     supabaseMock.invoke.mockResolvedValue({
       data: {
         request: {
@@ -69,7 +69,6 @@ describe("Supabase auth registration adapter", () => {
           companyName: "Visa Test",
           email: "new.agent@example.com",
           fullName: "Анна Петрова",
-          password: "previous-flow-password",
           phone: "+7 900 000-00-00",
         },
       },
