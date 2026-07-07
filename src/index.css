@@ -630,7 +630,7 @@ button {
   outline: none;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .vf-figma-questionnaire-screen .v19-questionnaire-screen-header {
     min-height: 56px;
     gap: 8px;
