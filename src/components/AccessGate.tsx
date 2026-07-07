@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
+import visaflowLogo from '../assets/visaflow-logo.png';
 import type { AccessRequestRegistrationInput, Session } from '../shared/authRegistration';
 
 type AccessGateMode = 'login' | 'register' | 'reset' | 'pending';
@@ -66,10 +67,12 @@ function AccessShell({ children }: { children: ReactNode }) {
   return (
     <main className="access-layout min-h-dvh bg-[#101011] text-white">
       <section className="access-brand-panel">
-        <div className="access-brand-mark">V</div>
+        <div className="access-brand-lockup">
+          <img className="access-brand-logo" src={visaflowLogo} alt="VisaFlow" />
+        </div>
         <p className="access-kicker">VisaFlow V-19</p>
-        <h2>Рабочий кабинет BLS</h2>
-        <p>Регистрация агентов, ручное подтверждение администратором и закрытый доступ к анкетам.</p>
+        <h2>Заявка на доступ</h2>
+        <p>Заполните форму агентства. Администратор подтвердит доступ перед входом в кабинет.</p>
       </section>
       <section className="access-card">{children}</section>
     </main>
@@ -84,7 +87,7 @@ export function AccessGate({
   onResetPassword,
   onSignOut,
 }: AccessGateProps) {
-  const [mode, setMode] = useState<AccessGateMode>(pendingSession ? 'pending' : 'login');
+  const [mode, setMode] = useState<AccessGateMode>(pendingSession ? 'pending' : 'register');
   const [email, setEmail] = useState(storedWorkspaceEmail);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -194,7 +197,7 @@ export function AccessGate({
     return (
       <AccessShell>
         <button className="access-back-button" type="button" onClick={() => setMode('login')}>
-          Вернуться ко входу
+          Уже есть доступ? Войти
         </button>
         <div className="access-card-header">
           <ShieldCheck size={22} />
