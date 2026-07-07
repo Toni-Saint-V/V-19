@@ -405,6 +405,19 @@ export type SubmissionFile = {
   linkedIssueId?: string;
 };
 
+export type CollectionDocumentUpload = {
+  applicantId: string;
+  docType: "questionnaire";
+  fileName: string;
+  id: string;
+  mimeType: string;
+  passportNumber?: string;
+  sizeBytes: number;
+  status: "uploaded" | "needs_review";
+  submissionId: string;
+  uploadedAtIso: string;
+};
+
 export type SubmissionHistoryItem = {
   id: string;
   text: string;
@@ -436,6 +449,7 @@ export type Submission = {
   applicants: Applicant[];
   issues: Issue[];
   files: SubmissionFile[];
+  collectionDocuments?: CollectionDocumentUpload[];
   completeness: {
     questionnaire: number;
     files: number;

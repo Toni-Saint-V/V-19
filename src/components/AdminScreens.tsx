@@ -8,15 +8,14 @@ import {
   Clock,
   FileText,
   FileCheck2,
-  Filter,
   Flame,
   MessageSquareWarning,
-  Search,
   ShieldCheck,
   Sparkles,
   User,
   Users,
 } from 'lucide-react';
+import { AdminMetricCard, AdminQueueToolbar } from './AdminSurfaceCommon';
 
 interface AdminScreenProps {
   onOpenDrawer: (id: string) => void;
@@ -142,18 +141,6 @@ function toneClasses(tone: string) {
   }
 }
 
-function MetricCard({ icon: Icon, label, value, tone = 'neutral' }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
-  return (
-    <div className="h-[90px] rounded-[8px] border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-3">
-      <div className="flex items-center justify-end sm:justify-between">
-        <span className="hidden text-[11px] font-medium uppercase tracking-wide text-white/45 sm:block">{label}</span>
-        <Icon className={`h-4 w-4 ${tone === 'green' ? 'text-[#b8baff]' : tone === 'orange' ? 'text-white/62' : tone === 'red' ? 'text-[#d59aa3]' : 'text-white/40'}`} />
-      </div>
-      <div className="mt-[30px] text-xl font-semibold text-white">{value}</div>
-    </div>
-  );
-}
-
 function ProgressLine({ label, value }: { label: string; value: number }) {
   return (
     <div>
@@ -224,14 +211,31 @@ function ReviewQueueCard({ item, onOpenDrawer }: { item: ReviewCard; onOpenDrawe
 
 export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
   const [activeLane, setActiveLane] = useState<Lane | 'all'>('all');
+  const [cityFilter, setCityFilter] = useState('Все города');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showIntro, setShowIntro] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.sessionStorage.getItem(reviewIntroStorageKey) !== 'true';
   });
-  const visibleReviews = activeLane === 'all' ? reviews : reviews.filter((item) => item.lane === activeLane);
-  const totalBlockers = reviews.reduce((sum, item) => sum + item.blockers, 0);
-  const totalWarnings = reviews.reduce((sum, item) => sum + item.warnings, 0);
-  const readyCount = reviews.filter((item) => item.lane === 'ready').length;
+  const cityOptions = ['Все города', ...Array.from(new Set(reviews.map((item) => item.city)))];
+  const searchNeedle = searchQuery.trim().toLowerCase();
+  const filteredReviews = reviews.filter((item) => {
+    const cityMatches = cityFilter === 'Все города' || item.city === cityFilter;
+    const searchMatches =
+      !searchNeedle ||
+      [item.id, item.title, item.agent, item.city]
+        .join(' ')
+        .toLowerCase()
+        .includes(searchNeedle);
+    return cityMatches && searchMatches;
+  });
+  const visibleReviews =
+    activeLane === 'all'
+      ? filteredReviews
+      : filteredReviews.filter((item) => item.lane === activeLane);
+  const totalBlockers = filteredReviews.reduce((sum, item) => sum + item.blockers, 0);
+  const totalWarnings = filteredReviews.reduce((sum, item) => sum + item.warnings, 0);
+  const readyCount = filteredReviews.filter((item) => item.lane === 'ready').length;
 
   useEffect(() => {
     if (!showIntro) return;
@@ -265,36 +269,38 @@ export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
         )}
 
         <div className="grid grid-cols-4 gap-2">
-          <MetricCard icon={FileText} label="В очереди" value={`${reviews.length}`} />
-          <MetricCard icon={Flame} label="Блокеры" value={`${totalBlockers}`} tone="red" />
-          <MetricCard icon={AlertCircle} label="Проверить" value={`${totalWarnings}`} tone="orange" />
-          <MetricCard icon={CheckCircle2} label="К выгрузке" value={`${readyCount}`} tone="green" />
+          <AdminMetricCard icon={FileText} label="В очереди" value={`${filteredReviews.length}`} />
+          <AdminMetricCard icon={Flame} label="Блокеры" value={`${totalBlockers}`} tone="red" />
+          <AdminMetricCard icon={AlertCircle} label="Проверить" value={`${totalWarnings}`} tone="orange" />
+          <AdminMetricCard icon={CheckCircle2} label="К выгрузке" value={`${readyCount}`} tone="green" />
         </div>
 
         <div className="rounded-[10px] border border-[#242529] bg-[#161617]">
-          <div className="flex flex-col gap-5 border-b border-[#242529] p-4 lg:p-5">
-            <div className="flex flex-wrap items-center gap-3">
-              <button onClick={() => setActiveLane('all')} className={`h-8 rounded-[10px] border px-3 text-[10px] font-medium transition-colors ${activeLane === 'all' ? 'border-[#6f64ff]/60 bg-[#6f64ff]/18 text-[#c9c6ff]' : 'border-white/10 bg-white/[0.045] text-white/55 hover:text-white'}`}>Все</button>
-              {lanes.map((lane) => {
-                const Icon = lane.icon;
-                const count = reviews.filter((item) => item.lane === lane.id).length;
-                return (
-                  <button key={lane.id} onClick={() => setActiveLane(lane.id)} className={`inline-flex h-8 items-center gap-2 rounded-[10px] border px-3 text-[10px] font-medium transition-colors ${activeLane === lane.id ? toneClasses(lane.tone) : 'border-white/10 bg-white/[0.045] text-white/55 hover:text-white'}`}>
-                    <Icon className="h-3.5 w-3.5" /> {lane.title} <span className="text-white/35">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/38" />
-                <input className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[11px] font-medium text-[#525151] placeholder:text-[#525151] outline-none focus:border-[#6f64ff]/55" placeholder="Поиск: ID, агент, семья" />
-              </div>
-              <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white">
-                <Filter className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
+          <AdminQueueToolbar
+            activeTab={activeLane}
+            cityFilter={cityFilter}
+            cityOptions={cityOptions}
+            filterLabel="Фильтры проверки"
+            onCityFilterChange={setCityFilter}
+            onFilterClick={() => {
+              setCityFilter('Все города');
+              setSearchQuery('');
+            }}
+            onSearchChange={setSearchQuery}
+            onTabChange={setActiveLane}
+            searchPlaceholder="Поиск: ID, агент, семья"
+            searchValue={searchQuery}
+            tabs={[
+              { id: 'all', label: 'Все' },
+              ...lanes.map((lane) => ({
+                count: filteredReviews.filter((item) => item.lane === lane.id).length,
+                icon: lane.icon,
+                id: lane.id,
+                label: lane.title,
+                tone: toneClasses(lane.tone),
+              })),
+            ]}
+          />
 
           <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2 2xl:grid-cols-4">
             {lanes.map((lane) => {

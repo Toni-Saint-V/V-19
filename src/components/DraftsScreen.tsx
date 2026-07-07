@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
@@ -12,7 +12,12 @@ import {
   User,
   Users,
 } from 'lucide-react';
-import type { Submission, SubmissionFile, SubmissionFileType } from '../modules/submissions/types';
+import type {
+  CollectionDocumentUpload,
+  Submission,
+  SubmissionFile,
+  SubmissionFileType,
+} from '../modules/submissions/types';
 import {
   uploadRequiredFile,
   type UploadedFileMetadata,
@@ -20,12 +25,14 @@ import {
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
 import {
   canonicalCollectionDocTypes,
+  collectionDocumentDocTypes,
   collectionDocTypes,
   detectCollectionDocType,
-  isCollectionDocType,
+  findCollectionDocumentUpload,
   normalizeCollectionPassportNumber,
   passportNumberFromCollectionText,
   resolveCollectionUploadTarget,
+  upsertCollectionDocumentUpload,
   type CollectionDocType,
 } from '../modules/submissions/documentCollectionIntake';
 import { fileToDocumentStatus } from './v19BusinessScreenAdapter';
@@ -37,18 +44,6 @@ interface DraftsScreenProps {
 }
 
 type DocStatus = 'verified' | 'processing' | 'error' | 'missing';
-
-type CollectionUploadRecord = {
-  applicantId: string;
-  docType: CollectionDocType;
-  fileName: string;
-  id: string;
-  passportNumber?: string;
-  sizeBytes: number;
-  status: 'uploaded' | 'needs_review';
-  submissionId: string;
-  uploadedAtIso: string;
-};
 
 type MatrixApplicant = {
   docs: Record<CollectionDocType, DocStatus>;
@@ -84,41 +79,7 @@ type UnmatchedUpload = {
   submissionId?: string;
 };
 
-const collectionStorageKey = 'visaflow.v19.collectionDocumentUploads.v2';
-
 const docTypes = collectionDocTypes;
-
-function loadCollectionUploads(): CollectionUploadRecord[] {
-  try {
-    const raw = globalThis.localStorage?.getItem(collectionStorageKey);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isCollectionUploadRecord) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCollectionUploads(records: CollectionUploadRecord[]) {
-  try {
-    globalThis.localStorage?.setItem(collectionStorageKey, JSON.stringify(records));
-  } catch {
-    // Local persistence is best-effort in dev/browser mode.
-  }
-}
-
-function isCollectionUploadRecord(value: unknown): value is CollectionUploadRecord {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<CollectionUploadRecord>;
-  return Boolean(
-    candidate.id &&
-      candidate.submissionId &&
-      candidate.applicantId &&
-      typeof candidate.docType === 'string' &&
-      isCollectionDocType(candidate.docType) &&
-      candidate.fileName,
-  );
-}
 
 function roleLabel(role: MatrixApplicant['role']) {
   return role;
@@ -153,22 +114,9 @@ function collectionStatus(
   submission: Submission,
   applicant: Submission['applicants'][number],
   docType: CollectionDocType,
-  uploads: CollectionUploadRecord[],
 ): DocStatus {
-  const upload = uploads.find(
-    (record) =>
-      record.submissionId === submission.id &&
-      record.applicantId === applicant.id &&
-      record.docType === docType,
-  );
-
+  const upload = findCollectionDocumentUpload(submission, applicant.id, docType);
   if (upload) return upload.status === 'needs_review' ? 'processing' : 'verified';
-
-  if (docType === 'questionnaire') {
-    if (applicant.questionnaireStatus === 'complete') return 'verified';
-    if (applicant.questionnaireStatus === 'needs_fix') return 'error';
-    if (applicant.questionnaireStatus === 'partial') return 'processing';
-  }
 
   return 'missing';
 }
@@ -176,14 +124,13 @@ function collectionStatus(
 function applicantDocs(
   submission: Submission,
   applicant: Submission['applicants'][number],
-  uploads: CollectionUploadRecord[],
 ): Record<CollectionDocType, DocStatus> {
   const applicantFiles = submission.files.filter((file) => file.applicantId === applicant.id);
   return {
     passport: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'passport_scan')),
     selfie: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'selfie')),
     selfie2: fileStatusToDocStatus(applicantFiles.find((file) => file.type === 'selfie_2')),
-    questionnaire: collectionStatus(submission, applicant, 'questionnaire', uploads),
+    questionnaire: collectionStatus(submission, applicant, 'questionnaire'),
   };
 }
 
@@ -194,13 +141,10 @@ function submissionDeadline(submission: Submission) {
   return 'В работе';
 }
 
-function buildMatrixSubmissions(
-  submissions: Submission[],
-  uploads: CollectionUploadRecord[],
-): MatrixSubmission[] {
+function buildMatrixSubmissions(submissions: Submission[]): MatrixSubmission[] {
   return submissions.map((submission) => {
     const applicants = submission.applicants.map((applicant) => ({
-      docs: applicantDocs(submission, applicant, uploads),
+      docs: applicantDocs(submission, applicant),
       id: applicant.id,
       name: applicant.fullName,
       passportNumber: normalizeCollectionPassportNumber(passportNumberFromApplicant(applicant)),
@@ -286,16 +230,40 @@ function applyCanonicalUpload(
   return { applied, nextSubmissions };
 }
 
+function applyCollectionDocumentUpload(
+  submissions: Submission[],
+  target: PendingCellTarget,
+  file: File,
+  passportNumber?: string,
+) {
+  if (!collectionDocumentDocTypes.has(target.docType)) {
+    return { applied: false, nextSubmissions: submissions };
+  }
+
+  let applied = false;
+  const nextSubmissions = submissions.map((submission) => {
+    if (submission.id !== target.submissionId) return submission;
+    applied = true;
+    return upsertCollectionDocumentUpload(
+      submission,
+      assignmentRecord(target, file, passportNumber),
+    );
+  });
+
+  return { applied, nextSubmissions };
+}
+
 function assignmentRecord(
   target: PendingCellTarget,
   file: File,
   passportNumber?: string,
-): CollectionUploadRecord {
+): CollectionDocumentUpload {
   return {
     applicantId: target.applicantId,
-    docType: target.docType,
+    docType: 'questionnaire',
     fileName: file.name,
     id: `collection-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    mimeType: mimeTypeForFile(file, target.docType),
     passportNumber,
     sizeBytes: file.size,
     status: 'uploaded',
@@ -380,18 +348,13 @@ export function DraftsScreen({
   onSubmissionsChange,
   submissions = [],
 }: DraftsScreenProps) {
-  const [collectionUploads, setCollectionUploads] = useState<CollectionUploadRecord[]>(() =>
-    loadCollectionUploads(),
-  );
   const [unmatchedUploads, setUnmatchedUploads] = useState<UnmatchedUpload[]>([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const [pendingCellTarget, setPendingCellTarget] = useState<PendingCellTarget | null>(null);
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
-  const visibleDrafts = useMemo(
-    () => buildMatrixSubmissions(submissions, collectionUploads),
-    [collectionUploads, submissions],
-  );
+  const visibleDrafts = useMemo(() => buildMatrixSubmissions(submissions), [submissions]);
   const summary = useMemo(() => {
     const statuses = visibleDrafts.flatMap((submission) =>
       submission.applicants.flatMap((applicant) => docTypes.map((doc) => applicant.docs[doc.key])),
@@ -404,33 +367,22 @@ export function DraftsScreen({
     };
   }, [visibleDrafts]);
 
-  useEffect(() => {
-    saveCollectionUploads(collectionUploads);
-  }, [collectionUploads]);
-
-  const commitSubmissions = (nextSubmissions: Submission[]) => {
-    void onSubmissionsChange?.(nextSubmissions);
+  const commitSubmissions = async (nextSubmissions: Submission[]) => {
+    setUploadError('');
+    try {
+      await onSubmissionsChange?.(nextSubmissions);
+      return true;
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Не удалось сохранить изменения. Попробуйте повторить загрузку.',
+      );
+      return false;
+    }
   };
 
-  const upsertCollectionUpload = (
-    target: PendingCellTarget,
-    file: File,
-    passportNumber?: string,
-  ) => {
-    setCollectionUploads((current) => [
-      assignmentRecord(target, file, passportNumber),
-      ...current.filter(
-        (record) =>
-          !(
-            record.submissionId === target.submissionId &&
-            record.applicantId === target.applicantId &&
-            record.docType === target.docType
-          ),
-      ),
-    ]);
-  };
-
-  const assignFileToTarget = (
+  const assignFileToTarget = async (
     target: PendingCellTarget,
     file: File,
     passportNumber?: string,
@@ -438,14 +390,14 @@ export function DraftsScreen({
     if (canonicalCollectionDocTypes.has(target.docType)) {
       const result = applyCanonicalUpload(submissions, target, file);
       if (result.applied) {
-        commitSubmissions(result.nextSubmissions);
-        return true;
+        return commitSubmissions(result.nextSubmissions);
       }
       return false;
     }
 
-    upsertCollectionUpload(target, file, passportNumber);
-    return true;
+    const result = applyCollectionDocumentUpload(submissions, target, file, passportNumber);
+    if (!result.applied) return false;
+    return commitSubmissions(result.nextSubmissions);
   };
 
   const triggerCellUpload = (target: PendingCellTarget) => {
@@ -457,8 +409,11 @@ export function DraftsScreen({
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file || !pendingCellTarget) return;
-    assignFileToTarget(pendingCellTarget, file, passportNumberFromCollectionText(file.name));
-    setPendingCellTarget(null);
+    void assignFileToTarget(
+      pendingCellTarget,
+      file,
+      passportNumberFromCollectionText(file.name),
+    ).finally(() => setPendingCellTarget(null));
   };
 
   const handleBulkFiles = async (files: FileList | File[]) => {
@@ -466,45 +421,52 @@ export function DraftsScreen({
     if (!uploadFiles.length) return;
     setBulkBusy(true);
     const unmatched: UnmatchedUpload[] = [];
+    const autoAssigned: UnmatchedUpload[] = [];
     let workingSubmissions = submissions;
     let submissionsChanged = false;
 
-    for (const file of uploadFiles) {
-      const detectedDocType = detectCollectionDocType(file.name);
-      const passportNumber = await detectedPassportNumber(file, detectedDocType);
-      const resolution = resolveCollectionUploadTarget({
-        applicants: applicantIndex(submissions),
-        detectedDocType,
-        passportNumber,
-      });
-
-      if (resolution.status === 'unmatched') {
-        unmatched.push({
-          ...firstApplicantTarget(submissions),
+    try {
+      for (const file of uploadFiles) {
+        const detectedDocType = detectCollectionDocType(file.name);
+        const passportNumber = await detectedPassportNumber(file, detectedDocType);
+        const resolution = resolveCollectionUploadTarget({
+          applicants: applicantIndex(submissions),
           detectedDocType,
-          file,
-          id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           passportNumber,
-          reason: resolution.reason,
         });
-        continue;
-      }
 
-      const target = resolution.target;
-      let applied = false;
+        if (resolution.status === 'unmatched') {
+          unmatched.push({
+            ...firstApplicantTarget(submissions),
+            detectedDocType,
+            file,
+            id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            passportNumber,
+            reason: resolution.reason,
+          });
+          continue;
+        }
 
-      if (canonicalCollectionDocTypes.has(target.docType)) {
-        const result = applyCanonicalUpload(workingSubmissions, target, file);
-        applied = result.applied;
+        const target = resolution.target;
+        const result = canonicalCollectionDocTypes.has(target.docType)
+          ? applyCanonicalUpload(workingSubmissions, target, file)
+          : applyCollectionDocumentUpload(workingSubmissions, target, file, passportNumber);
+
         if (result.applied) {
           workingSubmissions = result.nextSubmissions;
           submissionsChanged = true;
+          autoAssigned.push({
+            applicantId: target.applicantId,
+            detectedDocType,
+            file,
+            id: `unmatched-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            passportNumber,
+            reason: 'Сохранение не прошло. Назначьте повторно после проверки.',
+            submissionId: target.submissionId,
+          });
+          continue;
         }
-      } else {
-        applied = assignFileToTarget(target, file, passportNumber);
-      }
 
-      if (!applied) {
         unmatched.push({
           applicantId: target.applicantId,
           detectedDocType,
@@ -515,13 +477,22 @@ export function DraftsScreen({
           submissionId: target.submissionId,
         });
       }
-    }
 
-    if (submissionsChanged) {
-      commitSubmissions(workingSubmissions);
+      if (submissionsChanged) {
+        const saved = await commitSubmissions(workingSubmissions);
+        if (!saved) unmatched.push(...autoAssigned);
+      }
+      setUnmatchedUploads((current) => [...unmatched, ...current]);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Массовая загрузка прервалась. Проверьте нераспределённые файлы.',
+      );
+      setUnmatchedUploads((current) => [...unmatched, ...autoAssigned, ...current]);
+    } finally {
+      setBulkBusy(false);
     }
-    setUnmatchedUploads((current) => [...unmatched, ...current]);
-    setBulkBusy(false);
   };
 
   const handleBulkFileInput = (event: ChangeEvent<HTMLInputElement>) => {
@@ -529,9 +500,9 @@ export function DraftsScreen({
     event.currentTarget.value = '';
   };
 
-  const assignUnmatchedUpload = (upload: UnmatchedUpload) => {
+  const assignUnmatchedUpload = async (upload: UnmatchedUpload) => {
     if (!upload.submissionId || !upload.applicantId || upload.detectedDocType === 'unknown') return;
-    const applied = assignFileToTarget(
+    const applied = await assignFileToTarget(
       {
         applicantId: upload.applicantId,
         docType: upload.detectedDocType,
@@ -640,15 +611,22 @@ export function DraftsScreen({
             </p>
           </div>
           <button
-            className="hidden h-9 items-center gap-2 rounded-lg border border-white/5 bg-white/5 px-4 text-[13px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] sm:flex"
+            className="flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/5 bg-white/5 px-3 text-[12px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:cursor-wait sm:px-4 sm:text-[13px]"
             type="button"
             onClick={() => bulkInputRef.current?.click()}
             disabled={bulkBusy}
           >
             {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin text-white/70" /> : <UploadCloud className="w-4 h-4 text-white/70" />}
-            Массовая загрузка
+            <span className="hidden sm:inline">Массовая загрузка</span>
+            <span className="sm:hidden">Загрузить</span>
           </button>
         </div>
+
+        {uploadError ? (
+          <div className="border-b border-[#5b2b32]/60 bg-[#24191b]/50 px-4 py-2 text-[12px] text-[#d59aa3]" role="alert">
+            {uploadError}
+          </div>
+        ) : null}
 
         <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           <div className="min-w-[700px]">
@@ -807,7 +785,7 @@ export function DraftsScreen({
                   className="h-10 rounded-[8px] bg-[#1e1e21] px-3 text-[12px] font-medium text-white transition-colors hover:bg-[#27272b] disabled:cursor-not-allowed disabled:text-white/35"
                   disabled={!upload.submissionId || !upload.applicantId || upload.detectedDocType === 'unknown'}
                   type="button"
-                  onClick={() => assignUnmatchedUpload(upload)}
+                  onClick={() => void assignUnmatchedUpload(upload)}
                 >
                   Назначить
                 </button>
