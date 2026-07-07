@@ -202,6 +202,16 @@ button {
   background: var(--v19b-color-primary-hover);
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button:disabled,
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button:disabled:hover {
+  cursor: not-allowed;
+  border-color: var(--v19b-color-border-strong);
+  background: var(--v19b-color-control);
+  color: var(--v19b-color-text-muted);
+  box-shadow: none;
+  opacity: 0.46;
+}
+
 .vf-figma-questionnaire-screen .v19-questionnaire-title-wrap {
   display: flex;
   min-width: 0;

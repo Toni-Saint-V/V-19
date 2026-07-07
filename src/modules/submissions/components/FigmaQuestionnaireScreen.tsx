@@ -1317,6 +1317,8 @@ export function FigmaQuestionnaireScreen({
       }),
     [activeApplicantModel, submission.completeness.files, submission.files.length],
   );
+  const isCompleteButtonDisabled =
+    questionnaireStats.risks > 0 || sections.some((section) => section.status !== "complete");
 
   const currentSectionIssue = useMemo(() => {
     const currentSection = sections.find((section) => section.id === activeSection);
@@ -2185,6 +2187,7 @@ export function FigmaQuestionnaireScreen({
           </span>
           <button
             className="v19-questionnaire-complete-button"
+            disabled={isCompleteButtonDisabled}
             type="button"
             onClick={() => onComplete(completionPayload())}
           >
