@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import {
   AlertTriangle,
   ArrowRight,
+  Bot,
   CheckCircle2,
   CheckSquare,
   ChevronRight,
@@ -23,8 +24,9 @@ import {
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
 import { applyExportStateToSelection } from '../modules/submissions/submissionActions';
 import { buildExportPackageIdentity, exportSummary } from '../modules/submissions/exportRules';
+import { buildSubmissionAiHelperSurface } from '../modules/submissions/aiHelperSurface';
 import type { Submission } from '../modules/submissions/types';
-import { AdminMetricCard, AdminQueueToolbar } from './AdminSurfaceCommon';
+import { AdminMetricCard, AdminQueueToolbar, AdminToolbarSelect } from './AdminSurfaceCommon';
 
 interface ExportItem {
   id: string;
@@ -47,6 +49,8 @@ interface ExportItem {
 }
 
 type ExportQueueTab = 'all' | 'selected' | 'blocked';
+type ExportSort = 'tripDate' | 'createdAt';
+type ExportTypeFilter = 'all' | 'family' | 'single';
 
 function StatusPill({ tone, children }: { tone: 'green' | 'orange' | 'blue' | 'neutral'; children: React.ReactNode }) {
   const toneClass = {
@@ -99,14 +103,27 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
     });
 }
 
+function dateValue(value: string) {
+  const normalized = value.trim();
+  const ruDate = normalized.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+  if (ruDate) {
+    return Date.parse(`${ruDate[3]}-${ruDate[2]}-${ruDate[1]}T00:00:00.000Z`);
+  }
+  const parsed = Date.parse(normalized);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 export function AdminExportScreen({ submissions = [] }: { submissions?: Submission[] }) {
   const bridge = useVisaflowBusinessBridge();
   const realItems = useMemo(() => exportItemsFromSubmissions(submissions), [submissions]);
   const [selectedRealIds, setSelectedRealIds] = useState<string[]>([]);
   const [activeQueueTab, setActiveQueueTab] = useState<ExportQueueTab>('all');
   const [activeId, setActiveId] = useState('');
+  const [agentFilter, setAgentFilter] = useState('Все агенты');
   const [cityFilter, setCityFilter] = useState('Все города');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<ExportSort>('tripDate');
+  const [typeFilter, setTypeFilter] = useState<ExportTypeFilter>('all');
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
 
@@ -136,19 +153,32 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
     () => ['Все города', ...Array.from(new Set(enrichedItems.map((item) => item.city)))],
     [enrichedItems],
   );
+  const agentOptions = useMemo(
+    () => ['Все агенты', ...Array.from(new Set(enrichedItems.map((item) => item.agent)))],
+    [enrichedItems],
+  );
   const baseFilteredItems = useMemo(() => {
     const searchNeedle = searchQuery.trim().toLowerCase();
-    return enrichedItems.filter((item) => {
-      const cityMatches = cityFilter === 'Все города' || item.city === cityFilter;
-      const searchMatches =
-        !searchNeedle ||
-        [item.id, item.title, item.agent, item.city]
-          .join(' ')
-          .toLowerCase()
-          .includes(searchNeedle);
-      return cityMatches && searchMatches;
-    });
-  }, [cityFilter, enrichedItems, searchQuery]);
+    return enrichedItems
+      .filter((item) => {
+        const agentMatches = agentFilter === 'Все агенты' || item.agent === agentFilter;
+        const cityMatches = cityFilter === 'Все города' || item.city === cityFilter;
+        const typeMatches = typeFilter === 'all' || item.type === typeFilter;
+        const searchMatches =
+          !searchNeedle ||
+          [item.id, item.title, item.agent, item.city]
+            .join(' ')
+            .toLowerCase()
+            .includes(searchNeedle);
+        return agentMatches && cityMatches && typeMatches && searchMatches;
+      })
+      .sort((left, right) => {
+        if (sortBy === 'createdAt') {
+          return dateValue(right.approvedDate) - dateValue(left.approvedDate);
+        }
+        return dateValue(left.appointmentDate) - dateValue(right.appointmentDate);
+      });
+  }, [agentFilter, cityFilter, enrichedItems, searchQuery, sortBy, typeFilter]);
   const displayItems = useMemo(() => {
     if (activeQueueTab === 'selected') return baseFilteredItems.filter((item) => item.selected);
     if (activeQueueTab === 'blocked') return baseFilteredItems.filter((item) => item.blockers > 0);
@@ -167,6 +197,21 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
     [selectedSubmissions],
   );
   const activeItem = displayItems.find((item) => item.id === activeId) ?? selectedItems[0] ?? displayItems[0];
+  const activeSubmission = useMemo(
+    () => submissions.find((submission) => submission.id === activeItem?.id),
+    [activeItem?.id, submissions],
+  );
+  const exportHelper = useMemo(
+    () =>
+      activeSubmission
+        ? buildSubmissionAiHelperSurface({
+            role: 'admin',
+            submission: activeSubmission,
+            surface: 'export',
+          })
+        : null,
+    [activeSubmission],
+  );
   const selectedCount = selectedItems.length;
   const selectedApplicants = selectedItems.reduce((sum, item) => sum + item.applicantsCount, 0);
   const selectedFiles = selectedItems.reduce((sum, item) => sum + item.files, 0);
@@ -256,7 +301,7 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="grid h-full min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]"
+      className="v19-admin-screen grid h-full min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]"
     >
       <section className="flex min-w-0 flex-col gap-5">
         <div className="grid shrink-0 grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
@@ -299,25 +344,50 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
           <AdminQueueToolbar
-            activeTab={activeQueueTab}
             cityFilter={cityFilter}
             cityOptions={cityOptions}
             filterLabel="Сбросить фильтры выгрузки"
+            controls={
+              <>
+                <AdminToolbarSelect<ExportSort>
+                  label="Сортировка"
+                  value={sortBy}
+                  onChange={setSortBy}
+                  options={[
+                    { value: 'tripDate', label: 'Дата поездки' },
+                    { value: 'createdAt', label: 'Дата создания' },
+                  ]}
+                />
+                <AdminToolbarSelect<ExportTypeFilter>
+                  label="Тип"
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  options={[
+                    { value: 'all', label: 'Семьи и заявители' },
+                    { value: 'family', label: 'Семьи' },
+                    { value: 'single', label: 'Заявители' },
+                  ]}
+                />
+                <AdminToolbarSelect<string>
+                  label="Агент"
+                  value={agentFilter}
+                  onChange={setAgentFilter}
+                  options={agentOptions.map((agent) => ({ value: agent, label: agent }))}
+                />
+              </>
+            }
             onCityFilterChange={setCityFilter}
             onFilterClick={() => {
               setActiveQueueTab('all');
+              setAgentFilter('Все агенты');
               setCityFilter('Все города');
               setSearchQuery('');
+              setSortBy('tripDate');
+              setTypeFilter('all');
             }}
             onSearchChange={setSearchQuery}
-            onTabChange={setActiveQueueTab}
             searchPlaceholder="Поиск по ID, семье, агенту"
             searchValue={searchQuery}
-            tabs={[
-              { id: 'all', label: 'Все', count: baseFilteredItems.length },
-              { id: 'selected', label: 'Выбрано', count: baseFilteredItems.filter((item) => item.selected).length },
-              { id: 'blocked', label: 'Блокеры', count: baseFilteredItems.filter((item) => item.blockers > 0).length, tone: 'border-[#d59aa3]/45 bg-[#d59aa3]/10 text-[#e3b5bd]' },
-            ]}
           />
 
           <div className="grid shrink-0 grid-cols-[44px_minmax(220px,1fr)_150px_130px_110px] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
@@ -436,6 +506,35 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
               </div>
             )}
           </div>
+
+          {exportHelper ? (
+            <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Bot className="h-4 w-4 text-[#b8baff]" />
+                <h4 className="text-[14px] font-semibold text-white">Тихая AI-помощь</h4>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-white/[0.025] p-3">
+                <div className="text-[12px] font-semibold text-white/82">{exportHelper.title}</div>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-white/46">
+                  {exportHelper.nextStep}
+                </p>
+              </div>
+              <div className="mt-3 space-y-2">
+                {exportHelper.highlights.slice(0, 2).map((highlight) => (
+                  <div
+                    className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2"
+                    key={`${highlight.source}-${highlight.label}`}
+                  >
+                    <div className="text-[11px] font-semibold text-white/65">{highlight.label}</div>
+                    <div className="mt-0.5 text-[11px] leading-snug text-white/38">{highlight.detail}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-[10.5px] leading-relaxed text-white/32">
+                Только подсказка: выгрузку всё равно блокируют реальные pre-flight правила.
+              </div>
+            </div>
+          ) : null}
 
           <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
             <div className="mb-3 flex items-center justify-between">

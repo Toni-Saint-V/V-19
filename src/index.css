@@ -221,6 +221,37 @@ textarea {
   display: none;
 }
 
+.v19-admin-workspace,
+.v19-admin-main,
+.v19-admin-main-scroll,
+.v19-admin-main-inner,
+.v19-admin-screen {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.v19-admin-workspace {
+  overscroll-behavior: none;
+}
+
+.v19-admin-main,
+.v19-admin-main-inner,
+.v19-admin-screen {
+  overflow-x: clip;
+}
+
+.v19-admin-main-scroll {
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+
+.v19-admin-toolbar-tabs {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
+}
+
 ::selection {
   color: white;
   background: rgba(58, 69, 180, 0.55);
