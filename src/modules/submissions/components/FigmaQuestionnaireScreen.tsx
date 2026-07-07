@@ -3,13 +3,9 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
-  Building2,
   CheckCircle2,
   ChevronDown,
   Info,
-  Mail,
-  Phone,
-  User,
   Users,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
@@ -429,13 +425,6 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
     index: index + 1,
     name: applicant.fullName || (index === 0 ? "Иван Петров" : `Заявитель ${index + 1}`),
   }));
-}
-
-function applicantRoleLabel(role: Submission["applicants"][number]["role"] | undefined) {
-  if (role === "main") return "основной";
-  if (role === "spouse") return "супруга";
-  if (role === "child") return "ребенок";
-  return "заявитель";
 }
 
 function fallbackQuestionnaireFormData(
@@ -2369,41 +2358,6 @@ export function FigmaQuestionnaireScreen({
                 <div className="v19-questionnaire-fields-grid">
                   {renderSectionFields()}
                 </div>
-
-                <aside className="v19-questionnaire-context-rail">
-                  <section>
-                    <h3>Контекст заявителя</h3>
-                    <div className="v19-questionnaire-context-lines">
-                      <span>
-                        <User className="w-4 h-4" />
-                        {activeApplicantModel?.fullName ?? "Заявитель"},{" "}
-                        {applicantRoleLabel(activeApplicantModel?.role)}
-                      </span>
-                      <span>
-                        <Building2 className="w-4 h-4" />
-                        {formData.currentJob || formData.employerName || "Работа не указана"}
-                      </span>
-                      <span>
-                        <Mail className="w-4 h-4" />
-                        {formData.contactEmail || "Email не указан"}
-                      </span>
-                      <span>
-                        <Phone className="w-4 h-4" />
-                        {formData.contactPhone || "Телефон не указан"}
-                      </span>
-                    </div>
-                  </section>
-
-                  <section className="v19-questionnaire-next-action-card">
-                    <h3>Следующее лучшее действие</h3>
-                    <p>
-                      Подтвердите текущий раздел и перейдите к следующему блоку анкеты.
-                    </p>
-                    <button type="button" onClick={goToNextSection}>
-                      Следующий раздел
-                    </button>
-                  </section>
-                </aside>
               </div>
 
               <div className="v19-questionnaire-panel-footer">

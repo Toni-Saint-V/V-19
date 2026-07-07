@@ -5443,9 +5443,7 @@ body,
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-work-grid {
-    grid-template-columns:
-      minmax(var(--v19b-size-0), var(--v19b-grid-fr))
-      var(--v19b-size-340);
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
     padding: var(--v19b-size-24);
   }
 
@@ -5454,9 +5452,7 @@ body,
   }
 
   .vf-figma-questionnaire-screen .v19-questionnaire-context-rail {
-    display: grid;
-    align-content: start;
-    gap: var(--v19b-size-16);
+    display: none;
   }
 }
 
@@ -21068,7 +21064,7 @@ body,
 .vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label,
 .vf-figma-questionnaire-screen .v19-questionnaire-fields-grid label .flex-1 {
   color: #817e7e !important;
-  font-size: var(--v19b-size-13) !important;
+  font-size: var(--v19b-size-14) !important;
   font-weight: var(--v19b-weight-control) !important;
 }
 
