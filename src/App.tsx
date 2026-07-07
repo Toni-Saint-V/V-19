@@ -129,11 +129,7 @@ import {
   ExportScreen,
   type AdminWorkTab,
 } from "./modules/submissions/pages/OperationsScreens";
-import {
-  AgentApplicantsScreen,
-  AgentDraftsScreen,
-  AgentIssuesScreen,
-} from "./modules/submissions/pages/LinearAgentScreens";
+import { AgentDocumentCollectionScreen } from "./modules/submissions/pages/LinearAgentScreens";
 import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import type {
   City,
@@ -155,6 +151,7 @@ import {
   type ExportTab,
   matchesAgentTab,
   matchesReviewTab,
+  resolveLegacySurfaceRoute,
   type ReviewTab,
   surfaceDescription,
   surfaceTitle,
@@ -432,6 +429,30 @@ function reviewTabForAdminWork(tab: AdminWorkTab): ReviewTab {
   return tab;
 }
 
+function legacyRouteFromLocation() {
+  if (typeof window === "undefined") return "";
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const searchRoute =
+    searchParams.get("surface") ?? searchParams.get("route") ?? searchParams.get("screen");
+  if (searchRoute) return searchRoute;
+
+  return window.location.hash;
+}
+
+function legacyIssueTargetSubmission(
+  role: Role,
+  agentSubmissions: Submission[],
+  reviewSubmissions: Submission[],
+) {
+  const source = role === "admin" ? reviewSubmissions : agentSubmissions;
+  return (
+    source.find((submission) =>
+      submission.issues.some((issue) => issue.status !== "closed_by_admin"),
+    ) ?? source[0]
+  );
+}
+
 function MainApp() {
   const isSupabaseMode = supabaseRuntimeConfig.selected === "supabase";
   const localDemoSeedAutoLoginEnabled = canUseLocalDemoSeedAutoLogin(import.meta.env);
@@ -526,6 +547,7 @@ function MainApp() {
   const selectedExportIdsRef = useRef<string[]>(selectedExportIds);
   const localPassportFilesRef = useRef<Map<string, File>>(new Map());
   const uploadQueuesRef = useRef<Map<string, Promise<void>>>(new Map());
+  const legacyRouteAppliedRef = useRef(false);
   const [, setLocalPassportFileIds] = useState<string[]>([]);
   const [, setUploadingSubmissionIds] = useState<Set<string>>(() => new Set());
   const settingsDirty = !sameWorkspaceSettings(workspaceSettings, settingsDraft);
@@ -675,10 +697,7 @@ function MainApp() {
   });
   const isV19CollectionSurface =
     surface === "agent-actions" ||
-    surface === "agent-drafts" ||
-    surface === "agent-applicants" ||
-    surface === "agent-media" ||
-    surface === "agent-issues" ||
+    surface === "agent-documents" ||
     surface === "agent-submissions" ||
     surface === "admin-review" ||
     surface === "export";
@@ -734,32 +753,13 @@ function MainApp() {
             onClick: showAgentActions,
           },
           {
-            active: surface === "agent-drafts",
+            active: surface === "agent-documents",
             count: searchedAgentQueue.filter((submission) => submission.files.some((file) => file.status === "missing" || file.status === "needs_replacement")).length,
             icon: "Д",
-            id: "agent-drafts",
+            id: "agent-documents",
             label: "Сбор документов",
             meta: "Документы",
-            onClick: showAgentDrafts,
-          },
-          {
-            active: surface === "agent-applicants",
-            count: searchedAgentQueue.reduce((total, submission) => total + submission.applicants.length, 0),
-            icon: "З",
-            id: "agent-applicants",
-            label: "Заявители / Семьи",
-            meta: "Профили",
-            onClick: showAgentApplicants,
-          },
-          {
-            active: surface === "agent-issues",
-            count: searchedAgentQueue.reduce((total, submission) => total + submission.issues.filter((issue) => issue.status !== "closed_by_admin").length, 0),
-            icon: "!",
-            id: "agent-issues",
-            label: "Замечания",
-            meta: "Ошибки",
-            onClick: showAgentIssues,
-            tone: searchedAgentQueue.some((submission) => submission.issues.some((issue) => issue.status === "open")) ? "warning" : "default",
+            onClick: showAgentDocuments,
           },
           {
             active: surface === "settings",
@@ -1143,6 +1143,40 @@ function MainApp() {
     });
   }, [confirmClose, drawerMode]);
 
+  useEffect(() => {
+    if (legacyRouteAppliedRef.current || !authChecked || emptyRemoteWorkspace) return;
+    const legacyRoute = legacyRouteFromLocation();
+    if (!legacyRoute) return;
+
+    const resolution = resolveLegacySurfaceRoute(legacyRoute, role);
+    if (!resolution) return;
+
+    legacyRouteAppliedRef.current = true;
+    requestSettingsLeave(() => {
+      setAgentQuestionnaireOpen(false);
+      setSurface(resolution.surface);
+      if (resolution.agentTab) setAgentTab(resolution.agentTab);
+
+      if (!resolution.drawerTab) {
+        setDrawerMode("closed");
+        return;
+      }
+
+      const targetSubmission =
+        resolution.drawerTab === "issues"
+          ? legacyIssueTargetSubmission(role, searchedAgentQueue, searchedReviewQueue)
+          : role === "admin"
+            ? searchedReviewQueue[0]
+            : searchedAgentQueue[0];
+
+      if (targetSubmission) {
+        openSubmission(targetSubmission, resolution.drawerTab);
+      } else {
+        setDrawerMode("closed");
+      }
+    });
+  }, [authChecked, emptyRemoteWorkspace, role, searchedAgentQueue, searchedReviewQueue]);
+
   function rememberReturnFocus() {
     const activeElement = document.activeElement;
     returnFocusRef.current =
@@ -1265,33 +1299,12 @@ function MainApp() {
     });
   }
 
-  function showAgentDrafts() {
+  function showAgentDocuments() {
     requestSettingsLeave(() => {
-      setSurface("agent-drafts");
+      setSurface("agent-documents");
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
       const nextSubmission = searchedAgentQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentApplicants() {
-    requestSettingsLeave(() => {
-      setSurface("agent-applicants");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission = searchedAgentQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentIssues() {
-    requestSettingsLeave(() => {
-      setSurface("agent-issues");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission =
-        searchedAgentQueue.find((submission) => submission.issues.some((issue) => issue.status !== "closed_by_admin")) ?? searchedAgentQueue[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
@@ -3578,26 +3591,11 @@ function MainApp() {
             visibleSubmission={visibleAgentSubmission}
             summary={summary}
           />
-        ) : surface === "agent-drafts" || surface === "agent-media" ? (
-          <AgentDraftsScreen
+        ) : surface === "agent-documents" ? (
+          <AgentDocumentCollectionScreen
             hasSearchQuery={query.trim().length > 0}
             onClearSearch={() => setQuery("")}
             onCreate={openCreateSubmissionDrawer}
-            onOpen={openSubmission}
-            submissions={searchedAgentQueue}
-          />
-        ) : surface === "agent-applicants" ? (
-          <AgentApplicantsScreen
-            hasSearchQuery={query.trim().length > 0}
-            onClearSearch={() => setQuery("")}
-            onCreate={openCreateSubmissionDrawer}
-            onOpen={openSubmission}
-            submissions={searchedAgentQueue}
-          />
-        ) : surface === "agent-issues" ? (
-          <AgentIssuesScreen
-            hasSearchQuery={query.trim().length > 0}
-            onClearSearch={() => setQuery("")}
             onOpen={openSubmission}
             submissions={searchedAgentQueue}
           />

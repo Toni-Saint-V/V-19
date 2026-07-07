@@ -156,6 +156,7 @@ export function OperationalSidebar({
 
 const operationalIconMap: Array<[needle: string, Icon: LucideIcon]> = [
   ["actions", Menu],
+  ["documents", FileText],
   ["drafts", FileText],
   ["applicants", Users],
   ["media", ImageIcon],

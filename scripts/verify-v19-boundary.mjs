@@ -33,7 +33,6 @@ const promotedRuntimeFiles = [
 ];
 const forbiddenCopy = [
   "Люди",
-  "Семьи",
   "Группы",
   "Туристы",
   "CRM",
@@ -50,7 +49,10 @@ const forbiddenCopy = [
   "решение принято системой",
 ];
 const forbiddenReachableSurfaceTerms = [
-  '"Документы"',
+  "Заявители / Семьи",
+  "MediaScreen",
+  "DraftsScreen",
+  "IssuesScreen",
 ];
 const reachableSurfaceFiles = [
   path.join(root, "src/App.tsx"),

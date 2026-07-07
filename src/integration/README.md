@@ -16,7 +16,4 @@ The production flow is wired through `src/modules/submissions` and includes:
 
 `visaflowBusinessBridge.tsx` and `createVisaflowRuntimeBridge.ts` are kept as a compatibility/prototype bridge for standalone UI experiments. They are not the primary source of truth for the V-19 cockpit.
 
-The text references below mirror the current active entry files so the canonical flow is not accidentally replaced by the old mock shell:
-
-- `legacy-current-App.tsx.txt`
-- `legacy-current-main.tsx.txt`
+Legacy text snapshots of the old root shell were removed so `src/main.tsx` has a single reachable app path.
