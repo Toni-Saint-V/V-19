@@ -722,9 +722,6 @@ export function applyFamilySharedAnswers(
   if (input.sameSpainStay) {
     const stay = input.spainStay;
     addFamilySharedField(fieldUpdates, true, "hotel-name", stay?.name);
-    addFamilySharedField(fieldUpdates, true, "hotel-country", stay?.country);
-    addFamilySharedField(fieldUpdates, true, "hotel-city", stay?.city);
-    addFamilySharedField(fieldUpdates, true, "hotel-postal-code", stay?.postalCode);
     addFamilySharedField(fieldUpdates, true, "hotel-address", stay?.address);
     addFamilySharedField(fieldUpdates, true, "hotel-email", stay?.email);
     addFamilySharedField(fieldUpdates, true, "hotel-contact", stay?.contact);

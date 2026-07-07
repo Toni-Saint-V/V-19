@@ -324,15 +324,7 @@ function preliminaryFieldValue(
     field.id === "inviting-party-type" &&
     hasSpainStayInput(intake)
   ) {
-    return familySharedPreliminaryField(field, "Гостиница/временное жильё");
-  }
-
-  if (
-    intake.sameSpainStay &&
-    field.id === "hotel-country" &&
-    hasSpainStayInput(intake)
-  ) {
-    return familySharedPreliminaryField(field, "Spain");
+    return familySharedPreliminaryField(field, "Гостиница/временное жилье");
   }
 
   if (
@@ -351,7 +343,11 @@ function preliminaryFieldValue(
     return familySharedPreliminaryField(field, spainStayAddressValue(intake));
   }
 
-  if (intake.sameArrivalPlace && field.id === "route" && intake.arrivalPlace.trim()) {
+  if (
+    intake.sameArrivalPlace &&
+    field.id === "first-entry-country" &&
+    intake.arrivalPlace.trim()
+  ) {
     return { ...field, value: intake.arrivalPlace.trim() };
   }
 
@@ -390,7 +386,7 @@ export function completeQuestionnaire(submission: Submission): Submission {
     history: [
       {
         id: `и-${submission.id}-анкета`,
-        text: "Анкета заполнена",
+        text: "Анкета сохранена",
         at: "сейчас",
         source: "agent",
       },
