@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldCheck, DownloadCloud, Settings,
@@ -9,7 +9,6 @@ import { AdminExportScreen } from './AdminExportScreen';
 import { ReviewWorkspace } from './ReviewWorkspace';
 import { AdminReviewDrawer } from './AdminReviewDrawer';
 import { RemarkForm } from './RemarkForm';
-import SettingsScreen from '../modules/submissions/pages/SettingsScreen';
 import visaflowLogo from '../assets/visaflow-logo.png';
 import type { AccessRequest } from '../shared/authRegistration';
 import type { Submission } from '../modules/submissions/types';
@@ -21,6 +20,8 @@ import {
 
 type AdminNavSection = BridgeAdminNavSection | 'users';
 type AdminViewState = 'main' | 'review_workspace';
+
+const SettingsScreen = lazy(() => import('../modules/submissions/pages/SettingsScreen'));
 
 const accessRequestStatusCopy: Record<AccessRequest['status'], string> = {
   approved: 'approved',
@@ -280,7 +281,7 @@ export function AdminWorkspace({
           className="h-8 w-8 rounded-lg object-cover shadow-[0_0_24px_rgba(111,100,255,0.10)]"
         />
         <div className="flex-1 min-w-0">
-          <div className="text-[16px] font-medium tracking-tight">VisaFlow V-19</div>
+          <div className="text-[16px] font-[500] tracking-tight">VisaFlow V-19</div>
         </div>
         <button onClick={() => setMobileNavOpen(false)} className="md:hidden p-2 text-white/50 hover:text-white">
           <X className="w-5 h-5" />
@@ -498,25 +499,37 @@ export function AdminWorkspace({
               />
             )}
             {activeNav === 'settings' && (
-              <SettingsScreen
-                accessRequests={accessRequests}
-                accessRequestsBusy={accessRequestsBusy}
-                confirmLeave={false}
-                dirty={false}
-                email={currentEmail}
-                isSupabaseMode={false}
-                onApproveAccessRequest={onApproveAccessRequest}
-                onCancelLeave={() => undefined}
-                onConfirmLeave={() => undefined}
-                onRejectAccessRequest={onRejectAccessRequest}
-                onReset={() => undefined}
-                onSave={() => undefined}
-                onSettings={() => undefined}
-                onSignOut={onSignOut}
-                role="admin"
-                saveState="idle"
-                settings={{ compactLists: true, digest: 'instant', drawerHints: true }}
-              />
+              <Suspense
+                fallback={
+                  <div
+                    className="flex min-h-[360px] items-center justify-center rounded-2xl border border-[#242529] bg-[#161617] text-[13px] text-white/54"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    Загрузка настроек...
+                  </div>
+                }
+              >
+                <SettingsScreen
+                  accessRequests={accessRequests}
+                  accessRequestsBusy={accessRequestsBusy}
+                  confirmLeave={false}
+                  dirty={false}
+                  email={currentEmail}
+                  isSupabaseMode={false}
+                  onApproveAccessRequest={onApproveAccessRequest}
+                  onCancelLeave={() => undefined}
+                  onConfirmLeave={() => undefined}
+                  onRejectAccessRequest={onRejectAccessRequest}
+                  onReset={() => undefined}
+                  onSave={() => undefined}
+                  onSettings={() => undefined}
+                  onSignOut={onSignOut}
+                  role="admin"
+                  saveState="idle"
+                  settings={{ compactLists: true, digest: 'instant', drawerHints: true }}
+                />
+              </Suspense>
             )}
           </div>
         </div>
