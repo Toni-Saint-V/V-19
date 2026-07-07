@@ -256,6 +256,9 @@
   --v19-control-bg-active: var(--vf-selected-bg);
   --v19-control-fg: var(--vf-text-secondary);
   --v19-control-fg-active: var(--vf-text-primary);
+  --v19-questionnaire-textarea-value-color: #5f5d5d;
+  --v19-questionnaire-textarea-value-size: var(--vf-ref-size-16px);
+  --v19-questionnaire-textarea-value-weight: var(--vf-ref-font-weight-500);
   --v19b-size-0: 0;
   --v19b-shadow-panel: var(--shadow-dialog);
   --vf-figma-motion-ease: var(--v19-motion-ease-out);

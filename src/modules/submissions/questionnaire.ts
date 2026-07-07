@@ -382,7 +382,7 @@ export function updateQuestionnaireField(
                           submission,
                           update.applicantId,
                           section.title,
-                          field.label,
+                          field,
                         )
                           ? undefined
                           : field.error,
@@ -409,10 +409,12 @@ export function completeQuestionnaireSections(submission: Submission): Submissio
     ...submission,
     applicants: submission.applicants.map((applicant) => ({
       ...applicant,
-      sections: createQuestionnaireSections(
-        applicant.id,
-        applicant.fullName,
-        "complete",
+      sections: normalizeApplicantSections(applicant).map((section) =>
+        normalizeSection({
+          ...section,
+          status: "complete",
+          missing: undefined,
+        }),
       ),
     })),
     updatedAt: "сейчас",
@@ -437,7 +439,9 @@ export function flagQuestionnaireField(
           sections: applicant.sections.map((section) => ({
             ...section,
             fields: normalizeFields(section).map((field) =>
-              field.label === fieldLabel ? { ...field, error: reason } : field,
+              questionnaireFieldMatchesTarget(field, fieldLabel)
+                ? { ...field, error: reason }
+                : field,
             ),
           })),
         }),
@@ -460,7 +464,7 @@ export function clearOpenQuestionnaireIssueErrors(submission: Submission): Submi
               submission,
               applicant.id,
               section.title,
-              field.label,
+              field,
             )
               ? { ...field, error: undefined }
               : field,
@@ -515,17 +519,51 @@ function hasOpenQuestionnaireFieldIssue(
   submission: Submission,
   applicantId: string,
   sectionTitle: string,
-  fieldLabel: string,
+  field: QuestionnaireField,
 ) {
   return submission.issues.some(
     (issue) =>
       issue.status === "open" &&
       issue.target.applicantId === applicantId &&
-      issue.target.field === fieldLabel &&
+      questionnaireFieldMatchesTarget(field, issue.target.field) &&
       (issue.target.section === sectionTitle ||
         issue.target.section === "Анкета" ||
         issue.target.section === "Данные"),
   );
+}
+
+const questionnaireFieldLabelAliases: Record<string, string[]> = {
+  "birth-date": ["Дата рождения"],
+  "birth-place": ["Место рождения"],
+  "passport-expiry-date": ["Дата окончания паспорта", "Действителен до"],
+  "passport-issue-date": ["Дата выдачи паспорта", "Дата выдачи"],
+  "passport-no": ["Номер паспорта"],
+  "passport-type": ["Тип паспорта", "Тип документа", "Тип проездного документа"],
+};
+
+function questionnaireFieldMatchesTarget(
+  field: Pick<QuestionnaireField, "id" | "label">,
+  target?: string,
+) {
+  const normalizedTarget = normalizeQuestionnaireFieldLabel(target);
+  if (!normalizedTarget) return false;
+
+  const candidates = [
+    field.id,
+    field.label,
+    ...(questionnaireFieldLabelAliases[field.id] ?? []),
+  ];
+
+  return candidates.some(
+    (candidate) => normalizeQuestionnaireFieldLabel(candidate) === normalizedTarget,
+  );
+}
+
+function normalizeQuestionnaireFieldLabel(value?: string) {
+  return (value ?? "")
+    .trim()
+    .toLocaleLowerCase("ru-RU")
+    .replace(/ё/g, "е");
 }
 
 function normalizeApplicantSections(applicant: Applicant): QuestionnaireSection[] {
@@ -566,14 +604,37 @@ function findExistingSection(
   applicant: Applicant,
   blueprint: (typeof questionnaireBlueprint)[number],
 ) {
-  return applicant.sections.find((section) => {
+  const exactMatch = applicant.sections.find((section) => {
     if (section.id === `${applicant.id}-${blueprint.id}`) return true;
     if (section.id.endsWith(`-${blueprint.id}`)) return true;
     if (section.title === blueprint.title) return true;
 
-    const blueprintLabels = new Set(blueprint.fields.map((field) => field.label));
-    return section.fields.some((field) => blueprintLabels.has(field.label));
+    return false;
   });
+
+  if (exactMatch) return exactMatch;
+
+  return applicant.sections.find((section) => {
+    if (belongsToDifferentBlueprint(section, blueprint.id)) return false;
+
+    const matchingLabelCount = blueprint.fields.filter((blueprintField) =>
+      section.fields.some((field) => field.label === blueprintField.label),
+    ).length;
+    const minimumLabelMatch = Math.max(2, Math.ceil(blueprint.fields.length * 0.6));
+
+    return matchingLabelCount >= minimumLabelMatch;
+  });
+}
+
+function belongsToDifferentBlueprint(
+  section: QuestionnaireSection,
+  blueprintId: string,
+) {
+  return questionnaireBlueprint.some(
+    (candidate) =>
+      candidate.id !== blueprintId &&
+      (section.id.endsWith(`-${candidate.id}`) || section.title === candidate.title),
+  );
 }
 
 function mergeSeedField(

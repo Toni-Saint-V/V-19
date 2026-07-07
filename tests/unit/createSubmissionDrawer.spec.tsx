@@ -109,7 +109,9 @@ describe("CreateSubmissionDrawer passport readiness", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Паспорт принимается только в формате PDF, JPEG или PNG."),
+        screen.getByText(
+          "Паспорт принимается только в формате JPEG, PNG, WEBP, HEIC, HEIF или PDF.",
+        ),
       ).toBeVisible();
     });
     expect(nextButton).toBeDisabled();

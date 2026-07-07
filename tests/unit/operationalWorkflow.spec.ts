@@ -374,6 +374,44 @@ describe("operational workflow logic spine", () => {
     });
   });
 
+  test("creates family drafts with shared Russia and Spain addresses for every applicant", () => {
+    const family = createDraftSubmission({
+      applicantNames: ["ANTON VOLKOV", "IRINA VOLKOVA"],
+      city: "Москва",
+      familyCount: 2,
+      preliminaryIntake: {
+        arrivalPlace: "",
+        homeAddress: "NEVSKY 10",
+        sameArrivalPlace: false,
+        sameHomeAddress: true,
+        sameSpainStay: true,
+        sameTripDates: false,
+        spainStayAddress: "CALLE 10",
+        spainStayCity: "MADRID",
+        spainStayName: "HOTEL CENTRAL",
+        tripDateFrom: "",
+        tripDateTo: "",
+      },
+      submissions: [],
+      type: "family",
+    });
+
+    for (const applicantIndex of [0, 1]) {
+      expect(field(family, applicantIndex, "home-address")).toMatchObject({
+        reviewOriginSource: "family_shared",
+        reviewSource: "family_shared",
+        reviewState: "needs_review",
+        value: "NEVSKY 10",
+      });
+      expect(field(family, applicantIndex, "hotel-name")).toMatchObject({
+        reviewSource: "family_shared",
+        value: "HOTEL CENTRAL",
+      });
+      expect(field(family, applicantIndex, "hotel-address")?.value).toBe("CALLE 10");
+      expect(field(family, applicantIndex, "passport-no")?.value).toBe("");
+    }
+  });
+
   test("resolves an issue to the exact questionnaire field without closing it", () => {
     const submission = withIssue(
       createDraftSubmission({
@@ -1083,6 +1121,8 @@ function completeInProgressSubmission(): Submission {
           "passport-issue-date": mainReference.passportIssuedAt,
           "passport-no": mainReference.passportNumber,
           surname: mainReference.surname,
+          "arrival-date": "2026-07-10",
+          "departure-date": "2026-07-18",
         },
       ),
     ),

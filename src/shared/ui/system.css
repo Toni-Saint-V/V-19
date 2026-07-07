@@ -25616,6 +25616,53 @@ p {
   gap: var(--v19-space-sm);
 }
 
+.v19-family-shared-fields {
+  display: grid;
+  gap: var(--vf-ref-size-8px);
+}
+
+.v19-family-shared-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--vf-ref-size-8px);
+}
+
+.v19-family-shared-fields-full {
+  grid-column: 1 / -1;
+}
+
+.v19-family-shared-fields label {
+  display: grid;
+  min-width: 0;
+  gap: var(--vf-ref-size-5px);
+}
+
+.v19-family-shared-fields span {
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-58);
+  font-size: var(--vf-ref-size-11px);
+  line-height: 1.25;
+}
+
+.v19-family-shared-fields input {
+  min-width: 0;
+  min-height: var(--vf-ref-size-38px);
+  border: var(--vf-ref-size-1px) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-size-8);
+  background: var(--v19b-color-app);
+  color: var(--v19-fg);
+  font-size: var(--vf-ref-size-12px);
+  outline: none;
+  padding: 0 var(--vf-ref-size-10px);
+}
+
+.v19-family-shared-fields input::placeholder {
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-28);
+}
+
+.v19-family-shared-fields input:focus {
+  border-color: var(--vf-ref-color-rgb-255-255-255-0neg-24);
+}
+
 .create-submission-passport-upload-zone {
   min-height: var(--v19b-size-360);
 }
@@ -27460,6 +27507,12 @@ p {
   padding-bottom: var(--vf-ref-size-12px);
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control.is-textarea {
+  color: var(--v19-questionnaire-textarea-value-color);
+  font-size: var(--v19-questionnaire-textarea-value-size);
+  font-weight: var(--v19-questionnaire-textarea-value-weight);
+}
+
 .v19-questionnaire-field-control.is-normal:hover {
   border-color: var(--vf-ref-color-hexneg-2e2f34);
 }
@@ -27571,6 +27624,19 @@ p {
   border-radius: var(--vf-ref-size-10px);
   background: var(--vf-ref-color-rgb-0-0-0-0neg-16);
   text-align: left;
+  overflow: hidden;
+}
+
+.v19-passport-extraction-sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--vf-ref-color-rgb-255-255-255-0neg-20),
+    transparent
+  );
+  pointer-events: none;
 }
 
 .v19-passport-live-indicator > i,
@@ -27713,6 +27779,20 @@ p {
 
 .v19-passport-queue-card.is-green {
   border-color: var(--vf-green-soft-border, var(--vf-ref-color-rgba-69-208-130-0neg-48));
+}
+
+.v19-passport-queue-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--v19b-size-1);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--vf-yellow-soft-text, var(--vf-ref-color-hexneg-f4c866)),
+    transparent
+  );
 }
 
 .v19-passport-queue-state {
@@ -28308,6 +28388,14 @@ p {
   color: var(--vf-text-primary) !important;
   box-shadow: none !important;
   font-size: var(--vf-ref-size-12px) !important;
+}
+
+.ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)
+  .vf-figma-questionnaire-screen
+  .v19-questionnaire-field-control.is-textarea {
+  color: var(--v19-questionnaire-textarea-value-color) !important;
+  font-size: var(--v19-questionnaire-textarea-value-size) !important;
+  font-weight: var(--v19-questionnaire-textarea-value-weight) !important;
 }
 
 .ops-shell:is(.surface-agent-actions, .surface-agent-submissions, .surface-admin-review)

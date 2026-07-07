@@ -18948,6 +18948,12 @@ body,
   appearance: textfield;
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control.is-textarea {
+  color: var(--v19-questionnaire-textarea-value-color) !important;
+  font-size: var(--v19-questionnaire-textarea-value-size) !important;
+  font-weight: var(--v19-questionnaire-textarea-value-weight) !important;
+}
+
 /* Admin ReviewDrawer source lock: clean 5 reference shell, rows, remark modal. */
 .ops-shell.has-open-drawer.role-admin.surface-admin-review .admin-review-backdrop {
   background: var(--v19b-admin-drawer-backdrop) !important;

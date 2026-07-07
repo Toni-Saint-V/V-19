@@ -6,7 +6,6 @@ import {
   FileText,
   Image as ImageIcon,
   ScanLine,
-  Search,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -15,7 +14,6 @@ import {
   CANONICAL_CITIES,
   type City,
   type PassportExtractedField,
-  type PassportExtractedFieldKey,
   type PassportUploadDraft,
   type PreliminaryIntakeDraft,
   type Submission,
@@ -25,11 +23,9 @@ import {
   passportScanUploadAccept,
   passportScanUploadFormatLabel,
 } from "../mediaStorage";
-import { QuestionnaireSectionPreviewCard } from "./QuestionnaireWorkspacePrimitives";
 
 const maxFamilyApplicants = 6;
 
-type CreateSubmissionStep = "passport" | "questionnaire";
 type PassportLiveTone = "red" | "yellow" | "green";
 
 const submissionTypeOptions: Array<{ label: string; value: Submission["type"] }> = [
@@ -45,36 +41,6 @@ const firstStepFamilyQuestions: Array<{
   { key: "sameSpainStay", label: "Одно проживание в Испании у всех?" },
 ];
 
-const extractedFieldPreviewItems: Array<{
-  key: PassportExtractedFieldKey;
-  label: string;
-}> = [
-  { key: "surname", label: "Фамилия" },
-  { key: "firstName", label: "Имя" },
-  { key: "birthDate", label: "Дата рождения" },
-  { key: "birthPlace", label: "Место рождения" },
-  { key: "birthCountry", label: "Страна рождения" },
-  { key: "citizenship", label: "Гражданство" },
-  { key: "passportNumber", label: "Номер паспорта" },
-  { key: "passportIssuedAt", label: "Дата выдачи" },
-  { key: "passportIssuePlace", label: "Место выдачи" },
-  { key: "passportExpiresAt", label: "Дата окончания паспорта" },
-];
-
-const mediaRequirements = [
-  ["Загранпаспорт", "passport_scan"],
-  ["Селфи", "selfie"],
-  ["Селфи N2", "selfie_2"],
-];
-
-const questionnaireSections = [
-  "Личные данные",
-  "Паспорт",
-  "Адрес и контакты",
-  "Работа и занятость",
-  "Маршрут и проживание",
-];
-
 const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
   arrivalPlace: "",
   homeAddress: "",
@@ -88,9 +54,6 @@ const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
   tripDateFrom: "",
   tripDateTo: "",
 };
-
-const e2ePassportMockEnabled =
-  import.meta.env.DEV && import.meta.env.VITE_E2E_PASSPORT_MOCK_ENABLED === "true";
 
 type PassportUploadVisualStatus =
   | "empty"
@@ -244,61 +207,6 @@ function passportLiveState({
   };
 }
 
-function passportUploadFieldValue(
-  upload: PassportUploadDraft | undefined,
-  key: PassportExtractedFieldKey,
-) {
-  return upload?.extractedFields.find((field) => field.key === key)?.value.trim() ?? "";
-}
-
-function e2ePassportNumber(fileName: string) {
-  const hash = [...fileName].reduce(
-    (current, character) => (current * 31 + character.charCodeAt(0)) % 1_000_000,
-    0,
-  );
-
-  return `900${String(hash).padStart(6, "0")}`.slice(0, 9);
-}
-
-function e2ePassportMockFields(fileName: string): PassportExtractedField[] | null {
-  if (!e2ePassportMockEnabled) return null;
-
-  const match = /^e2e-passport-(.+)\.jpe?g$/iu.exec(fileName.trim());
-  if (!match?.[1]) return null;
-
-  const [surname = "Новый", ...givenParts] = match[1]
-    .replace(/[_-]+/g, " ")
-    .trim()
-    .split(/\s+/);
-  const firstName = givenParts.join(" ") || "заявитель";
-  const values: Array<
-    [PassportExtractedFieldKey, string, PassportExtractedField["confidence"]]
-  > = [
-    ["surname", surname, "high"],
-    ["firstName", firstName, "high"],
-    ["birthDate", "01.01.1990", "medium"],
-    ["birthPlace", "MOSCOW", "low"],
-    ["birthCountry", "USSR", "medium"],
-    ["citizenship", "Russian Federation", "medium"],
-    ["gender", "Male - Мужской", "medium"],
-    ["passportType", "Ordinary Passport", "medium"],
-    ["passportNumber", e2ePassportNumber(fileName), "high"],
-    ["passportIssueCountry", "Russian Federation", "medium"],
-    ["passportIssuedAt", "01.01.2020", "medium"],
-    ["passportIssuePlace", "FMS 77001", "low"],
-    ["passportExpiresAt", "01.01.2030", "medium"],
-  ];
-
-  return values.map(([key, value, confidence]) => ({
-    confidence,
-    key,
-    needsManualReview: true,
-    source: "passport_scan",
-    value,
-    verified: false,
-  }));
-}
-
 export function CreateSubmissionDrawer({
   city,
   familyCount,
@@ -318,6 +226,7 @@ export function CreateSubmissionDrawer({
   onCreate: (
     passportUploads?: PassportUploadDraft[],
     preliminaryIntake?: PreliminaryIntakeDraft,
+    options?: { openQuestionnaire?: boolean },
   ) => void;
   onCity: (city: City) => void;
   onFamilyCount: (count: number) => void;
@@ -332,7 +241,6 @@ export function CreateSubmissionDrawer({
   const [passportUploads, setPassportUploads] = useState<PassportUploadDraft[]>([]);
   const [passportFileError, setPassportFileError] = useState("");
   const [activeApplicantIndex, setActiveApplicantIndex] = useState(0);
-  const [createStep, setCreateStep] = useState<CreateSubmissionStep>("passport");
   const [isDragging, setIsDragging] = useState(false);
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
     emptyPreliminaryIntakeDraft,
@@ -440,24 +348,6 @@ export function CreateSubmissionDrawer({
     await Promise.all(
       nextUploads.map(async (upload) => {
         try {
-          const e2eFields = e2ePassportMockFields(upload.fileName);
-          if (e2eFields) {
-            if (uploadBatchRef.current !== nextBatch) return;
-            setPassportFileError("");
-            setPassportUploads((current) =>
-              current.map((candidate) =>
-                candidate.id === upload.id
-                  ? {
-                      ...candidate,
-                      extractedFields: e2eFields,
-                      status: "ready",
-                    }
-                  : candidate,
-              ),
-            );
-            return;
-          }
-
           const result = await invokePassportExtraction({
             applicantIndex: upload.applicantIndex,
             localFile: upload.file,
@@ -509,19 +399,17 @@ export function CreateSubmissionDrawer({
     );
   }
 
-  function openQuestionnaireStep() {
+  function createAndOpenQuestionnaire() {
     if (!passportReady) {
       showPassportNotReadyAlert();
       return;
     }
 
-    setCreateStep("questionnaire");
+    onCreate(passportUploads, preliminaryIntake, { openQuestionnaire: true });
   }
 
   function handlePrimaryAction() {
-    if (createStep === "passport") return openQuestionnaireStep();
-
-    onCreate(passportUploads, preliminaryIntake);
+    createAndOpenQuestionnaire();
   }
 
   function handleDragOver(event: DragEvent) {
@@ -561,9 +449,7 @@ export function CreateSubmissionDrawer({
   return (
     <motion.div
       animate={{ opacity: 1, y: 0 }}
-      className={`vf-figma-surface create-submission-drawer ${
-        createStep === "passport" ? "is-passport-step" : "is-questionnaire-step"
-      } v19-create-drawer-shell`}
+      className="vf-figma-surface create-submission-drawer is-passport-step v19-create-drawer-shell"
       exit={
         prefersReducedMotion
           ? { opacity: 0, y: 0 }
@@ -608,7 +494,7 @@ export function CreateSubmissionDrawer({
         </div>
 
         <span className="px-2 py-0.5 rounded-[var(--v19b-size-4)] bg-white/5 border border-white/5 text-[var(--v19b-size-10)] uppercase tracking-wider text-white/60 font-mono">
-          Шаг&nbsp; {createStep === "passport" ? "1" : "2"}/2
+          OCR
         </span>
 
         <button
@@ -624,14 +510,11 @@ export function CreateSubmissionDrawer({
       <h2 className="sr-only">Новая подача</h2>
       <div className="sr-only" role="group" aria-label="Предварительная заявка" />
       <div className="sr-only" role="group" aria-label="Заявители в подаче" />
-      {createStep === "passport" ? (
-        <h2 className="sr-only">Загрузите паспорт</h2>
-      ) : null}
+      <h2 className="sr-only">Загрузите паспорт</h2>
 
       <div className="flex-1 overflow-y-auto p-6 lg:p-10">
         <div className="create-submission-passport-shell mx-auto h-full">
-          {createStep === "passport" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-12 min-h-full">
               <div className="flex flex-col gap-6">
                 <section
                   className="rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
@@ -782,6 +665,10 @@ export function CreateSubmissionDrawer({
                           </span>
                         </div>
                       ))}
+                      <FamilySharedAddressFields
+                        preliminaryIntake={preliminaryIntake}
+                        onUpdate={updatePreliminaryIntake}
+                      />
                     </div>
                   </section>
                 ) : null}
@@ -843,6 +730,22 @@ export function CreateSubmissionDrawer({
                     role="status"
                     aria-live="polite"
                   >
+                    {activeUpload?.status === "extracting" ? (
+                      <motion.b
+                        aria-hidden="true"
+                        className="v19-passport-extraction-sweep"
+                        animate={
+                          prefersReducedMotion
+                            ? { opacity: 0.25 }
+                            : { x: ["-120%", "120%"], opacity: [0, 0.5, 0] }
+                        }
+                        transition={{
+                          duration: 1.35,
+                          ease: "easeInOut",
+                          repeat: Infinity,
+                        }}
+                      />
+                    ) : null}
                     <i aria-hidden="true" />
                     <span>
                       <strong>{liveState.title}</strong>
@@ -974,13 +877,31 @@ export function CreateSubmissionDrawer({
                           <motion.div
                             key={upload.id}
                             layout
-                            animate={{ opacity: 1, y: 0 }}
+                            animate={{
+                              opacity: 1,
+                              scale: isProcessing && !prefersReducedMotion ? [1, 1.012, 1] : 1,
+                              y: 0,
+                            }}
                             className={`v19-passport-queue-card is-${tone} p-3.5 rounded-[var(--v19b-radius-row)] bg-[var(--v19b-color-page)] border border-[var(--v19b-color-border)] relative overflow-hidden group hover:border-[var(--v19b-color-border-selected)] transition-colors`}
                             exit={{ opacity: 0, scale: 0.95 }}
                             initial={{ opacity: 0, y: 10 }}
+                            transition={{
+                              duration: 0.18,
+                              repeat: isProcessing && !prefersReducedMotion ? Infinity : 0,
+                              repeatDelay: 0.72,
+                            }}
                           >
                             {isProcessing ? (
-                              <div className="absolute bottom-0 left-0 h-[var(--v19b-size-1)] bg-white/20 w-full animate-pulse" />
+                              <motion.div
+                                aria-hidden="true"
+                                className="v19-passport-queue-progress"
+                                animate={{ x: ["-100%", "100%"] }}
+                                transition={{
+                                  duration: 1.2,
+                                  ease: "easeInOut",
+                                  repeat: Infinity,
+                                }}
+                              />
                             ) : null}
                             <div className="flex items-start gap-3">
                               <div className="w-9 h-9 shrink-0 rounded-[var(--v19b-size-8)] bg-[var(--v19b-color-panel-strong)] border border-[var(--v19b-color-border-strong)] flex items-center justify-center mt-0.5">
@@ -1030,10 +951,10 @@ export function CreateSubmissionDrawer({
                   ) : (
                     <div className="h-full min-h-[var(--v19b-size-240)] flex flex-col items-center justify-center text-center px-4">
                       <div className="w-10 h-10 rounded-full bg-[var(--v19b-color-panel)] border border-[var(--v19b-color-border)] flex items-center justify-center mb-3">
-                        <Search className="w-4 h-4 text-white/20" />
+                        <ScanLine className="w-4 h-4 text-white/20" />
                       </div>
                       <p className="text-[var(--v19b-size-12)] text-white/60 font-light">
-                        Локальная очередь пуста.
+                        Выберите паспорт, чтобы начать реальное извлечение.
                       </p>
                     </div>
                   )}
@@ -1041,155 +962,87 @@ export function CreateSubmissionDrawer({
 
               </div>
             </div>
-          ) : null}
-
-          {createStep === "questionnaire" ? (
-            <section className="cf-grid" aria-label="Следующие шаги анкеты">
-              <article className="cf-panel extraction-review-placeholder">
-                <div className="create-panel-head">
-                  <div>
-                    <p className="kicker">Паспорт</p>
-                    <h3>Извлечённые данные паспорта</h3>
-                  </div>
-                  <span>{passportUploads.length ? "Подставятся" : "Нет файла"}</span>
-                </div>
-                <div className="ef-preview">
-                  {extractedFieldPreviewItems.map((item) => {
-                    const value = passportUploadFieldValue(activeUpload, item.key);
-
-                    return (
-                      <label key={item.key}>
-                        <span>{item.label}</span>
-                        <input
-                          readOnly
-                          value={
-                            value ||
-                            (passportUploads.length
-                              ? "Требует проверки"
-                              : "Сначала загрузите паспорт")
-                          }
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-                <p>
-                  Данные паспорта требуют проверки оператором. Автозаполнение является
-                  предварительным и не подтверждает корректность документа.
-                </p>
-              </article>
-
-              <article className="cf-panel media-requirements">
-                <div className="create-panel-head">
-                  <div>
-                    <p className="kicker">Файлы</p>
-                    <h3>Обязательные файлы</h3>
-                  </div>
-                  <span>{applicantCount} заяв.</span>
-                </div>
-                <div className="mr-list">
-                  {mediaRequirements.map(([title, meta]) => (
-                    <div key={title}>
-                      <strong>{title}</strong>
-                      <span>{meta}</span>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  className="secondary-button mr-action"
-                  type="button"
-                  onClick={handlePrimaryAction}
-                >
-                  Открыть загрузку
-                </button>
-              </article>
-
-              <article className="cf-panel">
-                <div className="create-panel-head">
-                  <div>
-                    <p className="kicker">Анкета</p>
-                    <h3>Разделы анкеты</h3>
-                  </div>
-                  <span>Черновик</span>
-                </div>
-                <div className="qs-preview">
-                  {questionnaireSections.map((section) => (
-                    <QuestionnaireSectionPreviewCard
-                      className="qs-item"
-                      key={section}
-                      title={section}
-                      meta="Заполнить после сохранения"
-                    />
-                  ))}
-                </div>
-              </article>
-            </section>
-          ) : null}
         </div>
       </div>
 
-      {createStep === "passport" ? (
-        <footer className="v19-create-drawer-footer">
-          <span className="text-[var(--v19b-size-12)] text-white/60">
-            {type === "family" ? `${applicantCount} заявителя. ` : ""}
-            {passportReadinessSummary}
-          </span>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              disabled={!passportReady}
-              className={`v19-create-footer-action v19-create-footer-action--secondary ${
-                passportReady ? "is-enabled" : "is-disabled"
-              }`}
-              type="button"
-              onClick={() => onCreate(passportUploads, preliminaryIntake)}
-            >
-              Сохранить черновик
-            </button>
-            <button
-              disabled={!passportReady}
-              className={`create-passport-next v19-create-footer-action v19-create-footer-action--primary ${
-                passportReady ? "is-enabled" : "is-disabled"
-              }`}
-              type="button"
-              onClick={handlePrimaryAction}
-            >
-              Продолжить
-            </button>
-          </div>
-        </footer>
+      <footer className="v19-create-drawer-footer">
+        <span className="text-[var(--v19b-size-12)] text-white/60">
+          {type === "family" ? `${applicantCount} заявителя. ` : ""}
+          {passportReadinessSummary}
+        </span>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            disabled={!passportReady}
+            className={`v19-create-footer-action v19-create-footer-action--secondary ${
+              passportReady ? "is-enabled" : "is-disabled"
+            }`}
+            type="button"
+            onClick={() => onCreate(passportUploads, preliminaryIntake)}
+          >
+            Сохранить черновик
+          </button>
+          <button
+            disabled={!passportReady}
+            className={`create-passport-next v19-create-footer-action v19-create-footer-action--primary ${
+              passportReady ? "is-enabled" : "is-disabled"
+            }`}
+            type="button"
+            onClick={handlePrimaryAction}
+          >
+            Создать и открыть анкету
+          </button>
+        </div>
+      </footer>
+    </motion.div>
+  );
+}
+
+function FamilySharedAddressFields({
+  onUpdate,
+  preliminaryIntake,
+}: {
+  onUpdate: <Key extends keyof PreliminaryIntakeDraft>(
+    key: Key,
+    value: PreliminaryIntakeDraft[Key],
+  ) => void;
+  preliminaryIntake: PreliminaryIntakeDraft;
+}) {
+  return (
+    <div className="v19-family-shared-fields" aria-label="Общие адреса семьи">
+      {preliminaryIntake.sameHomeAddress ? (
+        <label>
+          <span>Адрес проживания в России</span>
+          <input
+            value={preliminaryIntake.homeAddress}
+            placeholder="Улица, дом, квартира, город"
+            onChange={(event) => onUpdate("homeAddress", event.currentTarget.value)}
+          />
+        </label>
       ) : null}
 
-      {createStep === "questionnaire" ? (
-        <footer className="shrink-0 px-6 lg:px-10 py-4 border-t border-[var(--v19b-color-border)] bg-[var(--v19b-color-deep-drawer-90)] backdrop-blur-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-[var(--v19b-size-12)] text-white/60">
-            Создайте черновик, чтобы загрузить обязательные файлы.
-          </span>
-          <div className="flex gap-3">
-            <button
-              className="v19-create-footer-action v19-create-footer-action--secondary is-enabled"
-              type="button"
-              onClick={() => setCreateStep("passport")}
-            >
-              Назад
-            </button>
-            <button
-              className="v19-create-footer-action v19-create-footer-action--secondary is-enabled"
-              type="button"
-              onClick={() => onCreate(passportUploads, preliminaryIntake)}
-            >
-              Сохранить черновик
-            </button>
-            <button
-              className="v19-create-footer-action v19-create-footer-action--primary is-enabled"
-              type="button"
-              onClick={handlePrimaryAction}
-            >
-              Создать и открыть
-            </button>
-          </div>
-        </footer>
+      {preliminaryIntake.sameSpainStay ? (
+        <div className="v19-family-shared-fields-grid">
+          <label>
+            <span>Место проживания в Испании</span>
+            <input
+              value={preliminaryIntake.spainStayName}
+              placeholder="Отель или адрес принимающей стороны"
+              onChange={(event) => onUpdate("spainStayName", event.currentTarget.value)}
+            />
+          </label>
+          <label className="v19-family-shared-fields-full">
+            <span>Адрес в Испании</span>
+            <input
+              value={preliminaryIntake.spainStayAddress}
+              placeholder="Calle, дом, индекс"
+              onChange={(event) =>
+                onUpdate("spainStayAddress", event.currentTarget.value)
+              }
+            />
+          </label>
+        </div>
       ) : null}
-    </motion.div>
+    </div>
   );
 }
 
