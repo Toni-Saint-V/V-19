@@ -1,4 +1,5 @@
 import { submissionBelongsToAgent } from "./ownership";
+import { BLS_CITY_OPTIONS } from "./questionnaire";
 import type { AgentOwnerId, Submission, SubmissionStatus } from "./types";
 import { blockerCount, fixedIssueCount, openIssueCount } from "./status";
 
@@ -84,6 +85,7 @@ export function searchSubmissions(
 
 export function cityFilterValuesForSubmissions(submissions: Submission[]): string[] {
   const cities = new Set<string>();
+  for (const city of BLS_CITY_OPTIONS) cities.add(city);
 
   for (const submission of submissions) {
     if (submission.city.trim()) cities.add(submission.city.trim());

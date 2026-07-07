@@ -27,7 +27,10 @@ import {
 } from "../../src/modules/submissions/exportContract";
 import { buildApplicantDocumentFileName } from "../../src/modules/submissions/filenamePolicy";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
-import { createQuestionnaireSections } from "../../src/modules/submissions/questionnaire";
+import {
+  BLS_CITY_OPTIONS,
+  createQuestionnaireSections,
+} from "../../src/modules/submissions/questionnaire";
 import {
   cityFilterValuesForSubmissions,
   searchSubmissions,
@@ -654,8 +657,7 @@ describe("V-19 export workbook contract", () => {
     expect(searchSubmissions([submission], "", "Москва")).toEqual([]);
     expect(cityFilterValuesForSubmissions([submission])).toEqual([
       "Все города",
-      "Казань",
-      "Санкт-Петербург",
+      ...[...BLS_CITY_OPTIONS].sort((left, right) => left.localeCompare(right, "ru")),
     ]);
   });
 
