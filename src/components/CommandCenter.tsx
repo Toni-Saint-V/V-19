@@ -37,6 +37,11 @@ import {
   searchAgentActions,
   type AgentActionItem,
 } from '../modules/submissions/agentActions';
+import {
+  agentAgencyLabel,
+  agentDisplayName,
+  agentInitials,
+} from '../modules/submissions/agentDirectory';
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
@@ -183,6 +188,9 @@ export function CommandCenter({
   );
   const actionQueue = useMemo(() => agentActionQueue(canonicalSubmissions ?? []), [canonicalSubmissions]);
   const visibleActions = useMemo(() => searchAgentActions(actionQueue.open, searchQuery), [actionQueue.open, searchQuery]);
+  const agentName = agentDisplayName(agentId);
+  const agentAgency = agentAgencyLabel(agentId);
+  const agentAvatar = agentInitials(agentId);
   const selectedCanonicalSubmission = useMemo(
     () => canonicalSubmissions?.find((submission) => submission.id === selectedRow),
     [canonicalSubmissions, selectedRow],
@@ -322,6 +330,15 @@ export function CommandCenter({
         </div>
       ) : onSignOut ? (
         <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
+          <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#242529] bg-white text-[12px] font-bold text-[#0a0a0b]">
+              {agentAvatar}
+            </span>
+            <div className="min-w-0 text-left">
+              <div className="truncate text-[13px] font-medium leading-5 text-white">{agentName}</div>
+              <div className="truncate text-[11px] leading-4 text-white/50">{agentAgency}</div>
+            </div>
+          </div>
           <button
             onClick={() => void onSignOut()}
             className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
@@ -464,7 +481,7 @@ export function CommandCenter({
         {mobileNavOpen && (
           <div className="md:hidden">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMobileNavOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
-            <motion.aside initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'spring', damping: 25, stiffness: 250 }} className="fixed inset-y-0 left-0 w-[280px] bg-[#161617] border-r border-[#202124] z-50 flex flex-col py-3 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+            <motion.aside initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'spring', damping: 25, stiffness: 250 }} className="fixed inset-y-0 left-0 w-[280px] bg-[#141416] border-r border-[#202124] z-50 flex flex-col py-3 font-medium shadow-[0_0_40px_rgba(0,0,0,0.5)]">
               {renderNavContent()}
             </motion.aside>
           </div>

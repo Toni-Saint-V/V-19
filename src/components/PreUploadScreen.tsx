@@ -301,7 +301,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         <div className="grid h-full min-h-full w-full grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] xl:gap-6 xl:p-6">
           <section className="flex h-full min-h-0 flex-col">
             <motion.div
-              className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)] lg:p-6 xl:rounded-3xl xl:border xl:border-[#242529]"
+              className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-5 pb-2 pt-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)] lg:p-6 xl:rounded-3xl xl:border xl:border-[#242529]"
             >
               <motion.div
                 aria-hidden
