@@ -8,6 +8,7 @@ import type {
   Submission,
 } from "./types";
 import { agentOwnerDisplayName } from "./ownership";
+import { productionReadinessBlockerReasons } from "./productionReadinessGate";
 import {
   type CanonicalSubmissionStatus,
   canonicalRequiredMediaReadiness,
@@ -104,6 +105,7 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   );
   const rows = buildExportRows(submissions);
   const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
+  const productionGateBlockers = productionReadinessBlockerReasons(submissions);
   const openBlockingIssues = submissions.filter((submission) =>
     submission.issues.some(
       (issue) =>
@@ -144,6 +146,10 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
 
   if (rowsWithMissingApplicantName.length > 0) {
     blockers.push({ reason: "В строках выгрузки есть заявители без ФИО" });
+  }
+
+  for (const reason of productionGateBlockers) {
+    blockers.push({ reason: `Production readiness gate: ${reason}` });
   }
 
   if (openBlockingIssues.length > 0) {

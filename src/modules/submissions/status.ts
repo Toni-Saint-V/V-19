@@ -24,6 +24,7 @@ import {
   isKnownContractRole,
   isStatusTransitionAllowed,
 } from "./domainContract";
+import { firstProductionReadinessBlocker } from "./productionReadinessGate";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -248,6 +249,13 @@ export const transitionMatrix: Record<
 const packageLevelExportActionReason =
   "Формирование Excel выполняется только через пакет выгрузки";
 const missingTripDateRangeReason = "Укажите даты поездки перед отправкой";
+const productionReadinessGateActions = new Set<SubmissionAction>([
+  "submit_for_review",
+  "submit_corrections",
+  "accept",
+  "close_issues_accept",
+  "mark_exported",
+]);
 
 export function openIssueCount(submission: Submission) {
   return submission.issues.filter((issue) => issue.status === "open").length;
@@ -475,6 +483,11 @@ export function canPerformAction(
     (submission.exportState !== "file_downloaded" || !submission.exportPackage)
   ) {
     return { ok: false, reason: "Сначала сформируйте и скачайте пакет выгрузки" };
+  }
+
+  if (productionReadinessGateActions.has(action)) {
+    const blocker = firstProductionReadinessBlocker(submission);
+    if (blocker) return { ok: false, reason: blocker.detail };
   }
 
   return { ok: true };
