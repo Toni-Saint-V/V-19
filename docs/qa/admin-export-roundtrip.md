@@ -43,6 +43,7 @@ Covered by `tests/unit/exportWorkbook.spec.ts` and `tests/unit/v19SubmissionRule
 - ZIP name is deterministic: `visaflow-export-${idempotencyKey}.zip`.
 - Applicant media filenames use passport number when available; otherwise they use the existing safe `missing-passport_*` fallback.
 - Required media/storage problems block ZIP generation before browser download.
+- ZIP folder numbering and `manifest.json` now use the same deterministic submission order as the workbook/identity contract.
 
 ## 9. Returned PDF/list upload behavior
 
@@ -56,6 +57,7 @@ Covered by `tests/unit/returnedPdfOperationalWorkflow.spec.ts`: owner agent sees
 
 - Domain `generateExport` remains admin-only.
 - App-level export completion handler now refuses non-admin workspace execution.
+- Admin export UI prepares workbook and ZIP in memory first, then requires the app-level protected export completion handler before browser download.
 - Agent visibility for returned materials is read-only through existing handoff view tests.
 
 ## 12. Commands run
@@ -68,9 +70,10 @@ Covered by `tests/unit/returnedPdfOperationalWorkflow.spec.ts`: owner agent sees
 - `npm run typecheck`: passed.
 - `npm run build`: passed.
 - `npm run verify:safety`: passed.
-- `npx vitest run tests/unit/exportWorkbook.spec.ts`: passed, 23 tests.
-- `npx vitest run tests/unit/v19SubmissionRules.spec.ts`: passed, 80 tests.
-- `npx vitest run tests/unit/exportWorkbook.spec.ts tests/unit/exportMediaZip.spec.ts tests/unit/submissionExportWorkflow.spec.ts tests/unit/returnedPdfOperationalWorkflow.spec.ts tests/unit/returnedPdfHandoffPersistence.spec.ts tests/unit/v19DomainEngine.spec.ts tests/unit/v19SubmissionRules.spec.ts`: passed, 145 tests.
+- `npx vitest run tests/unit/exportWorkbook.spec.ts`: passed, 24 tests.
+- `npx vitest run tests/unit/exportMediaZip.spec.ts`: passed, 13 tests.
+- `npx vitest run tests/unit/exportWorkbook.spec.ts tests/unit/exportMediaZip.spec.ts tests/unit/submissionExportWorkflow.spec.ts tests/unit/returnedPdfOperationalWorkflow.spec.ts tests/unit/returnedPdfHandoffPersistence.spec.ts`: passed, 51 tests.
+- `npx vitest run tests/unit/exportWorkbook.spec.ts tests/unit/v19SubmissionRules.spec.ts`: failed, 2 unrelated `v19SubmissionRules` admin work presentation/action queue expectations; workbook spec passed.
 - `npm run lint`: failed on unrelated dirty/untracked files and existing non-export surfaces; no remaining in-scope export lint error in touched tracked export modules.
 - `npx playwright test tests/e2e/app-smoke.spec.ts --project=chromium --grep "Export|Выгрузка|PDF|ZIP"`: failed, 5 tests.
 - `npm run dev -- --host 127.0.0.1`: served `http://127.0.0.1:5175/`.
@@ -95,6 +98,7 @@ Covered by `tests/unit/returnedPdfOperationalWorkflow.spec.ts`: owner agent sees
 ## 14. Remaining blockers
 
 - `npm run lint` is blocked by unrelated dirty/untracked code, including `_backup_export_zip_fix`, `ФФФФФФФФ`, `AdminReviewDrawer.tsx`, `CommandCenter.tsx`, `QuestionnaireScreen.tsx`, `FigmaQuestionnaireScreen.tsx`, and `OperationsScreens.tsx`.
+- `tests/unit/v19SubmissionRules.spec.ts` has two unrelated failures in admin work presentation/action queue expectations: `adminWorkDrawerTabFor("ПД-1054")` returns `overview` instead of expected `issues`, and the admin queue lacks `Проверить исправления`.
 - Requested Playwright grep is blocked by existing smoke-test/runtime mismatch: missing legacy admin cards `Нина Волкова`/`Петровы` and missing `.pi-file-input` in the active cockpit create flow.
 - Active returned PDF upload surface was not redesigned; only existing domain/service/handoff behavior is covered.
 
