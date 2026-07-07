@@ -331,11 +331,11 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={workspace}
-            initial={{ opacity: 0, scale: 0.985 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.985 }}
-            transition={{ duration: 0.2 }}
-            className="h-full w-full"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="v19-fullscreen-app h-full w-full"
           >
             {workspace === 'agent' ? (
               <CommandCenter

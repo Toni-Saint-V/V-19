@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeftRight,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
   FileText,
   Menu,
   Plus,
@@ -35,6 +38,7 @@ import {
 import {
   agentActionQueue,
   searchAgentActions,
+  type AgentActionDue,
   type AgentActionItem,
 } from '../modules/submissions/agentActions';
 import {
@@ -42,6 +46,7 @@ import {
   agentDisplayName,
   agentInitials,
 } from '../modules/submissions/agentDirectory';
+import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
@@ -50,6 +55,7 @@ type AgentShellNavSection = Extract<
   LegacyAgentNavSection,
   'actions' | 'documents' | 'submissions' | 'settings'
 >;
+type ActionSummaryFilter = 'open' | 'today' | 'week' | 'completed';
 
 type CommandCenterProps = {
   agentId?: Submission['agentId'];
@@ -176,6 +182,7 @@ export function CommandCenter({
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [actionSummaryFilter, setActionSummaryFilter] = useState<ActionSummaryFilter>('open');
   const [searchQuery, setSearchQuery] = useState('');
   const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() => loadProductIntakeDrafts());
 
@@ -186,7 +193,16 @@ export function CommandCenter({
     [canonicalRows, intakeRows],
   );
   const actionQueue = useMemo(() => agentActionQueue(canonicalSubmissions ?? []), [canonicalSubmissions]);
-  const visibleActions = useMemo(() => searchAgentActions(actionQueue.open, searchQuery), [actionQueue.open, searchQuery]);
+  const visibleActions = useMemo(() => {
+    const matchesFilter = (due: AgentActionDue) => {
+      if (actionSummaryFilter === 'open') return true;
+      if (actionSummaryFilter === 'today') return due === 'today';
+      if (actionSummaryFilter === 'week') return due === 'today' || due === 'week';
+      return due === 'completed';
+    };
+    const source = actionSummaryFilter === 'completed' ? actionQueue.completed : actionQueue.open;
+    return searchAgentActions(source.filter((action) => matchesFilter(action.due)), searchQuery);
+  }, [actionQueue.completed, actionQueue.open, actionSummaryFilter, searchQuery]);
   const agentName = agentDisplayName(agentId);
   const agentAgency = agentAgencyLabel(agentId);
   const agentAvatar = agentInitials(agentId);
@@ -282,6 +298,13 @@ export function CommandCenter({
     </button>
   );
 
+  const actionStatusTagClass = (action: AgentActionItem) => {
+    if (action.severity === 'blocker') return 'border-[#d59aa3]/30 bg-[#d59aa3]/10 text-[#e3b5bd]';
+    if (action.severity === 'warning') return 'border-[#f59e0b]/25 bg-[#f59e0b]/10 text-[#f3c97a]';
+    if (action.severity === 'ready') return 'border-[#34d399]/25 bg-[#34d399]/10 text-[#8fe6c0]';
+    return 'border-[#8fa3ff]/22 bg-[#8fa3ff]/10 text-[#b8baff]';
+  };
+
   const renderNavContent = () => (
     <>
       <div className="flex items-center gap-2.5 px-2 pb-4 mb-2">
@@ -349,19 +372,44 @@ export function CommandCenter({
 
   const renderActionsList = () => (
     <div className="space-y-4 lg:space-y-6">
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          { label: 'Открыто', value: actionQueue.summary.open },
-          { label: 'Сегодня', value: actionQueue.summary.today },
-          { label: 'На неделе', value: actionQueue.summary.week },
-          { label: 'Закрыто', value: actionQueue.summary.completed },
-        ].map((item) => (
-          <div key={item.label} className="h-[60px] rounded-[8px] border border-[#242529] bg-[#161617] px-2.5 py-2">
-            <div className="truncate text-[9px] font-medium uppercase tracking-wide text-white/40">{item.label}</div>
-            <div className="mt-2 text-[22px] font-medium leading-none text-white">{item.value}</div>
-          </div>
-        ))}
-      </div>
+      <V19SummaryTileGrid>
+        <V19SummaryTile
+          active={actionSummaryFilter === 'open'}
+          detail="в работе"
+          icon={FileText}
+          label="Открыто"
+          tone="neutral"
+          value={actionQueue.summary.open}
+          onClick={() => setActionSummaryFilter('open')}
+        />
+        <V19SummaryTile
+          active={actionSummaryFilter === 'today'}
+          detail="сегодня"
+          icon={Clock}
+          label="Сегодня"
+          tone="amber"
+          value={actionQueue.summary.today}
+          onClick={() => setActionSummaryFilter('today')}
+        />
+        <V19SummaryTile
+          active={actionSummaryFilter === 'week'}
+          detail="до недели"
+          icon={CalendarDays}
+          label="На неделе"
+          tone="indigo"
+          value={actionQueue.summary.week}
+          onClick={() => setActionSummaryFilter('week')}
+        />
+        <V19SummaryTile
+          active={actionSummaryFilter === 'completed'}
+          detail="закрыто"
+          icon={CheckCircle2}
+          label="Закрыто"
+          tone="green"
+          value={actionQueue.summary.completed}
+          onClick={() => setActionSummaryFilter('completed')}
+        />
+      </V19SummaryTileGrid>
 
       <div className="flex items-center gap-2">
         <div className="relative w-full sm:w-[320px]">
@@ -409,7 +457,9 @@ export function CommandCenter({
                   <div className="text-[11px] text-white/40 mt-1 truncate">{action.context}</div>
                 </div>
                 <div className="lg:w-[190px] shrink-0 lg:border-l border-[#202124] lg:pl-4">
-                  <div className="text-[12px] font-medium text-white/90 truncate">{action.dueLabel}</div>
+                  <span className={`inline-flex max-w-full items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${actionStatusTagClass(action)}`}>
+                    <span className="truncate">{action.dueLabel}</span>
+                  </span>
                   <div className="text-[10.5px] text-white/40 mt-0.5">{action.submission.city}</div>
                 </div>
                 <div className="hidden lg:flex min-w-[160px] shrink-0 items-center gap-1.5">

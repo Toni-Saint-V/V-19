@@ -1,44 +1,48 @@
 import type { ReactNode } from 'react';
 import { Filter, MapPin, Search } from 'lucide-react';
+import {
+  V19SummaryTile,
+  type V19SummaryTileTone,
+} from '../shared/ui/v19-design-system';
 
 type AdminSurfaceIcon = React.ElementType;
 
 export function AdminMetricCard({
+  active = false,
   detail,
   icon: Icon,
   label,
+  onClick,
   tone = 'neutral',
   value,
 }: {
+  active?: boolean;
   detail?: ReactNode;
   icon: AdminSurfaceIcon;
   label: string;
+  onClick?: () => void;
   tone?: string;
   value: ReactNode;
 }) {
+  const mappedTone: V19SummaryTileTone =
+    tone === 'green'
+      ? 'green'
+      : tone === 'orange'
+        ? 'amber'
+        : tone === 'red'
+          ? 'danger'
+          : 'neutral';
+
   return (
-    <div className="h-[90px] rounded-[8px] border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-3">
-      <div className="flex items-center justify-end sm:justify-between">
-        <span className="hidden text-[11px] font-medium uppercase tracking-wide text-white/45 sm:block">
-          {label}
-        </span>
-        <Icon
-          className={`h-4 w-4 ${
-            tone === 'green'
-              ? 'text-[#b8baff]'
-              : tone === 'orange'
-                ? 'text-white/62'
-                : tone === 'red'
-                  ? 'text-[#d59aa3]'
-                  : 'text-white/40'
-          }`}
-        />
-      </div>
-      <div className="mt-[30px] text-[22px] font-semibold leading-none text-white">
-        {value}
-      </div>
-      {detail ? <div className="mt-1 text-[10px] font-medium text-white/38">{detail}</div> : null}
-    </div>
+    <V19SummaryTile
+      active={active}
+      detail={detail}
+      icon={Icon}
+      label={label}
+      tone={mappedTone}
+      value={value}
+      onClick={onClick}
+    />
   );
 }
 

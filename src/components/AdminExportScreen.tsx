@@ -260,15 +260,40 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
     >
       <section className="flex min-w-0 flex-col gap-5">
         <div className="grid shrink-0 grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
-          <AdminMetricCard icon={CheckCircle2} label="Готовы" value={displayItems.length} tone="green" detail="пакетов в очереди" />
-          <AdminMetricCard icon={PackageCheck} label="Выбрано" value={selectedCount} tone="green" detail={`${selectedApplicants} заявителей`} />
-          <AdminMetricCard icon={FileArchive} label="Документы" value={selectedFiles} detail="файлов в ZIP-пакете" />
           <AdminMetricCard
+            active={activeQueueTab === 'all'}
+            detail="пакетов в очереди"
+            icon={CheckCircle2}
+            label="Готовы"
+            value={displayItems.length}
+            tone="green"
+            onClick={() => setActiveQueueTab('all')}
+          />
+          <AdminMetricCard
+            active={activeQueueTab === 'selected'}
+            detail={`${selectedApplicants} заявителей`}
+            icon={PackageCheck}
+            label="Выбрано"
+            value={selectedCount}
+            tone="green"
+            onClick={() => setActiveQueueTab('selected')}
+          />
+          <AdminMetricCard
+            active={activeQueueTab === 'selected'}
+            detail="файлов в ZIP-пакете"
+            icon={FileArchive}
+            label="Документы"
+            value={selectedFiles}
+            onClick={() => setActiveQueueTab('selected')}
+          />
+          <AdminMetricCard
+            active={activeQueueTab === 'blocked'}
             icon={hasExportBlockers ? XCircle : ShieldCheck}
             label="Pre-flight"
             value={hasExportBlockers ? 'STOP' : 'OK'}
             tone={hasExportBlockers ? 'red' : 'green'}
             detail={`${selectedWarnings} предупреждений`}
+            onClick={() => setActiveQueueTab('blocked')}
           />
         </div>
 

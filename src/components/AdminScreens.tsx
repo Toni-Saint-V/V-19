@@ -269,10 +269,37 @@ export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
         )}
 
         <div className="grid grid-cols-4 gap-2">
-          <AdminMetricCard icon={FileText} label="В очереди" value={`${filteredReviews.length}`} />
-          <AdminMetricCard icon={Flame} label="Блокеры" value={`${totalBlockers}`} tone="red" />
-          <AdminMetricCard icon={AlertCircle} label="Проверить" value={`${totalWarnings}`} tone="orange" />
-          <AdminMetricCard icon={CheckCircle2} label="К выгрузке" value={`${readyCount}`} tone="green" />
+          <AdminMetricCard
+            active={activeLane === 'all'}
+            icon={FileText}
+            label="В очереди"
+            value={`${filteredReviews.length}`}
+            onClick={() => setActiveLane('all')}
+          />
+          <AdminMetricCard
+            active={activeLane === 'urgent'}
+            icon={Flame}
+            label="Блокеры"
+            value={`${totalBlockers}`}
+            tone="red"
+            onClick={() => setActiveLane('urgent')}
+          />
+          <AdminMetricCard
+            active={activeLane === 'review'}
+            icon={AlertCircle}
+            label="Проверить"
+            value={`${totalWarnings}`}
+            tone="orange"
+            onClick={() => setActiveLane('review')}
+          />
+          <AdminMetricCard
+            active={activeLane === 'ready'}
+            icon={CheckCircle2}
+            label="К выгрузке"
+            value={`${readyCount}`}
+            tone="green"
+            onClick={() => setActiveLane('ready')}
+          />
         </div>
 
         <div className="rounded-[10px] border border-[#242529] bg-[#161617]">

@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import type { Submission } from '../modules/submissions/types';
 import { applicantInitials, updatedLabel } from './v19BusinessScreenAdapter';
 import { 
   Users, ChevronRight, Folder, CheckCircle2, AlertCircle, FileText, Flame
 } from 'lucide-react';
+import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
 
 interface ApplicantsScreenProps {
   onOpenDrawer: (id: string) => void;
@@ -13,6 +14,7 @@ interface ApplicantsScreenProps {
 
 // Mock Types
 type ApplicantStatus = 'ready' | 'missing_docs' | 'in_progress';
+type ApplicantSummaryFilter = 'all' | 'blockers' | 'review' | 'ready';
 
 interface FamilyMember {
   initials: string;
@@ -162,52 +164,37 @@ function metricsFromSubmissions(submissions: Submission[] | undefined, fallbackT
   };
 }
 
-function MetricCard({
-  hideLabel = false,
-  icon: Icon,
-  label,
-  tone = 'muted',
-  value,
-}: {
-  hideLabel?: boolean;
-  icon: typeof FileText;
-  label: string;
-  tone?: 'danger' | 'muted' | 'ready';
-  value: number;
-}) {
-  const iconClass =
-    tone === 'danger'
-      ? 'text-[#d59aa3]'
-      : tone === 'ready'
-        ? 'text-[#b8baff]'
-        : 'text-white/45';
-
-  return (
-    <div
-      aria-label={label}
-      className="flex h-[60px] min-h-[60px] flex-col justify-between rounded-[15px] border border-[#242529] bg-[#161617] px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] sm:h-auto sm:min-h-[118px] sm:px-5 sm:py-4"
-    >
-      <div className="flex items-start justify-end gap-3 sm:justify-between">
-        {!hideLabel ? (
-          <div className="hidden text-[12px] font-medium uppercase tracking-[0.12em] text-white/42 sm:block">
-            {label}
-          </div>
-        ) : null}
-        <Icon className={`h-3.5 w-3.5 sm:h-5 sm:w-5 ${iconClass}`} />
-      </div>
-      <div className="ml-2 text-[24px] font-medium leading-none text-white sm:ml-0 sm:mt-8 sm:text-[30px]">
-        {value}
-      </div>
-    </div>
-  );
-}
-
 export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreenProps) {
+  const [applicantSummaryFilter, setApplicantSummaryFilter] = useState<ApplicantSummaryFilter>('all');
   const families = useMemo(() => runtimeFamiliesFromSubmissions(submissions), [submissions]);
   const individuals = useMemo(() => runtimeIndividualsFromSubmissions(submissions), [submissions]);
   const metrics = useMemo(
     () => metricsFromSubmissions(submissions, families.length + individuals.length),
     [families.length, individuals.length, submissions],
+  );
+  const displayFamilies = useMemo(
+    () =>
+      families.filter((family) => {
+        if (applicantSummaryFilter === 'all') return true;
+        if (applicantSummaryFilter === 'blockers') {
+          return family.members.some((member) => member.status === 'missing_docs');
+        }
+        if (applicantSummaryFilter === 'review') {
+          return family.members.some((member) => member.status === 'in_progress');
+        }
+        return family.members.every((member) => member.status === 'ready');
+      }),
+    [applicantSummaryFilter, families],
+  );
+  const displayIndividuals = useMemo(
+    () =>
+      individuals.filter((individual) => {
+        if (applicantSummaryFilter === 'all') return true;
+        if (applicantSummaryFilter === 'blockers') return individual.status === 'missing_docs';
+        if (applicantSummaryFilter === 'review') return individual.status === 'in_progress';
+        return individual.status === 'ready';
+      }),
+    [applicantSummaryFilter, individuals],
   );
 
   return (
@@ -217,12 +204,43 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
       transition={{ duration: 0.3 }}
       className="space-y-6"
     >
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
-        <MetricCard icon={FileText} label="В очереди" value={metrics.queue} />
-        <MetricCard icon={Flame} label="Блокеры" tone="danger" value={metrics.blockers} />
-        <MetricCard icon={AlertCircle} label="Проверить" value={metrics.review} />
-        <MetricCard hideLabel icon={CheckCircle2} label="К выгрузке" tone="ready" value={metrics.exportReady} />
-      </div>
+      <V19SummaryTileGrid>
+        <V19SummaryTile
+          active={applicantSummaryFilter === 'all'}
+          detail="профили"
+          icon={FileText}
+          label="В очереди"
+          value={metrics.queue}
+          onClick={() => setApplicantSummaryFilter('all')}
+        />
+        <V19SummaryTile
+          active={applicantSummaryFilter === 'blockers'}
+          detail="блокеры"
+          icon={Flame}
+          label="Блокеры"
+          tone="danger"
+          value={metrics.blockers}
+          onClick={() => setApplicantSummaryFilter('blockers')}
+        />
+        <V19SummaryTile
+          active={applicantSummaryFilter === 'review'}
+          detail="ревью"
+          icon={AlertCircle}
+          label="Проверить"
+          tone="amber"
+          value={metrics.review}
+          onClick={() => setApplicantSummaryFilter('review')}
+        />
+        <V19SummaryTile
+          active={applicantSummaryFilter === 'ready'}
+          detail="экспорт"
+          icon={CheckCircle2}
+          label="К выгрузке"
+          tone="green"
+          value={metrics.exportReady}
+          onClick={() => setApplicantSummaryFilter('ready')}
+        />
+      </V19SummaryTileGrid>
 
       {/* Families Section */}
       <div>
@@ -230,7 +248,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           Семьи
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {families.map((family) => (
+          {displayFamilies.map((family) => (
             <div 
               key={family.id}
               onClick={() => onOpenDrawer(family.id)}
@@ -295,7 +313,7 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
           Одиночные профили
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {individuals.map((ind) => (
+          {displayIndividuals.map((ind) => (
             <div 
               key={ind.id}
               onClick={() => onOpenDrawer(ind.id)}
