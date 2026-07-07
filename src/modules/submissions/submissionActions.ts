@@ -33,6 +33,7 @@ import {
   applicantFileStatusForFiles,
   fileCompletenessPercent,
 } from "./fileAsset";
+import { normalizeCollectionDocuments } from "./documentCollectionIntake";
 import type {
   City,
   AgentOwnerId,
@@ -473,6 +474,10 @@ export function normalizeSubmissionForCanonicalRuntime(
       ),
     })),
     files,
+    collectionDocuments: normalizeCollectionDocuments(
+      submission.collectionDocuments,
+      submission.id,
+    ),
     completeness: {
       ...submission.completeness,
       files: filePercent,

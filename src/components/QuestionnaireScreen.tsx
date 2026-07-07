@@ -113,7 +113,10 @@ function submissionFileType(kind: ProductFileKind): SubmissionFile['type'] {
   return 'passport_scan';
 }
 
-function sectionsFromDraftApplicant(draft: ProductIntakeDraft, applicant: ProductIntakeDraft['applicants'][number]): QuestionnaireSection[] {
+function sectionsFromDraftApplicant(
+  draft: ProductIntakeDraft,
+  applicant: ProductIntakeDraft['applicants'][number],
+): QuestionnaireSection[] {
   const tripDates = splitTripDates(applicant.fields.tripDates || draft.tripDates);
   const values = new Map<string, string>();
 
@@ -213,7 +216,9 @@ function draftToSubmission(
     files,
     completeness: {
       questionnaire: draft.readyPercent,
-      files: draft.files.length ? Math.round(draft.files.reduce((sum, file) => sum + file.progress, 0) / draft.files.length) : 0,
+      files: draft.files.length
+        ? Math.round(draft.files.reduce((sum, file) => sum + file.progress, 0) / draft.files.length)
+        : 0,
       total: draft.readyPercent,
     },
     createdAt: draft.createdAtIso,
@@ -276,7 +281,9 @@ export function QuestionnaireScreen({
 }: QuestionnaireScreenProps) {
   const bridge = useVisaflowBusinessBridge();
   const sourceSubmission = useMemo(
-    () => submission ?? (draft ? draftToSubmission(draft, submissionId, agentId) : fallbackSubmission(submissionId, agentId)),
+    () =>
+      submission ??
+      (draft ? draftToSubmission(draft, submissionId, agentId) : fallbackSubmission(submissionId, agentId)),
     [agentId, draft, submission, submissionId],
   );
   const [workingSubmission, setWorkingSubmission] = useState(sourceSubmission);

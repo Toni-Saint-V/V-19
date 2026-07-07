@@ -2152,9 +2152,6 @@ export function FigmaQuestionnaireScreen({
         </button>
 
         <div className="v19-questionnaire-title-wrap">
-          <div className="v19-questionnaire-submission-id">
-            {submission.id}
-          </div>
           <h1
             aria-label={`Анкета: ${submission.title || "Семья Петровых"}`}
             className="v19-questionnaire-title"
@@ -2198,7 +2195,7 @@ export function FigmaQuestionnaireScreen({
       </div>
 
       <div className="v19-questionnaire-scroll">
-        <div className="max-w-[var(--v19b-size-1240)] mx-auto flex flex-col min-h-full gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
+        <div className="v19-questionnaire-scroll-frame max-w-[var(--v19b-size-1240)] mx-auto flex flex-col h-full min-h-0 gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
           <div className="v19-questionnaire-applicant-bar">
             <div className="flex overflow-x-auto scrollbar-hide gap-1.5 lg:gap-2 flex-1 w-full snap-x pb-1 md:pb-0">
               {applicants.map((applicant) => (
@@ -2232,6 +2229,40 @@ export function FigmaQuestionnaireScreen({
             </div>
           </div>
 
+          <div className="v19-questionnaire-section-list v19-questionnaire-section-list--pinned">
+            {sections.map((section) => (
+              <button
+                aria-selected={activeSection === section.id}
+                className={`v19-questionnaire-section-tab ${
+                  activeSection === section.id ? "is-active" : ""
+                }`}
+                key={`pinned-${section.id}`}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-[var(--v19b-size-12)] font-semibold truncate">
+                    {section.title}
+                  </div>
+                  <div className="text-[var(--v19b-size-10)] text-white/40 mt-0.5 truncate tracking-wide">
+                    {section.meta}
+                  </div>
+                </div>
+                <QuestionnaireProgressBadge
+                  className={`v19-questionnaire-progress-badge status-${section.status}`}
+                >
+                  {section.status === "complete" ? (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  ) : section.status === "issue" ? (
+                    <AlertCircle className="w-3.5 h-3.5" />
+                  ) : (
+                    "-"
+                  )}
+                </QuestionnaireProgressBadge>
+              </button>
+            ))}
+          </div>
+
           <QuestionnaireWorkspaceShell className="v19-questionnaire-workspace-shell flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
             <aside className="v19-questionnaire-section-nav">
               <V19ReadinessCard
@@ -2243,7 +2274,7 @@ export function FigmaQuestionnaireScreen({
 
               <V19SearchField label="Поиск поля анкеты" placeholder="Найти поле..." />
 
-              <div className="v19-questionnaire-section-list">
+              <div className="v19-questionnaire-section-list v19-questionnaire-section-list--sidebar">
                 {sections.map((section) => (
                   <button
                     aria-selected={activeSection === section.id}
@@ -2351,14 +2382,13 @@ export function FigmaQuestionnaireScreen({
 
               <div className="v19-questionnaire-panel-footer">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-[var(--v19b-size-11)] text-white/40 font-medium">
+                  <div className="v19-questionnaire-autosave-state">
                     <Info className="w-4 h-4" />
                     <span>Автосохранение включено</span>
                   </div>
                   <div className="v19-questionnaire-completion-pill">
                     <span className="v19-questionnaire-completion-dot" />
-                    Заполнено {questionnaireStats.completed} из {questionnaireStats.total} (
-                    {questionnaireStats.percent}%)
+                    Заполнено {questionnaireStats.completed} из {questionnaireStats.total}
                   </div>
                 </div>
                 <button
