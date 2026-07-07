@@ -148,7 +148,7 @@ export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
 export function cockpitUploadExtensionForMimeType(
   mimeType: string,
   fileType: SubmissionFileType,
-): "jpg" | "png" | "pdf" | "mp4" {
+): "jpg" | "png" | "webp" | "heic" | "heif" | "pdf" | "mp4" {
   if (
     !isCanonicalFrontendMediaType(fileType) &&
     !isRejectedLegacyMediaType(fileType)
@@ -159,6 +159,9 @@ export function cockpitUploadExtensionForMimeType(
   if (fileType === "video" && mimeType === "video/mp4") return "mp4";
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/heic") return "heic";
+  if (mimeType === "image/heif") return "heif";
   throw new Error("Unsupported media MIME type for this upload slot.");
 }
 
@@ -297,13 +300,6 @@ function applyPreliminaryIntakeToSection(
     };
   }
 
-  if (section.id.endsWith("-hotel")) {
-    return {
-      ...section,
-      fields: section.fields.map((field) => applyPreliminaryTripField(field, intake)),
-    };
-  }
-
   return section;
 }
 
@@ -332,12 +328,12 @@ function applyPreliminaryTripField(
     field.id === "inviting-party-type" &&
     hasSpainStayInput(intake)
   ) {
-    return { ...field, value: "Гостиница/временное жилье" };
+    return { ...field, value: "Гостиница/временное жильё" };
   }
 
   if (
     intake.sameSpainStay &&
-    field.id === "main-destination" &&
+    field.id === "hotel-country" &&
     hasSpainStayInput(intake)
   ) {
     return { ...field, value: "Spain" };
@@ -353,17 +349,21 @@ function applyPreliminaryTripField(
 
   if (
     intake.sameSpainStay &&
+    field.id === "hotel-city" &&
+    intake.spainStayCity.trim()
+  ) {
+    return { ...field, value: intake.spainStayCity.trim() };
+  }
+
+  if (
+    intake.sameSpainStay &&
     field.id === "hotel-address" &&
     intake.spainStayAddress.trim()
   ) {
     return { ...field, value: intake.spainStayAddress.trim() };
   }
 
-  if (
-    intake.sameArrivalPlace &&
-    field.id === "first-entry-country" &&
-    intake.arrivalPlace.trim()
-  ) {
+  if (intake.sameArrivalPlace && field.id === "route" && intake.arrivalPlace.trim()) {
     return { ...field, value: intake.arrivalPlace.trim() };
   }
 
@@ -385,7 +385,7 @@ export function completeQuestionnaire(submission: Submission): Submission {
     history: [
       {
         id: `и-${submission.id}-анкета`,
-        text: "Анкета сохранена",
+        text: "Анкета заполнена",
         at: "сейчас",
         source: "agent",
       },
@@ -603,7 +603,7 @@ export function addPreciseAdminIssue(
   const hasExplicitIssueTarget = Boolean(input.fileType || input.field);
   const issueInput = hasExplicitIssueTarget
     ? input
-    : { ...input, field: "Страна первого въезда" };
+    : { ...input, field: "Маршрут поездки" };
   const applicant =
     submission.applicants.find((item) => item.id === issueInput.applicantId) ??
     firstApplicant;
@@ -634,7 +634,7 @@ export function addPreciseAdminIssue(
       : flagQuestionnaireField(
           submission,
           applicant.id,
-          newIssue.target.field ?? "Страна первого въезда",
+          newIssue.target.field ?? "Маршрут поездки",
           newIssue.reason,
         );
 

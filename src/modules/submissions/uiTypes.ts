@@ -39,7 +39,7 @@ export function surfaceTitle(surface: Surface) {
   if (surface === "agent-actions") return "Мои действия";
   if (surface === "agent-drafts") return "Сбор документов";
   if (surface === "agent-applicants") return "Заявители / Семьи";
-  if (surface === "agent-media") return "Файлы / Медиа";
+  if (surface === "agent-media") return "Сбор документов";
   if (surface === "agent-issues") return "Замечания";
   if (surface === "agent-submissions") return "Мои подачи";
   if (surface === "admin-review") return "Проверка";
@@ -61,7 +61,7 @@ export function surfaceDescription(surface: Surface) {
   }
 
   if (surface === "agent-media") {
-    return "Единая очередь файлов: загрузка, замена, проверка и принятые медиа.";
+    return "Совместимый маршрут: файлы и слоты медиа показываются внутри сбора документов, чтобы не дробить прогресс.";
   }
 
   if (surface === "agent-issues") {

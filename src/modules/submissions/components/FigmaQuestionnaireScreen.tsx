@@ -13,7 +13,6 @@ import {
   Users,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
-import type { QuestionnaireFieldUpdate } from "../questionnaire";
 import type { Submission } from "../types";
 import {
   QuestionnaireProgressBadge,
@@ -62,7 +61,6 @@ type FigmaQuestionnaireScreenProps = {
   initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
   onComplete: (values: {
-    fieldUpdates: QuestionnaireFieldUpdate[];
     focusedUpdate?: {
       applicantId: string;
       fieldId: string;
@@ -117,9 +115,12 @@ type QuestionnaireFormData = {
   formFillerPhone: string;
   guardianInfo: string;
   hotelAddress: string;
+  hotelCity: string;
   hotelContact: string;
+  hotelCountry: string;
   hotelEmail: string;
   hotelName: string;
+  hotelPostalCode: string;
   homeCountry: string;
   invitingPartyType: string;
   livesOutsideCitizenship: string;
@@ -152,6 +153,7 @@ type QuestionnaireFormData = {
   stayDuration: string;
   stayPurposeDetails: string;
   stayPurpose: string;
+  stayRoute: string;
   surname: string;
   travelEnd: string;
   travelStart: string;
@@ -162,12 +164,6 @@ type FocusableQuestionnaireField = {
   fieldId: string;
   formKey: keyof QuestionnaireFormData;
   labels: string[];
-  sectionId: SectionId;
-};
-
-type QuestionnaireFieldBinding = {
-  fieldId: string;
-  formKey: keyof QuestionnaireFormData;
   sectionId: SectionId;
 };
 
@@ -470,9 +466,12 @@ function fallbackQuestionnaireFormData(
     formFillerPhone: "",
     guardianInfo: "",
     hotelAddress: "",
+    hotelCity: "",
     hotelContact: "",
+    hotelCountry: "",
     hotelEmail: "",
     hotelName: "",
+    hotelPostalCode: "",
     homeCountry: "",
     invitingPartyType: "",
     livesOutsideCitizenship: "",
@@ -505,6 +504,7 @@ function fallbackQuestionnaireFormData(
     stayDuration: "",
     stayPurposeDetails: "",
     stayPurpose: "",
+    stayRoute: "",
     surname: "",
     travelEnd: "",
     travelStart: "",
@@ -703,9 +703,16 @@ function questionnaireFormDataFromSubmission(
       fallback.guardianInfo,
     ),
     hotelAddress: submissionFieldValue(applicant, "hotel-address", fallback.hotelAddress),
+    hotelCity: submissionFieldValue(applicant, "hotel-city", fallback.hotelCity),
     hotelContact: submissionFieldValue(applicant, "hotel-contact", fallback.hotelContact),
+    hotelCountry: submissionFieldValue(applicant, "hotel-country", fallback.hotelCountry),
     hotelEmail: submissionFieldValue(applicant, "hotel-email", fallback.hotelEmail),
     hotelName: submissionFieldValue(applicant, "hotel-name", fallback.hotelName),
+    hotelPostalCode: submissionFieldValue(
+      applicant,
+      "hotel-postal-code",
+      fallback.hotelPostalCode,
+    ),
     homeCountry: submissionFieldValue(applicant, "home-country", fallback.homeCountry),
     invitingPartyType: submissionFieldValue(
       applicant,
@@ -830,6 +837,7 @@ function questionnaireFormDataFromSubmission(
       fallback.stayPurposeDetails,
     ),
     stayPurpose: submissionFieldValue(applicant, "purpose", fallback.stayPurpose),
+    stayRoute: submissionFieldValue(applicant, "route", fallback.stayRoute),
     surname: submissionFieldValue(applicant, "surname", fallback.surname),
     travelEnd: submissionFieldValue(applicant, "departure-date", fallback.travelEnd),
     travelStart: submissionFieldValue(applicant, "arrival-date", fallback.travelStart),
@@ -874,91 +882,13 @@ const focusableQuestionnaireFields: FocusableQuestionnaireField[] = [
     labels: ["Дата выезда"],
     sectionId: "trip",
   },
+  {
+    fieldId: "route",
+    formKey: "stayRoute",
+    labels: ["Маршрут поездки"],
+    sectionId: "trip",
+  },
 ];
-
-const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
-  { formKey: "appointmentCity", fieldId: "appointment-city", sectionId: "appointment" },
-  { formKey: "visaType", fieldId: "visa-type", sectionId: "appointment" },
-  { formKey: "category", fieldId: "category", sectionId: "appointment" },
-  { formKey: "desiredDate1", fieldId: "desired-date-1", sectionId: "appointment" },
-  { formKey: "desiredDate2", fieldId: "desired-date-2", sectionId: "appointment" },
-  { formKey: "desiredDate3", fieldId: "desired-date-3", sectionId: "appointment" },
-  { formKey: "appointmentNote", fieldId: "appointment-note", sectionId: "appointment" },
-  { formKey: "surname", fieldId: "surname", sectionId: "personal" },
-  { formKey: "previousSurname", fieldId: "previous-surname", sectionId: "personal" },
-  { formKey: "firstName", fieldId: "first-name", sectionId: "personal" },
-  { formKey: "dob", fieldId: "birth-date", sectionId: "personal" },
-  { formKey: "birthPlace", fieldId: "birth-place", sectionId: "personal" },
-  { formKey: "birthCountry", fieldId: "birth-country", sectionId: "personal" },
-  { formKey: "citizenship", fieldId: "nationality", sectionId: "personal" },
-  { formKey: "birthCitizenship", fieldId: "birth-citizenship", sectionId: "personal" },
-  { formKey: "otherCitizenship", fieldId: "other-citizenship", sectionId: "personal" },
-  { formKey: "sex", fieldId: "gender", sectionId: "personal" },
-  { formKey: "maritalStatus", fieldId: "marital-status", sectionId: "personal" },
-  { formKey: "guardianInfo", fieldId: "guardian-info", sectionId: "personal" },
-  { formKey: "nationalId", fieldId: "national-id", sectionId: "personal" },
-  { formKey: "passportType", fieldId: "passport-type", sectionId: "passport" },
-  { formKey: "passportNumber", fieldId: "passport-no", sectionId: "passport" },
-  { formKey: "passportIssued", fieldId: "passport-issue-date", sectionId: "passport" },
-  { formKey: "passportExpiry", fieldId: "passport-expiry-date", sectionId: "passport" },
-  { formKey: "passportIssueCountry", fieldId: "passport-issue-country", sectionId: "passport" },
-  { formKey: "passportIssuePlace", fieldId: "passport-issue-place", sectionId: "passport" },
-  { formKey: "euRelativeDetails", fieldId: "eu-relative-details", sectionId: "euRelative" },
-  { formKey: "euRelationship", fieldId: "eu-relationship", sectionId: "euRelative" },
-  { formKey: "contactAddress", fieldId: "home-address", sectionId: "contact" },
-  { formKey: "contactEmail", fieldId: "email", sectionId: "contact" },
-  { formKey: "contactPhone", fieldId: "contact-number", sectionId: "contact" },
-  { formKey: "homeCountry", fieldId: "home-country", sectionId: "contact" },
-  { formKey: "residenceCity", fieldId: "home-city", sectionId: "contact" },
-  { formKey: "residencePostalCode", fieldId: "postal-code", sectionId: "contact" },
-  { formKey: "livesOutsideCitizenship", fieldId: "lives-outside-citizenship", sectionId: "contact" },
-  { formKey: "residencePermitType", fieldId: "residence-permit-type", sectionId: "contact" },
-  { formKey: "residencePermitNumber", fieldId: "residence-permit-number", sectionId: "contact" },
-  { formKey: "residencePermitValidUntil", fieldId: "residence-permit-valid-until", sectionId: "contact" },
-  { formKey: "occupation", fieldId: "occupation", sectionId: "employment" },
-  { formKey: "currentJob", fieldId: "occupation-specify", sectionId: "employment" },
-  { formKey: "employerName", fieldId: "employer-name", sectionId: "employment" },
-  { formKey: "employerContact", fieldId: "employer-contact", sectionId: "employment" },
-  { formKey: "employerAddress", fieldId: "employer-address", sectionId: "employment" },
-  { formKey: "stayPurpose", fieldId: "purpose", sectionId: "trip" },
-  { formKey: "stayPurposeDetails", fieldId: "stay-purpose-details", sectionId: "trip" },
-  { formKey: "mainDestination", fieldId: "main-destination", sectionId: "trip" },
-  { formKey: "firstEntryCountry", fieldId: "first-entry-country", sectionId: "trip" },
-  { formKey: "entryCount", fieldId: "entry-count", sectionId: "trip" },
-  { formKey: "travelStart", fieldId: "arrival-date", sectionId: "trip" },
-  { formKey: "travelEnd", fieldId: "departure-date", sectionId: "trip" },
-  { formKey: "stayDuration", fieldId: "stay-duration", sectionId: "trip" },
-  { formKey: "previousBiometrics", fieldId: "previous-biometrics", sectionId: "trip" },
-  { formKey: "previousBiometricsDate", fieldId: "previous-biometrics-date", sectionId: "trip" },
-  { formKey: "previousVisaNumber", fieldId: "previous-visa-number", sectionId: "trip" },
-  { formKey: "finalEntryPermit", fieldId: "final-entry-permit", sectionId: "trip" },
-  { formKey: "finalEntryPermitIssuedBy", fieldId: "final-entry-permit-issued-by", sectionId: "trip" },
-  { formKey: "finalEntryPermitValidFrom", fieldId: "final-entry-permit-valid-from", sectionId: "trip" },
-  { formKey: "finalEntryPermitValidTo", fieldId: "final-entry-permit-valid-to", sectionId: "trip" },
-  { formKey: "invitingPartyType", fieldId: "inviting-party-type", sectionId: "hotel" },
-  { formKey: "hotelName", fieldId: "hotel-name", sectionId: "hotel" },
-  { formKey: "hotelAddress", fieldId: "hotel-address", sectionId: "hotel" },
-  { formKey: "hotelEmail", fieldId: "hotel-email", sectionId: "hotel" },
-  { formKey: "hotelContact", fieldId: "hotel-contact", sectionId: "hotel" },
-  { formKey: "companyOrgDetails", fieldId: "company-org-details", sectionId: "hotel" },
-  { formKey: "companyContactPerson", fieldId: "company-contact-person", sectionId: "hotel" },
-  { formKey: "companyPhone", fieldId: "company-phone", sectionId: "hotel" },
-  { formKey: "paymentSponsor", fieldId: "cost-covered-by", sectionId: "payment" },
-  { formKey: "paymentType", fieldId: "means-of-support", sectionId: "payment" },
-  { formKey: "sponsorInHostFields", fieldId: "sponsor-in-host-fields", sectionId: "payment" },
-  { formKey: "otherSponsor", fieldId: "other-sponsor", sectionId: "payment" },
-  { formKey: "sponsorMeans", fieldId: "sponsor-means", sectionId: "payment" },
-  { formKey: "formFillerName", fieldId: "form-filler-name", sectionId: "filler" },
-  { formKey: "formFillerContact", fieldId: "form-filler-contact", sectionId: "filler" },
-  { formKey: "formFillerPhone", fieldId: "form-filler-phone", sectionId: "filler" },
-];
-
-const questionnaireFieldAliases: Record<string, string[]> = {
-  "first-entry-country": ["Маршрут поездки", "Маршрут", "Страна въезда"],
-  "passport-expiry-date": ["Дата окончания паспорта"],
-  "passport-type": ["Тип документа", "Тип проездного документа"],
-  "previous-surname": ["Фамилия при рождении", "Девичья фамилия"],
-};
 
 function normalizeFocusLabel(value?: string) {
   return (value ?? "").trim().toLocaleLowerCase("ru-RU");
@@ -966,19 +896,6 @@ function normalizeFocusLabel(value?: string) {
 
 function sameFieldLabel(left?: string, right?: string) {
   return normalizeFocusLabel(left) === normalizeFocusLabel(right);
-}
-
-function issueFieldMatches(fieldId: string, label: string, targetField?: string) {
-  const normalizedTarget = normalizeFocusLabel(targetField);
-  if (!normalizedTarget) return false;
-
-  return [fieldId, label, ...(questionnaireFieldAliases[fieldId] ?? [])].some(
-    (candidate) => normalizeFocusLabel(candidate) === normalizedTarget,
-  );
-}
-
-function fieldBindingFor(formKey: keyof QuestionnaireFormData) {
-  return questionnaireFieldBindings.find((binding) => binding.formKey === formKey);
 }
 
 function focusableFieldFor(field?: string) {
@@ -1027,9 +944,6 @@ export function FigmaQuestionnaireScreen({
     [activeApplicant, submission],
   );
   const [formData, setFormData] = useState<QuestionnaireFormData>(() => sourceFormData);
-  const [pendingFieldUpdates, setPendingFieldUpdates] = useState<
-    Record<string, QuestionnaireFieldUpdate>
-  >({});
 
   useEffect(() => {
     if (applicants.some((applicant) => applicant.id === activeApplicant)) return;
@@ -1040,68 +954,11 @@ export function FigmaQuestionnaireScreen({
     setFormData(sourceFormData);
   }, [sourceFormData]);
 
-  useEffect(() => {
-    setPendingFieldUpdates({});
-  }, [submission.id]);
-
   const activeApplicantModel = useMemo(
     () =>
       submission.applicants.find((applicant) => applicant.id === activeApplicant) ??
       submission.applicants[0],
     [activeApplicant, submission.applicants],
-  );
-
-  const openFieldIssues = useMemo(
-    () =>
-      submission.issues.filter(
-        (issue) =>
-          issue.status === "open" &&
-          issue.type === "field" &&
-          issue.target.applicantId === activeApplicant,
-      ),
-    [activeApplicant, submission.issues],
-  );
-
-  function activeQuestionnaireField(fieldId: string) {
-    return questionnaireField(activeApplicantModel, fieldId);
-  }
-
-  function openFieldIssue(fieldId: string, label: string) {
-    return openFieldIssues.find((issue) =>
-      issueFieldMatches(fieldId, label, issue.target.field),
-    );
-  }
-
-  function fieldReviewState(fieldId: string, label: string): FieldState {
-    if (openFieldIssue(fieldId, label)) return "invalid";
-    if (
-      initialFieldTarget?.fieldId === fieldId ||
-      initialFieldTarget?.labels.some((candidate) => sameFieldLabel(candidate, label))
-    ) {
-      return "needs_review";
-    }
-    return activeQuestionnaireField(fieldId)?.reviewState === "needs_review"
-      ? "needs_review"
-      : "normal";
-  }
-
-  function fieldErrorMessage(fieldId: string, label: string) {
-    const issue = openFieldIssue(fieldId, label);
-    return issue?.comment ?? issue?.reason;
-  }
-
-  const currentSectionIssue = openFieldIssues.find((issue) =>
-    issue.target.field
-      ? questionnaireFieldBindings.some(
-          (binding) =>
-            binding.sectionId === activeSection &&
-            issueFieldMatches(
-              binding.fieldId,
-              activeQuestionnaireField(binding.fieldId)?.label ?? "",
-              issue.target.field,
-            ),
-        )
-      : false,
   );
 
   const selectOptions = useMemo(
@@ -1149,6 +1006,11 @@ export function FigmaQuestionnaireScreen({
       homeCountry: submissionFieldOptions(
         activeApplicantModel,
         "home-country",
+        BLS_COUNTRY_OPTIONS,
+      ),
+      hotelCountry: submissionFieldOptions(
+        activeApplicantModel,
+        "hotel-country",
         BLS_COUNTRY_OPTIONS,
       ),
       invitingPartyType: submissionFieldOptions(
@@ -1250,30 +1112,20 @@ export function FigmaQuestionnaireScreen({
     trip: "Цель, страны, даты и биометрия.",
   };
 
-  function updateField(key: keyof QuestionnaireFormData, value: string) {
-    const binding = fieldBindingFor(key);
-
-    if (binding) {
-      const updateKey = `${activeApplicant}:${binding.sectionId}:${binding.fieldId}`;
-      setPendingFieldUpdates((current) => {
-        if (sourceFormData[key] === value) {
-          const { [updateKey]: _removed, ...next } = current;
-          return next;
-        }
-
-        return {
-          ...current,
-          [updateKey]: {
-            applicantId: activeApplicant,
-            fieldId: binding.fieldId,
-            sectionId: binding.sectionId,
-            value,
-          },
-        };
-      });
-    }
-
+  function updateField(key: keyof typeof formData, value: string) {
     setFormData((current) => ({ ...current, [key]: value }));
+  }
+
+  function fieldReviewState(label: string): FieldState {
+    return initialFieldTarget?.labels.some((candidate) => sameFieldLabel(candidate, label))
+      ? "needs_review"
+      : "normal";
+  }
+
+  function fieldReviewSource(label: string) {
+    return fieldReviewState(label) === "needs_review"
+      ? "замечание администратора"
+      : undefined;
   }
 
   function goToNextSection() {
@@ -1292,15 +1144,6 @@ export function FigmaQuestionnaireScreen({
           value: formData[initialFieldTarget.formKey],
         }
       : undefined;
-
-  function completionPayload() {
-    return {
-      fieldUpdates: Object.values(pendingFieldUpdates),
-      focusedUpdate: focusedUpdatePayload,
-      travelEnd: formData.travelEnd,
-      travelStart: formData.travelStart,
-    };
-  }
 
   function renderSectionFields() {
     if (activeSection === "files") {
@@ -1403,46 +1246,46 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: C2"
-            errorMessage={fieldErrorMessage("passport-type", "Тип проездного документа")}
-            focused={fieldReviewState("passport-type", "Тип проездного документа") === "needs_review"}
+            focused={fieldReviewState("Тип проездного документа") === "needs_review"}
             label="Тип проездного документа"
             number="12"
             options={selectOptions.passportType}
             required
-            state={fieldReviewState("passport-type", "Тип проездного документа")}
+            reviewSource={fieldReviewSource("Тип проездного документа")}
+            state={fieldReviewState("Тип проездного документа")}
             value={formData.passportType}
             onChange={(value) => updateField("passportType", value)}
           />
           <FormField
             excelMap="Cell: C3"
-            errorMessage={fieldErrorMessage("passport-no", "Номер паспорта")}
-            focused={fieldReviewState("passport-no", "Номер паспорта") === "needs_review"}
+            focused={fieldReviewState("Номер паспорта") === "needs_review"}
             label="Номер паспорта"
             number="13"
             required
-            state={fieldReviewState("passport-no", "Номер паспорта")}
+            reviewSource={fieldReviewSource("Номер паспорта")}
+            state={fieldReviewState("Номер паспорта")}
             value={formData.passportNumber}
             onChange={(value) => updateField("passportNumber", value)}
           />
           <FormField
             excelMap="Cell: C4"
-            errorMessage={fieldErrorMessage("passport-issue-date", "Дата выдачи")}
-            focused={fieldReviewState("passport-issue-date", "Дата выдачи") === "needs_review"}
+            focused={fieldReviewState("Дата выдачи") === "needs_review"}
             label="Дата выдачи"
             number="3"
             required
-            state={fieldReviewState("passport-issue-date", "Дата выдачи")}
+            reviewSource={fieldReviewSource("Дата выдачи")}
+            state={fieldReviewState("Дата выдачи")}
             value={formData.passportIssued}
             onChange={(value) => updateField("passportIssued", value)}
           />
           <FormField
             excelMap="Cell: C5"
-            errorMessage={fieldErrorMessage("passport-expiry-date", "Действителен до")}
-            focused={fieldReviewState("passport-expiry-date", "Действителен до") === "needs_review"}
+            focused={fieldReviewState("Действителен до") === "needs_review"}
             label="Действителен до"
             number="4"
             required
-            state={fieldReviewState("passport-expiry-date", "Действителен до")}
+            reviewSource={fieldReviewSource("Действителен до")}
+            state={fieldReviewState("Действителен до")}
             value={formData.passportExpiry}
             onChange={(value) => updateField("passportExpiry", value)}
           />
@@ -1578,12 +1421,12 @@ export function FigmaQuestionnaireScreen({
         <>
           <FormField
             excelMap="Cell: E2"
-            errorMessage={fieldErrorMessage("occupation", "Профессия")}
             label="Профессия"
             number="1"
             options={selectOptions.occupation}
             required
-            state={fieldReviewState("occupation", "Профессия")}
+            reviewSource="employment_doc"
+            state="needs_review"
             value={formData.occupation}
             onChange={(value) => updateField("occupation", value)}
           />
@@ -1671,23 +1514,23 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             excelMap="Cell: F3"
-            errorMessage={fieldErrorMessage("arrival-date", "Дата въезда")}
-            focused={fieldReviewState("arrival-date", "Дата въезда") === "needs_review"}
+            focused={fieldReviewState("Дата въезда") === "needs_review"}
             label="Дата въезда"
             number="6"
             required
-            state={fieldReviewState("arrival-date", "Дата въезда")}
+            reviewSource={fieldReviewSource("Дата въезда")}
+            state={fieldReviewState("Дата въезда")}
             value={formData.travelStart}
             onChange={(value) => updateField("travelStart", value)}
           />
           <FormField
             excelMap="Cell: F4"
-            errorMessage={fieldErrorMessage("departure-date", "Дата выезда")}
-            focused={fieldReviewState("departure-date", "Дата выезда") === "needs_review"}
+            focused={fieldReviewState("Дата выезда") === "needs_review"}
             label="Дата выезда"
             number="7"
             required
-            state={fieldReviewState("departure-date", "Дата выезда")}
+            reviewSource={fieldReviewSource("Дата выезда")}
+            state={fieldReviewState("Дата выезда")}
             value={formData.travelEnd}
             onChange={(value) => updateField("travelEnd", value)}
           />
@@ -1932,21 +1775,20 @@ export function FigmaQuestionnaireScreen({
         />
         <FormField
           excelMap="Cell: B4"
-          errorMessage={fieldErrorMessage("birth-date", "Дата рождения")}
           label="Дата рождения"
           number="4"
           required
-          state={fieldReviewState("birth-date", "Дата рождения")}
+          state={activeApplicant === applicants[0]?.id ? "invalid" : "normal"}
           value={formData.dob}
           onChange={(value) => updateField("dob", value)}
         />
         <FormField
           excelMap="Cell: B5"
-          errorMessage={fieldErrorMessage("birth-place", "Место рождения")}
           label="Место рождения"
           number="5"
           required
-          state={fieldReviewState("birth-place", "Место рождения")}
+          reviewSource="passport_ocr"
+          state="needs_review"
           value={formData.birthPlace}
           onChange={(value) => updateField("birthPlace", value)}
         />
@@ -2067,7 +1909,13 @@ export function FigmaQuestionnaireScreen({
           <button
             className="v19-questionnaire-complete-button"
             type="button"
-            onClick={() => onComplete(completionPayload())}
+            onClick={() =>
+              onComplete({
+                focusedUpdate: focusedUpdatePayload,
+                travelEnd: formData.travelEnd,
+                travelStart: formData.travelStart,
+              })
+            }
           >
             <span className="hidden sm:inline">Готово к проверке</span>
             <span className="sm:hidden">Готово</span>
@@ -2182,7 +2030,7 @@ export function FigmaQuestionnaireScreen({
                 </p>
               </div>
 
-              {currentSectionIssue ? (
+              {activeSection === "personal" && activeApplicant === applicants[0]?.id ? (
                 <div className="v19-questionnaire-review-alert">
                   <div className="v19-questionnaire-review-strip" />
                   <div className="v19-questionnaire-review-icon">
@@ -2190,12 +2038,11 @@ export function FigmaQuestionnaireScreen({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
-                      {currentSectionIssue.target.field
-                        ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
-                        : currentSectionIssue.reason}
+                      Дата рождения не совпадает
                     </div>
                     <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
-                      {currentSectionIssue.comment}
+                      PDF: <strong className="text-white/90 font-medium">15.05.1985</strong>.
+                      Анкета: <strong className="text-white/90 font-medium">12.05.1985</strong>.
                     </p>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, Plus, Filter, User, Users, X, 
@@ -24,114 +24,20 @@ export type SubmissionListItem = {
   title: string;
   type: 'single' | 'family';
   applicantsCount: number;
-  applicantNames: string[];
-  passportNumbers: string[];
   city: string;
   tripDates: string;
-  departureDate: string;
-  createdAt: string;
   status: SubmissionStatus;
   completeness: number;
   updated: string;
   owner: string;
-  issuesCount: number;
 };
-
-type SubmissionStatusFilter = 'all' | 'issues' | 'review';
-type SubmissionSortKey = 'issues_desc' | 'departure_asc' | 'departure_desc' | 'created_desc' | 'created_asc';
 
 const mockSubmissions: SubmissionListItem[] = [
-  {
-    id: "SUB-1042",
-    title: "Семья Петровых",
-    type: "family",
-    applicantsCount: 4,
-    applicantNames: ["Иван Петров", "Анна Петрова", "Максим Петров", "Мария Петрова"],
-    passportNumbers: ["75 1234567", "75 7654321", "76 1002003", "76 1002004"],
-    city: "Санкт-Петербург",
-    tripDates: "18–23 июл 2026",
-    departureDate: "2026-07-18",
-    createdAt: "2026-07-05T09:35:00+03:00",
-    status: "returned",
-    completeness: 92,
-    updated: "12 мин назад",
-    owner: "Татьяна Н.",
-    issuesCount: 3,
-  },
-  {
-    id: "SUB-1057",
-    title: "Алина Смирнова",
-    type: "single",
-    applicantsCount: 1,
-    applicantNames: ["Алина Смирнова"],
-    passportNumbers: ["71 4455667"],
-    city: "Москва",
-    tripDates: "02–09 авг 2026",
-    departureDate: "2026-08-02",
-    createdAt: "2026-07-04T16:10:00+03:00",
-    status: "in_progress",
-    completeness: 64,
-    updated: "34 мин назад",
-    owner: "Татьяна Н.",
-    issuesCount: 0,
-  },
-  {
-    id: "SUB-1061",
-    title: "Семья Орловых",
-    type: "family",
-    applicantsCount: 4,
-    applicantNames: ["Олег Орлов", "Ирина Орлова", "Павел Орлов", "Дарья Орлова"],
-    passportNumbers: ["73 0022001", "73 0022002", "74 9040110", "74 9040111"],
-    city: "Москва",
-    tripDates: "11–21 авг 2026",
-    departureDate: "2026-08-11",
-    createdAt: "2026-07-03T12:25:00+03:00",
-    status: "submitted_for_review",
-    completeness: 100,
-    updated: "1 ч назад",
-    owner: "Татьяна Н.",
-    issuesCount: 0,
-  },
-  {
-    id: "SUB-1078",
-    title: "Дмитрий Волков",
-    type: "single",
-    applicantsCount: 1,
-    applicantNames: ["Дмитрий Волков"],
-    passportNumbers: ["72 8889900"],
-    city: "Москва",
-    tripDates: "06–12 сен 2026",
-    departureDate: "2026-09-06",
-    createdAt: "2026-07-02T18:45:00+03:00",
-    status: "ready_for_export",
-    completeness: 100,
-    updated: "2 ч назад",
-    owner: "Марина К.",
-    issuesCount: 0,
-  },
+  { id: "SUB-1042", title: "Семья Петровых", type: "family", applicantsCount: 4, city: "Санкт-Петербург", tripDates: "18–23 июл 2026", status: "returned", completeness: 92, updated: "12 мин назад", owner: "Татьяна Н." },
+  { id: "SUB-1057", title: "Алина Смирнова", type: "single", applicantsCount: 1, city: "Москва", tripDates: "02–09 авг 2026", status: "in_progress", completeness: 64, updated: "34 мин назад", owner: "Татьяна Н." },
+  { id: "SUB-1061", title: "Семья Орловых", type: "family", applicantsCount: 4, city: "Москва", tripDates: "11–21 авг 2026", status: "submitted_for_review", completeness: 100, updated: "1 ч назад", owner: "Татьяна Н." },
+  { id: "SUB-1078", title: "Дмитрий Волков", type: "single", applicantsCount: 1, city: "Москва", tripDates: "06–12 сен 2026", status: "ready_for_export", completeness: 100, updated: "2 ч назад", owner: "Марина К." },
 ];
-
-const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-});
-
-const normalizeText = (value: string) =>
-  value.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').trim();
-
-const normalizePassport = (value: string) =>
-  normalizeText(value).replace(/[^a-zа-я0-9]/gi, '');
-
-const getDateTime = (value: string) => {
-  const time = new Date(value).getTime();
-  return Number.isNaN(time) ? 0 : time;
-};
-
-const formatShortDate = (value: string) => {
-  const time = getDateTime(value);
-  return time === 0 ? '—' : dateFormatter.format(new Date(time));
-};
 
 type NavSection = AgentNavSection;
 type ViewState = 'main' | 'questionnaire' | 'upload';
@@ -143,99 +49,7 @@ export function CommandCenter({ onSwitchWorkspace }: { onSwitchWorkspace?: () =>
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [submissionStatusFilter, setSubmissionStatusFilter] = useState<SubmissionStatusFilter>('all');
-  const [cityFilter, setCityFilter] = useState('all');
-  const [sortBy, setSortBy] = useState<SubmissionSortKey>('created_desc');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const cityOptions = useMemo(
-    () => Array.from(new Set(mockSubmissions.map((sub) => sub.city))).sort((a, b) => a.localeCompare(b, 'ru')),
-    []
-  );
-
-  const totalIssuesCount = useMemo(
-    () => mockSubmissions.reduce((total, sub) => total + sub.issuesCount, 0),
-    []
-  );
-
-  const reviewCount = useMemo(
-    () => mockSubmissions.filter((sub) => sub.status === 'submitted_for_review').length,
-    []
-  );
-
-  const filteredSubmissions = useMemo(() => {
-    const normalizedSearch = normalizeText(searchQuery);
-    const compactSearch = normalizePassport(searchQuery);
-
-    return mockSubmissions
-      .filter((sub) => {
-        const matchesStatus =
-          submissionStatusFilter === 'all'
-            ? true
-            : submissionStatusFilter === 'issues'
-              ? sub.issuesCount > 0 || sub.status === 'returned'
-              : sub.status === 'submitted_for_review';
-
-        const matchesCity = cityFilter === 'all' || sub.city === cityFilter;
-
-        const searchableText = [
-          sub.id,
-          sub.title,
-          sub.owner,
-          sub.city,
-          ...sub.applicantNames,
-          ...sub.passportNumbers,
-        ].map(normalizeText);
-
-        const searchablePassports = sub.passportNumbers.map(normalizePassport);
-
-        const matchesSearch =
-          normalizedSearch.length === 0 ||
-          searchableText.some((value) => value.includes(normalizedSearch)) ||
-          (compactSearch.length > 0 && searchablePassports.some((passport) => passport.includes(compactSearch)));
-
-        return matchesStatus && matchesCity && matchesSearch;
-      })
-      .sort((a, b) => {
-        switch (sortBy) {
-          case 'issues_desc':
-            return b.issuesCount - a.issuesCount || getDateTime(b.createdAt) - getDateTime(a.createdAt);
-          case 'departure_asc':
-            return getDateTime(a.departureDate) - getDateTime(b.departureDate);
-          case 'departure_desc':
-            return getDateTime(b.departureDate) - getDateTime(a.departureDate);
-          case 'created_asc':
-            return getDateTime(a.createdAt) - getDateTime(b.createdAt);
-          case 'created_desc':
-          default:
-            return getDateTime(b.createdAt) - getDateTime(a.createdAt);
-        }
-      });
-  }, [cityFilter, searchQuery, sortBy, submissionStatusFilter]);
-
-  const hasActiveSubmissionFilters =
-    submissionStatusFilter !== 'all' ||
-    cityFilter !== 'all' ||
-    sortBy !== 'created_desc' ||
-    searchQuery.trim().length > 0;
-
-  const resetSubmissionFilters = () => {
-    setSubmissionStatusFilter('all');
-    setCityFilter('all');
-    setSortBy('created_desc');
-    setSearchQuery('');
-  };
-
-  const getStatusFilterButtonClassName = (filter: SubmissionStatusFilter) => {
-    const isActive = submissionStatusFilter === filter;
-
-    return `px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] border ${
-      isActive
-        ? 'bg-[#27272b] text-white shadow-sm border-[#2e2f34]'
-        : 'text-white/50 hover:text-white/80 border-transparent'
-    }`;
-  };
-
+  
   // Close mobile nav on resize to desktop
   useEffect(() => {
     const handleResize = () => {
@@ -280,16 +94,13 @@ export function CommandCenter({ onSwitchWorkspace }: { onSwitchWorkspace?: () =>
   };
 
   const getStatusBadge = (status: SubmissionStatus) => {
-    const badgeClassName = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] uppercase tracking-wide font-medium leading-none";
-    const badgeIconClassName = "w-3 h-3";
-
     switch (status) {
-      case 'in_progress': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-[#b8baff]`}><Clock className={badgeIconClassName} /> В работе</span>;
-      case 'returned': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-white/62`}><AlertCircle className={badgeIconClassName} /> Ошибки</span>;
-      case 'submitted_for_review': return <span className={`${badgeClassName} bg-[#6f64ff]/20 border-[#6f64ff]/30 text-[#b8baff]`}><Clock className={badgeIconClassName} /> На проверке</span>;
-      case 'corrections_received': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-white/62`}><Clock className={badgeIconClassName} /> Исправления</span>;
-      case 'ready_for_export': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-[#b8baff]`}><CheckCircle2 className={badgeIconClassName} /> Готово</span>;
-      default: return <span className={`${badgeClassName} bg-white/5 border-white/10 text-white/70`}><FileText className={badgeIconClassName} /> Черновик</span>;
+      case 'in_progress': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[10.5px] uppercase tracking-wide font-medium"><Clock className="w-3 h-3" /> В работе</span>;
+      case 'returned': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[10.5px] uppercase tracking-wide font-medium"><AlertCircle className="w-3 h-3" /> Ошибки</span>;
+      case 'submitted_for_review': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[10.5px] uppercase tracking-wide font-medium"><Clock className="w-3 h-3" /> На проверке</span>;
+      case 'corrections_received': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[10.5px] uppercase tracking-wide font-medium"><Clock className="w-3 h-3" /> Исправления</span>;
+      case 'ready_for_export': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[10.5px] uppercase tracking-wide font-medium"><CheckCircle2 className="w-3 h-3" /> Готово</span>;
+      default: return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/70 text-[10.5px] uppercase tracking-wide font-medium"><FileText className="w-3 h-3" /> Черновик</span>;
     }
   };
 
@@ -446,196 +257,70 @@ export function CommandCenter({ onSwitchWorkspace }: { onSwitchWorkspace?: () =>
             {/* Submissions List */}
             {activeNav === 'submissions' && (
               <div className="space-y-4 lg:space-y-6">
-                <div className="space-y-3 min-h-[48px] lg:min-h-12">
-                  <div className="flex flex-col xl:flex-row xl:items-center gap-3">
-                    <div className="flex bg-[#161617] p-1 border border-[#202124] rounded-[11px] overflow-x-auto scrollbar-hide">
-                      <button
-                        type="button"
-                        onClick={() => setSubmissionStatusFilter('all')}
-                        className={getStatusFilterButtonClassName('all')}
-                      >
-                        Все действия
-                        <span className="ml-1.5 text-[10px] bg-black/30 text-white/55 px-1.5 py-0.5 rounded-md">
-                          {mockSubmissions.length}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSubmissionStatusFilter('issues')}
-                        className={getStatusFilterButtonClassName('issues')}
-                      >
-                        Ошибки
-                        <span className="ml-1.5 text-[10px] bg-[#2a1d20]/70 text-[#d59aa3] px-1.5 py-0.5 rounded-md">
-                          {totalIssuesCount}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSubmissionStatusFilter('review')}
-                        className={getStatusFilterButtonClassName('review')}
-                      >
-                        На проверке
-                        <span className="ml-1.5 text-[10px] bg-black/30 text-white/55 px-1.5 py-0.5 rounded-md">
-                          {reviewCount}
-                        </span>
-                      </button>
-                    </div>
-
-                    <div className="xl:ml-auto flex items-center gap-2 w-full xl:w-auto">
-                      <div className="relative w-full xl:w-[320px]">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                        <input
-                          type="search"
-                          value={searchQuery}
-                          onChange={(event) => setSearchQuery(event.target.value)}
-                          placeholder="Паспорт или имя..."
-                          className="w-full h-10 bg-[#1e1e21] border border-[#242529] rounded-[10px] pl-9 pr-3 text-sm text-white placeholder-white/40 focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={resetSubmissionFilters}
-                        disabled={!hasActiveSubmissionFilters}
-                        aria-label={hasActiveSubmissionFilters ? 'Сбросить фильтры' : 'Фильтры не применены'}
-                        className="w-10 h-10 shrink-0 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] flex items-center justify-center text-white/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#1e1e21]"
-                      >
-                        {hasActiveSubmissionFilters ? <X className="w-4 h-4" /> : <Filter className="w-4 h-4" />}
-                      </button>
-                    </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-h-[48px] lg:min-h-12">
+                  <div className="flex bg-[#161617] p-1 border border-[#202124] rounded-[11px] overflow-x-auto scrollbar-hide">
+                    <button className="px-3 py-1.5 rounded-lg text-sm bg-[#27272b] text-white transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] shadow-sm border border-[#2e2f34]">Все действия</button>
+                    <button className="px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white/80 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] border border-transparent">Ошибки <span className="ml-1.5 text-[10px] bg-[#2a1d20]/70 text-[#d59aa3] px-1.5 py-0.5 rounded-md">3</span></button>
+                    <button className="px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white/80 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] border border-transparent">На проверке</button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(190px,240px)_minmax(240px,300px)_auto] gap-2">
-                    <label className="block">
-                      <span className="block mb-1.5 text-[11px] font-medium uppercase tracking-wider text-white/40">
-                        Город
-                      </span>
-                      <select
-                        value={cityFilter}
-                        onChange={(event) => setCityFilter(event.target.value)}
-                        className="w-full h-10 bg-[#1e1e21] border border-[#242529] rounded-[10px] px-3 text-sm text-white focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none"
-                      >
-                        <option value="all">Все города</option>
-                        {cityOptions.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="block">
-                      <span className="block mb-1.5 text-[11px] font-medium uppercase tracking-wider text-white/40">
-                        Сортировка
-                      </span>
-                      <select
-                        value={sortBy}
-                        onChange={(event) => setSortBy(event.target.value as SubmissionSortKey)}
-                        className="w-full h-10 bg-[#1e1e21] border border-[#242529] rounded-[10px] px-3 text-sm text-white focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none"
-                      >
-                        <option value="issues_desc">Сначала с проблемами</option>
-                        <option value="departure_asc">Дата вылета: ближе</option>
-                        <option value="departure_desc">Дата вылета: дальше</option>
-                        <option value="created_desc">Дата создания: новые</option>
-                        <option value="created_asc">Дата создания: старые</option>
-                      </select>
-                    </label>
-
-                    <div className="min-h-10 sm:col-span-2 xl:col-span-1 xl:self-end px-3 py-2 bg-[#161617] border border-[#202124] rounded-[10px] flex items-center justify-between gap-3 text-sm">
-                      <span className="text-white/40">Найдено</span>
-                      <span className="font-mono text-white/80">
-                        {filteredSubmissions.length} / {mockSubmissions.length}
-                      </span>
+                  <div className="sm:ml-auto flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative w-full sm:w-[260px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <input type="text" placeholder="Поиск..." className="w-full h-10 bg-[#1e1e21] border border-[#242529] rounded-[10px] pl-9 pr-3 text-sm text-white placeholder-white/40 focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none" />
                     </div>
+                    <button className="w-10 h-10 shrink-0 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] flex items-center justify-center text-white/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]">
+                      <Filter className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="text-[11px] font-medium text-white/40 uppercase tracking-wider mb-4 flex items-center">
                     <span className="flex-1 border-b border-[#202124] mr-3"></span>
-                    <span>{filteredSubmissions.length === 0 ? 'Нет совпадений' : 'Результаты'}</span>
+                    <span>Сегодня</span>
                     <span className="flex-1 border-b border-[#202124] ml-3"></span>
                   </div>
 
-                  {filteredSubmissions.length === 0 ? (
-                    <div className="min-h-[180px] rounded-[15px] border border-[#242529] bg-gradient-to-b from-[#161617] to-[#0e0e10] flex flex-col items-center justify-center text-center px-6">
-                      <Search className="w-8 h-8 text-white/25 mb-3" />
-                      <div className="text-sm font-medium text-white">Заявки не найдены</div>
-                      <div className="text-[12px] text-white/45 mt-1 max-w-[360px]">
-                        Измени город, сортировку, статус или запрос по паспорту / имени.
+                  {mockSubmissions.map((sub) => (
+                    <div 
+                      key={sub.id}
+                      onClick={() => handleRowClick(sub.id)}
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(sub.id); } }}
+                      className={`min-h-[92px] p-3 lg:p-0 lg:pl-4 lg:pr-3 border rounded-[15px] cursor-pointer transition-all flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] shadow-[inset_0_1px_0_rgba(255,255,255,0.026)] ${selectedRow === sub.id ? 'bg-gradient-to-b from-[#202024] to-[#161617] border-[#2e2f34]' : 'bg-gradient-to-b from-[#161617] to-[#0e0e10] border-[#242529] hover:border-[#2e2f34] hover:from-[#1a1a1d]'}`}
+                    >
+                      <div className="hidden lg:flex w-3.5 h-full items-center justify-center shrink-0">
+                        <div className={`w-2.5 h-2.5 rounded-full ${getStatusDot(sub.status)} ring-4 ring-black/20`} />
                       </div>
-                      {hasActiveSubmissionFilters && (
-                        <button
-                          type="button"
-                          onClick={resetSubmissionFilters}
-                          className="mt-4 h-9 px-4 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] text-[13px] text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-                        >
-                          Сбросить фильтры
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-2 mb-1 lg:hidden">
+                           <div className={`w-2 h-2 rounded-full ${getStatusDot(sub.status)}`} />
+                           <div className="text-[10.5px] text-white/50 font-mono">{sub.id}</div>
+                        </div>
+                        <div className="text-[14.5px] font-semibold text-white truncate leading-snug">{sub.title}</div>
+                        <div className="text-[10.5px] text-white/40 mt-0.5 truncate hidden lg:block">ID: <span className="font-mono text-white/60 mr-2">{sub.id}</span> Обновлено: {sub.updated}</div>
+                      </div>
+                      <div className="lg:w-[190px] shrink-0 lg:border-l border-[#202124] lg:pl-4 flex flex-col justify-center">
+                        <div className="text-[12px] font-medium text-white/90 truncate">{sub.city}</div>
+                        <div className="text-[10.5px] text-white/40 mt-0.5 flex items-center gap-1.5">
+                          {sub.type === 'family' ? <Users className="w-3 h-3" /> : <User className="w-3 h-3" />} {sub.type === 'family' ? `${sub.applicantsCount} заявителя` : '1 заявитель'}
+                        </div>
+                      </div>
+                      <div className="hidden lg:flex w-[126px] shrink-0 flex-col justify-center">
+                        <div className="text-[12px] font-medium text-white/90 truncate">{sub.tripDates}</div>
+                        <div className="text-[10.5px] text-white/40 mt-0.5">Даты поездки</div>
+                      </div>
+                      <div className="hidden lg:flex w-[136px] shrink-0 items-center">
+                        {getStatusBadge(sub.status)}
+                      </div>
+                      <div className="lg:w-[166px] shrink-0 flex items-center justify-end lg:justify-center mt-2 lg:mt-0">
+                        <button onClick={(e) => { e.stopPropagation(); handleOpenQuestionnaire(sub.id); }} tabIndex={0} className="h-10 px-4 w-full lg:w-auto bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] text-sm text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]">
+                          <span>Открыть</span>
                         </button>
-                      )}
-                    </div>
-                  ) : (
-                    filteredSubmissions.map((sub) => (
-                      <div
-                        key={sub.id}
-                        onClick={() => handleRowClick(sub.id)}
-                        tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(sub.id); } }}
-                        className={`min-h-[92px] p-3 lg:grid lg:grid-cols-[16px_minmax(0,1.35fr)_minmax(140px,0.95fr)_minmax(128px,0.8fr)_minmax(116px,0.7fr)_minmax(120px,0.65fr)_104px] lg:items-center lg:gap-4 lg:px-4 border rounded-[15px] cursor-pointer transition-all flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] shadow-[inset_0_1px_0_rgba(255,255,255,0.026)] ${selectedRow === sub.id ? 'bg-gradient-to-b from-[#202024] to-[#161617] border-[#2e2f34]' : 'bg-gradient-to-b from-[#161617] to-[#0e0e10] border-[#242529] hover:border-[#2e2f34] hover:from-[#1a1a1d]'}`}
-                      >
-                        <div className="hidden lg:flex h-full items-center justify-center">
-                          <div className={`w-2.5 h-2.5 rounded-full ${getStatusDot(sub.status)} ring-4 ring-black/20`} />
-                        </div>
-
-                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                          <div className="flex items-center gap-2 mb-1 lg:hidden">
-                            <div className={`w-2 h-2 rounded-full ${getStatusDot(sub.status)}`} />
-                            <div className="text-[10.5px] text-white/50 font-mono">{sub.id}</div>
-                          </div>
-                          <div className="text-[14.5px] font-semibold text-white truncate leading-snug">{sub.title}</div>
-                          <div className="text-[10.5px] text-white/40 mt-0.5 truncate hidden lg:block">
-                            ID: <span className="font-mono text-white/60 mr-2">{sub.id}</span>
-                            Создано: {formatShortDate(sub.createdAt)}
-                          </div>
-                          <div className="lg:hidden flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-white/42 mt-2">
-                            <span>Вылет: {formatShortDate(sub.departureDate)}</span>
-                            <span>Создано: {formatShortDate(sub.createdAt)}</span>
-                          </div>
-                        </div>
-
-                        <div className="min-w-0 lg:border-l border-[#202124] lg:pl-4 flex flex-col justify-center">
-                          <div className="text-[12px] font-medium text-white/90 truncate">{sub.city}</div>
-                          <div className="text-[10.5px] text-white/40 mt-0.5 flex items-center gap-1.5">
-                            {sub.type === 'family' ? <Users className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                            {sub.type === 'family' ? `${sub.applicantsCount} заявителя` : '1 заявитель'}
-                          </div>
-                        </div>
-
-                        <div className="hidden lg:flex min-w-0 flex-col justify-center">
-                          <div className="text-[12px] font-medium text-white/90 truncate">{sub.tripDates}</div>
-                          <div className="text-[10.5px] text-white/40 mt-0.5">Вылет: {formatShortDate(sub.departureDate)}</div>
-                        </div>
-
-                        <div className="hidden lg:flex min-w-0 flex-col justify-center">
-                          <div className="text-[12px] font-medium text-white/90 truncate">{formatShortDate(sub.createdAt)}</div>
-                          <div className="text-[10.5px] text-white/40 mt-0.5">Дата создания</div>
-                        </div>
-
-                        <div className="hidden lg:flex min-w-0 items-center justify-start">
-                          {getStatusBadge(sub.status)}
-                        </div>
-
-                        <div className="shrink-0 flex items-center justify-end lg:justify-center mt-2 lg:mt-0">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleOpenQuestionnaire(sub.id); }}
-                            tabIndex={0}
-                            className="h-10 px-4 w-full lg:w-auto bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] text-sm text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-                          >
-                            <span>Открыть</span>
-                          </button>
-                        </div>
                       </div>
-                    ))
-                  )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

@@ -403,7 +403,7 @@ export function AgentMediaScreen({
         <article>
           <small>Нужно загрузить/заменить</small>
           <strong>{missing}</strong>
-          <span>медиа-слотов</span>
+          <span>слотов документов</span>
         </article>
         <article>
           <small>На проверке</small>
@@ -420,7 +420,7 @@ export function AgentMediaScreen({
       <LinearSectionHeader
         icon={<ImageIcon size={18} strokeWidth={1.8} />}
         kicker="Очередь"
-        title="Файлы и медиа"
+        title="Файлы документов"
         action={
           onCreate ? (
             <Button variant="secondary" onClick={onCreate}>

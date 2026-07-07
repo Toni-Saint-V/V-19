@@ -133,7 +133,6 @@ import {
   AgentApplicantsScreen,
   AgentDraftsScreen,
   AgentIssuesScreen,
-  AgentMediaScreen,
 } from "./modules/submissions/pages/LinearAgentScreens";
 import type { WorkspaceTarget } from "./modules/submissions/workspaceModel";
 import type {
@@ -753,15 +752,6 @@ function MainApp() {
             onClick: showAgentApplicants,
           },
           {
-            active: surface === "agent-media",
-            count: searchedAgentQueue.reduce((total, submission) => total + submission.files.length, 0),
-            icon: "Ф",
-            id: "agent-media",
-            label: "Файлы / Медиа",
-            meta: "Медиа",
-            onClick: showAgentMedia,
-          },
-          {
             active: surface === "agent-issues",
             count: searchedAgentQueue.reduce((total, submission) => total + submission.issues.filter((issue) => issue.status !== "closed_by_admin").length, 0),
             icon: "!",
@@ -1291,17 +1281,6 @@ function MainApp() {
       setDrawerMode("closed");
       setAgentQuestionnaireOpen(false);
       const nextSubmission = searchedAgentQueue[0];
-      if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
-    });
-  }
-
-  function showAgentMedia() {
-    requestSettingsLeave(() => {
-      setSurface("agent-media");
-      setDrawerMode("closed");
-      setAgentQuestionnaireOpen(false);
-      const nextSubmission =
-        searchedAgentQueue.find((submission) => submission.files.length > 0) ?? searchedAgentQueue[0];
       if (nextSubmission) setSelectedSubmissionId(nextSubmission.id);
     });
   }
@@ -3599,7 +3578,7 @@ function MainApp() {
             visibleSubmission={visibleAgentSubmission}
             summary={summary}
           />
-        ) : surface === "agent-drafts" ? (
+        ) : surface === "agent-drafts" || surface === "agent-media" ? (
           <AgentDraftsScreen
             hasSearchQuery={query.trim().length > 0}
             onClearSearch={() => setQuery("")}
@@ -3612,14 +3591,6 @@ function MainApp() {
             hasSearchQuery={query.trim().length > 0}
             onClearSearch={() => setQuery("")}
             onCreate={openCreateSubmissionDrawer}
-            onOpen={openSubmission}
-            submissions={searchedAgentQueue}
-          />
-        ) : surface === "agent-media" ? (
-          <AgentMediaScreen
-            hasSearchQuery={query.trim().length > 0}
-            onClearSearch={() => setQuery("")}
-            onCreate={openApplicantsUploadTarget}
             onOpen={openSubmission}
             submissions={searchedAgentQueue}
           />

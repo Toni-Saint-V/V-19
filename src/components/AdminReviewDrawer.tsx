@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, CheckCircle2, FileText, Image as ImageIcon,
@@ -155,48 +155,6 @@ const QuestionnaireTab = ({ onVerifyDocument, onAddRemark }: any) => {
 export function AdminReviewDrawer({ isOpen, onClose, submissionId, onVerifyDocument, onAddRemark }: AdminReviewDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('questionnaire');
 
-  // Logic-only review state. UI is intentionally untouched.
-  const [reviewState, setReviewState] = useState({
-    verifiedFields: new Set<string>(),
-    closedIssues: new Set<string>(),
-    audit: [] as Array<{ action: string; at: string }>,
-  });
-
-  const reviewMetrics = useMemo(() => {
-    const verified = reviewState.verifiedFields.size;
-    const blockers = Math.max(0, 1 - reviewState.closedIssues.size);
-    return {
-      verified,
-      blockers,
-      ready: blockers === 0,
-    };
-  }, [reviewState]);
-
-  const registerReviewAction = useCallback((action: string) => {
-    setReviewState(prev => ({
-      ...prev,
-      audit: [...prev.audit, { action, at: new Date().toISOString() }],
-    }));
-  }, []);
-
-  const verifyField = useCallback((field: string) => {
-    setReviewState(prev => ({
-      ...prev,
-      verifiedFields: new Set(prev.verifiedFields).add(field),
-    }));
-    registerReviewAction(`field_verified:${field}`);
-  }, [registerReviewAction]);
-
-  const closeIssue = useCallback((issue: string) => {
-    setReviewState(prev => ({
-      ...prev,
-      closedIssues: new Set(prev.closedIssues).add(issue),
-    }));
-    registerReviewAction(`issue_closed:${issue}`);
-  }, [registerReviewAction]);
-
-  const canFinishReview = reviewMetrics.ready;
-
   // Focus and Keyboard Management
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -333,7 +291,7 @@ export function AdminReviewDrawer({ isOpen, onClose, submissionId, onVerifyDocum
               >
                 Отложить
               </button>
-              <button disabled={!canFinishReview} onClick={() => registerReviewAction('review_finished')} className="h-11 px-6 bg-[#202126] hover:bg-[#2a2b32] text-white font-medium text-[13px] rounded-xl shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors flex items-center gap-2 disabled:opacity-50">
+              <button className="h-11 px-6 bg-[#202126] hover:bg-[#2a2b32] text-white font-medium text-[13px] rounded-xl shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4" /> Завершить проверку
               </button>
             </footer>

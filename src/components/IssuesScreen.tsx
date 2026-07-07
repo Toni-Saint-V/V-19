@@ -1,4 +1,3 @@
-import type { AgentDrawerTab } from './Drawer';
 import { motion } from 'motion/react';
 import { AlertCircle, FileWarning, ArrowRight, User, Check } from 'lucide-react';
 
@@ -45,7 +44,7 @@ const mockIssues: Issue[] = [
 ];
 
 interface IssuesScreenProps {
-  onOpenDrawer: (id: string, tab?: AgentDrawerTab) => void;
+  onOpenDrawer: (id: string) => void;
 }
 
 export function IssuesScreen({ onOpenDrawer }: IssuesScreenProps) {
@@ -85,7 +84,7 @@ export function IssuesScreen({ onOpenDrawer }: IssuesScreenProps) {
         {mockIssues.map((issue) => (
           <div 
             key={issue.id}
-            onClick={() => onOpenDrawer(issue.submissionId, 'issues')}
+            onClick={() => onOpenDrawer(issue.submissionId)}
             className="group flex flex-col sm:flex-row gap-4 p-4 lg:p-5 bg-[#161617] border border-[#242529] hover:border-[#6f64ff]/40 rounded-2xl cursor-pointer transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
             tabIndex={0}
           >

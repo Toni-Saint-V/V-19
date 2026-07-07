@@ -1,12 +1,11 @@
 import { motion } from 'motion/react';
-import type { AgentDrawerTab } from './Drawer';
 import { 
   Plus, CheckCircle2, AlertCircle, ScanLine, 
   UploadCloud, ChevronRight, User, Users, FileWarning
 } from 'lucide-react';
 
 interface DraftsScreenProps {
-  onOpenDrawer: (id: string, tab?: AgentDrawerTab) => void;
+  onOpenDrawer: (id: string) => void;
 }
 
 // --- Mock Data ---
@@ -234,7 +233,7 @@ export function DraftsScreen({ onOpenDrawer }: DraftsScreenProps) {
                     </div>
                     <div className="w-[60px] shrink-0 flex items-center justify-center">
                       <button 
-                        onClick={() => onOpenDrawer(sub.id, 'files')}
+                        onClick={() => onOpenDrawer(sub.id)}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-white/30 hover:bg-white/10 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                       >
                         <ChevronRight className="w-4 h-4" />

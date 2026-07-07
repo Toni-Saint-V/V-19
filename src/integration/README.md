@@ -1,43 +1,22 @@
-# VisaFlow UI integration layer
+# VisaFlow integration layer
 
-This folder keeps the new top-product UI decoupled from the existing V-19 business logic.
+The active application entry point now runs the canonical V-19 cockpit from `src/App.tsx` and `src/main.tsx`.
 
-## Main entry point
+## Active flow
 
-`visaflowBusinessBridge.tsx` exposes a small bridge contract. The UI calls bridge handlers for important user intents:
+The production flow is wired through `src/modules/submissions` and includes:
 
-- workspace switch: agent/admin;
-- agent navigation;
-- admin navigation;
-- submission open;
-- questionnaire open;
-- package creation/upload screen;
-- admin document review;
-- remark open/submit;
-- export start.
+- agent document collection and questionnaire progress;
+- canonical file slots: `passport_scan`, `selfie`, `selfie_2`;
+- admin review, precise issues, correction handoff, and acceptance;
+- Supabase cockpit persistence and private `submission-media` storage;
+- export package generation and exported terminal state.
 
-## How to connect real logic
+## Bridge/prototype files
 
-Open `src/main.tsx` and pass a bridge to `<App />`:
+`visaflowBusinessBridge.tsx` and `createVisaflowRuntimeBridge.ts` are kept as a compatibility/prototype bridge for standalone UI experiments. They are not the primary source of truth for the V-19 cockpit.
 
-```tsx
-<App
-  bridge={{
-    onSubmissionOpen: (submissionId) => {
-      // Load submission from src/modules/submissions or Supabase service.
-      console.log('open submission', submissionId);
-    },
-    onExportPackages: async (submissionIds) => {
-      // Call exportWorkflow/exportService here.
-      console.log('export', submissionIds);
-    },
-  }}
-/>
-```
-
-The previous V-19 source files are preserved in their original paths (`src/modules`, `src/services`, `src/lib`, `src/types`, etc.) so they can be connected without restoring the old UI.
-
-The previous `App.tsx` and `main.tsx` are saved as text-only references:
+The text references below mirror the current active entry files so the canonical flow is not accidentally replaced by the old mock shell:
 
 - `legacy-current-App.tsx.txt`
 - `legacy-current-main.tsx.txt`
