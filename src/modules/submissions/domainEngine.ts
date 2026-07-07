@@ -12,6 +12,7 @@ import {
   hasUsableTripDateRange,
   isFixedIssueStatus,
 } from "./status";
+import { firstProductionReadinessBlocker } from "./productionReadinessGate";
 import {
   canonicalRequiredMediaReadiness,
   isCanonicalSubmissionStatus,
@@ -106,6 +107,10 @@ export function submitForReview(
   }
   if (!hasUsableTripDateRange(submission)) {
     return failure("VALIDATION_ERROR", "Trip dates must be complete.");
+  }
+  const gateBlocker = firstProductionReadinessBlocker(submission);
+  if (gateBlocker) {
+    return failure("VALIDATION_ERROR", gateBlocker.detail);
   }
 
   return success(
@@ -320,6 +325,10 @@ export function acceptSubmission(
   }
   if (!hasUsableTripDateRange(submission)) {
     return failure("VALIDATION_ERROR", "Trip dates must be complete.");
+  }
+  const gateBlocker = firstProductionReadinessBlocker(submission);
+  if (gateBlocker) {
+    return failure("VALIDATION_ERROR", gateBlocker.detail);
   }
 
   return success(
