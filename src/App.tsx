@@ -762,6 +762,15 @@ function MainApp() {
             onClick: showAgentDocuments,
           },
           {
+            active: surface === "agent-submissions",
+            count: searchedAgentQueue.length,
+            icon: "П",
+            id: "agent-submissions",
+            label: "Мои подачи",
+            meta: "Пакеты",
+            onClick: () => showAgentTab("all"),
+          },
+          {
             active: surface === "settings",
             icon: "Н",
             id: "agent-settings",
@@ -1175,6 +1184,8 @@ function MainApp() {
         setDrawerMode("closed");
       }
     });
+  // Legacy URL normalization is a one-time startup bridge for removed routes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, emptyRemoteWorkspace, role, searchedAgentQueue, searchedReviewQueue]);
 
   function rememberReturnFocus() {
