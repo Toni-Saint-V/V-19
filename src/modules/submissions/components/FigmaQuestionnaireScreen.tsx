@@ -2152,9 +2152,6 @@ export function FigmaQuestionnaireScreen({
         </button>
 
         <div className="v19-questionnaire-title-wrap">
-          <div className="v19-questionnaire-submission-id">
-            {submission.id}
-          </div>
           <h1
             aria-label={`Анкета: ${submission.title || "Семья Петровых"}`}
             className="v19-questionnaire-title"
@@ -2198,7 +2195,7 @@ export function FigmaQuestionnaireScreen({
       </div>
 
       <div className="v19-questionnaire-scroll">
-        <div className="max-w-[var(--v19b-size-1240)] mx-auto flex flex-col min-h-full gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
+        <div className="v19-questionnaire-scroll-frame max-w-[var(--v19b-size-1240)] mx-auto flex flex-col h-full min-h-0 gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
           <div className="v19-questionnaire-applicant-bar">
             <div className="flex overflow-x-auto scrollbar-hide gap-1.5 lg:gap-2 flex-1 w-full snap-x pb-1 md:pb-0">
               {applicants.map((applicant) => (
