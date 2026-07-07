@@ -151,7 +151,7 @@ function withFirstApplicantNameOnly(
         ...section,
         fields: section.fields.filter(
           (field) =>
-            !["first-name", "surname", "surname-at-birth"].includes(field.id),
+            !["first-name", "surname", "previous-surname"].includes(field.id),
         ),
       })),
     })),

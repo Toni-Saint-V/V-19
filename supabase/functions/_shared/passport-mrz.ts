@@ -103,7 +103,7 @@ export function parseTd3PassportMrz(
       mrzField("citizenship", countryLabel(citizenshipCode), confidence),
       mrzField(
         "gender",
-        gender === "M" ? "Male - Мужской" : gender === "F" ? "Female - Женский" : "",
+        gender === "M" ? "Мужской" : gender === "F" ? "Женский" : "",
         confidence,
       ),
       mrzField("passportType", "Ordinary Passport", confidence),

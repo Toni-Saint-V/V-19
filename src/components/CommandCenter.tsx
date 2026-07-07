@@ -280,13 +280,16 @@ export function CommandCenter({ onSwitchWorkspace }: { onSwitchWorkspace?: () =>
   };
 
   const getStatusBadge = (status: SubmissionStatus) => {
+    const badgeClassName = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] uppercase tracking-wide font-medium leading-none";
+    const badgeIconClassName = "w-3 h-3";
+
     switch (status) {
-      case 'in_progress': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[10.5px] uppercase tracking-wide font-medium"><Clock className="w-3 h-3" /> В работе</span>;
-      case 'returned': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[10.5px] uppercase tracking-wide font-medium"><AlertCircle className="w-3 h-3" /> Ошибки</span>;
-      case 'submitted_for_review': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[10.5px] uppercase tracking-wide font-medium"><Clock className="w-3 h-3" /> На проверке</span>;
-      case 'corrections_received': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[10.5px] uppercase tracking-wide font-medium"><Clock className="w-3 h-3" /> Исправления</span>;
-      case 'ready_for_export': return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[10.5px] uppercase tracking-wide font-medium"><CheckCircle2 className="w-3 h-3" /> Готово</span>;
-      default: return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/70 text-[10.5px] uppercase tracking-wide font-medium"><FileText className="w-3 h-3" /> Черновик</span>;
+      case 'in_progress': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-[#b8baff]`}><Clock className={badgeIconClassName} /> В работе</span>;
+      case 'returned': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-white/62`}><AlertCircle className={badgeIconClassName} /> Ошибки</span>;
+      case 'submitted_for_review': return <span className={`${badgeClassName} bg-[#6f64ff]/20 border-[#6f64ff]/30 text-[#b8baff]`}><Clock className={badgeIconClassName} /> На проверке</span>;
+      case 'corrections_received': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-white/62`}><Clock className={badgeIconClassName} /> Исправления</span>;
+      case 'ready_for_export': return <span className={`${badgeClassName} bg-white/[0.045] border-white/10 text-[#b8baff]`}><CheckCircle2 className={badgeIconClassName} /> Готово</span>;
+      default: return <span className={`${badgeClassName} bg-white/5 border-white/10 text-white/70`}><FileText className={badgeIconClassName} /> Черновик</span>;
     }
   };
 
@@ -577,9 +580,9 @@ export function CommandCenter({ onSwitchWorkspace }: { onSwitchWorkspace?: () =>
                         onClick={() => handleRowClick(sub.id)}
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(sub.id); } }}
-                        className={`min-h-[92px] p-3 lg:p-0 lg:pl-4 lg:pr-3 border rounded-[15px] cursor-pointer transition-all flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] shadow-[inset_0_1px_0_rgba(255,255,255,0.026)] ${selectedRow === sub.id ? 'bg-gradient-to-b from-[#202024] to-[#161617] border-[#2e2f34]' : 'bg-gradient-to-b from-[#161617] to-[#0e0e10] border-[#242529] hover:border-[#2e2f34] hover:from-[#1a1a1d]'}`}
+                        className={`min-h-[92px] p-3 lg:grid lg:grid-cols-[16px_minmax(0,1.35fr)_minmax(140px,0.95fr)_minmax(128px,0.8fr)_minmax(116px,0.7fr)_minmax(120px,0.65fr)_104px] lg:items-center lg:gap-4 lg:px-4 border rounded-[15px] cursor-pointer transition-all flex flex-col gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] shadow-[inset_0_1px_0_rgba(255,255,255,0.026)] ${selectedRow === sub.id ? 'bg-gradient-to-b from-[#202024] to-[#161617] border-[#2e2f34]' : 'bg-gradient-to-b from-[#161617] to-[#0e0e10] border-[#242529] hover:border-[#2e2f34] hover:from-[#1a1a1d]'}`}
                       >
-                        <div className="hidden lg:flex w-3.5 h-full items-center justify-center shrink-0">
+                        <div className="hidden lg:flex h-full items-center justify-center">
                           <div className={`w-2.5 h-2.5 rounded-full ${getStatusDot(sub.status)} ring-4 ring-black/20`} />
                         </div>
 
@@ -596,11 +599,10 @@ export function CommandCenter({ onSwitchWorkspace }: { onSwitchWorkspace?: () =>
                           <div className="lg:hidden flex flex-wrap gap-x-3 gap-y-1 text-[10.5px] text-white/42 mt-2">
                             <span>Вылет: {formatShortDate(sub.departureDate)}</span>
                             <span>Создано: {formatShortDate(sub.createdAt)}</span>
-                            <span>Проблем: {sub.issuesCount}</span>
                           </div>
                         </div>
 
-                        <div className="lg:w-[190px] shrink-0 lg:border-l border-[#202124] lg:pl-4 flex flex-col justify-center">
+                        <div className="min-w-0 lg:border-l border-[#202124] lg:pl-4 flex flex-col justify-center">
                           <div className="text-[12px] font-medium text-white/90 truncate">{sub.city}</div>
                           <div className="text-[10.5px] text-white/40 mt-0.5 flex items-center gap-1.5">
                             {sub.type === 'family' ? <Users className="w-3 h-3" /> : <User className="w-3 h-3" />}
@@ -608,24 +610,21 @@ export function CommandCenter({ onSwitchWorkspace }: { onSwitchWorkspace?: () =>
                           </div>
                         </div>
 
-                        <div className="hidden lg:flex w-[136px] shrink-0 flex-col justify-center">
+                        <div className="hidden lg:flex min-w-0 flex-col justify-center">
                           <div className="text-[12px] font-medium text-white/90 truncate">{sub.tripDates}</div>
                           <div className="text-[10.5px] text-white/40 mt-0.5">Вылет: {formatShortDate(sub.departureDate)}</div>
                         </div>
 
-                        <div className="hidden xl:flex w-[118px] shrink-0 flex-col justify-center">
+                        <div className="hidden lg:flex min-w-0 flex-col justify-center">
                           <div className="text-[12px] font-medium text-white/90 truncate">{formatShortDate(sub.createdAt)}</div>
                           <div className="text-[10.5px] text-white/40 mt-0.5">Дата создания</div>
                         </div>
 
-                        <div className="hidden lg:flex w-[154px] shrink-0 flex-col items-start justify-center gap-1">
+                        <div className="hidden lg:flex min-w-0 items-center justify-start">
                           {getStatusBadge(sub.status)}
-                          <span className={`text-[10.5px] ${sub.issuesCount > 0 ? 'text-[#d59aa3]' : 'text-white/35'}`}>
-                            Проблем: {sub.issuesCount}
-                          </span>
                         </div>
 
-                        <div className="lg:w-[154px] shrink-0 flex items-center justify-end lg:justify-center mt-2 lg:mt-0">
+                        <div className="shrink-0 flex items-center justify-end lg:justify-center mt-2 lg:mt-0">
                           <button
                             onClick={(e) => { e.stopPropagation(); handleOpenQuestionnaire(sub.id); }}
                             tabIndex={0}
