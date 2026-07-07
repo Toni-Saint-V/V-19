@@ -18,7 +18,7 @@ import { QuestionnaireScreen } from './QuestionnaireScreen';
 import { ApplicantsScreen } from './ApplicantsScreen';
 import { DraftsScreen } from './DraftsScreen';
 import { PreUploadScreen } from './PreUploadScreen';
-import visaflowLogo from '../assets/visaflow-logo.png';
+import visaflowLogo from '../assets/v-logo-premium-black-style.png';
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
