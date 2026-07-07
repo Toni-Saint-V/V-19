@@ -81,6 +81,7 @@ import {
   openIssueCount,
   statusLabelFor,
 } from "../status";
+import { CANONICAL_CITIES } from "../types";
 import type { DrawerTab, Submission } from "../types";
 import {
   matchesReviewTab,
@@ -1732,17 +1733,7 @@ const reviewTabForLane: Record<AdminReviewLaneFilter, AdminWorkTab> = {
   urgent: "review",
 };
 
-const adminReviewCityFilters = [
-  "Все города",
-  "Москва",
-  "Санкт-Петербург",
-  "Казань",
-  "Екатеринбург",
-  "Новосибирск",
-  "Нижний Новгород",
-  "Самара",
-  "Ростов-на-Дону",
-] as const;
+const adminReviewCityFilters = ["Все города", ...CANONICAL_CITIES] as const;
 
 const adminReviewAllAgents = "Все агенты";
 

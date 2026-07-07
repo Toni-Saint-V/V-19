@@ -272,12 +272,25 @@ export type SubmissionAction =
   | "mark_exported"
   | "open_history";
 
-export type City = "Москва" | "Санкт-Петербург" | "Казань";
+export type City =
+  | "Москва"
+  | "Санкт-Петербург"
+  | "Казань"
+  | "Екатеринбург"
+  | "Новосибирск"
+  | "Нижний Новгород"
+  | "Самара"
+  | "Ростов-на-Дону";
 
 export const CANONICAL_CITIES = [
   "Москва",
   "Санкт-Петербург",
   "Казань",
+  "Екатеринбург",
+  "Новосибирск",
+  "Нижний Новгород",
+  "Самара",
+  "Ростов-на-Дону",
 ] as const satisfies readonly City[];
 
 export function isCity(value: string): value is City {

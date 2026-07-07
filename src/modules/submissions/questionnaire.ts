@@ -38,7 +38,7 @@ const questionnaireSectionSummaries: Record<string, string> = {
   trip: "Цель, маршрут, даты поездки и биометрия",
 };
 
-const blsCityOptions = [
+export const BLS_CITY_OPTIONS = [
   "Москва",
   "Санкт-Петербург",
   "Казань",
@@ -157,7 +157,7 @@ const questionnaireBlueprint: Array<{
     title: "Общие поля подачи",
     stepLabel: "1 из 10",
     fields: [
-      { id: "appointment-city", label: "Город подачи", placeholder: "Выберите город", control: "select", options: blsCityOptions },
+      { id: "appointment-city", label: "Город подачи", placeholder: "Выберите город", control: "select", options: BLS_CITY_OPTIONS },
       { id: "visa-type", label: "Тип визы", placeholder: "Выберите тип визы", control: "select", options: ["Национальная", "Шенгенская"] },
       { id: "category", label: "Категория обслуживания", placeholder: "Выберите категорию", control: "select", options: ["Premium", "Normal"] },
       { id: "desired-date-1", label: "Желаемая дата 1", placeholder: "ДД.ММ.ГГГГ" },

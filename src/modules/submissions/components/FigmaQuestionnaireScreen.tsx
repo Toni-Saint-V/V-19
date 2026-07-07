@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
 import type { Submission } from "../types";
-import type { QuestionnaireFieldUpdate } from "../questionnaire";
+import { BLS_CITY_OPTIONS, type QuestionnaireFieldUpdate } from "../questionnaire";
 import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
@@ -174,17 +174,6 @@ type QuestionnaireFieldBinding = {
   formKey: keyof QuestionnaireFormData;
   sectionId: string;
 };
-
-const BLS_CITY_OPTIONS = [
-  "Москва",
-  "Санкт-Петербург",
-  "Казань",
-  "Екатеринбург",
-  "Новосибирск",
-  "Нижний Новгород",
-  "Самара",
-  "Ростов-на-Дону",
-];
 
 const BLS_COUNTRY_OPTIONS = [
   "Russian Federation",

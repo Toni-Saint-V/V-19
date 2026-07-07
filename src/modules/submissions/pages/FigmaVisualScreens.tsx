@@ -27,6 +27,7 @@ import {
 } from "../components/AdminTriageRadarPanel";
 import { applicantCountLabel, tripDates } from "../selectors";
 import { statusLabelFor } from "../status";
+import { CANONICAL_CITIES } from "../types";
 import type { City, DrawerTab, Submission } from "../types";
 import type { WorkspaceTarget } from "../workspaceModel";
 
@@ -140,14 +141,14 @@ export function FigmaActionQueueVisual({
     [completedActions, openActions],
   );
   const cityOptions = useMemo(() => {
-    const seen = new Set<City>();
+    const seen = new Set<City>(CANONICAL_CITIES);
     return allItems.reduce<City[]>((options, item) => {
       if (!seen.has(item.city)) {
         seen.add(item.city);
         options.push(item.city);
       }
       return options;
-    }, []);
+    }, [...CANONICAL_CITIES]);
   }, [allItems]);
   const categoryCounts = useMemo(
     () => ({

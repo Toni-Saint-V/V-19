@@ -25,7 +25,11 @@ import type { AppProfile } from "../../types/session";
 import { familyListTitleFromMainApplicantName } from "./listFormatters";
 import { assignSubmissionOwner, ensureSubmissionOwner } from "./ownership";
 import { normalizeSubmissionQuestionnaire } from "./questionnaire";
-import { isQuestionnaireReviewSource, isQuestionnaireReviewState } from "./types";
+import {
+  isCity,
+  isQuestionnaireReviewSource,
+  isQuestionnaireReviewState,
+} from "./types";
 import {
   canonicalRequiredMediaReadiness,
   isCanonicalFrontendMediaType,
@@ -1052,10 +1056,7 @@ function fallbackSubmissionFromRows(
         : undefined,
     type: row.type,
     country: "Испания",
-    city:
-      row.city === "Москва" || row.city === "Санкт-Петербург" || row.city === "Казань"
-        ? row.city
-        : "Москва",
+    city: isCity(row.city) ? row.city : "Москва",
     tripDateFrom: tripDateRange.from,
     tripDateTo: tripDateRange.to,
     status: fromSupabaseSubmissionRowStatus(row),
