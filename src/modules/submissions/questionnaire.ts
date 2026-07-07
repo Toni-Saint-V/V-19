@@ -539,9 +539,10 @@ const questionnaireFieldLabelAliases: Record<string, string[]> = {
   "passport-issue-date": ["Дата выдачи паспорта", "Дата выдачи"],
   "passport-no": ["Номер паспорта"],
   "passport-type": ["Тип паспорта", "Тип документа", "Тип проездного документа"],
+  "first-entry-country": ["Маршрут поездки"],
 };
 
-function questionnaireFieldMatchesTarget(
+export function questionnaireFieldMatchesTarget(
   field: Pick<QuestionnaireField, "id" | "label">,
   target?: string,
 ) {

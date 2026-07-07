@@ -8,11 +8,13 @@ import { createDraftSubmission, type CreateDraftInput } from "./submissionAction
 import {
   canPerformAction,
   blockerCount,
+  calculateSubmissionProgress,
   defaultDrawerTab,
+  hasBlockingIssues,
   hasUsableTripDateRange,
   isFixedIssueStatus,
+  transitionSubmissionStatus,
 } from "./status";
-import { firstProductionReadinessBlocker } from "./productionReadinessGate";
 import {
   canonicalRequiredMediaReadiness,
   isCanonicalSubmissionStatus,
@@ -108,31 +110,21 @@ export function submitForReview(
   if (!hasUsableTripDateRange(submission)) {
     return failure("VALIDATION_ERROR", "Trip dates must be complete.");
   }
-  const gateBlocker = firstProductionReadinessBlocker(submission);
-  if (gateBlocker) {
-    return failure("VALIDATION_ERROR", gateBlocker.detail);
-  }
 
-  return success(
+  return transitionSubmissionStatus(
     withDerivedState({
       ...submission,
-      status: "submitted_for_review",
       files: submission.files.map((file) =>
         file.status === "uploaded" ? { ...file, status: "pending_review" } : file,
       ),
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-на-проверку`,
-          text: "Агент отправил подачу на проверку",
-          at: "сейчас",
-          fromStatus: "in_progress",
-          source: "agent",
-          toStatus: "submitted_for_review",
-        },
-        ...submission.history,
-      ],
     }),
+    {
+      actorRole: role,
+      nextStatus: "submitted_for_review",
+      note: "Агент отправил подачу на проверку",
+      nowIso: "сейчас",
+      source: "agent",
+    },
   );
 }
 
@@ -164,24 +156,18 @@ export function returnWithIssues(
     createIssueFromInput(submission, issue, index),
   );
 
-  return success(
+  return transitionSubmissionStatus(
     withDerivedState({
       ...submission,
-      status: "returned",
       issues: [...nextIssues, ...submission.issues],
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-возврат`,
-          text: "Администратор вернул подачу с замечаниями",
-          at: "сейчас",
-          fromStatus: submission.status,
-          source: "admin",
-          toStatus: "returned",
-        },
-        ...submission.history,
-      ],
     }),
+    {
+      actorRole: role,
+      nextStatus: "returned",
+      note: "Администратор вернул подачу с замечаниями",
+      nowIso: "сейчас",
+      source: "admin",
+    },
   );
 }
 
@@ -243,24 +229,13 @@ export function resubmitCorrections(
     );
   }
 
-  return success(
-    withDerivedState({
-      ...submission,
-      status: "corrections_received",
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-исправления`,
-          text: "Агент отправил исправления",
-          at: "сейчас",
-          fromStatus: "returned",
-          source: "agent",
-          toStatus: "corrections_received",
-        },
-        ...submission.history,
-      ],
-    }),
-  );
+  return transitionSubmissionStatus(withDerivedState(submission), {
+    actorRole: role,
+    nextStatus: "corrections_received",
+    note: "Агент отправил исправления",
+    nowIso: "сейчас",
+    source: "agent",
+  });
 }
 
 export function closeIssue(
@@ -314,7 +289,7 @@ export function acceptSubmission(
   if (!["submitted_for_review", "corrections_received"].includes(submission.status)) {
     return failure("INVALID_TRANSITION", "Submission is not in admin acceptance.");
   }
-  if (acceptanceBlockingIssues(submission).length > 0) {
+  if (hasBlockingIssues(submission)) {
     return failure(
       "ACCEPTANCE_BLOCKED",
       "Acceptance is blocked until all issues are closed by admin.",
@@ -326,34 +301,24 @@ export function acceptSubmission(
   if (!hasUsableTripDateRange(submission)) {
     return failure("VALIDATION_ERROR", "Trip dates must be complete.");
   }
-  const gateBlocker = firstProductionReadinessBlocker(submission);
-  if (gateBlocker) {
-    return failure("VALIDATION_ERROR", gateBlocker.detail);
-  }
 
-  return success(
+  return transitionSubmissionStatus(
     withDerivedState({
       ...submission,
-      status: "ready_for_export",
       exportState: "ready",
       files: submission.files.map((file) =>
         file.status === "uploaded" || file.status === "pending_review"
-          ? { ...file, status: "accepted" }
+          ? { ...file, status: "accepted", reviewStatus: "accepted" }
           : file,
       ),
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-принято`,
-          text: "Администратор принял подачу",
-          at: "сейчас",
-          fromStatus: submission.status,
-          source: "admin",
-          toStatus: "ready_for_export",
-        },
-        ...submission.history,
-      ],
     }),
+    {
+      actorRole: role,
+      nextStatus: "ready_for_export",
+      note: "Администратор принял подачу",
+      nowIso: "сейчас",
+      source: "admin",
+    },
   );
 }
 
@@ -397,46 +362,27 @@ export function markExported(
     );
   }
 
-  return success(
-    withDerivedState({
-      ...submission,
-      status: "exported",
-      exportState: "marked_exported",
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-выгружено`,
-          text: "Подача отмечена выгруженной",
-          at: "сейчас",
-          fromStatus: "ready_for_export",
-          source: "admin",
-          toStatus: "exported",
-        },
-        ...submission.history,
-      ],
-    }),
+  const transitioned = transitionSubmissionStatus(withDerivedState(submission), {
+      actorRole: role,
+      nextStatus: "exported",
+      note: "Подача отмечена выгруженной",
+      nowIso: "сейчас",
+      source: "admin",
+    },
   );
+  return transitioned.ok
+    ? {
+        ok: true,
+        data: withDerivedState({
+          ...transitioned.data,
+          exportState: "marked_exported",
+        }),
+      }
+    : transitioned;
 }
 
 export function getCompleteness(submission: Submission) {
-  const fields = submission.applicants.flatMap((applicant) =>
-    applicant.sections.flatMap((section) => section.fields),
-  );
-  const requiredFields = fields.filter((field) => field.required);
-  const readyFields = requiredFields.filter(
-    (field) => field.value.trim().length > 0 && !field.error,
-  );
-  const questionnaire = percent(readyFields.length, requiredFields.length);
-  const readyFiles = submission.files.filter((file) =>
-    ["accepted", "pending_review", "uploaded"].includes(file.status),
-  );
-  const files = percent(readyFiles.length, submission.files.length);
-
-  return {
-    files,
-    questionnaire,
-    total: Math.round((questionnaire + files) / 2),
-  };
+  return calculateSubmissionProgress(submission);
 }
 
 export function getFileState(submission: Submission): SubmissionFileStatus {
@@ -547,7 +493,7 @@ export function getDefaultDrawerTab(submission: Submission) {
 function withDerivedState(submission: Submission): Submission {
   return {
     ...submission,
-    completeness: getCompleteness(submission),
+    completeness: calculateSubmissionProgress(submission),
     country: V19_FIXED_COUNTRY.label,
     countryCode: V19_FIXED_COUNTRY.code,
   };
@@ -568,9 +514,7 @@ function ensureNotTerminal(submission: Submission): CommandResult<Submission> | 
 
 function acceptanceBlockingIssues(submission: Submission) {
   return submission.issues.filter(
-    (issue) =>
-      issue.severity === "blocker" &&
-      (issue.status === "open" || isFixedIssueStatus(issue.status)),
+    (issue) => issue.status === "open" || isFixedIssueStatus(issue.status),
   );
 }
 
@@ -609,11 +553,6 @@ function isValidIssueInput(submission: Submission, input: IssueInput) {
     input.reason.trim().length > 0 &&
     input.comment.trim().length > 0
   );
-}
-
-function percent(ready: number, total: number) {
-  if (total === 0) return 0;
-  return Math.round((ready / total) * 100);
 }
 
 function success<T>(data: T): CommandResult<T> {

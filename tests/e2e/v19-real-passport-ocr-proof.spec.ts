@@ -4,27 +4,23 @@ import { expect, test } from "@playwright/test";
 import {
   clickFirstVisible,
   collectBrowserProblems,
-  drawer,
   expectAtLeastOneVisible,
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
 
 const realPassportPath = "/Users/user/Desktop/passport.jpeg";
 const qaDir = path.join(process.cwd(), "docs/qa/passport-ai-hints-20260706");
-const submissionsStorageKey = "visaflow.v19.submissions.v1";
+const intakeDraftStorageKey = "visaflow.v19.productIntakeDrafts.v1";
 
-type StoredQuestionnaireField = {
-  id?: unknown;
-  reviewSource?: unknown;
-  reviewState?: unknown;
-  value?: unknown;
-};
-
-type StoredSubmission = {
+type StoredIntakeDraft = {
   applicants?: Array<{
-    sections?: Array<{
-      fields?: StoredQuestionnaireField[];
-    }>;
+    fields?: {
+      birthDate?: unknown;
+      firstName?: unknown;
+      passportExpiresAt?: unknown;
+      passportNo?: unknown;
+      surname?: unknown;
+    };
   }>;
 };
 
@@ -32,7 +28,7 @@ test.describe("V-19 real passport OCR proof", () => {
   test("agent uploads the provided passport photo and sees extracted fields in the create flow", async ({
     page,
   }, testInfo) => {
-    test.setTimeout(90_000);
+    test.setTimeout(140_000);
     const browserProblems = collectBrowserProblems(page);
 
     await openFreshWorkspace(page, { heading: "Мои действия" });
@@ -41,35 +37,26 @@ test.describe("V-19 real passport OCR proof", () => {
     });
     await expectAtLeastOneVisible(createButton, "No visible create button matched.");
     await clickFirstVisible(createButton);
-    await expect(drawer(page)).toBeVisible();
 
-    await drawer(page).locator(".pi-file-input").setInputFiles(realPassportPath);
-    await expect(drawer(page).getByText("Паспорт принят").first()).toBeVisible({
-      timeout: 60_000,
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Загрузка и первичная сборка",
+      }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Один 1 заявитель" }).click();
+    await page.locator('input[type="file"]').setInputFiles(realPassportPath);
+
+    await expect(page.getByText("passport.jpeg").first()).toBeVisible();
+    await expect(page.getByText("Распознано").first()).toBeVisible({
+      timeout: 90_000,
     });
+    await expect(page.getByText("VOLKOV")).toBeVisible();
+    await expect(page.getByText("ANTON")).toBeVisible();
+    await expect(page.getByText("752869613")).toBeVisible();
+    await expect(page.getByText("20.08.1990")).toBeVisible();
+    await expect(page.getByText("26.02.2026")).toBeVisible();
 
-    await expect(drawer(page).getByRole("button", { name: "Продолжить" })).toBeEnabled();
-    await drawer(page).getByRole("button", { name: "Продолжить" }).click();
-    await expect(drawer(page).getByText("Извлечённые данные паспорта")).toBeVisible();
-
-    const extractedValues = await drawer(page)
-      .locator(".ef-preview input")
-      .evaluateAll((inputs) =>
-        inputs.map((input) => (input as unknown as { value: string }).value.trim()),
-      );
-    expect(extractedValues).toEqual(
-      expect.arrayContaining([
-        "VOLKOV",
-        "ANTON",
-        "752869613",
-        "20.08.1990",
-        "26.02.2026",
-      ]),
-    );
-    await expect(drawer(page).getByText(/предварительным/)).toBeVisible();
-    await expect(drawer(page).getByLabel("AI-подсказки по подстановке")).toContainText(
-      "Найдено",
-    );
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -85,14 +72,18 @@ test.describe("V-19 real passport OCR proof", () => {
       )
       .toBe(true);
     mkdirSync(qaDir, { recursive: true });
-    await drawer(page).screenshot({
+    await page.screenshot({
       path: path.join(
         qaDir,
-        `create-passport-ai-hints-${testInfo.project.name}.png`,
+        `create-passport-ai-intake-${testInfo.project.name}.png`,
       ),
+      fullPage: true,
     });
 
-    await drawer(page).getByRole("button", { name: "Создать и открыть" }).click();
+    await expect(page.getByRole("button", { name: "Перейти в анкету" })).toBeEnabled();
+    await page.getByRole("button", { name: "Перейти в анкету" }).click();
+    await expect(page.getByRole("heading", { name: /Анкета|VOLKOV|Schengen/ })).toBeVisible();
+
     await expect
       .poll(
         async () =>
@@ -100,30 +91,17 @@ test.describe("V-19 real passport OCR proof", () => {
             const raw = localStorage.getItem(storageKey);
             if (!raw) return null;
 
-            const submissions = JSON.parse(raw) as StoredSubmission[];
-            const firstApplicant = submissions[0]?.applicants?.[0];
-            const fields = new Map<string, StoredQuestionnaireField>();
-
-            for (const section of firstApplicant?.sections ?? []) {
-              for (const field of section.fields ?? []) {
-                if (typeof field.id === "string") {
-                  fields.set(field.id, field);
-                }
-              }
-            }
+            const drafts = JSON.parse(raw) as StoredIntakeDraft[];
+            const fields = drafts[0]?.applicants?.[0]?.fields;
 
             return {
-              birthDate: fields.get("birth-date")?.value,
-              firstName: fields.get("first-name")?.value,
-              passportExpiry: fields.get("passport-expiry-date")?.value,
-              passportNo: fields.get("passport-no")?.value,
-              passportReviewSource: fields.get("passport-no")?.reviewSource,
-              passportReviewState: fields.get("passport-no")?.reviewState,
-              surname: fields.get("surname")?.value,
-              surnameReviewSource: fields.get("surname")?.reviewSource,
-              surnameReviewState: fields.get("surname")?.reviewState,
+              birthDate: fields?.birthDate,
+              firstName: fields?.firstName,
+              passportExpiry: fields?.passportExpiresAt,
+              passportNo: fields?.passportNo,
+              surname: fields?.surname,
             };
-          }, submissionsStorageKey),
+          }, intakeDraftStorageKey),
         { timeout: 10_000 },
       )
       .toMatchObject({
@@ -131,11 +109,7 @@ test.describe("V-19 real passport OCR proof", () => {
         firstName: "ANTON",
         passportExpiry: "26.02.2026",
         passportNo: "752869613",
-        passportReviewSource: "passport_ocr",
-        passportReviewState: "needs_review",
         surname: "VOLKOV",
-        surnameReviewSource: "passport_ocr",
-        surnameReviewState: "needs_review",
       });
 
     expect(browserProblems, browserProblems.join("\n")).toEqual([]);

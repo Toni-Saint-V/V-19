@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertTriangle,
@@ -23,6 +23,10 @@ import {
   XCircle,
 } from 'lucide-react';
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
+import { OperationalMetricCard } from '../shared/ui/OperationalMetricCard';
+import { applyExportStateToSelection } from '../modules/submissions/submissionActions';
+import { buildExportPackageIdentity, exportSummary } from '../modules/submissions/exportRules';
+import type { Submission } from '../modules/submissions/types';
 
 interface ExportItem {
   id: string;
@@ -40,78 +44,9 @@ interface ExportItem {
   files: number;
   agent: string;
   packageSize: string;
+  blockerReasons: string[];
+  warningReasons: string[];
 }
-
-const initialMockData: ExportItem[] = [
-  {
-    id: 'SUB-1061',
-    title: 'Семья Орловых',
-    type: 'family',
-    applicantsCount: 4,
-    country: 'Испания',
-    city: 'Москва',
-    appointmentDate: '18 июля, 09:40',
-    approvedDate: 'Сегодня, 10:45',
-    selected: true,
-    readiness: 100,
-    warnings: 1,
-    blockers: 0,
-    files: 18,
-    agent: 'Мария Климова',
-    packageSize: '42 строки',
-  },
-  {
-    id: 'SUB-1078',
-    title: 'Дмитрий Волков',
-    type: 'single',
-    applicantsCount: 1,
-    country: 'Испания',
-    city: 'Санкт-Петербург',
-    appointmentDate: '19 июля, 12:10',
-    approvedDate: 'Вчера, 16:20',
-    selected: false,
-    readiness: 100,
-    warnings: 0,
-    blockers: 0,
-    files: 7,
-    agent: 'Игорь Сафонов',
-    packageSize: '14 строк',
-  },
-  {
-    id: 'SUB-1082',
-    title: 'Елена Смирнова',
-    type: 'single',
-    applicantsCount: 1,
-    country: 'Испания',
-    city: 'Москва',
-    appointmentDate: '20 июля, 10:30',
-    approvedDate: 'Вчера, 11:15',
-    selected: false,
-    readiness: 98,
-    warnings: 2,
-    blockers: 0,
-    files: 8,
-    agent: 'Анна Ветрова',
-    packageSize: '17 строк',
-  },
-  {
-    id: 'FAM-005',
-    title: 'Семья Кузнецовых',
-    type: 'family',
-    applicantsCount: 3,
-    country: 'Испания',
-    city: 'Екатеринбург',
-    appointmentDate: '22 июля, 08:50',
-    approvedDate: '12 авг, 09:30',
-    selected: false,
-    readiness: 100,
-    warnings: 0,
-    blockers: 0,
-    files: 15,
-    agent: 'Олег Морозов',
-    packageSize: '36 строк',
-  },
-];
 
 function StatusPill({ tone, children }: { tone: 'green' | 'orange' | 'blue' | 'neutral'; children: React.ReactNode }) {
   const toneClass = {
@@ -137,42 +72,159 @@ function ManifestRow({ icon: Icon, label, value, state = 'ok' }: { icon: React.E
   );
 }
 
-export function AdminExportScreen() {
-  const bridge = useVisaflowBusinessBridge();
-  const [items, setItems] = useState<ExportItem[]>(initialMockData);
-  const [activeId, setActiveId] = useState(initialMockData[0]?.id ?? '');
-  const [isExporting, setIsExporting] = useState(false);
+function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
+  return submissions
+    .filter((submission) => submission.status === 'ready_for_export')
+    .map((submission) => {
+      const summary = exportSummary([submission]);
+      return {
+        id: submission.id,
+        title: submission.listTitle ?? submission.title,
+        type: submission.type,
+        applicantsCount: submission.applicants.length,
+        country: submission.country,
+        city: submission.city,
+        appointmentDate: `${submission.tripDateFrom} – ${submission.tripDateTo}`,
+        approvedDate: submission.updatedAt,
+        selected: false,
+        readiness: submission.completeness.total,
+        warnings: summary.warnings.length,
+        blockers: summary.blockers.length,
+        files: submission.files.length,
+        agent: submission.agentId,
+        packageSize: `${summary.rowCount} строк`,
+        blockerReasons: summary.blockers.map((blocker) => blocker.reason),
+        warningReasons: summary.warnings.map((warning) => warning.reason),
+      };
+    });
+}
 
-  const selectedItems = useMemo(() => items.filter((item) => item.selected), [items]);
-  const activeItem = items.find((item) => item.id === activeId) ?? selectedItems[0] ?? items[0];
+export function AdminExportScreen({ submissions = [] }: { submissions?: Submission[] }) {
+  const bridge = useVisaflowBusinessBridge();
+  const realItems = useMemo(() => exportItemsFromSubmissions(submissions), [submissions]);
+  const [selectedRealIds, setSelectedRealIds] = useState<string[]>([]);
+  const [activeId, setActiveId] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  useEffect(() => {
+    setSelectedRealIds((current) => {
+      const available = new Set(realItems.map((item) => item.id));
+      const kept = current.filter((id) => available.has(id));
+      if (kept.length) return kept;
+      const firstUnblocked = realItems.find((item) => item.blockers === 0);
+      return [(firstUnblocked ?? realItems[0])?.id].filter(Boolean) as string[];
+    });
+    setActiveId((current) => {
+      if (realItems.some((item) => item.id === current)) return current;
+      return realItems.find((item) => item.blockers === 0)?.id ?? realItems[0]?.id ?? '';
+    });
+  }, [realItems]);
+
+  const displayItems = useMemo(
+    () =>
+      realItems.map((item) => ({
+        ...item,
+        selected: selectedRealIds.includes(item.id),
+      })),
+    [realItems, selectedRealIds],
+  );
+  const selectedItems = useMemo(
+    () => displayItems.filter((item) => item.selected),
+    [displayItems],
+  );
+  const selectedSubmissions = useMemo(
+    () => submissions.filter((submission) => selectedRealIds.includes(submission.id)),
+    [selectedRealIds, submissions],
+  );
+  const selectedPlan = useMemo(
+    () => exportSummary(selectedSubmissions),
+    [selectedSubmissions],
+  );
+  const activeItem = displayItems.find((item) => item.id === activeId) ?? selectedItems[0] ?? displayItems[0];
   const selectedCount = selectedItems.length;
   const selectedApplicants = selectedItems.reduce((sum, item) => sum + item.applicantsCount, 0);
   const selectedFiles = selectedItems.reduce((sum, item) => sum + item.files, 0);
-  const selectedWarnings = selectedItems.reduce((sum, item) => sum + item.warnings, 0);
-  const hasExportBlockers = selectedItems.some((item) => item.blockers > 0);
-
+  const selectedWarnings = selectedPlan.warnings.length;
+  const selectedBlockers = selectedPlan.blockers.length;
+  const hasExportBlockers = selectedBlockers > 0;
+  const selectedHistory = selectedSubmissions
+    .flatMap((submission) => submission.history.map((item) => ({ ...item, submissionId: submission.id })))
+    .slice(0, 3);
   const toggleAll = () => {
-    const allSelected = items.every((item) => item.selected);
-    setItems(items.map((item) => ({ ...item, selected: !allSelected })));
+    setExportError('');
+    const allSelected = displayItems.every((item) => item.selected);
+    setSelectedRealIds(allSelected ? [] : displayItems.map((item) => item.id));
   };
 
   const toggleItem = (id: string) => {
-    setItems(items.map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
+    setExportError('');
+    setSelectedRealIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
     setActiveId(id);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (selectedCount === 0 || hasExportBlockers) return;
+    setExportError('');
     const submissionIds = selectedItems.map((item) => item.id);
-    void bridge.onExportPackages?.(submissionIds);
-    emitVisaflowUiEvent(bridge, { type: 'export.start', submissionIds });
     setIsExporting(true);
-    setTimeout(() => {
-      const remaining = items.filter((item) => !item.selected);
-      setItems(remaining);
-      setActiveId(remaining[0]?.id ?? '');
+    try {
+      const [
+        {
+          createExportWorkbookArtifact,
+          default: downloadExportWorkbook,
+          verifyExportWorkbookArtifact,
+        },
+        { prepareExportMediaZip, downloadPreparedExportMediaZip },
+      ] = await Promise.all([
+        import('../modules/submissions/exportWorkbook'),
+        import('../modules/submissions/exportMediaZip'),
+      ]);
+      const generated = applyExportStateToSelection(
+        submissions,
+        submissionIds,
+        'file_generated',
+      );
+      const selectedGenerated = generated.filter((submission) =>
+        submissionIds.includes(submission.id),
+      );
+      const identity = buildExportPackageIdentity(selectedGenerated);
+      const plan = exportSummary(selectedGenerated);
+      if (!identity || !plan.downloadPackageIdentity) {
+        setExportError('Пакет выгрузки не готов: есть блокеры или устаревший preview.');
+        return;
+      }
+      const workbookArtifact = createExportWorkbookArtifact(plan.rows, identity);
+      if (!(await verifyExportWorkbookArtifact(workbookArtifact))) {
+        setExportError('Excel preview не совпал с XLSX. Файл не скачан.');
+        return;
+      }
+      const workbookResult = downloadExportWorkbook(plan.rows, identity);
+      if (!workbookResult.ok) {
+        setExportError(workbookResult.safeMessage);
+        return;
+      }
+      const zipArtifactResult = await prepareExportMediaZip(selectedGenerated, identity);
+      if (!zipArtifactResult.ok) {
+        setExportError(zipArtifactResult.safeMessage);
+        return;
+      }
+      const zipResult = downloadPreparedExportMediaZip(zipArtifactResult.artifact);
+      if (!zipResult.ok) {
+        setExportError(zipResult.safeMessage);
+        return;
+      }
+      await bridge.onExportPackages?.(submissionIds);
+      emitVisaflowUiEvent(bridge, { type: 'export.start', submissionIds });
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Не удалось завершить выгрузку.');
+    } finally {
       setIsExporting(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -183,42 +235,17 @@ export function AdminExportScreen() {
       className="grid h-full min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]"
     >
       <section className="flex min-w-0 flex-col gap-5">
-        <div className="grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-[#b8baff]/75">Готовы</span>
-              <CheckCircle2 className="h-4 w-4 text-[#b8baff]" />
-            </div>
-            <div className="mt-5 text-2xl font-semibold text-white">{items.length}</div>
-            <div className="mt-1 text-[11px] text-white/40">пакетов в очереди</div>
-          </div>
-
-          <div className="rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-white/50">Выбрано</span>
-              <PackageCheck className="h-4 w-4 text-[#b8baff]" />
-            </div>
-            <div className="mt-5 text-2xl font-semibold text-white">{selectedCount}</div>
-            <div className="mt-1 text-[11px] text-white/40">{selectedApplicants} заявителей</div>
-          </div>
-
-          <div className="rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-white/50">Документы</span>
-              <FileArchive className="h-4 w-4 text-white/45" />
-            </div>
-            <div className="mt-5 text-2xl font-semibold text-white">{selectedFiles}</div>
-            <div className="mt-1 text-[11px] text-white/40">строк в Excel-пакете</div>
-          </div>
-
-          <div className="rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-white/55">Pre-flight</span>
-              {hasExportBlockers ? <XCircle className="h-4 w-4 text-[#d59aa3]" /> : <ShieldCheck className="h-4 w-4 text-[#b8baff]" />}
-            </div>
-            <div className="mt-5 text-2xl font-semibold text-white">{hasExportBlockers ? 'STOP' : 'OK'}</div>
-            <div className="mt-1 text-[11px] text-white/40">{selectedWarnings} предупреждений</div>
-          </div>
+        <div className="grid shrink-0 grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
+          <OperationalMetricCard icon={CheckCircle2} label="Готовы" value={displayItems.length} tone="primary" detail="пакетов в очереди" />
+          <OperationalMetricCard icon={PackageCheck} label="Выбрано" value={selectedCount} tone="primary" detail={`${selectedApplicants} заявителей`} />
+          <OperationalMetricCard icon={FileArchive} label="Документы" value={selectedFiles} tone="muted" detail="файлов в ZIP-пакете" />
+          <OperationalMetricCard
+            icon={hasExportBlockers ? XCircle : ShieldCheck}
+            label="Pre-flight"
+            value={hasExportBlockers ? 'STOP' : 'OK'}
+            tone={hasExportBlockers ? 'danger' : 'primary'}
+            detail={`${selectedWarnings} предупреждений`}
+          />
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
@@ -233,10 +260,10 @@ export function AdminExportScreen() {
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
                   <input
                     placeholder="Поиск по ID, семье, агенту"
-                    className="h-10 w-full rounded-xl border border-[#242529] bg-[#111113] pl-9 pr-3 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#6f64ff]/70"
+                    className="h-10 w-full rounded-[8px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#6f64ff]/70"
                   />
                 </div>
-                <button className="h-10 rounded-xl border border-[#242529] bg-[#111113] px-3 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/5">
+                <button className="h-10 rounded-[6px] border border-[#242529] bg-[#111113] px-3 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/5">
                   <Filter className="h-4 w-4" />
                 </button>
               </div>
@@ -246,9 +273,9 @@ export function AdminExportScreen() {
           <div className="grid shrink-0 grid-cols-[44px_minmax(220px,1fr)_150px_130px_110px] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
             <button
               onClick={toggleAll}
-              className={`flex h-5 w-5 items-center justify-center rounded-md border ${items.every((item) => item.selected) && items.length > 0 ? 'border-[#6f64ff] bg-[#6f64ff]' : 'border-[#242529] bg-[#161617]'}`}
+              className={`flex h-5 w-5 items-center justify-center rounded-md border ${displayItems.every((item) => item.selected) && displayItems.length > 0 ? 'border-[#6f64ff] bg-[#6f64ff]' : 'border-[#242529] bg-[#161617]'}`}
             >
-              {items.every((item) => item.selected) && items.length > 0 && <CheckSquare className="h-3.5 w-3.5 text-white" />}
+              {displayItems.every((item) => item.selected) && displayItems.length > 0 && <CheckSquare className="h-3.5 w-3.5 text-white" />}
             </button>
             <div>Пакет</div>
             <div>Слот</div>
@@ -257,7 +284,7 @@ export function AdminExportScreen() {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {items.length === 0 ? (
+            {displayItems.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center px-4 py-20 text-center">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/5 bg-white/5">
                   <CheckCircle2 className="h-5 w-5 text-white/35" />
@@ -267,7 +294,7 @@ export function AdminExportScreen() {
               </div>
             ) : (
               <div className="space-y-1">
-                {items.map((item) => (
+                {displayItems.map((item) => (
                   <button
                     key={item.id}
                     onClick={() => toggleItem(item.id)}
@@ -281,7 +308,8 @@ export function AdminExportScreen() {
                       <div className="flex items-center gap-2">
                         {item.type === 'family' ? <Users className="h-3.5 w-3.5 text-white/50" /> : <User className="h-3.5 w-3.5 text-white/50" />}
                         <span className="truncate text-[14px] font-medium text-white">{item.title}</span>
-                        <span className="rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/40">{item.id}</span>
+                        <span className="hidden rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/40 lg:inline-flex">{item.id}</span>
+                        <span className="ml-auto shrink-0 text-[12px] text-white/65 lg:hidden">{item.appointmentDate}</span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-white/40">
                         <span>{item.agent}</span>
@@ -292,9 +320,10 @@ export function AdminExportScreen() {
                       </div>
                     </div>
 
-                    <div className="text-[12px] text-white/65 lg:text-[13px]">{item.appointmentDate}</div>
+                    <div className="hidden text-[12px] text-white/65 lg:block lg:text-[13px]">{item.appointmentDate}</div>
 
                     <div className="flex items-center gap-2">
+                      <span className="shrink-0 rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/40 lg:hidden">{item.id}</span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/5 lg:w-20 lg:flex-none">
                         <div className="h-full rounded-full bg-[#7c73ff]" style={{ width: `${item.readiness}%` }} />
                       </div>
@@ -303,7 +332,7 @@ export function AdminExportScreen() {
 
                     <div className="flex items-center justify-between gap-3 lg:justify-end">
                       {item.warnings > 0 ? <StatusPill tone="orange">{item.warnings} warning</StatusPill> : <StatusPill tone="green">чисто</StatusPill>}
-                      <span className="text-[12px] font-medium text-white/55">{item.packageSize}</span>
+                      <span className="hidden text-[12px] font-medium text-white/55 lg:inline">{item.packageSize}</span>
                     </div>
                   </button>
                 ))}
@@ -364,12 +393,22 @@ export function AdminExportScreen() {
               <StatusPill tone={hasExportBlockers ? 'orange' : 'green'}>{hasExportBlockers ? 'нужна правка' : 'можно выгружать'}</StatusPill>
             </div>
             <div className="space-y-2">
-              <ManifestRow icon={ShieldCheck} label="Открытые блокеры" value="0" />
-              <ManifestRow icon={FileSpreadsheet} label="Excel preview" value="готов" />
-              <ManifestRow icon={FileSpreadsheet} label="Excel rows" value={`${selectedApplicants} строк`} state={selectedCount ? 'ok' : 'neutral'} />
-              <ManifestRow icon={Lock} label="Дубликаты экспорта" value="нет" />
+              <ManifestRow icon={ShieldCheck} label="Открытые блокеры" value={`${selectedBlockers}`} state={selectedBlockers ? 'warn' : 'ok'} />
+              <ManifestRow icon={FileSpreadsheet} label="Excel preview" value={selectedCount ? 'готов' : 'нет выбора'} state={selectedCount ? 'ok' : 'neutral'} />
+              <ManifestRow icon={FileSpreadsheet} label="Excel rows" value={`${selectedPlan.rowCount} строк`} state={selectedCount ? 'ok' : 'neutral'} />
+              <ManifestRow icon={FileArchive} label="ZIP медиа" value={`${selectedFiles} файлов`} state={selectedCount ? 'ok' : 'neutral'} />
+              <ManifestRow icon={Lock} label="Состояние экспорта" value={selectedPlan.exportState} state={selectedCount ? 'ok' : 'neutral'} />
               <ManifestRow icon={AlertTriangle} label="Warnings" value={`${selectedWarnings}`} state={selectedWarnings ? 'warn' : 'ok'} />
             </div>
+            {(selectedPlan.blockers.length > 0 || selectedPlan.warnings.length > 0) && (
+              <div className="mt-3 space-y-1.5">
+                {[...selectedPlan.blockers, ...selectedPlan.warnings].map((item) => (
+                  <div key={item.reason} className="rounded-lg border border-white/5 bg-white/[0.025] px-3 py-2 text-[11px] leading-snug text-white/55">
+                    {item.reason}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
@@ -403,18 +442,19 @@ export function AdminExportScreen() {
               <h4 className="text-[14px] font-semibold text-white">История сегодня</h4>
             </div>
             <div className="space-y-3 border-l border-white/10 pl-4">
-              <div>
-                <div className="text-[12px] font-medium text-white/75">12 пакетов выгружено</div>
-                <div className="text-[11px] text-white/35">14:25 · Excel</div>
-              </div>
-              <div>
-                <div className="text-[12px] font-medium text-white/75">2 пакета возвращены в проверку</div>
-                <div className="text-[11px] text-white/35">12:10 · mismatch по датам</div>
-              </div>
-              <div>
-                <div className="text-[12px] font-medium text-white/75">Manifest обновлён</div>
-                <div className="text-[11px] text-white/35">09:05 · авто-проверка</div>
-              </div>
+              {selectedHistory.length === 0 ? (
+                <div>
+                  <div className="text-[12px] font-medium text-white/75">История появится после действия</div>
+                  <div className="text-[11px] text-white/35">Только реальные события выбранных подач</div>
+                </div>
+              ) : (
+                selectedHistory.map((item) => (
+                  <div key={`${item.submissionId}-${item.id}`}>
+                    <div className="text-[12px] font-medium text-white/75">{item.text}</div>
+                    <div className="text-[11px] text-white/35">{item.at} · {item.source ?? 'system'}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -426,11 +466,11 @@ export function AdminExportScreen() {
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#202126] text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
           >
             {isExporting ? <UploadCloud className="h-4 w-4 animate-pulse" /> : <Download className="h-4 w-4" />}
-            {isExporting ? 'Формируем Excel…' : 'Сформировать Excel'}
+            {isExporting ? 'Формируем пакет…' : 'Скачать Excel + ZIP'}
             {!isExporting && <ArrowRight className="h-4 w-4" />}
           </button>
-          <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-white/35">
-            <Clock3 className="h-3.5 w-3.5" /> Audit log будет записан автоматически
+          <div className={`mt-2 flex items-center justify-center gap-2 text-[11px] ${exportError ? 'text-[#d59aa3]' : 'text-white/35'}`}>
+            <Clock3 className="h-3.5 w-3.5" /> {exportError || 'Excel и ZIP файлов формируются fail-closed'}
           </div>
         </div>
       </aside>

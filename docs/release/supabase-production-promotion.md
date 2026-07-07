@@ -52,6 +52,8 @@ Apply migrations only in the repository order declared by
 - `20260703165306_day10_review_readiness_storage_identity.sql`
 - `20260704050806_day10_required_media_canonical_write_paths.sql`
 - `20260706000100_ai_helper_admin_intent_quota_contract.sql`
+- `20260706023000_typed_submission_files.sql`
+- `20260707000100_typed_status_history_source.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

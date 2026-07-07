@@ -8,6 +8,8 @@ export interface StatusHistoryInput {
   from_status: string | null;
   to_status: string;
   comment: string;
+  source?: "agent" | "admin" | "bb" | "system";
+  note?: string | null;
   changed_by: string;
   changed_at?: string;
 }
@@ -23,6 +25,8 @@ export async function appendStatusHistory(input: StatusHistoryInput): Promise<vo
     from_status: input.from_status,
     to_status: input.to_status,
     comment: input.comment,
+    source: input.source ?? "system",
+    note: input.note ?? null,
     changed_by: input.changed_by,
     changed_at: input.changed_at ?? new Date().toISOString(),
   });

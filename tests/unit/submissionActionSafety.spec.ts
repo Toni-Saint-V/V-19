@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 import {
   applySubmissionAction,
   applySubmissionActionResult,
+  calculateSubmissionProgress,
   canPerformAction,
   getPrimaryAction,
+  transitionSubmissionById,
 } from "../../src/modules/submissions/status";
 import {
   createSubmissionActionErrorState,
@@ -12,6 +14,7 @@ import {
 import {
   applyActionToSubmissionListResult,
   createDraftSubmission,
+  uploadRequiredFile,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
@@ -276,6 +279,243 @@ describe("submission action safety", () => {
       error: {
         code: "EXPORT_NOT_READY",
         message: "Формирование Excel выполняется только через пакет выгрузки",
+      },
+    });
+  });
+
+  test("uses the canonical transition helper for allowed and role-blocked moves", () => {
+    const draft = {
+      ...reviewReadySubmission(),
+      status: "draft" as const,
+    };
+
+    const started = transitionSubmissionById([draft], {
+      actorId: "agent-1",
+      actorRole: "agent",
+      nextStatus: "in_progress",
+      note: "Агент начал заполнение",
+      source: "agent",
+      submissionId: draft.id,
+    });
+
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    expect(started.data[0]?.status).toBe("in_progress");
+    expect(started.data[0]?.history[0]).toMatchObject({
+      actorId: "agent-1",
+      fromStatus: "draft",
+      note: "Агент начал заполнение",
+      source: "agent",
+      toStatus: "in_progress",
+    });
+
+    expect(
+      transitionSubmissionById([draft], {
+        actorRole: "agent",
+        nextStatus: "ready_for_export",
+        source: "agent",
+        submissionId: draft.id,
+      }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Действие недоступно в текущем статусе",
+      },
+    });
+  });
+
+  test("canonical transition helper rejects direct review handoff without required work", () => {
+    const incomplete = {
+      ...reviewReadySubmission(),
+      files: [],
+      status: "in_progress" as const,
+    };
+
+    expect(
+      transitionSubmissionById([incomplete], {
+        actorRole: "agent",
+        nextStatus: "submitted_for_review",
+        source: "agent",
+        submissionId: incomplete.id,
+      }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Есть незаполненные поля или недостающие файлы",
+      },
+    });
+  });
+
+  test("canonical transition helper requires prepared export approval snapshot", () => {
+    const submitted = applySubmissionAction(
+      reviewReadySubmission(),
+      "submit_for_review",
+      "agent",
+    );
+
+    expect(
+      transitionSubmissionById([submitted], {
+        actorRole: "admin",
+        nextStatus: "ready_for_export",
+        source: "admin",
+        submissionId: submitted.id,
+      }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Есть незаполненные поля или недостающие файлы",
+      },
+    });
+  });
+
+  test("empty progress denominators are not persisted as complete", () => {
+    const malformed: Submission = {
+      ...reviewReadySubmission(),
+      applicants: [
+        {
+          ...(reviewReadySubmission().applicants[0] as Submission["applicants"][number]),
+          sections: [],
+        },
+      ],
+      files: [],
+    };
+
+    expect(calculateSubmissionProgress(malformed)).toEqual({
+      files: 0,
+      questionnaire: 0,
+      total: 0,
+    });
+  });
+
+  test("blocks approval when any open issue remains, not only blocker severity", () => {
+    const submitted = applySubmissionAction(
+      reviewReadySubmission(),
+      "submit_for_review",
+      "agent",
+    );
+    const withWarningIssue: Submission = {
+      ...submitted,
+      issues: [
+        {
+          id: "issue-warning-open",
+          type: "field",
+          target: {
+            applicantId: submitted.applicants[0]?.id ?? "applicant-1",
+            applicantName: submitted.applicants[0]?.fullName ?? "Applicant",
+            field: "Маршрут поездки",
+            section: "Анкета",
+          },
+          reason: "Нужно уточнить",
+          comment: "Не хватает детали",
+          severity: "warning",
+          status: "open",
+          createdBy: "admin",
+          createdAt: "сейчас",
+        },
+      ],
+    };
+
+    expect(canPerformAction(withWarningIssue, "accept", "admin")).toEqual({
+      ok: false,
+      reason: "Есть незакрытые замечания",
+    });
+    expect(applySubmissionActionResult(withWarningIssue, "accept", "admin")).toEqual({
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Есть незакрытые замечания",
+      },
+    });
+  });
+
+  test("replacement upload fixes the matching file issue and does not move status", () => {
+    const returned: Submission = {
+      ...reviewReadySubmission(),
+      status: "returned",
+      issues: [],
+    };
+    const targetFile = returned.files[0];
+    if (!targetFile) throw new Error("Missing file fixture");
+    const needsReplacement: Submission = {
+      ...returned,
+      files: returned.files.map((file) =>
+        file.id === targetFile.id
+          ? {
+              ...file,
+              status: "needs_replacement",
+              storageBucket: "submission-media",
+              storagePath: "old/path.jpg",
+            }
+          : file,
+      ),
+      issues: [
+        {
+          id: "issue-file-replacement",
+          type: "file",
+          target: {
+            applicantId: targetFile.applicantId,
+            applicantName:
+              returned.applicants.find((item) => item.id === targetFile.applicantId)
+                ?.fullName ?? "Applicant",
+            fileType: targetFile.type,
+            section: "Файлы",
+          },
+          reason: "Файл нужно заменить",
+          comment: "Плохое качество",
+          severity: "blocker",
+          status: "open",
+          createdBy: "admin",
+          createdAt: "сейчас",
+        },
+      ],
+    };
+
+    const uploaded = uploadRequiredFile(needsReplacement, targetFile.id, {
+      generatedFileName: "new-file.jpg",
+      mimeType: "image/jpeg",
+      originalFileName: "new-file.jpg",
+      sizeBytes: 1234,
+      storageAdapter: "supabase-private",
+      storageBucket: "submission-media",
+      storagePath: "new/path.jpg",
+      uploadedAtIso: "2026-07-07T10:00:00.000Z",
+    });
+
+    expect(uploaded.status).toBe("returned");
+    expect(uploaded.issues[0]?.status).toBe("fixed_by_agent");
+    expect(uploaded.files.find((file) => file.id === targetFile.id)).toMatchObject({
+      status: "uploaded",
+      storagePath: "new/path.jpg",
+      uploadStatus: "uploaded",
+    });
+    expect(uploaded.history[0]?.detail).toContain("old/path.jpg");
+  });
+
+  test("exported blocks upload and status changes", () => {
+    const exported: Submission = {
+      ...reviewReadySubmission(),
+      exportState: "marked_exported",
+      status: "exported",
+    };
+    const targetFile = exported.files[0];
+    if (!targetFile) throw new Error("Missing file fixture");
+
+    expect(uploadRequiredFile(exported, targetFile.id)).toBe(exported);
+    expect(
+      transitionSubmissionById([exported], {
+        actorRole: "admin",
+        nextStatus: "ready_for_export",
+        source: "admin",
+        submissionId: exported.id,
+      }),
+    ).toEqual({
+      ok: false,
+      error: {
+        code: "EXPORTED_TERMINAL",
+        message: "Exported is terminal for V-19.",
       },
     });
   });

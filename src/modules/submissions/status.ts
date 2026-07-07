@@ -8,9 +8,14 @@ import type {
   Submission,
   SubmissionAction,
   SubmissionFileStatus,
+  SubmissionHistorySource,
   SubmissionStatus,
 } from "./types";
-import { clearOpenQuestionnaireIssueErrors } from "./questionnaire";
+import {
+  clearOpenQuestionnaireIssueErrors,
+  questionnaireFieldMatchesTarget,
+} from "./questionnaire";
+import { applicantFileStatusForFiles } from "./fileAsset";
 import {
   passportGateIssues,
   passportGateReason,
@@ -19,12 +24,12 @@ import {
 } from "./passportExtractionGuards";
 import {
   canonicalRequiredMediaReadiness,
+  CANONICAL_FRONTEND_MEDIA_TYPES,
   isCanonicalSubmissionStatus,
   isIssueTransitionAllowed,
   isKnownContractRole,
   isStatusTransitionAllowed,
 } from "./domainContract";
-import { firstProductionReadinessBlocker } from "./productionReadinessGate";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -158,8 +163,12 @@ export const adminIssueStatuses: SubmissionStatus[] = [
   "corrections_received",
 ];
 
-export function canAgentEditSubmissionContent(submission: Submission) {
+export function canAgentEditSubmission(submission: Submission) {
   return agentEditableStatuses.includes(submission.status);
+}
+
+export function canAgentEditSubmissionContent(submission: Submission) {
+  return canAgentEditSubmission(submission);
 }
 
 export function canEditSubmissionContent(submission: Submission, role: Role) {
@@ -249,13 +258,6 @@ export const transitionMatrix: Record<
 const packageLevelExportActionReason =
   "Формирование Excel выполняется только через пакет выгрузки";
 const missingTripDateRangeReason = "Укажите даты поездки перед отправкой";
-const productionReadinessGateActions = new Set<SubmissionAction>([
-  "submit_for_review",
-  "submit_corrections",
-  "accept",
-  "close_issues_accept",
-  "mark_exported",
-]);
 
 export function openIssueCount(submission: Submission) {
   return submission.issues.filter((issue) => issue.status === "open").length;
@@ -289,6 +291,122 @@ export function acceptanceBlockingIssueCount(submission: Submission) {
   ).length;
 }
 
+export function hasBlockingIssues(submission: Submission) {
+  return submission.issues.some(
+    (issue) => issue.status === "open" || isFixedIssueStatus(issue.status),
+  );
+}
+
+export function hasRequiredDocuments(submission: Submission) {
+  return canonicalRequiredMediaReadiness(submission).ok;
+}
+
+export function calculateSubmissionProgress(
+  submission: Submission,
+): Submission["completeness"] {
+  const fields = submission.applicants.flatMap((applicant) =>
+    applicant.sections.flatMap((section) => section.fields),
+  );
+  const requiredFields = fields.filter((field) => field.required);
+  const readyFields = requiredFields.filter(
+    (field) => field.value.trim().length > 0 && !field.error,
+  );
+  const questionnaire = percent(readyFields.length, requiredFields.length);
+  const requiredFiles = submission.files.filter((file) =>
+    CANONICAL_FRONTEND_MEDIA_TYPES.some((type) => type === file.type),
+  );
+  const filesToScore = requiredFiles.length ? requiredFiles : submission.files;
+  const readyFiles = filesToScore.filter(isFileReadyForProgress);
+  const files = percent(readyFiles.length, filesToScore.length);
+  let total = Math.round((questionnaire + files) / 2);
+
+  if (submission.status !== "exported") {
+    if (submission.issues.some((issue) => issue.status === "open")) {
+      total = Math.min(total, 90);
+    } else if (submission.issues.some((issue) => isFixedIssueStatus(issue.status))) {
+      total = Math.min(total, 95);
+    }
+  }
+
+  return { files, questionnaire, total };
+}
+
+function isFileReadyForProgress(file: Submission["files"][number]) {
+  if (file.status === "missing" || file.status === "needs_replacement") return false;
+  if (file.uploadStatus && file.uploadStatus !== "uploaded") return false;
+  if (
+    file.reviewStatus === "replace_required" ||
+    file.reviewStatus === "poor_quality"
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function percent(ready: number, total: number) {
+  if (total === 0) return 0;
+  return Math.round((ready / total) * 100);
+}
+
+export function withRecalculatedSubmissionProgress(
+  submission: Submission,
+): Submission {
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      fileStatus: applicantFileStatusForFiles(
+        submission.files.filter((file) => file.applicantId === applicant.id),
+      ),
+    })),
+    completeness: calculateSubmissionProgress(submission),
+  };
+}
+
+export function canAgentSubmitForReview(submission: Submission) {
+  return (
+    submission.status === "in_progress" &&
+    calculateSubmissionProgress(submission).questionnaire === 100 &&
+    hasRequiredDocuments(submission) &&
+    !hasBlockingIssues(submission) &&
+    hasUsableTripDateRange(submission) &&
+    !requiresPassportGateBeforeAction(submission, "submit_for_review") &&
+    !requiresPassportExtractionReviewBeforeAction(submission, "submit_for_review")
+  );
+}
+
+export function canAdminReturnSubmission(submission: Submission) {
+  return adminIssueStatuses.includes(submission.status) && openIssueCount(submission) > 0;
+}
+
+export function canAdminApproveForExport(submission: Submission) {
+  return (
+    (submission.status === "submitted_for_review" ||
+      submission.status === "corrections_received") &&
+    !hasBlockingIssues(submission) &&
+    hasRequiredDocuments(submission) &&
+    hasUsableTripDateRange(submission)
+  );
+}
+
+export function canAdminMarkExported(submission: Submission) {
+  return (
+    submission.status === "ready_for_export" &&
+    submission.exportState === "file_downloaded" &&
+    Boolean(submission.exportPackage)
+  );
+}
+
+export function canReplaceDocument(
+  submission: Submission,
+  file: Submission["files"][number],
+) {
+  return (
+    canAgentEditSubmission(submission) &&
+    (file.status === "missing" || file.status === "needs_replacement")
+  );
+}
+
 export function hasRequiredBasics(submission: Submission) {
   return submission.city && submission.applicants.length > 0;
 }
@@ -301,10 +419,11 @@ export function hasUsableTripDateRange(submission: Submission) {
 
 export function hasMissingRequiredWork(submission: Submission) {
   const media = canonicalRequiredMediaReadiness(submission);
+  const progress = calculateSubmissionProgress(submission);
 
   return (
-    submission.completeness.questionnaire < 100 ||
-    submission.completeness.files < 100 ||
+    progress.questionnaire < 100 ||
+    progress.files < 100 ||
     !media.ok ||
     submission.files.some(
       (file) => file.status === "missing" || file.status === "needs_replacement",
@@ -382,6 +501,14 @@ export function canPerformAction(
   action: SubmissionAction,
   role: Role,
 ): { ok: boolean; reason?: string } {
+  return validateSubmissionActionPolicy(submission, action, role);
+}
+
+function validateSubmissionActionPolicy(
+  submission: Submission,
+  action: SubmissionAction,
+  role: Role,
+): { ok: boolean; reason?: string } {
   if (!isKnownContractRole(role)) return { ok: false, reason: "Недостаточно прав" };
   if (!isCanonicalSubmissionStatus(submission.status)) {
     return { ok: false, reason: "Действие недоступно в текущем статусе" };
@@ -412,10 +539,7 @@ export function canPerformAction(
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
-  if (
-    action === "submit_for_review" &&
-    acceptanceBlockingIssueCount(submission) > 0
-  ) {
+  if (action === "submit_for_review" && hasBlockingIssues(submission)) {
     return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
@@ -448,15 +572,19 @@ export function canPerformAction(
     return { ok: false, reason: "Сначала отметьте замечания исправленными" };
   }
 
-  if (action === "return_with_issues" && openIssueCount(submission) === 0) {
+  if (action === "return_with_issues" && !canAdminReturnSubmission(submission)) {
     return { ok: false, reason: "Нужно добавить точное замечание" };
   }
 
-  if (action === "return_again" && openIssueCount(submission) === 0) {
+  if (action === "return_again" && !canAdminReturnSubmission(submission)) {
     return { ok: false, reason: "Нужно добавить точное замечание" };
   }
 
-  if (action === "accept" && acceptanceBlockingIssueCount(submission) > 0) {
+  if (action === "accept" && hasBlockingIssues(submission)) {
+    return { ok: false, reason: "Есть незакрытые замечания" };
+  }
+
+  if (action === "close_issues_accept" && openIssueCount(submission) > 0) {
     return { ok: false, reason: "Есть незакрытые замечания" };
   }
 
@@ -474,22 +602,226 @@ export function canPerformAction(
     return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
   }
 
-  if (action === "close_issues_accept" && blockerCount(submission) > 0) {
-    return { ok: false, reason: "Есть незакрытые замечания" };
-  }
-
   if (
     action === "mark_exported" &&
-    (submission.exportState !== "file_downloaded" || !submission.exportPackage)
+    !canAdminMarkExported(submission)
   ) {
     return { ok: false, reason: "Сначала сформируйте и скачайте пакет выгрузки" };
   }
 
-  if (productionReadinessGateActions.has(action)) {
-    const blocker = firstProductionReadinessBlocker(submission);
-    if (blocker) return { ok: false, reason: blocker.detail };
+  return { ok: true };
+}
+
+const directStatusTransitionActions = Object.entries(transitionMatrix).filter(
+  ([action]) => action !== "generate_export" && action !== "open_history",
+) as Array<
+  [
+    SubmissionAction,
+    { from: SubmissionStatus[]; to: SubmissionStatus; role: Role },
+  ]
+>;
+
+function submissionActionForStatusTransition(
+  fromStatus: SubmissionStatus,
+  toStatus: SubmissionStatus,
+  role: Role,
+): SubmissionAction | undefined {
+  return directStatusTransitionActions.find(
+    ([, transition]) =>
+      transition.role === role &&
+      transition.to === toStatus &&
+      transition.from.includes(fromStatus),
+  )?.[0];
+}
+
+export type SubmissionStatusTransitionInput = {
+  actorId?: string;
+  actorRole: Role;
+  nextStatus: SubmissionStatus;
+  note?: string;
+  nowIso?: string;
+  source: SubmissionHistorySource;
+  submissionId: string;
+};
+
+export function transitionSubmissionById(
+  submissions: Submission[],
+  input: SubmissionStatusTransitionInput,
+): CommandResult<Submission[]> {
+  let matchedSubmission = false;
+  const nextSubmissions: Submission[] = [];
+
+  for (const submission of submissions) {
+    if (submission.id !== input.submissionId) {
+      nextSubmissions.push(submission);
+      continue;
+    }
+
+    matchedSubmission = true;
+    const result = transitionSubmissionStatus(submission, input);
+    if (!result.ok) return result;
+    nextSubmissions.push(result.data);
   }
 
+  if (!matchedSubmission) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_ERROR", message: "Подача не найдена" },
+    };
+  }
+
+  return { ok: true, data: nextSubmissions };
+}
+
+export function transitionSubmissionStatus(
+  submission: Submission,
+  input: Omit<SubmissionStatusTransitionInput, "submissionId">,
+): CommandResult<Submission> {
+  if (!isCanonicalSubmissionStatus(submission.status)) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Submission status is not canonical.",
+      },
+    };
+  }
+  if (!isCanonicalSubmissionStatus(input.nextStatus)) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Target status is not canonical.",
+      },
+    };
+  }
+  if (submission.status === "exported") {
+    return {
+      ok: false,
+      error: { code: "EXPORTED_TERMINAL", message: "Exported is terminal for V-19." },
+    };
+  }
+  const statusTransitionAllowed = isStatusTransitionAllowed(
+    submission.status,
+    input.nextStatus,
+    { mutating: true },
+  );
+  if (!statusTransitionAllowed) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Действие недоступно в текущем статусе",
+      },
+    };
+  }
+  if (!isTransitionRoleAllowed(submission.status, input.nextStatus, input.actorRole)) {
+    return {
+      ok: false,
+      error: {
+        code: "PERMISSION_DENIED",
+        message: "Действие недоступно в текущем статусе",
+      },
+    };
+  }
+  const action = submissionActionForStatusTransition(
+    submission.status,
+    input.nextStatus,
+    input.actorRole,
+  );
+  if (!action) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: "Действие недоступно в текущем статусе",
+      },
+    };
+  }
+  const actionGuard = validateSubmissionActionPolicy(
+    submission,
+    action,
+    input.actorRole,
+  );
+  if (!actionGuard.ok) {
+    return {
+      ok: false,
+      error: {
+        code: domainErrorCodeForBlockedAction(
+          action,
+          actionGuard.reason ?? "Действие заблокировано доменными правилами.",
+        ),
+        message: actionGuard.reason ?? "Действие заблокировано доменными правилами.",
+      },
+    };
+  }
+  const preparedSnapshotGuard = validatePreparedTransitionSnapshot(
+    submission,
+    input.nextStatus,
+  );
+  if (!preparedSnapshotGuard.ok) {
+    return {
+      ok: false,
+      error: {
+        code: domainErrorCodeForBlockedAction(action, preparedSnapshotGuard.reason),
+        message: preparedSnapshotGuard.reason,
+      },
+    };
+  }
+
+  const now = input.nowIso ?? "сейчас";
+  const text = `Статус изменен: ${statusLabels[input.nextStatus]}`;
+
+  return {
+    ok: true,
+    data: withRecalculatedSubmissionProgress({
+      ...submission,
+      status: input.nextStatus,
+      updatedAt: now,
+      history: [
+        {
+          id: `и-${submission.id}-${submission.status}-${input.nextStatus}-${submission.history.length + 1}`,
+          actorId: input.actorId,
+          at: now,
+          createdAt: now,
+          fromStatus: submission.status,
+          note: input.note,
+          source: input.source,
+          text: input.note ? `${text}: ${input.note}` : text,
+          toStatus: input.nextStatus,
+        },
+        ...submission.history,
+      ],
+    }),
+  };
+}
+
+function isTransitionRoleAllowed(
+  fromStatus: SubmissionStatus,
+  toStatus: SubmissionStatus,
+  role: Role,
+) {
+  return Boolean(submissionActionForStatusTransition(fromStatus, toStatus, role));
+}
+
+function validatePreparedTransitionSnapshot(
+  submission: Submission,
+  nextStatus: SubmissionStatus,
+): { ok: true } | { ok: false; reason: string } {
+  if (nextStatus !== "ready_for_export") return { ok: true };
+  if (hasBlockingIssues(submission)) {
+    return { ok: false, reason: "Есть незакрытые замечания" };
+  }
+  if (
+    !canonicalRequiredMediaReadiness(submission, {
+      requireAccepted: true,
+    }).ok
+  ) {
+    return { ok: false, reason: "Есть незаполненные поля или недостающие файлы" };
+  }
+  if (submission.exportState !== "ready") {
+    return { ok: false, reason: "Пакет выгрузки ещё не готов" };
+  }
   return { ok: true };
 }
 
@@ -697,151 +1029,97 @@ export function applySubmissionActionResult(
   if (action === "submit_corrections") {
     const corrected = clearOpenQuestionnaireIssueErrors(submission);
 
-    return {
-      ok: true,
-      data: {
-        ...corrected,
-        status: "corrections_received",
-        issues: corrected.issues,
-        updatedAt: "сейчас",
-        history: [
-          {
-            id: `и-${submission.id}-исправления`,
-            text: "Агент отправил исправления",
-            at: "сейчас",
-            fromStatus: submission.status,
-            source: "agent",
-            toStatus: "corrections_received",
-          },
-          ...corrected.history,
-        ],
-      },
-    };
+    return transitionSubmissionStatus(corrected, {
+      actorId,
+      actorRole: role,
+      nextStatus: "corrections_received",
+      note: "Агент отправил исправления",
+      nowIso: "сейчас",
+      source: role,
+    });
   }
 
   if (action === "close_issues_accept") {
     const reviewedAtIso = new Date().toISOString();
-    return {
-      ok: true,
-      data: {
-        ...submission,
-        status: "ready_for_export",
-        exportState: "ready",
-        files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
-        issues: submission.issues.map((issue) =>
-          isIssueTransitionAllowed(issue.status, "closed_by_admin")
-            ? { ...issue, status: "closed_by_admin" }
-            : issue,
-        ),
-        updatedAt: "сейчас",
-        history: [
-          {
-            id: `и-${submission.id}-принято`,
-            text: "Администратор закрыл исправления и принял подачу",
-            at: "сейчас",
-            fromStatus: submission.status,
-            source: "admin",
-            toStatus: "ready_for_export",
-          },
-          ...submission.history,
-        ],
-      },
+    const prepared: Submission = {
+      ...submission,
+      exportState: "ready",
+      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
+      issues: submission.issues.map((issue) =>
+        isIssueTransitionAllowed(issue.status, "closed_by_admin")
+          ? { ...issue, status: "closed_by_admin" }
+          : issue,
+      ),
     };
+
+    return transitionSubmissionStatus(prepared, {
+      actorId,
+      actorRole: role,
+      nextStatus: "ready_for_export",
+      note: "Администратор закрыл исправления и принял подачу",
+      nowIso: "сейчас",
+      source: role,
+    });
   }
 
   if (action === "accept") {
     const reviewedAtIso = new Date().toISOString();
-    return {
-      ok: true,
-      data: {
-        ...submission,
-        status: "ready_for_export",
-        exportState: "ready",
-        files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
-        updatedAt: "сейчас",
-        history: [
-          {
-            id: `и-${submission.id}-принято`,
-            text: "Администратор принял подачу",
-            at: "сейчас",
-            fromStatus: submission.status,
-            source: "admin",
-            toStatus: "ready_for_export",
-          },
-          ...submission.history,
-        ],
-      },
+    const prepared: Submission = {
+      ...submission,
+      exportState: "ready",
+      files: markReviewFilesAccepted(submission.files, reviewedAtIso, actorId),
     };
+
+    return transitionSubmissionStatus(prepared, {
+      actorId,
+      actorRole: role,
+      nextStatus: "ready_for_export",
+      note: "Администратор принял подачу",
+      nowIso: "сейчас",
+      source: role,
+    });
   }
 
   if (action === "submit_for_review") {
-    return {
-      ok: true,
-      data: {
-        ...submission,
-        status: "submitted_for_review",
-        files: submission.files.map((file) =>
-          file.status === "uploaded" ? { ...file, status: "pending_review" } : file,
-        ),
-        updatedAt: "сейчас",
-        history: [
-          {
-            id: `и-${submission.id}-на-проверку`,
-            text: "Агент отправил подачу на проверку",
-            at: "сейчас",
-            fromStatus: submission.status,
-            source: "agent",
-            toStatus: "submitted_for_review",
-          },
-          ...submission.history,
-        ],
-      },
+    const prepared: Submission = {
+      ...submission,
+      files: submission.files.map((file) =>
+        file.status === "uploaded" ? { ...file, status: "pending_review" } : file,
+      ),
     };
+
+    return transitionSubmissionStatus(prepared, {
+      actorId,
+      actorRole: role,
+      nextStatus: "submitted_for_review",
+      note: "Агент отправил подачу на проверку",
+      nowIso: "сейчас",
+      source: role,
+    });
   }
 
   if (action === "mark_exported") {
-    return {
-      ok: true,
-      data: {
-        ...submission,
-        status: "exported",
-        exportState: "marked_exported",
-        updatedAt: "сейчас",
-        history: [
-          {
-            id: `и-${submission.id}-выгружено`,
-            text: "Подача отмечена выгруженной",
-            at: "сейчас",
-            fromStatus: submission.status,
-            source: "admin",
-            toStatus: "exported",
-          },
-          ...submission.history,
-        ],
-      },
-    };
+    const transitioned = transitionSubmissionStatus(submission, {
+      actorId,
+      actorRole: role,
+      nextStatus: "exported",
+      note: "Подача отмечена выгруженной",
+      nowIso: "сейчас",
+      source: role,
+    });
+    return transitioned.ok
+      ? { ok: true, data: { ...transitioned.data, exportState: "marked_exported" } }
+      : transitioned;
   }
 
   const transition = transitionMatrix[action];
-  return {
-    ok: true,
-    data: {
-      ...submission,
-      status: transition.to,
-      updatedAt: "сейчас",
-      history: [
-        {
-          id: `и-${submission.id}-${action}`,
-          text: `Статус изменен: ${statusLabels[transition.to]}`,
-          at: "сейчас",
-          fromStatus: submission.status,
-          source: role,
-          toStatus: transition.to,
-        },
-        ...submission.history,
-      ],
-    },
-  };
+  return transitionSubmissionStatus(submission, {
+    actorId,
+    actorRole: role,
+    nextStatus: transition.to,
+    nowIso: "сейчас",
+    source: role,
+  });
 }
 
 function submissionActionFailure(
@@ -927,7 +1205,9 @@ export function isSubmissionIssueResolved(submission: Submission, issue: Issue) 
   }
 
   const fields = applicant.sections.flatMap((section) => section.fields);
-  const field = fields.find((item) => item.label === issue.target.field);
+  const field = fields.find((item) =>
+    questionnaireFieldMatchesTarget(item, issue.target.field),
+  );
   if (!field) return false;
 
   const value = field.value.trim();

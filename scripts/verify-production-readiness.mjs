@@ -44,6 +44,7 @@ const scopedDiffPaths = [
   "supabase/migrations/20260630222703_returned_pdf_handoff_security_invoker.sql",
   "supabase/migrations/20260630235513_allow_trip_date_sync_during_submit_handoff.sql",
   "supabase/migrations/20260706000100_ai_helper_admin_intent_quota_contract.sql",
+  "supabase/migrations/20260707000100_typed_status_history_source.sql",
   "docs/release/auth-data-production-readiness.md",
   "docs/release/supabase-production-approval-checklist.md",
   "docs/release/supabase-production-promotion.md",

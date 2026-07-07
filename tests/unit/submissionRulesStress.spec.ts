@@ -228,7 +228,7 @@ describe("submission deterministic rules adversarial stress gate", () => {
     ]);
   });
 
-  test("warning-only issues do not block accept or export, but unresolved blockers do", () => {
+  test("any unresolved issue blocks accept and export", () => {
     const warningOnly = submittedForAcceptance({
       issues: [issue({ severity: "warning", status: "open" })],
     });
@@ -239,20 +239,23 @@ describe("submission deterministic rules adversarial stress gate", () => {
       issues: [issue({ severity: "blocker", status: "fixed_by_agent" })],
     });
 
-    expect(canPerformAction(warningOnly, "accept", "admin")).toEqual({ ok: true });
+    expect(canPerformAction(warningOnly, "accept", "admin")).toEqual({
+      ok: false,
+      reason: "Есть незакрытые замечания",
+    });
     expect(acceptSubmission(warningOnly, "admin")).toMatchObject({
-      ok: true,
-      data: {
-        status: "ready_for_export",
+      error: {
+        code: "ACCEPTANCE_BLOCKED",
       },
+      ok: false,
     });
     expect(
       exportSummary([
         readyClone({ issues: [issue({ severity: "warning", status: "open" })] }),
       ]),
     ).toMatchObject({
-      canGenerate: true,
-      ready: true,
+      canGenerate: false,
+      ready: false,
     });
 
     for (const blocked of [openBlocker, fixedBlocker]) {

@@ -8,6 +8,8 @@ import {
   exportPackageIdentityMatches,
   exportSummary,
 } from "./exportRules";
+import { createExportWorkbookArtifact } from "./exportWorkbook";
+import { buildApplicantDocumentFileName } from "./filenamePolicy";
 import {
   downloadMediaFromStorage,
   mediaStorageBucket,
@@ -48,6 +50,7 @@ export type ExportMediaZipArtifact = {
   fileName: string;
   packageIdentity: ExportPackageIdentity;
   submissionCount: number;
+  workbookFileName: string;
 };
 
 export type ExportMediaZipArtifactResult =
@@ -86,16 +89,12 @@ type BrowserDownloadRuntime = typeof globalThis & {
   setTimeout(callback: () => void, timeout: number): unknown;
 };
 
-const slotFileNames: Record<CanonicalFrontendMediaType, string> = {
-  passport_scan: "01_passport_scan",
-  selfie: "02_selfie",
-  selfie_2: "03_selfie_2",
-};
+type ArchiveGroup = "family" | "single";
 
-const archiveRootFolders = {
-  family: "Семьи",
-  single: "Заявители",
-} as const;
+const archiveSectionFolders: Record<ArchiveGroup, string> = {
+  family: "01_Семьи",
+  single: "02_Заявители",
+};
 
 export function canDownloadExportMediaZip(submissions: Submission[]): boolean {
   const summary = exportSummary(submissions);
@@ -104,6 +103,17 @@ export function canDownloadExportMediaZip(submissions: Submission[]): boolean {
     (summary.exportState === "file_generated" ||
       summary.exportState === "file_downloaded")
   );
+}
+
+export async function prepareExportMediaZip(
+  submissions: Submission[],
+  expectedIdentity: ExportPackageIdentity | null,
+  options: { downloadMedia?: ExportMediaZipDownloader } = {},
+): Promise<ExportMediaZipArtifactResult> {
+  return createExportMediaZipArtifact(submissions, {
+    downloadMedia: options.downloadMedia,
+    expectedIdentity,
+  });
 }
 
 export async function createExportMediaZipArtifact(
@@ -120,23 +130,31 @@ export async function createExportMediaZipArtifact(
   if (!identityResult.ok) return identityResult;
 
   const downloadMedia = options.downloadMedia ?? defaultDownloadMedia;
+  const orderedSubmissions = orderSubmissionsForMediaArchive(submissions);
   const outerZip = new JSZip();
-  outerZip.folder(archiveRootFolders.family);
-  outerZip.folder(archiveRootFolders.single);
-
-  const groupIndexes = {
-    family: 0,
-    single: 0,
-  };
+  const cityIndexes = new Map<string, Record<ArchiveGroup, number>>();
   let applicantCount = 0;
   let fileCount = 0;
 
   try {
-    for (const submission of submissions) {
+    const summary = exportSummary(submissions);
+    const workbookArtifact = createExportWorkbookArtifact(
+      summary.rows,
+      identityResult.identity,
+    );
+    outerZip.file(workbookArtifact.fileName, workbookArtifact.blob);
+
+    for (const submission of orderedSubmissions) {
+      const cityFolder = safeArchiveName(submission.city, "city");
       const group = archiveGroupForSubmission(submission);
-      groupIndexes[group] += 1;
-      const submissionFolder = `${archiveRootFolders[group]}/${numberPrefix(
-        groupIndexes[group],
+      const counters = ensureCityCounters(cityIndexes, cityFolder);
+      counters[group] += 1;
+
+      outerZip.folder(`${cityFolder}/${archiveSectionFolders.family}`);
+      outerZip.folder(`${cityFolder}/${archiveSectionFolders.single}`);
+
+      const submissionFolder = `${cityFolder}/${archiveSectionFolders[group]}/${numberPrefix(
+        counters[group],
       )}_${safeArchiveName(`${submission.id}_${submission.title}`, "submission")}`;
 
       for (const [applicantIndex, applicant] of submission.applicants.entries()) {
@@ -176,7 +194,7 @@ export async function createExportMediaZipArtifact(
           }
 
           outerZip.file(
-            `${applicantFolder}/${archiveMediaFileName(type, prepared.file)}`,
+            `${applicantFolder}/${archiveMediaFileName(type, prepared.file, applicant)}`,
             blob,
           );
           fileCount += 1;
@@ -184,6 +202,31 @@ export async function createExportMediaZipArtifact(
         applicantCount += 1;
       }
     }
+
+    outerZip.file(
+      "manifest.json",
+      JSON.stringify(
+        buildArchiveManifest(orderedSubmissions, identityResult.identity, {
+          applicantCount,
+          fileCount,
+          workbookFileName: workbookArtifact.fileName,
+        }),
+        null,
+        2,
+      ),
+    );
+    outerZip.file(
+      "README_ПАКЕТ.txt",
+      [
+        "Visaflow export package",
+        `Submissions: ${orderedSubmissions.length}`,
+        `Applicants: ${applicantCount}`,
+        `Media files: ${fileCount}`,
+        `Workbook: ${workbookArtifact.fileName}`,
+        "Required files per applicant: passport_scan, selfie, selfie_2",
+        "Archive structure: city / families first / single applicants second.",
+      ].join("\n"),
+    );
 
     const blob = await outerZip.generateAsync({
       compression: "DEFLATE",
@@ -197,13 +240,43 @@ export async function createExportMediaZipArtifact(
         blob,
         contentType: "application/zip",
         fileCount,
-        fileName: `visaflow-media-${identityResult.identity.idempotencyKey}.zip`,
+        fileName: `visaflow-export-${identityResult.identity.idempotencyKey}.zip`,
         packageIdentity: identityResult.identity,
-        submissionCount: submissions.length,
+        submissionCount: orderedSubmissions.length,
+        workbookFileName: workbookArtifact.fileName,
       },
     };
   } catch {
     return blocked("zip_failed", "Не удалось сформировать ZIP-файл.");
+  }
+}
+
+export function downloadPreparedExportMediaZip(
+  artifact: ExportMediaZipArtifact,
+): ExportMediaZipResult {
+  const runtime = globalThis as BrowserDownloadRuntime;
+  let url = "";
+
+  try {
+    url = runtime.URL.createObjectURL(artifact.blob);
+    const link = runtime.document.createElement("a");
+    link.href = url;
+    link.download = artifact.fileName;
+    link.rel = "noopener";
+    runtime.document.body.append(link);
+    link.click();
+    link.remove();
+    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 0);
+    return {
+      ok: true,
+      applicantCount: artifact.applicantCount,
+      fileCount: artifact.fileCount,
+      fileName: artifact.fileName,
+      submissionCount: artifact.submissionCount,
+    };
+  } catch {
+    if (url) runtime.URL.revokeObjectURL(url);
+    return blocked("download_failed", "Не удалось скачать ZIP-файл. Повторите попытку.");
   }
 }
 
@@ -212,36 +285,12 @@ export default async function downloadExportMediaZip(
   expectedIdentity: ExportPackageIdentity | null,
   options: { downloadMedia?: ExportMediaZipDownloader } = {},
 ): Promise<ExportMediaZipResult> {
-  const artifactResult = await createExportMediaZipArtifact(submissions, {
+  const artifactResult = await prepareExportMediaZip(submissions, expectedIdentity, {
     downloadMedia: options.downloadMedia,
-    expectedIdentity,
   });
   if (!artifactResult.ok) return artifactResult;
 
-  const runtime = globalThis as BrowserDownloadRuntime;
-  let url = "";
-
-  try {
-    url = runtime.URL.createObjectURL(artifactResult.artifact.blob);
-    const link = runtime.document.createElement("a");
-    link.href = url;
-    link.download = artifactResult.artifact.fileName;
-    link.rel = "noopener";
-    runtime.document.body.append(link);
-    link.click();
-    link.remove();
-    runtime.setTimeout(() => runtime.URL.revokeObjectURL(url), 0);
-    return {
-      ok: true,
-      applicantCount: artifactResult.artifact.applicantCount,
-      fileCount: artifactResult.artifact.fileCount,
-      fileName: artifactResult.artifact.fileName,
-      submissionCount: artifactResult.artifact.submissionCount,
-    };
-  } catch {
-    if (url) runtime.URL.revokeObjectURL(url);
-    return blocked("download_failed", "Не удалось скачать ZIP-файл. Повторите попытку.");
-  }
+  return downloadPreparedExportMediaZip(artifactResult.artifact);
 }
 
 function validateExportMediaZipIdentity(
@@ -349,15 +398,62 @@ async function defaultDownloadMedia(target: MediaStorageTarget): Promise<Blob | 
   return downloadMediaFromStorage(target);
 }
 
-function archiveGroupForSubmission(submission: Submission): keyof typeof archiveRootFolders {
+function archiveGroupForSubmission(submission: Submission): ArchiveGroup {
   return submission.type === "family" ? "family" : "single";
+}
+
+function orderSubmissionsForMediaArchive(submissions: Submission[]): Submission[] {
+  const cityOrder = new Map<string, number>();
+  submissions.forEach((submission) => {
+    if (!cityOrder.has(submission.city)) {
+      cityOrder.set(submission.city, cityOrder.size);
+    }
+  });
+
+  return submissions
+    .map((submission, index) => ({ index, submission }))
+    .sort((left, right) => {
+      const leftCityOrder = cityOrder.get(left.submission.city) ?? left.index;
+      const rightCityOrder = cityOrder.get(right.submission.city) ?? right.index;
+
+      if (leftCityOrder !== rightCityOrder) {
+        return leftCityOrder - rightCityOrder;
+      }
+
+      const leftFamilyOrder = left.submission.type === "family" ? 0 : 1;
+      const rightFamilyOrder = right.submission.type === "family" ? 0 : 1;
+
+      if (leftFamilyOrder !== rightFamilyOrder) {
+        return leftFamilyOrder - rightFamilyOrder;
+      }
+
+      return left.index - right.index;
+    })
+    .map((item) => item.submission);
+}
+
+function ensureCityCounters(
+  cityIndexes: Map<string, Record<ArchiveGroup, number>>,
+  cityFolder: string,
+): Record<ArchiveGroup, number> {
+  const existing = cityIndexes.get(cityFolder);
+  if (existing) return existing;
+
+  const counters = { family: 0, single: 0 };
+  cityIndexes.set(cityFolder, counters);
+  return counters;
 }
 
 function archiveMediaFileName(
   type: CanonicalFrontendMediaType,
   file: SubmissionFile,
+  applicant: Applicant,
 ): string {
-  return `${slotFileNames[type]}.${fileExtension(file)}`;
+  return buildApplicantDocumentFileName({
+    applicant,
+    documentType: type,
+    extension: fileExtension(file),
+  });
 }
 
 function fileExtension(file: SubmissionFile): string {
@@ -374,15 +470,48 @@ function fileExtension(file: SubmissionFile): string {
 function safeArchiveName(value: string, fallback: string): string {
   const safe = value
     .normalize("NFKC")
-    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_")
+    .split("")
+    .map(replaceUnsafeArchiveCharacter)
+    .join("")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 96);
   return safe || fallback;
 }
 
+function replaceUnsafeArchiveCharacter(character: string): string {
+  const codePoint = character.codePointAt(0) ?? 0;
+  if (codePoint < 32) return "_";
+  return /[\\/:*?"<>|]/.test(character) ? "_" : character;
+}
+
 function numberPrefix(value: number): string {
   return String(value).padStart(2, "0");
+}
+
+function buildArchiveManifest(
+  submissions: Submission[],
+  identity: ExportPackageIdentity,
+  counts: { applicantCount: number; fileCount: number; workbookFileName: string },
+) {
+  return {
+    applicantCount: counts.applicantCount,
+    fileCount: counts.fileCount,
+    package: identity,
+    requiredMediaTypes: CANONICAL_FRONTEND_MEDIA_TYPES,
+    workbookFileName: counts.workbookFileName,
+    submissions: submissions.map((submission) => ({
+      applicants: submission.applicants.map((applicant) => ({
+        id: applicant.id,
+        mediaTypes: CANONICAL_FRONTEND_MEDIA_TYPES,
+        name: applicant.fullName,
+      })),
+      city: submission.city,
+      id: submission.id,
+      title: submission.title,
+      type: submission.type,
+    })),
+  };
 }
 
 function blocked(reason: ExportMediaZipBlockedReason, safeMessage: string) {

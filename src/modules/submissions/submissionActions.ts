@@ -2,13 +2,15 @@ import {
   applySubmissionAction,
   applySubmissionActionResult,
   canAddAdminIssue,
-  canAgentEditSubmissionContent,
+  canReplaceDocument,
+  withRecalculatedSubmissionProgress,
 } from "./status";
 import {
   completeQuestionnaireSections,
   createQuestionnaireSections,
   flagQuestionnaireField,
   normalizeSubmissionQuestionnaire,
+  questionnaireFieldMatchesTarget,
   updateQuestionnaireField as updateQuestionnaireFieldInSubmission,
   type QuestionnaireFieldUpdate,
 } from "./questionnaire";
@@ -46,7 +48,6 @@ import type {
   Role,
   SubmissionFile,
   FileAssetStorageAdapter,
-  SubmissionFileStatus,
   SubmissionFileType,
   SubmissionStatus,
 } from "./types";
@@ -485,13 +486,12 @@ export function uploadRequiredFile(
   fileId: string,
   metadata?: UploadedFileMetadata,
 ): Submission {
-  if (!canAgentEditSubmissionContent(submission)) return submission;
-
   const targetFile = submission.files.find((file) => file.id === fileId);
-  if (!targetFile || !isFileUploadable(targetFile.status)) return submission;
+  if (!targetFile || !canReplaceDocument(submission, targetFile)) return submission;
   if (!isCanonicalFrontendMediaType(targetFile.type)) return submission;
   const isPassportReplacementUpload =
     targetFile.type === "passport_scan" && targetFile.status === "needs_replacement";
+  const previousFileIdentity = fileStorageIdentityLabel(targetFile);
 
   const files = submission.files.map((file) =>
     file.id === fileId
@@ -528,15 +528,12 @@ export function uploadRequiredFile(
   const applicant = submission.applicants.find(
     (item) => item.id === targetFile.applicantId,
   );
-  const filePercent = fileCompleteness(files);
+  const issues = markReplacementIssuesPendingAdminReview(submission.issues, targetFile);
 
-  return {
+  return withRecalculatedSubmissionProgress({
     ...submission,
     applicants: submission.applicants.map((item) => ({
       ...item,
-      fileStatus: applicantFileStatus(
-        files.filter((file) => file.applicantId === item.id),
-      ),
       passportExtraction:
         targetFile.type === "passport_scan" && item.id === targetFile.applicantId
           ? isPassportReplacementUpload
@@ -545,22 +542,47 @@ export function uploadRequiredFile(
           : item.passportExtraction,
     })),
     files,
-    completeness: {
-      ...submission.completeness,
-      files: filePercent,
-      total: Math.round((submission.completeness.questionnaire + filePercent) / 2),
-    },
+    issues,
     updatedAt: "сейчас",
     history: [
       {
         id: `и-${submission.id}-файл-${fileId}`,
         text: `Файл загружен: ${fileTypeName(targetFile.type)} · ${applicant?.fullName ?? "Заявитель"}`,
         at: "сейчас",
+        detail: previousFileIdentity
+          ? `Предыдущий файл сохранён в истории замены: ${previousFileIdentity}`
+          : undefined,
         source: "agent",
       },
       ...submission.history,
     ],
-  };
+  });
+}
+
+function markReplacementIssuesPendingAdminReview(
+  issues: Issue[],
+  targetFile: SubmissionFile,
+) {
+  return issues.map((issue) => {
+    if (
+      issue.status === "open" &&
+      issue.target.applicantId === targetFile.applicantId &&
+      issue.target.fileType === targetFile.type
+    ) {
+      return { ...issue, status: "fixed_by_agent" as const };
+    }
+    return issue;
+  });
+}
+
+function fileStorageIdentityLabel(file: SubmissionFile) {
+  const parts = [
+    file.storageBucket ? `bucket=${file.storageBucket}` : "",
+    file.storagePath ? `path=${file.storagePath}` : "",
+    file.generatedFileName ? `generated=${file.generatedFileName}` : "",
+    file.originalFileName ? `original=${file.originalFileName}` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(", ") : undefined;
 }
 
 function replacementUploadFileName(file: SubmissionFile) {
@@ -795,15 +817,50 @@ export function applyExportStateToSelection(
   return submissions.map((submission) => {
     if (!selectedIds.includes(submission.id)) return submission;
     if (exportState === "file_generated" || exportState === "file_downloaded") {
-      return { ...submission, exportPackage: exportPackage ?? undefined, exportState };
+      return withExportStateHistory({
+        ...submission,
+        exportPackage: exportPackage ?? undefined,
+        exportState,
+      }, exportState);
     }
     if (exportState === "ready" || exportState === "not_ready") {
       const nextSubmission = { ...submission };
       delete nextSubmission.exportPackage;
-      return { ...nextSubmission, exportState };
+      return withExportStateHistory({ ...nextSubmission, exportState }, exportState);
     }
-    return { ...submission, exportState };
+    return withExportStateHistory({ ...submission, exportState }, exportState);
   });
+}
+
+function withExportStateHistory(
+  submission: Submission,
+  exportState: ExportState,
+): Submission {
+  const historyByState: Partial<Record<ExportState, string>> = {
+    file_generated: "Excel выгрузка сформирована",
+    file_downloaded: "ZIP пакет выгрузки сформирован",
+    marked_exported: "Пакет выгрузки отмечен выгруженным",
+  };
+  const text = historyByState[exportState];
+  if (!text) return submission;
+
+  const packageId = submission.exportPackage?.idempotencyKey ?? "no-package";
+  const historyId = `и-${submission.id}-export-${exportState}-${packageId}`;
+  if (submission.history.some((item) => item.id === historyId)) return submission;
+
+  return {
+    ...submission,
+    history: [
+      {
+        id: historyId,
+        text,
+        at: "сейчас",
+        detail: submission.exportPackage?.fileName,
+        source: "admin",
+      },
+      ...submission.history,
+    ],
+  };
 }
 
 function canApplyExportStateToSelection(
@@ -933,10 +990,6 @@ function draftTitle(type: Submission["type"], firstApplicantName?: string) {
   const firstToken = firstApplicantName.split(/\s+/)[0];
   if (!firstToken || firstToken === "Основной") return "Новая семейная подача";
   return `Семья ${firstToken.replace(/а$/i, "")}ых`;
-}
-
-function isFileUploadable(status: SubmissionFileStatus) {
-  return status === "missing" || status === "needs_replacement";
 }
 
 function mergeUploadedStorageFields(
@@ -1095,7 +1148,8 @@ function issueSnapshot(submission: Submission, input: IssueInput) {
 
   const applicant = submission.applicants.find((item) => item.id === input.applicantId);
   const fields = applicant?.sections.flatMap((section) => section.fields) ?? [];
-  return fields.find((field) => field.label === input.field)?.value;
+  return fields.find((field) => questionnaireFieldMatchesTarget(field, input.field))
+    ?.value;
 }
 
 function markIssueFileForReplacement(

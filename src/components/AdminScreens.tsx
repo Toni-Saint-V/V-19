@@ -144,12 +144,12 @@ function toneClasses(tone: string) {
 
 function MetricCard({ icon: Icon, label, value, tone = 'neutral' }: { icon: React.ElementType; label: string; value: string; tone?: string }) {
   return (
-    <div className="min-h-[82px] rounded-[8px] border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-[14px] font-medium uppercase tracking-wide text-white/45">{label}</span>
+    <div className="h-[90px] rounded-[8px] border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] p-3">
+      <div className="flex items-center justify-end sm:justify-between">
+        <span className="hidden text-[11px] font-medium uppercase tracking-wide text-white/45 sm:block">{label}</span>
         <Icon className={`h-4 w-4 ${tone === 'green' ? 'text-[#b8baff]' : tone === 'orange' ? 'text-white/62' : tone === 'red' ? 'text-[#d59aa3]' : 'text-white/40'}`} />
       </div>
-      <div className="mt-2 text-xl font-semibold text-white">{value}</div>
+      <div className="mt-[30px] text-xl font-semibold text-white">{value}</div>
     </div>
   );
 }
@@ -161,7 +161,7 @@ function ProgressLine({ label, value }: { label: string; value: number }) {
         <span>{label}</span>
         <span>{value}%</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+      <div className="h-[3px] overflow-hidden rounded-full bg-white/5">
         <div className="h-full rounded-full bg-[#8fa3ff]" style={{ width: `${value}%` }} />
       </div>
     </div>
@@ -190,11 +190,11 @@ function ReviewQueueCard({ item, onOpenDrawer }: { item: ReviewCard; onOpenDrawe
           <div className="mt-1 flex items-center gap-2 text-[11.5px] font-medium text-white/45">
             {item.type === 'family' ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
             <span>{item.applicants} чел.</span>
-            <span>·</span>
-            <span>{item.agent}</span>
           </div>
         </div>
-        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/55" />
+        <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white/30 transition-colors group-hover:bg-white/[0.09] group-hover:text-white/55">
+          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </span>
       </div>
 
       <div className="mb-3 rounded-[8px] border border-white/5 bg-white/[0.025] p-3">
@@ -217,7 +217,7 @@ function ReviewQueueCard({ item, onOpenDrawer }: { item: ReviewCard; onOpenDrawe
         {item.blockers === 0 && item.warnings === 0 && <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[9px] font-medium text-[#b8baff]">без замечаний</span>}
       </div>
 
-      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] text-white/35">{item.lastEvent}</div>
+      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] font-medium text-[#6d6f6d]">{item.agent}</div>
     </button>
   );
 }
@@ -264,7 +264,7 @@ export function ReviewScreen({ onOpenDrawer }: AdminScreenProps) {
           </motion.div>
         )}
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-2">
           <MetricCard icon={FileText} label="В очереди" value={`${reviews.length}`} />
           <MetricCard icon={Flame} label="Блокеры" value={`${totalBlockers}`} tone="red" />
           <MetricCard icon={AlertCircle} label="Проверить" value={`${totalWarnings}`} tone="orange" />

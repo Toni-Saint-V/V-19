@@ -118,7 +118,7 @@ describe("Supabase security contract", () => {
     expect(accessRequestFunction).not.toContain("password:");
     expect(accessRequestFunction).not.toContain("display_name,organization_name,role");
     expect(supabaseRegistration).not.toContain("...input");
-    expect(supabaseRegistration).toContain("password: input.password");
+    expect(supabaseRegistration).not.toContain("password:");
   });
 
   test("keeps admin PDFs private, slot-limited, and linked before agent reads", () => {
@@ -546,6 +546,35 @@ describe("Supabase security contract", () => {
     expect(rpcBoundary).toContain("insert into public.media_assets");
     expect(rpcBoundary).toContain("insert into public.corrections");
     expect(rpcBoundary).toContain("insert into public.status_history");
+  });
+
+  test("persists typed cockpit status history source and note without mutable audit patches", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260707000100_typed_status_history_source.sql",
+    );
+
+    expect(migration).toContain(
+      "add column if not exists source text not null default 'system'",
+    );
+    expect(migration).toContain("add column if not exists note text");
+    expect(migration).toContain("status_history_source_check");
+    expect(migration).toContain("source in ('agent', 'admin', 'bb', 'system')");
+    expect(migration).toContain("payload_without_status_history");
+    expect(migration).toContain(
+      "payload_without_status_history",
+    );
+    expect(migration).toContain("insert into public.status_history");
+    expect(migration).toContain("source,");
+    expect(migration).toContain("note,");
+    expect(migration).toContain(
+      "jsonb_to_recordset(coalesce(payload -> 'status_history'",
+    );
+    expect(migration).toContain(
+      "history_payload.source in ('agent', 'admin', 'bb', 'system')",
+    );
+    expect(migration).toContain("history_payload.note");
+    expect(migration).toContain("on conflict (id) do nothing");
+    expect(migration).not.toContain("update public.status_history");
   });
 
   test("keeps media access private with signed URLs instead of public URLs", () => {

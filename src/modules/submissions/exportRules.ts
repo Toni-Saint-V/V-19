@@ -8,7 +8,6 @@ import type {
   Submission,
 } from "./types";
 import { agentOwnerDisplayName } from "./ownership";
-import { productionReadinessBlockerReasons } from "./productionReadinessGate";
 import {
   type CanonicalSubmissionStatus,
   canonicalRequiredMediaReadiness,
@@ -105,16 +104,12 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   );
   const rows = buildExportRows(submissions);
   const rowsWithMissingApplicantName = rows.filter((row) => !row.applicantName.trim());
-  const productionGateBlockers = productionReadinessBlockerReasons(submissions);
   const openBlockingIssues = submissions.filter((submission) =>
     submission.issues.some(
-      (issue) =>
-        issue.severity === "blocker" &&
-        (issue.status === "open" || issue.status === "fixed_by_agent"),
+      (issue) => issue.status === "open" || issue.status === "fixed_by_agent",
     ),
   );
   const cities = new Set(submissions.map((submission) => submission.city));
-  const ownerAgentIds = new Set(submissions.map((submission) => submission.agentId));
   const tripDateRanges = new Set(submissions.map(tripDateRangeKey));
   const exportState = getExportSelectionState(submissions);
 
@@ -148,10 +143,6 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     blockers.push({ reason: "В строках выгрузки есть заявители без ФИО" });
   }
 
-  for (const reason of productionGateBlockers) {
-    blockers.push({ reason: `Production readiness gate: ${reason}` });
-  }
-
   if (openBlockingIssues.length > 0) {
     blockers.push({
       reason: "В выборке есть блокирующие замечания, не закрытые администратором",
@@ -159,8 +150,6 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   }
 
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
-  if (cities.size > 1 && ownerAgentIds.size > 1)
-    blockers.push({ reason: "Нельзя смешивать подачи разных агентов" });
   if (tripDateRanges.size > 1)
     blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (exportState === "mixed")
@@ -251,9 +240,23 @@ export function buildExportInternalMappings(
 }
 
 function orderSubmissionsForExportRows(submissions: Submission[]): Submission[] {
+  const cityOrder = new Map<City, number>();
+  submissions.forEach((submission) => {
+    if (!cityOrder.has(submission.city)) {
+      cityOrder.set(submission.city, cityOrder.size);
+    }
+  });
+
   return submissions
     .map((submission, index) => ({ index, submission }))
     .sort((left, right) => {
+      const leftCityOrder = cityOrder.get(left.submission.city) ?? left.index;
+      const rightCityOrder = cityOrder.get(right.submission.city) ?? right.index;
+
+      if (leftCityOrder !== rightCityOrder) {
+        return leftCityOrder - rightCityOrder;
+      }
+
       const leftFamilyOrder = left.submission.type === "family" ? 0 : 1;
       const rightFamilyOrder = right.submission.type === "family" ? 0 : 1;
 

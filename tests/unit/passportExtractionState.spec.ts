@@ -21,6 +21,7 @@ import { canPerformAction } from "../../src/modules/submissions/status";
 import type { Submission } from "../../src/modules/submissions/types";
 import type { PassportExtractionResult } from "../../src/modules/submissions/passportExtractionContract";
 import { parsePassportMrzText } from "../../src/modules/submissions/passportExtractionService";
+import { fillRequiredQuestionnaireForTest } from "./helpers/questionnaireTestFill";
 
 function draftSubmission(): Submission {
   return createDraftSubmission({
@@ -501,7 +502,7 @@ describe("passport extraction state", () => {
   });
 
   test("blocks domain submit actions until passport extraction review is explicit", () => {
-    const base = draftSubmission();
+    const base = fillRequiredQuestionnaireForTest(draftSubmission());
     const draft = {
       ...base,
       completeness: { questionnaire: 100, files: 100, total: 100 },

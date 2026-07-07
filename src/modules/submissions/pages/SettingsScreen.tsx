@@ -33,7 +33,7 @@ const adminSections: SettingsSectionId[] = [
 ];
 
 const sectionLabels: Record<SettingsSectionId, string> = {
-  "access-requests": "Заявки на доступ",
+  "access-requests": "Входящие заявки на регистрацию",
   "export-defaults": "Выгрузка",
   interface: "Интерфейс",
   notifications: "Уведомления",

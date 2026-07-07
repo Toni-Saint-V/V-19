@@ -163,11 +163,13 @@ function metricsFromSubmissions(submissions: Submission[] | undefined, fallbackT
 }
 
 function MetricCard({
+  hideLabel = false,
   icon: Icon,
   label,
   tone = 'muted',
   value,
 }: {
+  hideLabel?: boolean;
   icon: typeof FileText;
   label: string;
   tone?: 'danger' | 'muted' | 'ready';
@@ -181,14 +183,19 @@ function MetricCard({
         : 'text-white/45';
 
   return (
-    <div className="min-h-[118px] rounded-[15px] border border-[#242529] bg-[#161617] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-white/42">
-          {label}
-        </div>
-        <Icon className={`h-5 w-5 ${iconClass}`} />
+    <div
+      aria-label={label}
+      className="flex h-[60px] min-h-[60px] flex-col justify-between rounded-[15px] border border-[#242529] bg-[#161617] px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] sm:h-auto sm:min-h-[118px] sm:px-5 sm:py-4"
+    >
+      <div className="flex items-start justify-end gap-3 sm:justify-between">
+        {!hideLabel ? (
+          <div className="hidden text-[12px] font-medium uppercase tracking-[0.12em] text-white/42 sm:block">
+            {label}
+          </div>
+        ) : null}
+        <Icon className={`h-3.5 w-3.5 sm:h-5 sm:w-5 ${iconClass}`} />
       </div>
-      <div className="mt-8 text-[32px] font-semibold leading-none text-white">
+      <div className="ml-1 text-[24px] font-medium leading-none text-white sm:ml-0 sm:mt-8 sm:text-[30px]">
         {value}
       </div>
     </div>
@@ -210,11 +217,11 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
       transition={{ duration: 0.3 }}
       className="space-y-6"
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
         <MetricCard icon={FileText} label="В очереди" value={metrics.queue} />
         <MetricCard icon={Flame} label="Блокеры" tone="danger" value={metrics.blockers} />
         <MetricCard icon={AlertCircle} label="Проверить" value={metrics.review} />
-        <MetricCard icon={CheckCircle2} label="К выгрузке" tone="ready" value={metrics.exportReady} />
+        <MetricCard hideLabel icon={CheckCircle2} label="К выгрузке" tone="ready" value={metrics.exportReady} />
       </div>
 
       {/* Families Section */}

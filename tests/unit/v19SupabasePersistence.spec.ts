@@ -16,6 +16,7 @@ const mockState = vi.hoisted(() => ({
     name: string;
   }>,
   submissionRows: [] as unknown[],
+  statusHistoryRows: [] as unknown[],
 }));
 
 vi.mock("../../src/lib/supabase/client", () => {
@@ -77,7 +78,9 @@ vi.mock("../../src/lib/supabase/client", () => {
                     ? mockState.questionnaireRows
                     : table === "media_assets"
                       ? mockState.mediaAssetRows
-                      : mockState.exportBatchRows,
+                      : table === "status_history"
+                        ? mockState.statusHistoryRows
+                        : mockState.exportBatchRows,
             ),
         };
       },
@@ -155,6 +158,7 @@ beforeEach(() => {
   mockState.questionnaireRows = [];
   mockState.rpcCalls = [];
   mockState.submissionRows = [];
+  mockState.statusHistoryRows = [];
 });
 
 describe("V-19 Supabase cockpit persistence", () => {
@@ -427,6 +431,7 @@ describe("V-19 Supabase cockpit persistence", () => {
           text: "Администратор вернул подачу с замечаниями",
           at: "сейчас",
           fromStatus: "submitted_for_review",
+          note: "Нужно уточнить маршрут.",
           source: "admin",
           toStatus: "returned",
         },
@@ -444,11 +449,18 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(
       (
         mockState.rpcCalls[0]?.args.payload as {
-          status_history: Array<{ from_status: string | null; to_status: string }>;
+          status_history: Array<{
+            from_status: string | null;
+            note: string | null;
+            source: string;
+            to_status: string;
+          }>;
         }
       ).status_history[0],
     ).toMatchObject({
       from_status: "submitted_for_review",
+      note: "Нужно уточнить маршрут.",
+      source: "admin",
       to_status: "returned",
     });
   });
@@ -499,6 +511,49 @@ describe("V-19 Supabase cockpit persistence", () => {
       },
     });
     expect(rpcNames()).toEqual([]);
+  });
+
+  it("rehydrates typed status history rows over snapshot-only status events", async () => {
+    const submitted = initialSubmissions.find(
+      (submission) => submission.status === "submitted_for_review",
+    ) as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submitted,
+      adminProfile.id,
+      submitted.agentId,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:10:00.000Z",
+      },
+    ];
+    mockState.statusHistoryRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000777",
+        entity_type: "submission",
+        entity_id: submitted.id,
+        from_status: "in_progress",
+        to_status: "submitted_for_review",
+        comment: "Агент отправил подачу на проверку",
+        source: "agent",
+        note: "Все обязательные файлы загружены",
+        changed_by: agentProfile.id,
+        changed_at: "2026-06-16T09:10:00.000Z",
+      },
+    ];
+
+    const loaded = await loadCockpitSubmissionsForProfile(adminProfile);
+
+    expect(loaded.submissions[0]?.history[0]).toMatchObject({
+      actorId: agentProfile.id,
+      createdAt: "2026-06-16T09:10:00.000Z",
+      fromStatus: "in_progress",
+      note: "Все обязательные файлы загружены",
+      source: "agent",
+      toStatus: "submitted_for_review",
+    });
   });
 
   it("fails closed before RPC when acceptance keeps fixed issues unresolved", async () => {
@@ -634,6 +689,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       "applicants",
       "questionnaire_answers",
       "media_assets",
+      "status_history",
     ]);
     expect(field).toMatchObject({
       id: sourceAnswer.field_id,
@@ -660,6 +716,35 @@ describe("V-19 Supabase cockpit persistence", () => {
         updated_at: "2026-06-16T09:00:00.000Z",
       },
     ];
+    mockState.applicantRows = [];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions[0]).toMatchObject({
+      tripDateFrom: "2026-08-11",
+      tripDateTo: "2026-08-20",
+    });
+  });
+
+  it("recovers corrections_received from durable history without cockpit snapshot", async () => {
+    const submission = {
+      ...(initialSubmissions[0] as Submission),
+      status: "corrections_received" as const,
+    };
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        status: "waiting_review",
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
     mockState.applicantRows = [
       {
         id: submission.applicants[0]?.id,
@@ -669,12 +754,57 @@ describe("V-19 Supabase cockpit persistence", () => {
         media_percent: 100,
       },
     ];
+    mockState.statusHistoryRows = [
+      {
+        id: "00000000-0000-4000-8000-000000000456",
+        entity_type: "submission",
+        entity_id: submission.id,
+        from_status: null,
+        to_status: "corrections_received",
+        comment: "Агент отправил исправления",
+        source: "agent",
+        note: "Повторная отправка",
+        changed_by: agentProfile.id,
+        changed_at: "2026-06-16T10:00:00.000Z",
+      },
+    ];
 
     const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
 
     expect(loaded.submissions[0]).toMatchObject({
-      tripDateFrom: "2026-08-11",
-      tripDateTo: "2026-08-20",
+      status: "corrections_received",
+    });
+    expect(loaded.submissions[0]?.history[0]).toMatchObject({
+      fromStatus: undefined,
+      source: "agent",
+      toStatus: "corrections_received",
+    });
+  });
+
+  it("does not hydrate empty fallback questionnaire work as complete", async () => {
+    const submission = initialSubmissions[0] as Submission;
+    const payload = toCockpitDraftPersistencePayload(
+      submission,
+      agentProfile.id,
+      agentProfile.id,
+    );
+    mockState.submissionRows = [
+      {
+        ...payload.submission,
+        family_intelligence: null,
+        readiness_percent: 100,
+        created_at: "2026-06-16T09:00:00.000Z",
+        updated_at: "2026-06-16T09:00:00.000Z",
+      },
+    ];
+    mockState.applicantRows = [];
+
+    const loaded = await loadCockpitSubmissionsForProfile(agentProfile);
+
+    expect(loaded.submissions[0]?.completeness).toMatchObject({
+      questionnaire: 0,
+      files: 0,
+      total: 0,
     });
   });
 
@@ -1408,6 +1538,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       "applicants",
       "questionnaire_answers",
       "media_assets",
+      "status_history",
       "export_batches",
     ]);
     expect(loaded.submissions[0]).toMatchObject({
@@ -1464,6 +1595,7 @@ describe("V-19 Supabase cockpit persistence", () => {
       "applicants",
       "questionnaire_answers",
       "media_assets",
+      "status_history",
     ]);
     expect(loaded.submissions[0]).toMatchObject({
       exportPackage: undefined,

@@ -19,6 +19,8 @@ export type ProductIntakeFile = {
   kind: ProductFileKind;
   status: ProductFileStatus;
   progress: number;
+  extractedValues?: Partial<ProductApplicantFields>;
+  fileRef?: File;
   issue?: string;
   ownerName?: string;
   extractedFieldKeys: string[];
@@ -205,7 +207,10 @@ export function createDemoIntakeFiles(type: ProductPackageType): ProductIntakeFi
 export function createBrowserIntakeFiles(files: File[], type: ProductPackageType): ProductIntakeFile[] {
   return files.map((file, index) => {
     const kind = fileKindFromName(file.name);
-    return intakeFile(`browser-${Date.now()}-${index}-${stableToken(file.name)}`, file.name, kind, type === 'family' && index > 0 ? undefined : undefined);
+    return {
+      ...intakeFile(`browser-${Date.now()}-${index}-${stableToken(file.name)}`, file.name, kind, type === 'family' && index > 0 ? undefined : undefined),
+      fileRef: file,
+    };
   });
 }
 
@@ -213,61 +218,73 @@ export function resetFilesForPipeline(files: ProductIntakeFile[]): ProductIntake
   return files.map((file) => ({ ...file, status: 'queued', progress: 0 }));
 }
 
-function baseFields(index: number, type: ProductPackageType): ProductApplicantFields {
-  const family = type === 'family';
-  const isSecond = family && index === 1;
-  const surname = family ? 'PETROV' : 'SMIRNOVA';
-  const firstName = family ? (isSecond ? 'ANNA' : 'IVAN') : 'ALINA';
+function emptyApplicantFields(): ProductApplicantFields {
   return {
-    surname,
-    firstName,
-    birthDate: isSecond ? '14.09.1987' : family ? '12.05.1985' : '02.03.1991',
-    birthPlace: isSecond ? 'SAINT PETERSBURG' : 'MOSCOW',
-    nationality: 'RUSSIAN FEDERATION',
-    gender: isSecond || !family ? 'F' : 'M',
-    phone: '+7 921 000-41-12',
-    email: family ? 'petrov.family@example.com' : 'alina.smirnova@example.com',
-    passportType: 'Ordinary passport',
-    passportNo: isSecond ? '75 7654321' : '75 1234567',
-    passportIssuedAt: '15.06.2020',
-    passportExpiresAt: '15.06.2030',
-    passportIssueCountry: 'RUSSIAN FEDERATION',
-    passportIssuePlace: 'FMS 770-123',
-    occupation: isSecond ? 'Designer' : 'Project manager',
-    employerName: isSecond ? 'Self-employed' : 'ООО «Северный маршрут»',
-    employerAddress: 'Москва, ул. Тверская, 1',
-    employerPhone: '+7 495 000-00-00',
-    financeType: 'Собственные средства',
-    bankBalance: '480 000 ₽',
-    mainDestination: 'Spain',
-    firstEntryCountry: 'Spain',
-    tripDates: '18.08.2026 – 02.09.2026',
-    hotelName: 'Hotel Madrid Centro',
-    hotelAddress: 'Calle Mayor 1, Madrid',
-    purpose: 'Tourism',
-    entryCount: 'Multiple entries',
-    biometrics: 'Сдана 18.09.2023',
-    previousVisas: 'Schengen C, 2023–2025',
-    refusals: 'Нет',
+    surname: '',
+    firstName: '',
+    birthDate: '',
+    birthPlace: '',
+    nationality: '',
+    gender: '',
+    phone: '',
+    email: '',
+    passportType: '',
+    passportNo: '',
+    passportIssuedAt: '',
+    passportExpiresAt: '',
+    passportIssueCountry: '',
+    passportIssuePlace: '',
+    occupation: '',
+    employerName: '',
+    employerAddress: '',
+    employerPhone: '',
+    financeType: '',
+    bankBalance: '',
+    mainDestination: '',
+    firstEntryCountry: '',
+    tripDates: '',
+    hotelName: '',
+    hotelAddress: '',
+    purpose: '',
+    entryCount: '',
+    biometrics: '',
+    previousVisas: '',
+    refusals: '',
   };
 }
 
-function buildApplicants(type: ProductPackageType): ProductIntakeApplicant[] {
+function extractedApplicantFieldsForFile(file: ProductIntakeFile | undefined) {
+  if (file?.kind !== 'passport') return {};
+  return file.extractedValues ?? {};
+}
+
+function buildApplicants(type: ProductPackageType, files: ProductIntakeFile[]): ProductIntakeApplicant[] {
   const count = type === 'family' ? 2 : 1;
+  const passportFiles = files.filter((file) =>
+    file.kind === 'passport' && ['recognized', 'needs_review'].includes(file.status),
+  );
+
   return Array.from({ length: count }, (_, index) => {
-    const fields = baseFields(index, type);
+    const fields = {
+      ...emptyApplicantFields(),
+      ...extractedApplicantFieldsForFile(passportFiles[index] ?? (type === 'single' ? passportFiles[0] : undefined)),
+    };
+    const fullName = [fields.firstName, fields.surname].filter(Boolean).join(' ');
     return {
       id: `intake-app-${index + 1}`,
       role: type === 'single' ? 'single' : index === 0 ? 'main' : 'spouse',
-      fullName: `${fields.firstName} ${fields.surname}`,
-      confidence: index === 0 ? 0.94 : 0.89,
+      fullName: fullName || `Заявитель ${index + 1}`,
+      confidence: Object.values(fields).some((value) => value.trim()) ? 0.94 : 0,
       fields,
     };
   });
 }
 
 export function buildProductIntakeDraft(type: ProductPackageType, files: ProductIntakeFile[], seedIso = new Date().toISOString()): ProductIntakeDraft {
-  const applicants = buildApplicants(type);
+  const applicants = buildApplicants(type, files);
+  const namedApplicants = applicants
+    .map((applicant) => applicant.fullName)
+    .filter((name) => !/^Заявитель \d+$/.test(name));
   const finalFiles = files.filter((file) => ['recognized', 'needs_review', 'failed'].includes(file.status));
   const blockers = finalFiles.filter((file) => file.status === 'failed');
   const warnings = finalFiles.filter((file) => file.status === 'needs_review');
@@ -278,7 +295,7 @@ export function buildProductIntakeDraft(type: ProductPackageType, files: Product
 
   return {
     id,
-    title: type === 'family' ? 'Семья Петровых' : 'Алина Смирнова',
+    title: namedApplicants[0] ?? (type === 'family' ? 'Семейный пакет' : 'Новый заявитель'),
     type,
     country: 'Испания',
     city: 'Москва',
@@ -309,7 +326,10 @@ export function getPrefillPreviewFields(draft: ProductIntakeDraft): PrefillPrevi
     ['surname', 'Фамилия', 'passport', 0.98],
     ['firstName', 'Имя', 'passport', 0.98],
     ['birthDate', 'Дата рождения', 'passport', 0.96],
+    ['birthPlace', 'Место рождения', 'passport', 0.9],
     ['passportNo', 'Номер паспорта', 'passport', 0.97],
+    ['passportIssuedAt', 'Дата выдачи', 'passport', 0.9],
+    ['passportExpiresAt', 'Срок действия', 'passport', 0.95],
     ['bankBalance', 'Сумма на счёте', 'bank', 0.76],
     ['tripDates', 'Даты поездки', 'booking', 0.94],
     ['hotelName', 'Отель', 'booking', 0.92],
@@ -319,10 +339,12 @@ export function getPrefillPreviewFields(draft: ProductIntakeDraft): PrefillPrevi
   return fields.flatMap(([key, label, kind, confidence]) => {
     const source = sourceForKind(kind);
     if (!source) return [];
+    const value = String(main.fields[key] ?? '').trim();
+    if (!value) return [];
     return [{
       key,
       label,
-      value: String(main.fields[key] ?? ''),
+      value,
       sourceKind: kind,
       sourceFileName: source.name,
       confidence,
@@ -332,9 +354,10 @@ export function getPrefillPreviewFields(draft: ProductIntakeDraft): PrefillPrevi
 }
 
 export function loadProductIntakeDrafts(): ProductIntakeDraft[] {
-  if (typeof window === 'undefined') return [];
+  const storage = globalThis.localStorage;
+  if (!storage) return [];
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = storage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed as ProductIntakeDraft[] : [];
@@ -344,9 +367,10 @@ export function loadProductIntakeDrafts(): ProductIntakeDraft[] {
 }
 
 export function saveProductIntakeDrafts(drafts: ProductIntakeDraft[]) {
-  if (typeof window === 'undefined') return;
+  const storage = globalThis.localStorage;
+  if (!storage) return;
   try {
-    window.localStorage.setItem(storageKey, JSON.stringify(drafts));
+    storage.setItem(storageKey, JSON.stringify(drafts));
   } catch {
     // Local demo persistence is best-effort; canonical persistence remains in V19 submissions.
   }

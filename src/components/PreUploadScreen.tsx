@@ -4,16 +4,12 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Calendar,
   CheckCircle2,
   Database,
   FileText,
-  FolderOpen,
   Image as ImageIcon,
   Loader2,
-  Plane,
   ScanText,
-  ShieldCheck,
   Sparkles,
   UploadCloud,
   UserPlus,
@@ -24,7 +20,6 @@ import {
 import {
   buildProductIntakeDraft,
   createBrowserIntakeFiles,
-  createDemoIntakeFiles,
   getPrefillPreviewFields,
   productFileKindLabels,
   productFileStatusLabels,
@@ -36,9 +31,11 @@ import {
   type ProductIntakePhase,
   type ProductPackageType,
 } from '../modules/submissions/productIntakeFlow';
+import type { PassportExtractionField } from '../modules/submissions/passportExtractionContract';
 
 interface PreUploadScreenProps {
   onBack: () => void;
+  onSaveDraft?: (draft: ProductIntakeDraft) => void;
   onComplete?: (draft: ProductIntakeDraft) => void;
   initialPackageType?: ProductPackageType;
 }
@@ -90,15 +87,42 @@ function visibleStepIndex(phase: ProductIntakePhase) {
   }
 }
 
-export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'family' }: PreUploadScreenProps) {
+function passportExtractionValues(fields: PassportExtractionField[]) {
+  const values: Record<string, string> = {};
+
+  for (const field of fields) {
+    if (!field.value.trim()) continue;
+    if (field.key === 'surname') values.surname = field.value;
+    if (field.key === 'firstName') values.firstName = field.value;
+    if (field.key === 'birthDate') values.birthDate = field.value;
+    if (field.key === 'birthPlace') values.birthPlace = field.value;
+    if (field.key === 'citizenship') values.nationality = field.value;
+    if (field.key === 'gender') values.gender = field.value;
+    if (field.key === 'passportType') values.passportType = field.value;
+    if (field.key === 'passportNumber') values.passportNo = field.value;
+    if (field.key === 'passportIssuedAt') values.passportIssuedAt = field.value;
+    if (field.key === 'passportExpiresAt') values.passportExpiresAt = field.value;
+    if (field.key === 'passportIssueCountry') values.passportIssueCountry = field.value;
+    if (field.key === 'passportIssuePlace') values.passportIssuePlace = field.value;
+  }
+
+  return values;
+}
+
+export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackageType = 'family' }: PreUploadScreenProps) {
   const [packageType, setPackageType] = useState<ProductPackageType>(initialPackageType);
   const [phase, setPhase] = useState<ProductIntakePhase>('selecting');
-  const [files, setFiles] = useState<ProductIntakeFile[]>(() => createDemoIntakeFiles(initialPackageType));
+  const [files, setFiles] = useState<ProductIntakeFile[]>([]);
+  const [familyResidence, setFamilyResidence] = useState({
+    russia: 'yes',
+    spain: 'yes',
+  });
   const [draftSeedIso, setDraftSeedIso] = useState(() => new Date().toISOString());
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [manualUpload, setManualUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pipelineRunRef = useRef(0);
   const timersRef = useRef<number[]>([]);
 
   const draft = useMemo(
@@ -133,8 +157,58 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
     setFiles((current) => current.map((file) => (file.id === fileId ? { ...file, ...patch } : file)));
   };
 
-  const runPipeline = (sourceFiles = files) => {
+  const extractPassportFile = async (file: ProductIntakeFile, applicantIndex: number, runId: number) => {
+    const uploadFile = file.fileRef;
+    if (!uploadFile) {
+      patchFile(file.id, {
+        status: 'needs_review',
+        progress: 100,
+        issue: 'Файл паспорта не доступен для локального OCR. Проверьте данные вручную.',
+      });
+      return;
+    }
+
+    try {
+      const { invokePassportExtraction } = await import('../modules/submissions/passportExtractionService');
+      const result = await invokePassportExtraction({
+        applicantIndex,
+        localFile: uploadFile,
+        openAiFallbackAllowed: false,
+      });
+      if (pipelineRunRef.current !== runId) return;
+
+      const extractedValues = passportExtractionValues(result.fields);
+      const hasPassportIdentity = Boolean(
+        extractedValues.passportNo || extractedValues.surname || extractedValues.firstName,
+      );
+
+      patchFile(file.id, {
+        extractedFieldKeys: result.fields.map((field) => field.key),
+        extractedValues,
+        issue:
+          result.status === 'extracted' && hasPassportIdentity
+            ? result.summary
+            : 'OCR не подтвердил паспортные поля. Проверьте данные вручную.',
+        progress: 100,
+        status:
+          result.status === 'extracted' && hasPassportIdentity
+            ? 'recognized'
+            : 'needs_review',
+      });
+    } catch {
+      if (pipelineRunRef.current !== runId) return;
+      patchFile(file.id, {
+        status: 'needs_review',
+        progress: 100,
+        issue: 'OCR паспорта не завершился. Проверьте данные вручную.',
+      });
+    }
+  };
+
+  const runPipeline = (sourceFiles = files, options: { extractPassports?: boolean } = {}) => {
     clearPipeline();
+    const runId = pipelineRunRef.current + 1;
+    pipelineRunRef.current = runId;
     const queued = resetFilesForPipeline(sourceFiles);
     setFiles(queued);
     setPhase('uploading');
@@ -143,17 +217,27 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
     queued.forEach((file, index) => {
       const offset = index * 520;
       schedule(() => {
+        if (pipelineRunRef.current !== runId) return;
         setPhase('uploading');
         setActiveFileId(file.id);
         patchFile(file.id, { status: 'uploading', progress: 34 });
       }, offset + 80);
-      schedule(() => patchFile(file.id, { status: 'uploaded', progress: 62 }), offset + 260);
       schedule(() => {
+        if (pipelineRunRef.current !== runId) return;
+        patchFile(file.id, { status: 'uploaded', progress: 62 });
+      }, offset + 260);
+      schedule(() => {
+        if (pipelineRunRef.current !== runId) return;
         setPhase('extracting');
         setActiveFileId(file.id);
         patchFile(file.id, { status: 'extracting', progress: 86 });
+        if (options.extractPassports && file.kind === 'passport') {
+          void extractPassportFile(file, index, runId);
+        }
       }, offset + 430);
       schedule(() => {
+        if (pipelineRunRef.current !== runId) return;
+        if (options.extractPassports && file.kind === 'passport') return;
         const finalStatus: ProductFileStatus = file.kind === 'unknown' ? 'failed' : file.kind === 'bank' ? 'needs_review' : 'recognized';
         patchFile(file.id, {
           status: finalStatus,
@@ -168,20 +252,29 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
       }, offset + 760);
     });
 
-    const tail = Math.max(queued.length * 520 + 900, 1200);
-    schedule(() => {
-      setActiveFileId(null);
-      setPhase('review');
-    }, tail);
-    schedule(() => setPhase('ready'), tail + 620);
+    if (!options.extractPassports) {
+      const tail = Math.max(queued.length * 520 + 900, 1200);
+      schedule(() => {
+        if (pipelineRunRef.current !== runId) return;
+        setActiveFileId(null);
+        setPhase('review');
+      }, tail);
+      schedule(() => {
+        if (pipelineRunRef.current !== runId) return;
+        setPhase('ready');
+      }, tail + 620);
+    }
   };
 
   const resetScenario = (nextType: ProductPackageType) => {
-    const nextFiles = createDemoIntakeFiles(nextType);
+    clearPipeline();
+    pipelineRunRef.current += 1;
     setPackageType(nextType);
     setManualUpload(false);
     setDraftSeedIso(new Date().toISOString());
-    runPipeline(nextFiles);
+    setFiles([]);
+    setActiveFileId(null);
+    setPhase('selecting');
   };
 
   const handleFiles = (fileList: FileList | File[]) => {
@@ -190,7 +283,7 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
 
     setManualUpload(true);
     setDraftSeedIso(new Date().toISOString());
-    runPipeline(nextFiles);
+    runPipeline(nextFiles, { extractPassports: true });
   };
 
   const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
@@ -209,11 +302,20 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
     onComplete?.(buildProductIntakeDraft(packageType, files, draftSeedIso));
   };
 
+  const saveDraft = () => {
+    onSaveDraft?.(buildProductIntakeDraft(packageType, files, draftSeedIso));
+  };
+
   useEffect(() => {
-    schedule(() => runPipeline(createDemoIntakeFiles(initialPackageType)), 360);
     return clearPipeline;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!manualUpload || files.length === 0) return;
+    if (!files.every((file) => finalStatuses.includes(file.status))) return;
+    setActiveFileId(null);
+    setPhase('ready');
+  }, [files, manualUpload]);
 
   return (
     <motion.div
@@ -231,7 +333,6 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <div className="text-[11px] text-white/40 uppercase tracking-wider font-medium">Новый пакет · live intake</div>
           <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight leading-none mt-1">Загрузка и первичная сборка</h1>
         </div>
         <div className="ml-auto hidden sm:flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[12px] text-white/55">
@@ -243,7 +344,7 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
         </div>
         <button
           onClick={onBack}
-          className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+          className="w-10 h-10 rounded-[6px] bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -263,35 +364,57 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               />
 
-              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-6 relative z-10">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#6f64ff]/15 border border-[#6f64ff]/25 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide mb-3">
-                    <Sparkles className="w-3.5 h-3.5" /> AI-assisted intake
-                  </div>
-                  <h2 className="text-[28px] lg:text-[36px] font-semibold tracking-tight text-white leading-[1.05] max-w-2xl">
-                    Система собирает пакет, извлекает поля и готовит анкету
-                  </h2>
-                  <p className="text-[14px] text-white/50 leading-relaxed mt-3 max-w-2xl">
-                    Поток теперь живой: файлы проходят загрузку, OCR, классификацию, риск-сверку и передают извлечённые значения в следующий экран анкеты.
-                  </p>
+              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5 mb-6 relative z-10">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#6f64ff]/25 bg-[#6f64ff]/15 text-[#b8baff]">
+                  <Sparkles className="w-4 h-4" />
                 </div>
-                <div className="grid grid-cols-2 gap-2 w-full lg:w-[320px]">
-                  <button
-                    onClick={() => resetScenario('family')}
-                    className={`p-4 rounded-2xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${packageType === 'family' ? 'bg-[#6f64ff]/15 border-[#6f64ff]/35 shadow-[0_0_24px_rgba(111,100,255,0.12)]' : 'bg-[#161617] border-[#242529] hover:border-[#2e2f34]'}`}
-                  >
-                    <Users className="w-5 h-5 text-[#b8baff] mb-3" />
-                    <div className="text-[13px] font-semibold text-white">Семья</div>
-                    <div className="text-[11px] text-white/40 mt-1">2+ заявителя</div>
-                  </button>
-                  <button
-                    onClick={() => resetScenario('single')}
-                    className={`p-4 rounded-2xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${packageType === 'single' ? 'bg-[#6f64ff]/15 border-[#6f64ff]/35 shadow-[0_0_24px_rgba(111,100,255,0.12)]' : 'bg-[#161617] border-[#242529] hover:border-[#2e2f34]'}`}
-                  >
-                    <UserPlus className="w-5 h-5 text-[#b8baff] mb-3" />
-                    <div className="text-[13px] font-semibold text-white">Один</div>
-                    <div className="text-[11px] text-white/40 mt-1">1 заявитель</div>
-                  </button>
+                <div className="w-full space-y-3 lg:w-[420px]">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => resetScenario('family')}
+                      className={`p-4 rounded-2xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${packageType === 'family' ? 'bg-[#6f64ff]/15 border-[#6f64ff]/35 shadow-[0_0_24px_rgba(111,100,255,0.12)]' : 'bg-[#161617] border-[#242529] hover:border-[#2e2f34]'}`}
+                    >
+                      <Users className="w-5 h-5 text-[#b8baff] mb-3" />
+                      <div className="text-[13px] font-semibold text-white">Семья</div>
+                      <div className="text-[11px] text-white/40 mt-1">2+ заявителя</div>
+                    </button>
+                    <button
+                      onClick={() => resetScenario('single')}
+                      className={`p-4 rounded-2xl border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${packageType === 'single' ? 'bg-[#6f64ff]/15 border-[#6f64ff]/35 shadow-[0_0_24px_rgba(111,100,255,0.12)]' : 'bg-[#161617] border-[#242529] hover:border-[#2e2f34]'}`}
+                    >
+                      <UserPlus className="w-5 h-5 text-[#b8baff] mb-3" />
+                      <div className="text-[13px] font-semibold text-white">Один</div>
+                      <div className="text-[11px] text-white/40 mt-1">1 заявитель</div>
+                    </button>
+                  </div>
+
+                  {packageType === 'family' ? (
+                    <div className="space-y-2 rounded-2xl border border-[#242529] bg-[#141416]/70 p-3">
+                      {[
+                        ['russia', 'У вас одинаковый адрес проживания в России?'],
+                        ['spain', 'В Испании?'],
+                      ].map(([key, question]) => (
+                        <div key={key} className="flex items-center justify-between gap-3">
+                          <span className="text-[12px] font-medium text-white/70">{question}</span>
+                          <div className="flex shrink-0 overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.035]">
+                            {[
+                              ['yes', 'Да'],
+                              ['no', 'Нет'],
+                            ].map(([value, label]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setFamilyResidence((current) => ({ ...current, [key]: value }))}
+                                className={`h-8 px-2.5 text-[11px] font-medium transition-colors ${familyResidence[key as keyof typeof familyResidence] === value ? 'bg-[#6f64ff]/25 text-[#d7d5ff]' : 'text-white/45 hover:text-white/70'}`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -326,81 +449,102 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
                 </p>
                 <button
                   type="button"
-                  className="mt-5 h-11 px-5 rounded-xl bg-white text-[#101011] text-[14px] font-semibold hover:bg-white/90 transition-colors"
+                  className="mt-5 h-11 px-5 rounded-[8px] bg-white text-[#101011] text-[14px] font-semibold hover:bg-white/90 transition-colors"
                 >
                   Выбрать файлы
                 </button>
                 <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" onChange={handleFileInput} />
               </div>
-            </motion.div>
 
-            <motion.div layout className="rounded-2xl bg-[#161617] border border-[#242529] overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#242529] flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-[15px] font-semibold text-white">Загруженные файлы</h3>
-                  <p className="text-[12px] text-white/40 mt-1">Каждый файл проходит отдельную машинную ветку и отдаёт поля в prefill.</p>
+              {files.length > 0 ? (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-[#242529] bg-[#161617]">
+                  <div className="flex items-center justify-between gap-3 border-b border-[#242529] px-4 py-3">
+                    <div>
+                      <h3 className="text-[14px] font-semibold text-white">Загруженные файлы</h3>
+                      <p className="mt-0.5 text-[12px] text-white/40">Статус OCR и фактические поля из выбранных документов.</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-[#b8baff]">
+                      {completedCount}/{files.length} готово
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-[#242529]">
+                    <AnimatePresence initial={false}>
+                      {files.map((file) => (
+                        <motion.div
+                          layout
+                          key={file.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          className={`flex items-center gap-3 px-4 py-3 ${activeFileId === file.id ? 'bg-[#6f64ff]/[0.07]' : ''}`}
+                        >
+                          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#242529] bg-[#1e1e21]">
+                            {fileIcon(file)}
+                            {['uploading', 'extracting'].includes(file.status) ? (
+                              <motion.div
+                                className="absolute inset-0 bg-[#6f64ff]/10"
+                                animate={{ opacity: [0.1, 0.35, 0.1] }}
+                                transition={{ duration: 0.9, repeat: Infinity }}
+                              />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <div className="truncate text-[14px] font-medium text-white">{file.name}</div>
+                              <span className="hidden rounded-md border border-white/10 bg-white/[0.035] px-1.5 py-0.5 text-[10px] text-white/45 sm:inline">
+                                {productFileKindLabels[file.kind]}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 truncate text-[12px] text-white/40">
+                              {file.extractedFieldKeys.length} полей · {file.issue ?? 'Ошибок OCR не получено'}
+                            </div>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5">
+                              <motion.div
+                                initial={false}
+                                animate={{ width: `${file.progress}%` }}
+                                transition={{ duration: 0.28 }}
+                                className="h-full rounded-full bg-[#6f64ff]"
+                              />
+                            </div>
+                          </div>
+                          <div className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${statusClass(file.status)}`}>
+                            {file.status === 'recognized' && <CheckCircle2 className="h-3.5 w-3.5" />}
+                            {file.status === 'needs_review' && <AlertCircle className="h-3.5 w-3.5" />}
+                            {file.status === 'failed' && <X className="h-3.5 w-3.5" />}
+                            {['uploading', 'extracting'].includes(file.status) && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            {file.status === 'queued' && <Database className="h-3.5 w-3.5" />}
+                            {productFileStatusLabels[file.status]}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
                 </div>
-                <span className="shrink-0 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide">
-                  {completedCount}/{files.length} готово
-                </span>
-              </div>
+              ) : null}
 
-              <div className="divide-y divide-[#242529]">
-                <AnimatePresence initial={false}>
-                  {files.map((file, index) => (
-                    <motion.div
-                      layout
-                      key={file.id}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ delay: index * 0.025, duration: 0.2 }}
-                      className={`px-5 py-4 flex items-center gap-4 transition-colors ${activeFileId === file.id ? 'bg-[#6f64ff]/[0.07]' : 'hover:bg-white/[0.03]'}`}
-                    >
-                      <div className="relative w-10 h-10 rounded-xl bg-[#1e1e21] border border-[#242529] flex items-center justify-center shrink-0 overflow-hidden">
-                        {fileIcon(file)}
-                        {['uploading', 'extracting'].includes(file.status) && (
-                          <motion.div
-                            className="absolute inset-0 bg-[#6f64ff]/10"
-                            animate={{ opacity: [0.1, 0.35, 0.1] }}
-                            transition={{ duration: 0.9, repeat: Infinity }}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="text-[14px] font-medium text-white truncate">{file.name}</div>
-                          <span className="hidden md:inline px-1.5 py-0.5 rounded-md bg-white/[0.035] border border-white/10 text-[10px] text-white/45">
-                            {productFileKindLabels[file.kind]}
-                          </span>
-                        </div>
-                        <div className="text-[12px] text-white/40 mt-0.5 truncate">{file.ownerName ?? 'Владелец будет определён'} · {file.extractedFieldKeys.length} полей</div>
-                        <div className="mt-2 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                          <motion.div
-                            initial={false}
-                            animate={{ width: `${file.progress}%` }}
-                            transition={{ duration: 0.28 }}
-                            className="h-full rounded-full bg-[#6f64ff]"
-                          />
-                        </div>
-                      </div>
-                      <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium ${statusClass(file.status)}`}>
-                        {file.status === 'recognized' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        {file.status === 'needs_review' && <AlertCircle className="w-3.5 h-3.5" />}
-                        {file.status === 'failed' && <X className="w-3.5 h-3.5" />}
-                        {['uploading', 'extracting'].includes(file.status) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        {file.status === 'queued' && <Database className="w-3.5 h-3.5" />}
-                        {productFileStatusLabels[file.status]}
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={saveDraft}
+                  className="h-11 rounded-[8px] border border-[#242529] bg-[#1e1e21] px-3 text-[13px] font-medium text-white/75 transition-colors hover:bg-[#27272b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                >
+                  Сохранить черновик
+                </button>
+                <button
+                  type="button"
+                  onClick={completeDraft}
+                  disabled={phase !== 'ready'}
+                  className="h-11 rounded-[8px] bg-[#6f64ff] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  Далее
+                </button>
               </div>
             </motion.div>
           </section>
 
           <aside className="space-y-5">
-            <div className="rounded-2xl bg-[#161617] border border-[#242529] p-5 sticky top-0 overflow-hidden">
+            <div className="hidden rounded-2xl bg-[#161617] border border-[#242529] p-5 sticky top-0 overflow-hidden xl:block">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h3 className="text-[14px] font-semibold text-white">Прогресс сборки</h3>
                 <span className="text-[12px] text-white/45">{averageProgress}%</span>
@@ -434,33 +578,10 @@ export function PreUploadScreen({ onBack, onComplete, initialPackageType = 'fami
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-2">
-                <div className="p-3 rounded-xl bg-[#1a1a1d] border border-[#242529]">
-                  <Plane className="w-4 h-4 text-white/40 mb-2" />
-                  <div className="text-[11px] text-white/40">Страна</div>
-                  <div className="text-[13px] font-medium text-white">{draft.country}</div>
-                </div>
-                <div className="p-3 rounded-xl bg-[#1a1a1d] border border-[#242529]">
-                  <Calendar className="w-4 h-4 text-white/40 mb-2" />
-                  <div className="text-[11px] text-white/40">Даты</div>
-                  <div className="text-[13px] font-medium text-white truncate">{draft.tripDates.split('–')[0]?.trim() ?? draft.tripDates}</div>
-                </div>
-                <div className="p-3 rounded-xl bg-[#1a1a1d] border border-[#242529]">
-                  <FolderOpen className="w-4 h-4 text-white/40 mb-2" />
-                  <div className="text-[11px] text-white/40">Пакет</div>
-                  <div className="text-[13px] font-medium text-white">{packageType === 'family' ? 'Семья' : 'Один'}</div>
-                </div>
-                <div className="p-3 rounded-xl bg-[#1a1a1d] border border-[#242529]">
-                  <ShieldCheck className="w-4 h-4 text-[#b8baff] mb-2" />
-                  <div className="text-[11px] text-white/40">Готовность</div>
-                  <motion.div initial={false} animate={{ opacity: [0.6, 1] }} className="text-[13px] font-medium text-white">{draft.readyPercent}%</motion.div>
-                </div>
-              </div>
-
               <button
                 onClick={completeDraft}
                 disabled={phase !== 'ready'}
-                className="mt-5 w-full h-11 rounded-xl bg-[#6f64ff] hover:bg-[#4855d4] disabled:bg-white/10 disabled:text-white/35 disabled:cursor-not-allowed text-white text-[14px] font-semibold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="mt-5 w-full h-11 rounded-[8px] bg-[#6f64ff] hover:bg-[#4855d4] disabled:bg-white/10 disabled:text-white/35 disabled:cursor-not-allowed text-white text-[14px] font-semibold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 {phase === 'ready' ? 'Перейти в анкету' : 'Идёт извлечение'} <ArrowRight className="w-4 h-4" />
               </button>

@@ -1,19 +1,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  AlertCircle,
   ArrowLeftRight,
-  CheckCircle2,
   FileText,
   FileWarning,
-  Filter,
   Image as ImageIcon,
   Menu,
   Plus,
   Search,
   Settings,
   UploadCloud,
-  User,
   Users,
   X,
 } from 'lucide-react';
@@ -29,10 +25,9 @@ import {
   useVisaflowBusinessBridge,
   type AgentNavSection,
 } from '../integration/visaflowBusinessBridge';
-import type { Submission, SubmissionStatus } from '../modules/submissions/types';
+import type { Submission } from '../modules/submissions/types';
 import {
   listItemsFromSubmissions,
-  statusLabel,
   type LegacyAgentNavSection,
   type LegacySubmissionListItem,
 } from './v19BusinessScreenAdapter';
@@ -54,6 +49,7 @@ type SubmissionFilter = 'all' | 'issues' | 'review' | 'ready';
 
 type CommandCenterProps = {
   submissions?: Submission[];
+  onSignOut?: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
   onNavigateSettings?: () => void;
   showCompatibilityScreens?: boolean;
@@ -142,15 +138,6 @@ function submissionMatchesFilter(submission: SubmissionListItem, filter: Submiss
   return true;
 }
 
-function submissionMatchesQuery(submission: SubmissionListItem, query: string) {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return true;
-  return [submission.id, submission.title, submission.city, submission.tripDates, submission.owner, submission.nextAction]
-    .join(' ')
-    .toLowerCase()
-    .includes(normalized);
-}
-
 function canonicalBridgeNav(section: LegacyAgentNavSection): AgentNavSection | null {
   if (section === 'actions' || section === 'documents' || section === 'submissions' || section === 'settings') return section;
   return null;
@@ -175,25 +162,9 @@ function navLabel(section: LegacyAgentNavSection) {
   }
 }
 
-function statusBadge(status: SubmissionStatus) {
-  const base = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10.5px] uppercase tracking-wide font-medium';
-  switch (status) {
-    case 'returned':
-    case 'requires_action':
-      return <span className={`${base} bg-white/[0.045] border-white/10 text-white/62`}><AlertCircle className="w-3 h-3" /> {statusLabel(status)}</span>;
-    case 'submitted_for_review':
-      return <span className={`${base} bg-[#6f64ff]/20 border-[#6f64ff]/30 text-[#b8baff]`}>На проверке</span>;
-    case 'ready_for_export':
-      return <span className={`${base} bg-white/[0.045] border-white/10 text-[#b8baff]`}><CheckCircle2 className="w-3 h-3" /> Готово к выгрузке</span>;
-    case 'exported':
-      return <span className={`${base} bg-white/5 border-white/10 text-white/45`}>Выгружено</span>;
-    default:
-      return <span className={`${base} bg-white/5 border-white/10 text-white/70`}><FileText className="w-3 h-3" /> {statusLabel(status)}</span>;
-  }
-}
-
 export function CommandCenter({
   submissions: canonicalSubmissions,
+  onSignOut,
   onSwitchWorkspace,
   onNavigateSettings,
   showCompatibilityScreens = true,
@@ -204,7 +175,6 @@ export function CommandCenter({
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [submissionFilter, setSubmissionFilter] = useState<SubmissionFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() => loadProductIntakeDrafts());
 
@@ -214,16 +184,18 @@ export function CommandCenter({
     () => [...intakeRows, ...(canonicalRows.length ? canonicalRows : fallbackSubmissions)],
     [canonicalRows, intakeRows],
   );
-  const visibleSubmissions = useMemo(
-    () => rows.filter((submission) => submissionMatchesFilter(submission, submissionFilter) && submissionMatchesQuery(submission, searchQuery)),
-    [rows, searchQuery, submissionFilter],
-  );
   const actionQueue = useMemo(() => agentActionQueue(canonicalSubmissions ?? []), [canonicalSubmissions]);
   const visibleActions = useMemo(() => searchAgentActions(actionQueue.open, searchQuery), [actionQueue.open, searchQuery]);
+  const selectedCanonicalSubmission = useMemo(
+    () => canonicalSubmissions?.find((submission) => submission.id === selectedRow),
+    [canonicalSubmissions, selectedRow],
+  );
+  const selectedIntakeDraft = useMemo(
+    () => intakeDrafts.find((draft) => draft.id === selectedRow),
+    [intakeDrafts, selectedRow],
+  );
 
   const issueCount = rows.filter((submission) => submissionMatchesFilter(submission, 'issues')).length;
-  const reviewCount = rows.filter((submission) => submissionMatchesFilter(submission, 'review')).length;
-  const readyCount = rows.filter((submission) => submissionMatchesFilter(submission, 'ready')).length;
 
   useEffect(() => {
     const handleResize = () => {
@@ -290,9 +262,12 @@ export function CommandCenter({
     setSelectedRow(draft.id);
     setDrawerOpen(false);
     setActiveNav('submissions');
-    setSubmissionFilter('all');
     setSearchQuery('');
     setCurrentView('questionnaire');
+  };
+
+  const handleUploadDraftSave = (draft: ProductIntakeDraft) => {
+    setIntakeDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8));
   };
 
   const renderNavButton = (section: LegacyAgentNavSection, icon: ReactNode, count?: number, warning?: boolean) => (
@@ -344,130 +319,41 @@ export function CommandCenter({
         )}
       </div>
 
-      <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
-        <button
-          onClick={onSwitchWorkspace}
-          className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
-        >
-          <ArrowLeftRight className="w-4 h-4 text-white/50" />
-          В админскую зону
-        </button>
-      </div>
-    </>
-  );
-
-  const renderSubmissionsList = () => (
-    <div className="space-y-4 lg:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-h-[48px] lg:min-h-12">
-        <div className="flex bg-[#161617] p-1 border border-[#202124] rounded-[11px] overflow-x-auto scrollbar-hide">
-          {[
-            { key: 'all' as const, label: 'Все подачи', count: rows.length },
-            { key: 'issues' as const, label: 'Ошибки', count: issueCount },
-            { key: 'review' as const, label: 'На проверке', count: reviewCount },
-            { key: 'ready' as const, label: 'К выгрузке', count: readyCount },
-          ].map((item) => {
-            const active = submissionFilter === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setSubmissionFilter(item.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] border ${active ? 'bg-[#27272b] text-white shadow-sm border-[#2e2f34]' : 'text-white/50 hover:text-white/80 border-transparent'}`}
-              >
-                {item.label}
-                {item.count > 0 && <span className="ml-1.5 text-[10px] bg-[#18181b] border border-white/5 text-white/65 px-1.5 py-0.5 rounded-md">{item.count}</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="sm:ml-auto flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative w-full sm:w-[260px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.currentTarget.value)}
-              placeholder="Поиск..."
-              className="w-full h-10 bg-[#1e1e21] border border-[#242529] rounded-[10px] pl-9 pr-3 text-sm text-white placeholder-white/40 focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 transition-all outline-none"
-            />
-          </div>
+      {onSwitchWorkspace ? (
+        <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
           <button
-            onClick={() => setSubmissionFilter((current) => (current === 'all' ? 'issues' : 'all'))}
-            className="w-10 h-10 shrink-0 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] flex items-center justify-center text-white/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+            onClick={onSwitchWorkspace}
+            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
           >
-            <Filter className="w-4 h-4" />
+            <ArrowLeftRight className="w-4 h-4 text-white/50" />
+            В админскую зону
           </button>
         </div>
-      </div>
-
-      <div className="space-y-2">
-        <AnimatePresence mode="popLayout">
-          {visibleSubmissions.length === 0 ? (
-            <motion.div key="empty-submissions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-[15px] border border-dashed border-[#242529] bg-[#161617] p-8 text-center text-sm text-white/45">
-              Ничего не найдено. Сбросьте фильтр или создайте новый пакет.
-            </motion.div>
-          ) : (
-            visibleSubmissions.map((sub, index) => (
-              <motion.div
-                layout
-                key={sub.id}
-                initial={{ opacity: 0, y: 14, scale: 0.992 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.992 }}
-                transition={{ duration: 0.2, delay: index * 0.018 }}
-                onClick={() => handleRowClick(sub.id)}
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleRowClick(sub.id);
-                  }
-                }}
-                className={`min-h-[104px] p-4 border rounded-[15px] cursor-pointer transition-all flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] shadow-[inset_0_1px_0_rgba(255,255,255,0.026)] ${selectedRow === sub.id ? 'bg-gradient-to-b from-[#202024] to-[#161617] border-[#2e2f34]' : 'bg-gradient-to-b from-[#161617] to-[#0e0e10] border-[#242529] hover:border-[#2e2f34] hover:from-[#1a1a1d]'}`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="text-[14.5px] font-semibold text-white truncate leading-snug">{sub.title}</div>
-                    <span className="rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/45">{sub.id}</span>
-                  </div>
-                  <div className="text-[11px] text-white/40 mt-1 truncate">{sub.nextAction ?? 'Следующее действие не определено'}</div>
-                </div>
-                <div className="lg:w-[190px] shrink-0 lg:border-l border-[#202124] lg:pl-4 flex flex-col justify-center">
-                  <div className="text-[12px] font-medium text-white/90 truncate">{sub.city}</div>
-                  <div className="text-[10.5px] text-white/40 mt-0.5 flex items-center gap-1.5">
-                    {sub.type === 'family' ? <Users className="w-3 h-3" /> : <User className="w-3 h-3" />} {sub.type === 'family' ? `${sub.applicantsCount} заявителя` : '1 заявитель'}
-                  </div>
-                </div>
-                <div className="hidden lg:flex w-[126px] shrink-0 flex-col justify-center">
-                  <div className="text-[12px] font-medium text-white/90 truncate">{sub.tripDates}</div>
-                  <div className="text-[10.5px] text-white/40 mt-0.5">Даты поездки</div>
-                </div>
-                <div className="hidden lg:flex w-[156px] shrink-0 items-center">{statusBadge(sub.status)}</div>
-                <div className="lg:w-[156px] shrink-0 flex items-center justify-end lg:justify-center mt-2 lg:mt-0">
-                  <button onClick={(e) => { e.stopPropagation(); handleOpenQuestionnaire(sub.id); }} className="h-10 px-4 w-full lg:w-auto bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-[10px] text-sm text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]">
-                    Открыть
-                  </button>
-                </div>
-              </motion.div>
-            ))
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
+      ) : onSignOut ? (
+        <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
+          <button
+            onClick={() => void onSignOut()}
+            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+          >
+            Выйти
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 
   const renderActionsList = () => (
     <div className="space-y-4 lg:space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-2">
         {[
           { label: 'Открыто', value: actionQueue.summary.open },
           { label: 'Сегодня', value: actionQueue.summary.today },
           { label: 'На неделе', value: actionQueue.summary.week },
           { label: 'Закрыто', value: actionQueue.summary.completed },
         ].map((item) => (
-          <div key={item.label} className="rounded-[15px] border border-[#242529] bg-[#161617] px-4 py-3">
-            <div className="text-[11px] uppercase tracking-wide text-white/40">{item.label}</div>
-            <div className="mt-2 text-[24px] font-semibold text-white">{item.value}</div>
+          <div key={item.label} className="h-[60px] rounded-[8px] border border-[#242529] bg-[#161617] px-2.5 py-2">
+            <div className="truncate text-[9px] font-medium uppercase tracking-wide text-white/40">{item.label}</div>
+            <div className="mt-2 text-[22px] font-medium leading-none text-white">{item.value}</div>
           </div>
         ))}
       </div>
@@ -568,10 +454,16 @@ export function CommandCenter({
     <div className="flex h-full w-full bg-[#101011] relative overflow-hidden">
       <AnimatePresence mode="wait">
         {currentView === 'questionnaire' && selectedRow && (
-          <QuestionnaireScreen key={`questionnaire-${selectedRow}`} submissionId={selectedRow} onBack={() => setCurrentView('main')} />
+          <QuestionnaireScreen
+            key={`questionnaire-${selectedRow}`}
+            submissionId={selectedRow}
+            draft={selectedIntakeDraft}
+            submission={selectedCanonicalSubmission}
+            onBack={() => setCurrentView('main')}
+          />
         )}
         {currentView === 'upload' && (
-          <PreUploadScreen key="upload" onBack={() => setCurrentView('main')} onComplete={handleUploadComplete} />
+          <PreUploadScreen key="upload" onBack={() => setCurrentView('main')} onSaveDraft={handleUploadDraftSave} onComplete={handleUploadComplete} />
         )}
       </AnimatePresence>
 
