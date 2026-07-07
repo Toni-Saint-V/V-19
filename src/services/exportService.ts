@@ -44,6 +44,7 @@ export type ExportPackageFormat = ExportBatch["format"];
 
 export interface ExportPackageOptions {
   batchId?: string;
+  city?: string;
   createdAt: string;
   createdBy: string;
   format: ExportPackageFormat;
@@ -90,6 +91,12 @@ export type ExportPackageDraft =
   | ExportPackageBlocked
   | ExportPackageDuplicate
   | ExportPackageReady;
+
+export interface ExportCityPackageDraft {
+  city: string;
+  draft: ExportPackageDraft;
+  submissions: Submission[];
+}
 
 const exportableStatuses = new Set(["accepted"]);
 
@@ -194,6 +201,19 @@ export function buildExportPackageDraft(
     plan,
     rows: plan.rows,
   };
+}
+
+export function buildExportPackageDraftsByCity(
+  submissions: Submission[],
+  options: ExportPackageOptions,
+): ExportCityPackageDraft[] {
+  const grouped = groupSubmissionsByExportCity(submissions.map(normalizeSubmission));
+
+  return grouped.map(([city, citySubmissions]) => ({
+    city,
+    draft: buildExportPackageDraft(citySubmissions, { ...options, city }),
+    submissions: citySubmissions,
+  }));
 }
 
 export function applyExportPackageDraft(
@@ -419,6 +439,17 @@ function exportPackageContentFingerprint(
 
 function sortedSubmissionIds(submissions: Submission[]): string[] {
   return submissions.map((submission) => submission.id).sort();
+}
+
+function groupSubmissionsByExportCity(submissions: Submission[]): Array<[string, Submission[]]> {
+  const groups = new Map<string, Submission[]>();
+
+  for (const submission of submissions) {
+    const city = submission.city?.trim() || "Без города";
+    groups.set(city, [...(groups.get(city) ?? []), submission]);
+  }
+
+  return Array.from(groups.entries()).sort(([left], [right]) => left.localeCompare(right, "ru"));
 }
 
 function sortSubmissionsForExport(submissions: Submission[]): Submission[] {
