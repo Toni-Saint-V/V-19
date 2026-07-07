@@ -9,7 +9,7 @@ import { AdminExportScreen } from './AdminExportScreen';
 import { ReviewWorkspace } from './ReviewWorkspace';
 import { AdminReviewDrawer } from './AdminReviewDrawer';
 import { RemarkForm } from './RemarkForm';
-import visaflowLogo from '../assets/visaflow-logo.png';
+import visaflowLogo from '../assets/v-logo-premium-black-style.png';
 import type { AccessRequest } from '../shared/authRegistration';
 import type { Submission } from '../modules/submissions/types';
 import {

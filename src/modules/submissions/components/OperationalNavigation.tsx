@@ -13,7 +13,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import visaOpsLogo from "../../../assets/visaflow-logo.png";
+import visaOpsLogo from "../../../assets/v-logo-premium-black-style.png";
 import { cn } from "../../../shared/ui/cn";
 import { Button, IconButton, NavCount } from "../../../shared/ui/primitives";
 
