@@ -195,7 +195,7 @@ function MetricCard({
         ) : null}
         <Icon className={`h-3.5 w-3.5 sm:h-5 sm:w-5 ${iconClass}`} />
       </div>
-      <div className="ml-1 text-[24px] font-medium leading-none text-white sm:ml-0 sm:mt-8 sm:text-[30px]">
+      <div className="ml-2 text-[24px] font-medium leading-none text-white sm:ml-0 sm:mt-8 sm:text-[30px]">
         {value}
       </div>
     </div>
