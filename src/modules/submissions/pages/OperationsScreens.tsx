@@ -110,6 +110,10 @@ import {
   targetForIssue,
   type WorkspaceTarget,
 } from "../workspaceModel";
+import {
+  AdminSurfaceMetricCard,
+  AdminSurfaceToolbar,
+} from "../components/AdminSurfacePrimitives";
 
 function pluralRu(count: number, one: string, few: string, many: string) {
   const mod10 = Math.abs(count) % 10;
@@ -1781,13 +1785,13 @@ function AdminReviewMetricCard({
   value: string;
 }) {
   return (
-    <div className="v19-admin-cockpit-metric">
-      <div>
-        <span>{label}</span>
-        <Icon aria-hidden="true" className={`tone-${tone}`} size={16} strokeWidth={1.8} />
-      </div>
-      <strong>{value}</strong>
-    </div>
+    <AdminSurfaceMetricCard
+      className="v19-admin-cockpit-metric"
+      icon={Icon}
+      label={label}
+      tone={tone}
+      value={value}
+    />
   );
 }
 
@@ -2302,49 +2306,47 @@ export function AdminReviewScreen({
         </div>
 
         <div className="v19-admin-cockpit-board">
-          <div className="v19-admin-cockpit-toolbar">
-            <div className="v19-admin-cockpit-tabs" role="tablist" aria-label="Очередь проверки">
-              <button
-                aria-selected={activeLane === "all"}
-                className={activeLane === "all" ? "is-active" : ""}
-                role="tab"
-                type="button"
-                onClick={() => chooseLane("all")}
-              >
-                Все
-              </button>
-              {adminReviewLaneConfig.map((lane) => {
-                const Icon = lane.icon;
-                return (
-                  <button
-                    aria-selected={activeLane === lane.id}
-                    className={activeLane === lane.id ? `is-active tone-${lane.tone}` : ""}
-                    key={lane.id}
-                    role="tab"
-                    type="button"
-                    onClick={() => chooseLane(lane.id)}
-                  >
-                    <Icon aria-hidden="true" size={14} strokeWidth={1.8} />
-                    {lane.title}
-                    <span>{laneItems[lane.id].length}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="v19-admin-cockpit-tools">
-              <div className="v19-admin-cockpit-search">
+          <AdminSurfaceToolbar
+            activeTab={activeLane}
+            ariaLabel="Очередь проверки"
+            className="v19-admin-cockpit-toolbar"
+            onTabChange={(tab) => chooseLane(tab as AdminReviewLaneFilter)}
+            search={
+              <>
                 <Search aria-hidden="true" size={16} strokeWidth={1.8} />
                 {searchControl}
-              </div>
-              <button
-                aria-label="Фильтры очереди"
-                type="button"
-                onClick={() => setMobileFiltersOpen(true)}
-              >
-                <Filter aria-hidden="true" size={16} strokeWidth={1.8} />
-              </button>
-            </div>
-          </div>
+              </>
+            }
+            tabs={[
+              { id: "all", label: "Все" },
+              ...adminReviewLaneConfig.map((lane) => ({
+                count: laneItems[lane.id].length,
+                icon: lane.icon,
+                id: lane.id,
+                label: lane.title,
+                tone: lane.tone,
+              })),
+            ]}
+            tools={
+              <>
+                <button
+                  aria-label={`Фильтр городов: ${mobileCityFilter}`}
+                  title="Фильтр городов"
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(true)}
+                >
+                  <MapPin aria-hidden="true" size={16} strokeWidth={1.8} />
+                </button>
+                <button
+                  aria-label="Фильтры очереди"
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(true)}
+                >
+                  <Filter aria-hidden="true" size={16} strokeWidth={1.8} />
+                </button>
+              </>
+            }
+          />
 
           {permissionDenied ? (
             renderBlockedState(
@@ -4015,14 +4017,15 @@ function AdminExportMetricCard({
   value: number | string;
 }) {
   return (
-    <div className={`v19-admin-export-metric tone-${tone}`}>
-      <div>
-        <span>{label}</span>
-        <Icon aria-hidden="true" focusable="false" size={16} />
-      </div>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </div>
+    <AdminSurfaceMetricCard
+      className="v19-admin-export-metric"
+      detail={detail}
+      icon={Icon}
+      iconClassName=""
+      label={label}
+      tone={tone}
+      value={value}
+    />
   );
 }
 

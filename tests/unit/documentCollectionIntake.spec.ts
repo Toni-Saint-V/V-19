@@ -1,11 +1,15 @@
 import { describe, expect, test } from "vitest";
 import {
   detectCollectionDocType,
+  findCollectionDocumentUpload,
   normalizeCollectionPassportNumber,
+  normalizeCollectionDocuments,
   passportNumberFromCollectionText,
   resolveCollectionUploadTarget,
+  upsertCollectionDocumentUpload,
   type CollectionApplicantIndexEntry,
 } from "../../src/modules/submissions/documentCollectionIntake";
+import type { CollectionDocumentUpload, Submission } from "../../src/modules/submissions/types";
 
 const applicants: CollectionApplicantIndexEntry[] = [
   {
@@ -94,6 +98,94 @@ describe("document collection intake", () => {
     ).toMatchObject({
       reason: "Номер паспорта не дал одного точного совпадения.",
       status: "unmatched",
+    });
+  });
+
+  test("normalizes only questionnaire collection uploads", () => {
+    const normalized = normalizeCollectionDocuments(
+      [
+        {
+          applicantId: "app-1",
+          docType: "questionnaire",
+          fileName: "form.pdf",
+          id: "doc-1",
+          passportNumber: "75 286 9613",
+          sizeBytes: 1200,
+          status: "uploaded",
+          submissionId: "SUB-1",
+          uploadedAtIso: "2026-07-07T09:00:00.000Z",
+        },
+        {
+          applicantId: "app-1",
+          docType: "selfie",
+          fileName: "selfie.jpg",
+          id: "doc-2",
+          status: "uploaded",
+          submissionId: "SUB-1",
+        },
+      ],
+      "SUB-1",
+    );
+
+    expect(normalized).toEqual([
+      {
+        applicantId: "app-1",
+        docType: "questionnaire",
+        fileName: "form.pdf",
+        id: "doc-1",
+        mimeType: "application/octet-stream",
+        passportNumber: "752869613",
+        sizeBytes: 1200,
+        status: "uploaded",
+        submissionId: "SUB-1",
+        uploadedAtIso: "2026-07-07T09:00:00.000Z",
+      },
+    ]);
+  });
+
+  test("upserts questionnaire records without using questionnaireStatus as file readiness", () => {
+    const baseSubmission = {
+      id: "SUB-1",
+      applicants: [
+        {
+          id: "app-1",
+          questionnaireStatus: "complete",
+        },
+      ],
+      collectionDocuments: [],
+      history: [],
+    } as unknown as Submission;
+    const record: CollectionDocumentUpload = {
+      applicantId: "app-1",
+      docType: "questionnaire",
+      fileName: "form.pdf",
+      id: "doc-1",
+      mimeType: "application/pdf",
+      sizeBytes: 1200,
+      status: "uploaded",
+      submissionId: "SUB-1",
+      uploadedAtIso: "2026-07-07T09:00:00.000Z",
+    };
+
+    expect(findCollectionDocumentUpload(baseSubmission, "app-1", "questionnaire")).toBeUndefined();
+
+    const withUpload = upsertCollectionDocumentUpload(baseSubmission, record);
+    expect(findCollectionDocumentUpload(withUpload, "app-1", "questionnaire")).toMatchObject({
+      fileName: "form.pdf",
+      status: "uploaded",
+    });
+
+    const replaced = upsertCollectionDocumentUpload(withUpload, {
+      ...record,
+      fileName: "form-v2.pdf",
+      id: "doc-2",
+      status: "needs_review",
+    });
+
+    expect(replaced.collectionDocuments).toHaveLength(1);
+    expect(findCollectionDocumentUpload(replaced, "app-1", "questionnaire")).toMatchObject({
+      fileName: "form-v2.pdf",
+      status: "needs_review",
     });
   });
 });

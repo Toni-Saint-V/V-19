@@ -10,12 +10,10 @@ import {
   Download,
   FileArchive,
   FileSpreadsheet,
-  Filter,
   FolderCheck,
   History,
   Lock,
   PackageCheck,
-  Search,
   ShieldCheck,
   UploadCloud,
   User,
@@ -23,10 +21,10 @@ import {
   XCircle,
 } from 'lucide-react';
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
-import { OperationalMetricCard } from '../shared/ui/OperationalMetricCard';
 import { applyExportStateToSelection } from '../modules/submissions/submissionActions';
 import { buildExportPackageIdentity, exportSummary } from '../modules/submissions/exportRules';
 import type { Submission } from '../modules/submissions/types';
+import { AdminMetricCard, AdminQueueToolbar } from './AdminSurfaceCommon';
 
 interface ExportItem {
   id: string;
@@ -47,6 +45,8 @@ interface ExportItem {
   blockerReasons: string[];
   warningReasons: string[];
 }
+
+type ExportQueueTab = 'all' | 'selected' | 'blocked';
 
 function StatusPill({ tone, children }: { tone: 'green' | 'orange' | 'blue' | 'neutral'; children: React.ReactNode }) {
   const toneClass = {
@@ -103,7 +103,10 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
   const bridge = useVisaflowBusinessBridge();
   const realItems = useMemo(() => exportItemsFromSubmissions(submissions), [submissions]);
   const [selectedRealIds, setSelectedRealIds] = useState<string[]>([]);
+  const [activeQueueTab, setActiveQueueTab] = useState<ExportQueueTab>('all');
   const [activeId, setActiveId] = useState('');
+  const [cityFilter, setCityFilter] = useState('Все города');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
 
@@ -121,7 +124,7 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
     });
   }, [realItems]);
 
-  const displayItems = useMemo(
+  const enrichedItems = useMemo(
     () =>
       realItems.map((item) => ({
         ...item,
@@ -129,9 +132,31 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
       })),
     [realItems, selectedRealIds],
   );
+  const cityOptions = useMemo(
+    () => ['Все города', ...Array.from(new Set(enrichedItems.map((item) => item.city)))],
+    [enrichedItems],
+  );
+  const baseFilteredItems = useMemo(() => {
+    const searchNeedle = searchQuery.trim().toLowerCase();
+    return enrichedItems.filter((item) => {
+      const cityMatches = cityFilter === 'Все города' || item.city === cityFilter;
+      const searchMatches =
+        !searchNeedle ||
+        [item.id, item.title, item.agent, item.city]
+          .join(' ')
+          .toLowerCase()
+          .includes(searchNeedle);
+      return cityMatches && searchMatches;
+    });
+  }, [cityFilter, enrichedItems, searchQuery]);
+  const displayItems = useMemo(() => {
+    if (activeQueueTab === 'selected') return baseFilteredItems.filter((item) => item.selected);
+    if (activeQueueTab === 'blocked') return baseFilteredItems.filter((item) => item.blockers > 0);
+    return baseFilteredItems;
+  }, [activeQueueTab, baseFilteredItems]);
   const selectedItems = useMemo(
-    () => displayItems.filter((item) => item.selected),
-    [displayItems],
+    () => enrichedItems.filter((item) => item.selected),
+    [enrichedItems],
   );
   const selectedSubmissions = useMemo(
     () => submissions.filter((submission) => selectedRealIds.includes(submission.id)),
@@ -235,39 +260,40 @@ export function AdminExportScreen({ submissions = [] }: { submissions?: Submissi
     >
       <section className="flex min-w-0 flex-col gap-5">
         <div className="grid shrink-0 grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
-          <OperationalMetricCard icon={CheckCircle2} label="Готовы" value={displayItems.length} tone="primary" detail="пакетов в очереди" />
-          <OperationalMetricCard icon={PackageCheck} label="Выбрано" value={selectedCount} tone="primary" detail={`${selectedApplicants} заявителей`} />
-          <OperationalMetricCard icon={FileArchive} label="Документы" value={selectedFiles} tone="muted" detail="файлов в ZIP-пакете" />
-          <OperationalMetricCard
+          <AdminMetricCard icon={CheckCircle2} label="Готовы" value={displayItems.length} tone="green" detail="пакетов в очереди" />
+          <AdminMetricCard icon={PackageCheck} label="Выбрано" value={selectedCount} tone="green" detail={`${selectedApplicants} заявителей`} />
+          <AdminMetricCard icon={FileArchive} label="Документы" value={selectedFiles} detail="файлов в ZIP-пакете" />
+          <AdminMetricCard
             icon={hasExportBlockers ? XCircle : ShieldCheck}
             label="Pre-flight"
             value={hasExportBlockers ? 'STOP' : 'OK'}
-            tone={hasExportBlockers ? 'danger' : 'primary'}
+            tone={hasExportBlockers ? 'red' : 'green'}
             detail={`${selectedWarnings} предупреждений`}
           />
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
-          <div className="shrink-0 border-b border-[#242529] bg-[#1a1a1d] p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div>
-                <h2 className="text-[18px] font-semibold text-white">Пакеты к выгрузке</h2>
-                <p className="mt-1 text-[12px] text-white/45">Формирование Excel, контроль preview rows, idempotency и экспортных блокеров.</p>
-              </div>
-              <div className="flex flex-1 items-center gap-2 lg:ml-auto lg:max-w-[520px]">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                  <input
-                    placeholder="Поиск по ID, семье, агенту"
-                    className="h-10 w-full rounded-[8px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#6f64ff]/70"
-                  />
-                </div>
-                <button className="h-10 rounded-[6px] border border-[#242529] bg-[#111113] px-3 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/5">
-                  <Filter className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <AdminQueueToolbar
+            activeTab={activeQueueTab}
+            cityFilter={cityFilter}
+            cityOptions={cityOptions}
+            filterLabel="Сбросить фильтры выгрузки"
+            onCityFilterChange={setCityFilter}
+            onFilterClick={() => {
+              setActiveQueueTab('all');
+              setCityFilter('Все города');
+              setSearchQuery('');
+            }}
+            onSearchChange={setSearchQuery}
+            onTabChange={setActiveQueueTab}
+            searchPlaceholder="Поиск по ID, семье, агенту"
+            searchValue={searchQuery}
+            tabs={[
+              { id: 'all', label: 'Все', count: baseFilteredItems.length },
+              { id: 'selected', label: 'Выбрано', count: baseFilteredItems.filter((item) => item.selected).length },
+              { id: 'blocked', label: 'Блокеры', count: baseFilteredItems.filter((item) => item.blockers > 0).length, tone: 'border-[#d59aa3]/45 bg-[#d59aa3]/10 text-[#e3b5bd]' },
+            ]}
+          />
 
           <div className="grid shrink-0 grid-cols-[44px_minmax(220px,1fr)_150px_130px_110px] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
             <button

@@ -7,7 +7,6 @@ import {
   Plus,
   Search,
   Settings,
-  UploadCloud,
   Users,
   X,
 } from 'lucide-react';
@@ -46,6 +45,10 @@ import {
 export type SubmissionListItem = LegacySubmissionListItem;
 
 type ViewState = 'main' | 'questionnaire' | 'upload';
+type AgentShellNavSection = Extract<
+  LegacyAgentNavSection,
+  'actions' | 'documents' | 'submissions' | 'settings'
+>;
 
 type CommandCenterProps = {
   agentId?: Submission['agentId'];
@@ -137,7 +140,7 @@ function canonicalBridgeNav(section: LegacyAgentNavSection): AgentNavSection | n
   return null;
 }
 
-function navLabel(section: LegacyAgentNavSection) {
+function navLabel(section: AgentShellNavSection) {
   switch (section) {
     case 'actions':
       return 'Мои действия';
@@ -147,17 +150,12 @@ function navLabel(section: LegacyAgentNavSection) {
       return 'Мои подачи';
     case 'settings':
       return 'Настройки';
-    case 'applicants':
-      return 'Заявители / Семьи';
-    case 'files':
-    case 'media':
-      return 'Файлы / Медиа';
-    case 'issues':
-      return 'Замечания';
   }
 }
 
-function normalizeAgentNav(section: LegacyAgentNavSection): LegacyAgentNavSection {
+function normalizeAgentNav(section: LegacyAgentNavSection): AgentShellNavSection {
+  if (section === 'applicants') return 'submissions';
+  if (section === 'drafts') return 'submissions';
   if (section === 'files' || section === 'media') return 'documents';
   if (section === 'issues') return 'actions';
   return section;
@@ -172,7 +170,7 @@ export function CommandCenter({
   onNavigateSettings,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
-  const [activeNav, setActiveNav] = useState<LegacyAgentNavSection>('actions');
+  const [activeNav, setActiveNav] = useState<AgentShellNavSection>('actions');
   const [currentView, setCurrentView] = useState<ViewState>('main');
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -247,12 +245,6 @@ export function CommandCenter({
     handleRowClick(action.submission.id);
   };
 
-  const openUpload = () => {
-    bridge.onUploadOpen?.();
-    emitVisaflowUiEvent(bridge, { type: 'upload.open' });
-    setCurrentView('upload');
-  };
-
   const createPackage = () => {
     bridge.onCreatePackage?.();
     emitVisaflowUiEvent(bridge, { type: 'package.create' });
@@ -283,7 +275,7 @@ export function CommandCenter({
       className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${activeNav === section ? 'bg-[#27272b] text-white' : 'hover:bg-white/5 text-white/70 hover:text-white'}`}
     >
       {icon}
-      <span className="flex-1 text-left">{navLabel(section)}</span>
+      <span className="flex-1 text-left">{navLabel(normalizeAgentNav(section))}</span>
       {typeof count === 'number' && <span className="px-1.5 py-0.5 rounded-full bg-[#18181b] border border-white/5 text-[11px] font-medium text-white/80">{count}</span>}
       {warning && <span className="w-2 h-2 rounded-full bg-[#a35f69]" />}
     </button>
@@ -499,10 +491,6 @@ export function CommandCenter({
             <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight text-white m-0 leading-none">{title}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={openUpload} className="h-[36px] lg:h-10 px-3.5 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]">
-              <UploadCloud className="w-4 h-4" />
-              <span className="hidden sm:inline">Загрузить</span>
-            </button>
             <button onClick={createPackage} className="h-[36px] lg:h-10 px-3.5 bg-[#6f64ff] hover:bg-[#4855d4] text-white rounded-[10px] text-[13px] lg:text-sm font-medium transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Создать пакет</span>
@@ -519,7 +507,6 @@ export function CommandCenter({
                 submissions={canonicalSubmissions}
               />
             )}
-            {activeNav === 'applicants' && <ApplicantsScreen onOpenDrawer={handleRowClick} submissions={canonicalSubmissions} />}
             {activeNav === 'settings' && renderSettings()}
             {activeNav === 'actions' && renderActionsList()}
             {activeNav === 'submissions' && <ApplicantsScreen onOpenDrawer={handleRowClick} submissions={canonicalSubmissions} />}

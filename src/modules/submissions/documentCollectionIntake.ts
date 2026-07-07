@@ -1,3 +1,5 @@
+import type { CollectionDocumentUpload, Submission } from './types';
+
 export type CollectionDocType =
   | 'passport'
   | 'selfie'
@@ -38,6 +40,10 @@ export const canonicalCollectionDocTypes: ReadonlySet<CollectionDocType> = new S
   'passport',
   'selfie',
   'selfie2',
+]);
+
+export const collectionDocumentDocTypes: ReadonlySet<CollectionDocType> = new Set([
+  'questionnaire',
 ]);
 
 const collectionDocTypeKeys = new Set(collectionDocTypes.map((doc) => doc.key));
@@ -105,5 +111,101 @@ export function resolveCollectionUploadTarget({
       docType: detectedDocType,
       submissionId: match.submissionId,
     },
+  };
+}
+
+function isCollectionDocumentStatus(
+  value: unknown,
+): value is CollectionDocumentUpload['status'] {
+  return value === 'uploaded' || value === 'needs_review';
+}
+
+export function normalizeCollectionDocuments(
+  value: unknown,
+  submissionId?: string,
+): CollectionDocumentUpload[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const candidate = item as Partial<CollectionDocumentUpload>;
+    if (
+      !candidate.id ||
+      !candidate.applicantId ||
+      !candidate.fileName ||
+      candidate.docType !== 'questionnaire'
+    ) {
+      return [];
+    }
+
+    const normalizedSubmissionId = submissionId ?? candidate.submissionId;
+    if (!normalizedSubmissionId) return [];
+    if (submissionId && candidate.submissionId && candidate.submissionId !== submissionId) {
+      return [];
+    }
+
+    return [
+      {
+        applicantId: candidate.applicantId,
+        docType: 'questionnaire',
+        fileName: candidate.fileName,
+        id: candidate.id,
+        mimeType: candidate.mimeType || 'application/octet-stream',
+        passportNumber: normalizeCollectionPassportNumber(candidate.passportNumber),
+        sizeBytes: Number.isFinite(Number(candidate.sizeBytes)) ? Number(candidate.sizeBytes) : 0,
+        status: isCollectionDocumentStatus(candidate.status) ? candidate.status : 'uploaded',
+        submissionId: normalizedSubmissionId,
+        uploadedAtIso: candidate.uploadedAtIso || new Date(0).toISOString(),
+      },
+    ];
+  });
+}
+
+export function findCollectionDocumentUpload(
+  submission: Pick<Submission, 'collectionDocuments' | 'id'>,
+  applicantId: string,
+  docType: CollectionDocType,
+) {
+  if (!collectionDocumentDocTypes.has(docType)) return undefined;
+  return normalizeCollectionDocuments(submission.collectionDocuments, submission.id).find(
+    (record) =>
+      record.submissionId === submission.id &&
+      record.applicantId === applicantId &&
+      record.docType === docType,
+  );
+}
+
+export function upsertCollectionDocumentUpload(
+  submission: Submission,
+  record: CollectionDocumentUpload,
+): Submission {
+  if (!collectionDocumentDocTypes.has(record.docType)) return submission;
+
+  const current = normalizeCollectionDocuments(submission.collectionDocuments, submission.id);
+  const collectionDocuments = [
+    record,
+    ...current.filter(
+      (item) =>
+        !(
+          item.submissionId === record.submissionId &&
+          item.applicantId === record.applicantId &&
+          item.docType === record.docType
+        ),
+    ),
+  ];
+
+  return {
+    ...submission,
+    collectionDocuments,
+    history: [
+      ...submission.history,
+      {
+        id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        text: `Загружена анкета: ${record.fileName}`,
+        at: 'сейчас',
+        source: 'agent',
+      },
+    ],
+    updatedAt: 'сейчас',
   };
 }
