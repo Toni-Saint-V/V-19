@@ -43,9 +43,9 @@ const testValuesByFieldId: Record<string, string> = {
 };
 
 export function fillRequiredQuestionnaireForTest(submission: Submission): Submission {
-  let next = submission;
+  let next = completeQuestionnaire(submission);
 
-  for (const applicant of submission.applicants) {
+  for (const applicant of next.applicants) {
     for (const section of applicant.sections) {
       for (const field of section.fields) {
         if (!field.required || field.value.trim()) continue;
@@ -60,7 +60,7 @@ export function fillRequiredQuestionnaireForTest(submission: Submission): Submis
     }
   }
 
-  return completeQuestionnaire(next);
+  return next;
 }
 
 function valueForField(field: QuestionnaireField) {

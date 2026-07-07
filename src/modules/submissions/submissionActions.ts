@@ -233,7 +233,7 @@ export function createDraftSubmission({
         ? preliminaryIntake.tripDateTo.trim()
         : "не указано",
     status: "draft",
-    applicants: applyPreliminaryIntakeToApplicants(applicants, preliminaryIntake),
+    applicants,
     issues: [],
     files: requiredFilesForApplicants(applicants, draftIdToken, idScheme),
     completeness: { questionnaire: 0, files: 0, total: 0 },
@@ -255,58 +255,54 @@ export function createDraftSubmission({
     ],
   };
 
-  return preliminaryIntake ? normalizeSubmissionQuestionnaire(submission) : submission;
+  if (!preliminaryIntake) return submission;
+
+  return applyPreliminaryIntakeToSubmission(
+    normalizeSubmissionQuestionnaire(submission),
+    preliminaryIntake,
+  );
 }
 
-function applyPreliminaryIntakeToApplicants(
-  applicants: Submission["applicants"],
-  intake: PreliminaryIntakeDraft | undefined,
-) {
-  if (!intake) return applicants;
-
-  return applicants.map((applicant) => ({
-    ...applicant,
-    sections: applicant.sections.map((section) =>
-      applyPreliminaryIntakeToSection(section, intake),
-    ),
-  }));
-}
-
-function applyPreliminaryIntakeToSection(
-  section: QuestionnaireSection,
+function applyPreliminaryIntakeToSubmission(
+  submission: Submission,
   intake: PreliminaryIntakeDraft,
-): QuestionnaireSection {
-  if (section.id.endsWith("-contacts")) {
-    return {
-      ...section,
-      fields: section.fields.map((field) => {
-        if (
-          intake.sameHomeAddress &&
-          field.id === "home-address" &&
-          intake.homeAddress.trim()
-        ) {
-          return { ...field, value: intake.homeAddress.trim() };
-        }
+): Submission {
+  let nextSubmission = submission;
 
-        return field;
-      }),
-    };
+  for (const applicant of submission.applicants) {
+    for (const section of applicant.sections) {
+      for (const field of section.fields) {
+        const nextField = preliminaryFieldValue(field, intake);
+        if (!nextField || nextField.value === field.value) continue;
+
+        nextSubmission = updateQuestionnaireFieldInSubmission(nextSubmission, {
+          applicantId: applicant.id,
+          fieldId: field.id,
+          reviewOriginSource: nextField.reviewOriginSource,
+          reviewSource: nextField.reviewSource,
+          reviewState: nextField.reviewState,
+          sectionId: section.id,
+          value: nextField.value,
+        });
+      }
+    }
   }
 
-  if (section.id.endsWith("-trip")) {
-    return {
-      ...section,
-      fields: section.fields.map((field) => applyPreliminaryTripField(field, intake)),
-    };
-  }
-
-  return section;
+  return nextSubmission;
 }
 
-function applyPreliminaryTripField(
+function preliminaryFieldValue(
   field: QuestionnaireSection["fields"][number],
   intake: PreliminaryIntakeDraft,
-) {
+): QuestionnaireSection["fields"][number] | null {
+  if (
+    intake.sameHomeAddress &&
+    field.id === "home-address" &&
+    intake.homeAddress.trim()
+  ) {
+    return familySharedPreliminaryField(field, intake.homeAddress.trim());
+  }
+
   if (
     intake.sameTripDates &&
     field.id === "arrival-date" &&
@@ -328,7 +324,7 @@ function applyPreliminaryTripField(
     field.id === "inviting-party-type" &&
     hasSpainStayInput(intake)
   ) {
-    return { ...field, value: "Гостиница/временное жильё" };
+    return familySharedPreliminaryField(field, "Гостиница/временное жильё");
   }
 
   if (
@@ -336,7 +332,7 @@ function applyPreliminaryTripField(
     field.id === "hotel-country" &&
     hasSpainStayInput(intake)
   ) {
-    return { ...field, value: "Spain" };
+    return familySharedPreliminaryField(field, "Spain");
   }
 
   if (
@@ -344,30 +340,35 @@ function applyPreliminaryTripField(
     field.id === "hotel-name" &&
     intake.spainStayName.trim()
   ) {
-    return { ...field, value: intake.spainStayName.trim() };
-  }
-
-  if (
-    intake.sameSpainStay &&
-    field.id === "hotel-city" &&
-    intake.spainStayCity.trim()
-  ) {
-    return { ...field, value: intake.spainStayCity.trim() };
+    return familySharedPreliminaryField(field, intake.spainStayName.trim());
   }
 
   if (
     intake.sameSpainStay &&
     field.id === "hotel-address" &&
-    intake.spainStayAddress.trim()
+    spainStayAddressValue(intake)
   ) {
-    return { ...field, value: intake.spainStayAddress.trim() };
+    return familySharedPreliminaryField(field, spainStayAddressValue(intake));
   }
 
   if (intake.sameArrivalPlace && field.id === "route" && intake.arrivalPlace.trim()) {
     return { ...field, value: intake.arrivalPlace.trim() };
   }
 
-  return field;
+  return null;
+}
+
+function familySharedPreliminaryField(
+  field: QuestionnaireSection["fields"][number],
+  value: string,
+) {
+  return {
+    ...field,
+    reviewOriginSource: "family_shared" as const,
+    reviewSource: "family_shared" as const,
+    reviewState: "needs_review" as const,
+    value,
+  };
 }
 
 function hasSpainStayInput(intake: PreliminaryIntakeDraft) {
@@ -376,6 +377,10 @@ function hasSpainStayInput(intake: PreliminaryIntakeDraft) {
     intake.spainStayCity.trim() ||
     intake.spainStayAddress.trim(),
   );
+}
+
+function spainStayAddressValue(intake: PreliminaryIntakeDraft) {
+  return intake.spainStayAddress.trim() || intake.spainStayCity.trim();
 }
 
 export function completeQuestionnaire(submission: Submission): Submission {
