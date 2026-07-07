@@ -218,7 +218,6 @@ export function AdminWorkspace({
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [bottomProfileMenuOpen, setBottomProfileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const pendingAccessRequestCount = accessRequests.filter((request) => request.status === 'pending').length;
   
   // Drawer & Form State
@@ -269,7 +268,6 @@ export function AdminWorkspace({
     setActiveNav(nav);
     setMobileNavOpen(false);
     setBottomProfileMenuOpen(false);
-    setUserMenuOpen(false);
   };
 
   const renderNavContent = () => (
@@ -449,39 +447,6 @@ export function AdminWorkspace({
             <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight text-white m-0 leading-none">
               {getPageTitle()}
             </h1>
-          </div>
-          <div className="relative ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              aria-label="Профиль администратора"
-              aria-expanded={userMenuOpen}
-              onClick={() => setUserMenuOpen((open) => !open)}
-              className="w-8 h-8 rounded-full bg-gradient-to-br from-[#2a2a30] to-[#1a1a20] border border-white/10 flex items-center justify-center text-xs font-medium text-white/70 shadow-inner transition-colors hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
-            >
-              АД
-            </button>
-            <AnimatePresence>
-              {userMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                  transition={{ duration: 0.14 }}
-                  className="absolute right-0 top-10 z-30 w-36 rounded-[8px] border border-[#242529] bg-[#1a1a1d] p-1 shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      void onSignOut();
-                    }}
-                    className="w-full rounded-[6px] px-3 py-2 text-left text-[13px] font-medium text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
-                  >
-                    Выйти
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </header>
 

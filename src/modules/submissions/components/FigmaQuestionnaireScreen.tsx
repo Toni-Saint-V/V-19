@@ -1062,6 +1062,10 @@ function sectionForFocus(
   return "personal";
 }
 
+function sectionIdMatches(sectionId: string, canonicalId: string) {
+  return sectionId === canonicalId || sectionId.endsWith(`-${canonicalId}`);
+}
+
 export function FigmaQuestionnaireScreen({
   initialFocus,
   onBack,
@@ -1279,8 +1283,8 @@ export function FigmaQuestionnaireScreen({
           } satisfies SectionTab & { id: SectionId };
         }
 
-        const sourceSection = activeApplicantModel?.sections.find(
-          (section) => section.id === canonicalId,
+        const sourceSection = activeApplicantModel?.sections.find((section) =>
+          sectionIdMatches(section.id, canonicalId),
         );
 
         if (!sourceSection) return definition;
