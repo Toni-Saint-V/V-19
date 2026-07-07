@@ -56,9 +56,9 @@ function buildExportContractRow(
   const surname = field("surname", nameParts.surname);
   const mobile = digitsOnly(field("contact-number"));
   const hotelName = field("hotel-name");
-  const hotelCountry = field("hotel-country", "Spain");
-  const hotelCity = field("hotel-city");
-  const hotelPostalCode = field("hotel-postal-code");
+  const contactPersonCountry = field("main-destination");
+  const contactPersonCity = "";
+  const contactPersonPostalCode = "";
   const hotelEmail = field("hotel-email");
   const hotelAddress = field("hotel-address");
   const hotelContact = digitsOnly(field("hotel-contact"));
@@ -88,13 +88,13 @@ function buildExportContractRow(
     appointmentType: submission.type === "family" ? "Family" : "Individual",
     city: submission.city,
     contactPersonAddress: hotelAddress,
-    contactPersonCity: hotelCity,
-    contactPersonCountry: hotelCountry,
+    contactPersonCity,
+    contactPersonCountry,
     contactPersonEmail: hotelEmail,
     contactPersonFirstName: hotelName,
     contactPersonLastName: "Reception",
     contactPersonMobile: hotelContact,
-    contactPersonZipCode: hotelPostalCode,
+    contactPersonZipCode: contactPersonPostalCode,
     costCoveredBy: normalizeCost(field("cost-covered-by")),
     countryOfBirth: normalizeCountry(field("birth-country")),
     currentNationality: normalizeCountry(field("nationality")),
@@ -113,12 +113,12 @@ function buildExportContractRow(
     intendedDateOfArrival,
     intendedDateOfDeparture,
     invitingCompanyAddress: hotelAddress,
-    invitingCompanyCity: hotelCity,
+    invitingCompanyCity: contactPersonCity,
     invitingCompanyContactNo: hotelContact,
-    invitingCompanyCountry: hotelCountry,
+    invitingCompanyCountry: contactPersonCountry,
     invitingCompanyEmail: hotelEmail,
     invitingCompanyName: hotelName,
-    invitingCompanyZipCode: hotelPostalCode,
+    invitingCompanyZipCode: contactPersonPostalCode,
     lastName: surname,
     location: submission.city,
     maritalStatus: normalizeMaritalStatus(field("marital-status")),
@@ -143,7 +143,7 @@ function buildExportContractRow(
       submission.type === "family" ? `${submission.id}-${index + 1}` : submission.id,
     submissionId: submission.id,
     submissionTitle: submission.title,
-    surnameAtBirth: field("surname-at-birth", surname),
+    surnameAtBirth: field("previous-surname"),
     surnameFamilyName: surname,
     travelDate: normalizeExportContractDate(
       field("travel-date", submission.tripDateFrom),
@@ -199,6 +199,8 @@ function normalizeCountry(value: string): string {
 }
 
 function normalizeGender(value: string): string {
+  if (/жен/i.test(value)) return "Female";
+  if (/муж/i.test(value)) return "Male";
   if (/female/i.test(value)) return "Female";
   if (/male/i.test(value)) return "Male";
   return value;

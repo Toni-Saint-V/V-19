@@ -833,7 +833,7 @@ describe("passport extraction contract", () => {
         }),
         expect.objectContaining({
           key: "gender",
-          value: "Male - Мужской",
+          value: "Мужской",
         }),
         expect.objectContaining({
           key: "passportType",
