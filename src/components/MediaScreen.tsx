@@ -1,4 +1,3 @@
-import type { AgentDrawerTab } from './Drawer';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -8,10 +7,6 @@ import {
 
 type FileCategory = 'all' | 'passports' | 'selfies' | 'financial' | 'other';
 type FileStatus = 'verified' | 'processing' | 'error';
-
-interface MediaScreenProps {
-  onOpenDrawer?: (id: string, tab?: AgentDrawerTab) => void;
-}
 
 interface MediaFile {
   id: string;
@@ -34,13 +29,13 @@ const mockFiles: MediaFile[] = [
   { id: '6', name: 'Booking_Hotel_Madrid.pdf', type: 'pdf', category: 'other', size: '500 KB', status: 'verified', applicant: 'Алина Смирнова', submissionId: 'SUB-1057', date: 'Вчера, 16:32' },
 ];
 
-export function MediaScreen({ onOpenDrawer }: MediaScreenProps = {}) {
+export function MediaScreen() {
   const [activeTab, setActiveTab] = useState<FileCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredFiles = mockFiles.filter(f => 
     (activeTab === 'all' || f.category === activeTab) &&
-    (f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.applicant.toLowerCase().includes(searchQuery.toLowerCase()) || f.submissionId.toLowerCase().includes(searchQuery.toLowerCase()))
+    (f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.applicant.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const getStatusIcon = (status: FileStatus) => {
@@ -107,13 +102,6 @@ export function MediaScreen({ onOpenDrawer }: MediaScreenProps = {}) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 key={file.id}
-                onClick={() => onOpenDrawer?.(file.submissionId, 'files')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onOpenDrawer?.(file.submissionId, 'files');
-                  }
-                }}
                 className="group flex flex-col bg-[#161617] border border-[#242529] rounded-2xl overflow-hidden hover:border-[#6f64ff]/40 transition-all cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                 tabIndex={0}
               >
@@ -133,10 +121,10 @@ export function MediaScreen({ onOpenDrawer }: MediaScreenProps = {}) {
 
                   {/* Overlay Actions */}
                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(event) => event.stopPropagation()} className="w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                    <button className="w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
                       <Download className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={(event) => event.stopPropagation()} className="w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                    <button className="w-7 h-7 rounded-md bg-[#161617]/90 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
                       <MoreVertical className="w-3.5 h-3.5" />
                     </button>
                   </div>

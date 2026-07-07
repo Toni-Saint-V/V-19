@@ -146,13 +146,6 @@ const blsOccupationOptions = [
 
 const yesNoOptions = ["Нет", "Да"];
 
-const questionnaireFieldLabelAliases: Record<string, string[]> = {
-  "first-entry-country": ["Маршрут поездки", "Маршрут", "Страна въезда"],
-  "passport-expiry-date": ["Дата окончания паспорта"],
-  "passport-type": ["Тип документа", "Тип проездного документа"],
-  "previous-surname": ["Фамилия при рождении", "Девичья фамилия"],
-};
-
 const questionnaireBlueprint: Array<{
   id: string;
   title: string;
@@ -389,7 +382,7 @@ export function updateQuestionnaireField(
                           submission,
                           update.applicantId,
                           section.title,
-                          field,
+                          field.label,
                         )
                           ? undefined
                           : field.error,
@@ -416,7 +409,11 @@ export function completeQuestionnaireSections(submission: Submission): Submissio
     ...submission,
     applicants: submission.applicants.map((applicant) => ({
       ...applicant,
-      sections: normalizeApplicantSections(applicant),
+      sections: createQuestionnaireSections(
+        applicant.id,
+        applicant.fullName,
+        "complete",
+      ),
     })),
     updatedAt: "сейчас",
   });
@@ -440,9 +437,7 @@ export function flagQuestionnaireField(
           sections: applicant.sections.map((section) => ({
             ...section,
             fields: normalizeFields(section).map((field) =>
-              questionnaireFieldMatchesTarget(field, fieldLabel)
-                ? { ...field, error: reason }
-                : field,
+              field.label === fieldLabel ? { ...field, error: reason } : field,
             ),
           })),
         }),
@@ -465,7 +460,7 @@ export function clearOpenQuestionnaireIssueErrors(submission: Submission): Submi
               submission,
               applicant.id,
               section.title,
-              field,
+              field.label,
             )
               ? { ...field, error: undefined }
               : field,
@@ -520,37 +515,17 @@ function hasOpenQuestionnaireFieldIssue(
   submission: Submission,
   applicantId: string,
   sectionTitle: string,
-  field: Pick<QuestionnaireField, "id" | "label"> | FieldSeed | string,
+  fieldLabel: string,
 ) {
   return submission.issues.some(
     (issue) =>
       issue.status === "open" &&
       issue.target.applicantId === applicantId &&
-      questionnaireFieldMatchesTarget(field, issue.target.field) &&
+      issue.target.field === fieldLabel &&
       (issue.target.section === sectionTitle ||
         issue.target.section === "Анкета" ||
         issue.target.section === "Данные"),
   );
-}
-
-function questionnaireFieldMatchesTarget(
-  field: Pick<QuestionnaireField, "id" | "label"> | FieldSeed | string,
-  target?: string,
-) {
-  const fieldId = typeof field === "string" ? undefined : field.id;
-  const fieldLabel = typeof field === "string" ? field : field.label;
-  const normalizedTarget = normalizeQuestionnaireLabel(target);
-  if (!normalizedTarget) return false;
-
-  return [
-    fieldId,
-    fieldLabel,
-    ...(fieldId ? (questionnaireFieldLabelAliases[fieldId] ?? []) : []),
-  ].some((candidate) => normalizeQuestionnaireLabel(candidate) === normalizedTarget);
-}
-
-function normalizeQuestionnaireLabel(value?: string) {
-  return (value ?? "").trim().toLocaleLowerCase("ru-RU");
 }
 
 function normalizeApplicantSections(applicant: Applicant): QuestionnaireSection[] {
@@ -597,11 +572,7 @@ function findExistingSection(
     if (section.title === blueprint.title) return true;
 
     const blueprintLabels = new Set(blueprint.fields.map((field) => field.label));
-    const matchingLabelCount = section.fields.filter((field) =>
-      blueprintLabels.has(field.label),
-    ).length;
-    const minimumLabelMatch = Math.max(2, Math.ceil(blueprint.fields.length * 0.6));
-    return matchingLabelCount >= minimumLabelMatch;
+    return section.fields.some((field) => blueprintLabels.has(field.label));
   });
 }
 
@@ -616,10 +587,7 @@ function mergeSeedField(
 ): QuestionnaireField {
   const seeded = seedField(field, applicantName, status, sectionId, index, missing);
   const existing = existingFields.find(
-    (item) =>
-      item.id === field.id ||
-      item.label === field.label ||
-      questionnaireFieldMatchesTarget(field, item.label),
+    (item) => item.id === field.id || item.label === field.label,
   );
 
   if (!existing) return seeded;

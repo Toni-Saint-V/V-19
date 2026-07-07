@@ -1,8 +1,4 @@
-import {
-  applyExportPackageDraft,
-  buildExportPackageArchiveArtifact,
-  buildExportPackageDraft,
-} from '../services/exportService';
+import { applyExportPackageDraft, buildExportPackageDraft } from '../services/exportService';
 import { loadLocalSubmissions, saveLocalSubmissions } from '../services/localRepository';
 import type {
   AgentNavSection,
@@ -78,7 +74,7 @@ export function createVisaflowRuntimeBridge(): VisaflowBusinessBridge {
     onVerifyDocument: (activeSubmissionId) => patchRuntimeState({ activeSubmissionId }),
     onRemarkOpen: (lastRemark) => patchRuntimeState({ lastRemark }),
     onRemarkSubmit: (lastRemark) => patchRuntimeState({ lastRemark }),
-    onExportPackages: async (submissionIds) => {
+    onExportPackages: (submissionIds) => {
       const submissions = loadLocalSubmissions();
       const selectedIds = new Set(submissionIds);
       const selectedSubmissions = submissions.filter((submission) => selectedIds.has(submission.id));
@@ -95,7 +91,7 @@ export function createVisaflowRuntimeBridge(): VisaflowBusinessBridge {
         return;
       }
 
-      downloadExportArtifact(await buildExportPackageArchiveArtifact(draft));
+      downloadExportArtifact(draft.artifact);
 
       if (draft.status === 'ready') {
         saveLocalSubmissions(applyExportPackageDraft(submissions, draft));
