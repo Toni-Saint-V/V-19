@@ -405,7 +405,7 @@ export function AccessGate({
               setMode('reset');
             }}
           >
-            Восстановить пароль
+            Не помню пароль
           </button>
         </div>
       </AccessShell>

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
 import {
-  ArrowLeft, CheckCircle2, AlertCircle, MessageSquarePlus, ZoomIn,
-  ZoomOut, RotateCw, ScanText, FileText, User, ShieldCheck, Sparkles,
+  ArrowLeft, CheckCircle2, AlertCircle, MessageSquarePlus,
+  RotateCw, ScanText, FileText, User, ShieldCheck, Sparkles,
   ChevronDown, Eye, Download, Maximize2
 } from 'lucide-react';
 
@@ -72,13 +72,17 @@ function FieldReviewRow({ field, onAddRemark }: { field: (typeof fields)[number]
 }
 
 export function ReviewWorkspace({ submissionId, onBack, onAddRemark }: ReviewWorkspaceProps) {
-  const [zoomLabel, setZoomLabel] = useState('100%');
+  const enterFullscreen = () => {
+    const target = document.documentElement;
+    if (document.fullscreenElement) return;
+    void target.requestFullscreen?.();
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.985 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.985 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
       className="fixed inset-0 z-[60] bg-[#101011] text-white flex flex-col overflow-hidden"
     >
       <header className="h-[64px] shrink-0 border-b border-[#202124] bg-[#141416]/95 backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">
@@ -110,11 +114,8 @@ export function ReviewWorkspace({ submissionId, onBack, onAddRemark }: ReviewWor
               <span className="text-[13px] font-medium text-white truncate">Passport_Petrov_I.pdf</span>
             </div>
             <div className="ml-auto flex items-center gap-1.5">
-              <button onClick={() => setZoomLabel('90%')} className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"><ZoomOut className="w-4 h-4" /></button>
-              <div className="h-9 px-2.5 rounded-lg bg-white/5 border border-white/5 flex items-center text-[12px] font-mono text-white/60 min-w-[58px] justify-center">{zoomLabel}</div>
-              <button onClick={() => setZoomLabel('120%')} className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"><ZoomIn className="w-4 h-4" /></button>
               <button className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"><RotateCw className="w-4 h-4" /></button>
-              <button className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"><Maximize2 className="w-4 h-4" /></button>
+              <button onClick={enterFullscreen} className="w-9 h-9 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/55 hover:text-white transition-colors"><Maximize2 className="w-4 h-4" /></button>
             </div>
           </div>
 

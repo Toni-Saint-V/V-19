@@ -1,6 +1,7 @@
 import {
   type ButtonHTMLAttributes,
   type CSSProperties,
+  type ElementType,
   type InputHTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
@@ -67,6 +68,14 @@ export type V19SignalButtonTone =
   | "danger"
   | "green"
   | "muted";
+
+export type V19SummaryTileTone =
+  | "amber"
+  | "danger"
+  | "green"
+  | "indigo"
+  | "muted"
+  | "neutral";
 
 export type V19FamilyMember = {
   initials: string;
@@ -188,6 +197,75 @@ export function V19SignalButton({
       <small>{note}</small>
       <span className="v19-signal-button-mark" aria-hidden="true" />
     </button>
+  );
+}
+
+export function V19SummaryTileGrid({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("v19-summary-tile-grid", className)}>{children}</div>;
+}
+
+export function V19SummaryTile({
+  active = false,
+  ariaLabel,
+  className,
+  detail,
+  icon: Icon,
+  label,
+  onClick,
+  tone = "neutral",
+  value,
+}: {
+  active?: boolean;
+  ariaLabel?: string;
+  className?: string;
+  detail?: ReactNode;
+  icon: ElementType;
+  label: string;
+  onClick?: () => void;
+  tone?: V19SummaryTileTone;
+  value: ReactNode;
+}) {
+  const content = (
+    <>
+      <span className="v19-summary-tile-label">{label}</span>
+      <span className="v19-summary-tile-main">
+        <strong>{value}</strong>
+        <span className="v19-summary-tile-icon" aria-hidden="true">
+          <Icon />
+        </span>
+      </span>
+      {detail ? <small>{detail}</small> : null}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        aria-label={ariaLabel ?? label}
+        aria-pressed={active}
+        className={cn("v19-summary-tile", `tone-${tone}`, active && "is-active", className)}
+        type="button"
+        onClick={onClick}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      aria-label={ariaLabel ?? label}
+      className={cn("v19-summary-tile", `tone-${tone}`, className)}
+      role="group"
+    >
+      {content}
+    </div>
   );
 }
 

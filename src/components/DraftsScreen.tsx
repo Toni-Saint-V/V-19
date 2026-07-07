@@ -4,10 +4,10 @@ import {
   AlertCircle,
   CalendarDays,
   CheckCircle2,
-  ChevronRight,
   FileWarning,
   Loader2,
   MapPin,
+  MoreVertical,
   Plus,
   ScanLine,
   UploadCloud,
@@ -24,6 +24,7 @@ import {
   uploadRequiredFile,
   type UploadedFileMetadata,
 } from '../modules/submissions/submissionActions';
+import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
 import { passportNumberFromApplicant } from '../modules/submissions/filenamePolicy';
 import {
   canonicalCollectionDocTypes,
@@ -46,6 +47,7 @@ interface DraftsScreenProps {
 }
 
 type DocStatus = 'verified' | 'processing' | 'error' | 'missing';
+type DraftSummaryFilter = 'missing' | 'processing' | 'error';
 
 type MatrixApplicant = {
   docs: Record<CollectionDocType, DocStatus>;
@@ -409,20 +411,30 @@ export function DraftsScreen({
   const [uploadError, setUploadError] = useState('');
   const [pendingCellTarget, setPendingCellTarget] = useState<PendingCellTarget | null>(null);
   const [mobileApplicantIndex, setMobileApplicantIndex] = useState<Record<string, number>>({});
+  const [draftSummaryFilter, setDraftSummaryFilter] = useState<DraftSummaryFilter>('missing');
   const cellInputRef = useRef<HTMLInputElement | null>(null);
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
-  const visibleDrafts = useMemo(() => buildMatrixSubmissions(submissions), [submissions]);
+  const allDrafts = useMemo(() => buildMatrixSubmissions(submissions), [submissions]);
+  const visibleDrafts = useMemo(
+    () =>
+      allDrafts.filter((submission) =>
+        submission.applicants.some((applicant) =>
+          docTypes.some((doc) => applicant.docs[doc.key] === draftSummaryFilter),
+        ),
+      ),
+    [allDrafts, draftSummaryFilter],
+  );
   const summary = useMemo(() => {
-    const statuses = visibleDrafts.flatMap((submission) =>
+    const statuses = allDrafts.flatMap((submission) =>
       submission.applicants.flatMap((applicant) => docTypes.map((doc) => applicant.docs[doc.key])),
     );
     return {
       error: statuses.filter((status) => status === 'error').length,
       missing: statuses.filter((status) => status === 'missing').length,
       processing: statuses.filter((status) => status === 'processing').length,
-      submissions: visibleDrafts.length,
+      submissions: allDrafts.length,
     };
-  }, [visibleDrafts]);
+  }, [allDrafts]);
 
   const commitSubmissions = async (nextSubmissions: Submission[]) => {
     setUploadError('');
@@ -624,46 +636,35 @@ export function DraftsScreen({
         onChange={handleBulkFileInput}
       />
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
-        <div className="flex h-[60px] flex-col justify-between rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-3 py-1.5 shadow-sm sm:h-[110px] sm:p-4 lg:p-5">
-          <div className="flex items-center justify-end sm:justify-between">
-            <span className="hidden text-[12px] font-medium text-white/50 uppercase tracking-wide sm:block">Ждут загрузки</span>
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5 sm:h-8 sm:w-8">
-              <UploadCloud className="h-3.5 w-3.5 text-white/40 sm:h-4 sm:w-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-[24px] font-medium leading-none text-white sm:text-2xl sm:font-semibold">{summary.missing}</div>
-            <div className="mt-1 hidden text-[11px] text-white/40 sm:block">по {summary.submissions} пакетам</div>
-          </div>
-        </div>
-
-        <div className="flex h-[60px] flex-col justify-between rounded-2xl border border-[#242529] bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-3 py-1.5 shadow-sm sm:h-[110px] sm:p-4 lg:p-5">
-          <div className="flex items-center justify-end sm:justify-between">
-            <span className="hidden text-[12px] font-medium text-white/50 uppercase tracking-wide sm:block">В обработке OCR</span>
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.045] sm:h-8 sm:w-8">
-              <ScanLine className="h-3.5 w-3.5 text-[#b8baff] sm:h-4 sm:w-4" />
-            </div>
-          </div>
-          <div>
-            <div className="text-[24px] font-medium leading-none text-white sm:text-2xl sm:font-semibold">{summary.processing}</div>
-            <div className="mt-1 hidden text-[11px] text-white/40 sm:block">распознаются системой</div>
-          </div>
-        </div>
-
-        <div className="group relative flex h-[60px] flex-col justify-between overflow-hidden rounded-2xl border border-[#5b2b32]/50 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-3 py-1.5 shadow-[0_4px_20px_rgba(239,68,68,0.05)] sm:h-[110px] sm:p-4 lg:p-5">
-          <div className="relative z-10 flex items-center justify-end sm:justify-between">
-            <span className="hidden text-[12px] font-medium text-[#d59aa3]/80 uppercase tracking-wide sm:block">Ошибки проверки</span>
-            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#24191b]/60 sm:h-8 sm:w-8">
-              <FileWarning className="h-3.5 w-3.5 text-[#d59aa3] sm:h-4 sm:w-4" />
-            </div>
-          </div>
-          <div className="relative z-10">
-            <div className="text-[24px] font-medium leading-none text-white sm:text-2xl sm:font-semibold">{summary.error}</div>
-            <div className="mt-1 hidden text-[11px] text-white/50 sm:block">требуют ручного ревью</div>
-          </div>
-        </div>
-      </div>
+      <V19SummaryTileGrid className="grid-cols-3">
+        <V19SummaryTile
+          active={draftSummaryFilter === 'missing'}
+          detail={`ожидают · ${summary.submissions}`}
+          icon={UploadCloud}
+          label="Ждут загрузки"
+          tone="neutral"
+          value={summary.missing}
+          onClick={() => setDraftSummaryFilter('missing')}
+        />
+        <V19SummaryTile
+          active={draftSummaryFilter === 'processing'}
+          detail="OCR"
+          icon={ScanLine}
+          label="В обработке"
+          tone="indigo"
+          value={summary.processing}
+          onClick={() => setDraftSummaryFilter('processing')}
+        />
+        <V19SummaryTile
+          active={draftSummaryFilter === 'error'}
+          detail="ревью"
+          icon={FileWarning}
+          label="Ошибки"
+          tone="danger"
+          value={summary.error}
+          onClick={() => setDraftSummaryFilter('error')}
+        />
+      </V19SummaryTileGrid>
 
       <div className="flex flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
         <div className="flex items-center justify-between border-b border-[#242529] bg-[#1a1a1d] px-4 py-4">
@@ -717,7 +718,7 @@ export function DraftsScreen({
                   type="button"
                   title="Открыть пакет"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <MoreVertical className="h-4 w-4" />
                 </button>
               </div>
 
@@ -829,7 +830,7 @@ export function DraftsScreen({
                         className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                         type="button"
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
