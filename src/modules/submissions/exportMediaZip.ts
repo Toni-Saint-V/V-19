@@ -7,9 +7,11 @@ import {
 } from "../documents/documentExport";
 import {
   DOCUMENT_TYPES,
+  buildDocumentStoragePath,
   documentTypeToFrontendMediaType,
   tryNormalizeDocumentType,
   type DocumentAsset,
+  type DocumentType,
 } from "../documents/documentTypes";
 import {
   buildExportPackageIdentity,
@@ -91,7 +93,7 @@ type DocumentExportRepository = Pick<
   "getReadyForExport" | "markExported" | "recordExportAudit"
 >;
 
-type ExportMediaZipOptions = {
+export type ExportMediaZipOptions = {
   documentAssets?: DocumentAsset[];
   documentRepository?: DocumentExportRepository;
   downloadDocument?: ExportMediaZipDocumentDownloader;
@@ -237,7 +239,9 @@ export async function createExportMediaZipArtifact(
           packageId: identityResult.identity.idempotencyKey,
           submissionIds: identityResult.identity.submissionIds,
         });
-        await documentAssetsResult.repository.markExported(documents.documentAssetIds);
+        await documentAssetsResult.repository.markExported(
+          documents.documentAssetIds,
+        );
       } catch {
         return blocked(
           "audit_failed",
@@ -303,6 +307,28 @@ export default async function downloadExportMediaZip(
   if (!artifactResult.ok) return artifactResult;
 
   return downloadPreparedExportMediaZip(artifactResult.artifact);
+}
+
+export function buildLocalDemoExportMediaZipOptions(
+  submissions: Submission[],
+): Pick<ExportMediaZipOptions, "documentAssets" | "downloadDocument"> {
+  return {
+    documentAssets: localDemoDocumentAssetsFromSubmissionFiles(submissions),
+    downloadDocument: async (asset, context) => {
+      const lines = [
+        "VisaFlow local export document placeholder",
+        `Submission: ${context.submission.id} — ${context.submission.title}`,
+        `Applicant: ${context.applicant.fullName}`,
+        `Document type: ${context.type}`,
+        `Storage path: ${asset.storage.path}`,
+        "Supabase/private storage is inactive in this runtime, so the ZIP contains a deterministic non-empty local placeholder for demo export.",
+      ];
+
+      return new Blob([lines.join("\n")], {
+        type: asset.mime ?? "application/octet-stream",
+      });
+    },
+  };
 }
 
 function validateExportMediaZipIdentity(
@@ -443,6 +469,90 @@ function documentDownloaderForOptions(
       bucket: mediaStorageBucket,
       path: asset.storage.path,
     });
+}
+
+function localDemoDocumentAssetsFromSubmissionFiles(
+  submissions: Submission[],
+): DocumentAsset[] {
+  const now = new Date().toISOString();
+
+  return submissions.flatMap((submission) =>
+    submission.files.flatMap((file) => {
+      const type = tryNormalizeDocumentType(file.type);
+      if (!type || file.status !== "accepted") return [];
+
+      const filename = localDemoDocumentFileName(file, type);
+      const storagePath = buildDocumentStoragePath({
+        applicantId: file.applicantId,
+        filename,
+        submissionId: submission.id,
+        type,
+      });
+
+      return [
+        {
+          id: `${file.id}-${type}`,
+          sourceMediaAssetId: file.id,
+          submissionId: submission.id,
+          applicantId: file.applicantId,
+          ownerUserId: submission.agentId,
+          type,
+          storage: {
+            bucket: mediaStorageBucket,
+            path: storagePath,
+            filename,
+          },
+          uploadStatus: "uploaded" as const,
+          validationStatus: "passed" as const,
+          exportStatus: "ready" as const,
+          mime: file.mimeType ?? defaultMimeForLocalDemoDocument(type),
+          size: Math.max(1, file.sizeBytes ?? 1),
+          checksum: null,
+          uploadedAt: file.uploadedAtIso ?? now,
+          validatedAt: file.reviewedAtIso ?? now,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+    }),
+  );
+}
+
+function localDemoDocumentFileName(
+  file: SubmissionFile,
+  type: DocumentType,
+): string {
+  const extension = localDemoExtension(file.mimeType, type);
+  const raw =
+    file.generatedFileName ??
+    file.originalFileName ??
+    `${file.id}_${type}.${extension}`;
+  const withExtension = /\.[a-z0-9]+$/i.test(raw) ? raw : `${raw}.${extension}`;
+  const safe = withExtension
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}_.-]+/gu, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 96);
+
+  return safe || `${file.id}_${type}.${extension}`;
+}
+
+function localDemoExtension(
+  mimeType: string | undefined,
+  type: DocumentType,
+): string {
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/heic") return "heic";
+  if (mimeType === "image/heif") return "heif";
+  if (type === "passport_scan") return "jpg";
+  return "jpg";
+}
+
+function defaultMimeForLocalDemoDocument(type: DocumentType): string {
+  return type === "passport_scan" ? "image/jpeg" : "image/jpeg";
 }
 
 function documentAssetsFromSubmissionFiles(
