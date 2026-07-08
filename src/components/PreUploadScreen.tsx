@@ -88,8 +88,15 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     return phase === 'ready' || phase === 'review' || sourceReady;
   });
   const showExtractionStatus = files.length > 0 && packageType === 'family';
-  const extractionIsDone = phase === 'ready';
-  const extractionStatusText = extractionIsDone ? 'Успешно распознано' : 'Идет распознавание документа';
+  const hasRecognizedFiles = recognizedCount > 0;
+  const filesAreFinal = files.length > 0 && files.every((file) => finalStatuses.includes(file.status));
+  const extractionIsDone = phase === 'ready' && hasRecognizedFiles && previewFields.length > 0;
+  const extractionNeedsReview =
+    filesAreFinal &&
+    ['review', 'ready'].includes(phase) &&
+    !extractionIsDone;
+  const extractionStatusText = extractionNeedsReview ? 'Нужна ручная сверка' : 'Идет распознавание документа';
+  const completeBlocked = filesAreFinal && !extractionIsDone;
 
   const clearPipeline = () => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -207,10 +214,6 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         setActiveFileId(null);
         setPhase('review');
       }, tail);
-      schedule(() => {
-        if (pipelineRunRef.current !== runId) return;
-        setPhase('ready');
-      }, tail + 620);
     }
   };
 
@@ -261,7 +264,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     if (!manualUpload || files.length === 0) return;
     if (!files.every((file) => finalStatuses.includes(file.status))) return;
     setActiveFileId(null);
-    setPhase('ready');
+    setPhase(files.some((file) => file.status === 'recognized') ? 'ready' : 'review');
   }, [files, manualUpload]);
 
   return (
@@ -485,7 +488,8 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 <button
                   type="button"
                   onClick={completeDraft}
-                  className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  disabled={completeBlocked}
+                  className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#25252a] disabled:text-white/35 disabled:shadow-none"
                 >
                   Далее
                 </button>
@@ -555,9 +559,10 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
               <button
                 onClick={completeDraft}
-                className="mt-4 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[8px] bg-[#3a45b4] text-[14px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                disabled={completeBlocked}
+                className="mt-4 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[8px] bg-[#3a45b4] text-[14px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#25252a] disabled:text-white/35 disabled:shadow-none"
               >
-                {phase === 'ready' ? 'Перейти в анкету' : 'Идёт извлечение'} <ArrowRight className="w-4 h-4" />
+                {extractionIsDone ? 'Перейти в анкету' : extractionNeedsReview ? 'Проверьте файл' : 'Идёт извлечение'} <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </aside>
