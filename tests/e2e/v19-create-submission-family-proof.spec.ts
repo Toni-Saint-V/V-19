@@ -115,7 +115,7 @@ async function footerTop(dialog: Locator) {
 }
 
 async function expectActionButtonsInViewport(page: Page, dialog: Locator) {
-  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  const viewportHeight = page.viewportSize()?.height ?? 0;
 
   for (const name of ["Сохранить черновик", "Далее"]) {
     const button = dialog.getByRole("button", { exact: true, name });
@@ -138,7 +138,7 @@ async function expectQuestionnaireDesktopLayout(page: Page) {
 
   const pinnedDisplay = await page
     .locator(".v19-questionnaire-section-list--pinned")
-    .evaluate((element) => getComputedStyle(element).display);
+    .evaluate("element => window.getComputedStyle(element).display");
   expect(pinnedDisplay).toBe("none");
 
   const applicantBox = await applicantBar.boundingBox();
