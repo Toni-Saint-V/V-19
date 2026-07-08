@@ -33,7 +33,7 @@ interface PreUploadScreenProps {
 }
 
 const finalStatuses: ProductFileStatus[] = ['recognized', 'needs_review', 'failed'];
-const passportExtractionTimeoutMs = 8000;
+const passportExtractionTimeoutMs = 30000;
 
 function passportExtractionValues(fields: PassportExtractionField[]) {
   const values: Record<string, string> = {};
