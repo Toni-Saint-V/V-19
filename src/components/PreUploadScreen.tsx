@@ -91,13 +91,18 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   const showExtractionStatus = files.length > 0 && packageType === 'family';
   const hasRecognizedFiles = recognizedCount > 0;
   const filesAreFinal = files.length > 0 && files.every((file) => finalStatuses.includes(file.status));
-  const extractionIsDone = phase === 'ready' && hasRecognizedFiles && previewFields.length > 0;
+  const extractionIsDone = phase === 'ready' && filesAreFinal && hasRecognizedFiles && previewFields.length > 0;
+  const canContinueToQuestionnaire = extractionIsDone;
   const extractionNeedsReview =
     filesAreFinal &&
     ['review', 'ready'].includes(phase) &&
-    !extractionIsDone;
-  const extractionStatusText = extractionNeedsReview ? 'Нужна ручная сверка' : 'Идет распознавание документа';
-  const completeBlocked = files.length > 0 && !extractionIsDone;
+    !canContinueToQuestionnaire;
+  const extractionStatusText = extractionIsDone
+    ? 'Успешно распознано'
+    : extractionNeedsReview
+      ? 'Нужна ручная сверка'
+      : 'Идет распознавание документа';
+  const completeBlocked = !canContinueToQuestionnaire;
 
   const clearPipeline = () => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -256,6 +261,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
   };
 
   const completeDraft = () => {
+    if (!canContinueToQuestionnaire) return;
     onComplete?.(buildProductIntakeDraft(packageType, files, draftSeedIso));
   };
 
@@ -495,6 +501,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 <button
                   type="button"
                   onClick={completeDraft}
+                  aria-disabled={completeBlocked}
                   disabled={completeBlocked}
                   className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#25252a] disabled:text-white/35 disabled:shadow-none"
                 >
@@ -566,6 +573,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
               <button
                 onClick={completeDraft}
+                aria-disabled={completeBlocked}
                 disabled={completeBlocked}
                 className="mt-4 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[8px] bg-[#3a45b4] text-[14px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#25252a] disabled:text-white/35 disabled:shadow-none"
               >

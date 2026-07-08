@@ -159,7 +159,20 @@ function fileKindFromName(name: string): ProductFileKind {
 function extractedKeysForKind(kind: ProductFileKind) {
   switch (kind) {
     case 'passport':
-      return ['surname', 'firstName', 'birthDate', 'birthPlace', 'passportNo', 'passportIssuedAt', 'passportExpiresAt'];
+      return [
+        'surname',
+        'firstName',
+        'birthDate',
+        'birthPlace',
+        'nationality',
+        'gender',
+        'passportType',
+        'passportNo',
+        'passportIssuedAt',
+        'passportExpiresAt',
+        'passportIssueCountry',
+        'passportIssuePlace',
+      ];
     case 'bank':
       return ['financeType', 'bankBalance'];
     case 'booking':
@@ -190,6 +203,7 @@ export function createDemoIntakeFiles(type: ProductPackageType): ProductIntakeFi
   const base = [
     intakeFile('demo-passport-main', 'Passport_Main.pdf', 'passport', type === 'family' ? 'Иван Петров' : 'Алина Смирнова'),
     intakeFile('demo-selfie-main', 'Selfie_Main.jpg', 'photo', type === 'family' ? 'Иван Петров' : 'Алина Смирнова'),
+    intakeFile('demo-selfie-2-main', 'Selfie_2_Main.jpg', 'photo', type === 'family' ? 'Иван Петров' : 'Алина Смирнова'),
     intakeFile('demo-bank-main', 'Bank_Statement.pdf', 'bank', type === 'family' ? 'Иван Петров' : 'Алина Смирнова'),
     intakeFile('demo-booking', 'Booking_Hotel_Flights.pdf', 'booking'),
     intakeFile('demo-employment', 'Employment_Certificate.pdf', 'employment', type === 'family' ? 'Иван Петров' : 'Алина Смирнова'),
@@ -201,6 +215,7 @@ export function createDemoIntakeFiles(type: ProductPackageType): ProductIntakeFi
     ...base,
     intakeFile('demo-passport-spouse', 'Passport_Spouse.pdf', 'passport', 'Анна Петрова'),
     intakeFile('demo-selfie-spouse', 'Selfie_Spouse.jpg', 'photo', 'Анна Петрова'),
+    intakeFile('demo-selfie-2-spouse', 'Selfie_2_Spouse.jpg', 'photo', 'Анна Петрова'),
   ];
 }
 
@@ -259,10 +274,11 @@ function extractedApplicantFieldsForFile(file: ProductIntakeFile | undefined) {
 }
 
 function buildApplicants(type: ProductPackageType, files: ProductIntakeFile[]): ProductIntakeApplicant[] {
-  const count = type === 'family' ? 2 : 1;
   const passportFiles = files.filter((file) =>
     file.kind === 'passport' && ['recognized', 'needs_review'].includes(file.status),
   );
+  const queuedPassportCount = files.filter((file) => file.kind === 'passport').length;
+  const count = type === 'family' ? Math.max(2, passportFiles.length, queuedPassportCount) : 1;
 
   return Array.from({ length: count }, (_, index) => {
     const fields = {

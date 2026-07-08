@@ -10,7 +10,12 @@ import {
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
 import type { Submission } from "../types";
-import { BLS_CITY_OPTIONS, type QuestionnaireFieldUpdate } from "../questionnaire";
+import {
+  BLS_CITY_OPTIONS,
+  updateQuestionnaireField,
+  validateQuestionnaireFieldValue,
+  type QuestionnaireFieldUpdate,
+} from "../questionnaire";
 import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
@@ -71,14 +76,17 @@ type FormFieldProps = {
 type FigmaQuestionnaireScreenProps = {
   initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
-  onComplete: (values: {
-    fieldUpdates: QuestionnaireFieldUpdate[];
-    focusedUpdate?: QuestionnaireFieldUpdate;
-    travelEnd: string;
-    travelStart: string;
-  }) => void;
+  onComplete: (values: QuestionnaireCommitPayload) => void;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
+  onSaveDraft?: (values: QuestionnaireCommitPayload) => void;
   submission: Submission;
+};
+
+type QuestionnaireCommitPayload = {
+  fieldUpdates: QuestionnaireFieldUpdate[];
+  focusedUpdate?: QuestionnaireFieldUpdate;
+  travelEnd: string;
+  travelStart: string;
 };
 
 type QuestionnaireInitialFocus = {
@@ -307,11 +315,17 @@ function FormField({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  const validationMessage = validateFormFieldValue({ label, required, type, value });
+  const effectiveState: FieldState = validationMessage || state === "invalid"
+    ? "invalid"
+    : state;
+  const effectiveErrorMessage =
+    errorMessage ?? validationMessage ?? reviewSource ?? "Нужно исправить значение";
   const baseClasses = "v19-questionnaire-field-control";
   const stateClasses =
-    state === "needs_review"
+    effectiveState === "needs_review"
       ? "is-review"
-      : state === "invalid"
+      : effectiveState === "invalid"
         ? "is-invalid"
         : "is-normal";
 
@@ -394,11 +408,11 @@ function FormField({
         />
       )}
 
-      {state === "invalid" ? (
+      {effectiveState === "invalid" ? (
       <div className="flex items-start gap-1.5 text-[var(--v19b-size-10-5)] text-white/40 mt-1">
         <span className="text-red-400 flex items-center gap-1.5 font-medium">
           <AlertCircle className="w-3.5 h-3.5" />
-          {errorMessage ?? reviewSource ?? "Нужно исправить значение"}
+          {effectiveErrorMessage}
         </span>
       </div>
       ) : null}
@@ -540,8 +554,118 @@ function questionnaireField(
     .find((field) => field.id === fieldId);
 }
 
-function fieldIsReady(field: Submission["applicants"][number]["sections"][number]["fields"][number]) {
-  return !field.required || Boolean(field.value.trim() && !field.error);
+type QuestionnaireModelField = NonNullable<
+  ReturnType<typeof questionnaireField>
+>;
+
+const requiredQuestionnaireFileTypes = ["passport_scan", "selfie", "selfie_2"] as const;
+
+function questionnaireUpdateKey(
+  update: Pick<QuestionnaireFieldUpdate, "applicantId" | "fieldId" | "sectionId">,
+) {
+  return `${update.applicantId}:${update.sectionId}:${update.fieldId}`;
+}
+
+function applyQuestionnaireUpdates(
+  submission: Submission,
+  updates: QuestionnaireFieldUpdate[],
+) {
+  return updates.reduce(
+    (nextSubmission, update) => updateQuestionnaireField(nextSubmission, update),
+    submission,
+  );
+}
+
+function parseQuestionnaireDate(value: string) {
+  const trimmed = value.trim();
+  const dotted = /^(\d{2})[.-](\d{2})[.-](\d{4})$/.exec(trimmed);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!dotted && !iso) return null;
+
+  const year = Number(iso ? iso[1] : dotted?.[3]);
+  const month = Number(iso ? iso[2] : dotted?.[2]);
+  const day = Number(iso ? iso[3] : dotted?.[1]);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function validationMessageForQuestionnaireField(
+  field: Pick<QuestionnaireModelField, "id" | "label" | "required">,
+  value: string,
+) {
+  return validateQuestionnaireFieldValue(field, value);
+}
+
+
+function validateFormFieldValue({
+  label,
+  required,
+  type,
+  value,
+}: Pick<FormFieldProps, "label" | "required" | "type" | "value">) {
+  if (required && !value.trim()) return "Обязательное поле";
+  if (!value.trim()) return undefined;
+
+  const normalizedLabel = label.toLocaleLowerCase("ru-RU");
+
+  if (type === "email" || normalizedLabel.includes("email")) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+      ? undefined
+      : "Проверьте формат email";
+  }
+
+  if (normalizedLabel.includes("телефон")) {
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 7 && digits.length <= 18 ? undefined : "Проверьте номер телефона";
+  }
+
+  if (
+    normalizedLabel.includes("дата") ||
+    normalizedLabel.includes("действител")
+  ) {
+    return parseQuestionnaireDate(value.trim())
+      ? undefined
+      : "Дата должна быть в формате ДД.ММ.ГГГГ";
+  }
+
+  if (type === "number" && Number.isNaN(Number(value))) {
+    return "Введите число";
+  }
+
+  return undefined;
+}
+
+function fieldIsReady(field: QuestionnaireModelField) {
+  return (
+    !field.required ||
+    Boolean(
+      field.value.trim() &&
+        !field.error &&
+        !validationMessageForQuestionnaireField(field, field.value),
+    )
+  );
+}
+
+function fileIsReadyForQuestionnaire(file: Submission["files"][number] | undefined) {
+  if (!file) return false;
+  if (file.status === "missing" || file.status === "needs_replacement") return false;
+  if (file.uploadStatus && file.uploadStatus !== "uploaded") return false;
+  if (
+    file.reviewStatus === "replace_required" ||
+    file.reviewStatus === "poor_quality"
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function riskLabel(count: number) {
@@ -1078,25 +1202,40 @@ export function FigmaQuestionnaireScreen({
   onBack,
   onComplete,
   onFieldChange,
+  onSaveDraft,
   submission,
 }: FigmaQuestionnaireScreenProps) {
-  const applicants = useMemo(() => applicantTabs(submission), [submission]);
   const initialFieldTarget = focusableFieldFor(initialFocus?.field);
-  const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
-  const [activeApplicant, setActiveApplicant] = useState(
-    initialApplicantId,
-  );
-  const [activeSection, setActiveSection] = useState<SectionId>(
-    sectionForFocus(initialFocus, initialFieldTarget),
-  );
-  const sourceFormData = useMemo(
-    () => questionnaireFormDataFromSubmission(submission, activeApplicant),
-    [activeApplicant, submission],
-  );
-  const [formData, setFormData] = useState<QuestionnaireFormData>(() => sourceFormData);
   const [pendingFieldUpdates, setPendingFieldUpdates] = useState<
     Record<string, QuestionnaireFieldUpdate>
   >({});
+  const pendingUpdates = useMemo(
+    () => Object.values(pendingFieldUpdates),
+    [pendingFieldUpdates],
+  );
+  const draftSubmission = useMemo(
+    () => applyQuestionnaireUpdates(submission, pendingUpdates),
+    [pendingUpdates, submission],
+  );
+  const applicants = useMemo(() => applicantTabs(draftSubmission), [draftSubmission]);
+  const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
+  const [activeApplicant, setActiveApplicant] = useState(initialApplicantId);
+  const [activeSection, setActiveSection] = useState<SectionId>(
+    sectionForFocus(initialFocus, initialFieldTarget),
+  );
+  const baseFormData = useMemo(
+    () => questionnaireFormDataFromSubmission(submission, activeApplicant),
+    [activeApplicant, submission],
+  );
+  const sourceFormData = useMemo(
+    () => questionnaireFormDataFromSubmission(draftSubmission, activeApplicant),
+    [activeApplicant, draftSubmission],
+  );
+  const [formData, setFormData] = useState<QuestionnaireFormData>(() => sourceFormData);
+
+  useEffect(() => {
+    setPendingFieldUpdates({});
+  }, [submission.id]);
 
   useEffect(() => {
     if (applicants.some((applicant) => applicant.id === activeApplicant)) return;
@@ -1105,14 +1244,13 @@ export function FigmaQuestionnaireScreen({
 
   useEffect(() => {
     setFormData(sourceFormData);
-    setPendingFieldUpdates({});
   }, [sourceFormData]);
 
   const activeApplicantModel = useMemo(
     () =>
-      submission.applicants.find((applicant) => applicant.id === activeApplicant) ??
-      submission.applicants[0],
-    [activeApplicant, submission.applicants],
+      draftSubmission.applicants.find((applicant) => applicant.id === activeApplicant) ??
+      draftSubmission.applicants[0],
+    [activeApplicant, draftSubmission.applicants],
   );
 
   const selectOptions = useMemo(
@@ -1254,40 +1392,75 @@ export function FigmaQuestionnaireScreen({
 
   const openFieldIssues = useMemo(
     () =>
-      submission.issues.filter(
+      draftSubmission.issues.filter(
         (issue) =>
           issue.status === "open" &&
           issue.target.applicantId === activeApplicant &&
           issue.target.field,
       ),
-    [activeApplicant, submission.issues],
+    [activeApplicant, draftSubmission.issues],
   );
 
-  const questionnaireStats = useMemo(() => {
-    const fields = activeApplicantModel?.sections.flatMap((section) => section.fields) ?? [];
-    const total = fields.length;
-    const completed = fields.filter(fieldIsReady).length;
-    const fieldRisks = fields.filter(
-      (field) => field.error || field.reviewState === "needs_review",
+  const readinessStats = useMemo(() => {
+    const fields = draftSubmission.applicants.flatMap((applicant) =>
+      applicant.sections.flatMap((section) => section.fields),
+    );
+    const requiredFields = fields.filter((field) => field.required);
+    const completedFields = requiredFields.filter(fieldIsReady);
+    const validationRisks = fields.filter(
+      (field) =>
+        Boolean(field.error) ||
+        Boolean(validationMessageForQuestionnaireField(field, field.value)),
     ).length;
+    const openIssueRisks = draftSubmission.issues.filter(
+      (issue) => issue.status === "open" || issue.status === "fixed_by_agent",
+    ).length;
+    const requiredFileSlots = draftSubmission.applicants.flatMap((applicant) =>
+      requiredQuestionnaireFileTypes.map((type) => ({ applicantId: applicant.id, type })),
+    );
+    const readyFiles = requiredFileSlots.filter((slot) =>
+      fileIsReadyForQuestionnaire(
+        draftSubmission.files.find(
+          (file) => file.applicantId === slot.applicantId && file.type === slot.type,
+        ),
+      ),
+    );
+    const total = requiredFields.length + requiredFileSlots.length;
+    const completed = completedFields.length + readyFiles.length;
     const percent = total ? Math.round((completed / total) * 100) : 0;
+    const risks = validationRisks + openIssueRisks;
 
     return {
+      canSubmit: total > 0 && completed === total && risks === 0,
       completed,
+      completedFields: completedFields.length,
+      completedFiles: readyFiles.length,
+      fieldTotal: requiredFields.length,
+      fileTotal: requiredFileSlots.length,
       percent,
-      risks: fieldRisks + openFieldIssues.length,
+      risks,
       total,
     };
-  }, [activeApplicantModel, openFieldIssues.length]);
+  }, [draftSubmission]);
 
   const sections = useMemo(
     () =>
       sectionDefinitions.map(({ canonicalId, ...definition }) => {
         if (definition.id === "files") {
+          const applicantFiles = activeApplicantModel
+            ? requiredQuestionnaireFileTypes.map((type) =>
+                draftSubmission.files.find(
+                  (file) => file.applicantId === activeApplicantModel.id && file.type === type,
+                ),
+              )
+            : [];
+          const completed = applicantFiles.filter(fileIsReadyForQuestionnaire).length;
+          const total = requiredQuestionnaireFileTypes.length;
+
           return {
             ...definition,
-            meta: fileCountLabel(submission.files.length),
-            status: submission.completeness.files >= 100 ? "complete" : "pending",
+            meta: `${completed} из ${total}`,
+            status: completed === total ? "complete" : "pending",
           } satisfies SectionTab & { id: SectionId };
         }
 
@@ -1297,13 +1470,14 @@ export function FigmaQuestionnaireScreen({
 
         if (!sourceSection) return definition;
 
-        const total = sourceSection.fields.length;
-        const completed = sourceSection.fields.filter(fieldIsReady).length;
-        const hasRisk =
-          sourceSection.status === "needs_fix" ||
-          sourceSection.fields.some(
-            (field) => field.error || field.reviewState === "needs_review",
-          );
+        const requiredFields = sourceSection.fields.filter((field) => field.required);
+        const total = requiredFields.length;
+        const completed = requiredFields.filter(fieldIsReady).length;
+        const hasRisk = sourceSection.fields.some(
+          (field) =>
+            Boolean(field.error) ||
+            Boolean(validationMessageForQuestionnaireField(field, field.value)),
+        );
 
         return {
           ...definition,
@@ -1312,10 +1486,9 @@ export function FigmaQuestionnaireScreen({
             hasRisk ? "issue" : total > 0 && completed === total ? "complete" : "pending",
         } satisfies SectionTab & { id: SectionId };
       }),
-    [activeApplicantModel, submission.completeness.files, submission.files.length],
+    [activeApplicantModel, draftSubmission.files],
   );
-  const isCompleteButtonDisabled =
-    questionnaireStats.risks > 0 || sections.some((section) => section.status !== "complete");
+  const isCompleteButtonDisabled = !readinessStats.canSubmit;
 
   const currentSectionIssue = useMemo(() => {
     const currentSection = sections.find((section) => section.id === activeSection);
@@ -1342,25 +1515,30 @@ export function FigmaQuestionnaireScreen({
     const binding = questionnaireFieldBindings.find((item) => item.formKey === key);
     if (!binding) return;
 
+    const modelField = questionnaireField(activeApplicantModel, binding.fieldId);
     const update = {
       applicantId: activeApplicant,
+      error: modelField
+        ? validationMessageForQuestionnaireField(modelField, value)
+        : undefined,
       fieldId: binding.fieldId,
       sectionId: binding.sectionId,
       value,
     } satisfies QuestionnaireFieldUpdate;
+    const updateKey = questionnaireUpdateKey(update);
 
     setPendingFieldUpdates((current) => {
       const next = { ...current };
-      if (value === sourceFormData[key]) {
-        delete next[binding.fieldId];
+      if (value === baseFormData[key]) {
+        delete next[updateKey];
         return next;
       }
 
-      next[binding.fieldId] = update;
+      next[updateKey] = update;
       return next;
     });
 
-    if (value !== sourceFormData[key]) onFieldChange?.(update);
+    if (value !== baseFormData[key]) onFieldChange?.(update);
   }
 
   function fieldIssue(fieldId: string, label: string) {
@@ -1373,6 +1551,10 @@ export function FigmaQuestionnaireScreen({
     if (fieldIssue(fieldId, label)) return "invalid";
 
     const field = questionnaireField(activeApplicantModel, fieldId);
+    const validationError = field
+      ? validationMessageForQuestionnaireField(field, field.value)
+      : undefined;
+    if (field?.error || validationError) return "invalid";
     if (field?.reviewState === "needs_review") return "needs_review";
 
     return initialFieldTarget?.fieldId === fieldId ||
@@ -1383,17 +1565,75 @@ export function FigmaQuestionnaireScreen({
 
   function fieldErrorMessage(fieldId: string, label: string) {
     const issue = fieldIssue(fieldId, label);
-    return issue?.comment ?? issue?.reason;
+    if (issue) return issue.comment ?? issue.reason;
+    const field = questionnaireField(activeApplicantModel, fieldId);
+    return field ? validationMessageForQuestionnaireField(field, field.value) : undefined;
   }
 
   function fieldReviewSource(fieldId: string, label: string) {
     if (fieldReviewState(fieldId, label) !== "needs_review") return undefined;
     return questionnaireField(activeApplicantModel, fieldId)?.reviewSource
-      ? "замечание администратора"
+      ? "требует сверки OCR"
       : undefined;
   }
 
-  function completionPayload() {
+  function requiredFileForActiveApplicant(
+    type: (typeof requiredQuestionnaireFileTypes)[number],
+  ) {
+    if (!activeApplicantModel) return undefined;
+    return draftSubmission.files.find(
+      (file) => file.applicantId === activeApplicantModel.id && file.type === type,
+    );
+  }
+
+  function requiredFileState(
+    type: (typeof requiredQuestionnaireFileTypes)[number],
+  ): FieldState {
+    return fileIsReadyForQuestionnaire(requiredFileForActiveApplicant(type))
+      ? "normal"
+      : "invalid";
+  }
+
+  function requiredFileError(
+    type: (typeof requiredQuestionnaireFileTypes)[number],
+  ) {
+    const file = requiredFileForActiveApplicant(type);
+    if (!file) return "Файл не загружен";
+    if (file.status === "needs_replacement") return "Файл нужно заменить";
+    if (file.uploadStatus && file.uploadStatus !== "uploaded") return "Файл не загружен";
+    if (file.reviewStatus === "replace_required" || file.reviewStatus === "poor_quality") {
+      return "Файл не прошёл проверку качества";
+    }
+    return undefined;
+  }
+
+  function requiredFileValue(
+    type: (typeof requiredQuestionnaireFileTypes)[number],
+    fallback: string,
+  ) {
+    const file = requiredFileForActiveApplicant(type);
+    return file?.originalFileName || file?.generatedFileName || fallback;
+  }
+
+  const focusedApplicantId = initialFocus?.applicantId ?? activeApplicant;
+  const focusedUpdatePayload = useMemo(() => {
+    if (!initialFieldTarget || focusedApplicantId === undefined) return undefined;
+
+    const focusedField = questionnaireField(activeApplicantModel, initialFieldTarget.fieldId);
+    const value = formData[initialFieldTarget.formKey];
+
+    return {
+      applicantId: focusedApplicantId,
+      error: focusedField
+        ? validationMessageForQuestionnaireField(focusedField, value)
+        : undefined,
+      fieldId: initialFieldTarget.fieldId,
+      sectionId: initialFieldTarget.sectionId,
+      value,
+    } satisfies QuestionnaireFieldUpdate;
+  }, [activeApplicantModel, focusedApplicantId, formData, initialFieldTarget]);
+
+  function completionPayload(): QuestionnaireCommitPayload {
     return {
       fieldUpdates: Object.values(pendingFieldUpdates),
       focusedUpdate: focusedUpdatePayload,
@@ -1408,17 +1648,6 @@ export function FigmaQuestionnaireScreen({
     setActiveSection(nextSection.id);
   }
 
-  const focusedApplicantId = initialFocus?.applicantId ?? activeApplicant;
-  const focusedUpdatePayload =
-    initialFieldTarget && focusedApplicantId !== undefined
-      ? {
-          applicantId: focusedApplicantId,
-          fieldId: initialFieldTarget.fieldId,
-          sectionId: initialFieldTarget.sectionId,
-          value: formData[initialFieldTarget.formKey],
-        }
-      : undefined;
-
   function renderSectionFields() {
     if (activeSection === "files") {
       return (
@@ -1428,27 +1657,33 @@ export function FigmaQuestionnaireScreen({
             fullWidth
             label="Загранпаспорт"
             number="F1"
+            errorMessage={requiredFileError("passport_scan")}
             readOnly
             required
-            value="Скан или фото главной страницы с фото"
+            state={requiredFileState("passport_scan")}
+            value={requiredFileValue("passport_scan", "Скан или фото главной страницы с фото")}
           />
           <FormField
             excelMap="BLS files: selfie-front"
             fullWidth
             label="Селфи 1"
             number="F2"
+            errorMessage={requiredFileError("selfie")}
             readOnly
             required
-            value="Лицом / анфас"
+            state={requiredFileState("selfie")}
+            value={requiredFileValue("selfie", "Лицом / анфас")}
           />
           <FormField
             excelMap="BLS files: selfie-profile"
             fullWidth
             label="Селфи 2"
             number="F3"
+            errorMessage={requiredFileError("selfie_2")}
             readOnly
             required
-            value="Боком / профиль"
+            state={requiredFileState("selfie_2")}
+            value={requiredFileValue("selfie_2", "Боком / профиль")}
           />
         </>
       );
@@ -2171,12 +2406,12 @@ export function FigmaQuestionnaireScreen({
 
         <div className="v19-questionnaire-title-wrap">
           <h1
-            aria-label={`Анкета: ${submission.title || "Семья Петровых"}`}
+            aria-label={`Анкета: ${draftSubmission.title || "Семья Петровых"}`}
             className="v19-questionnaire-title"
           >
             <span className="v19-questionnaire-title-mobile">Анкета</span>
             <span className="v19-questionnaire-title-desktop">
-              Анкета: {submission.title || "Семья Петровых"}
+              Анкета: {draftSubmission.title || "Семья Петровых"}
             </span>
           </h1>
         </div>
@@ -2184,10 +2419,17 @@ export function FigmaQuestionnaireScreen({
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-[var(--v19b-size-11)] text-white/40 hidden md:inline-flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-            Сохранено только что
+            {readinessStats.percent}% · {readinessStats.completed}/{readinessStats.total}
           </span>
           <button
-            className="v19-questionnaire-complete-button"
+            className="v19-questionnaire-draft-button"
+            type="button"
+            onClick={() => onSaveDraft?.(completionPayload())}
+          >
+            Черновик
+          </button>
+          <button
+            className={`v19-questionnaire-complete-button ${readinessStats.canSubmit ? "is-ready" : "is-blocked"}`}
             disabled={isCompleteButtonDisabled}
             type="button"
             onClick={() => onComplete(completionPayload())}
@@ -2200,7 +2442,7 @@ export function FigmaQuestionnaireScreen({
 
       <div className="v19-questionnaire-progress-track">
         <motion.div
-          animate={{ width: `${questionnaireStats.percent}%` }}
+          animate={{ width: `${readinessStats.percent}%` }}
           className="v19-questionnaire-progress-fill"
           initial={{ width: 0 }}
           transition={{ delay: 0.1, duration: 1.2, ease: "easeOut" }}
@@ -2241,8 +2483,8 @@ export function FigmaQuestionnaireScreen({
             <div className="hidden md:flex shrink-0 items-center gap-2 text-[var(--v19b-size-12)] text-white/50 px-3 border-l border-white/5">
               <Users className="w-4 h-4" />
               <span>
-                {submission.type === "family"
-                  ? `Семья, ${Math.max(submission.applicants.length, 1)} чел.`
+                {draftSubmission.type === "family"
+                  ? `Семья, ${Math.max(draftSubmission.applicants.length, 1)} чел.`
                   : "Один заявитель"}
               </span>
             </div>
@@ -2285,10 +2527,10 @@ export function FigmaQuestionnaireScreen({
           <QuestionnaireWorkspaceShell className="v19-questionnaire-workspace-shell flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
             <aside className="v19-questionnaire-section-nav">
               <V19ReadinessCard
-                description="Пакет можно отправлять после сверки полей, отмеченных администратором."
-                detail={riskLabel(questionnaireStats.risks)}
-                scoreLabel={`${questionnaireStats.percent}%`}
-                value={questionnaireStats.percent}
+                description="Пакет можно отправлять, когда обязательные поля и файлы готовы без ошибок."
+                detail={riskLabel(readinessStats.risks)}
+                scoreLabel={`${readinessStats.percent}%`}
+                value={readinessStats.percent}
               />
 
               <V19SearchField label="Поиск поля анкеты" placeholder="Найти поле..." />
@@ -2372,7 +2614,7 @@ export function FigmaQuestionnaireScreen({
                   </div>
                   <div className="v19-questionnaire-completion-pill">
                     <span className="v19-questionnaire-completion-dot" />
-                    Заполнено {questionnaireStats.completed} из {questionnaireStats.total}
+                    Заполнено {readinessStats.completed} из {readinessStats.total}
                   </div>
                 </div>
                 <button
