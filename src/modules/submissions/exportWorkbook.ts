@@ -29,9 +29,7 @@ export type ExportWorkbookArtifact = {
 };
 
 export type ExportWorkbookBlockedReason =
-  | "download_failed"
-  | "export_not_ready"
-  | "row_mismatch";
+  "download_failed" | "export_not_ready" | "row_mismatch";
 
 export type ExportWorkbookDownloadResult =
   | { ok: true; fileName: string }
@@ -74,7 +72,8 @@ export function buildExportWorkbookRowFills(
     ...rows.map((row) => {
       if (row.appointmentType !== "Family") return null;
 
-      const familyKey = row.familyGroupId ?? row.familySubmissionId ?? row.submissionId;
+      const familyKey =
+        row.familyGroupId ?? row.familySubmissionId ?? row.submissionId;
       const existing = familyFillsBySubmission.get(familyKey);
       if (existing) return existing;
 
@@ -105,31 +104,9 @@ export function createExportWorkbookArtifact(
   };
 }
 
-export default function downloadExportWorkbook(
-  rows: ExportContractRow[],
-  identity: ExportPackageIdentity | null,
+export function downloadPreparedExportWorkbookArtifact(
+  artifact: ExportWorkbookArtifact,
 ): ExportWorkbookDownloadResult {
-  if (!identity || identity.rowCount < 1) {
-    return {
-      ok: false,
-      reason: "export_not_ready",
-      safeMessage: "Сначала сформируйте файл выгрузки для текущей выборки.",
-    };
-  }
-
-  if (
-    identity.rowCount !== rows.length ||
-    identity.contentFingerprint !== exportContractFingerprint(rows, identity.format)
-  ) {
-    return {
-      ok: false,
-      reason: "row_mismatch",
-      safeMessage: "Предпросмотр устарел. Обновите выборку и сформируйте файл заново.",
-    };
-  }
-
-  const artifact = createExportWorkbookArtifact(rows, identity);
-
   const runtime = globalThis as BrowserDownloadRuntime;
   let url = "";
 
@@ -149,7 +126,37 @@ export default function downloadExportWorkbook(
     return {
       ok: false,
       reason: "download_failed",
-      safeMessage: "Не удалось подготовить файл Эксель. Повторите формирование.",
+      safeMessage:
+        "Не удалось подготовить файл Эксель. Повторите формирование.",
     };
   }
+}
+
+export default function downloadExportWorkbook(
+  rows: ExportContractRow[],
+  identity: ExportPackageIdentity | null,
+): ExportWorkbookDownloadResult {
+  if (!identity || identity.rowCount < 1) {
+    return {
+      ok: false,
+      reason: "export_not_ready",
+      safeMessage: "Сначала сформируйте файл выгрузки для текущей выборки.",
+    };
+  }
+
+  if (
+    identity.rowCount !== rows.length ||
+    identity.contentFingerprint !==
+      exportContractFingerprint(rows, identity.format)
+  ) {
+    return {
+      ok: false,
+      reason: "row_mismatch",
+      safeMessage:
+        "Предпросмотр устарел. Обновите выборку и сформируйте файл заново.",
+    };
+  }
+
+  const artifact = createExportWorkbookArtifact(rows, identity);
+  return downloadPreparedExportWorkbookArtifact(artifact);
 }
