@@ -82,6 +82,8 @@ async function verifyFamilyCreateFlow(page: Page, mobile: boolean) {
 
   await dialog.locator('input[type="file"]').setInputFiles(e2ePassportFile("family"));
   await expect(dialog.getByText("Заменить набор файлов")).toBeVisible();
+  await expect(dialog.getByText("Нужна ручная сверка").first()).toBeVisible();
+  await expect(dialog.getByText("Успешно распознано")).toHaveCount(0);
   await expect(nextButton).toBeEnabled();
   await expectActionButtonsInViewport(page, dialog);
 

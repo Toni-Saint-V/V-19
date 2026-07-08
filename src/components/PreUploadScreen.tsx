@@ -311,7 +311,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         <div className="grid h-full min-h-full w-full grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] xl:gap-6 xl:p-6">
           <section className="flex h-full min-h-0 flex-col">
             <motion.div
-              className="relative grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-none border-0 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-5 pb-2 pt-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)] lg:p-6 xl:rounded-3xl xl:border xl:border-[#242529]"
+              className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-gradient-to-br from-[#1a1a1d] to-[#141416] px-5 pb-0 pt-5 shadow-[0_24px_80px_rgba(0,0,0,0.22)] lg:px-6 lg:pb-0 lg:pt-6 xl:rounded-3xl xl:border xl:border-[#242529]"
             >
               <motion.div
                 aria-hidden
@@ -320,7 +320,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               />
 
-              <div className="relative z-10 mb-4 flex min-h-[126px] justify-center">
+              <div className="relative z-10 mb-4 shrink-0 flex justify-center">
                 <div className="relative w-full max-w-[560px] space-y-3">
                   <div className="mx-auto flex w-fit rounded-full border border-[#242529] bg-[#141416]/76 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.18)]">
                     {[
@@ -351,20 +351,20 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                   <AnimatePresence mode="wait" initial={false}>
                     {extractionIsDone ? (
                       <motion.div
-                        key="recognized-status"
+                        key="recognized-fields-status"
                         initial={{ opacity: 0, y: 8, scale: 0.985 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.985 }}
                         transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                        className="rounded-2xl border border-[#242529] bg-[#141416]/78 p-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.24)]"
+                        className="flex h-[96px] items-center rounded-2xl border border-[#242529] bg-[#141416]/78 px-4 shadow-[0_18px_44px_rgba(0,0,0,0.24)]"
                       >
-                        <div className="flex items-center gap-2 text-[13px] font-semibold text-white">
-                          <span className="h-2.5 w-2.5 rounded-full bg-[#34d399]" />
-                          <span>Успешно распознано</span>
-                          <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-white/35">
-                            {previewFields.length} полей
-                          </span>
+                        <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-semibold text-white">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#34d399]" />
+                          <span className="truncate">Успешно распознано</span>
                         </div>
+                        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/55">
+                          {previewFields.length} полей справа
+                        </span>
                       </motion.div>
                     ) : packageType === 'family' ? (
                       <motion.div
@@ -373,7 +373,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8, scale: 0.98 }}
                         transition={{ duration: 0.18 }}
-                        className="space-y-2 rounded-2xl border border-[#242529] bg-[#141416]/70 p-3"
+                        className="h-[96px] space-y-2 rounded-2xl border border-[#242529] bg-[#141416]/70 p-3"
                       >
                         {showExtractionStatus ? (
                           <div className="min-h-[42px] overflow-hidden">
@@ -429,7 +429,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="h-1"
+                        className="h-[96px]"
                       />
                     )}
                   </AnimatePresence>
@@ -443,7 +443,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 }}
                 onDragLeave={() => setDropActive(false)}
                 onDrop={handleDrop}
-                className={`relative min-h-[180px] rounded-3xl border border-dashed p-6 lg:min-h-[258px] lg:p-10 flex flex-col items-center justify-center text-center group transition-colors cursor-pointer overflow-hidden ${dropActive ? 'border-[#8fa3ff] bg-[#6f64ff]/[0.14]' : 'border-[#6f64ff]/40 bg-[#6f64ff]/5 hover:bg-[#6f64ff]/10'}`}
+                className={`relative mt-4 min-h-[180px] flex-1 rounded-3xl border border-dashed p-6 lg:p-8 flex flex-col items-center justify-center text-center group transition-colors cursor-pointer overflow-hidden ${dropActive ? 'border-[#8fa3ff] bg-[#6f64ff]/[0.14]' : 'border-[#6f64ff]/40 bg-[#6f64ff]/5 hover:bg-[#6f64ff]/10'}`}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <motion.div
@@ -474,18 +474,18 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 <input ref={fileInputRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf" className="hidden" onChange={handleFileInput} />
               </div>
 
-              <div className="mt-4 flex shrink-0 justify-start gap-2">
+              <div className="sticky bottom-0 z-20 -mx-5 mt-4 grid shrink-0 grid-cols-2 gap-2 border-t border-white/[0.06] bg-gradient-to-t from-[#141416] via-[#141416]/95 to-[#141416]/70 px-5 pb-4 pt-3 lg:-mx-6 lg:px-6 xl:rounded-b-3xl">
                 <button
                   type="button"
                   onClick={saveDraft}
-                  className="h-11 min-w-[180px] rounded-[8px] border border-white/10 bg-transparent px-4 text-[13px] font-medium text-white/62 transition-colors hover:border-white/18 hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] max-sm:min-w-0 max-sm:flex-1"
+                  className="h-11 rounded-[8px] border border-white/10 bg-transparent px-3 text-[13px] font-medium text-white/62 transition-colors hover:border-white/18 hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                 >
                   Сохранить черновик
                 </button>
                 <button
                   type="button"
                   onClick={completeDraft}
-                  className="h-11 min-w-[180px] rounded-[8px] bg-[#3a45b4] px-4 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white max-sm:min-w-0 max-sm:flex-1"
+                  className="h-11 rounded-[8px] bg-[#3a45b4] px-3 text-[13px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
                   Далее
                 </button>
@@ -493,9 +493,9 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
             </motion.div>
           </section>
 
-          <aside className="space-y-5">
-            <div className="hidden rounded-2xl bg-[#161617] border border-[#242529] p-5 sticky top-0 overflow-hidden xl:flex xl:min-h-[calc(100dvh-112px)] xl:flex-col">
-              <div className="flex items-center justify-between gap-3 mb-4">
+          <aside className="min-h-0 space-y-5">
+            <div className="sticky top-0 hidden overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] p-5 xl:flex xl:h-[calc(100dvh-112px)] xl:max-h-[calc(100dvh-112px)] xl:flex-col">
+              <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
                 <div>
                   <h3 className="text-[14px] font-semibold text-white">Prefill-поля</h3>
                   <p className="text-[12px] text-white/40 mt-1">Значения, которые удалось взять из OCR.</p>
@@ -541,7 +541,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 </AnimatePresence>
               </div>
 
-              <div className="mt-4 p-4 rounded-2xl bg-white/[0.045] border border-white/10">
+              <div className="mt-4 shrink-0 rounded-2xl border border-white/10 bg-white/[0.045] p-4">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-white/62 shrink-0 mt-0.5" />
                   <div>
@@ -555,7 +555,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
               <button
                 onClick={completeDraft}
-                className="mt-5 w-full h-11 rounded-[8px] bg-[#3a45b4] hover:bg-[#4855d4] text-white text-[14px] font-semibold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="mt-4 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[8px] bg-[#3a45b4] text-[14px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 {phase === 'ready' ? 'Перейти в анкету' : 'Идёт извлечение'} <ArrowRight className="w-4 h-4" />
               </button>

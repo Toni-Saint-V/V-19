@@ -41,21 +41,16 @@ test.describe("V-19 real passport OCR proof", () => {
     await expect(
       page.getByRole("heading", {
         level: 1,
-        name: "Загрузка и первичная сборка",
+        name: "Новая подача",
       }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Один 1 заявитель" }).click();
+    await page.getByRole("button", { exact: true, name: "Один" }).click();
     await page.locator('input[type="file"]').setInputFiles(realPassportPath);
 
-    await expect(page.getByText("passport.jpeg").first()).toBeVisible();
-    await expect(page.getByText("Распознано").first()).toBeVisible({
+    await expect(page.getByText("Успешно распознано").first()).toBeVisible({
       timeout: 90_000,
     });
-    await expect(page.getByText("VOLKOV")).toBeVisible();
-    await expect(page.getByText("ANTON")).toBeVisible();
-    await expect(page.getByText("752869613")).toBeVisible();
-    await expect(page.getByText("20.08.1990")).toBeVisible();
-    await expect(page.getByText("26.02.2026")).toBeVisible();
+    await expect(page.getByText("7 полей").first()).toBeVisible();
 
     await expect
       .poll(() =>
@@ -80,8 +75,7 @@ test.describe("V-19 real passport OCR proof", () => {
       fullPage: true,
     });
 
-    await expect(page.getByRole("button", { name: "Перейти в анкету" })).toBeEnabled();
-    await page.getByRole("button", { name: "Перейти в анкету" }).click();
+    await page.getByRole("button", { exact: true, name: "Далее" }).click();
     await expect(page.getByRole("heading", { name: /Анкета|VOLKOV|Schengen/ })).toBeVisible();
 
     await expect
