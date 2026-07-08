@@ -15964,6 +15964,7 @@ button.v19-summary-tile:not(:disabled):active {
 .vf-figma-questionnaire-screen
   :where(
     .v19-questionnaire-back-button,
+    .v19-questionnaire-draft-button,
     .v19-questionnaire-complete-button,
     .v19-questionnaire-next-button,
     .v19-questionnaire-next-action-card button,
@@ -27321,6 +27322,7 @@ button.v19-summary-tile:not(:disabled):active {
 .v19-questionnaire-field-control:focus-visible,
 .v19-questionnaire-applicant-tab:focus-visible,
 .v19-questionnaire-section-tab:focus-visible,
+.v19-questionnaire-draft-button:focus-visible,
 .v19-questionnaire-complete-button:focus-visible,
 .v19-questionnaire-next-button:focus-visible,
 .v19-create-upload-button:focus-visible,
@@ -27342,6 +27344,7 @@ button.v19-summary-tile:not(:disabled):active {
   font-size: var(--vf-ref-size-12px);
 }
 
+.v19-questionnaire-draft-button,
 .v19-questionnaire-complete-button,
 .v19-questionnaire-next-button,
 .v19-create-upload-button,
@@ -27369,6 +27372,41 @@ button.v19-summary-tile:not(:disabled):active {
 
 .v19-questionnaire-complete-button:hover {
   background: var(--vf-accent-hover);
+}
+
+.v19-questionnaire-draft-button {
+  min-height: var(--vf-ref-size-36px);
+  padding: 0 var(--vf-ref-size-12px);
+  border: var(--vf-ref-size-1px) solid var(--vf-ref-color-rgb-255-255-255-0neg-1);
+  border-radius: var(--v19-radius-control);
+  color: var(--vf-ref-color-rgb-255-255-255-0neg-7);
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-04);
+  font-size: var(--vf-ref-size-13px);
+  box-shadow: none;
+}
+
+.v19-questionnaire-draft-button:hover {
+  border-color: var(--vf-ref-color-rgb-255-255-255-0neg-18);
+  color: var(--v19-fg);
+  background: var(--vf-ref-color-rgb-255-255-255-0neg-07);
+}
+
+.v19-questionnaire-complete-button.is-ready {
+  border: var(--vf-ref-size-1px) solid var(--v19-success);
+  background: var(--vf-accent-active, var(--vf-ref-color-hexneg-5964d6));
+  box-shadow: 0 0 var(--vf-ref-size-24px) rgba(52, 211, 153, 0.28);
+}
+
+.v19-questionnaire-complete-button.is-blocked,
+.v19-questionnaire-complete-button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.v19-questionnaire-complete-button.is-blocked:hover,
+.v19-questionnaire-complete-button:disabled:hover {
+  background: var(--vf-accent-active, var(--vf-ref-color-hexneg-5964d6));
 }
 
 .v19-questionnaire-progress-track {
@@ -36371,4 +36409,38 @@ select,
     overflow-wrap: normal !important;
     word-break: normal !important;
   }
+}
+
+
+.vf-figma-questionnaire-screen .v19-questionnaire-draft-button {
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19-control-radius) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text) !important;
+  box-shadow: none !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-draft-button:hover {
+  border-color: var(--v19b-color-border-selected) !important;
+  background: var(--v19b-color-control-hover) !important;
+  color: var(--v19b-color-text-strong) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button.is-ready {
+  border-color: var(--v19-success) !important;
+  box-shadow: 0 0 var(--v19b-size-28) rgba(52, 211, 153, 0.3) !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button.is-blocked,
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button:disabled {
+  opacity: 0.52 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button.is-blocked:hover,
+.vf-figma-questionnaire-screen .v19-questionnaire-complete-button:disabled:hover {
+  border-color: var(--v19b-color-primary) !important;
+  background: var(--v19b-color-app) !important;
+  box-shadow: none !important;
 }

@@ -298,11 +298,95 @@ const questionnaireBlueprint: Array<{
   },
 ];
 
+
+type QuestionnaireValidationField = Pick<QuestionnaireField, "id" | "label" | "required"> &
+  Partial<Pick<QuestionnaireField, "value">>;
+
+function parseQuestionnaireDateValue(value: string) {
+  const trimmed = value.trim();
+  const dotted = /^(\d{2})[.-](\d{2})[.-](\d{4})$/.exec(trimmed);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!dotted && !iso) return null;
+
+  const year = Number(iso ? iso[1] : dotted?.[3]);
+  const month = Number(iso ? iso[2] : dotted?.[2]);
+  const day = Number(iso ? iso[3] : dotted?.[1]);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function questionnaireFieldLooksLikeDate(
+  field: Pick<QuestionnaireField, "id" | "label">,
+) {
+  const label = field.label.toLocaleLowerCase("ru-RU");
+  return (
+    field.id.includes("date") ||
+    field.id.includes("valid") ||
+    field.id.includes("expiry") ||
+    field.id.includes("expires") ||
+    label.includes("дата") ||
+    label.includes("действител")
+  );
+}
+
+export function validateQuestionnaireFieldValue(
+  field: QuestionnaireValidationField,
+  value = field.value ?? "",
+) {
+  const trimmed = value.trim();
+  const normalizedLabel = field.label.toLocaleLowerCase("ru-RU");
+
+  if (field.required && !trimmed) return "Обязательное поле";
+  if (!trimmed) return undefined;
+
+  if (field.id === "email" || normalizedLabel.includes("email")) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+      ? undefined
+      : "Проверьте формат email";
+  }
+
+  if (
+    field.id.includes("phone") ||
+    field.id === "contact-number" ||
+    normalizedLabel.includes("телефон")
+  ) {
+    const digits = trimmed.replace(/\D/g, "");
+    return digits.length >= 7 && digits.length <= 18
+      ? undefined
+      : "Проверьте номер телефона";
+  }
+
+  if (questionnaireFieldLooksLikeDate(field)) {
+    return parseQuestionnaireDateValue(trimmed)
+      ? undefined
+      : "Дата должна быть в формате ДД.ММ.ГГГГ";
+  }
+
+  if (field.id === "passport-no") {
+    const compact = trimmed.replace(/\s/g, "");
+    return /^[A-ZА-Я0-9-]{5,20}$/i.test(compact)
+      ? undefined
+      : "Проверьте номер паспорта";
+  }
+
+  return undefined;
+}
+
 export type QuestionnaireFieldUpdate = {
   applicantId: string;
   sectionId: string;
   fieldId: string;
   value: string;
+  error?: string;
   reviewOriginSource?: QuestionnaireReviewSource;
   reviewSource?: QuestionnaireReviewSource;
   reviewState?: QuestionnaireReviewState;
@@ -377,7 +461,9 @@ export function updateQuestionnaireField(
                       reviewSource: update.reviewSource ?? field.reviewSource,
                       reviewState: update.reviewState ?? field.reviewState,
                       error:
-                        update.value.trim() &&
+                        update.error ??
+                        validateQuestionnaireFieldValue(field, update.value) ??
+                        (update.value.trim() &&
                         !hasOpenQuestionnaireFieldIssue(
                           submission,
                           update.applicantId,
@@ -385,7 +471,7 @@ export function updateQuestionnaireField(
                           field,
                         )
                           ? undefined
-                          : field.error,
+                          : field.error),
                     }
                   : field,
               ),
@@ -488,8 +574,8 @@ export function questionnaireProblemCount(submission: Submission) {
   for (const applicant of submission.applicants) {
     for (const section of applicant.sections) {
       for (const field of normalizeFields(section)) {
-        if (field.required && !field.value.trim()) {
-          keys.add(`${applicant.id}:${section.id}:${field.id}:missing`);
+        if (validateQuestionnaireFieldValue(field)) {
+          keys.add(`${applicant.id}:${section.id}:${field.id}:validation`);
         }
         if (field.error) {
           keys.add(`${applicant.id}:${section.id}:${field.id}:error`);
@@ -737,7 +823,7 @@ function seedField(
 function normalizeSection(section: QuestionnaireSection): QuestionnaireSection {
   const fields = normalizeFields(section);
   const status = sectionStatus(fields);
-  const firstMissing = fields.find((field) => field.required && !field.value.trim());
+  const firstInvalidField = fields.find((field) => validateQuestionnaireFieldValue(field));
   const firstError = fields.find((field) => field.error);
 
   return {
@@ -746,7 +832,10 @@ function normalizeSection(section: QuestionnaireSection): QuestionnaireSection {
     status,
     missing:
       firstError?.error ??
-      (firstMissing ? `Нужно заполнить: ${firstMissing.label}` : undefined),
+      (firstInvalidField
+        ? validateQuestionnaireFieldValue(firstInvalidField) ??
+          `Нужно заполнить: ${firstInvalidField.label}`
+        : undefined),
   };
 }
 
@@ -780,7 +869,9 @@ function recalculateQuestionnaire(submission: Submission): Submission {
 
 function sectionStatus(fields: QuestionnaireField[]): QuestionnaireStatus {
   if (!fields.length) return "empty";
-  if (fields.some((field) => field.error)) return "needs_fix";
+  if (fields.some((field) => field.error || validateQuestionnaireFieldValue(field))) {
+    return "needs_fix";
+  }
   const ready = fields.filter(isFieldReady).length;
   if (ready === fields.length) return "complete";
   if (ready === 0) return "empty";
@@ -796,5 +887,5 @@ function applicantStatus(sections: QuestionnaireSection[]): QuestionnaireStatus 
 }
 
 function isFieldReady(field: QuestionnaireField) {
-  return !field.required || Boolean(field.value.trim() && !field.error);
+  return !validateQuestionnaireFieldValue(field) && !field.error;
 }

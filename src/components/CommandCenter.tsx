@@ -35,6 +35,7 @@ import {
   saveProductIntakeDrafts,
   type ProductIntakeDraft,
 } from '../modules/submissions/productIntakeFlow';
+import { productIntakeDraftToSubmission } from '../modules/submissions/productIntakeSubmissionAdapter';
 import {
   agentActionQueue,
   searchAgentActions,
@@ -217,6 +218,20 @@ export function CommandCenter({
     () => intakeDrafts.find((draft) => draft.id === selectedRow),
     [intakeDrafts, selectedRow],
   );
+  const intakeSubmissionsForCards = useMemo(
+    () =>
+      intakeDrafts.map((draft) =>
+        productIntakeDraftToSubmission(draft, {
+          agentId,
+          useIntakeFilesAsLocalDemoUploads: true,
+        }),
+      ),
+    [agentId, intakeDrafts],
+  );
+  const submissionCards = useMemo(
+    () => [...intakeSubmissionsForCards, ...(canonicalSubmissions ?? [])],
+    [canonicalSubmissions, intakeSubmissionsForCards],
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -243,6 +258,15 @@ export function CommandCenter({
   };
 
   const handleRowClick = (id: string) => {
+    if (intakeDrafts.some((draft) => draft.id === id)) {
+      bridge.onQuestionnaireOpen?.(id);
+      emitVisaflowUiEvent(bridge, { type: 'questionnaire.open', submissionId: id });
+      setSelectedRow(id);
+      setDrawerOpen(false);
+      setCurrentView('questionnaire');
+      return;
+    }
+
     bridge.onSubmissionOpen?.(id);
     emitVisaflowUiEvent(bridge, { type: 'submission.open', submissionId: id });
     setSelectedRow(id);
@@ -284,10 +308,17 @@ export function CommandCenter({
 
   const handleUploadDraftSave = (draft: ProductIntakeDraft) => {
     setIntakeDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8));
+    setSelectedRow(draft.id);
+    setDrawerOpen(false);
+    setActiveNav('submissions');
+    setSearchQuery('');
+    setCurrentView('main');
   };
 
-  const persistQuestionnaireSubmission = (nextSubmission: Submission) =>
-    onSubmissionsChange?.([nextSubmission]);
+  const persistQuestionnaireSubmission = (nextSubmission: Submission) => {
+    setIntakeDrafts((current) => current.filter((draft) => draft.id !== nextSubmission.id));
+    return onSubmissionsChange?.([nextSubmission]);
+  };
 
   const renderNavButton = (section: LegacyAgentNavSection, icon: ReactNode, count?: number, warning?: boolean) => (
     <button
@@ -653,7 +684,7 @@ export function CommandCenter({
             )}
             {activeNav === 'settings' && renderSettings()}
             {activeNav === 'actions' && renderActionsList()}
-            {activeNav === 'submissions' && <ApplicantsScreen onOpenDrawer={handleRowClick} submissions={canonicalSubmissions} />}
+            {activeNav === 'submissions' && <ApplicantsScreen onOpenDrawer={handleRowClick} submissions={submissionCards} />}
           </div>
         </div>
       </main>
