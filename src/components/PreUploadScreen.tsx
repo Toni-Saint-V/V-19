@@ -33,6 +33,7 @@ interface PreUploadScreenProps {
 }
 
 const finalStatuses: ProductFileStatus[] = ['recognized', 'needs_review', 'failed'];
+const passportExtractionTimeoutMs = 8000;
 
 function passportExtractionValues(fields: PassportExtractionField[]) {
   const values: Record<string, string> = {};
@@ -96,7 +97,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     ['review', 'ready'].includes(phase) &&
     !extractionIsDone;
   const extractionStatusText = extractionNeedsReview ? 'Нужна ручная сверка' : 'Идет распознавание документа';
-  const completeBlocked = filesAreFinal && !extractionIsDone;
+  const completeBlocked = files.length > 0 && !extractionIsDone;
 
   const clearPipeline = () => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -125,11 +126,16 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
 
     try {
       const { invokePassportExtraction } = await import('../modules/submissions/passportExtractionService');
-      const result = await invokePassportExtraction({
-        applicantIndex,
-        localFile: uploadFile,
-        openAiFallbackAllowed: false,
-      });
+      const result = await Promise.race([
+        invokePassportExtraction({
+          applicantIndex,
+          localFile: uploadFile,
+          openAiFallbackAllowed: false,
+        }),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error('Passport OCR timeout')), passportExtractionTimeoutMs),
+        ),
+      ]);
       if (pipelineRunRef.current !== runId) return;
 
       const extractedValues = passportExtractionValues(result.fields);
@@ -138,6 +144,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
       );
 
       patchFile(file.id, {
+        kind: result.status === 'extracted' && hasPassportIdentity ? 'passport' : file.kind,
         extractedFieldKeys: result.fields.map((field) => field.key),
         extractedValues,
         issue:
@@ -186,13 +193,13 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
         setPhase('extracting');
         setActiveFileId(file.id);
         patchFile(file.id, { status: 'extracting', progress: 86 });
-        if (options.extractPassports && file.kind === 'passport') {
+        if (options.extractPassports && ['passport', 'unknown'].includes(file.kind)) {
           void extractPassportFile(file, index, runId);
         }
       }, offset + 430);
       schedule(() => {
         if (pipelineRunRef.current !== runId) return;
-        if (options.extractPassports && file.kind === 'passport') return;
+        if (options.extractPassports && ['passport', 'unknown'].includes(file.kind)) return;
         const finalStatus: ProductFileStatus = file.kind === 'unknown' ? 'failed' : file.kind === 'bank' ? 'needs_review' : 'recognized';
         patchFile(file.id, {
           status: finalStatus,
