@@ -184,7 +184,7 @@ describe("export media mega ZIP", () => {
     );
     expect(result.artifact).toMatchObject({
       applicantCount: 1,
-      fileCount: 4,
+      fileCount: 3,
       submissionCount: 1,
     });
 
@@ -199,9 +199,9 @@ describe("export media mega ZIP", () => {
 
     expect(mediaEntryNames(names.fileNames)).toEqual(
       expect.arrayContaining([
-        `${rootFolder}/Москва/Дмитрий Орлов/660010561_passport_scan.pdf`,
-        `${rootFolder}/Москва/Дмитрий Орлов/660010561_selfie_1.jpg`,
-        `${rootFolder}/Москва/Дмитрий Орлов/660010561_selfie_2.jpg`,
+        `${rootFolder}/Москва/Дмитрий Орлов/passport.pdf`,
+        `${rootFolder}/Москва/Дмитрий Орлов/selfie_1.jpg`,
+        `${rootFolder}/Москва/Дмитрий Орлов/selfie_2.jpg`,
       ]),
     );
   });
@@ -221,10 +221,10 @@ describe("export media mega ZIP", () => {
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
     expect(mediaNames).toContain(
-      `${rootFolder}/Москва/Дмитрий Орлов/660010561_selfie_1.jpg`,
+      `${rootFolder}/Москва/Дмитрий Орлов/selfie_1.jpg`,
     );
     expect(mediaNames).not.toContain(
-      `${rootFolder}/Москва/Дмитрий Орлов/660010561_selfie.jpg`,
+      `${rootFolder}/Москва/Дмитрий Орлов/selfie.jpg`,
     );
   });
 
@@ -243,13 +243,13 @@ describe("export media mega ZIP", () => {
     if (!result.ok) throw new Error(result.safeMessage);
     expect(result.artifact).toMatchObject({
       applicantCount: 3,
-      fileCount: 12,
+      fileCount: 9,
       submissionCount: 1,
     });
 
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
-    expect(mediaNames).toHaveLength(16);
+    expect(mediaNames).toHaveLength(9);
     expect(
       mediaNames.every((name) =>
         name.startsWith(`${rootFolder}/Москва/Семья Волковых/`),
@@ -257,10 +257,10 @@ describe("export media mega ZIP", () => {
     ).toBe(true);
     expect(mediaNames).toEqual(
       expect.arrayContaining([
-        `${rootFolder}/Москва/Семья Волковых/660011021_passport_scan.pdf`,
-        `${rootFolder}/Москва/Семья Волковых/660011021_selfie_1.jpg`,
-        `${rootFolder}/Москва/Семья Волковых/660011022_passport_scan.pdf`,
-        `${rootFolder}/Москва/Семья Волковых/660011023_selfie_2.jpg`,
+        `${rootFolder}/Москва/Семья Волковых/01_анна_волкова_passport.pdf`,
+        `${rootFolder}/Москва/Семья Волковых/01_анна_волкова_selfie_1.jpg`,
+        `${rootFolder}/Москва/Семья Волковых/02_игорь_волков_passport.pdf`,
+        `${rootFolder}/Москва/Семья Волковых/03_мила_волкова_selfie_2.jpg`,
       ]),
     );
   });
@@ -282,7 +282,7 @@ describe("export media mega ZIP", () => {
 
     const names = await zipEntryNames(result.artifact.blob);
     const mediaNames = mediaEntryNames(names.fileNames);
-    expect(mediaNames).toHaveLength(16);
+    expect(mediaNames).toHaveLength(12);
     expect(mediaNames.some((name) => name.includes("/Ольга Фролова/"))).toBe(
       true,
     );
@@ -377,7 +377,7 @@ describe("export media mega ZIP", () => {
         documentAssetIds: expect.arrayContaining(
           assets.map((asset) => asset.id),
         ),
-        fileCount: 4,
+        fileCount: 3,
         fileName: result.artifact.fileName,
         submissionIds: [selection[0]!.id],
       }),
