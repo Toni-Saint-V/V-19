@@ -9,7 +9,9 @@ export default tseslint.config(
     ignores: [
       "dist",
       "playwright-report",
+      "playwright-report-*",
       "test-results",
+      "test-results-*",
       "public/tesseract",
       "docs/References/**",
     ],

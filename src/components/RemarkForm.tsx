@@ -142,6 +142,8 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
                 Отмена
               </button>
               <button
+                aria-label="Отправить замечание"
+                data-testid="remark-form-submit"
                 onClick={handleSubmit}
                 className="h-11 px-5 rounded-xl bg-[#24242a] hover:bg-[#2a2b32] text-[13px] font-semibold text-white flex items-center gap-2 shadow-[0_0_28px_rgba(111,100,255,0.14)] transition-colors"
               >

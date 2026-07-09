@@ -193,6 +193,8 @@ const FieldRow = ({
         </button>
       )}
       <button
+        aria-label="Добавить замечание"
+        data-testid="admin-review-add-remark"
         type="button"
         onClick={onRemark}
         className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
