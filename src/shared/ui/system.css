@@ -28119,8 +28119,9 @@ button.v19-summary-tile:not(:disabled):active {
   .v19-questionnaire-applicant-bar {
     flex-direction: row;
     align-items: center;
-    min-height: var(--vf-ref-size-62px);
-    padding: var(--vf-ref-size-10px);
+    height: var(--vf-ref-size-40px);
+    min-height: var(--vf-ref-size-40px);
+    padding: 0 var(--vf-ref-size-10px);
   }
 
   .v19-questionnaire-work-head {
