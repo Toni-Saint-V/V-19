@@ -869,22 +869,12 @@ function recalculateQuestionnaire(submission: Submission): Submission {
 
 function sectionStatus(fields: QuestionnaireField[]): QuestionnaireStatus {
   if (!fields.length) return "empty";
-
-  const hasBlockingError = fields.some((field) => {
-    if (field.error) return true;
-    const validationError = validateQuestionnaireFieldValue(field);
-    if (!validationError) return false;
-    return Boolean(field.value.trim());
-  });
-  if (hasBlockingError) return "needs_fix";
-
-  const requiredFields = fields.filter((field) => field.required);
-  const readyRequired = requiredFields.filter(
-    (field) => !validateQuestionnaireFieldValue(field) && !field.error,
-  ).length;
-
-  if (readyRequired === requiredFields.length) return "complete";
-  if (readyRequired === 0) return "empty";
+  if (fields.some((field) => field.error || validateQuestionnaireFieldValue(field))) {
+    return "needs_fix";
+  }
+  const ready = fields.filter(isFieldReady).length;
+  if (ready === fields.length) return "complete";
+  if (ready === 0) return "empty";
   return "partial";
 }
 

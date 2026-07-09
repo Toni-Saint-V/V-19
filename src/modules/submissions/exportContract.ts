@@ -1,4 +1,4 @@
-import type { Applicant, Submission } from "./types";
+import type { Applicant, City, Submission } from "./types";
 import { agentOwnerDisplayName } from "./ownership";
 import {
   digitsOnly,
@@ -136,7 +136,7 @@ function buildExportContractRow(
     invitingCompanyName: hotelName,
     invitingCompanyZipCode: hotelPostalCode,
     lastName: surname,
-    location: submission.city,
+    location: exportLocationCode(submission.city),
     maritalStatus: normalizeMaritalStatus(field("marital-status")),
     meansOfSupport: normalizeMeans(field("means-of-support")),
     nationalityAtBirth: normalizeCountry(field("birth-country")),
