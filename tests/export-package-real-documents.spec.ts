@@ -45,7 +45,7 @@ test("ZIP contains real workbook and four real document files per applicant", as
   expect(summary.ready).toBe(true);
   expect(summary.canDownload).toBe(true);
   expect(summary.rowCount).toBe(2);
-  expect(summary.rows[0].location).toBe("SPB");
+  expect(summary.rows[0].location).toBe("Санкт-Петербург");
   expect(summary.rows[0].visaType).toBe("C");
   expect(summary.rows[0].visaSubType).toBe("NA");
   expect(summary.rows[0].appointmentCategory).toBe("NORMAL");
@@ -120,7 +120,7 @@ test("ZIP contains real workbook and four real document files per applicant", as
   );
   expect(workbook.sheetName).toBe("Sheet1");
   expect(workbook.rows[0][0]).toBe("Location");
-  expect(workbook.rows[1][0]).toBe("SPB");
+  expect(workbook.rows[1][0]).toBe("Санкт-Петербург");
   expect(workbook.rows[1][1]).toBe("C");
   expect(workbook.rows[1][2]).toBe("NA");
   expect(workbook.rows[1][3]).toBe("NORMAL");
