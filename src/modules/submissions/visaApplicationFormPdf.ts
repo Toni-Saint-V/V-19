@@ -1,20 +1,16 @@
-import { BLS_VISA_FORM_TEMPLATE_BASE64 } from "./visaApplicationFormTemplate";
 import type { Applicant, Submission } from "./types";
 
 export function createVisaApplicationFormPdfBlob(
   submission: Submission,
   applicant: Applicant,
 ): Blob {
-  void submission;
-  void applicant;
-  return createTemplateVisaFormBlob();
-}
-
-function createTemplateVisaFormBlob(): Blob {
-  const binary = atob(BLS_VISA_FORM_TEMPLATE_BASE64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return new Blob([bytes], { type: "application/pdf" });
+  const data = buildVisaFormData(submission, applicant);
+  return createPdfBlob([
+    renderPage1(data),
+    renderPage2(data),
+    renderPage3(data),
+    renderPage4(data),
+  ]);
 }
 
 type VisaFormData = {

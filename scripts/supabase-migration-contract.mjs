@@ -29,6 +29,7 @@ export const requiredMigrationOrder = [
   "20260706000100_ai_helper_admin_intent_quota_contract.sql",
   "20260706023000_typed_submission_files.sql",
   "20260707000100_typed_status_history_source.sql",
+  "20260707001000_document_assets_production_pipeline.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [

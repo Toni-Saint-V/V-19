@@ -976,7 +976,7 @@ export function getPrimaryAction(
   }
 
   if (submission.status === "corrections_received") {
-    const shouldReturnAgain = blockerCount(submission) > 0;
+    const shouldReturnAgain = openIssueCount(submission) > 0;
     const decision = {
       action: shouldReturnAgain ? "return_again" : "close_issues_accept",
       label: shouldReturnAgain ? "Вернуть снова" : "Закрыть и принять",
@@ -986,7 +986,7 @@ export function getPrimaryAction(
   }
 
   if (submission.status === "submitted_for_review") {
-    const shouldReturn = blockerCount(submission) > 0;
+    const shouldReturn = openIssueCount(submission) > 0;
     const decision = {
       action: shouldReturn ? "return_with_issues" : "accept",
       label: shouldReturn ? "Вернуть" : "Принять",

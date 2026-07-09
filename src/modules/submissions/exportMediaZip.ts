@@ -3,10 +3,10 @@ import { DocumentRepository } from "../documents/documentRepository";
 import {
   buildDocumentsZip,
   DocumentZipBuilderError,
+  EXPORT_DOCUMENT_TYPES,
   type DocumentZipDownloader,
 } from "../documents/documentExport";
 import {
-  DOCUMENT_TYPES,
   buildDocumentStoragePath,
   documentTypeToFrontendMediaType,
   tryNormalizeDocumentType,
@@ -20,6 +20,7 @@ import {
   exportSummary,
 } from "./exportRules";
 import { createExportWorkbookArtifact } from "./exportWorkbook";
+import { createVisaApplicationFormPdfBlob } from "./visaApplicationFormPdf";
 import {
   downloadMediaFromStorage,
   mediaStorageBucket,
@@ -180,7 +181,7 @@ export async function createExportMediaZipArtifact(
 
     outerZip.file(
       `${documents.rootFolder}/${workbookArtifact.fileName}`,
-      workbookArtifact.blob,
+      await workbookArtifact.blob.arrayBuffer(),
     );
     outerZip.file(
       `${documents.rootFolder}/manifest.json`,
@@ -315,6 +316,13 @@ export function buildLocalDemoExportMediaZipOptions(
   return {
     documentAssets: localDemoDocumentAssetsFromSubmissionFiles(submissions),
     downloadDocument: async (asset, context) => {
+      if (asset.type === "visa_form") {
+        return createVisaApplicationFormPdfBlob(
+          context.submission,
+          context.applicant,
+        );
+      }
+
       const lines = [
         "VisaFlow local export document placeholder",
         `Submission: ${context.submission.id} — ${context.submission.title}`,
@@ -438,6 +446,13 @@ function documentDownloaderForOptions(
   if (options.downloadMedia) {
     const legacyDownload = options.downloadMedia;
     return async (asset, context) => {
+      if (asset.type === "visa_form") {
+        return createVisaApplicationFormPdfBlob(
+          context.submission,
+          context.applicant,
+        );
+      }
+
       const frontendType = documentTypeToFrontendMediaType(asset.type);
       const file = submissions
         .find((submission) => submission.id === asset.submissionId)
@@ -464,11 +479,19 @@ function documentDownloaderForOptions(
     };
   }
 
-  return async (asset) =>
-    downloadMediaFromStorage({
+  return async (asset, context) => {
+    if (asset.type === "visa_form") {
+      return createVisaApplicationFormPdfBlob(
+        context.submission,
+        context.applicant,
+      );
+    }
+
+    return downloadMediaFromStorage({
       bucket: mediaStorageBucket,
       path: asset.storage.path,
     });
+  };
 }
 
 function localDemoDocumentAssetsFromSubmissionFiles(
@@ -628,13 +651,13 @@ function buildArchiveManifest(
     documentEntries: counts.documentEntries,
     fileCount: counts.fileCount,
     package: identity,
-    requiredDocumentTypes: DOCUMENT_TYPES,
+    requiredDocumentTypes: EXPORT_DOCUMENT_TYPES,
     rootFolder: counts.rootFolder,
     workbookFileName: counts.workbookFileName,
     submissions: submissions.map((submission) => ({
       applicants: submission.applicants.map((applicant) => ({
         id: applicant.id,
-        documentTypes: DOCUMENT_TYPES,
+        documentTypes: EXPORT_DOCUMENT_TYPES,
         name: applicant.fullName,
       })),
       city: submission.city,

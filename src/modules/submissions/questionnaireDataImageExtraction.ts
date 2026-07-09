@@ -515,7 +515,7 @@ function isFullNameLabel(label: string) {
 
 function splitFullNameValue(value: string) {
   const tokens = normalizeLooseValue(value)
-    .replace(/(mr|mrs|ms|miss)\.?/gi, "")
+    .replace(/\b(mr|mrs|ms|miss)\.?\b/gi, "")
     .split(/\s+/)
     .map((token) => token.replace(/[^A-ZА-ЯЁ-]/gi, "").toUpperCase())
     .filter(Boolean);

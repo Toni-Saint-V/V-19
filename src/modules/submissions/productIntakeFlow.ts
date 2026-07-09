@@ -38,12 +38,22 @@ export type ProductApplicantRole = 'main' | 'spouse' | 'child' | 'single';
 export type ProductApplicantFields = {
   surname: string;
   firstName: string;
+  previousSurname: string;
   birthDate: string;
   birthPlace: string;
+  birthCountry: string;
   nationality: string;
+  birthCitizenship: string;
+  otherCitizenship: string;
   gender: string;
+  maritalStatus: string;
+  nationalId: string;
   phone: string;
   email: string;
+  homeAddress: string;
+  homeCountry: string;
+  homeCity: string;
+  postalCode: string;
   passportType: string;
   passportNo: string;
   passportIssuedAt: string;
@@ -51,20 +61,34 @@ export type ProductApplicantFields = {
   passportIssueCountry: string;
   passportIssuePlace: string;
   occupation: string;
+  occupationSpecify: string;
   employerName: string;
   employerAddress: string;
   employerPhone: string;
+  costCoveredBy: string;
   financeType: string;
   bankBalance: string;
+  meansOfSupport: string;
   mainDestination: string;
   firstEntryCountry: string;
+  arrivalDate: string;
+  departureDate: string;
+  stayDuration: string;
   tripDates: string;
   hotelName: string;
+  hotelCountry: string;
+  hotelCity: string;
+  hotelPostalCode: string;
   hotelAddress: string;
+  hotelEmail: string;
+  hotelContact: string;
   purpose: string;
+  stayPurposeDetails: string;
   entryCount: string;
   biometrics: string;
+  previousBiometrics: string;
   previousVisas: string;
+  invitingPartyType: string;
   refusals: string;
 };
 
@@ -162,10 +186,20 @@ function extractedKeysForKind(kind: ProductFileKind) {
       return [
         'surname',
         'firstName',
+        'previousSurname',
         'birthDate',
         'birthPlace',
+        'birthCountry',
         'nationality',
+        'birthCitizenship',
+        'otherCitizenship',
         'gender',
+        'maritalStatus',
+        'nationalId',
+        'homeAddress',
+        'homeCountry',
+        'homeCity',
+        'postalCode',
         'passportType',
         'passportNo',
         'passportIssuedAt',
@@ -174,13 +208,13 @@ function extractedKeysForKind(kind: ProductFileKind) {
         'passportIssuePlace',
       ];
     case 'bank':
-      return ['financeType', 'bankBalance'];
+      return ['financeType', 'bankBalance', 'costCoveredBy', 'meansOfSupport'];
     case 'booking':
-      return ['mainDestination', 'firstEntryCountry', 'tripDates', 'hotelName', 'hotelAddress'];
+      return ['mainDestination', 'firstEntryCountry', 'arrivalDate', 'departureDate', 'stayDuration', 'tripDates', 'hotelName', 'hotelCountry', 'hotelCity', 'hotelPostalCode', 'hotelAddress', 'hotelEmail', 'hotelContact'];
     case 'employment':
-      return ['occupation', 'employerName', 'employerAddress', 'employerPhone'];
+      return ['occupation', 'occupationSpecify', 'employerName', 'employerAddress', 'employerPhone'];
     case 'photo':
-      return ['biometrics'];
+      return ['biometrics', 'previousBiometrics'];
     default:
       return [];
   }
@@ -237,12 +271,22 @@ function emptyApplicantFields(): ProductApplicantFields {
   return {
     surname: '',
     firstName: '',
+    previousSurname: '',
     birthDate: '',
     birthPlace: '',
+    birthCountry: '',
     nationality: '',
+    birthCitizenship: '',
+    otherCitizenship: '',
     gender: '',
+    maritalStatus: '',
+    nationalId: '',
     phone: '',
     email: '',
+    homeAddress: '',
+    homeCountry: '',
+    homeCity: '',
+    postalCode: '',
     passportType: '',
     passportNo: '',
     passportIssuedAt: '',
@@ -250,20 +294,34 @@ function emptyApplicantFields(): ProductApplicantFields {
     passportIssueCountry: '',
     passportIssuePlace: '',
     occupation: '',
+    occupationSpecify: '',
     employerName: '',
     employerAddress: '',
     employerPhone: '',
+    costCoveredBy: '',
     financeType: '',
     bankBalance: '',
+    meansOfSupport: '',
     mainDestination: '',
     firstEntryCountry: '',
+    arrivalDate: '',
+    departureDate: '',
+    stayDuration: '',
     tripDates: '',
     hotelName: '',
+    hotelCountry: '',
+    hotelCity: '',
+    hotelPostalCode: '',
     hotelAddress: '',
+    hotelEmail: '',
+    hotelContact: '',
     purpose: '',
+    stayPurposeDetails: '',
     entryCount: '',
     biometrics: '',
+    previousBiometrics: '',
     previousVisas: '',
+    invitingPartyType: '',
     refusals: '',
   };
 }

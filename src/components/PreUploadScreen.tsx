@@ -77,6 +77,10 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
     () => buildProductIntakeDraft(packageType, files, draftSeedIso),
     [draftSeedIso, files, packageType],
   );
+  const activeFileName = useMemo(
+    () => files.find((file) => file.id === activeFileId)?.name,
+    [activeFileId, files],
+  );
 
   const recognizedCount = files.filter((file) => file.status === 'recognized').length;
   const averageProgress = files.length
@@ -480,6 +484,7 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 </h3>
                 <p className="text-[13px] text-white/45 leading-relaxed mt-2 max-w-md">
                   PDF, JPG, PNG. После выбора файлы автоматически пройдут upload → OCR → prefill mapping.
+                  {activeFileName ? ` Сейчас обрабатывается: ${activeFileName}.` : ''}
                 </p>
                 <button
                   type="button"
