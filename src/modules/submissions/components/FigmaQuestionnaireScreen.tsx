@@ -1362,20 +1362,6 @@ export function FigmaQuestionnaireScreen({
     [activeApplicantModel],
   );
 
-  const sectionDescriptions: Record<SectionId, string> = {
-    appointment: "Город, тип визы, категория и даты.",
-    contact: "Адрес, email и телефон.",
-    euRelative: "Данные родственника из ЕС/ЕЭЗ.",
-    employment: "Работа, учеба и контакты.",
-    files: "Три обязательных файла BLS.",
-    filler: "Кто заполнял анкету.",
-    hotel: "Отель или приглашение.",
-    passport: "Документ, номер и сроки.",
-    payment: "Оплата и спонсор.",
-    personal: "Данные как в паспорте.",
-    trip: "Цель, страны, даты и биометрия.",
-  };
-
   const openFieldIssues = useMemo(
     () =>
       draftSubmission.issues.filter(
@@ -2558,15 +2544,6 @@ export function FigmaQuestionnaireScreen({
             </aside>
 
             <div className="v19-questionnaire-work-panel">
-              <div className="v19-questionnaire-work-head">
-                <h3 className="text-[var(--v19b-size-15)] lg:text-[var(--v19b-size-16)] font-semibold text-white leading-snug">
-                  {sections.find((section) => section.id === activeSection)?.title}
-                </h3>
-                <p className="text-[var(--v19b-size-11-5)] text-white/50 mt-1.5 leading-relaxed max-w-xl">
-                  {sectionDescriptions[activeSection]}
-                </p>
-              </div>
-
               {currentSectionIssue ? (
                 <div className="v19-questionnaire-review-alert">
                   <div className="v19-questionnaire-review-strip" />
