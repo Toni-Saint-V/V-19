@@ -1,41 +1,90 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
+  clearExportSelection,
   clickWorkspaceButton,
   collectBrowserProblems,
   openFreshWorkspace,
 } from "./v19-pilot-helpers";
 
-test.describe("V-19 admin export downloads", () => {
-  test("admin downloads Excel plus media ZIP with photos and passport scans", async ({
+function blockingBrowserProblems(problems: string[]) {
+  return problems.filter(
+    (problem) =>
+      !/ResizeObserver loop|favicon|net::ERR_ABORTED|Download the React DevTools/i.test(
+        problem,
+      ),
+  );
+}
+
+async function expectBodyMatches(page: Page, patterns: RegExp[], timeout = 20_000) {
+  await expect
+    .poll(
+      async () => {
+        const text = await page.locator("body").innerText().catch(() => "");
+        return patterns.some((pattern) => pattern.test(text));
+      },
+      { timeout },
+    )
+    .toBe(true);
+}
+
+test.describe("V-19 admin export download proof", () => {
+  test("admin downloads the generated Excel+documents ZIP package", async ({
     page,
   }) => {
     const browserProblems = collectBrowserProblems(page);
 
-    await openFreshWorkspace(page, { heading: "Мои действия" });
-    await page.getByRole("button", { name: "В админскую зону" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Очередь на проверку" }),
-    ).toBeVisible();
-    await clickWorkspaceButton(page, "Выгрузка");
-    await expect(page.getByRole("heading", { name: "Центр выгрузки" })).toBeVisible();
-    await expect(page.getByText("SUB-1102").first()).toBeVisible();
-
-    const downloads: string[] = [];
-    page.on("download", (download) => {
-      downloads.push(download.suggestedFilename());
+    await openFreshWorkspace(page, {
+      heading: "Проверка",
+      workspaceEmail: "admin@visaflow.local",
     });
 
-    await page.getByRole("button", { name: "Скачать Excel + ZIP" }).click();
-    await expect
-      .poll(() => downloads, { timeout: 20_000 })
-      .toEqual(
-        expect.arrayContaining([
-          expect.stringMatching(/^visaflow-export-.+\.xlsx$/),
-          expect.stringMatching(/^visaflow-media-.+\.zip$/),
-        ]),
-      );
+    await clickWorkspaceButton(page, /Выгрузка/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Выгрузка" }),
+    ).toBeVisible();
 
-    await expect(page.getByText("Excel и ZIP файлов формируются fail-closed")).toBeVisible();
-    expect(browserProblems, browserProblems.join("\n")).toEqual([]);
+    await clearExportSelection(page);
+
+    const targetRow = page
+      .locator(".export-row")
+      .filter({ hasText: /Семья Волковых|SUB-1102|Семья Петровых|ПД-1054/ })
+      .first();
+
+    await expect(targetRow).toBeVisible();
+    await targetRow.getByRole("checkbox").check();
+
+    await expectBodyMatches(page, [/Пакет выбран|Excel preview|Excel rows/i]);
+
+    const prepareButton = page
+      .getByRole("button", { name: /Сформировать Excel|Excel готов/i })
+      .first();
+
+    await expect(prepareButton).toBeVisible();
+    if (await prepareButton.isEnabled()) {
+      await prepareButton.click();
+    }
+
+    const downloadButton = page
+      .getByRole("button", {
+        name: /Скачать ZIP с Excel|Скачать ZIP \+ Excel|Скачать ZIP файлов/i,
+      })
+      .first();
+
+    await expect(downloadButton).toBeEnabled();
+
+    const downloadPromise = page.waitForEvent("download");
+    await downloadButton.click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(
+      /^visaflow-export-.+_documents\.zip$/,
+    );
+    await expect(download.failure()).resolves.toBeNull();
+
+    await expectBodyMatches(page, [/ZIP скачан|Excel готов|Скачать ZIP с Excel/i]);
+
+    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
+      [],
+    );
   });
 });

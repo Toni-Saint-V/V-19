@@ -4,15 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint .",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test": "VITE_SUPABASE_BACKEND_TARGET=local-demo VITE_SUPABASE_SANDBOX_PROBE_ENABLED=false vitest run tests/unit tests/integration",
-    "test:business-logic": "VITE_SUPABASE_BACKEND_TARGET=local-demo VITE_SUPABASE_SANDBOX_PROBE_ENABLED=false vitest run tests/unit --exclude \"tests/unit/**/*.tsx\"",
+    "test": "cross-env VITE_SUPABASE_BACKEND_TARGET=local-demo VITE_SUPABASE_SANDBOX_PROBE_ENABLED=false vitest run tests/unit tests/integration",
+    "test:business-logic": "cross-env VITE_SUPABASE_BACKEND_TARGET=local-demo VITE_SUPABASE_SANDBOX_PROBE_ENABLED=false vitest run tests/unit --exclude \"tests/unit/**/*.tsx\"",
     "test:supabase-live": "VITEST_SUPABASE_LIVE=1 vitest run tests/integration/supabase-live.spec.ts",
     "test:e2e": "playwright test",
     "test:e2e:supabase": "playwright test --config playwright.supabase.config.ts",
@@ -37,7 +37,13 @@
     "v19:e2e:4": "node scripts/launch-v19-parallel-e2e.mjs --allow-dirty-source",
     "verify": "npm run typecheck && npm run lint && npm run verify:safety && npm run verify:codex-hook && npm run verify:agent-screen-system && npm run verify:v19-boundary && npm run verify:v19-ui-proof && npm run test && npm run build && npm run verify:performance",
     "verify:local-readiness": "npm run verify && npm run verify:security && npm run test:e2e",
-    "verify:full": "npm run verify:local-readiness && npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet"
+    "verify:full": "npm run verify:local-readiness && npm run verify:auth-data-readiness && npm run verify:supabase-release && npm run verify:production-packet",
+    "test:e2e:smoke": "playwright test tests/e2e/v19-local-demo-smoke.spec.ts --config=playwright.e2e-fastlane.config.ts --project=chromium",
+    "test:e2e:pilot": "playwright test tests/e2e/v19-pilot-agent-flow.spec.ts tests/e2e/v19-pilot-admin-review-flow.spec.ts tests/e2e/v19-admin-export-download-proof.spec.ts --config=playwright.e2e-fastlane.config.ts --project=chromium",
+    "verify:e2e-fastlane": "npm run typecheck && npm run lint && npm run build && npm run test:e2e:smoke && npm run test:e2e:pilot",
+    "test:e2e:focused": "playwright test tests/e2e/v19-pilot-agent-flow.spec.ts tests/e2e/v19-pilot-admin-review-flow.spec.ts tests/e2e/v19-admin-export-download-proof.spec.ts --config=playwright.e2e-fastlane.config.ts --project=chromium",
+    "verify:e2e-localhost": "npm run typecheck && npm run build && npm run test:e2e:smoke && npm run test:e2e:focused",
+    "verify:e2e-focused-root": "npm run typecheck && npm run build && npm run test:e2e:smoke && npm run test:e2e:focused"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",
@@ -72,6 +78,10 @@
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.35.0",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "cross-env": "^7.0.3"
+  },
+  "engines": {
+    "node": ">=20.19 <21 || >=22.12 <23"
   }
 }

@@ -327,6 +327,8 @@ function ReviewQueueCard({
   return (
     <button
       aria-label={`Ручная проверка заявки ${item.title}`}
+      data-submission-card=""
+      data-submission-id={item.id}
       onClick={() => onOpenDrawer(item.id)}
       className={`group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${hasBlocker ? "border-[#5b2b32]/45 bg-[#1d1719]/80 hover:border-[#74414a]/55" : "border-[#242529] bg-[#161617] hover:border-[#6f64ff]/40"}`}
     >
@@ -711,6 +713,8 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
               aiWatchlist.map((item) => (
                 <button
                   className={`w-full rounded-[10px] border p-3 text-left transition-colors hover:border-[#6f64ff]/45 ${watchToneClass(item.tone)}`}
+                  data-submission-card=""
+                  data-submission-id={item.id}
                   key={item.id}
                   type="button"
                   onClick={() => onOpenDrawer(item.id)}
