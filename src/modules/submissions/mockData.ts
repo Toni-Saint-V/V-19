@@ -21,7 +21,7 @@ function applicant(
       (section) => ({
         ...section,
         fields: section.fields.map((field) =>
-          field.id === "passport-no" && field.value.trim()
+          field.id === "passport-no"
             ? { ...field, value: mockPassportNumber(id) }
             : field,
         ),

@@ -110,7 +110,6 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
     ),
   );
   const cities = new Set(submissions.map((submission) => submission.city));
-  const tripDateRanges = new Set(submissions.map(tripDateRangeKey));
   const exportState = getExportSelectionState(submissions);
 
   if (!contractValid) {
@@ -150,8 +149,6 @@ export function getExportBlockers(submissions: Submission[]): ExportBlocker[] {
   }
 
   if (cities.size > 1) blockers.push({ reason: "Нельзя смешивать разные города" });
-  if (tripDateRanges.size > 1)
-    blockers.push({ reason: "Нельзя смешивать разные даты поездки" });
   if (exportState === "mixed")
     blockers.push({ reason: "В выборке разные состояния выгрузки" });
 
@@ -163,17 +160,24 @@ export function getExportWarnings(submissions: Submission[]): ExportBlocker[] {
 
   const cities = new Set(submissions.map((submission) => submission.city));
   const ownerAgentIds = new Set(submissions.map((submission) => submission.agentId));
+  const tripDateRanges = new Set(submissions.map(tripDateRangeKey));
+  const warnings: ExportBlocker[] = [];
 
-  if (cities.size === 1 && ownerAgentIds.size > 1) {
-    return [
-      {
-        reason:
-          "В пакете подачи разных агентов. Excel доступен, PDF останется у своих агентов.",
-      },
-    ];
+  if (cities.size === 1 && tripDateRanges.size > 1) {
+    warnings.push({
+      reason:
+        "В одном городе разные даты поездки. Excel и ZIP доступны, проверьте слот/дату перед BLS выгрузкой.",
+    });
   }
 
-  return [];
+  if (cities.size === 1 && ownerAgentIds.size > 1) {
+    warnings.push({
+      reason:
+        "В пакете подачи разных агентов. Excel доступен, PDF останется у своих агентов.",
+    });
+  }
+
+  return warnings;
 }
 
 export function canGenerateExport(submissions: Submission[]) {

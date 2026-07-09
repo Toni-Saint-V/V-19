@@ -70,7 +70,7 @@ export function buildExportWorkbookRowFills(
   return [
     null,
     ...rows.map((row) => {
-      if (row.appointmentType !== "Family") return null;
+      if (row.appointmentType !== "Family" && row.appointmentType !== "FAMILY") return null;
 
       const familyKey =
         row.familyGroupId ?? row.familySubmissionId ?? row.submissionId;

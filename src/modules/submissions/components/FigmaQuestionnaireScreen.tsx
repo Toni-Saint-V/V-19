@@ -437,9 +437,7 @@ function applicantTabs(submission: Submission): ApplicantTab[] {
   }));
 }
 
-function fallbackQuestionnaireFormData(
-  _applicantName: string | undefined,
-): QuestionnaireFormData {
+function fallbackQuestionnaireFormData(): QuestionnaireFormData {
   return {
     appointmentCity: "",
     appointmentNote: "",
@@ -680,18 +678,6 @@ function riskLabel(count: number) {
   return `${count} рисков`;
 }
 
-function fileCountLabel(count: number) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) return `${count} файл`;
-  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) {
-    return `${count} файла`;
-  }
-
-  return `${count} файлов`;
-}
-
 function submissionFieldOptions(
   applicant: Submission["applicants"][number] | undefined,
   fieldId: string,
@@ -708,7 +694,7 @@ function questionnaireFormDataFromSubmission(
   const applicant =
     submission.applicants.find((candidate) => candidate.id === applicantId) ??
     submission.applicants[0];
-  const fallback = fallbackQuestionnaireFormData(applicant?.fullName);
+  const fallback = fallbackQuestionnaireFormData();
 
   return {
     ...fallback,

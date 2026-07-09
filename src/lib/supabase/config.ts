@@ -69,7 +69,7 @@ function validActivationTarget(value: string | undefined): boolean {
 }
 
 export function getSupabaseRuntimeConfig(): SupabaseRuntimeConfig {
-  const env = (import.meta as unknown as VisaFlowImportMeta).env;
+  const env = (import.meta as unknown as Partial<VisaFlowImportMeta>).env ?? {};
   const projectId = clean(env.VITE_SUPABASE_PROJECT_ID);
   const url = clean(env.VITE_SUPABASE_URL);
   const publishableKey = clean(

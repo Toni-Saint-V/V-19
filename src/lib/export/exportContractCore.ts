@@ -186,8 +186,20 @@ export function validateExportContractShape(): boolean {
 
 export function serializeExportContractRow(row: ExportContractRow): string[] {
   return exportContractColumns.map((column) =>
-    safeSpreadsheetValue(row[column.key] ?? ""),
+    safeSpreadsheetValue(serializedColumnValue(row, column.key)),
   );
+}
+
+function serializedColumnValue(
+  row: ExportContractRow,
+  key: ExportContractColumnKey,
+): string {
+  const value = row[key] ?? "";
+  if (key === "appointmentType") {
+    if (value === "FAMILY") return "Family";
+    if (value === "INDIVIDUAL") return "Individual";
+  }
+  return value;
 }
 
 export function exportContractRecordFromRow(

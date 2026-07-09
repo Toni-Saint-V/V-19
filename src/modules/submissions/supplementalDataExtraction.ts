@@ -423,7 +423,7 @@ function compactFields(fields: Partial<ProductApplicantFields>) {
 }
 
 function normalizePersonToken(value: string) {
-  return value.replace(/[^A-ZА-ЯЁ\-]/gi, "").toUpperCase();
+  return value.replace(/[^A-ZА-ЯЁ-]/gi, "").toUpperCase();
 }
 
 function normalizeDate(value: string | undefined) {

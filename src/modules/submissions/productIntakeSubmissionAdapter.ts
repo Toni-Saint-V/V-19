@@ -44,8 +44,12 @@ const passportQuestionnaireFieldIds = new Set([
   'passport-issue-place',
 ]);
 
+const supplementalQuestionnaireSource = 'pdf_reconciliation' satisfies QuestionnaireReviewSource;
+
 function sourceForDraftQuestionnaireField(fieldId: string): QuestionnaireReviewSource {
-  return passportQuestionnaireFieldIds.has(fieldId) ? 'passport_ocr' : 'data_ocr';
+  return passportQuestionnaireFieldIds.has(fieldId)
+    ? 'passport_ocr'
+    : supplementalQuestionnaireSource;
 }
 
 
@@ -350,9 +354,9 @@ function sectionsFromDraftApplicant(
   setValue('category', 'Normal');
   setValue('birth-country', applicant.fields.birthCountry || birthCountryFromBirthDate(applicant.fields.birthDate));
   setValue('birth-citizenship', applicant.fields.birthCitizenship || birthCountryFromBirthDate(applicant.fields.birthDate));
-  setValue('arrival-date', applicant.fields.arrivalDate || tripDates.arrival, applicant.fields.arrivalDate ? 'data_ocr' : undefined);
-  setValue('departure-date', applicant.fields.departureDate || tripDates.departure, applicant.fields.departureDate ? 'data_ocr' : undefined);
-  setValue('stay-duration', applicant.fields.stayDuration, 'data_ocr');
+  setValue('arrival-date', applicant.fields.arrivalDate || tripDates.arrival, applicant.fields.arrivalDate ? supplementalQuestionnaireSource : undefined);
+  setValue('departure-date', applicant.fields.departureDate || tripDates.departure, applicant.fields.departureDate ? supplementalQuestionnaireSource : undefined);
+  setValue('stay-duration', applicant.fields.stayDuration, supplementalQuestionnaireSource);
   if (!values.get('passport-type')) setValue('passport-type', 'Ordinary Passport');
   if (!values.get('passport-issue-country')) setValue('passport-issue-country', 'Russian Federation');
   if (!values.get('nationality')) setValue('nationality', 'Russian Federation');

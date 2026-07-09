@@ -1,13 +1,33 @@
+// src/modules/documents/documentExport.ts
 import JSZip from "jszip";
 import type { Submission, Applicant } from "../submissions/types";
+import { mediaStorageBucket } from "../submissions/mediaStoragePolicy";
 import {
-  archiveDocumentName,
   documentExtension,
   DOCUMENT_TYPES,
   type DocumentAsset,
-  type DocumentType,
 } from "./documentTypes";
 import { validateDocumentAsset, validateDocuments } from "./documentValidation";
+
+export const GENERATED_DOCUMENT_TYPES = ["visa_form"] as const;
+export const EXPORT_DOCUMENT_TYPES = [
+  ...DOCUMENT_TYPES,
+  ...GENERATED_DOCUMENT_TYPES,
+] as const;
+
+export type GeneratedDocumentType = (typeof GENERATED_DOCUMENT_TYPES)[number];
+export type ExportDocumentType = (typeof EXPORT_DOCUMENT_TYPES)[number];
+
+export type GeneratedDocumentAsset = Omit<
+  DocumentAsset,
+  "sourceMediaAssetId" | "type"
+> & {
+  generated: true;
+  sourceMediaAssetId?: null;
+  type: GeneratedDocumentType;
+};
+
+export type ExportDocumentAsset = DocumentAsset | GeneratedDocumentAsset;
 
 export type DocumentZipBlockedReason =
   | "empty_file"
@@ -26,12 +46,12 @@ export class DocumentZipBuilderError extends Error {
 }
 
 export type DocumentZipDownloader = (
-  asset: DocumentAsset,
+  asset: ExportDocumentAsset,
   context: {
     applicant: Applicant;
     applicantIndex: number;
     submission: Submission;
-    type: DocumentType;
+    type: ExportDocumentType;
   },
 ) => Promise<Blob | null>;
 
@@ -86,10 +106,11 @@ export async function buildDocumentsZip(
         );
       }
 
-      for (const type of DOCUMENT_TYPES) {
-        const asset = applicantDocs.find(
-          (candidate) => candidate.type === type,
-        );
+      for (const type of EXPORT_DOCUMENT_TYPES) {
+        const asset =
+          type === "visa_form"
+            ? generatedVisaFormAsset(submission, applicant, applicantIndex)
+            : applicantDocs.find((candidate) => candidate.type === type);
         if (!asset) {
           throw new DocumentZipBuilderError(
             "media_not_ready",
@@ -97,12 +118,14 @@ export async function buildDocumentsZip(
           );
         }
 
-        const assetFailures = validateDocumentAsset(asset);
-        if (assetFailures.length > 0) {
-          throw new DocumentZipBuilderError(
-            "media_not_ready",
-            assetFailures[0]?.message ?? "Document is not ready for export.",
-          );
+        if (asset.type !== "visa_form") {
+          const assetFailures = validateDocumentAsset(asset);
+          if (assetFailures.length > 0) {
+            throw new DocumentZipBuilderError(
+              "media_not_ready",
+              assetFailures[0]?.message ?? "Document is not ready for export.",
+            );
+          }
         }
 
         let blob: Blob | null;
@@ -139,16 +162,14 @@ export async function buildDocumentsZip(
           submissionFolder,
           archiveDocumentFileName({
             applicant,
-            applicantCount: submission.applicants.length,
-            applicantIndex,
             asset,
             type,
           }),
         ].join("/");
 
-        zip.file(entryName, blob);
+        zip.file(entryName, await blob.arrayBuffer());
         entries.push(entryName);
-        documentAssetIds.push(asset.id);
+        if (asset.type !== "visa_form") documentAssetIds.push(asset.id);
         fileCount += 1;
       }
 
@@ -168,23 +189,72 @@ export async function buildDocumentsZip(
 
 export function archiveDocumentFileName(input: {
   applicant: Applicant;
-  applicantCount: number;
-  applicantIndex: number;
-  asset: DocumentAsset;
-  type: DocumentType;
+  asset: ExportDocumentAsset;
+  type: ExportDocumentType;
 }): string {
   const extension = sanitizeExtension(documentExtension(input.asset));
-  const documentName = archiveDocumentName(input.type);
+  const applicantPrefix = archiveApplicantPrefix(input.applicant);
+  return `${applicantPrefix}_${input.type}.${extension}`;
+}
 
-  if (input.applicantCount === 1) {
-    return `${documentName}.${extension}`;
+function generatedVisaFormAsset(
+  submission: Submission,
+  applicant: Applicant,
+  applicantIndex: number,
+): GeneratedDocumentAsset {
+  const now = "1970-01-01T00:00:00.000Z";
+  const applicantPrefix = archiveApplicantPrefix(applicant);
+  const filename = `${applicantPrefix}_visa_form.pdf`;
+
+  return {
+    checksum: null,
+    createdAt: now,
+    exportStatus: "ready",
+    generated: true,
+    id: `${submission.id}-${applicant.id}-visa-form-${applicantIndex}`,
+    applicantId: applicant.id,
+    mime: "application/pdf",
+    ownerUserId: submission.agentId,
+    size: 1,
+    sourceMediaAssetId: null,
+    storage: {
+      bucket: mediaStorageBucket,
+      filename,
+      path: [
+        "generated",
+        "submissions",
+        safeFilenameSegment(submission.id, "submission"),
+        "applicants",
+        safeFilenameSegment(applicant.id, "applicant"),
+        "visa_form",
+        filename,
+      ].join("/"),
+    },
+    submissionId: submission.id,
+    type: "visa_form",
+    updatedAt: now,
+    uploadedAt: now,
+    uploadStatus: "uploaded",
+    validatedAt: now,
+    validationStatus: "passed",
+  };
+}
+
+function archiveApplicantPrefix(applicant: Applicant): string {
+  return (
+    passportNumberForApplicant(applicant) ??
+    safeFilenameSegment(applicant.fullName, applicant.id)
+  );
+}
+
+function passportNumberForApplicant(applicant: Applicant): string | null {
+  for (const section of applicant.sections) {
+    const field = section.fields.find((candidate) => candidate.id === "passport-no");
+    const value = field?.value.trim();
+    if (value) return safeFilenameSegment(value, applicant.id);
   }
 
-  const applicantName = safeFilenameSegment(
-    input.applicant.fullName,
-    input.applicant.id,
-  );
-  return `${numberPrefix(input.applicantIndex + 1)}_${applicantName}_${documentName}.${extension}`;
+  return null;
 }
 
 export function exportDateLabel(value: Date | string | undefined): string {
@@ -199,9 +269,12 @@ export function safeArchiveName(value: string, fallback: string): string {
   const safe = value
     .normalize("NFKC")
     .split("")
-    .map((character) => (/[\\/:*?"<>|]/.test(character) ? "_" : character))
+    .map((character) =>
+      /[\\/:*?"<>|]/.test(character) || character.charCodeAt(0) < 32
+        ? "_"
+        : character,
+    )
     .join("")
-    .replace(/[\u0000-\u001f]/g, "_")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 96);
@@ -230,8 +303,4 @@ function sanitizeExtension(value: string): string {
       .replace(/[^a-z0-9]+/gi, "")
       .toLowerCase() || "bin"
   );
-}
-
-function numberPrefix(value: number): string {
-  return String(value).padStart(2, "0");
 }

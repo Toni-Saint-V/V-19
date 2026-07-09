@@ -1,4 +1,4 @@
-import type { Applicant, Submission } from "./types";
+import type { Applicant, City, Submission } from "./types";
 import { agentOwnerDisplayName } from "./ownership";
 import {
   digitsOnly,
@@ -6,6 +6,22 @@ import {
   normalizeExportContractDate,
   type ExportContractRow,
 } from "../../lib/export/exportContractCore";
+
+
+const exportLocationCodes: Record<City, string> = {
+  "Москва": "MOW",
+  "Санкт-Петербург": "SPB",
+  "Казань": "KZN",
+  "Екатеринбург": "SVX",
+  "Новосибирск": "OVB",
+  "Нижний Новгород": "GOJ",
+  "Самара": "KUF",
+  "Ростов-на-Дону": "ROV",
+};
+
+function exportLocationCode(city: City): string {
+  return exportLocationCodes[city] ?? city;
+}
 export {
   buildExportPreview,
   buildExportWorkbookMatrix,
@@ -85,7 +101,7 @@ function buildExportContractRow(
     applicantMobile: mobile,
     applicantName: applicant.fullName,
     appointmentCategory: normalizeCategory(field("category")),
-    appointmentType: submission.type === "family" ? "Family" : "Individual",
+    appointmentType: normalizeAppointmentType(submission.type),
     city: submission.city,
     contactPersonAddress: hotelAddress,
     contactPersonCity: hotelCity,
@@ -120,7 +136,7 @@ function buildExportContractRow(
     invitingCompanyName: hotelName,
     invitingCompanyZipCode: hotelPostalCode,
     lastName: surname,
-    location: submission.city,
+    location: exportLocationCode(submission.city),
     maritalStatus: normalizeMaritalStatus(field("marital-status")),
     meansOfSupport: normalizeMeans(field("means-of-support")),
     nationalityAtBirth: normalizeCountry(field("birth-country")),
@@ -150,8 +166,8 @@ function buildExportContractRow(
     ),
     tripDates: `${submission.tripDateFrom}-${submission.tripDateTo}`,
     type: groupLabel,
-    visaSubType: field("visa-sub-type"),
-    visaType: field("visa-type"),
+    visaSubType: normalizeVisaSubType(field("visa-sub-type")),
+    visaType: normalizeVisaType(field("visa-type")),
   };
 }
 
@@ -189,7 +205,25 @@ function looksLikeRussianSurname(value: string) {
 }
 
 function normalizeCategory(value: string): string {
-  return value.includes("Normal") ? "Normal" : value;
+  if (/normal/i.test(value)) return "NORMAL";
+  if (/premium|prime/i.test(value)) return "PREMIUM";
+  return value.trim().toUpperCase();
+}
+
+function normalizeAppointmentType(value: Submission["type"]): string {
+  return value === "family" ? "FAMILY" : "INDIVIDUAL";
+}
+
+function normalizeVisaType(value: string): string {
+  if (/\bC\b|schengen|шенген/i.test(value)) return "C";
+  if (/\bD\b|national|национ/i.test(value)) return "D";
+  return value.trim().toUpperCase();
+}
+
+function normalizeVisaSubType(value: string): string {
+  if (!value.trim()) return "NA";
+  if (/tour|тур|business|делов|visit|visitor|гост/i.test(value)) return "NA";
+  return value.trim().toUpperCase();
 }
 
 function normalizeCountry(value: string): string {
@@ -212,10 +246,10 @@ function normalizeMaritalStatus(value: string): string {
 }
 
 function normalizeEntryCount(value: string): string {
-  if (/multiple/i.test(value)) return "Multiple Entry";
-  if (/two/i.test(value)) return "Two Entry";
-  if (/single/i.test(value)) return "Single Entry";
-  return value;
+  if (/multiple|multi|мног/i.test(value)) return "MULTIPLE";
+  if (/two|double|дв/i.test(value)) return "TWO";
+  if (/single|одн/i.test(value)) return "SINGLE";
+  return value.trim().toUpperCase();
 }
 
 function normalizeCost(value: string): string {

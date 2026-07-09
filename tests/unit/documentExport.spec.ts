@@ -1,9 +1,6 @@
 import JSZip from "jszip";
 import { describe, expect, test } from "vitest";
-import {
-  buildDocumentsZip,
-  DocumentZipBuilderError,
-} from "../../src/modules/documents/documentExport";
+import { buildDocumentsZip } from "../../src/modules/documents/documentExport";
 import {
   DOCUMENT_TYPES,
   normalizeDocumentType,
@@ -68,8 +65,8 @@ function documentAsset(
 }
 
 async function zipFileNames(zip: JSZip): Promise<string[]> {
-  const blob = await zip.generateAsync({ type: "blob" });
-  const loaded = await JSZip.loadAsync(blob);
+  const bytes = await zip.generateAsync({ type: "arraybuffer" });
+  const loaded = await JSZip.loadAsync(bytes);
   return Object.keys(loaded.files)
     .filter((name) => !loaded.files[name]?.dir)
     .sort();
@@ -99,12 +96,13 @@ describe("document export ZIP builder", () => {
       submissions: [submission],
     });
 
-    expect(result).toMatchObject({ applicantCount: 3, fileCount: 9 });
+    expect(result).toMatchObject({ applicantCount: 3, fileCount: 12 });
     expect(await zipFileNames(result.zip)).toEqual(
       expect.arrayContaining([
-        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/01_анна_волкова_passport.jpg",
-        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/01_анна_волкова_selfie_1.jpg",
-        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/02_игорь_волков_selfie_2.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011021_passport_scan.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011021_selfie_1.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011022_selfie_2.jpg",
+        "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011023_visa_form.pdf",
       ]),
     );
   });

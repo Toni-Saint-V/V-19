@@ -109,8 +109,12 @@ test("ZIP contains real workbook and four real document files per applicant", as
     .async("uint8array");
   expect(asciiPrefix(workbookBytes, 2)).toBe("PK");
 
+  const workbookBuffer = workbookBytes.buffer.slice(
+    workbookBytes.byteOffset,
+    workbookBytes.byteOffset + workbookBytes.byteLength,
+  ) as ArrayBuffer;
   const workbook = await parseExportWorkbookBlob(
-    new Blob([workbookBytes], {
+    new Blob([workbookBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
   );

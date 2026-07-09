@@ -25,6 +25,7 @@ const promotedRuntimeFiles = [
   path.join(root, "src/assets/v-logo-premium-black-style.png"),
   path.join(root, "src/assets/visaflow-logo.png"),
   path.join(root, "src/lib/export/exportContractCore.ts"),
+  path.join(root, "src/lib/export/exportWorkbookCore.ts"),
   path.join(root, "src/lib/supabase/activation.ts"),
   path.join(root, "src/lib/supabase/client.ts"),
   path.join(root, "src/lib/supabase/config.ts"),
