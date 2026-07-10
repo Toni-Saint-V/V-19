@@ -52,6 +52,47 @@ function renderCreateDrawer() {
 }
 
 describe("CreateSubmissionDrawer passport readiness", () => {
+  test("shows extracted passport fields in the animated right column", async () => {
+    vi.mocked(invokePassportExtraction).mockResolvedValueOnce({
+      fields: [
+        {
+          confidence: "high",
+          key: "surname",
+          needsManualReview: false,
+          value: "VOLKOV",
+        },
+        {
+          confidence: "high",
+          key: "firstName",
+          needsManualReview: false,
+          value: "ANTON",
+        },
+        {
+          confidence: "high",
+          key: "passportNumber",
+          needsManualReview: false,
+          value: "752869613",
+        },
+      ],
+      guardrails: [],
+      source: "local-ocr",
+      status: "extracted",
+      summary: "Passport extracted.",
+    });
+    const { input } = renderCreateDrawer();
+
+    fireEvent.change(input, {
+      target: { files: [passportFile("volkov.jpg")] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "Распознанные поля OCR" })).toBeVisible();
+      expect(screen.getByText("VOLKOV")).toBeVisible();
+      expect(screen.getByText("ANTON")).toBeVisible();
+      expect(screen.getByText("752869613")).toBeVisible();
+    });
+  });
+
   test("keeps incomplete extracted OCR under operator review", async () => {
     vi.mocked(invokePassportExtraction).mockResolvedValueOnce({
       fields: [
