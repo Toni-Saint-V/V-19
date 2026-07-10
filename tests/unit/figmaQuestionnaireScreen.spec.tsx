@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { FigmaQuestionnaireScreen } from "../../src/modules/submissions/components/FigmaQuestionnaireScreen";
 import {
@@ -20,13 +20,27 @@ function sectionIdForField(submission: Submission, fieldId: string) {
 }
 
 function setField(submission: Submission, fieldId: string, value: string) {
-  const applicantId = submission.applicants[0]?.id;
+  return setApplicantField(submission, 0, fieldId, value);
+}
+
+function setApplicantField(
+  submission: Submission,
+  applicantIndex: number,
+  fieldId: string,
+  value: string,
+) {
+  const applicantId = submission.applicants[applicantIndex]?.id;
   if (!applicantId) throw new Error("expected applicant");
+
+  const section = submission.applicants[applicantIndex]?.sections.find((item) =>
+    item.fields.some((field) => field.id === fieldId),
+  );
+  if (!section) throw new Error(`expected section for ${fieldId}`);
 
   return updateQuestionnaireField(submission, {
     applicantId,
     fieldId,
-    sectionId: sectionIdForField(submission, fieldId),
+    sectionId: section.id,
     value,
   });
 }
@@ -36,8 +50,20 @@ function fillEveryQuestionnaireField(submission: Submission) {
   if (!applicant) throw new Error("expected applicant");
 
   return applicant.sections
-    .flatMap((section) => section.fields.map((field) => field.id))
-    .reduce((current, fieldId) => setField(current, fieldId, "READY"), submission);
+    .flatMap((section) => section.fields)
+    .reduce((current, field) => {
+      const { id: fieldId, label } = field;
+      const value = fieldId.includes("date") || fieldId.includes("valid") || fieldId.includes("expiry")
+        ? "20.08.2030"
+        : label.toLocaleLowerCase("ru-RU").includes("email")
+          ? "ready@example.com"
+          : label.toLocaleLowerCase("ru-RU").includes("телефон")
+            ? "79000000000"
+            : fieldId === "passport-no"
+              ? "752869613"
+              : "READY";
+      return setField(current, fieldId, value);
+    }, submission);
 }
 
 function setFieldReview(
@@ -277,7 +303,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Иное гражданство",
       "Пол",
       "Семейное положение",
-      "Родитель/опекун несовершеннолетнего",
       "Национальный ID",
     ]);
 
@@ -301,9 +326,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Город проживания",
       "Почтовый индекс",
       "Проживание не в стране гражданства",
-      "Вид на жительство / документ",
-      "Номер документа",
-      "Действителен до",
     ]);
 
     clickPinnedSection(result.container, "Работа / учеба");
@@ -318,7 +340,6 @@ describe("FigmaQuestionnaireScreen", () => {
     clickPinnedSection(result.container, "Поездка");
     expect(visibleFieldLabels(result.container)).toEqual([
       "Цель поездки",
-      "Дополнительные сведения о цели",
       "Основная страна назначения",
       "Страна первого въезда",
       "Количество въездов",
@@ -326,8 +347,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Дата выезда",
       "Длительность пребывания",
       "Отпечатки ранее сдавались",
-      "Дата сдачи отпечатков",
-      "Номер визы",
       "Разрешение на въезд в конечную страну",
       "Кем выдано",
       "Действительно с",
@@ -341,19 +360,437 @@ describe("FigmaQuestionnaireScreen", () => {
       "Адрес",
       "Email",
       "Телефон",
-      "Название и адрес компании/организации",
-      "Контактное лицо компании",
-      "Телефон компании",
     ]);
 
     clickPinnedSection(result.container, "Оплата поездки");
     expect(visibleFieldLabels(result.container)).toEqual([
       "Кто оплачивает поездку",
       "Средства заявителя",
-      "Спонсор указан в полях 30/31",
-      "Другой спонсор",
-      "Средства спонсора",
     ]);
+  });
+
+  test("hides the rare previous surname field for male applicants until requested", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen onBack={vi.fn()} onComplete={vi.fn()} submission={submission} />,
+    );
+
+    clickPinnedSection(result.container, "Личные данные");
+    fireEvent.click(screen.getByRole("button", { name: "Мужской" }));
+
+    expect(visibleFieldLabels(result.container)).not.toContain("Фамилия при рождении / предыдущая");
+    fireEvent.click(screen.getByRole("button", { name: "Указать предыдущую фамилию" }));
+    expect(visibleFieldLabels(result.container)).toContain("Фамилия при рождении / предыдущая");
+  });
+
+  test("reveals only the follow-up questions required by an answer", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Адрес и контакты");
+    expect(screen.queryByLabelText("Вид на жительство / документ")).not.toBeInTheDocument();
+    fireEvent.click(dropdownTrigger(result.container, "Проживание не в стране гражданства"));
+    fireEvent.click(screen.getByRole("button", { name: "Да" }));
+    expect(screen.getByLabelText("Вид на жительство / документ")).toBeInTheDocument();
+
+    clickPinnedSection(result.container, "Поездка");
+    expect(visibleFieldLabels(result.container)).not.toContain("Дополнительные сведения о цели");
+    expect(screen.queryByLabelText("Дата сдачи отпечатков")).not.toBeInTheDocument();
+    fireEvent.click(dropdownTrigger(result.container, "Цель поездки"));
+    fireEvent.click(screen.getByRole("button", { name: "OTHER" }));
+    expect(visibleFieldLabels(result.container)).toContain("Дополнительные сведения о цели");
+    fireEvent.click(dropdownTrigger(result.container, "Отпечатки ранее сдавались"));
+    fireEvent.click(screen.getByRole("button", { name: "Да" }));
+    expect(screen.getByLabelText("Дата сдачи отпечатков")).toBeInTheDocument();
+
+    clickPinnedSection(result.container, "Оплата поездки");
+    expect(screen.queryByLabelText("Другой спонсор")).not.toBeInTheDocument();
+    fireEvent.click(dropdownTrigger(result.container, "Кто оплачивает поездку"));
+    fireEvent.click(screen.getByRole("button", { name: "Спонсор" }));
+    expect(screen.getByLabelText("Другой спонсор")).toBeInTheDocument();
+  });
+
+  test("formats dates and phones while offering common email domains", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Дата рождения"), {
+      target: { value: "20082012" },
+    });
+    expect(screen.getByLabelText("Дата рождения")).toHaveValue("20.08.2012");
+
+    clickPinnedSection(result.container, "Адрес и контакты");
+    const phone = screen.getByLabelText("Телефон");
+    fireEvent.focus(phone);
+    expect(phone).toHaveValue("+7");
+    fireEvent.change(phone, { target: { value: "+79001234567" } });
+    expect(phone).toHaveValue("+7 900 123-45-67");
+
+    const email = screen.getByLabelText("Email");
+    fireEvent.change(email, { target: { value: "anna" } });
+    expect(
+      Array.from(result.container.querySelectorAll("datalist option")).map((option) => option.getAttribute("value")),
+    ).toContain("anna@gmail.com");
+
+    clickPinnedSection(result.container, "Отель / приглашение");
+    const hotelPhone = screen.getByLabelText("Телефон");
+    fireEvent.focus(hotelPhone);
+    expect(hotelPhone).toHaveValue("+34");
+  });
+
+  test("keeps citizenship and birth country empty until each family applicant chooses them", () => {
+    let submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    submission = setApplicantField(submission, 0, "birth-date", "20.08.1990");
+    submission = setApplicantField(submission, 1, "birth-date", "20.08.1991");
+    const onSaveDraft = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onSaveDraft={onSaveDraft}
+        submission={submission}
+      />,
+    );
+
+    expect(dropdownTrigger(result.container, "Текущее гражданство")).toHaveTextContent("Выберите");
+    expect(dropdownTrigger(result.container, "Страна рождения")).toHaveTextContent("Выберите");
+    expect(screen.queryByRole("button", { name: "Другое" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+    expect(onSaveDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fieldUpdates: expect.not.arrayContaining([
+          expect.objectContaining({ fieldId: "nationality" }),
+          expect.objectContaining({ fieldId: "birth-country" }),
+        ]),
+      }),
+    );
+
+    const withManualCountry = setField(submission, "birth-country", "Spain");
+    const manualResult = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={withManualCountry}
+      />,
+    );
+    expect(dropdownTrigger(manualResult.container, "Страна рождения")).toHaveTextContent("Spain");
+  });
+
+  test("clears stale conditional answers when saving a draft", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const staleSubmission = setField(
+      setField(draft, "lives-outside-citizenship", "Нет"),
+      "residence-permit-type",
+      "ВНЖ",
+    );
+    const onSaveDraft = vi.fn();
+
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onSaveDraft={onSaveDraft}
+        submission={staleSubmission}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
+
+    expect(onSaveDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fieldUpdates: expect.arrayContaining([
+          expect.objectContaining({
+            fieldId: "residence-permit-type",
+            value: "",
+          }),
+        ]),
+      }),
+    );
+    expect(result.container).toBeTruthy();
+  });
+
+  test("accepts a home address without punctuation and explains the quick format", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Адрес и контакты");
+    const address = screen.getByLabelText("Домашний адрес");
+    expect(address).toHaveAttribute("placeholder", "Улица дом квартира");
+    expect(
+      screen.getByText("Можно без запятых и точек: ул Ленина дом 5 квартира 12"),
+    ).toBeInTheDocument();
+
+    fireEvent.change(address, { target: { value: "ул Ленина дом 5 квартира 12" } });
+    expect(address).toHaveValue("ул Ленина дом 5 квартира 12");
+  });
+
+  test("shows actionable file slots and uploads a passport in one selection", async () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const passportFile = draft.files.find((file) => file.type === "passport_scan");
+    if (!passportFile) throw new Error("expected passport file slot");
+    const submission = {
+      ...draft,
+      files: draft.files.map((file) =>
+        file.id === passportFile.id ? { ...file, status: "missing" as const } : file,
+      ),
+    };
+    const onUploadFile = vi.fn().mockResolvedValue(undefined);
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onUploadFile={onUploadFile}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Файлы");
+    expect(screen.getByText("Три файла на заявителя. Выберите нужный слот — статус обновится после загрузки.")).toBeInTheDocument();
+    const passportInput = screen.getByLabelText("Загрузить Загранпаспорт");
+    expect(passportInput).toHaveAttribute("accept", expect.stringContaining("image/webp"));
+    const selfieInput = screen.getByLabelText("Загрузить Селфи 1");
+    expect(selfieInput).toHaveAttribute("accept", expect.stringContaining("image/heic"));
+    expect(selfieInput.getAttribute("accept")).not.toContain("image/gif");
+
+    fireEvent.change(passportInput, {
+      target: { files: [new File(["passport"], "passport.webp", { type: "image/webp" })] },
+    });
+    await waitFor(() =>
+      expect(onUploadFile).toHaveBeenCalledWith(
+        passportFile.id,
+        expect.objectContaining({ name: "passport.webp" }),
+      ),
+    );
+  });
+
+  test("does not offer a file upload when the submission is no longer editable", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const submission = {
+      ...draft,
+      files: draft.files.map((file) =>
+        file.type === "passport_scan" ? { ...file, status: "missing" as const } : file,
+      ),
+      status: "submitted_for_review" as const,
+    };
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onUploadFile={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Файлы");
+    expect(screen.queryByLabelText("Загрузить Загранпаспорт")).not.toBeInTheDocument();
+  });
+
+  test("suggests a ten-year passport expiry when it is empty", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const onFieldChange = vi.fn();
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        onFieldChange={onFieldChange}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Паспорт");
+    fireEvent.change(screen.getByLabelText("Дата выдачи"), {
+      target: { value: "20082016" },
+    });
+
+    expect(screen.getByLabelText("Дата выдачи")).toHaveValue("20.08.2016");
+    expect(screen.getByLabelText("Действителен до")).toHaveValue("20.08.2026");
+    expect(
+      screen.getByText(
+        "Если дата окончания не считалась: введите дату выдачи — подставим +10 лет. Для 5-летнего паспорта исправьте дату.",
+      ),
+    ).toBeInTheDocument();
+    expect(onFieldChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fieldId: "passport-expiry-date",
+        value: "20.08.2026",
+      }),
+    );
+
+    fireEvent.change(screen.getByLabelText("Действителен до"), {
+      target: { value: "20082021" },
+    });
+    fireEvent.change(screen.getByLabelText("Дата выдачи"), {
+      target: { value: "20082017" },
+    });
+    expect(screen.getByLabelText("Действителен до")).toHaveValue("20.08.2021");
+  });
+
+  test("uses one-click options for short choice lists and search for long lists", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    clickPinnedSection(result.container, "Адрес и контакты");
+    expect(screen.getByRole("group", { name: "Проживание не в стране гражданства" })).toBeInTheDocument();
+
+    clickPinnedSection(result.container, "Личные данные");
+    fireEvent.click(dropdownTrigger(result.container, "Страна рождения"));
+    const countrySearch = screen.getByLabelText("Поиск: Страна рождения");
+    fireEvent.change(countrySearch, { target: { value: "испан" } });
+    expect(screen.getByRole("button", { name: "Spain" })).toBeInTheDocument();
+  });
+
+  test("reveals minor and company-only fields from their triggering answers", () => {
+    const submission = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+
+    expect(visibleFieldLabels(result.container)).not.toContain("Родитель/опекун несовершеннолетнего");
+    fireEvent.change(screen.getByLabelText("Дата рождения"), {
+      target: { value: "20.08.2012" },
+    });
+    expect(visibleFieldLabels(result.container)).toContain("Родитель/опекун несовершеннолетнего");
+
+    clickPinnedSection(result.container, "Отель / приглашение");
+    expect(visibleFieldLabels(result.container)).not.toContain("Контактное лицо компании");
+    fireEvent.click(dropdownTrigger(result.container, "Тип принимающей стороны"));
+    fireEvent.click(screen.getByRole("button", { name: "Приглашающая компания/организация" }));
+    expect(visibleFieldLabels(result.container)).toContain("Контактное лицо компании");
+  });
+
+  test("copies only the current section's shared family data from the primary applicant", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["IVANOVA MARIA", "IVANOV ANTON"],
+      city: "Москва",
+      familyCount: 2,
+      idScheme: "local",
+      submissions: [],
+      type: "family",
+    });
+    const submission = setField(setField(draft, "home-city", "Москва"), "home-address", "Арбат, 1");
+    const result = render(
+      <FigmaQuestionnaireScreen
+        onBack={vi.fn()}
+        onComplete={vi.fn()}
+        submission={submission}
+      />,
+    );
+    const applicantTabs = result.container.querySelectorAll(".v19-questionnaire-applicant-tab");
+    fireEvent.click(applicantTabs[1] as HTMLButtonElement);
+    clickPinnedSection(result.container, "Адрес и контакты");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Скопировать общие данные от IVANOVA MARIA" }),
+    );
+
+    expect(screen.getByLabelText("Город проживания")).toHaveValue("Москва");
+    expect(visibleFieldLabels(result.container)).toContain("Домашний адрес");
   });
 
   test("keeps BLS dropdown dictionaries available on the current UI", () => {
@@ -502,13 +939,21 @@ describe("FigmaQuestionnaireScreen", () => {
     if (!applicantId) throw new Error("expected applicant");
     const onComplete = vi.fn();
 
+    const readySubmission = fillEveryQuestionnaireField(draft);
+
     render(
       <FigmaQuestionnaireScreen
         onBack={vi.fn()}
         onComplete={onComplete}
         submission={{
-          ...fillEveryQuestionnaireField(draft),
+          ...readySubmission,
           completeness: { files: 100, questionnaire: 100, total: 100 },
+          files: readySubmission.files.map((file) => ({
+            ...file,
+            reviewStatus: "accepted",
+            status: "accepted",
+            uploadStatus: "uploaded",
+          })),
         }}
       />,
     );

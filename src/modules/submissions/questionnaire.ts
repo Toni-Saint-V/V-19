@@ -180,7 +180,7 @@ const questionnaireBlueprint: Array<{
       { id: "nationality", label: "Текущее гражданство", placeholder: "Выберите гражданство", control: "select", options: blsCountryOptions },
       { id: "birth-citizenship", label: "Гражданство при рождении, если отличается", placeholder: "Выберите или введите гражданство", control: "select", options: blsCountryOptions, required: false },
       { id: "other-citizenship", label: "Иное гражданство", placeholder: "Выберите или введите гражданство", control: "select", options: blsCountryOptions, required: false },
-      { id: "gender", label: "Пол", placeholder: "Выберите пол", control: "select", options: ["Мужской", "Женский", "Другое"] },
+      { id: "gender", label: "Пол", placeholder: "Выберите пол", control: "select", options: ["Мужской", "Женский"] },
       { id: "marital-status", label: "Семейное положение", placeholder: "Выберите статус", control: "select", options: ["Холост/не замужем", "Женат/замужем", "Зарегистрированное партнерство", "Раздельно", "Разведен(а)", "Вдовец/вдова", "Иное"] },
       { id: "guardian-info", label: "Родитель/опекун несовершеннолетнего", placeholder: "Только для несовершеннолетних", required: false, span: "full" },
       { id: "national-id", label: "Национальный ID", placeholder: "Если есть", required: false },

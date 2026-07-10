@@ -13,11 +13,15 @@ export {
   buildMediaStoragePath,
   buildVisaApplicationPdfStorageTarget,
   isPassportScanUploadFileAccepted,
+  mediaMimeTypeForFile,
   mediaStorageBucket,
   MediaStorageValidationError,
   passportScanUploadAccept,
   passportScanUploadFormatLabel,
   passportScanUploadMimeTypes,
+  selfieUploadAccept,
+  selfieUploadFormatLabel,
+  selfieUploadMimeTypes,
   storageTargetForSlot,
   validateApplicationPdfStorageTarget,
   validateAppointmentPdfStorageTarget,
@@ -31,6 +35,7 @@ export {
 export async function uploadMediaToStorage(
   target: MediaStorageTarget,
   file: File,
+  options: { contentType?: string } = {},
 ): Promise<{ path: string } | null> {
   validateMediaStorageTarget({ target, file });
 
@@ -41,7 +46,7 @@ export async function uploadMediaToStorage(
     .from(target.bucket)
     .upload(target.path, file, {
       upsert: false,
-      contentType: file.type,
+      contentType: options.contentType ?? file.type,
     });
 
   if (error) {

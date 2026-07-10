@@ -7,6 +7,7 @@ import {
   buildVisaApplicationPdfStorageTarget,
   createMediaSignedUrl,
   deleteMediaFromStorage,
+  mediaMimeTypeForFile,
   mediaStorageBucket,
   isPassportScanUploadFileAccepted,
   storageTargetForSlot,
@@ -303,6 +304,10 @@ describe("media storage contract", () => {
         ),
       }),
     ).not.toThrow();
+
+    expect(mediaMimeTypeForFile({ name: "passport.PDF", type: "" })).toBe("application/pdf");
+    expect(mediaMimeTypeForFile({ name: "selfie.heic", type: "" })).toBe("image/heic");
+    expect(mediaMimeTypeForFile({ name: "selfie.gif", type: "" })).toBeNull();
   });
 
   test("rejects traversal and malformed prefixed paths", () => {

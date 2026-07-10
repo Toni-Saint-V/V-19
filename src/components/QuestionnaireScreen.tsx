@@ -22,6 +22,7 @@ interface QuestionnaireScreenProps {
   onBack: () => void;
   draft?: ProductIntakeDraft;
   submission?: Submission;
+  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onSaveDraft?: (submissionId: string) => void | Promise<void>;
   onSubmissionChange?: (submission: Submission) => void | Promise<void>;
   onSubmitForReview?: (submissionId: string) => void | Promise<void>;
@@ -201,6 +202,7 @@ export function QuestionnaireScreen({
   onBack,
   draft,
   submission,
+  onUploadFile,
   onSaveDraft,
   onSubmissionChange,
   onSubmitForReview,
@@ -299,6 +301,7 @@ export function QuestionnaireScreen({
       onBack={onBack}
       onComplete={handleComplete}
       onSaveDraft={handleSaveDraft}
+      onUploadFile={onUploadFile}
     />
   );
 }
