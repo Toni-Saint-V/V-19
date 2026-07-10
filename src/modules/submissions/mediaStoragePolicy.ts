@@ -25,12 +25,17 @@ const legacyArchiveMediaStorageObjectTypes = new Set(["photo_white", "video"]);
 const appointmentPdfApplicantId = "common";
 const submissionStoragePrefix = "submissions";
 const applicantStoragePrefix = "applicants";
-export const passportScanUploadMimeTypes = [
+export const selfieUploadMimeTypes = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/heic",
   "image/heif",
+] as const;
+export const selfieUploadAccept = selfieUploadMimeTypes.join(",");
+export const selfieUploadFormatLabel = "JPEG, PNG, WEBP, HEIC или HEIF";
+export const passportScanUploadMimeTypes = [
+  ...selfieUploadMimeTypes,
   "application/pdf",
 ] as const;
 export const passportScanUploadAccept = passportScanUploadMimeTypes.join(",");
@@ -108,16 +113,8 @@ function allowedMimeTypes(type: MediaStorageObjectType): Set<string> {
   if (type === "application_pdf") return new Set(["application/pdf"]);
   if (type === "appointment_pdf") return new Set(["application/pdf"]);
   if (type === "visa_application_pdf") return new Set(["application/pdf"]);
-  if (type === "passport_scan")
-    return new Set([
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "image/heic",
-      "image/heif",
-      "application/pdf",
-    ]);
-  return new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+  if (type === "passport_scan") return new Set(passportScanUploadMimeTypes);
+  return new Set(selfieUploadMimeTypes);
 }
 
 function allowedLegacyArchiveMimeTypes(type: string): Set<string> {
@@ -135,6 +132,11 @@ function mimeTypeForExtension(extension: string): string | null {
   if (extension === "mp4") return "video/mp4";
   if (extension === "pdf") return "application/pdf";
   return null;
+}
+
+export function mediaMimeTypeForFile(file: Pick<File, "name" | "type">): string | null {
+  const explicitMimeType = file.type.trim();
+  return explicitMimeType || mimeTypeForExtension(extensionForFileName(file.name));
 }
 
 function maxSizeBytes(type: MediaStorageObjectType): number {

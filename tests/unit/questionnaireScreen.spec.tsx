@@ -17,7 +17,7 @@ function fieldValue(submission: Submission, fieldId: string) {
 }
 
 describe("QuestionnaireScreen", () => {
-  test("persists changed questionnaire fields through the agent submission bridge", async () => {
+  test("saves partial questionnaire changes as a draft through the agent submission bridge", async () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -40,12 +40,12 @@ describe("QuestionnaireScreen", () => {
     fireEvent.change(screen.getByLabelText("Фамилия"), {
       target: { value: "VOLKOV" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Готово/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
 
     await waitFor(() => expect(onSubmissionChange).toHaveBeenCalledTimes(1));
 
     const nextSubmission = onSubmissionChange.mock.calls[0]?.[0] as Submission;
     expect(fieldValue(nextSubmission, "surname")).toBe("VOLKOV");
-    expect(nextSubmission.status).toBe("in_progress");
+    expect(nextSubmission.status).toBe("draft");
   });
 });

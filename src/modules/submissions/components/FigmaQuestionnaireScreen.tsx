@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
   ChevronDown,
-  Info,
+  FileText,
+  Upload,
   Users,
 } from "lucide-react";
 import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-system";
@@ -16,6 +17,13 @@ import {
   validateQuestionnaireFieldValue,
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
+import {
+  passportScanUploadAccept,
+  passportScanUploadFormatLabel,
+  selfieUploadAccept,
+  selfieUploadFormatLabel,
+} from "../mediaStorage";
+import { canReplaceDocument } from "../status";
 import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
@@ -56,20 +64,72 @@ const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionI
   { canonicalId: "filler", id: "filler", meta: "0 из 0", status: "pending", title: "Кто заполнил" },
 ];
 
+const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
+  appointment: [
+    "appointment-city",
+    "visa-type",
+    "category",
+    "desired-date-1",
+    "desired-date-2",
+    "desired-date-3",
+    "appointment-note",
+  ],
+  contact: [
+    "home-address",
+    "home-country",
+    "home-city",
+    "postal-code",
+    "lives-outside-citizenship",
+    "residence-permit-type",
+    "residence-permit-number",
+    "residence-permit-valid-until",
+  ],
+  hotel: [
+    "inviting-party-type",
+    "hotel-name",
+    "hotel-address",
+    "hotel-email",
+    "hotel-contact",
+    "company-org-details",
+    "company-contact-person",
+    "company-phone",
+  ],
+  payment: [
+    "cost-covered-by",
+    "means-of-support",
+    "sponsor-in-host-fields",
+    "other-sponsor",
+    "sponsor-means",
+  ],
+  trip: [
+    "purpose",
+    "stay-purpose-details",
+    "main-destination",
+    "first-entry-country",
+    "entry-count",
+    "arrival-date",
+    "departure-date",
+    "stay-duration",
+  ],
+};
+
 type FormFieldProps = {
   excelMap?: string;
   errorMessage?: string;
   focused?: boolean;
   fullWidth?: boolean;
+  hint?: string;
   label: string;
   number?: string;
   onChange?: (value: string) => void;
   options?: string[];
+  phonePrefix?: "+7" | "+34";
+  placeholder?: string;
   readOnly?: boolean;
   required?: boolean;
   reviewSource?: string;
   state?: FieldState;
-  type?: "email" | "input" | "number" | "textarea";
+  type?: "email" | "input" | "number" | "tel" | "textarea";
   value: string;
 };
 
@@ -78,6 +138,7 @@ type FigmaQuestionnaireScreenProps = {
   onBack: () => void;
   onComplete: (values: QuestionnaireCommitPayload) => void;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
+  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onSaveDraft?: (values: QuestionnaireCommitPayload) => void;
   submission: Submission;
 };
@@ -286,14 +347,85 @@ const BLS_OCCUPATION_OPTIONS = [
 
 const YES_NO_OPTIONS = ["Нет", "Да"];
 
+const commonEmailDomains = ["gmail.com", "yandex.ru", "mail.ru", "icloud.com", "outlook.com"];
+
+const optionSearchAliases: Record<string, string[]> = {
+  "Russian Federation": ["россия", "рф"],
+  Spain: ["испания"],
+  "United Kingdom": ["великобритания", "англия"],
+  "United States": ["сша", "америка"],
+};
+
+function isDateFieldLabel(label: string) {
+  const normalized = label.toLocaleLowerCase("ru-RU");
+  return normalized.includes("дата") || normalized.includes("действител");
+}
+
+function formatDateInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 1) return digits;
+  if (digits.length <= 3) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2, 4)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+function formatPhoneInput(value: string, prefix: "+7" | "+34") {
+  const prefixDigits = prefix.replace(/\D/g, "");
+  let digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+
+  if (prefix === "+7" && digits.startsWith("8")) digits = `7${digits.slice(1)}`;
+  if (!digits.startsWith(prefixDigits)) digits = `${prefixDigits}${digits}`;
+
+  const localDigits = digits.slice(prefixDigits.length).slice(0, prefix === "+7" ? 10 : 9);
+  const groups = prefix === "+7"
+    ? [localDigits.slice(0, 3), localDigits.slice(3, 6), localDigits.slice(6, 8), localDigits.slice(8, 10)]
+    : [localDigits.slice(0, 3), localDigits.slice(3, 6), localDigits.slice(6, 9)];
+  const separator = prefix === "+7" ? [" ", "-", "-"] : [" ", " "];
+
+  return groups.reduce(
+    (formatted, group, index) =>
+      group ? `${formatted}${index === 0 ? " " : separator[index - 1]}${group}` : formatted,
+    prefix,
+  );
+}
+
+function emailSuggestions(value: string) {
+  const [localPart = "", domainPart = ""] = value.trim().split("@", 2);
+  if (!localPart) return [];
+
+  return commonEmailDomains
+    .filter((domain) => domain.startsWith(domainPart.toLocaleLowerCase("en-US")))
+    .map((domain) => `${localPart}@${domain}`);
+}
+
+function optionMatchesSearch(option: string, query: string) {
+  const normalizedOption = option.toLocaleLowerCase("ru-RU");
+  if (normalizedOption.includes(query)) return true;
+  return (optionSearchAliases[option] ?? []).some((alias) => alias.includes(query));
+}
+
+function inputAutocomplete(label: string, type: FormFieldProps["type"]) {
+  if (type === "email" || label.toLocaleLowerCase("ru-RU").includes("email")) return "email";
+  if (label === "Фамилия") return "family-name";
+  if (label === "Имя") return "given-name";
+  if (label.toLocaleLowerCase("ru-RU").includes("адрес")) return "street-address";
+  if (label.toLocaleLowerCase("ru-RU").includes("город")) return "address-level2";
+  if (label.toLocaleLowerCase("ru-RU").includes("индекс")) return "postal-code";
+  return "off";
+}
+
 function FormField({
   errorMessage,
   focused,
   fullWidth,
+  hint,
   label,
   number,
   onChange,
   options,
+  phonePrefix,
+  placeholder,
   readOnly,
   required,
   reviewSource,
@@ -302,7 +434,9 @@ function FormField({
   value,
 }: FormFieldProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [optionQuery, setOptionQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const optionSearchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -315,12 +449,36 @@ function FormField({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  const usesQuickOptions = Boolean(options && options.length <= 3);
+  const usesOptionSearch = Boolean(options && options.length > 8);
+  const filteredOptions = useMemo(() => {
+    if (!options) return [];
+    const query = optionQuery.trim().toLocaleLowerCase("ru-RU");
+    return query
+      ? options.filter((option) => optionMatchesSearch(option, query))
+      : options;
+  }, [optionQuery, options]);
+  const dateField = isDateFieldLabel(label);
+  const emailField = type === "email" || label.toLocaleLowerCase("ru-RU").includes("email");
+  const fieldId = `questionnaire-${number ?? "field"}-${label}`.replace(/\s+/g, "-");
+  const suggestionsId = `${fieldId}-email-suggestions`;
+  const fieldEmailSuggestions = emailField ? emailSuggestions(value) : [];
+
+  useEffect(() => {
+    if (!isOpen || !usesOptionSearch) return;
+    optionSearchRef.current?.focus();
+  }, [isOpen, usesOptionSearch]);
+
   const validationMessage = validateFormFieldValue({ label, required, type, value });
-  const effectiveState: FieldState = validationMessage || state === "invalid"
+  const isEmptyRequiredField = validationMessage === "Обязательное поле" && !value.trim();
+  const effectiveState: FieldState =
+    (validationMessage && !isEmptyRequiredField) || state === "invalid"
     ? "invalid"
     : state;
   const effectiveErrorMessage =
     errorMessage ?? validationMessage ?? reviewSource ?? "Нужно исправить значение";
+  const shouldShowError =
+    effectiveState === "invalid" && (!isEmptyRequiredField || Boolean(errorMessage));
   const baseClasses = "v19-questionnaire-field-control";
   const stateClasses =
     effectiveState === "needs_review"
@@ -345,11 +503,27 @@ function FormField({
         ) : null}
         <span className="flex-1 mt-[var(--v19b-size-3)]">
           {label}
-          {required ? <span className="text-red-400 ml-1">*</span> : null}
+          {required ? <span className="v19-questionnaire-required-mark">*</span> : null}
         </span>
       </label>
 
-      {options ? (
+      {options && usesQuickOptions ? (
+        <div aria-label={label} className="v19-questionnaire-quick-options" role="group">
+          {options.map((option) => (
+            <button
+              aria-pressed={value === option}
+              className={`v19-questionnaire-field-control v19-questionnaire-quick-option ${
+                value === option ? "is-selected" : stateClasses
+              }`}
+              key={option}
+              type="button"
+              onClick={() => onChange?.(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : options ? (
         <div className="relative" ref={dropdownRef}>
           <button
             className={`flex items-center justify-between text-left ${baseClasses} ${stateClasses}`}
@@ -371,7 +545,17 @@ function FormField({
                 initial={{ opacity: 0, scale: 0.98, y: -4 }}
                 transition={{ duration: 0.15 }}
               >
-                {options.map((option) => (
+                {usesOptionSearch ? (
+                  <input
+                    aria-label={`Поиск: ${label}`}
+                    className="v19-questionnaire-field-control"
+                    placeholder="Начните вводить"
+                    ref={optionSearchRef}
+                    value={optionQuery}
+                    onChange={(event) => setOptionQuery(event.target.value)}
+                  />
+                ) : null}
+                {filteredOptions.map((option) => (
                   <button
                     className={`v19-questionnaire-dropdown-option ${
                       value === option ? "is-selected" : ""
@@ -386,36 +570,76 @@ function FormField({
                     {option}
                   </button>
                 ))}
+                {!filteredOptions.length ? (
+                  <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
+                ) : null}
               </motion.div>
             ) : null}
           </AnimatePresence>
         </div>
       ) : type === "textarea" ? (
         <textarea
+          aria-label={label}
           className={`${baseClasses} is-textarea ${stateClasses}`}
+          placeholder={placeholder}
           readOnly={readOnly ?? !onChange}
           value={value}
           onChange={(event) => onChange?.(event.target.value)}
         />
       ) : (
-        <input
-          aria-label={label}
-          className={`${baseClasses} ${stateClasses}`}
-          type={type === "email" || type === "number" ? type : "text"}
-          readOnly={readOnly ?? !onChange}
-          value={value}
-          onChange={(event) => onChange?.(event.target.value)}
-        />
+        <>
+          <input
+            aria-label={label}
+            autoComplete={inputAutocomplete(label, type)}
+            className={`${baseClasses} ${stateClasses}`}
+            inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
+            list={fieldEmailSuggestions.length ? suggestionsId : undefined}
+            maxLength={phonePrefix ? (phonePrefix === "+7" ? 17 : 15) : undefined}
+            placeholder={
+              placeholder ??
+              (dateField
+                ? "ДД.ММ.ГГГГ"
+                : phonePrefix
+                  ? `${phonePrefix} ${phonePrefix === "+7" ? "900 000-00-00" : "600 000 000"}`
+                  : emailField
+                    ? "name@example.com"
+                    : undefined)
+            }
+            readOnly={readOnly ?? !onChange}
+            type={type === "email" || type === "number" || type === "tel" ? type : "text"}
+            value={value}
+            onChange={(event) => {
+              const nextValue = phonePrefix
+                ? formatPhoneInput(event.target.value, phonePrefix)
+                : dateField
+                  ? formatDateInput(event.target.value)
+                  : event.target.value;
+              onChange?.(nextValue);
+            }}
+            onFocus={() => {
+              if (phonePrefix && !value) onChange?.(phonePrefix);
+            }}
+          />
+          {fieldEmailSuggestions.length ? (
+            <datalist id={suggestionsId}>
+              {fieldEmailSuggestions.map((suggestion) => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
+          ) : null}
+        </>
       )}
 
-      {effectiveState === "invalid" ? (
+      {shouldShowError ? (
       <div className="flex items-start gap-1.5 text-[var(--v19b-size-10-5)] text-white/40 mt-1">
-        <span className="text-red-400 flex items-center gap-1.5 font-medium">
-          <AlertCircle className="w-3.5 h-3.5" />
+        <span className="v19-questionnaire-field-error flex items-center gap-1.5 font-medium">
+          <AlertCircle className="v19-questionnaire-field-error-icon w-3.5 h-3.5" />
           {effectiveErrorMessage}
         </span>
       </div>
       ) : null}
+
+      {hint ? <p className="v19-questionnaire-field-hint">{hint}</p> : null}
     </div>
   );
 }
@@ -557,6 +781,7 @@ type QuestionnaireModelField = NonNullable<
 >;
 
 const requiredQuestionnaireFileTypes = ["passport_scan", "selfie", "selfie_2"] as const;
+type RequiredQuestionnaireFileType = (typeof requiredQuestionnaireFileTypes)[number];
 
 function questionnaireUpdateKey(
   update: Pick<QuestionnaireFieldUpdate, "applicantId" | "fieldId" | "sectionId">,
@@ -594,6 +819,34 @@ function parseQuestionnaireDate(value: string) {
   }
 
   return date;
+}
+
+function passportExpiryFromIssueDate(value: string) {
+  const issuedAt = parseQuestionnaireDate(value);
+  if (!issuedAt) return "";
+
+  const expiryYear = issuedAt.getFullYear() + 10;
+  const month = issuedAt.getMonth();
+  const lastDayOfExpiryMonth = new Date(expiryYear, month + 1, 0).getDate();
+  const day = Math.min(issuedAt.getDate(), lastDayOfExpiryMonth);
+
+  return [day, month + 1, expiryYear]
+    .map((part, index) => (index === 2 ? String(part) : String(part).padStart(2, "0")))
+    .join(".");
+}
+
+function isQuestionnaireMinor(value: string) {
+  const birthDate = parseQuestionnaireDate(value);
+  if (!birthDate) return false;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const birthdayHasPassed =
+    today.getMonth() > birthDate.getMonth() ||
+    (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+  if (!birthdayHasPassed) age -= 1;
+
+  return age < 18;
 }
 
 function validationMessageForQuestionnaireField(
@@ -642,6 +895,16 @@ function validateFormFieldValue({
   return undefined;
 }
 
+function hasActionableFieldProblem(field: QuestionnaireModelField) {
+  const validationMessage = validationMessageForQuestionnaireField(field, field.value);
+  const requiredButEmpty = validationMessage === "Обязательное поле" && !field.value.trim();
+
+  return Boolean(
+    (field.error && !(field.error === "Обязательное поле" && !field.value.trim())) ||
+      (validationMessage && !requiredButEmpty),
+  );
+}
+
 function fieldIsReady(field: QuestionnaireModelField) {
   return (
     !field.required ||
@@ -664,6 +927,97 @@ function fileIsReadyForQuestionnaire(file: Submission["files"][number] | undefin
     return false;
   }
   return true;
+}
+
+function fileAcceptForQuestionnaire(fileType: RequiredQuestionnaireFileType) {
+  return fileType === "passport_scan" ? passportScanUploadAccept : selfieUploadAccept;
+}
+
+function fileFormatHint(fileType: RequiredQuestionnaireFileType) {
+  return fileType === "passport_scan" ? passportScanUploadFormatLabel : selfieUploadFormatLabel;
+}
+
+function questionnaireFileStatus(file: Submission["files"][number] | undefined) {
+  if (!file) return "Слот файла не создан";
+  if (file.status === "needs_replacement") return "Нужна замена";
+  if (file.status === "missing") return "Нужно добавить";
+  if (file.reviewStatus === "replace_required" || file.reviewStatus === "poor_quality") {
+    return "Нужна замена";
+  }
+  if (file.status === "pending_review") return "На проверке";
+  if (file.status === "accepted") return "Принято";
+  return "Загружено";
+}
+
+function QuestionnaireFileSlot({
+  description,
+  file,
+  fileType,
+  label,
+  onUploadFile,
+  submission,
+}: {
+  description: string;
+  file?: Submission["files"][number];
+  fileType: RequiredQuestionnaireFileType;
+  label: string;
+  onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
+  submission: Submission;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const needsUpload = file?.status === "missing" || file?.status === "needs_replacement";
+  const canUpload = Boolean(file && needsUpload && onUploadFile && canReplaceDocument(submission, file));
+  const fileName = file?.originalFileName || file?.generatedFileName;
+  const status = questionnaireFileStatus(file);
+  const actionLabel = file?.status === "needs_replacement" ? "Заменить" : "Загрузить";
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFile = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!selectedFile || !file || !onUploadFile) return;
+
+    setUploadError("");
+    setIsUploading(true);
+    try {
+      await onUploadFile(file.id, selectedFile);
+    } catch {
+      setUploadError("Не удалось загрузить файл. Попробуйте ещё раз.");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  return (
+    <article className="v19-questionnaire-file-slot" data-file-slot={fileType}>
+      <span className="v19-questionnaire-file-icon" aria-hidden="true">
+        <FileText />
+      </span>
+      <span className="v19-questionnaire-file-copy">
+        <strong>{label}</strong>
+        <span>{fileName || description}</span>
+        <small>{fileFormatHint(fileType)}</small>
+      </span>
+      <span className={`v19-questionnaire-file-status ${fileIsReadyForQuestionnaire(file) ? "is-ready" : ""}`}>
+        {status}
+      </span>
+      {canUpload ? (
+        <label className="v19-questionnaire-file-upload">
+          <Upload aria-hidden="true" />
+          {isUploading ? "Загружаем…" : actionLabel}
+          <input
+            accept={fileAcceptForQuestionnaire(fileType)}
+            aria-label={`${actionLabel} ${label}`}
+            className="sr-only"
+            disabled={isUploading}
+            type="file"
+            onChange={handleFileChange}
+          />
+        </label>
+      ) : null}
+      {uploadError ? <span className="v19-questionnaire-file-error" role="alert">{uploadError}</span> : null}
+    </article>
+  );
 }
 
 function riskLabel(count: number) {
@@ -1105,6 +1459,60 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "form-filler-phone", formKey: "formFillerPhone", sectionId: "filler" },
 ];
 
+function dependentFieldKeysFor(
+  key: keyof QuestionnaireFormData,
+  value: string,
+): Array<keyof QuestionnaireFormData> {
+  if (key === "livesOutsideCitizenship" && value !== "Да") {
+    return ["residencePermitType", "residencePermitNumber", "residencePermitValidUntil"];
+  }
+  if (key === "stayPurpose" && value !== "OTHER") {
+    return ["stayPurposeDetails"];
+  }
+  if (key === "previousBiometrics" && value !== "Да") {
+    return ["previousBiometricsDate"];
+  }
+  if (key === "paymentSponsor" && value !== "Спонсор") {
+    return ["sponsorInHostFields", "otherSponsor", "sponsorMeans"];
+  }
+  if (key === "invitingPartyType" && value !== "Приглашающая компания/организация") {
+    return ["companyOrgDetails", "companyContactPerson", "companyPhone"];
+  }
+  if (key === "dob" && !isQuestionnaireMinor(value)) {
+    return ["guardianInfo"];
+  }
+  return [];
+}
+
+function conditionalFieldClearsFor(
+  applicant: Submission["applicants"][number] | undefined,
+  applicantId: string,
+  formData: QuestionnaireFormData,
+): QuestionnaireFieldUpdate[] {
+  const parentKeys = [
+    "livesOutsideCitizenship",
+    "stayPurpose",
+    "previousBiometrics",
+    "paymentSponsor",
+    "invitingPartyType",
+    "dob",
+  ] as const satisfies Array<keyof QuestionnaireFormData>;
+
+  return parentKeys.flatMap((parentKey) =>
+    dependentFieldKeysFor(parentKey, formData[parentKey]).flatMap((fieldKey) => {
+      const binding = questionnaireFieldBindings.find((item) => item.formKey === fieldKey);
+      if (!binding || !questionnaireField(applicant, binding.fieldId)) return [];
+
+      return [{
+        applicantId,
+        fieldId: binding.fieldId,
+        sectionId: binding.sectionId,
+        value: "",
+      } satisfies QuestionnaireFieldUpdate];
+    }),
+  );
+}
+
 function normalizeFocusLabel(value?: string) {
   return (value ?? "").trim().toLocaleLowerCase("ru-RU");
 }
@@ -1188,6 +1596,7 @@ export function FigmaQuestionnaireScreen({
   onBack,
   onComplete,
   onFieldChange,
+  onUploadFile,
   onSaveDraft,
   submission,
 }: FigmaQuestionnaireScreenProps) {
@@ -1209,6 +1618,7 @@ export function FigmaQuestionnaireScreen({
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
+  const [showPreviousSurnameForMale, setShowPreviousSurnameForMale] = useState(false);
   const baseFormData = useMemo(
     () => questionnaireFormDataFromSubmission(submission, activeApplicant),
     [activeApplicant, submission],
@@ -1227,6 +1637,10 @@ export function FigmaQuestionnaireScreen({
     if (applicants.some((applicant) => applicant.id === activeApplicant)) return;
     setActiveApplicant(applicants[0]?.id ?? "app-1");
   }, [activeApplicant, applicants]);
+
+  useEffect(() => {
+    setShowPreviousSurnameForMale(false);
+  }, [activeApplicant]);
 
   useEffect(() => {
     setFormData(sourceFormData);
@@ -1279,8 +1693,7 @@ export function FigmaQuestionnaireScreen({
       gender: submissionFieldOptions(activeApplicantModel, "gender", [
         "Мужской",
         "Женский",
-        "Другое",
-      ]),
+      ]).filter((option) => option !== "Другое" && option !== "OTHER"),
       homeCountry: submissionFieldOptions(
         activeApplicantModel,
         "home-country",
@@ -1379,11 +1792,7 @@ export function FigmaQuestionnaireScreen({
     );
     const requiredFields = fields.filter((field) => field.required);
     const completedFields = requiredFields.filter(fieldIsReady);
-    const validationRisks = fields.filter(
-      (field) =>
-        Boolean(field.error) ||
-        Boolean(validationMessageForQuestionnaireField(field, field.value)),
-    ).length;
+    const validationRisks = fields.filter(hasActionableFieldProblem).length;
     const openIssueRisks = draftSubmission.issues.filter(
       (issue) => issue.status === "open" || issue.status === "fixed_by_agent",
     ).length;
@@ -1445,11 +1854,7 @@ export function FigmaQuestionnaireScreen({
         const requiredFields = sourceSection.fields.filter((field) => field.required);
         const total = requiredFields.length;
         const completed = requiredFields.filter(fieldIsReady).length;
-        const hasRisk = sourceSection.fields.some(
-          (field) =>
-            Boolean(field.error) ||
-            Boolean(validationMessageForQuestionnaireField(field, field.value)),
-        );
+        const hasRisk = sourceSection.fields.some(hasActionableFieldProblem);
 
         return {
           ...definition,
@@ -1461,6 +1866,30 @@ export function FigmaQuestionnaireScreen({
     [activeApplicantModel, draftSubmission.files],
   );
   const isCompleteButtonDisabled = !readinessStats.canSubmit;
+  const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
+  const showPurposeDetails = formData.stayPurpose === "OTHER";
+  const showPreviousBiometricsDetails = formData.previousBiometrics === "Да";
+  const showPreviousSurname =
+    formData.sex !== "Мужской" ||
+    Boolean(formData.previousSurname.trim()) ||
+    showPreviousSurnameForMale;
+  const showSponsorFields = formData.paymentSponsor === "Спонсор";
+  const showGuardianInfo =
+    isQuestionnaireMinor(formData.dob) || Boolean(formData.guardianInfo.trim());
+  const showCompanyInviteFields =
+    formData.invitingPartyType === "Приглашающая компания/организация" ||
+    Boolean(
+      formData.companyOrgDetails.trim() ||
+        formData.companyContactPerson.trim() ||
+        formData.companyPhone.trim(),
+    );
+  const primaryApplicant = draftSubmission.applicants[0];
+  const sharedFieldIds = familySharedFieldIds[activeSection] ?? [];
+  const canCopyFamilySection =
+    draftSubmission.type === "family" &&
+    Boolean(primaryApplicant) &&
+    primaryApplicant?.id !== activeApplicant &&
+    sharedFieldIds.length > 0;
 
   const currentSectionIssue = useMemo(() => {
     const currentSection = sections.find((section) => section.id === activeSection);
@@ -1483,34 +1912,92 @@ export function FigmaQuestionnaireScreen({
   }, [activeApplicantModel, activeSection, openFieldIssues, sections]);
 
   function updateField(key: keyof QuestionnaireFormData, value: string) {
-    setFormData((current) => ({ ...current, [key]: value }));
-    const binding = questionnaireFieldBindings.find((item) => item.formKey === key);
-    if (!binding) return;
+    const dependentKeys = dependentFieldKeysFor(key, value);
+    const buildUpdate = (fieldKey: keyof QuestionnaireFormData, fieldValue: string) => {
+      const binding = questionnaireFieldBindings.find((item) => item.formKey === fieldKey);
+      if (!binding) return undefined;
 
-    const modelField = questionnaireField(activeApplicantModel, binding.fieldId);
-    const update = {
-      applicantId: activeApplicant,
-      error: modelField
-        ? validationMessageForQuestionnaireField(modelField, value)
-        : undefined,
-      fieldId: binding.fieldId,
-      sectionId: binding.sectionId,
-      value,
-    } satisfies QuestionnaireFieldUpdate;
-    const updateKey = questionnaireUpdateKey(update);
+      const modelField = questionnaireField(activeApplicantModel, binding.fieldId);
+      return {
+        binding,
+        update: {
+          applicantId: activeApplicant,
+          error: modelField
+            ? validationMessageForQuestionnaireField(modelField, fieldValue)
+            : undefined,
+          fieldId: binding.fieldId,
+          sectionId: binding.sectionId,
+          value: fieldValue,
+        } satisfies QuestionnaireFieldUpdate,
+      };
+    };
 
-    setPendingFieldUpdates((current) => {
-      const next = { ...current };
-      if (value === baseFormData[key]) {
-        delete next[updateKey];
-        return next;
-      }
+    const updates = [
+      buildUpdate(key, value),
+      ...dependentKeys.map((dependentKey) => buildUpdate(dependentKey, "")),
+    ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 
-      next[updateKey] = update;
+    setFormData((current) => {
+      const next = { ...current, [key]: value };
+      for (const dependentKey of dependentKeys) next[dependentKey] = "";
       return next;
     });
 
-    if (value !== baseFormData[key]) onFieldChange?.(update);
+    setPendingFieldUpdates((current) => {
+      const next = { ...current };
+      for (const { binding, update } of updates) {
+        const updateKey = questionnaireUpdateKey(update);
+        if (update.value === baseFormData[binding.formKey]) {
+          delete next[updateKey];
+        } else {
+          next[updateKey] = update;
+        }
+      }
+      return next;
+    });
+
+    for (const { binding, update } of updates) {
+      if (update.value !== baseFormData[binding.formKey]) onFieldChange?.(update);
+    }
+  }
+
+  function updatePassportIssueDate(value: string) {
+    updateField("passportIssued", value);
+
+    const suggestedExpiry = passportExpiryFromIssueDate(value);
+    if (formData.passportExpiry || !suggestedExpiry) return;
+
+    updateField("passportExpiry", suggestedExpiry);
+  }
+
+  function copyFamilySectionFromPrimaryApplicant() {
+    if (!primaryApplicant || !canCopyFamilySection) return;
+
+    const updates = sharedFieldIds.flatMap((fieldId) => {
+      const sourceField = questionnaireField(primaryApplicant, fieldId);
+      const targetField = questionnaireField(activeApplicantModel, fieldId);
+      const binding = questionnaireFieldBindings.find((item) => item.fieldId === fieldId);
+      if (!sourceField?.value.trim() || !targetField || !binding) return [];
+
+      return [{
+        applicantId: activeApplicant,
+        error: validationMessageForQuestionnaireField(targetField, sourceField.value),
+        fieldId,
+        reviewOriginSource: "family_shared" as const,
+        reviewSource: "family_shared" as const,
+        reviewState: "needs_review" as const,
+        sectionId: binding.sectionId,
+        value: sourceField.value,
+      } satisfies QuestionnaireFieldUpdate];
+    });
+    if (!updates.length) return;
+
+    setPendingFieldUpdates((current) => {
+      const next = { ...current };
+      for (const update of updates) next[questionnaireUpdateKey(update)] = update;
+      return next;
+    });
+    for (const update of updates) onFieldChange?.(update);
   }
 
   function fieldIssue(fieldId: string, label: string) {
@@ -1523,10 +2010,7 @@ export function FigmaQuestionnaireScreen({
     if (fieldIssue(fieldId, label)) return "invalid";
 
     const field = questionnaireField(activeApplicantModel, fieldId);
-    const validationError = field
-      ? validationMessageForQuestionnaireField(field, field.value)
-      : undefined;
-    if (field?.error || validationError) return "invalid";
+    if (field && hasActionableFieldProblem(field)) return "invalid";
     if (field?.reviewState === "needs_review") return "needs_review";
 
     return initialFieldTarget?.fieldId === fieldId ||
@@ -1539,7 +2023,7 @@ export function FigmaQuestionnaireScreen({
     const issue = fieldIssue(fieldId, label);
     if (issue) return issue.comment ?? issue.reason;
     const field = questionnaireField(activeApplicantModel, fieldId);
-    return field ? validationMessageForQuestionnaireField(field, field.value) : undefined;
+    return field?.error ?? (field ? validationMessageForQuestionnaireField(field, field.value) : undefined);
   }
 
   function fieldReviewSource(fieldId: string, label: string) {
@@ -1556,35 +2040,6 @@ export function FigmaQuestionnaireScreen({
     return draftSubmission.files.find(
       (file) => file.applicantId === activeApplicantModel.id && file.type === type,
     );
-  }
-
-  function requiredFileState(
-    type: (typeof requiredQuestionnaireFileTypes)[number],
-  ): FieldState {
-    return fileIsReadyForQuestionnaire(requiredFileForActiveApplicant(type))
-      ? "normal"
-      : "invalid";
-  }
-
-  function requiredFileError(
-    type: (typeof requiredQuestionnaireFileTypes)[number],
-  ) {
-    const file = requiredFileForActiveApplicant(type);
-    if (!file) return "Файл не загружен";
-    if (file.status === "needs_replacement") return "Файл нужно заменить";
-    if (file.uploadStatus && file.uploadStatus !== "uploaded") return "Файл не загружен";
-    if (file.reviewStatus === "replace_required" || file.reviewStatus === "poor_quality") {
-      return "Файл не прошёл проверку качества";
-    }
-    return undefined;
-  }
-
-  function requiredFileValue(
-    type: (typeof requiredQuestionnaireFileTypes)[number],
-    fallback: string,
-  ) {
-    const file = requiredFileForActiveApplicant(type);
-    return file?.originalFileName || file?.generatedFileName || fallback;
   }
 
   const focusedApplicantId = initialFocus?.applicantId ?? activeApplicant;
@@ -1606,8 +2061,18 @@ export function FigmaQuestionnaireScreen({
   }, [activeApplicantModel, focusedApplicantId, formData, initialFieldTarget]);
 
   function completionPayload(): QuestionnaireCommitPayload {
+    const conditionalClears = conditionalFieldClearsFor(
+      activeApplicantModel,
+      activeApplicant,
+      formData,
+    );
+    const updates = new Map<string, QuestionnaireFieldUpdate>();
+    for (const update of [...Object.values(pendingFieldUpdates), ...conditionalClears]) {
+      updates.set(questionnaireUpdateKey(update), update);
+    }
+
     return {
-      fieldUpdates: Object.values(pendingFieldUpdates),
+      fieldUpdates: [...updates.values()],
       focusedUpdate: focusedUpdatePayload,
       travelEnd: formData.travelEnd,
       travelStart: formData.travelStart,
@@ -1623,41 +2088,37 @@ export function FigmaQuestionnaireScreen({
   function renderSectionFields() {
     if (activeSection === "files") {
       return (
-        <>
-          <FormField
-            excelMap="BLS files: passport-main-page"
-            fullWidth
+        <section aria-label="Файлы заявителя" className="v19-questionnaire-file-list">
+          <p className="v19-questionnaire-file-intro">
+            {onUploadFile
+              ? "Три файла на заявителя. Выберите нужный слот — статус обновится после загрузки."
+              : "Три файла на заявителя. Статусы доступны здесь; загрузка — в рабочем пространстве."}
+          </p>
+          <QuestionnaireFileSlot
+            description="Главная страница загранпаспорта с фото"
+            file={requiredFileForActiveApplicant("passport_scan")}
+            fileType="passport_scan"
             label="Загранпаспорт"
-            number="F1"
-            errorMessage={requiredFileError("passport_scan")}
-            readOnly
-            required
-            state={requiredFileState("passport_scan")}
-            value={requiredFileValue("passport_scan", "Скан или фото главной страницы с фото")}
+            onUploadFile={onUploadFile}
+            submission={draftSubmission}
           />
-          <FormField
-            excelMap="BLS files: selfie-front"
-            fullWidth
+          <QuestionnaireFileSlot
+            description="Фото анфас"
+            file={requiredFileForActiveApplicant("selfie")}
+            fileType="selfie"
             label="Селфи 1"
-            number="F2"
-            errorMessage={requiredFileError("selfie")}
-            readOnly
-            required
-            state={requiredFileState("selfie")}
-            value={requiredFileValue("selfie", "Лицом / анфас")}
+            onUploadFile={onUploadFile}
+            submission={draftSubmission}
           />
-          <FormField
-            excelMap="BLS files: selfie-profile"
-            fullWidth
+          <QuestionnaireFileSlot
+            description="Фото в профиль"
+            file={requiredFileForActiveApplicant("selfie_2")}
+            fileType="selfie_2"
             label="Селфи 2"
-            number="F3"
-            errorMessage={requiredFileError("selfie_2")}
-            readOnly
-            required
-            state={requiredFileState("selfie_2")}
-            value={requiredFileValue("selfie_2", "Боком / профиль")}
+            onUploadFile={onUploadFile}
+            submission={draftSubmission}
           />
-        </>
+        </section>
       );
     }
 
@@ -1760,12 +2221,13 @@ export function FigmaQuestionnaireScreen({
             reviewSource={fieldReviewSource("passport-issue-date", "Дата выдачи")}
             state={fieldReviewState("passport-issue-date", "Дата выдачи")}
             value={formData.passportIssued}
-            onChange={(value) => updateField("passportIssued", value)}
+            onChange={updatePassportIssueDate}
           />
           <FormField
             excelMap="Cell: C5"
             errorMessage={fieldErrorMessage("passport-expiry-date", "Действителен до")}
             focused={fieldReviewState("passport-expiry-date", "Действителен до") === "needs_review"}
+            hint="Если дата окончания не считалась: введите дату выдачи — подставим +10 лет. Для 5-летнего паспорта исправьте дату."
             label="Действителен до"
             number="4"
             required
@@ -1823,8 +2285,10 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: D2"
             fullWidth
+            hint="Можно без запятых и точек: ул Ленина дом 5 квартира 12"
             label="Домашний адрес"
             number="1"
+            placeholder="Улица дом квартира"
             required
             type="textarea"
             value={formData.contactAddress}
@@ -1843,6 +2307,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: D3"
             label="Телефон"
             number="3"
+            phonePrefix="+7"
             required
             value={formData.contactPhone}
             onChange={(value) => updateField("contactPhone", value)}
@@ -1876,27 +2341,31 @@ export function FigmaQuestionnaireScreen({
             value={formData.livesOutsideCitizenship}
             onChange={(value) => updateField("livesOutsideCitizenship", value)}
           />
-          <FormField
-            excelMap="Анкета: residence-permit-type"
-            label="Вид на жительство / документ"
-            number="8"
-            value={formData.residencePermitType}
-            onChange={(value) => updateField("residencePermitType", value)}
-          />
-          <FormField
-            excelMap="Анкета: residence-permit-number"
-            label="Номер документа"
-            number="9"
-            value={formData.residencePermitNumber}
-            onChange={(value) => updateField("residencePermitNumber", value)}
-          />
-          <FormField
-            excelMap="Анкета: residence-permit-valid-until"
-            label="Действителен до"
-            number="10"
-            value={formData.residencePermitValidUntil}
-            onChange={(value) => updateField("residencePermitValidUntil", value)}
-          />
+          {showResidencePermitFields ? (
+            <>
+              <FormField
+                excelMap="Анкета: residence-permit-type"
+                label="Вид на жительство / документ"
+                number="8"
+                value={formData.residencePermitType}
+                onChange={(value) => updateField("residencePermitType", value)}
+              />
+              <FormField
+                excelMap="Анкета: residence-permit-number"
+                label="Номер документа"
+                number="9"
+                value={formData.residencePermitNumber}
+                onChange={(value) => updateField("residencePermitNumber", value)}
+              />
+              <FormField
+                excelMap="Анкета: residence-permit-valid-until"
+                label="Действителен до"
+                number="10"
+                value={formData.residencePermitValidUntil}
+                onChange={(value) => updateField("residencePermitValidUntil", value)}
+              />
+            </>
+          ) : null}
         </>
       );
     }
@@ -1937,6 +2406,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: employer-contact"
             label="Телефон работодателя / учебного заведения"
             number="4"
+            phonePrefix="+7"
             value={formData.employerContact}
             onChange={(value) => updateField("employerContact", value)}
           />
@@ -1965,15 +2435,17 @@ export function FigmaQuestionnaireScreen({
             value={formData.stayPurpose}
             onChange={(value) => updateField("stayPurpose", value)}
           />
-          <FormField
-            excelMap="Анкета: stay-purpose-details"
-            fullWidth
-            label="Дополнительные сведения о цели"
-            number="2"
-            type="textarea"
-            value={formData.stayPurposeDetails}
-            onChange={(value) => updateField("stayPurposeDetails", value)}
-          />
+          {showPurposeDetails ? (
+            <FormField
+              excelMap="Анкета: stay-purpose-details"
+              fullWidth
+              label="Дополнительные сведения о цели"
+              number="2"
+              type="textarea"
+              value={formData.stayPurposeDetails}
+              onChange={(value) => updateField("stayPurposeDetails", value)}
+            />
+          ) : null}
           <FormField
             excelMap="Анкета: main-destination"
             label="Основная страна назначения"
@@ -2038,20 +2510,24 @@ export function FigmaQuestionnaireScreen({
             value={formData.previousBiometrics}
             onChange={(value) => updateField("previousBiometrics", value)}
           />
-          <FormField
-            excelMap="Анкета: previous-biometrics-date"
-            label="Дата сдачи отпечатков"
-            number="10"
-            value={formData.previousBiometricsDate}
-            onChange={(value) => updateField("previousBiometricsDate", value)}
-          />
-          <FormField
-            excelMap="Анкета: previous-visa-number"
-            label="Номер визы"
-            number="11"
-            value={formData.previousVisaNumber}
-            onChange={(value) => updateField("previousVisaNumber", value)}
-          />
+          {showPreviousBiometricsDetails ? (
+            <>
+              <FormField
+                excelMap="Анкета: previous-biometrics-date"
+                label="Дата сдачи отпечатков"
+                number="10"
+                value={formData.previousBiometricsDate}
+                onChange={(value) => updateField("previousBiometricsDate", value)}
+              />
+              <FormField
+                excelMap="Анкета: previous-visa-number"
+                label="Номер визы"
+                number="11"
+                value={formData.previousVisaNumber}
+                onChange={(value) => updateField("previousVisaNumber", value)}
+              />
+            </>
+          ) : null}
           <FormField
             excelMap="Анкета: final-entry-permit"
             label="Разрешение на въезд в конечную страну"
@@ -2124,34 +2600,40 @@ export function FigmaQuestionnaireScreen({
           <FormField
             label="Телефон"
             number="5"
+            phonePrefix="+34"
             value={formData.hotelContact}
             onChange={(value) => updateField("hotelContact", value)}
           />
-          <FormField
-            excelMap="Анкета: company-org-details"
-            fullWidth
-            label="Название и адрес компании/организации"
-            number="6"
-            type="textarea"
-            value={formData.companyOrgDetails}
-            onChange={(value) => updateField("companyOrgDetails", value)}
-          />
-          <FormField
-            excelMap="Анкета: company-contact-person"
-            fullWidth
-            label="Контактное лицо компании"
-            number="7"
-            type="textarea"
-            value={formData.companyContactPerson}
-            onChange={(value) => updateField("companyContactPerson", value)}
-          />
-          <FormField
-            excelMap="Анкета: company-phone"
-            label="Телефон компании"
-            number="8"
-            value={formData.companyPhone}
-            onChange={(value) => updateField("companyPhone", value)}
-          />
+          {showCompanyInviteFields ? (
+            <>
+              <FormField
+                excelMap="Анкета: company-org-details"
+                fullWidth
+                label="Название и адрес компании/организации"
+                number="6"
+                type="textarea"
+                value={formData.companyOrgDetails}
+                onChange={(value) => updateField("companyOrgDetails", value)}
+              />
+              <FormField
+                excelMap="Анкета: company-contact-person"
+                fullWidth
+                label="Контактное лицо компании"
+                number="7"
+                type="textarea"
+                value={formData.companyContactPerson}
+                onChange={(value) => updateField("companyContactPerson", value)}
+              />
+              <FormField
+                excelMap="Анкета: company-phone"
+                label="Телефон компании"
+                number="8"
+                phonePrefix="+34"
+                value={formData.companyPhone}
+                onChange={(value) => updateField("companyPhone", value)}
+              />
+            </>
+          ) : null}
         </>
       );
     }
@@ -2177,30 +2659,34 @@ export function FigmaQuestionnaireScreen({
             value={formData.paymentType}
             onChange={(value) => updateField("paymentType", value)}
           />
-          <FormField
-            excelMap="Анкета: sponsor-in-host-fields"
-            label="Спонсор указан в полях 30/31"
-            number="3"
-            options={selectOptions.sponsorInHostFields}
-            value={formData.sponsorInHostFields}
-            onChange={(value) => updateField("sponsorInHostFields", value)}
-          />
-          <FormField
-            excelMap="Анкета: other-sponsor"
-            label="Другой спонсор"
-            number="4"
-            value={formData.otherSponsor}
-            onChange={(value) => updateField("otherSponsor", value)}
-          />
-          <FormField
-            excelMap="Анкета: sponsor-means"
-            fullWidth
-            label="Средства спонсора"
-            number="5"
-            options={selectOptions.sponsorMeans}
-            value={formData.sponsorMeans}
-            onChange={(value) => updateField("sponsorMeans", value)}
-          />
+          {showSponsorFields ? (
+            <>
+              <FormField
+                excelMap="Анкета: sponsor-in-host-fields"
+                label="Спонсор указан в полях 30/31"
+                number="3"
+                options={selectOptions.sponsorInHostFields}
+                value={formData.sponsorInHostFields}
+                onChange={(value) => updateField("sponsorInHostFields", value)}
+              />
+              <FormField
+                excelMap="Анкета: other-sponsor"
+                label="Другой спонсор"
+                number="4"
+                value={formData.otherSponsor}
+                onChange={(value) => updateField("otherSponsor", value)}
+              />
+              <FormField
+                excelMap="Анкета: sponsor-means"
+                fullWidth
+                label="Средства спонсора"
+                number="5"
+                options={selectOptions.sponsorMeans}
+                value={formData.sponsorMeans}
+                onChange={(value) => updateField("sponsorMeans", value)}
+              />
+            </>
+          ) : null}
         </>
       );
     }
@@ -2228,6 +2714,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: form-filler-phone"
             label="Телефон заполнившего"
             number="3"
+            phonePrefix="+7"
             value={formData.formFillerPhone}
             onChange={(value) => updateField("formFillerPhone", value)}
           />
@@ -2246,13 +2733,23 @@ export function FigmaQuestionnaireScreen({
           value={formData.surname}
           onChange={(value) => updateField("surname", value)}
         />
-        <FormField
-          excelMap="Анкета: previous-surname"
-          label="Фамилия при рождении / предыдущая"
-          number="2"
-          value={formData.previousSurname}
-          onChange={(value) => updateField("previousSurname", value)}
-        />
+        {showPreviousSurname ? (
+          <FormField
+            excelMap="Анкета: previous-surname"
+            label="Фамилия при рождении / предыдущая"
+            number="2"
+            value={formData.previousSurname}
+            onChange={(value) => updateField("previousSurname", value)}
+          />
+        ) : (
+          <button
+            className="v19-questionnaire-optional-reveal"
+            type="button"
+            onClick={() => setShowPreviousSurnameForMale(true)}
+          >
+            Указать предыдущую фамилию
+          </button>
+        )}
         <FormField
           excelMap="Cell: B3"
           label="Имя"
@@ -2335,15 +2832,17 @@ export function FigmaQuestionnaireScreen({
           value={formData.maritalStatus}
           onChange={(value) => updateField("maritalStatus", value)}
         />
-        <FormField
-          excelMap="Анкета: guardian-info"
-          fullWidth
-          label="Родитель/опекун несовершеннолетнего"
-          number="12"
-          type="textarea"
-          value={formData.guardianInfo}
-          onChange={(value) => updateField("guardianInfo", value)}
-        />
+        {showGuardianInfo ? (
+          <FormField
+            excelMap="Анкета: guardian-info"
+            fullWidth
+            label="Родитель/опекун несовершеннолетнего"
+            number="12"
+            type="textarea"
+            value={formData.guardianInfo}
+            onChange={(value) => updateField("guardianInfo", value)}
+          />
+        ) : null}
         <FormField
           excelMap="Анкета: national-id"
           label="Национальный ID"
@@ -2362,6 +2861,7 @@ export function FigmaQuestionnaireScreen({
     <motion.div
       animate={{ opacity: 1 }}
       className="vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell"
+      data-submission-id={draftSubmission.id}
       exit={{ opacity: 0 }}
       initial={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
@@ -2564,30 +3064,27 @@ export function FigmaQuestionnaireScreen({
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
+                {canCopyFamilySection ? (
+                  <button
+                    className="v19-questionnaire-draft-button"
+                    type="button"
+                    onClick={copyFamilySectionFromPrimaryApplicant}
+                  >
+                    Скопировать общие данные от {primaryApplicant?.fullName || "первого заявителя"}
+                  </button>
+                ) : null}
                 <div className="v19-questionnaire-fields-grid">
                   {renderSectionFields()}
                 </div>
               </div>
 
-              <div className="v19-questionnaire-panel-footer">
-                <div className="flex items-center gap-4">
-                  <div className="v19-questionnaire-autosave-state">
-                    <Info className="w-4 h-4" />
-                    <span>Автосохранение включено</span>
-                  </div>
-                  <div className="v19-questionnaire-completion-pill">
-                    <span className="v19-questionnaire-completion-dot" />
-                    Заполнено {readinessStats.completed} из {readinessStats.total}
-                  </div>
-                </div>
-                <button
-                  className="v19-questionnaire-next-button"
-                  type="button"
-                  onClick={goToNextSection}
-                >
-                  Следующий раздел
-                </button>
-              </div>
+              <button
+                className="v19-questionnaire-next-button v19-questionnaire-next-button--simple"
+                type="button"
+                onClick={goToNextSection}
+              >
+                Продолжить
+              </button>
             </div>
           </QuestionnaireWorkspaceShell>
         </div>
