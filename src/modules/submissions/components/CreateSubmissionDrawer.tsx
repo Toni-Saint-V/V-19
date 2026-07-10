@@ -41,6 +41,22 @@ const firstStepFamilyQuestions: Array<{
   { key: "sameSpainStay", label: "Одно проживание в Испании у всех?" },
 ];
 
+const passportFieldLabels: Record<PassportExtractedField["key"], string> = {
+  birthCountry: "Страна рождения",
+  birthDate: "Дата рождения",
+  birthPlace: "Место рождения",
+  citizenship: "Гражданство",
+  firstName: "Имя",
+  gender: "Пол",
+  passportExpiresAt: "Срок действия",
+  passportIssueCountry: "Страна выдачи",
+  passportIssuedAt: "Дата выдачи",
+  passportIssuePlace: "Место выдачи",
+  passportNumber: "Номер паспорта",
+  passportType: "Тип паспорта",
+  surname: "Фамилия",
+};
+
 const emptyPreliminaryIntakeDraft: PreliminaryIntakeDraft = {
   arrivalPlace: "",
   homeAddress: "",
@@ -252,6 +268,17 @@ export function CreateSubmissionDrawer({
   );
   const activeUpload = passportUploads.find(
     (upload) => upload.applicantIndex === safeActiveApplicantIndex,
+  );
+  const extractedPassportFields = passportUploads.flatMap((upload) =>
+    passportUploadVisualStatus(upload) === "ready"
+      ? upload.extractedFields
+          .filter((field) => field.value.trim())
+          .map((field) => ({
+            ...field,
+            applicantIndex: upload.applicantIndex,
+            uploadId: upload.id,
+          }))
+      : [],
   );
   const passportReady = allApplicantPassportsReady(passportUploads, applicantCount);
   const missingPassportLabels = missingApplicantPassportLabels(
@@ -863,6 +890,63 @@ export function CreateSubmissionDrawer({
                     {passportUploads.length} ITEMS
                   </span>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {extractedPassportFields.length ? (
+                    <motion.section
+                      aria-label="Распознанные поля OCR"
+                      className="mb-5 rounded-[var(--v19b-size-14)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-page)] p-3.5"
+                      initial={prefersReducedMotion ? false : { opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: 12 }}
+                      transition={{ duration: prefersReducedMotion ? 0.01 : 0.18 }}
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h4 className="text-[var(--v19b-size-12)] font-medium text-white/75">
+                          Распознано OCR
+                        </h4>
+                        <span className="text-[var(--v19b-size-10)] font-mono text-[var(--vf-green-soft-text)]">
+                          {extractedPassportFields.length} ПОЛЕЙ
+                        </span>
+                      </div>
+                      <div className="max-h-[var(--v19b-size-180)] space-y-2 overflow-y-auto pr-1">
+                        <AnimatePresence initial={false} mode="popLayout">
+                          {extractedPassportFields.map((field, index) => (
+                            <motion.div
+                              key={`${field.uploadId}-${field.key}`}
+                              className="rounded-[var(--v19b-radius-control)] border border-[var(--v19b-color-border)] bg-[var(--v19b-color-panel)] px-3 py-2"
+                              initial={
+                                prefersReducedMotion
+                                  ? false
+                                  : { opacity: 0, x: 14, scale: 0.985 }
+                              }
+                              animate={{ opacity: 1, x: 0, scale: 1 }}
+                              exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -10 }}
+                              transition={{
+                                delay: prefersReducedMotion ? 0 : index * 0.025,
+                                duration: prefersReducedMotion ? 0.01 : 0.16,
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="min-w-0">
+                                  <span className="block text-[var(--v19b-size-10)] uppercase tracking-[var(--v19b-tracking-wider)] text-white/38">
+                                    {passportFieldLabels[field.key]}
+                                  </span>
+                                  <strong className="mt-1 block break-words text-[var(--v19b-size-12)] font-medium text-white/82">
+                                    {field.value}
+                                  </strong>
+                                </span>
+                                <span className="shrink-0 text-[var(--v19b-size-10)] text-white/38">
+                                  {field.applicantIndex + 1}
+                                </span>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    </motion.section>
+                  ) : null}
+                </AnimatePresence>
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-[var(--v19b-color-border-selected)]">
                   {passportUploads.length ? (
