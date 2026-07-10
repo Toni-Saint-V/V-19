@@ -345,6 +345,30 @@ describeLive("V-19 canonical Supabase live smoke", () => {
       .remove(uploadedTargets.map(({ target }) => target.path));
     await saveDraft(owner.client, submission, owner.profile.id);
 
+    const { error: agentReviewEscalationError } = await owner.client
+      .from("media_assets")
+      .insert({
+        id: `${submission.id}-review-bypass`,
+        applicant_id: applicant.id ?? "",
+        submission_id: submission.id,
+        type: "passport_scan",
+        original_file_name: "review-bypass.jpg",
+        generated_file_name: "review-bypass.jpg",
+        storage_bucket: mediaStorageBucket,
+        storage_path: uploadedTargets[0].target.path,
+        mime_type: "image/jpeg",
+        size_bytes: 1,
+        upload_status: "uploaded",
+        review_status: "accepted",
+        uploaded_at: new Date().toISOString(),
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: owner.profile.id,
+    });
+    expect(agentReviewEscalationError).toBeTruthy();
+    expect(agentReviewEscalationError?.message).toContain(
+      "Agents cannot set media review state",
+    );
+
     const { data: ownerRows, error: ownerReadError } = await owner.client
       .from("submissions")
       .select("id,status,agent_id")

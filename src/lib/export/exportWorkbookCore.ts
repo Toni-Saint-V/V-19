@@ -33,10 +33,18 @@ const numericColumnNames = new Set([
   "AW",
   "AZ",
 ]);
-const familyDataStyleId = 52;
-const familyDataTextStyleId = 53;
-const familyDataDateStyleId = 54;
-const familyDataNoteStyleId = 55;
+const familyStyleBaseId = 52;
+const familyStyleVariantCount = 4;
+const familyWorkbookFills = [
+  "C6E0B4",
+  "FFF2CC",
+  "BDD7EE",
+  "F4CCCC",
+  "D9EAD3",
+  "D9D2E9",
+  "FCE5CD",
+  "CFE2F3",
+] as const;
 
 export function createExportWorkbookBlob(
   workbookRows: readonly (readonly string[])[],
@@ -105,13 +113,22 @@ function stylesXml(): string {
     const fillId = index === 1 || index === 2 || index === 3 ? 2 : 0;
     return `<xf numFmtId="${dateStyle ? 164 : 0}" fontId="0" fillId="${fillId}" borderId="1" xfId="0"${dateStyle ? ' applyNumberFormat="1"' : ""}/>`;
   }).join("");
-  const familyXfs = [
-    `<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>`,
-    `<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>`,
-    `<xf numFmtId="164" fontId="0" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>`,
-    `<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>`,
-  ].join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd;@"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor theme="4" tint="0.59999389629810485"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="56">${baseXfs}${familyXfs}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const familyXfs = familyWorkbookFills.flatMap((_, paletteIndex) => {
+    const fillId = paletteIndex + 3;
+    return [
+      `<xf numFmtId="0" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyFill="1"/>`,
+      `<xf numFmtId="0" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyFill="1"/>`,
+      `<xf numFmtId="164" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>`,
+      `<xf numFmtId="0" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyFill="1"/>`,
+    ];
+  }).join("");
+  const familyFills = familyWorkbookFills
+    .map(
+      (rgb) =>
+        `<fill><patternFill patternType="solid"><fgColor rgb="${rgb}"/><bgColor indexed="64"/></patternFill></fill>`,
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd;@"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts><fills count="${3 + familyWorkbookFills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor theme="4" tint="0.59999389629810485"/><bgColor indexed="64"/></patternFill></fill>${familyFills}</fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${52 + familyWorkbookFills.length * familyStyleVariantCount}">${baseXfs}${familyXfs}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 }
 
 function worksheetXml(
@@ -163,7 +180,7 @@ function dataRowXml(
   const cells = Array.from({ length: templateVisibleColumnCount }, (_, index) => {
     const column = columnName(index + 1);
     if (index >= templateColumnCount) {
-      return `<c r="${column}${rowNumber}" s="${rowFill ? familyDataStyleId : 33}"/>`;
+      return `<c r="${column}${rowNumber}" s="${rowFill ? familyStyleId("", rowFill) : 33}"/>`;
     }
 
     let value = row[index] ?? "";
@@ -176,7 +193,7 @@ function dataRowXml(
       rowNumber,
       value,
       sharedStrings,
-      rowFill ? familyStyleId(column) : dataStyleId(column),
+      rowFill ? familyStyleId(column, rowFill) : dataStyleId(column),
     );
   }).join("");
   return `<row r="${rowNumber}" spans="1:57" s="40" customFormat="1">${cells}</row>`;
@@ -247,13 +264,22 @@ function dataStyleId(column: string) {
   return 33;
 }
 
-function familyStyleId(column: string) {
-  if (dateColumnNames.has(column)) return familyDataDateStyleId;
+function familyStyleId(column: string, rowFill: ExportWorkbookRowFill) {
+  const styleBaseId =
+    familyStyleBaseId +
+    familyWorkbookFillIndex(rowFill) * familyStyleVariantCount;
+  if (dateColumnNames.has(column)) return styleBaseId + 2;
   if (column === "E" || column === "AP" || column === "AY") {
-    return familyDataTextStyleId;
+    return styleBaseId + 1;
   }
-  if (column === "BC") return familyDataNoteStyleId;
-  return familyDataStyleId;
+  if (column === "BC") return styleBaseId + 3;
+  return styleBaseId;
+}
+
+function familyWorkbookFillIndex(rowFill: ExportWorkbookRowFill): number {
+  const parsedIndex = Number(rowFill.slice("family-".length));
+  if (!Number.isSafeInteger(parsedIndex) || parsedIndex < 1) return 0;
+  return (parsedIndex - 1) % familyWorkbookFills.length;
 }
 
 function blankStyleId(column: string) {

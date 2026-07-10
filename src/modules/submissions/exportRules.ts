@@ -247,15 +247,15 @@ export function orderSubmissionsForExportPackage(submissions: Submission[]): Sub
   return submissions
     .map((submission, index) => ({ index, submission }))
     .sort((left, right) => {
-      const cityOrder = compareExportText(left.submission.city, right.submission.city);
-      if (cityOrder !== 0) return cityOrder;
-
       const leftFamilyOrder = left.submission.type === "family" ? 0 : 1;
       const rightFamilyOrder = right.submission.type === "family" ? 0 : 1;
 
       if (leftFamilyOrder !== rightFamilyOrder) {
         return leftFamilyOrder - rightFamilyOrder;
       }
+
+      const cityOrder = compareExportText(left.submission.city, right.submission.city);
+      if (cityOrder !== 0) return cityOrder;
 
       return (
         compareExportText(left.submission.tripDateFrom, right.submission.tripDateFrom) ||

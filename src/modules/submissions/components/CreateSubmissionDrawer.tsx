@@ -243,7 +243,7 @@ export function CreateSubmissionDrawer({
     passportUploads?: PassportUploadDraft[],
     preliminaryIntake?: PreliminaryIntakeDraft,
     options?: { openQuestionnaire?: boolean },
-  ) => void;
+  ) => void | Promise<void>;
   onCity: (city: City) => void;
   onFamilyCount: (count: number) => void;
   onPassportFilesSelected: () => void;
@@ -261,6 +261,8 @@ export function CreateSubmissionDrawer({
   const [preliminaryIntake, setPreliminaryIntake] = useState<PreliminaryIntakeDraft>(
     emptyPreliminaryIntakeDraft,
   );
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState("");
   const prefersReducedMotion = useReducedMotion();
   const safeActiveApplicantIndex = boundedApplicantIndex(
     activeApplicantIndex,
@@ -426,17 +428,21 @@ export function CreateSubmissionDrawer({
     );
   }
 
-  function createAndOpenQuestionnaire() {
+  async function saveCreation(options?: { openQuestionnaire?: boolean }) {
     if (!passportReady) {
       showPassportNotReadyAlert();
       return;
     }
 
-    onCreate(passportUploads, preliminaryIntake, { openQuestionnaire: true });
-  }
-
-  function handlePrimaryAction() {
-    createAndOpenQuestionnaire();
+    setCreateBusy(true);
+    setCreateError("");
+    try {
+      await onCreate(passportUploads, preliminaryIntake, options);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Не удалось создать подачу.");
+    } finally {
+      setCreateBusy(false);
+    }
   }
 
   function handleDragOver(event: DragEvent) {
@@ -1050,30 +1056,33 @@ export function CreateSubmissionDrawer({
       </div>
 
       <footer className="v19-create-drawer-footer">
-        <span className="text-[var(--v19b-size-12)] text-white/60">
-          {type === "family" ? `${applicantCount} заявителя. ` : ""}
-          {passportReadinessSummary}
-        </span>
+        <div className="min-w-0">
+          <span className="text-[var(--v19b-size-12)] text-white/60">
+            {type === "family" ? `${applicantCount} заявителя. ` : ""}
+            {passportReadinessSummary}
+          </span>
+          {createError ? <p className="mt-1 text-[var(--v19b-size-12)] text-red-300" role="alert">{createError}</p> : null}
+        </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <button
-            disabled={!passportReady}
+            disabled={!passportReady || createBusy}
             className={`v19-create-footer-action v19-create-footer-action--secondary ${
               passportReady ? "is-enabled" : "is-disabled"
             }`}
             type="button"
-            onClick={() => onCreate(passportUploads, preliminaryIntake)}
+            onClick={() => void saveCreation()}
           >
-            Сохранить черновик
+            {createBusy ? "Сохраняем..." : "Сохранить черновик"}
           </button>
           <button
-            disabled={!passportReady}
+            disabled={!passportReady || createBusy}
             className={`create-passport-next v19-create-footer-action v19-create-footer-action--primary ${
               passportReady ? "is-enabled" : "is-disabled"
             }`}
             type="button"
-            onClick={handlePrimaryAction}
+            onClick={() => void saveCreation({ openQuestionnaire: true })}
           >
-            Создать и открыть анкету
+            {createBusy ? "Создаём..." : "Создать и открыть анкету"}
           </button>
         </div>
       </footer>

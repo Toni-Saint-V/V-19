@@ -984,4 +984,61 @@ describe("Supabase security contract", () => {
       "grant execute on function public.consume_ai_helper_quota(text, text, text, text) to public",
     );
   });
+
+  test("keeps media review state server-owned and binds media to its applicant submission", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260710021043_harden_media_asset_review_boundary.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+
+    expectSqlStatement(
+      migration,
+      "create or replace function app_private.enforce_media_asset_review_boundary()",
+    );
+    expectSqlStatement(
+      migration,
+      "if actor_role = 'agent' then",
+    );
+    expectSqlStatement(
+      migration,
+      "raise exception 'Agents cannot set media review state'",
+    );
+    expectSqlStatement(
+      migration,
+      "raise exception 'Agents cannot preserve or set media review state while changing media'",
+    );
+    expectSqlStatement(
+      migration,
+      "where applicant.id = new.applicant_id and applicant.submission_id = new.submission_id",
+    );
+    expectSqlStatement(
+      migration,
+      "create trigger media_assets_enforce_review_boundary",
+    );
+    expectSqlStatement(
+      migration,
+      "create unique index if not exists applicants_id_submission_id_uidx",
+    );
+    expectSqlStatement(
+      migration,
+      "create index if not exists media_assets_applicant_submission_idx",
+    );
+    expectSqlStatement(
+      migration,
+      "add constraint media_assets_applicant_submission_fkey",
+    );
+    expectSqlStatement(
+      migration,
+      "foreign key (applicant_id, submission_id) references public.applicants (id, submission_id)",
+    );
+    expectSqlStatement(
+      migration,
+      "alter table public.media_assets validate constraint media_assets_applicant_submission_fkey",
+    );
+    expect(migrationContract).toContain(
+      "20260710021043_harden_media_asset_review_boundary.sql",
+    );
+  });
 });

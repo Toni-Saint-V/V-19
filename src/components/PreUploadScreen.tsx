@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowRight,
   UploadCloud,
   UserPlus,
   Users,
@@ -311,13 +310,6 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
             Новая подача
           </h1>
         </div>
-        <div className="ml-auto hidden sm:flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[12px] text-white/55">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#8fa3ff] opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#8fa3ff]" />
-          </span>
-          {productIntakePhaseLabel(phase)} · {averageProgress}%
-        </div>
         <button
           aria-label="Закрыть создание"
           onClick={onBack}
@@ -339,6 +331,13 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 animate={{ scale: [1, 1.12, 1], opacity: [0.55, 0.8, 0.55] }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               />
+              <div className="v19-preupload-progress-indicator">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#8fa3ff] opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#8fa3ff]" />
+                </span>
+                {productIntakePhaseLabel(phase)} · {averageProgress}%
+              </div>
 
               <div className="relative z-10 mb-4 shrink-0 flex justify-center">
                 <div className="relative w-full max-w-[560px] space-y-3">
@@ -488,7 +487,11 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 </p>
                 <button
                   type="button"
-                  className="mt-5 h-11 px-5 rounded-[8px] bg-white text-[#101011] text-[14px] font-semibold hover:bg-white/90 transition-colors"
+                  className="v19-file-picker-button mt-5"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
                 >
                   Выбрать файлы
                 </button>
@@ -576,14 +579,6 @@ export function PreUploadScreen({ onBack, onSaveDraft, onComplete, initialPackag
                 </div>
               </div>
 
-              <button
-                onClick={completeDraft}
-                aria-disabled={completeBlocked}
-                disabled={completeBlocked}
-                className="mt-4 flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[8px] bg-[#3a45b4] text-[14px] font-semibold text-white shadow-[0_0_20px_rgba(58,69,180,0.25)] transition-colors hover:bg-[#4855d4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#25252a] disabled:text-white/35 disabled:shadow-none"
-              >
-                {extractionIsDone ? 'Перейти в анкету' : extractionNeedsReview ? 'Проверьте файл' : 'Идёт извлечение'} <ArrowRight className="w-4 h-4" />
-              </button>
             </div>
           </aside>
         </div>

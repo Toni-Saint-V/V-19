@@ -285,16 +285,26 @@ const reviewIntroStorageKey = "visaflow.v19.adminReviewIntroSeen";
 function toneClasses(tone: string) {
   switch (tone) {
     case "red":
-      return "border-[#5b2b32]/45 bg-[#24191b]/60 text-[#d59aa3]";
+      return "border-[#5b2b32]/45 bg-[#24191b]/60 text-[#ff5c67]";
     case "orange":
-      return "border-white/10 bg-white/[0.045] text-white/62";
+      return "border-[#6a481f]/45 bg-[#2d2118]/65 text-[#f59e0b]";
     case "blue":
-      return "border-[#6f64ff]/25 bg-[#6f64ff]/15 text-[#b8baff]";
+      return "border-[#6f64ff]/25 bg-[#6f64ff]/15 text-[#8fa3ff]";
     case "green":
-      return "border-white/10 bg-white/[0.045] text-[#b8baff]";
+      return "border-[#244238]/45 bg-[#14251f]/45 text-[#34d399]";
     default:
       return "border-white/10 bg-white/5 text-white/50";
   }
+}
+
+function reviewCountLabel(count: number) {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return 'заявок';
+  if (lastDigit === 1) return 'заявка';
+  if (lastDigit >= 2 && lastDigit <= 4) return 'заявки';
+  return 'заявок';
 }
 
 function ProgressLine({ label, value }: { label: string; value: number }) {
@@ -384,7 +394,7 @@ function ReviewQueueCard({
           </span>
         )}
         {item.warnings > 0 && (
-          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[9px] font-medium text-white/62">
+          <span className="rounded-full border border-[#6a481f]/45 bg-[#2d2118]/65 px-2 py-1 text-[9px] font-medium text-[#f59e0b]">
             {item.warnings} проверить
           </span>
         )}
@@ -650,7 +660,12 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
               const laneItems = visibleReviews.filter(
                 (item) => item.lane === lane.id,
               );
-              if (activeLane !== "all" && activeLane !== lane.id) return null;
+              if (
+                (activeLane !== "all" && activeLane !== lane.id) ||
+                laneItems.length === 0
+              ) {
+                return null;
+              }
 
               return (
                 <div
@@ -674,24 +689,18 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
                       </div>
                     </div>
                     <span className="rounded-[8px] bg-white/5 px-2 py-1 text-[11px] font-medium text-white/45">
-                      {laneItems.length}
+                      {laneItems.length} {reviewCountLabel(laneItems.length)}
                     </span>
                   </div>
 
                   <div className="space-y-3">
-                    {laneItems.length === 0 ? (
-                      <div className="rounded-[10px] border border-dashed border-white/10 p-5 text-center text-[12px] text-white/30">
-                        Пусто
-                      </div>
-                    ) : (
-                      laneItems.map((item) => (
-                        <ReviewQueueCard
-                          key={item.id}
-                          item={item}
-                          onOpenDrawer={onOpenDrawer}
-                        />
-                      ))
-                    )}
+                    {laneItems.map((item) => (
+                      <ReviewQueueCard
+                        key={item.id}
+                        item={item}
+                        onOpenDrawer={onOpenDrawer}
+                      />
+                    ))}
                   </div>
                 </div>
               );

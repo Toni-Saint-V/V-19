@@ -14,6 +14,7 @@ import {
   FolderCheck,
   History,
   Lock,
+  MapPin,
   PackageCheck,
   ShieldCheck,
   UploadCloud,
@@ -42,6 +43,7 @@ import {
   AdminQueueToolbar,
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
+import { agentDisplayName } from "../modules/submissions/agentDirectory";
 
 interface ExportItem {
   id: string;
@@ -129,10 +131,17 @@ function ManifestRow({
 
 function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
   return submissions
-    .filter((submission) => submission.status === "ready_for_export")
-    .map((submission) => {
+    .flatMap((submission) => {
       const summary = exportSummary([submission]);
-      return {
+      if (
+        submission.status !== "ready_for_export" ||
+        submission.completeness.total !== 100 ||
+        !summary.ready
+      ) {
+        return [];
+      }
+
+      return [{
         id: submission.id,
         title: submission.listTitle ?? submission.title,
         type: submission.type,
@@ -150,7 +159,7 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
         packageSize: `${summary.rowCount} строк`,
         blockerReasons: summary.blockers.map((blocker) => blocker.reason),
         warningReasons: summary.warnings.map((warning) => warning.reason),
-      };
+      }];
     });
 }
 
@@ -507,6 +516,7 @@ export function AdminExportScreen({
       if (!prepared) return;
       const {
         buildLocalDemoExportMediaZipOptions,
+        commitExportMediaZipArtifact,
         downloadPreparedExportMediaZip,
         prepareExportMediaZip,
       } = await import("../modules/submissions/exportMediaZip");
@@ -527,6 +537,12 @@ export function AdminExportScreen({
       );
       if (!zipResult.ok) {
         setExportError(zipResult.safeMessage);
+        return;
+      }
+
+      const commitResult = await commitExportMediaZipArtifact(zipArtifactResult.artifact);
+      if (!commitResult.ok) {
+        setExportError(commitResult.safeMessage);
         return;
       }
 
@@ -655,7 +671,7 @@ export function AdminExportScreen({
             searchValue={searchQuery}
           />
 
-          <div className="grid shrink-0 grid-cols-[44px_minmax(220px,1fr)_150px_130px_110px] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
+          <div className="grid shrink-0 grid-cols-[32px_minmax(140px,0.9fr)_minmax(190px,1.3fr)_minmax(120px,0.7fr)_minmax(140px,0.8fr)] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
             <button
               onClick={toggleAll}
               className={`flex h-5 w-5 items-center justify-center rounded-md border ${displayItems.every((item) => item.selected) && displayItems.length > 0 ? "border-[#6f64ff] bg-[#6f64ff]" : "border-[#242529] bg-[#161617]"}`}
@@ -665,10 +681,10 @@ export function AdminExportScreen({
                   <CheckSquare className="h-3.5 w-3.5 text-white" />
                 )}
             </button>
-            <div>Пакет</div>
-            <div>Слот</div>
-            <div>Готовность</div>
-            <div className="text-right">Размер</div>
+            <div>Подача</div>
+            <div>Заявитель</div>
+            <div>Даты поездки</div>
+            <div>Агент</div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -689,7 +705,7 @@ export function AdminExportScreen({
                 {displayItems.map((item) => (
                   <label
                     key={item.id}
-                    className={`export-row grid w-full cursor-pointer grid-cols-1 gap-3 rounded-xl border px-3 py-3 text-left transition-colors lg:grid-cols-[32px_minmax(220px,1fr)_150px_130px_110px] lg:items-center ${item.selected ? "border-[#6f64ff]/35 bg-[#6f64ff]/10" : activeId === item.id ? "border-white/10 bg-white/[0.035]" : "border-transparent bg-transparent hover:border-white/5 hover:bg-white/5"}`}
+                    className={`export-row grid w-full cursor-pointer grid-cols-1 gap-3 rounded-xl border px-3 py-3 text-left transition-colors lg:grid-cols-[32px_minmax(140px,0.9fr)_minmax(190px,1.3fr)_minmax(120px,0.7fr)_minmax(140px,0.8fr)] lg:items-center ${item.selected ? "border-[#6f64ff]/35 bg-[#6f64ff]/10" : activeId === item.id ? "border-white/10 bg-white/[0.035]" : "border-transparent bg-transparent hover:border-white/5 hover:bg-white/5"}`}
                   >
                     <input
                       aria-label={`Выбрать ${item.title}`}
@@ -699,62 +715,34 @@ export function AdminExportScreen({
                       onChange={() => toggleItem(item.id)}
                     />
 
+                    <div className="flex min-w-0 items-center gap-2 text-[12px] text-white/55">
+                      <span className="shrink-0 rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/55">
+                        {item.id}
+                      </span>
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                      <span className="truncate">{item.city}</span>
+                    </div>
+
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         {item.type === "family" ? (
-                          <Users className="h-3.5 w-3.5 text-white/50" />
+                          <Users className="h-3.5 w-3.5 shrink-0 text-[#8fa3ff]" />
                         ) : (
-                          <User className="h-3.5 w-3.5 text-white/50" />
+                          <User className="h-3.5 w-3.5 shrink-0 text-[#8fa3ff]" />
                         )}
                         <span className="truncate text-[14px] font-medium text-white">
                           {item.title}
                         </span>
-                        <span className="hidden rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/40 lg:inline-flex">
-                          {item.id}
-                        </span>
-                        <span className="ml-auto shrink-0 text-[12px] text-white/65 lg:hidden">
-                          {item.appointmentDate}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-white/40">
-                        <span>{item.agent}</span>
-                        <span className="h-1 w-1 rounded-full bg-white/20" />
-                        <span>{item.city}</span>
-                        <span className="h-1 w-1 rounded-full bg-white/20" />
-                        <span>{item.files} файлов</span>
                       </div>
                     </div>
 
-                    <div className="hidden text-[12px] text-white/65 lg:block lg:text-[13px]">
+                    <div className="text-[12px] text-white/65 lg:text-[13px]">
                       {item.appointmentDate}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="shrink-0 rounded-md border border-white/5 bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-white/40 lg:hidden">
-                        {item.id}
-                      </span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/5 lg:w-20 lg:flex-none">
-                        <div
-                          className="h-full rounded-full bg-[#7c73ff]"
-                          style={{ width: `${item.readiness}%` }}
-                        />
-                      </div>
-                      <span className="text-[12px] font-medium text-white/70">
-                        {item.readiness}%
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3 lg:justify-end">
-                      {item.warnings > 0 ? (
-                        <StatusPill tone="orange">
-                          {item.warnings} warning
-                        </StatusPill>
-                      ) : (
-                        <StatusPill tone="green">чисто</StatusPill>
-                      )}
-                      <span className="hidden text-[12px] font-medium text-white/55 lg:inline">
-                        {item.packageSize}
-                      </span>
+                    <div className="flex items-center gap-2 text-[12px] text-white/65 lg:text-[13px]">
+                      <User className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                      <span className="truncate">{agentDisplayName(item.agent)}</span>
                     </div>
                   </label>
                 ))}

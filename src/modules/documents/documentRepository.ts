@@ -4,20 +4,13 @@ import {
   type VisaFlowSupabaseClient,
 } from "../../lib/supabase/client";
 import type {
-  DocumentAssetInsert as DbDocumentAssetInsert,
   DocumentExportEventInsert,
 } from "../../lib/supabase/database.types";
 import { mapSupabasePersistenceError } from "../../services/persistenceObservability";
 import {
-  mediaStorageBucket,
-  type MediaStorageTarget,
-} from "../submissions/mediaStoragePolicy";
-import {
   type DocumentAsset,
-  type DocumentAssetInsert,
   type DocumentAssetRow,
   mapDocumentAssetRow,
-  parseDocumentStoragePath,
 } from "./documentTypes";
 
 const documentAssetSelect =
@@ -96,58 +89,6 @@ export class DocumentRepository {
     );
   }
 
-  async save(asset: DocumentAssetInsert): Promise<DocumentAsset> {
-    const { data, error } = await this.client
-      .from("document_assets")
-      .upsert(asset as DbDocumentAssetInsert, {
-        onConflict: "submission_id,applicant_id,type",
-      })
-      .select(documentAssetSelect)
-      .single();
-
-    if (error) {
-      throw mapSupabasePersistenceError(error, {
-        operation: "document_assets.save",
-        fallbackKind: "database",
-      });
-    }
-
-    return mapDocumentAssetRow(data as DocumentAssetRow);
-  }
-
-  async saveUploadedStorageAsset(
-    target: MediaStorageTarget,
-    file: Pick<File, "name" | "size" | "type">,
-    options: {
-      checksum?: string | null;
-      ownerUserId?: string | null;
-      sourceMediaAssetId?: string | null;
-    } = {},
-  ): Promise<DocumentAsset | null> {
-    const parsed = parseDocumentStoragePath(target.path);
-    if (!parsed) return null;
-
-    const ownerUserId = options.ownerUserId ?? (await this.currentUserId());
-    return this.save({
-      source_media_asset_id: options.sourceMediaAssetId ?? null,
-      submission_id: parsed.submissionId,
-      applicant_id: parsed.applicantId,
-      owner_user_id: ownerUserId,
-      type: parsed.type,
-      bucket: mediaStorageBucket,
-      storage_path: target.path,
-      filename: parsed.filename,
-      upload_status: "uploaded",
-      validation_status: "pending",
-      export_status: "not_ready",
-      mime: file.type || null,
-      size: file.size || null,
-      checksum: options.checksum ?? null,
-      uploaded_at: new Date().toISOString(),
-      validated_at: null,
-    });
-  }
-
   async markExported(ids: string[]): Promise<void> {
     if (!ids.length) return;
 
@@ -199,9 +140,9 @@ export class DocumentRepository {
     }).auth;
 
     if (typeof auth?.getUser !== "function") return null;
-
     const { data, error } = await auth.getUser();
     if (error) return null;
     return data?.user?.id ?? null;
   }
+
 }
