@@ -176,9 +176,9 @@ function unresolvedWarningCount(submission: Submission) {
 }
 
 function reviewLaneForSubmission(submission: Submission): Lane {
+  if (unresolvedBlockerCount(submission) > 0) return "urgent";
   if (submission.status === "returned") return "returned";
   if (submission.status === "ready_for_export") return "ready";
-  if (unresolvedBlockerCount(submission) > 0) return "urgent";
   if (
     submission.status === "submitted_for_review" &&
     submission.completeness.total >= 100
@@ -675,7 +675,7 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
                   <div className="mb-3 flex items-center justify-between gap-2 px-1">
                     <div className="flex items-center gap-2">
                       <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-[8px] border ${toneClasses(lane.tone)}`}
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border ${toneClasses(lane.tone)}`}
                       >
                         <Icon className="h-4 w-4" />
                       </div>
