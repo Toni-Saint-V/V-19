@@ -21429,7 +21429,7 @@ body,
 .v19-legacy-action-status.tone-blocker {
   border-color: var(--v19b-color-border-strong);
   background: var(--v19b-color-app);
-  color: var(--v19b-color-text-faint);
+  color: var(--v19b-color-text-strong) !important;
 }
 
 .v19-legacy-action-status-dot {
@@ -21455,7 +21455,7 @@ body,
 .v19-legacy-action-status.tone-warning {
   border-color: var(--v19b-color-border-strong);
   background: var(--v19b-color-app);
-  color: var(--v19b-color-text-muted);
+  color: var(--v19b-color-text-strong) !important;
 }
 
 .v19-legacy-action-status.tone-ready {
@@ -21511,7 +21511,7 @@ body,
   padding: var(--v19b-size-0) var(--v19b-size-14);
   border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
   border-radius: var(--v19b-radius-control);
-  color: var(--v19b-color-text);
+  color: var(--v19b-color-text-strong) !important;
   background: var(--v19b-color-control);
   font-family: var(--v19b-font-family);
   font-size: var(--v19b-size-13);
@@ -22096,28 +22096,28 @@ body,
   --admin-review-status-bg: var(--v19b-status-review-bg);
   --admin-review-status-border: var(--v19b-status-review-border);
   --admin-review-status-dot: var(--v19b-dot-review);
-  --admin-review-status-text: var(--v19b-color-primary-text);
+  --admin-review-status-text: var(--v19b-color-text-strong);
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-status-pill.is-teal {
   --admin-review-status-bg: var(--v19b-status-success-bg);
   --admin-review-status-border: var(--v19b-status-success-border);
   --admin-review-status-dot: var(--v19b-dot-success);
-  --admin-review-status-text: var(--v19b-admin-drawer-green-text);
+  --admin-review-status-text: var(--v19b-color-text-strong);
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-status-pill.is-amber {
   --admin-review-status-bg: var(--v19b-admin-drawer-orange-bg);
   --admin-review-status-border: var(--v19b-admin-drawer-orange-border);
   --admin-review-status-dot: var(--v19b-dot-warning);
-  --admin-review-status-text: var(--v19b-admin-drawer-orange-text);
+  --admin-review-status-text: var(--v19b-color-text-strong);
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-status-pill.is-danger {
   --admin-review-status-bg: var(--v19b-status-danger-bg);
   --admin-review-status-border: var(--v19b-status-danger-border);
   --admin-review-status-dot: var(--v19b-dot-danger);
-  --admin-review-status-text: var(--v19b-dot-danger);
+  --admin-review-status-text: var(--v19b-color-text-strong);
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-status-pill .admin-review-status-dot {
@@ -22141,16 +22141,16 @@ body,
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-title,
 [data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-title > * {
-  color: var(--v19b-color-text-70) !important;
+  color: var(--v19b-color-text-strong) !important;
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-title > span:first-child {
   background: var(--v19b-color-tag) !important;
-  color: var(--v19b-color-text-60) !important;
+  color: var(--v19b-color-text-strong) !important;
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-note {
-  color: var(--v19b-color-text-50) !important;
+  color: var(--v19b-color-text-strong) !important;
 }
 
 [data-admin-review-drawer-surface="workspace"] .admin-review-metric--checked,

@@ -2359,10 +2359,10 @@ function AdminRemarkForm({
         aria-label="Новое замечание"
         aria-modal="true"
         className="admin-remark-form"
-        exit={{ opacity: 0, scale: 0.96, y: 10 }}
-        initial={{ opacity: 0, scale: 0.96, y: 10 }}
+        exit={{ opacity: 0, scale: 0.98, y: 22 }}
+        initial={{ opacity: 0, scale: 0.98, y: 22 }}
         role="dialog"
-        transition={{ damping: 26, stiffness: 300, type: "spring" }}
+        transition={{ damping: 24, stiffness: 260, type: "spring" }}
       >
         <header>
           <div>

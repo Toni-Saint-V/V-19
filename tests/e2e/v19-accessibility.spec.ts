@@ -3,6 +3,21 @@ import { expect, test, type Page } from "@playwright/test";
 import { clickWorkspaceButton, openFreshWorkspace } from "./v19-pilot-helpers";
 
 async function expectNoAxeViolations(page: Page, context: string, include?: string) {
+  const dialog = page.getByRole("dialog").first();
+  if (await dialog.isVisible({ timeout: 250 }).catch(() => false)) {
+    await expect
+      .poll(
+        () =>
+          dialog.locator('[style*="opacity"]').evaluateAll((nodes) =>
+            (nodes as unknown as Array<{ getAttribute(name: string): string | null }>).every(
+              (node) => /opacity:\s*1(?:;|$)/.test(node.getAttribute("style") ?? ""),
+            ),
+          ),
+        { message: `${context}: dialog content finishes entering before accessibility analysis` },
+      )
+      .toBe(true);
+  }
+
   const axeBuilder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]);
   const results = await (include ? axeBuilder.include(include) : axeBuilder).analyze();
 
@@ -14,6 +29,21 @@ async function expectNoAxeViolations(page: Page, context: string, include?: stri
     })),
     context,
   ).toEqual([]);
+}
+
+async function waitForAgentRowsToSettle(page: Page) {
+  await expect
+    .poll(
+      () =>
+        page.locator('[data-testid="agent-action-row"]').evaluateAll((rows) =>
+          (rows as unknown as Array<{ getAttribute(name: string): string | null }>).every((row) => {
+            const inlineStyle = row.getAttribute("style") ?? "";
+            return !inlineStyle.includes("opacity") || /opacity:\s*1(?:;|$)/.test(inlineStyle);
+          }),
+        ),
+      { message: "agent action rows finish entering before accessibility analysis" },
+    )
+    .toBe(true);
 }
 
 async function openAgentActionsTab(page: Page) {
@@ -29,6 +59,7 @@ test.describe("V-19 accessibility contract", () => {
   }) => {
     await openFreshWorkspace(page);
     await expect(page.getByRole("button", { name: "Входящие" })).toHaveCount(0);
+    await waitForAgentRowsToSettle(page);
     await expectNoAxeViolations(page, "agent actions");
 
     await openAgentActionsTab(page);
@@ -36,6 +67,7 @@ test.describe("V-19 accessibility contract", () => {
       page.getByRole("heading", { level: 1, name: "Мои действия" }),
     ).toBeVisible();
     await expect(page.getByRole("region", { name: "Мои действия" })).toBeVisible();
+    await waitForAgentRowsToSettle(page);
     await expectNoAxeViolations(page, "agent actions");
 
     await clickWorkspaceButton(page, /^Мои подачи$/);

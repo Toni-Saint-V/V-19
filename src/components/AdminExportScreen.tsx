@@ -678,6 +678,12 @@ export function AdminExportScreen({
 
           <div className="grid shrink-0 grid-cols-[32px_minmax(140px,0.9fr)_minmax(190px,1.3fr)_minmax(120px,0.7fr)_minmax(140px,0.8fr)] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
             <button
+              aria-label={
+                displayItems.every((item) => item.selected) && displayItems.length > 0
+                  ? "Снять выбор со всех подач"
+                  : "Выбрать все подачи"
+              }
+              aria-pressed={displayItems.every((item) => item.selected) && displayItems.length > 0}
               onClick={toggleAll}
               className={`flex h-5 w-5 items-center justify-center rounded-md border ${displayItems.every((item) => item.selected) && displayItems.length > 0 ? "border-[#6f64ff] bg-[#6f64ff]" : "border-[#242529] bg-[#161617]"}`}
             >
@@ -778,7 +784,12 @@ export function AdminExportScreen({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-5">
+        <div
+          aria-label="Панель контроля выгрузки"
+          className="min-h-0 flex-1 overflow-y-auto p-5 space-y-5"
+          role="region"
+          tabIndex={0}
+        >
           <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>

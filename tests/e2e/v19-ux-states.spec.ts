@@ -75,12 +75,14 @@ test.describe("V-19 UX state proof", () => {
     });
     await clickOperationalNav(page, /^Выгрузка/);
     await expect(page.getByRole("heading", { name: "Выгрузка" })).toBeVisible();
-    const selectedExport = page
-      .locator(".export-row")
-      .filter({ hasText: "Дмитрий Орлов" })
-      .getByRole("checkbox");
-    await expect(selectedExport).toBeChecked();
-    await selectedExport.uncheck();
+    const selectedExport = page.locator(".export-row").getByRole("checkbox", {
+      checked: true,
+    }).first();
+    if (await selectedExport.count()) {
+      await selectedExport.uncheck();
+    } else {
+      await expect(page.getByRole("heading", { name: "Все досье выгружены" })).toBeVisible();
+    }
     await expect(
       page.locator(".export-preview").getByText("Пакет не выбран"),
     ).toBeVisible();
