@@ -49,6 +49,19 @@ export const BLS_CITY_OPTIONS = [
   "Ростов-на-Дону",
 ];
 
+export const POPULAR_RUSSIAN_CITY_OPTIONS = [
+  "Москва",
+  "Санкт-Петербург",
+  "Нижний Новгород",
+  "Ростов-на-Дону",
+  "Самара",
+  "Новосибирск",
+  "Екатеринбург",
+  "Казань",
+  "Краснодар",
+  "Уфа",
+] as const;
+
 const blsCountryOptions = [
   "Russian Federation",
   "USSR",

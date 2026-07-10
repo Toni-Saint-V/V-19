@@ -23,6 +23,7 @@ import {
   fileTypeLabels,
   getPrimaryAction,
   statusLabelFor,
+  statusTone,
 } from "../modules/submissions/status";
 import type {
   ActionDecision,
@@ -197,7 +198,7 @@ const FieldRow = ({
         data-testid="admin-review-add-remark"
         type="button"
         onClick={onRemark}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+        className="admin-review-remark-action flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
         title="Добавить замечание"
       >
         <MessageSquarePlus className="h-4 w-4" />
@@ -205,7 +206,7 @@ const FieldRow = ({
       <button
         type="button"
         onClick={onApprove}
-        className={`flex h-8 w-8 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60
+        className={`admin-review-approve-action flex h-8 w-8 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60
           ${status === "ok" ? "border-white/12 bg-white/[0.06] text-[#b8baff]" : "border-transparent bg-white/5 text-white/40 hover:border-white/10 hover:bg-white/[0.045] hover:text-[#b8baff]"}`}
         title="Пометить как проверенное"
       >
@@ -408,14 +409,18 @@ function QuestionnaireTab({
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-[12px] font-medium">
-          <div className="flex items-center gap-1.5 text-[#b8baff]">
+          <div className="admin-review-metric admin-review-metric--checked flex items-center gap-1.5 text-[#b8baff]">
             <CheckCircle2 className="h-4 w-4" /> {checkedCount} проверено
           </div>
-          <div className="flex items-center gap-1.5 text-white/40">
+          <div className="admin-review-metric admin-review-metric--pending flex items-center gap-1.5 text-white/40">
             <span className="h-2 w-2 rounded-full bg-white/20" /> {missingCount}{" "}
             осталось
           </div>
-          <div className="flex items-center gap-1.5 text-white/62">
+          <div
+            className={`admin-review-metric admin-review-metric--issues ${
+              applicantIssues.length ? "is-open" : "is-clear"
+            } flex items-center gap-1.5 text-white/62`}
+          >
             <AlertCircle className="h-4 w-4" /> {applicantIssues.length}{" "}
             замечаний
           </div>
@@ -425,13 +430,13 @@ function QuestionnaireTab({
       <div className="space-y-6">
         {applicant.sections.map((section, sectionIndex) => (
           <section key={section.id}>
-            <h3 className="mb-4 flex items-center gap-2 text-[15px] font-semibold text-white">
+            <h3 className="admin-review-questionnaire-section-title mb-4 flex items-center gap-2 text-[15px] font-semibold text-white">
               <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 font-mono text-[12px] text-white/60">
                 {sectionIndex + 1}
               </span>
               {section.title}
               {section.missing && (
-                <span className="text-[11px] font-medium text-white/38">
+                <span className="admin-review-questionnaire-section-note text-[11px] font-medium text-white/38">
                   · {section.missing}
                 </span>
               )}
@@ -618,6 +623,7 @@ export function AdminReviewDrawer({
     !primaryAction ||
     primaryAction.disabled ||
     primaryAction.action === "open_history";
+  const reviewStatusTone = submission ? statusTone[submission.status] : "muted";
   const primaryReason =
     primaryAction?.disabled && primaryAction.reason
       ? primaryAction.reason
@@ -728,6 +734,7 @@ export function AdminReviewDrawer({
           />
 
           <motion.div
+            data-admin-review-drawer-surface="workspace"
             role="dialog"
             initial={{ x: "100%", opacity: 0.5, filter: "blur(8px)" }}
             animate={{ x: 0, opacity: 1, filter: "blur(0px)" }}
@@ -744,7 +751,7 @@ export function AdminReviewDrawer({
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="mb-2 flex items-center gap-2 text-[11px] text-white/50 lg:text-xs">
-                    <span className="font-mono font-medium tracking-wider text-white/70">
+                    <span className="admin-review-submission-tag font-mono font-medium tracking-wider text-white/70">
                       {activeSubmissionId ?? "—"}
                     </span>
                     <span className="h-1 w-1 rounded-full bg-white/20" />
@@ -754,7 +761,10 @@ export function AdminReviewDrawer({
                   </div>
                   <h2 className="flex items-center gap-3 text-[20px] font-semibold leading-tight tracking-tight text-white lg:text-[24px]">
                     Проверка пакета
-                    <span className="rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
+                    <span
+                      className={`admin-review-status-pill is-${reviewStatusTone} rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62`}
+                    >
+                      <span className="admin-review-status-dot" aria-hidden="true" />
                       {submission
                         ? statusLabelFor(submission.status)
                         : "Не выбрана"}

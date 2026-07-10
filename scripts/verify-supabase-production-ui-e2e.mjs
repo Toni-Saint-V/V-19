@@ -3,6 +3,8 @@ import path from "node:path";
 
 const root = process.cwd();
 const configPath = path.join(root, "playwright.supabase-production-ui.config.ts");
+const specPath = path.join(root, "tests/e2e-supabase-ui/production-readonly.spec.ts");
+const helperPath = path.join(root, "tests/e2e-supabase-ui/ui-helpers.ts");
 const required = [
   'SUPABASE_PRODUCTION_E2E_UNLOCK !== "1"',
   'VITE_SUPABASE_ACTIVATION_TARGET: "production"',
@@ -13,15 +15,21 @@ const required = [
   'refuses an unapproved Supabase project ref',
   'refuses an unapproved Supabase URL',
   'testMatch: /production-readonly\\.spec\\.ts/',
+  'collectSupabaseMutations',
+  'expect(supabaseMutations()).toEqual([])',
 ];
 
-if (!fs.existsSync(configPath)) {
-  console.error("Production UI E2E contract failed: config is missing.");
+const missingFiles = [configPath, specPath, helperPath].filter((filePath) => !fs.existsSync(filePath));
+if (missingFiles.length) {
+  console.error("Production UI E2E contract failed: required files are missing.");
+  for (const filePath of missingFiles) console.error(`- ${path.relative(root, filePath)}`);
   process.exit(1);
 }
 
-const config = fs.readFileSync(configPath, "utf8");
-const missing = required.filter((entry) => !config.includes(entry));
+const contract = [configPath, specPath, helperPath]
+  .map((filePath) => fs.readFileSync(filePath, "utf8"))
+  .join("\n");
+const missing = required.filter((entry) => !contract.includes(entry));
 if (missing.length) {
   console.error("Production UI E2E contract failed:");
   for (const entry of missing) console.error(`- missing ${entry}`);

@@ -77,6 +77,36 @@ export function collectBrowserProblems(page: Page) {
   return () => problems.filter((problem) => !browserProblemIgnore.test(problem));
 }
 
+export function collectSupabaseMutations(page: Page) {
+  const mutations: string[] = [];
+
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    const method = request.method().toUpperCase();
+    const isSupabaseApi = /\/(?:auth\/v1|rest\/v1|storage\/v1|functions\/v1)(?:\/|$)/.test(
+      url.pathname,
+    );
+
+    if (!isSupabaseApi || method === "GET" || method === "HEAD" || method === "OPTIONS") {
+      return;
+    }
+
+    // Password login is the only expected non-read request in this smoke.
+    // All data/storage/function writes remain evidence of an unsafe test.
+    if (
+      method === "POST" &&
+      url.pathname === "/auth/v1/token" &&
+      url.searchParams.get("grant_type") === "password"
+    ) {
+      return;
+    }
+
+    mutations.push(`${method} ${url.pathname}`);
+  });
+
+  return () => mutations;
+}
+
 export async function isVisible(locator: Locator) {
   return locator.isVisible({ timeout: 750 }).catch(() => false);
 }

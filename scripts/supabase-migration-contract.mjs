@@ -82,6 +82,19 @@ export const requiredRemoteMigrationOrder = [
   "20260703141744_day10_review_readiness_required_media_slots",
   "20260703165306_day10_review_readiness_storage_identity",
   "20260705235913_day10_required_media_canonical_write_paths",
+  "20260706000100_ai_helper_admin_intent_quota_contract",
+  "20260706023000_typed_submission_files",
+  "20260707000100_typed_status_history_source",
+  "20260707001000_document_assets_production_pipeline",
+  "20260709234515_agent_return_packages",
+  "20260710000100_allow_submission_handoff_child_writes",
+  "20260710000200_allow_handoff_children_in_draft_rpc",
+  "20260710000300_persist_handoff_applicant_projection",
+  "20260710003127_agent_return_packages_duplicate_result",
+  "20260710003254_document_asset_function_search_path_hardening",
+  "20260710004000_harden_document_assets_projection",
+  "20260710021043_harden_media_asset_review_boundary",
+  "20260710022231_add_media_assets_applicant_submission_index",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

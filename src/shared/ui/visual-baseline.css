@@ -21950,6 +21950,20 @@ body,
   background: var(--v19b-color-control);
 }
 
+.vf-figma-questionnaire-screen .v19-questionnaire-section-optional {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .vf-figma-questionnaire-screen .v19-questionnaire-section-list--sidebar .v19-questionnaire-section-optional {
+    width: var(--v19b-size-full);
+    justify-self: stretch;
+    text-align: left;
+  }
+}
+
 @media (min-width: 1024px) {
   .vf-figma-questionnaire-screen .v19-questionnaire-section-nav {
     gap: var(--v19b-size-10) !important;
@@ -22049,4 +22063,109 @@ body,
   align-items: center !important;
   gap: var(--v19b-size-8) !important;
   width: var(--v19b-size-full) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-submission-tag {
+  display: inline-flex !important;
+  min-height: var(--v19b-size-24) !important;
+  align-items: center !important;
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong) !important;
+  border-radius: var(--v19b-radius-control) !important;
+  background: var(--v19b-color-control) !important;
+  color: var(--v19b-color-text-70) !important;
+  line-height: var(--v19b-line-height-control) !important;
+  padding-inline: var(--v19b-size-8) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-status-pill {
+  --admin-review-status-bg: var(--v19b-status-muted-bg);
+  --admin-review-status-border: var(--v19b-color-border-strong);
+  --admin-review-status-dot: var(--v19b-dot-neutral);
+  --admin-review-status-text: var(--v19b-status-muted-text);
+  display: inline-flex !important;
+  min-height: var(--v19b-size-24) !important;
+  align-items: center !important;
+  gap: var(--v19b-size-6) !important;
+  border-color: var(--admin-review-status-border) !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background: var(--admin-review-status-bg) !important;
+  color: var(--admin-review-status-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-status-pill.is-blue {
+  --admin-review-status-bg: var(--v19b-status-review-bg);
+  --admin-review-status-border: var(--v19b-status-review-border);
+  --admin-review-status-dot: var(--v19b-dot-review);
+  --admin-review-status-text: var(--v19b-color-primary-text);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-status-pill.is-teal {
+  --admin-review-status-bg: var(--v19b-status-success-bg);
+  --admin-review-status-border: var(--v19b-status-success-border);
+  --admin-review-status-dot: var(--v19b-dot-success);
+  --admin-review-status-text: var(--v19b-admin-drawer-green-text);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-status-pill.is-amber {
+  --admin-review-status-bg: var(--v19b-admin-drawer-orange-bg);
+  --admin-review-status-border: var(--v19b-admin-drawer-orange-border);
+  --admin-review-status-dot: var(--v19b-dot-warning);
+  --admin-review-status-text: var(--v19b-admin-drawer-orange-text);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-status-pill.is-danger {
+  --admin-review-status-bg: var(--v19b-status-danger-bg);
+  --admin-review-status-border: var(--v19b-status-danger-border);
+  --admin-review-status-dot: var(--v19b-dot-danger);
+  --admin-review-status-text: var(--v19b-dot-danger);
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-status-pill .admin-review-status-dot {
+  width: var(--v19b-size-6) !important;
+  height: var(--v19b-size-6) !important;
+  border-radius: var(--v19b-radius-pill) !important;
+  background: var(--admin-review-status-dot) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-remark-action {
+  border-color: var(--v19b-admin-drawer-orange-border) !important;
+  background: var(--v19b-admin-drawer-orange-bg) !important;
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-approve-action {
+  border-color: var(--v19b-color-primary-soft-30) !important;
+  background: var(--v19b-color-primary-soft-10) !important;
+  color: var(--v19b-color-primary-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-title,
+[data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-title > * {
+  color: var(--v19b-color-text-70) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-title > span:first-child {
+  background: var(--v19b-color-tag) !important;
+  color: var(--v19b-color-text-60) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-questionnaire-section-note {
+  color: var(--v19b-color-text-50) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--checked,
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--issues.is-clear {
+  color: var(--v19b-admin-drawer-green-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--pending {
+  color: var(--v19b-admin-drawer-orange-text) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--pending > span {
+  background: var(--v19b-dot-warning) !important;
+}
+
+[data-admin-review-drawer-surface="workspace"] .admin-review-metric--issues.is-open {
+  color: var(--v19b-dot-danger) !important;
 }

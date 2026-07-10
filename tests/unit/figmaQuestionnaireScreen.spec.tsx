@@ -91,7 +91,7 @@ function pinnedSectionTitles(container: HTMLElement) {
   const list = container.querySelector(".v19-questionnaire-section-list--pinned");
   if (!list) throw new Error("expected pinned section list");
 
-  return Array.from(list.querySelectorAll("button")).map((button) => {
+  return Array.from(list.querySelectorAll(".v19-questionnaire-section-tab")).map((button) => {
     const title = button.querySelector(".font-semibold")?.textContent?.trim();
     if (!title) throw new Error("expected section title");
     return title;
@@ -239,7 +239,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  test("renders BLS sections in the archived order without changing the shell", () => {
+  test("hides the EU relative section until it is explicitly needed", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -262,7 +262,6 @@ describe("FigmaQuestionnaireScreen", () => {
       "Запись",
       "Личные данные",
       "Паспорт",
-      "Родственник ЕС",
       "Адрес и контакты",
       "Работа / учеба",
       "Поездка",
@@ -270,6 +269,8 @@ describe("FigmaQuestionnaireScreen", () => {
       "Оплата поездки",
       "Кто заполнил",
     ]);
+    fireEvent.click(screen.getByRole("button", { name: "Добавить родственника ЕС" }));
+    expect(pinnedSectionTitles(result.container)).toContain("Родственник ЕС");
   });
 
   test("renders BLS field order and labels inside questionnaire sections", () => {
@@ -557,7 +558,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(result.container).toBeTruthy();
   });
 
-  test("accepts a home address without punctuation and explains the quick format", () => {
+  test("preserves typed address spaces and offers city completion without filling the field with hints", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -576,13 +577,18 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     const address = screen.getByLabelText("Домашний адрес");
-    expect(address).toHaveAttribute("placeholder", "Улица дом квартира");
-    expect(
-      screen.getByText("Можно без запятых и точек: ул Ленина дом 5 квартира 12"),
-    ).toBeInTheDocument();
+    expect(address).not.toHaveAttribute("placeholder");
 
+    fireEvent.change(address, { target: { value: "ул Ленина " } });
+    expect(address).toHaveValue("ул Ленина ");
     fireEvent.change(address, { target: { value: "ул Ленина дом 5 квартира 12" } });
     expect(address).toHaveValue("ул Ленина дом 5 квартира 12");
+
+    const city = screen.getByLabelText("Город проживания");
+    fireEvent.focus(city);
+    fireEvent.change(city, { target: { value: "спб" } });
+    fireEvent.click(screen.getByRole("option", { name: "Санкт-Петербург" }));
+    expect(city).toHaveValue("Санкт-Петербург");
   });
 
   test("shows actionable file slots and uploads a passport in one selection", async () => {
@@ -924,6 +930,30 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(screen.getAllByText("PDF не совпадает с заявкой: Дата рождения.")).toHaveLength(2);
     expect(screen.queryByText(/Проверить|passport_ocr/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Место рождения")).toHaveClass("is-review");
+  });
+
+  test("clears a non-blocking review highlight after the applicant focuses the field", () => {
+    const draft = createDraftSubmission({
+      applicantNames: ["VOLKOV ANTON"],
+      city: "Москва",
+      familyCount: 1,
+      idScheme: "local",
+      submissions: [],
+      type: "single",
+    });
+    const submission = setFieldReview(draft, "birth-date", "20.08.1990", {
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+    });
+
+    render(
+      <FigmaQuestionnaireScreen onBack={vi.fn()} onComplete={vi.fn()} submission={submission} />,
+    );
+
+    const birthDate = screen.getByLabelText("Дата рождения");
+    expect(birthDate).toHaveClass("is-review");
+    fireEvent.focus(birthDate);
+    expect(birthDate).not.toHaveClass("is-review");
   });
 
   test("returns every changed questionnaire field on completion", () => {
