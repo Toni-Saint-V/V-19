@@ -80,9 +80,9 @@ export function ReviewWorkspace({ submissionId, onBack, onAddRemark }: ReviewWor
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, scale: 0.985 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.985 }}
       className="fixed inset-0 z-[60] bg-[#101011] text-white flex flex-col overflow-hidden"
     >
       <header className="h-[64px] shrink-0 border-b border-[#202124] bg-[#141416]/95 backdrop-blur-md flex items-center px-4 lg:px-6 gap-4">

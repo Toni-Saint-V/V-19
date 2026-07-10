@@ -1710,6 +1710,108 @@ const figmaSubmissionDrawerStyles = `
       display: none;
     }
   }
+
+  /* Historical Drawer reference: compact operational shell. The content keeps
+     the current canonical submission/file handlers; only its visual frame is
+     mapped to the approved AgentDrawer. */
+  @media (min-width: 761px) {
+    .v20-submission-drawer {
+      inset: var(--v19-canvas-inset-desktop-max) var(--v19-canvas-inset-desktop-max) var(--v19-canvas-inset-desktop-max) auto;
+      width: var(--v19-drawer-max-width);
+      height: auto;
+      border: 1px solid var(--v19-line-default);
+      border-radius: var(--v19-app-frame-radius);
+      background: var(--v19-panel);
+      box-shadow: -24px 0 80px rgb(0 0 0 / 0.6);
+    }
+
+    .v20-drawer-topbar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--v19-space-lg);
+      min-height: 0;
+      padding: var(--v19-space-lg) var(--v19-space-2xl) 0;
+      background: rgb(17 17 19 / 0.95);
+    }
+
+    .v20-drawer-topbar > .v20-icon-button:first-child {
+      display: none;
+    }
+
+    .v20-icon-button {
+      width: var(--v19-button-height);
+      height: var(--v19-button-height);
+      border-radius: var(--v19-radius-button);
+      background: var(--v19-control);
+    }
+
+    .v20-icon-button.is-close {
+      border-color: var(--v19-line-default);
+      background: var(--v19-control);
+    }
+
+    .v20-icon-glyph,
+    .v20-icon-glyph.is-close {
+      font-size: var(--v19-space-2xl);
+    }
+
+    .v20-title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .v20-subtitle {
+      margin-top: var(--v19-space-sm);
+      font-size: 12px;
+    }
+
+    .v20-tabbar-wrap {
+      padding: var(--v19-space-lg) var(--v19-space-2xl) 0;
+    }
+
+    .v20-tabbar {
+      gap: var(--v19-space-sm);
+    }
+
+    .v20-tab-button {
+      min-height: 44px;
+      padding: 0 var(--v19-space-md);
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .v20-tab-button.is-active {
+      border-color: transparent;
+      background: transparent;
+      box-shadow: inset 0 -2px var(--v19-fg);
+    }
+
+    .v20-drawer-body {
+      padding: var(--v19-space-2xl) var(--v19-space-2xl) 92px;
+    }
+
+    .v20-footer {
+      gap: var(--v19-space-lg);
+      padding: var(--v19-space-lg) var(--v19-space-2xl) var(--v19-space-xl);
+      background: rgb(17 17 19 / 0.95);
+    }
+
+    .v20-footer-actions {
+      grid-template-columns: auto auto;
+      gap: var(--v19-space-md);
+    }
+
+    .v20-action-button {
+      min-height: 44px;
+      padding: 0 var(--v19-space-xl);
+      border-radius: var(--v19-radius-button);
+      font-size: 14px;
+      font-weight: 500;
+    }
+  }
 `;
 
 function getDrawerFocusableElements(container: HTMLElement | null) {

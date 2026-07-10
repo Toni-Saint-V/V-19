@@ -97,19 +97,25 @@ async function expectDrawerFitsViewport(
     await expect(closeButton).toBeVisible();
   }
 
-  const box = await dialog.boundingBox();
   const viewport = page.viewportSize();
 
-  expect(box, `${context}: drawer box`).not.toBeNull();
   expect(viewport, `${context}: viewport`).not.toBeNull();
-  expect(box!.x, `${context}: drawer left`).toBeGreaterThanOrEqual(-1);
-  expect(box!.y, `${context}: drawer top`).toBeGreaterThanOrEqual(-1);
-  expect(box!.x + box!.width, `${context}: drawer right`).toBeLessThanOrEqual(
-    viewport!.width + 1,
-  );
-  expect(box!.y + box!.height, `${context}: drawer bottom`).toBeLessThanOrEqual(
-    viewport!.height + 1,
-  );
+  await expect
+    .poll(
+      async () => {
+        const box = await dialog.boundingBox();
+        if (!box) return false;
+
+        return (
+          box.x >= -1 &&
+          box.y >= -1 &&
+          box.x + box.width <= viewport!.width + 1 &&
+          box.y + box.height <= viewport!.height + 1
+        );
+      },
+      { message: `${context}: drawer settles within the viewport` },
+    )
+    .toBe(true);
 }
 
 async function screenshot(page: Page, viewport: ViewportProof, name: string) {

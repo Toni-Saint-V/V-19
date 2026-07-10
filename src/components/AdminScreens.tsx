@@ -410,7 +410,7 @@ function ReviewQueueCard({
         )}
       </div>
 
-      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] font-medium text-[#6d6f6d]">
+      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] font-medium text-white/60">
         {item.agent}
       </div>
     </button>

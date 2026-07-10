@@ -436,7 +436,7 @@ function QuestionnaireTab({
               </span>
               {section.title}
               {section.missing && (
-                <span className="admin-review-questionnaire-section-note text-[11px] font-medium text-white/38">
+                <span className="admin-review-questionnaire-section-note text-[11px] font-medium text-white/70">
                   · {section.missing}
                 </span>
               )}
@@ -762,7 +762,7 @@ export function AdminReviewDrawer({
                   <h2 className="flex items-center gap-3 text-[20px] font-semibold leading-tight tracking-tight text-white lg:text-[24px]">
                     Проверка пакета
                     <span
-                      className={`admin-review-status-pill is-${reviewStatusTone} rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62`}
+                      className={`admin-review-status-pill is-${reviewStatusTone} rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/70`}
                     >
                       <span className="admin-review-status-dot" aria-hidden="true" />
                       {submission
