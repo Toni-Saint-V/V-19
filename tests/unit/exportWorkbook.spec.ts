@@ -393,7 +393,7 @@ describe("V-19 export workbook contract", () => {
     expect(plan.preview.headers).toEqual(parsed.rows[0]);
     expect(plan.preview.rows).toEqual(workbookDataRows);
     expect(buildExportWorkbookRows(plan.rows)).toEqual(parsed.rows);
-    expect(plan.preview.rows[0]?.[0]).toBe("Москва");
+    expect(plan.preview.rows[0]?.[0]).toBe("MOW");
     expect(plan.preview.rows[0]).not.toEqual(
       expect.arrayContaining(["Schengen", "Tourism", "Normal"]),
     );
@@ -462,7 +462,30 @@ describe("V-19 export workbook contract", () => {
     expect(await verifyExportWorkbookArtifact(artifact)).toBe(true);
   });
 
-  test("exports family blocks before singles, keeps each family contiguous, and leaves singles uncolored", async () => {
+  test("keeps the fourth family visually distinct", () => {
+    const baseRow = exportSummary([readySubmission()]).rows[0];
+    if (!baseRow) throw new Error("expected base export row");
+    const rows = Array.from({ length: 4 }, (_, index) => ({
+      ...baseRow,
+      appointmentType: "Family",
+      familySubmissionId: `family-${index + 1}`,
+      familyGroupId: `family-${index + 1}`,
+      submissionId: `family-${index + 1}`,
+      type: "Семья",
+    }));
+
+    const rowFills = buildExportWorkbookRowFills(rows);
+
+    expect(rowFills).toEqual([
+      null,
+      "family-1",
+      "family-2",
+      "family-3",
+      "family-4",
+    ]);
+  });
+
+  test("exports all family blocks before singles, keeps families contiguous, and gives each family a distinct fill", async () => {
     const familyOne = withApplicantPassports(byId("SUB-1102"), [
       "111111111",
       "222222222",
@@ -508,17 +531,23 @@ describe("V-19 export workbook contract", () => {
     expect(parsed.rows[0]).not.toEqual(
       expect.arrayContaining(["Agent", "Family", "Debug"]),
     );
-    expect(stylesXml).toContain('<cellXfs count="56">');
+    expect(stylesXml).toContain('<fills count="11">');
+    expect(stylesXml).toContain('<fgColor rgb="C6E0B4"/>');
+    expect(stylesXml).toContain('<fgColor rgb="FFF2CC"/>');
+    expect(stylesXml).toContain('<fgColor rgb="BDD7EE"/>');
+    expect(stylesXml).toContain('<fgColor rgb="F4CCCC"/>');
+    expect(stylesXml).toContain('<cellXfs count="84">');
     expect(stylesXml).toContain(
-      '<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1"/>',
+      '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1"/>',
     );
     expect(stylesXml).toContain(
-      '<xf numFmtId="164" fontId="0" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>',
+      '<xf numFmtId="164" fontId="0" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>',
     );
     expect(worksheetXml).toContain('<c r="A2" s="52"');
     expect(worksheetXml).toContain('<c r="E2" s="53"');
     expect(worksheetXml).toContain('<c r="L2" s="54"');
     expect(worksheetXml).toContain('<c r="BC2" s="55"');
+    expect(worksheetXml).toContain('<c r="A5" s="56"');
     expect(worksheetXml).toContain('<c r="A8" s="33"');
   });
 

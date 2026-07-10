@@ -62,6 +62,7 @@ export type ExportMediaZipArtifact = {
   applicantCount: number;
   blob: Blob;
   contentType: "application/zip";
+  documentAssetIds: string[];
   fileCount: number;
   fileName: string;
   packageIdentity: ExportPackageIdentity;
@@ -219,37 +220,13 @@ export async function createExportMediaZipArtifact(
       applicantCount: documents.applicantCount,
       blob,
       contentType: "application/zip",
+      documentAssetIds: documents.documentAssetIds,
       fileCount: documents.fileCount,
       fileName: `visaflow-export-${identityResult.identity.idempotencyKey}_documents.zip`,
       packageIdentity: identityResult.identity,
       submissionCount: orderedSubmissions.length,
       workbookFileName: workbookArtifact.fileName,
     };
-
-    if (documentAssetsResult.repository) {
-      try {
-        await documentAssetsResult.repository.recordExportAudit({
-          documentAssetIds: documents.documentAssetIds,
-          fileCount: documents.fileCount,
-          fileName: artifact.fileName,
-          metadata: {
-            applicantCount: documents.applicantCount,
-            rootFolder: documents.rootFolder,
-            workbookFileName: workbookArtifact.fileName,
-          },
-          packageId: identityResult.identity.idempotencyKey,
-          submissionIds: identityResult.identity.submissionIds,
-        });
-        await documentAssetsResult.repository.markExported(
-          documents.documentAssetIds,
-        );
-      } catch {
-        return blocked(
-          "audit_failed",
-          "ZIP сформирован, но audit event не записан. Экспорт остановлен.",
-        );
-      }
-    }
 
     return { ok: true, artifact };
   } catch (error) {
@@ -260,6 +237,45 @@ export async function createExportMediaZipArtifact(
       );
     }
     return blocked("zip_failed", "Не удалось сформировать ZIP-файл.");
+  }
+}
+
+export async function commitExportMediaZipArtifact(
+  artifact: ExportMediaZipArtifact,
+  repository: DocumentExportRepository | null = DocumentRepository.optional(),
+): Promise<
+  | { ok: true }
+  | { ok: false; reason: "audit_failed"; safeMessage: string }
+> {
+  if (!artifact.documentAssetIds.length) return { ok: true };
+  if (!repository) {
+    return {
+      ok: false,
+      reason: "audit_failed",
+      safeMessage: "ZIP скачан, но audit event не записан. Экспорт остановлен.",
+    };
+  }
+
+  try {
+    await repository.recordExportAudit({
+      documentAssetIds: artifact.documentAssetIds,
+      fileCount: artifact.fileCount,
+      fileName: artifact.fileName,
+      metadata: {
+        applicantCount: artifact.applicantCount,
+        workbookFileName: artifact.workbookFileName,
+      },
+      packageId: artifact.packageIdentity.idempotencyKey,
+      submissionIds: artifact.packageIdentity.submissionIds,
+    });
+    await repository.markExported(artifact.documentAssetIds);
+    return { ok: true };
+  } catch {
+    return {
+      ok: false,
+      reason: "audit_failed",
+      safeMessage: "ZIP скачан, но audit event не записан. Экспорт остановлен.",
+    };
   }
 }
 
@@ -306,8 +322,13 @@ export default async function downloadExportMediaZip(
     options,
   );
   if (!artifactResult.ok) return artifactResult;
-
-  return downloadPreparedExportMediaZip(artifactResult.artifact);
+  const downloadResult = downloadPreparedExportMediaZip(artifactResult.artifact);
+  if (!downloadResult.ok) return downloadResult;
+  const commitResult = await commitExportMediaZipArtifact(
+    artifactResult.artifact,
+    options.documentRepository ?? DocumentRepository.optional(),
+  );
+  return commitResult.ok ? downloadResult : commitResult;
 }
 
 export function buildLocalDemoExportMediaZipOptions(

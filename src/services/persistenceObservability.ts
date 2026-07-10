@@ -17,7 +17,6 @@ export type SupabasePersistenceOperation =
   | "media_assets.list"
   | "document_assets.get_applicant_documents"
   | "document_assets.get_ready_for_export"
-  | "document_assets.save"
   | "document_assets.mark_exported"
   | "document_export_events.insert"
   | "corrections.list"
@@ -25,16 +24,26 @@ export type SupabasePersistenceOperation =
   | "export_batches.insert"
   | "export_batches.list"
   | "export_batches.read_duplicate"
+  | "export_batch_members.list"
   | "rpc.complete_export_package"
   | "rpc.publish_returned_pdf_handoff"
+  | "rpc.start_agent_return_package"
+  | "rpc.publish_agent_return_package"
   | "rpc.upsert_questionnaire_answers"
   | "status_history.list"
   | "status_history.insert"
   | "rpc.save_submission_draft"
   | "rpc.submit_corrections_handoff"
   | "storage.upload_media"
+  | "storage.upload_agent_return_package_artifact"
   | "storage.delete_media"
   | "storage.create_signed_url"
+  | "storage.create_agent_return_package_signed_url"
+  | "agent_return_packages.list_published"
+  | "agent_return_package_artifacts.list"
+  | "agent_return_package_artifacts.read_slot"
+  | "agent_return_package_artifacts.list_published"
+  | "agent_return_package_artifacts.save"
   | "storage.download_media";
 
 export type PersistenceFailureKind =
@@ -126,7 +135,12 @@ function kindForOperation(
 ): PersistenceFailureKind {
   if (operation.startsWith("auth.")) return "auth";
   if (operation === "rpc.save_submission_draft") return "save";
-  if (operation === "storage.upload_media") return "upload";
+  if (
+    operation === "storage.upload_media" ||
+    operation === "storage.upload_agent_return_package_artifact"
+  ) {
+    return "upload";
+  }
   if (operation.startsWith("storage.")) return "storage";
   return fallbackKind ?? "database";
 }

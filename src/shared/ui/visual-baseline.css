@@ -2,6 +2,53 @@
    Raw reusable values live in ./tokens/index.css. Rules below must use var(...).
    Media-query breakpoints are the only CSS limitation exception. */
 
+.v19-preupload-progress-indicator {
+  position: absolute;
+  top: var(--v19b-size-16);
+  right: var(--v19b-size-16);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v19b-size-6);
+  min-height: var(--v19b-size-28);
+  padding: var(--v19b-size-0) var(--v19b-size-10);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-pill);
+  color: var(--v19b-color-text-faint);
+  background: var(--v19b-color-panel);
+  font-size: var(--v19b-size-12);
+  font-weight: var(--v19b-weight-control);
+}
+
+.v19-file-picker-button {
+  min-height: var(--v19b-size-44);
+  padding-inline: var(--v19b-size-20);
+  border: var(--v19b-size-1) solid var(--v19b-color-primary-soft-20);
+  border-radius: var(--v19b-radius-control);
+  color: var(--v19b-color-text-faint);
+  background: var(--v19b-color-app);
+  font-family: var(--v19b-font-family);
+  font-size: var(--v19b-size-14);
+  font-weight: var(--v19b-weight-control);
+  box-shadow: var(--v19b-shadow-primary-soft);
+  transition:
+    border-color var(--v19b-motion-fast),
+    color var(--v19b-motion-fast),
+    background var(--v19b-motion-fast),
+    box-shadow var(--v19b-motion-fast);
+}
+
+.v19-file-picker-button:hover {
+  border-color: var(--v19b-color-primary-soft-30);
+  color: var(--v19b-color-text-muted);
+  background: var(--v19b-color-control);
+}
+
+.v19-file-picker-button:focus-visible {
+  outline: var(--v19b-size-2) solid var(--v19b-color-focus);
+  outline-offset: var(--v19b-size-2);
+}
+
 /* Admin surfaces use the same AppShell side menu as the agent surfaces. */
 .ops-shell.has-unified-side-menu.role-admin:is(
     .surface-admin-review,
@@ -383,6 +430,59 @@
   display: grid;
   gap: var(--v19b-size-12);
 }
+
+.v19-two-row-toolbar {
+  display: grid;
+  grid-template-rows: var(--v19b-size-40) var(--v19b-size-40);
+  gap: var(--v19b-size-8);
+  min-width: var(--v19b-size-0);
+}
+
+.v19-two-row-toolbar-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--v19b-size-8);
+  min-width: var(--v19b-size-0);
+}
+
+.v19-two-row-toolbar-search-row {
+  display: grid;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--v19b-size-40);
+  gap: var(--v19b-size-8);
+  min-width: var(--v19b-size-0);
+}
+
+.v19-admin-queue-toolbar .v19-admin-toolbar-controls {
+  display: contents;
+}
+
+.v19-admin-queue-toolbar .v19-admin-toolbar-controls > label,
+.v19-admin-queue-toolbar .v19-admin-city-filter {
+  flex: 1 1 var(--v19b-size-0);
+  min-width: var(--v19b-size-0);
+}
+
+.v19-admin-queue-toolbar .v19-admin-city-filter {
+  flex-grow: 0.9;
+}
+
+.v19-admin-queue-toolbar .v19-admin-toolbar-select-label {
+  display: none;
+}
+
+.v19-admin-queue-toolbar :is(.v19-admin-toolbar-controls select, .v19-admin-city-filter select) {
+  min-width: var(--v19b-size-0);
+  width: var(--v19b-size-full);
+}
+
+.v19-admin-queue-toolbar .v19-admin-queue-toolbar-search {
+  width: var(--v19b-size-full);
+}
+
+.v19-admin-queue-toolbar .v19-two-row-toolbar-search-row > button {
+  justify-self: end;
+}
+
 
 .v19-admin-cockpit-lane-empty {
   padding: var(--v19b-size-20);
@@ -21151,7 +21251,7 @@ body,
   border-radius: var(--v19b-radius-control);
   outline: var(--v19b-size-0);
   color: var(--v19b-color-text);
-  background: var(--v19b-color-control);
+  background: var(--v19b-color-panel);
   font-family: var(--v19b-font-family);
   font-size: var(--v19b-size-13);
   transition:
@@ -21191,6 +21291,7 @@ body,
     minmax(var(--v19b-size-0), var(--v19b-grid-fr))
     minmax(var(--v19b-size-176), var(--v19b-size-220))
     minmax(var(--v19b-size-120), var(--v19b-size-180))
+    minmax(var(--v19b-size-120), var(--v19b-size-180))
     minmax(var(--v19b-size-110), var(--v19b-size-150));
   align-items: center;
   gap: var(--v19b-size-16);
@@ -21222,6 +21323,7 @@ body,
 
 .v19-legacy-action-main,
 .v19-legacy-action-meta,
+.v19-legacy-action-city-column,
 .v19-legacy-action-badges,
 .v19-legacy-action-cta-wrap {
   min-width: var(--v19b-size-0);
@@ -21236,6 +21338,15 @@ body,
   display: flex;
   align-items: center;
   gap: var(--v19b-size-8);
+  min-width: var(--v19b-size-0);
+}
+
+.v19-legacy-action-labels {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--v19b-size-2);
+  flex: 0 0 auto;
   min-width: var(--v19b-size-0);
 }
 
@@ -21254,35 +21365,53 @@ body,
   flex: 0 0 auto;
   padding: var(--v19b-size-2) var(--v19b-size-6);
   border: var(--v19b-size-1) solid var(--v19b-color-border);
-  border-radius: var(--v19b-size-2);
+  border-radius: var(--v19b-radius-control);
   color: var(--v19b-color-text-faint);
   background: var(--v19b-color-tag);
   font-family: var(--v19b-font-family);
-  font-size: var(--v19b-size-10);
+  font-size: var(--v19b-size-8);
+  font-weight: var(--v19b-weight-control);
   line-height: var(--v19b-line-height-control);
 }
 
-.v19-legacy-action-context {
-  min-width: var(--v19b-size-0);
-  overflow: hidden;
-  color: var(--v19b-color-text-faint);
-  font-size: var(--v19b-size-11);
-  line-height: var(--v19b-line-height-row);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.v19-legacy-action-family-tag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--v19b-size-4);
+  min-height: var(--v19b-size-20);
+  padding: var(--v19b-size-0) var(--v19b-size-6);
+  border: var(--v19b-size-1) solid var(--v19b-color-border-strong);
+  border-radius: var(--v19b-radius-pill);
+  color: var(--v19b-color-text-muted);
+  background: var(--v19b-color-tag);
+  font-size: var(--v19b-size-8);
+  font-weight: var(--v19b-weight-control);
+  line-height: var(--v19b-line-height-control);
+}
+
+.v19-legacy-action-family-tag > svg {
+  width: var(--v19b-size-12);
+  height: var(--v19b-size-12);
+  stroke-width: var(--v19b-size-2);
 }
 
 .v19-legacy-action-meta {
   display: grid;
-  gap: var(--v19b-size-4);
   padding-left: var(--v19b-size-16);
   border-left: var(--v19b-size-1) solid var(--v19b-color-border);
+}
+
+.v19-legacy-action-city-column {
+  display: flex;
+  align-items: center;
 }
 
 .v19-legacy-action-status,
 .v19-legacy-action-badge {
   display: inline-flex;
   align-items: center;
+  gap: var(--v19b-size-6);
   max-width: var(--v19b-size-full);
   min-height: var(--v19b-size-24);
   width: fit-content;
@@ -21298,15 +21427,35 @@ body,
 }
 
 .v19-legacy-action-status.tone-blocker {
-  border-color: var(--v19b-status-danger-border);
-  background: var(--v19b-status-danger-bg);
-  color: var(--v19b-dot-danger);
+  border-color: var(--v19b-color-border-strong);
+  background: var(--v19b-color-app);
+  color: var(--v19b-color-text-faint);
+}
+
+.v19-legacy-action-status-dot {
+  flex: 0 0 auto;
+  width: var(--v19b-size-4);
+  height: var(--v19b-size-4);
+  border-radius: var(--v19b-radius-pill);
+  background: var(--v19b-dot-danger);
+}
+
+.v19-legacy-action-status.tone-warning .v19-legacy-action-status-dot {
+  background: var(--v19b-dot-warning);
+}
+
+.v19-legacy-action-status.tone-ready .v19-legacy-action-status-dot {
+  background: var(--v19b-dot-success);
+}
+
+.v19-legacy-action-status.tone-info .v19-legacy-action-status-dot {
+  background: var(--v19b-dot-review);
 }
 
 .v19-legacy-action-status.tone-warning {
   border-color: var(--v19b-color-border-strong);
-  background: var(--v19b-status-muted-bg);
-  color: var(--v19b-dot-warning);
+  background: var(--v19b-color-app);
+  color: var(--v19b-color-text-muted);
 }
 
 .v19-legacy-action-status.tone-ready {
@@ -21399,7 +21548,6 @@ body,
   }
 
   .v19-legacy-actions-summary .v19-summary-tile {
-    min-height: var(--v19b-size-64);
     padding: var(--v19b-size-8);
   }
 
@@ -21419,19 +21567,22 @@ body,
 
   .v19-legacy-action-title-line {
     display: grid;
+    grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr));
     gap: var(--v19b-size-6);
   }
 
-  .v19-legacy-action-id {
-    order: -1;
+  .v19-legacy-action-labels {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--v19b-size-6);
     justify-self: start;
   }
 
   .v19-legacy-action-title {
-    white-space: normal;
-  }
-
-  .v19-legacy-action-context {
+    grid-column: 1 / -1;
+    grid-row: 2;
     white-space: normal;
   }
 
@@ -21440,6 +21591,11 @@ body,
     padding: var(--v19b-size-0) var(--v19b-size-0) var(--v19b-size-8);
     border-left: var(--v19b-size-0);
     border-bottom: var(--v19b-size-1) solid var(--v19b-color-border);
+  }
+
+  .v19-legacy-action-city-column {
+    grid-column: 1 / -1;
+    padding-bottom: var(--v19b-size-8);
   }
 
   .v19-legacy-action-status {
@@ -21489,6 +21645,10 @@ body,
   .v19-legacy-action-row {
     min-height: var(--v19b-size-148);
     padding: var(--v19b-size-12) var(--v19b-size-14);
+  }
+
+  .v19-legacy-action-city-column {
+    display: flex;
   }
 }
 
@@ -21857,4 +22017,36 @@ body,
 .v19-figma-drawer-shell .v19-drawer-issue-actions button:disabled {
   cursor: not-allowed !important;
   opacity: var(--v19b-opacity-disabled) !important;
+}
+
+/* Shared two-row toolbar layout for the agent action queue. */
+.ops-shell.surface-agent-actions .vf-figma-actions-toolbar.v19-two-row-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) !important;
+  grid-template-rows: var(--v19b-size-40) var(--v19b-size-40) !important;
+  gap: var(--v19b-size-8) !important;
+  min-height: var(--v19b-size-0) !important;
+  padding: var(--v19b-size-0) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-actions-toolbar .v19-two-row-toolbar-filters,
+.ops-shell.surface-agent-actions .vf-figma-actions-toolbar .v19-two-row-toolbar-search-row {
+  display: block !important;
+  min-width: var(--v19b-size-0) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-actions-toolbar .vf-figma-toolbar-topline {
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) var(--v19b-size-112) !important;
+  align-items: center !important;
+  gap: var(--v19b-size-8) !important;
+  width: var(--v19b-size-full) !important;
+}
+
+.ops-shell.surface-agent-actions .vf-figma-actions-toolbar .vf-figma-tools {
+  display: grid !important;
+  grid-template-columns: minmax(var(--v19b-size-0), var(--v19b-grid-fr)) auto !important;
+  align-items: center !important;
+  gap: var(--v19b-size-8) !important;
+  width: var(--v19b-size-full) !important;
 }

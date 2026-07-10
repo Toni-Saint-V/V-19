@@ -440,6 +440,28 @@ export function V19SearchField({
   );
 }
 
+export function V19TwoRowToolbar({
+  action,
+  className,
+  filters,
+  search,
+}: {
+  action?: ReactNode;
+  className?: string;
+  filters: ReactNode;
+  search: ReactNode;
+}) {
+  return (
+    <div className={cn("v19-two-row-toolbar", className)}>
+      <div className="v19-two-row-toolbar-filters">{filters}</div>
+      <div className="v19-two-row-toolbar-search-row">
+        {search}
+        {action}
+      </div>
+    </div>
+  );
+}
+
 export function V19UnifiedToolbar<T extends string>({
   cityFilter,
   cityOptions,
@@ -477,8 +499,10 @@ export function V19UnifiedToolbar<T extends string>({
   }
 
   return (
-    <div className="vf-figma-actions-toolbar">
-      <div className="vf-figma-toolbar-topline">
+    <V19TwoRowToolbar
+      className="vf-figma-actions-toolbar"
+      filters={
+        <div className="vf-figma-toolbar-topline">
         <div className="vf-figma-tabs" aria-label={tabsLabel} role="tablist">
           {tabs.map((tab) => (
             <button
@@ -513,9 +537,10 @@ export function V19UnifiedToolbar<T extends string>({
             ))}
           </select>
         </label>
-      </div>
-
-      <div className="vf-figma-tools">
+        </div>
+      }
+      search={
+        <div className="vf-figma-tools">
         <div className="vf-figma-search">
           <Search aria-hidden="true" size={20} />
           <input
@@ -550,8 +575,9 @@ export function V19UnifiedToolbar<T extends string>({
             <span className="vf-figma-view-toggle-label">Колонки</span>
           </button>
         </div>
-      </div>
-    </div>
+        </div>
+      }
+    />
   );
 }
 

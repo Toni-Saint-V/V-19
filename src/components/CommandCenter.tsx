@@ -16,20 +16,31 @@ import {
 import { Drawer } from './Drawer';
 import { QuestionnaireScreen } from './QuestionnaireScreen';
 import { ApplicantsScreen } from './ApplicantsScreen';
+import { AgentReturnPackagesPanel } from './AgentReturnPackagesPanel';
 import { DraftsScreen } from './DraftsScreen';
 import { PreUploadScreen } from './PreUploadScreen';
+import { CreateSubmissionDrawer } from '../modules/submissions/components/CreateSubmissionDrawer';
+import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from '../modules/submissions/components/adminAiAssistance';
 import visaflowLogo from '../assets/v-logo-premium-black-style.png';
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
   type AgentNavSection,
 } from '../integration/visaflowBusinessBridge';
-import type { Submission } from '../modules/submissions/types';
+import { createDraft } from '../modules/submissions/domainEngine';
+import type {
+  City,
+  PassportUploadDraft,
+  PreliminaryIntakeDraft,
+  Submission,
+  SubmissionAction,
+} from '../modules/submissions/types';
 import {
   listItemsFromSubmissions,
   type LegacyAgentNavSection,
   type LegacySubmissionListItem,
 } from './v19BusinessScreenAdapter';
+import { updateQuestionnaireField } from '../modules/submissions/questionnaire';
 import {
   loadProductIntakeDrafts,
   saveProductIntakeDrafts,
@@ -47,7 +58,18 @@ import {
   agentDisplayName,
   agentInitials,
 } from '../modules/submissions/agentDirectory';
+import {
+  generatedCockpitMediaFileName,
+  mediaSlotTypeForSubmissionFileType,
+  uploadRequiredFile,
+} from '../modules/submissions/submissionActions';
+import {
+  buildMediaStoragePath,
+  mediaMimeTypeForFile,
+  uploadMediaToStorage,
+} from '../modules/submissions/mediaStorage';
 import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
+import { applySubmissionActionResult, canReplaceDocument } from '../modules/submissions/status';
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
@@ -65,6 +87,7 @@ type CommandCenterProps = {
   onSignOut?: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
   onNavigateSettings?: () => void;
+  usesSupabase?: boolean;
 };
 
 const fallbackSubmissions: SubmissionListItem[] = [
@@ -176,6 +199,7 @@ export function CommandCenter({
   onSignOut,
   onSwitchWorkspace,
   onNavigateSettings,
+  usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
   const [activeNav, setActiveNav] = useState<AgentShellNavSection>('actions');
@@ -188,15 +212,50 @@ export function CommandCenter({
   const [settingsDigest, setSettingsDigest] = useState<'instant' | 'daily'>('instant');
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
-  const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() => loadProductIntakeDrafts());
+  const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() =>
+    usesSupabase ? [] : loadProductIntakeDrafts(),
+  );
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [createCity, setCreateCity] = useState<City>('Москва');
+  const [createFamilyCount, setCreateFamilyCount] = useState(2);
+  const [createType, setCreateType] = useState<Submission['type']>('single');
+  const [canonicalOverrides, setCanonicalOverrides] = useState<Record<string, Submission>>({});
 
-  const canonicalRows = useMemo(() => listItemsFromSubmissions(canonicalSubmissions), [canonicalSubmissions]);
+  const effectiveCanonicalSubmissions = useMemo(() => {
+    const byId = new Map(
+      (canonicalSubmissions ?? []).map((submission) => [submission.id, submission]),
+    );
+    for (const submission of Object.values(canonicalOverrides)) {
+      byId.set(submission.id, submission);
+    }
+    return [...byId.values()];
+  }, [canonicalOverrides, canonicalSubmissions]);
+
+  useEffect(() => {
+    if (!canonicalSubmissions?.length || !Object.keys(canonicalOverrides).length) return;
+    setCanonicalOverrides((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const [id, override] of Object.entries(current)) {
+        if (canonicalSubmissions.find((submission) => submission.id === id) === override) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [canonicalOverrides, canonicalSubmissions]);
+
+  const canonicalRows = useMemo(() => listItemsFromSubmissions(effectiveCanonicalSubmissions), [effectiveCanonicalSubmissions]);
   const intakeRows = useMemo(() => intakeDrafts.map(intakeDraftToListItem), [intakeDrafts]);
   const rows = useMemo(
-    () => [...intakeRows, ...(canonicalRows.length ? canonicalRows : fallbackSubmissions)],
-    [canonicalRows, intakeRows],
+    () =>
+      usesSupabase
+        ? canonicalRows
+        : [...intakeRows, ...(canonicalRows.length ? canonicalRows : fallbackSubmissions)],
+    [canonicalRows, intakeRows, usesSupabase],
   );
-  const actionQueue = useMemo(() => agentActionQueue(canonicalSubmissions ?? []), [canonicalSubmissions]);
+  const actionQueue = useMemo(() => agentActionQueue(effectiveCanonicalSubmissions), [effectiveCanonicalSubmissions]);
   const visibleActions = useMemo(() => {
     const matchesFilter = (due: AgentActionDue) => {
       if (actionSummaryFilter === 'open') return true;
@@ -211,8 +270,8 @@ export function CommandCenter({
   const agentAgency = agentAgencyLabel(agentId);
   const agentAvatar = agentInitials(agentId);
   const selectedCanonicalSubmission = useMemo(
-    () => canonicalSubmissions?.find((submission) => submission.id === selectedRow),
-    [canonicalSubmissions, selectedRow],
+    () => effectiveCanonicalSubmissions.find((submission) => submission.id === selectedRow),
+    [effectiveCanonicalSubmissions, selectedRow],
   );
   const selectedIntakeDraft = useMemo(
     () => intakeDrafts.find((draft) => draft.id === selectedRow),
@@ -229,8 +288,11 @@ export function CommandCenter({
     [agentId, intakeDrafts],
   );
   const submissionCards = useMemo(
-    () => [...intakeSubmissionsForCards, ...(canonicalSubmissions ?? [])],
-    [canonicalSubmissions, intakeSubmissionsForCards],
+    () =>
+      usesSupabase
+        ? effectiveCanonicalSubmissions
+        : [...intakeSubmissionsForCards, ...effectiveCanonicalSubmissions],
+    [effectiveCanonicalSubmissions, intakeSubmissionsForCards, usesSupabase],
   );
 
   useEffect(() => {
@@ -242,8 +304,9 @@ export function CommandCenter({
   }, []);
 
   useEffect(() => {
+    if (usesSupabase) return;
     saveProductIntakeDrafts(intakeDrafts);
-  }, [intakeDrafts]);
+  }, [intakeDrafts, usesSupabase]);
 
   const navigateTo = (nav: LegacyAgentNavSection) => {
     const normalizedNav = normalizeAgentNav(nav);
@@ -292,7 +355,224 @@ export function CommandCenter({
   const createPackage = () => {
     bridge.onCreatePackage?.();
     emitVisaflowUiEvent(bridge, { type: 'package.create' });
+    if (usesSupabase) {
+      setCreateDrawerOpen(true);
+      return;
+    }
     setCurrentView('upload');
+  };
+
+  const createCanonicalDraft = async (
+    passportUploads: PassportUploadDraft[] = [],
+    preliminaryIntake?: PreliminaryIntakeDraft,
+    options?: { openQuestionnaire?: boolean },
+  ) => {
+    const applicantNames = passportUploads.map((upload) => {
+      const firstName = upload.extractedFields.find((field) => field.key === 'firstName')?.value.trim();
+      const surname = upload.extractedFields.find((field) => field.key === 'surname')?.value.trim();
+      return [firstName, surname].filter(Boolean).join(' ');
+    });
+    const result = createDraft({
+      agentId,
+      applicantNames,
+      city: createCity,
+      familyCount: createFamilyCount,
+      idScheme: 'supabase',
+      preliminaryIntake,
+      submissions: canonicalSubmissions ?? [],
+      type: createType,
+    });
+    if (!result.ok) throw new Error(result.error.message);
+
+    const passportFieldIds: Record<string, string> = {
+      birthCountry: 'birth-country',
+      birthDate: 'birth-date',
+      birthPlace: 'birth-place',
+      citizenship: 'nationality',
+      firstName: 'first-name',
+      gender: 'gender',
+      passportExpiresAt: 'passport-expiry-date',
+      passportIssueCountry: 'passport-issue-country',
+      passportIssuePlace: 'passport-issue-place',
+      passportIssuedAt: 'passport-issue-date',
+      passportNumber: 'passport-no',
+      passportType: 'passport-type',
+      surname: 'surname',
+    };
+    const nowIso = new Date().toISOString();
+    let nextSubmission = result.data;
+    for (const upload of passportUploads) {
+      const applicant = nextSubmission.applicants[upload.applicantIndex];
+      if (!applicant) continue;
+      const passportFile = nextSubmission.files.find(
+        (file) => file.applicantId === applicant.id && file.type === 'passport_scan',
+      );
+      if (!passportFile || !upload.file) {
+        throw new Error(`Не удалось подготовить файл паспорта для ${applicant.fullName}.`);
+      }
+
+      const generatedFileName = generatedCockpitMediaFileName({
+        applicantId: applicant.id,
+        fileType: passportFile.type,
+        mimeType: upload.file.type,
+        submissionId: nextSubmission.id,
+        uploadNonce: upload.id,
+      });
+      const storageTarget = buildMediaStoragePath(
+        nextSubmission.id,
+        applicant.id,
+        mediaSlotTypeForSubmissionFileType(passportFile.type),
+        generatedFileName,
+      );
+      const storedFile = await uploadMediaToStorage(storageTarget, upload.file);
+      if (!storedFile) {
+        throw new Error('Supabase Storage недоступен для сохранения паспорта.');
+      }
+      nextSubmission = uploadRequiredFile(nextSubmission, passportFile.id, {
+        generatedFileName,
+        mimeType: upload.file.type,
+        originalFileName: upload.file.name,
+        sizeBytes: upload.file.size,
+        storageAdapter: 'supabase-private',
+        storageBucket: storageTarget.bucket,
+        storagePath: storedFile.path,
+        uploadedAtIso: new Date().toISOString(),
+      });
+
+      nextSubmission = {
+        ...nextSubmission,
+        applicants: nextSubmission.applicants.map((candidate) =>
+          candidate.id === applicant.id
+            ? {
+                ...candidate,
+                passportExtraction: {
+                  appliedFieldKeys: upload.extractedFields.map((field) => field.key),
+                  attemptCount: 1,
+                  extractedFields: upload.extractedFields,
+                  lastAttemptAtIso: nowIso,
+                  sourceFileId: passportFile?.id,
+                  sourceFileName: upload.fileName,
+                  status: upload.status,
+                  summary:
+                    upload.status === 'ready'
+                      ? 'Паспортные данные перенесены в анкету.'
+                      : 'Паспорт принят, понадобится ручная проверка.',
+                },
+              }
+            : candidate,
+        ),
+      };
+      for (const field of upload.extractedFields) {
+        const fieldId = passportFieldIds[field.key];
+        if (!fieldId || !field.value.trim()) continue;
+        const section = applicant.sections.find((candidate) =>
+          candidate.fields.some((candidateField) => candidateField.id === fieldId),
+        );
+        if (!section) continue;
+        nextSubmission = updateQuestionnaireField(nextSubmission, {
+          applicantId: applicant.id,
+          fieldId,
+          reviewOriginSource: 'passport_ocr',
+          reviewSource: 'passport_ocr',
+          reviewState: 'needs_review',
+          sectionId: section.id,
+          value: field.value,
+        });
+      }
+    }
+
+    await onSubmissionsChange?.([nextSubmission]);
+    setCanonicalOverrides((current) => ({ ...current, [nextSubmission.id]: nextSubmission }));
+    setCreateDrawerOpen(false);
+    setActiveNav('submissions');
+    setSearchQuery('');
+    if (options?.openQuestionnaire) {
+      setSelectedRow(nextSubmission.id);
+      setDrawerOpen(false);
+      setCurrentView('questionnaire');
+    }
+  };
+
+  const uploadCanonicalFile = async (fileId: string, file: File) => {
+    const submission = effectiveCanonicalSubmissions.find((candidate) => candidate.id === selectedRow);
+    const targetFile = submission?.files.find((candidate) => candidate.id === fileId);
+    if (!submission || !targetFile) {
+      throw new Error('Не удалось определить слот файла для загрузки.');
+    }
+    if (!canReplaceDocument(submission, targetFile)) {
+      throw new Error('Файл нельзя загрузить в текущем статусе подачи.');
+    }
+    const mimeType = mediaMimeTypeForFile(file);
+    if (!mimeType) {
+      throw new Error('Не удалось определить тип выбранного файла.');
+    }
+
+    const generatedFileName = generatedCockpitMediaFileName({
+      applicantId: targetFile.applicantId,
+      fileType: targetFile.type,
+      mimeType,
+      submissionId: submission.id,
+      uploadNonce: `${Date.now()}`,
+    });
+    const target = buildMediaStoragePath(
+      submission.id,
+      targetFile.applicantId,
+      mediaSlotTypeForSubmissionFileType(targetFile.type),
+      generatedFileName,
+    );
+    const uploaded = await uploadMediaToStorage(target, file, { contentType: mimeType });
+    if (!uploaded) {
+      throw new Error('Supabase Storage недоступен для загрузки файла.');
+    }
+
+    const uploadedSubmission = uploadRequiredFile(submission, fileId, {
+      generatedFileName,
+      mimeType,
+      originalFileName: file.name,
+      sizeBytes: file.size,
+      storageAdapter: 'supabase-private',
+      storageBucket: target.bucket,
+      storagePath: uploaded.path,
+      uploadedAtIso: new Date().toISOString(),
+    });
+    if (uploadedSubmission === submission) {
+      throw new Error('Файл нельзя загрузить в текущем статусе подачи.');
+    }
+
+    const nextSubmission =
+      targetFile.type === 'passport_scan' && targetFile.status !== 'needs_replacement'
+        ? {
+            ...uploadedSubmission,
+            applicants: uploadedSubmission.applicants.map((applicant) =>
+              applicant.id === targetFile.applicantId
+                ? {
+                    ...applicant,
+                    passportExtraction: submission.applicants.find(
+                      (candidate) => candidate.id === applicant.id,
+                    )?.passportExtraction,
+                  }
+                : applicant,
+            ),
+          }
+        : uploadedSubmission;
+
+    await onSubmissionsChange?.([nextSubmission]);
+    setCanonicalOverrides((current) => ({ ...current, [nextSubmission.id]: nextSubmission }));
+  };
+
+  const executeAgentSubmissionAction = async (action: SubmissionAction) => {
+    if (!selectedCanonicalSubmission) return;
+
+    const result = applySubmissionActionResult(
+      selectedCanonicalSubmission,
+      action,
+      'agent',
+      agentId ?? selectedCanonicalSubmission.agentId,
+    );
+    if (!result.ok) throw new Error(result.error.message);
+
+    await onSubmissionsChange?.([result.data]);
+    setCanonicalOverrides((current) => ({ ...current, [result.data.id]: result.data }));
   };
 
   const handleUploadComplete = (draft: ProductIntakeDraft) => {
@@ -335,10 +615,10 @@ export function CommandCenter({
 
   const actionStatusTagClass = (action: AgentActionItem) => `tone-${action.severity}`;
 
-  const actionPeopleLabel = (action: AgentActionItem) =>
+  const actionPeopleCount = (action: AgentActionItem) =>
     action.submission.type === 'family'
-      ? `${action.submission.applicants.length} чел.`
-      : '';
+      ? action.submission.applicants.length
+      : null;
 
   const renderNavContent = () => (
     <>
@@ -493,18 +773,31 @@ export function CommandCenter({
               >
                 <div className="v19-legacy-action-main">
                   <div className="v19-legacy-action-title-line">
+                    <span className="v19-legacy-action-labels">
+                      <span className="v19-legacy-action-id">{action.submission.id}</span>
+                      {actionPeopleCount(action) ? (
+                        <span
+                          aria-label={`Семья: ${actionPeopleCount(action)} человек`}
+                          className="v19-legacy-action-family-tag"
+                        >
+                          <Users aria-hidden="true" />
+                          <span>{actionPeopleCount(action)}</span>
+                        </span>
+                      ) : null}
+                    </span>
                     <strong className="v19-legacy-action-title">{action.title}</strong>
-                    <span className="v19-legacy-action-id">{action.submission.id}</span>
                   </div>
-                  <span className="v19-legacy-action-context">{action.context}</span>
                 </div>
                 <div className="v19-legacy-action-meta">
                   <span
                     className={`v19-legacy-action-status ${actionStatusTagClass(action)}`}
                     data-testid="agent-action-status"
                   >
+                    <span aria-hidden="true" className="v19-legacy-action-status-dot" />
                     <span className="truncate">{action.dueLabel}</span>
                   </span>
+                </div>
+                <div className="v19-legacy-action-city-column">
                   <span className="v19-legacy-action-city">
                     <span aria-hidden="true" />
                     {action.submission.city}
@@ -519,11 +812,6 @@ export function CommandCenter({
                       {badge.label}
                     </span>
                   ))}
-                  {actionPeopleLabel(action) ? (
-                    <span className="v19-legacy-action-badge is-people-badge">
-                      {actionPeopleLabel(action)}
-                    </span>
-                  ) : null}
                 </div>
                 <div className="v19-legacy-action-cta-wrap">
                   <button
@@ -633,6 +921,7 @@ export function CommandCenter({
             submission={selectedCanonicalSubmission}
             onBack={() => setCurrentView('main')}
             onSubmissionChange={persistQuestionnaireSubmission}
+            onUploadFile={usesSupabase ? uploadCanonicalFile : undefined}
           />
         )}
         {currentView === 'upload' && (
@@ -656,7 +945,7 @@ export function CommandCenter({
       <main className="flex-1 min-w-0 flex flex-col bg-[#141416]">
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMobileNavOpen(true)} className="md:hidden w-10 h-10 -ml-2 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/70">
+            <button aria-label="Меню" onClick={() => setMobileNavOpen(true)} className="md:hidden w-10 h-10 -ml-2 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/70">
               <Menu className="w-5 h-5" />
             </button>
             <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight text-white m-0 leading-none">{title}</h1>
@@ -676,11 +965,14 @@ export function CommandCenter({
         <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           <div className="max-w-[1460px] mx-auto h-full">
             {activeNav === 'documents' && (
-              <DraftsScreen
-                onOpenDrawer={handleRowClick}
-                onSubmissionsChange={onSubmissionsChange}
-                submissions={canonicalSubmissions}
-              />
+              <div>
+                <AgentReturnPackagesPanel enabled={usesSupabase} />
+                <DraftsScreen
+                  onOpenDrawer={handleRowClick}
+                  onSubmissionsChange={onSubmissionsChange}
+                  submissions={canonicalSubmissions}
+                />
+              </div>
             )}
             {activeNav === 'settings' && renderSettings()}
             {activeNav === 'actions' && renderActionsList()}
@@ -689,13 +981,44 @@ export function CommandCenter({
         </div>
       </main>
 
-      <Drawer
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        submissionId={selectedRow}
-        submission={canonicalSubmissions?.find((submission) => submission.id === selectedRow)}
-        onOpenQuestionnaire={() => selectedRow && handleOpenQuestionnaire(selectedRow)}
-      />
+      {usesSupabase ? (
+        drawerOpen && selectedCanonicalSubmission ? (
+          <OperationalSubmissionDrawer
+            activeTab="overview"
+            onAction={executeAgentSubmissionAction}
+            onClose={() => setDrawerOpen(false)}
+            onOpenQuestionnaireWorkspace={() => handleOpenQuestionnaire(selectedCanonicalSubmission.id)}
+            onUploadFile={uploadCanonicalFile}
+            role="agent"
+            submission={selectedCanonicalSubmission}
+            surface="agent"
+          />
+        ) : null
+      ) : (
+        <Drawer
+          isOpen={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          submissionId={selectedRow}
+          submission={selectedCanonicalSubmission}
+          onOpenQuestionnaire={() => selectedRow && handleOpenQuestionnaire(selectedRow)}
+        />
+      )}
+
+      <AnimatePresence>
+        {usesSupabase && createDrawerOpen && (
+          <CreateSubmissionDrawer
+            city={createCity}
+            familyCount={createFamilyCount}
+            onCity={setCreateCity}
+            onClose={() => setCreateDrawerOpen(false)}
+            onCreate={createCanonicalDraft}
+            onFamilyCount={setCreateFamilyCount}
+            onPassportFilesSelected={() => undefined}
+            onType={setCreateType}
+            type={createType}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

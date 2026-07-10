@@ -715,10 +715,31 @@ function applicantRoleLabel(role: Applicant["role"]): string {
   return "Заявитель";
 }
 
+function questionnaireFieldValue(applicant: Applicant, ...fieldIds: string[]) {
+  const fieldIdSet = new Set(fieldIds);
+  return (
+    applicant.sections
+      .flatMap((section) => section.fields)
+      .find((field) => fieldIdSet.has(field.id))
+      ?.value.trim() || null
+  );
+}
+
+function questionnaireDateValue(value: string | null) {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const dotted = /^(\d{2})[.-](\d{2})[.-](\d{4})$/.exec(value);
+  return dotted ? `${dotted[3]}-${dotted[2]}-${dotted[1]}` : null;
+}
+
 function toApplicantInsert(
   submission: Submission,
   applicant: Applicant,
 ): ApplicantInsert {
+  const birthDate = questionnaireFieldValue(applicant, "birth-date");
+  const passportIssuedAt = questionnaireFieldValue(applicant, "passport-issue-date");
+  const passportExpiresAt = questionnaireFieldValue(applicant, "passport-expiry-date");
+
   return {
     id: applicant.id,
     submission_id: submission.id,
@@ -726,20 +747,20 @@ function toApplicantInsert(
     role: applicantRoleLabel(applicant.role),
     suggested_role: null,
     role_confirmed: true,
-    birth_date: null,
+    birth_date: questionnaireDateValue(birthDate),
     patronymic: null,
-    citizenship: null,
-    address: null,
-    phone: null,
-    email: null,
-    passport_number: "",
-    passport_issued_at: null,
-    passport_expires_at: null,
+    citizenship: questionnaireFieldValue(applicant, "nationality"),
+    address: questionnaireFieldValue(applicant, "home-address"),
+    phone: questionnaireFieldValue(applicant, "contact-number"),
+    email: questionnaireFieldValue(applicant, "email"),
+    passport_number: questionnaireFieldValue(applicant, "passport-no") ?? "",
+    passport_issued_at: questionnaireDateValue(passportIssuedAt),
+    passport_expires_at: questionnaireDateValue(passportExpiresAt),
     country: submission.country,
     city: submission.city,
     trip_dates: tripDate(submission),
-    hotel_name: null,
-    hotel_address: null,
+    hotel_name: questionnaireFieldValue(applicant, "hotel-name"),
+    hotel_address: questionnaireFieldValue(applicant, "hotel-address"),
     questionnaire_percent: submission.completeness.questionnaire,
     media_percent: submission.completeness.files,
   };

@@ -85,6 +85,24 @@ export type Database = {
         Update: Partial<ExportBatchInsert>;
         Relationships: [];
       };
+      export_batch_members: {
+        Row: ExportBatchMemberRow;
+        Insert: ExportBatchMemberInsert;
+        Update: Partial<ExportBatchMemberInsert>;
+        Relationships: [];
+      };
+      agent_return_packages: {
+        Row: AgentReturnPackageRow;
+        Insert: AgentReturnPackageInsert;
+        Update: Partial<AgentReturnPackageInsert>;
+        Relationships: [];
+      };
+      agent_return_package_artifacts: {
+        Row: AgentReturnPackageArtifactRow;
+        Insert: AgentReturnPackageArtifactInsert;
+        Update: Partial<AgentReturnPackageArtifactInsert>;
+        Relationships: [];
+      };
       document_export_events: {
         Row: DocumentExportEventRow;
         Insert: DocumentExportEventInsert;
@@ -117,6 +135,18 @@ export type Database = {
           payload: ReturnedPdfHandoffPublishPayload;
         };
         Returns: ReturnedPdfHandoffPublishResult;
+      };
+      start_agent_return_package: {
+        Args: {
+          payload: AgentReturnPackageStartPayload;
+        };
+        Returns: AgentReturnPackageStartResult;
+      };
+      publish_agent_return_package: {
+        Args: {
+          payload: AgentReturnPackagePublishPayload;
+        };
+        Returns: AgentReturnPackagePublishResult;
       };
       save_submission_draft: {
         Args: {
@@ -469,6 +499,107 @@ export type ExportBatchInsert = Omit<
   file_name?: string | null;
   idempotency_key?: string | null;
 };
+
+export interface ExportBatchMemberRow extends DbRecord {
+  export_batch_id: string;
+  submission_id: string;
+  applicant_id: string;
+  source_agent_id: string;
+  source_agent_display_name: string;
+  city: string;
+  submission_type: "single" | "family";
+  family_submission_id: string | null;
+  submission_title: string;
+  applicant_name: string;
+  submission_order: number;
+  applicant_order: number;
+  created_at: string;
+}
+
+export type ExportBatchMemberInsert = Omit<
+  ExportBatchMemberRow,
+  "created_at"
+> & {
+  created_at?: string;
+};
+
+export type AgentReturnPackageStatus = "draft" | "published";
+
+export interface AgentReturnPackageRow extends DbRecord {
+  id: string;
+  export_batch_id: string;
+  agent_id: string;
+  city: string;
+  status: AgentReturnPackageStatus;
+  created_by: string;
+  created_at: string;
+  published_by: string | null;
+  published_at: string | null;
+}
+
+export type AgentReturnPackageInsert = Omit<
+  AgentReturnPackageRow,
+  "id" | "created_at" | "published_by" | "published_at" | "status"
+> & {
+  id?: string;
+  created_at?: string;
+  published_by?: string | null;
+  published_at?: string | null;
+  status?: AgentReturnPackageStatus;
+};
+
+export type AgentReturnPackageArtifactKind =
+  | "agent_list_pdf"
+  | "visa_application_pdf";
+
+export interface AgentReturnPackageArtifactRow extends DbRecord {
+  id: string;
+  return_package_id: string;
+  applicant_id: string | null;
+  applicant_name: string | null;
+  artifact_kind: AgentReturnPackageArtifactKind;
+  storage_bucket: "agent-return-packages";
+  storage_path: string;
+  file_name: string;
+  sha256: string;
+  size_bytes: number;
+  uploaded_by: string;
+  uploaded_at: string;
+}
+
+export type AgentReturnPackageArtifactInsert = Omit<
+  AgentReturnPackageArtifactRow,
+  "id" | "uploaded_at" | "uploaded_by"
+> & {
+  id?: string;
+  uploaded_at?: string;
+  uploaded_by?: string;
+};
+
+export interface AgentReturnPackageStartPayload {
+  exportPackageKey: string;
+  agentId: string;
+}
+
+export interface AgentReturnPackageStartResult extends DbRecord {
+  id: string;
+  exportBatchId: string;
+  agentId: string;
+  city: string;
+  status: AgentReturnPackageStatus;
+  applicantCount: number;
+}
+
+export interface AgentReturnPackagePublishPayload {
+  returnPackageId: string;
+}
+
+export interface AgentReturnPackagePublishResult extends DbRecord {
+  id: string;
+  status: AgentReturnPackageStatus;
+  artifactCount: number;
+  duplicate: boolean;
+}
 
 export interface DocumentExportEventRow extends DbRecord {
   id: string;

@@ -10,11 +10,13 @@ import {
   ArrowLeftRight,
   CheckCircle2,
   XCircle,
+  Inbox,
 } from "lucide-react";
 import { ReviewScreen } from "./AdminScreens";
 import { AdminExportScreen } from "./AdminExportScreen";
 import { ReviewWorkspace } from "./ReviewWorkspace";
 import { AdminReviewDrawer } from "./AdminReviewDrawer";
+import { AdminReturnPackagesScreen } from "./AdminReturnPackagesScreen";
 import { RemarkForm } from "./RemarkForm";
 import visaflowLogo from "../assets/v-logo-premium-black-style.png";
 import type { AccessRequest } from "../shared/authRegistration";
@@ -28,7 +30,7 @@ import {
   type AdminNavSection as BridgeAdminNavSection,
 } from "../integration/visaflowBusinessBridge";
 
-type AdminNavSection = BridgeAdminNavSection | "users";
+type AdminNavSection = BridgeAdminNavSection | "users" | "returns";
 type AdminViewState = "main" | "review_workspace";
 
 const SettingsScreen = lazy(
@@ -228,6 +230,7 @@ export function AdminWorkspace({
   onSignOut,
   onSwitchWorkspace,
   submissions,
+  usesSupabase = false,
 }: {
   accessRequests?: AccessRequest[];
   accessRequestsBusy?: boolean;
@@ -237,6 +240,7 @@ export function AdminWorkspace({
   onSignOut: () => void | Promise<void>;
   onSwitchWorkspace?: () => void;
   submissions?: Submission[];
+  usesSupabase?: boolean;
 }) {
   const bridge = useVisaflowBusinessBridge();
   const [activeNav, setActiveNav] = useState<AdminNavSection>("review");
@@ -324,7 +328,7 @@ export function AdminWorkspace({
   };
 
   const navigateTo = (nav: AdminNavSection) => {
-    if (nav !== "users") {
+    if (nav === "review" || nav === "export" || nav === "settings") {
       bridge.onAdminNavChange?.(nav);
       emitVisaflowUiEvent(bridge, { type: "admin.nav", section: nav });
     }
@@ -381,6 +385,16 @@ export function AdminWorkspace({
               3
             </span>
           </button>
+          {usesSupabase ? (
+            <button
+              aria-label="Возврат"
+              onClick={() => navigateTo("returns")}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60 ${activeNav === "returns" ? "bg-[#27272b] text-white border border-[#2e2f34]" : "hover:bg-white/5 text-white/70 hover:text-white border border-transparent"}`}
+            >
+              <Inbox className="w-4 h-4 text-[#8fe7c1]" />{" "}
+              <span className="flex-1 text-left">Возврат</span>
+            </button>
+          ) : null}
         </nav>
 
         <nav className="space-y-0.5">
@@ -487,6 +501,8 @@ export function AdminWorkspace({
         return "Проверка";
       case "export":
         return "Выгрузка";
+      case "returns":
+        return "Возврат документов";
       case "users":
         return "Управление пользователями";
       case "settings":
@@ -585,6 +601,9 @@ export function AdminWorkspace({
             )}
             {activeNav === "export" && (
               <AdminExportScreen submissions={submissions} />
+            )}
+            {usesSupabase && activeNav === "returns" && (
+              <AdminReturnPackagesScreen />
             )}
             {activeNav === "users" && (
               <AdminUsersAccessPanel

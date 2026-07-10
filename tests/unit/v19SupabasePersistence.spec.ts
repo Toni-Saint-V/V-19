@@ -599,7 +599,7 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(rpcNames()).toEqual([]);
   });
 
-  it("keeps normalized applicant projection out of the cockpit payload and snapshot", async () => {
+  it("persists questionnaire projection without embedding a normalized snapshot", async () => {
     const submission = initialSubmissions[0] as Submission;
     const payload = toCockpitDraftPersistencePayload(
       submission,
@@ -636,7 +636,7 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(savedPayload.applicants[0]).toMatchObject({
       birth_date: null,
       email: null,
-      passport_number: "",
+      passport_number: "660010481",
       phone: null,
     });
     expect(savedSnapshot?.applicants[0]).not.toHaveProperty("normalizedProfile");
@@ -1062,7 +1062,7 @@ describe("V-19 Supabase cockpit persistence", () => {
     expect(unscopedPayload.applicants[0]).toMatchObject({
       birth_date: null,
       email: null,
-      passport_number: "",
+      passport_number: "660010481",
     });
   });
 

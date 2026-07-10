@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { describe, expect, test, vi } from "vitest";
 import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import {
+  commitExportMediaZipArtifact,
   createExportMediaZipArtifact,
   default as downloadExportMediaZip,
   type ExportMediaZipDocumentDownloader,
@@ -353,7 +354,7 @@ describe("export media mega ZIP", () => {
     expect(result).toMatchObject({ ok: false, reason: "storage_unavailable" });
   });
 
-  test("uses document repository assets and records export audit", async () => {
+  test("uses document repository assets and commits export audit after download", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
     const assets = documentAssetsFor(selection);
     const repository = {
@@ -374,6 +375,11 @@ describe("export media mega ZIP", () => {
     expect(repository.getReadyForExport).toHaveBeenCalledWith([
       selection[0]!.id,
     ]);
+    expect(repository.recordExportAudit).not.toHaveBeenCalled();
+    expect(repository.markExported).not.toHaveBeenCalled();
+
+    const commitResult = await commitExportMediaZipArtifact(result.artifact, repository);
+    expect(commitResult).toEqual({ ok: true });
     expect(repository.recordExportAudit).toHaveBeenCalledWith(
       expect.objectContaining({
         documentAssetIds: expect.arrayContaining(

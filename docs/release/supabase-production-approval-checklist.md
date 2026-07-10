@@ -41,6 +41,15 @@ Backup owner:
 - `20260706023000_typed_submission_files.sql`
 - `20260707000100_typed_status_history_source.sql`
 - `20260707001000_document_assets_production_pipeline.sql`
+- `20260709234515_agent_return_packages.sql`
+- `20260710000100_allow_submission_handoff_child_writes.sql`
+- `20260710000200_allow_handoff_children_in_draft_rpc.sql`
+- `20260710000300_persist_handoff_applicant_projection.sql`
+- `20260710003127_agent_return_packages_duplicate_result.sql`
+- `20260710003254_document_asset_function_search_path_hardening.sql`
+- `20260710004000_harden_document_assets_projection.sql`
+- `20260710021043_harden_media_asset_review_boundary.sql`
+- `20260710022231_add_media_assets_applicant_submission_index.sql`
 
 ## Required Evidence
 

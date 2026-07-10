@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AccessGate } from './components/AccessGate';
 import { CommandCenter } from './components/CommandCenter';
@@ -24,10 +24,34 @@ import {
   type AccessRequestRegistrationInput,
   type Session,
 } from './shared/authRegistration';
+import { supabaseAccessRequestRepository } from './shared/supabaseAuthRegistration';
+import {
+  getCurrentAppSession,
+  signInSupabaseWithPassword,
+  signOutCurrentSession,
+} from './services/authService';
 import type { Role, Submission, SubmissionAction } from './modules/submissions/types';
-import type { AppProfile } from './types/session';
+import type { AppProfile, AppSession } from './types/session';
 
 type Workspace = 'agent' | 'admin';
+
+function sessionFromSupabase(appSession: AppSession): Session {
+  const { profile, supabaseSession } = appSession;
+  return {
+    approvalStatus: 'approved',
+    companyName: profile.organizationName ?? '',
+    createdAt: supabaseSession?.user.created_at ?? new Date(0).toISOString(),
+    email: profile.email,
+    expiresAt: supabaseSession?.expires_at
+      ? new Date(supabaseSession.expires_at * 1000).toISOString()
+      : undefined,
+    fullName: profile.displayName,
+    ownerAgentId: profile.role === 'agent' ? profile.id : undefined,
+    role: profile.role,
+    status: 'active',
+    userId: profile.id,
+  };
+}
 
 export interface AppProps {
   bridge?: VisaflowBusinessBridge;
@@ -48,11 +72,31 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
   const [ownerIdsBySubmissionId, setOwnerIdsBySubmissionId] = useState<
     Map<string, string>
   >(new Map());
+  const submissionsRef = useRef(submissions);
+  const ownerIdsBySubmissionIdRef = useRef(ownerIdsBySubmissionId);
   const supabaseEnabled = Boolean(getSupabaseClient());
   const activeApprovedSession =
     authSession?.status === 'active' && authSession.approvalStatus === 'approved'
       ? authSession
       : null;
+
+  useEffect(() => {
+    submissionsRef.current = submissions;
+  }, [submissions]);
+
+  useEffect(() => {
+    ownerIdsBySubmissionIdRef.current = ownerIdsBySubmissionId;
+  }, [ownerIdsBySubmissionId]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+
+    submissionsRef.current = [];
+    ownerIdsBySubmissionIdRef.current = new Map();
+    setSubmissions([]);
+    setOwnerIdsBySubmissionId(new Map());
+    setSupabaseProfile(null);
+  }, [activeApprovedSession?.userId, supabaseEnabled]);
   const visibleSubmissions = useMemo(() => {
     if (!activeApprovedSession) return [];
     if (activeApprovedSession.role === 'admin') return submissions;
@@ -60,9 +104,18 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     return submissions.filter((submission) => submission.agentId === ownerAgentId);
   }, [activeApprovedSession, submissions]);
 
-  const refreshAccessRequests = useCallback(async () => {
+  const refreshAccessRequests = useCallback(async (session: Session | null) => {
+    if (supabaseEnabled) {
+      if (session?.role !== 'admin') {
+        setAccessRequests([]);
+        return;
+      }
+      setAccessRequests(await supabaseAccessRequestRepository.listPendingAccessRequests());
+      return;
+    }
+
     setAccessRequests(await accessRequestRepository.listPendingAccessRequests());
-  }, []);
+  }, [supabaseEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +123,13 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     async function bootstrapLocalAuth() {
       setAuthError('');
       try {
-        const restored = await authRepository.restoreSession();
+        let restored: Session | null;
+        if (supabaseEnabled) {
+          const appSession = await getCurrentAppSession();
+          restored = appSession ? sessionFromSupabase(appSession) : null;
+        } else {
+          restored = await authRepository.restoreSession();
+        }
         if (cancelled) return;
         setAuthSession(restored);
         if (restored?.role === 'admin' && restored.status === 'active' && restored.approvalStatus === 'approved') {
@@ -78,7 +137,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
         } else {
           setWorkspace('agent');
         }
-        await refreshAccessRequests();
+        await refreshAccessRequests(restored);
       } catch (error) {
         if (!cancelled) {
           setAuthError(error instanceof Error ? error.message : 'Не удалось восстановить сессию.');
@@ -93,7 +152,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     return () => {
       cancelled = true;
     };
-  }, [refreshAccessRequests]);
+  }, [refreshAccessRequests, supabaseEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,56 +193,92 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
   }, [activeApprovedSession, supabaseEnabled]);
 
   const persistSubmissions = useCallback(async (nextSubmissions: Submission[]) => {
-    setSubmissions(nextSubmissions);
+    const currentSubmissions = submissionsRef.current;
+    const currentOwnerIds = ownerIdsBySubmissionIdRef.current;
     if (!supabaseEnabled) {
+      submissionsRef.current = nextSubmissions;
+      setSubmissions(nextSubmissions);
       saveSubmissions(nextSubmissions);
       return;
     }
-    if (!supabaseProfile) return;
+    const persistenceProfile =
+      supabaseProfile ??
+      (activeApprovedSession
+        ? {
+            displayName: activeApprovedSession.fullName,
+            email: activeApprovedSession.email,
+            id: activeApprovedSession.userId,
+            organizationName: activeApprovedSession.companyName,
+            role: activeApprovedSession.role,
+          }
+        : null);
+    if (!persistenceProfile) {
+      throw new Error('Профиль Supabase ещё загружается. Повторите действие через несколько секунд.');
+    }
+
+    const currentById = new Map(currentSubmissions.map((submission) => [submission.id, submission]));
+    const changedSubmissions = nextSubmissions.filter(
+      (submission) => currentById.get(submission.id) !== submission,
+    );
+    if (!changedSubmissions.length) return;
 
     const nextOwnerIds = await saveCockpitSubmissionsForProfile(
-      supabaseProfile,
-      nextSubmissions,
-      ownerIdsBySubmissionId,
+      persistenceProfile,
+      changedSubmissions,
+      currentOwnerIds,
     );
+    submissionsRef.current = nextSubmissions;
+    setSubmissions(nextSubmissions);
+    ownerIdsBySubmissionIdRef.current = nextOwnerIds;
     setOwnerIdsBySubmissionId(nextOwnerIds);
-  }, [ownerIdsBySubmissionId, supabaseEnabled, supabaseProfile]);
+  }, [activeApprovedSession, supabaseEnabled, supabaseProfile]);
 
   const persistVisibleAgentSubmissions = useCallback(
     async (nextVisibleSubmissions: Submission[]) => {
+      const currentSubmissions = submissionsRef.current;
       const nextById = new Map(
         nextVisibleSubmissions.map((submission) => [submission.id, submission]),
       );
-      const existingIds = new Set(submissions.map((submission) => submission.id));
+      const existingIds = new Set(currentSubmissions.map((submission) => submission.id));
       const additions = nextVisibleSubmissions.filter(
         (submission) => !existingIds.has(submission.id),
       );
       await persistSubmissions(
         [
           ...additions,
-          ...submissions.map((submission) => nextById.get(submission.id) ?? submission),
+          ...currentSubmissions.map((submission) => nextById.get(submission.id) ?? submission),
         ],
       );
     },
-    [persistSubmissions, submissions],
+    [persistSubmissions],
   );
 
   const handleLogin = useCallback(async (email: string, password: string) => {
     setAuthError('');
-    const nextSession = await authRepository.loginApprovedUser(email, password);
+    const nextSession = supabaseEnabled
+      ? sessionFromSupabase(await signInSupabaseWithPassword(email, password))
+      : await authRepository.loginApprovedUser(email, password);
     setAuthSession(nextSession);
     setWorkspace(nextSession.role === 'admin' && nextSession.status === 'active' && nextSession.approvalStatus === 'approved' ? 'admin' : 'agent');
-    await refreshAccessRequests();
-  }, [refreshAccessRequests]);
+    await refreshAccessRequests(nextSession);
+  }, [refreshAccessRequests, supabaseEnabled]);
 
   const handleRegister = useCallback(async (input: AccessRequestRegistrationInput) => {
     setAuthError('');
+    if (supabaseEnabled) {
+      await supabaseAccessRequestRepository.submitAccessRequest(input);
+      setAuthSession(null);
+      setWorkspace('agent');
+      setAccessRequests([]);
+      return;
+    }
+
     await authRepository.submitAccessRequest(input);
     const nextSession = await authRepository.restoreSession();
     setAuthSession(nextSession);
     setWorkspace('agent');
-    await refreshAccessRequests();
-  }, [refreshAccessRequests]);
+    await refreshAccessRequests(nextSession);
+  }, [refreshAccessRequests, supabaseEnabled]);
 
   const handleResetPassword = useCallback(async (email: string) => {
     setAuthError('');
@@ -192,32 +287,48 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
   }, []);
 
   const handleSignOut = useCallback(async () => {
-    await authRepository.logout();
+    if (supabaseEnabled) {
+      await signOutCurrentSession();
+    } else {
+      await authRepository.logout();
+    }
     setAuthSession(null);
     setWorkspace('agent');
-  }, []);
+    setAccessRequests([]);
+    submissionsRef.current = [];
+    ownerIdsBySubmissionIdRef.current = new Map();
+    setSubmissions([]);
+    setOwnerIdsBySubmissionId(new Map());
+    setSupabaseProfile(null);
+  }, [supabaseEnabled]);
 
   const handleApproveAccessRequest = useCallback(async (requestId: string) => {
     if (!activeApprovedSession || activeApprovedSession.role !== 'admin') return;
     setAccessRequestsBusy(true);
     try {
-      await accessRequestRepository.approveAccessRequest(requestId, activeApprovedSession.userId);
-      await refreshAccessRequests();
+      const repository = supabaseEnabled
+        ? supabaseAccessRequestRepository
+        : accessRequestRepository;
+      await repository.approveAccessRequest(requestId, activeApprovedSession.userId);
+      await refreshAccessRequests(activeApprovedSession);
     } finally {
       setAccessRequestsBusy(false);
     }
-  }, [activeApprovedSession, refreshAccessRequests]);
+  }, [activeApprovedSession, refreshAccessRequests, supabaseEnabled]);
 
   const handleRejectAccessRequest = useCallback(async (requestId: string) => {
     if (!activeApprovedSession || activeApprovedSession.role !== 'admin') return;
     setAccessRequestsBusy(true);
     try {
-      await accessRequestRepository.rejectAccessRequest(requestId, activeApprovedSession.userId);
-      await refreshAccessRequests();
+      const repository = supabaseEnabled
+        ? supabaseAccessRequestRepository
+        : accessRequestRepository;
+      await repository.rejectAccessRequest(requestId, activeApprovedSession.userId);
+      await refreshAccessRequests(activeApprovedSession);
     } finally {
       setAccessRequestsBusy(false);
     }
-  }, [activeApprovedSession, refreshAccessRequests]);
+  }, [activeApprovedSession, refreshAccessRequests, supabaseEnabled]);
 
   const applySubmissionAction = useCallback((
     submissionId: string,
@@ -342,6 +453,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
                 agentId={activeApprovedSession.ownerAgentId ?? activeApprovedSession.userId}
                 onSubmissionsChange={persistVisibleAgentSubmissions}
                 submissions={visibleSubmissions}
+                usesSupabase={supabaseEnabled}
                 onSignOut={handleSignOut}
                 onSwitchWorkspace={activeApprovedSession.role === 'admin' ? switchWorkspace : undefined}
               />
@@ -355,6 +467,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
                 onSignOut={handleSignOut}
                 onSwitchWorkspace={switchWorkspace}
                 submissions={submissions}
+                usesSupabase={supabaseEnabled}
               />
             )}
           </motion.div>
