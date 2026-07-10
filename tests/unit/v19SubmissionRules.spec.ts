@@ -22,6 +22,7 @@ import {
   exportSummary,
   exportSummaryForSelectedIds,
   getExportBlockers,
+  getExportWarnings,
 } from "../../src/modules/submissions/exportRules";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import {
@@ -573,8 +574,16 @@ describe("V-19 export rules", () => {
     expect(blockers).toContain("В выборке есть подачи не готовые к выгрузке");
     expect(blockers).toContain("В выборке есть уже выгруженные подачи");
     expect(blockers).toContain("Нельзя смешивать разные города");
-    expect(blockers).toContain("Нельзя смешивать разные даты поездки");
+    expect(blockers).not.toContain("Нельзя смешивать разные даты поездки");
     expect(blockers).not.toContain("Нельзя смешивать одинарные и семейные подачи");
+    expect(
+      getExportWarnings([
+        readyClone({ id: "ПД-1056" }),
+        readyClone({ id: "ПД-ДАТА", tripDateFrom: "10.10", tripDateTo: "20.10" }),
+      ]).map((warning) => warning.reason),
+    ).toContain(
+      "В одном городе разные даты поездки. Excel и ZIP доступны, проверьте слот/дату перед BLS выгрузкой.",
+    );
   });
 
   it("allows one city export batch to mix family and single submissions", () => {
@@ -987,10 +996,7 @@ describe("V-19 submission actions", () => {
     );
     expect(
       canPerformAction(withAllReplacements, "submit_corrections", "agent"),
-    ).toEqual({
-      ok: false,
-      reason: "Не найден номер загранпаспорта.",
-    });
+    ).toEqual({ ok: true });
 
     const withExtractedPassport = finishPassportExtraction(
       withAllReplacements,
@@ -1650,7 +1656,7 @@ describe("V-19 submission actions", () => {
     });
     expect(sofiaFields.get("surname")).toBe("VOLKOV");
     expect(sofiaFields.get("first-name")).toBe("ANTON");
-    expect(sofiaFields.get("passport-no")).toBe("752869613");
+    expect(sofiaFields.get("passport-no")).toBe("660010483");
     expect(passportExtractionRows(sofia)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1666,8 +1672,8 @@ describe("V-19 submission actions", () => {
           key: "firstName",
         }),
         expect.objectContaining({
-          conflict: false,
-          currentValue: "752869613",
+          conflict: true,
+          currentValue: "660010483",
           extractedValue: "752869613",
           key: "passportNumber",
         }),

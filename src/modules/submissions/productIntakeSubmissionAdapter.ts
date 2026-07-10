@@ -352,8 +352,8 @@ function sectionsFromDraftApplicant(
   setValue('appointment-city', draft.city);
   setValue('visa-type', 'Шенгенская');
   setValue('category', 'Normal');
-  setValue('birth-country', applicant.fields.birthCountry || birthCountryFromBirthDate(applicant.fields.birthDate));
-  setValue('birth-citizenship', applicant.fields.birthCitizenship || birthCountryFromBirthDate(applicant.fields.birthDate));
+  setValue('birth-country', applicant.fields.birthCountry || birthCountryFromBirthDate(applicant.fields.birthDate) || 'Russian Federation');
+  setValue('birth-citizenship', applicant.fields.birthCitizenship || 'Russian Federation');
   setValue('arrival-date', applicant.fields.arrivalDate || tripDates.arrival, applicant.fields.arrivalDate ? supplementalQuestionnaireSource : undefined);
   setValue('departure-date', applicant.fields.departureDate || tripDates.departure, applicant.fields.departureDate ? supplementalQuestionnaireSource : undefined);
   setValue('stay-duration', applicant.fields.stayDuration, supplementalQuestionnaireSource);

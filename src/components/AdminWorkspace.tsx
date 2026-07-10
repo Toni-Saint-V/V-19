@@ -21,6 +21,7 @@ import { RemarkForm } from "./RemarkForm";
 import visaflowLogo from "../assets/v-logo-premium-black-style.png";
 import type { AccessRequest } from "../shared/authRegistration";
 import type {
+  IssueInput,
   Submission,
   SubmissionAction,
 } from "../modules/submissions/types";
@@ -32,7 +33,6 @@ import {
 
 type AdminNavSection = BridgeAdminNavSection | "users" | "returns";
 type AdminViewState = "main" | "review_workspace";
-
 const SettingsScreen = lazy(
   () => import("../modules/submissions/pages/SettingsScreen"),
 );
@@ -252,7 +252,6 @@ export function AdminWorkspace({
     (request) => request.status === "pending",
   ).length;
 
-  // Drawer & Form State
   const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
   const [remarkFormOpen, setRemarkFormOpen] = useState(false);
   const [remarkContext, setRemarkContext] = useState<{
@@ -307,6 +306,12 @@ export function AdminWorkspace({
     submissionId: string,
     action: SubmissionAction,
   ) => {
+    if (action === "generate_export") {
+      setAdminDrawerOpen(false);
+      navigateTo("export");
+      return;
+    }
+
     await bridge.onSubmissionAction?.({
       submissionId,
       action,
@@ -325,6 +330,37 @@ export function AdminWorkspace({
       setMobileNavOpen(false);
       setBottomProfileMenuOpen(false);
     }
+  };
+
+  const handleAddIssue = (input: IssueInput) => {
+    if (!selectedRow) return;
+    const payload = { submissionId: selectedRow, input };
+    void bridge.onAdminIssueAdd?.(payload);
+    emitVisaflowUiEvent(bridge, { type: "admin.issue.add", payload });
+  };
+
+  const handleRemarkSubmit = (input: {
+    field?: string;
+    applicant?: string;
+    message: string;
+    severity: "warning" | "critical";
+  }) => {
+    if (!selectedSubmission) return;
+    const applicant = selectedSubmission.applicants.find(
+      (item) => item.fullName === input.applicant,
+    ) ?? selectedSubmission.applicants[0];
+    if (!applicant) return;
+
+    handleAddIssue({
+      type: input.field ? "field" : "section",
+      applicantId: applicant.id,
+      field: input.field,
+      reason: input.field
+        ? `Требуется исправить поле «${input.field}»`
+        : "Требуется исправить данные",
+      comment: input.message,
+      severity: input.severity === "critical" ? "blocker" : "warning",
+    });
   };
 
   const navigateTo = (nav: AdminNavSection) => {
@@ -515,12 +551,12 @@ export function AdminWorkspace({
       {currentView === "review_workspace" && selectedRow && (
         <ReviewWorkspace
           submissionId={selectedRow}
+          submission={selectedSubmission}
           onBack={handleBackToDrawer}
           onAddRemark={(field) => handleOpenRemark(field)}
         />
       )}
 
-      {/* Admin Review Drawer */}
       <AdminReviewDrawer
         isOpen={adminDrawerOpen}
         onClose={() => setAdminDrawerOpen(false)}
@@ -535,13 +571,13 @@ export function AdminWorkspace({
         }}
       />
 
-      {/* Shared Remark Form */}
       <RemarkForm
         isOpen={remarkFormOpen}
         onClose={() => setRemarkFormOpen(false)}
         submissionId={selectedRow || ""}
         defaultField={remarkContext.field}
         defaultApplicant={remarkContext.applicant}
+        onSubmit={handleRemarkSubmit}
       />
 
       {/* Mobile Nav Overlay */}

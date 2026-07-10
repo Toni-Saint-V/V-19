@@ -44,6 +44,7 @@ import {
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
 import { agentDisplayName } from "../modules/submissions/agentDirectory";
+import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
 
 interface ExportItem {
   id: string;
@@ -944,6 +945,11 @@ export function AdminExportScreen({
                 state={selectedWarnings ? "warn" : "ok"}
               />
             </div>
+            {selectedCount > 0 ? (
+              <div className="mt-3">
+                <ExportWorkbookPreview preview={selectedPlan.preview} />
+              </div>
+            ) : null}
             {(selectedPlan.blockers.length > 0 ||
               selectedPlan.warnings.length > 0) && (
               <div className="mt-3 space-y-1.5">

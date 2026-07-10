@@ -9,6 +9,12 @@ interface RemarkFormProps {
   submissionId: string;
   defaultField?: string;
   defaultApplicant?: string;
+  onSubmit?: (input: {
+    field?: string;
+    applicant?: string;
+    message: string;
+    severity: 'warning' | 'critical';
+  }) => void | Promise<void>;
 }
 
 const templates = [
@@ -17,7 +23,7 @@ const templates = [
   'Нужно добавить подтверждающий документ для этого поля.',
 ];
 
-export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaultApplicant }: RemarkFormProps) {
+export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaultApplicant, onSubmit }: RemarkFormProps) {
   const bridge = useVisaflowBusinessBridge();
   const [message, setMessage] = useState(defaultField ? `Проверьте поле «${defaultField}».` : templates[0]);
   const [severity, setSeverity] = useState<'warning' | 'critical'>('warning');
@@ -38,6 +44,12 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
     };
     void bridge.onRemarkSubmit?.(payload);
     emitVisaflowUiEvent(bridge, { type: 'remark.submit', payload });
+    void onSubmit?.({
+      field: defaultField,
+      applicant: defaultApplicant,
+      severity,
+      message,
+    });
     onClose();
   };
 

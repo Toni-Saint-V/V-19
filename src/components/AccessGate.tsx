@@ -3,11 +3,14 @@ import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'luc
 import visaflowLogo from '../assets/visaflow-logo.png';
 import type { AccessRequestRegistrationInput, Session } from '../shared/authRegistration';
 
-type AccessGateMode = 'login' | 'register' | 'reset' | 'pending';
+type AccessGateMode = 'invite' | 'login' | 'register' | 'reset' | 'pending';
 
 type AccessGateProps = {
   error: string;
+  inviteSetupEmail: string;
   pendingSession: Session | null;
+  usesSupabase?: boolean;
+  onCompleteInvite: (password: string) => Promise<void>;
   onLogin: (email: string, password: string) => Promise<void>;
   onRegister: (input: AccessRequestRegistrationInput) => Promise<void>;
   onResetPassword: (email: string) => Promise<string>;
@@ -25,6 +28,22 @@ type RegistrationTextField = {
 };
 
 const workspaceEmailStorageKey = 'visaflow.workspaceEmail.v2';
+
+const accessTitleIds: Record<AccessGateMode, string> = {
+  invite: 'workspace-invite-title',
+  login: 'workspace-access-title',
+  pending: 'workspace-pending-title',
+  register: 'workspace-register-title',
+  reset: 'workspace-reset-title',
+};
+
+const accessCopyIds: Record<AccessGateMode, string> = {
+  invite: 'workspace-invite-copy',
+  login: 'workspace-access-copy',
+  pending: 'workspace-pending-copy',
+  register: 'workspace-register-copy',
+  reset: 'workspace-reset-copy',
+};
 
 const registrationFields: RegistrationTextField[] = [
   {
@@ -131,7 +150,10 @@ function AccessShell({
 
 export function AccessGate({
   error,
+  inviteSetupEmail,
   pendingSession,
+  usesSupabase = false,
+  onCompleteInvite,
   onLogin,
   onRegister,
   onResetPassword,
@@ -143,6 +165,9 @@ export function AccessGate({
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [resetEmail, setResetEmail] = useState(storedWorkspaceEmail);
   const [registerPasswordVisible, setRegisterPasswordVisible] = useState(false);
+  const [invitePassword, setInvitePassword] = useState('');
+  const [invitePasswordConfirmation, setInvitePasswordConfirmation] = useState('');
+  const [invitePasswordVisible, setInvitePasswordVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState('');
   const [success, setSuccess] = useState('');
@@ -164,22 +189,14 @@ export function AccessGate({
     setRegistration((current) => ({ ...current, email: pendingSession.email }));
   }, [pendingSession]);
 
-  const activeTitleId =
-    mode === 'login'
-      ? 'workspace-access-title'
-      : mode === 'reset'
-        ? 'workspace-reset-title'
-        : mode === 'pending'
-          ? 'workspace-pending-title'
-          : 'workspace-register-title';
-  const activeCopyId =
-    mode === 'login'
-      ? 'workspace-access-copy'
-      : mode === 'reset'
-        ? 'workspace-reset-copy'
-        : mode === 'pending'
-          ? 'workspace-pending-copy'
-          : 'workspace-register-copy';
+  useEffect(() => {
+    if (!inviteSetupEmail) return;
+    setMode('invite');
+    setEmail(inviteSetupEmail);
+  }, [inviteSetupEmail]);
+
+  const activeTitleId = accessTitleIds[mode];
+  const activeCopyId = accessCopyIds[mode];
 
   const registerErrors = useMemo(
     () => ({
@@ -254,7 +271,7 @@ export function AccessGate({
       registration.companyName.trim() &&
       registration.city.trim() &&
       registration.phone.trim() &&
-      registration.password.trim() &&
+      (usesSupabase || registration.password.trim()) &&
       validEmail(registration.email);
     if (!complete) return;
 
@@ -288,6 +305,37 @@ export function AccessGate({
     }
   }
 
+  async function submitInvitePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    clearMessages();
+    if (invitePassword.length < 12) {
+      setLocalError('Пароль должен содержать не меньше 12 символов.');
+      return;
+    }
+    if (invitePassword !== invitePasswordConfirmation) {
+      setLocalError('Пароли не совпадают.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await onCompleteInvite(invitePassword);
+      rememberWorkspaceEmail(inviteSetupEmail);
+      setEmail(inviteSetupEmail);
+      setPassword('');
+      setInvitePassword('');
+      setInvitePasswordConfirmation('');
+      setSuccess('Пароль сохранён. Войдите в кабинет с новым паролем.');
+      setMode('login');
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : 'Не удалось сохранить пароль.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function openRegisterFromLogin() {
     setRegistration((current) => ({ ...current, email }));
     setAttempted(false);
@@ -307,6 +355,64 @@ export function AccessGate({
       >
         {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
       </button>
+    );
+  }
+
+  if (mode === 'invite' && inviteSetupEmail) {
+    return (
+      <AccessShell activeCopyId={activeCopyId} activeTitleId={activeTitleId}>
+        <div className="access-card-header">
+          <div>
+            <p className="access-kicker">Приглашение подтверждено</p>
+            <h1 id="workspace-invite-title">Создайте пароль</h1>
+          </div>
+          <ShieldCheck aria-hidden="true" />
+        </div>
+        <p className="access-intro" id="workspace-invite-copy">
+          Установите пароль для {inviteSetupEmail}. После сохранения войдите обычным способом.
+        </p>
+        <form className="access-form" onSubmit={(event) => void submitInvitePassword(event)} noValidate>
+          <div className="access-field">
+            <label className="access-field-label" htmlFor="workspace-invite-password">
+              Новый пароль
+            </label>
+            <div className="access-password-control">
+              <input
+                autoComplete="new-password"
+                id="workspace-invite-password"
+                minLength={12}
+                name="invite-password"
+                type={invitePasswordVisible ? 'text' : 'password'}
+                value={invitePassword}
+                onChange={(event) => setInvitePassword(event.target.value)}
+              />
+              {renderPasswordToggle(invitePasswordVisible, setInvitePasswordVisible)}
+            </div>
+          </div>
+          <div className="access-field">
+            <label className="access-field-label" htmlFor="workspace-invite-password-confirmation">
+              Повторите пароль
+            </label>
+            <input
+              autoComplete="new-password"
+              id="workspace-invite-password-confirmation"
+              minLength={12}
+              name="invite-password-confirmation"
+              type={invitePasswordVisible ? 'text' : 'password'}
+              value={invitePasswordConfirmation}
+              onChange={(event) => setInvitePasswordConfirmation(event.target.value)}
+            />
+          </div>
+          {localError || error ? (
+            <p className="access-error" role="alert">
+              {localError || error}
+            </p>
+          ) : null}
+          <PrimaryButton busy={busy}>
+            {busy ? 'Сохраняем...' : 'Сохранить пароль'}
+          </PrimaryButton>
+        </form>
+      </AccessShell>
     );
   }
 
@@ -383,6 +489,10 @@ export function AccessGate({
           {localError || error ? (
             <p className="access-error" role="alert">
               {localError || error}
+            </p>
+          ) : success ? (
+            <p className="access-success" role="status">
+              {success}
             </p>
           ) : null}
 
@@ -503,34 +613,40 @@ export function AccessGate({
           );
         })}
 
-        <div className="access-field">
-          <label className="access-field-label" htmlFor="workspace-register-password">
-            Пароль
-          </label>
-          <div className="access-password-control">
-            <input
-              aria-describedby={registerErrors.password ? 'workspace-register-password-error' : undefined}
-              aria-invalid={Boolean(registerErrors.password)}
-              autoComplete="new-password"
-              id="workspace-register-password"
-              name="password"
-              placeholder="Введите пароль"
-              type={registerPasswordVisible ? 'text' : 'password'}
-              value={registration.password}
-              onBlur={() => setTouched((current) => ({ ...current, password: true }))}
-              onChange={(event) => {
-                const value = event.target.value;
-                setRegistration((current) => ({ ...current, password: value }));
-              }}
-            />
-            {renderPasswordToggle(registerPasswordVisible, setRegisterPasswordVisible)}
+        {!usesSupabase ? (
+          <div className="access-field">
+            <label className="access-field-label" htmlFor="workspace-register-password">
+              Пароль
+            </label>
+            <div className="access-password-control">
+              <input
+                aria-describedby={registerErrors.password ? 'workspace-register-password-error' : undefined}
+                aria-invalid={Boolean(registerErrors.password)}
+                autoComplete="new-password"
+                id="workspace-register-password"
+                name="password"
+                placeholder="Введите пароль"
+                type={registerPasswordVisible ? 'text' : 'password'}
+                value={registration.password}
+                onBlur={() => setTouched((current) => ({ ...current, password: true }))}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setRegistration((current) => ({ ...current, password: value }));
+                }}
+              />
+              {renderPasswordToggle(registerPasswordVisible, setRegisterPasswordVisible)}
+            </div>
+            {registerErrors.password ? (
+              <small className="access-field-error" id="workspace-register-password-error">
+                {registerErrors.password}
+              </small>
+            ) : null}
           </div>
-          {registerErrors.password ? (
-            <small className="access-field-error" id="workspace-register-password-error">
-              {registerErrors.password}
-            </small>
-          ) : null}
-        </div>
+        ) : (
+          <p className="access-intro">
+            После одобрения придёт приглашение Supabase — пароль задаётся только по этой ссылке.
+          </p>
+        )}
 
         {localError || error ? (
           <p className="access-error" role="alert">

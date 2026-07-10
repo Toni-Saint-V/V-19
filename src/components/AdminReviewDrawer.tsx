@@ -23,7 +23,6 @@ import {
   fileTypeLabels,
   getPrimaryAction,
   statusLabelFor,
-  statusTone,
 } from "../modules/submissions/status";
 import type {
   ActionDecision,
@@ -198,7 +197,7 @@ const FieldRow = ({
         data-testid="admin-review-add-remark"
         type="button"
         onClick={onRemark}
-        className="admin-review-remark-action flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
         title="Добавить замечание"
       >
         <MessageSquarePlus className="h-4 w-4" />
@@ -206,7 +205,7 @@ const FieldRow = ({
       <button
         type="button"
         onClick={onApprove}
-        className={`admin-review-approve-action flex h-8 w-8 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60
+        className={`flex h-8 w-8 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60
           ${status === "ok" ? "border-white/12 bg-white/[0.06] text-[#b8baff]" : "border-transparent bg-white/5 text-white/40 hover:border-white/10 hover:bg-white/[0.045] hover:text-[#b8baff]"}`}
         title="Пометить как проверенное"
       >
@@ -398,7 +397,7 @@ function QuestionnaireTab({
             aria-label="Заявитель"
             value={applicant.id}
             onChange={(event) => setApplicantId(event.target.value)}
-            className="h-10 w-full rounded-xl border border-[#242529] bg-[#1e1e21] px-3 text-[13px] text-white outline-none focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 sm:w-[280px]"
+            className="h-10 w-full rounded-xl border border-[#242529] bg-[#1e1e21] px-3 text-[13px] text-white outline-none focus:border-[#6f64ff] focus:ring-1 focus:ring-[#3a45b4]/30 sm:w-[240px]"
           >
             {submission.applicants.map((item) => (
               <option key={item.id} value={item.id}>
@@ -409,17 +408,15 @@ function QuestionnaireTab({
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-[12px] font-medium">
-          <div className="admin-review-metric admin-review-metric--checked flex items-center gap-1.5 text-[#b8baff]">
+          <div className="flex items-center gap-1.5 text-[#b8baff]">
             <CheckCircle2 className="h-4 w-4" /> {checkedCount} проверено
           </div>
-          <div className="admin-review-metric admin-review-metric--pending flex items-center gap-1.5 text-white/40">
+          <div className="flex items-center gap-1.5 text-white/40">
             <span className="h-2 w-2 rounded-full bg-white/20" /> {missingCount}{" "}
             осталось
           </div>
           <div
-            className={`admin-review-metric admin-review-metric--issues ${
-              applicantIssues.length ? "is-open" : "is-clear"
-            } flex items-center gap-1.5 text-white/62`}
+            className="flex items-center gap-1.5 text-white/62"
           >
             <AlertCircle className="h-4 w-4" /> {applicantIssues.length}{" "}
             замечаний
@@ -430,16 +427,11 @@ function QuestionnaireTab({
       <div className="space-y-6">
         {applicant.sections.map((section, sectionIndex) => (
           <section key={section.id}>
-            <h3 className="admin-review-questionnaire-section-title mb-4 flex items-center gap-2 text-[15px] font-semibold text-white">
+            <h3 className="mb-4 flex items-center gap-2 text-[15px] font-semibold text-white">
               <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 font-mono text-[12px] text-white/60">
                 {sectionIndex + 1}
               </span>
               {section.title}
-              {section.missing && (
-                <span className="admin-review-questionnaire-section-note text-[11px] font-medium text-white/70">
-                  · {section.missing}
-                </span>
-              )}
             </h3>
             <div className="space-y-2">
               {section.fields.map((field) => (
@@ -623,7 +615,6 @@ export function AdminReviewDrawer({
     !primaryAction ||
     primaryAction.disabled ||
     primaryAction.action === "open_history";
-  const reviewStatusTone = submission ? statusTone[submission.status] : "muted";
   const primaryReason =
     primaryAction?.disabled && primaryAction.reason
       ? primaryAction.reason
@@ -734,7 +725,6 @@ export function AdminReviewDrawer({
           />
 
           <motion.div
-            data-admin-review-drawer-surface="workspace"
             role="dialog"
             initial={{ x: "100%", opacity: 0.5, filter: "blur(8px)" }}
             animate={{ x: 0, opacity: 1, filter: "blur(0px)" }}
@@ -761,10 +751,7 @@ export function AdminReviewDrawer({
                   </div>
                   <h2 className="flex items-center gap-3 text-[20px] font-semibold leading-tight tracking-tight text-white lg:text-[24px]">
                     Проверка пакета
-                    <span
-                      className={`admin-review-status-pill is-${reviewStatusTone} rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/70`}
-                    >
-                      <span className="admin-review-status-dot" aria-hidden="true" />
+                    <span className="rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
                       {submission
                         ? statusLabelFor(submission.status)
                         : "Не выбрана"}
@@ -868,19 +855,16 @@ export function AdminReviewDrawer({
               >
                 Отложить
               </button>
-              <button
-                type="button"
-                onClick={handlePublishReturnedPdfHandoff}
-                disabled={!canPublishReturnedPdfHandoff}
-                title={
-                  canPublishReturnedPdfHandoff
-                    ? "Передать опубликованный PDF-пакет агенту"
-                    : returnedPdfHandoffReason
-                }
-                className="h-11 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/30"
-              >
-                Передать PDF агенту
-              </button>
+              {canPublishReturnedPdfHandoff && (
+                <button
+                  type="button"
+                  onClick={handlePublishReturnedPdfHandoff}
+                  title={returnedPdfHandoffReason}
+                  className="h-11 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.08]"
+                >
+                  Передать PDF агенту
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handlePrimaryAction}

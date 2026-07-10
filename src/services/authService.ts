@@ -97,6 +97,9 @@ export async function getCurrentAppSession(): Promise<AppSession | null> {
     });
   }
   if (!data.session?.user.email) return null;
+  if (data.session.user.user_metadata.password_setup_required === true) {
+    return null;
+  }
 
   const profile = await fetchCurrentProfile(data.session.user.id);
   if (!profile) return null;

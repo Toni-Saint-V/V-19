@@ -269,7 +269,7 @@ describe("FigmaQuestionnaireScreen", () => {
       "Оплата поездки",
       "Кто заполнил",
     ]);
-    fireEvent.click(screen.getByRole("button", { name: "Добавить родственника ЕС" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Добавить родственника ЕС" })[0]!);
     expect(pinnedSectionTitles(result.container)).toContain("Родственник ЕС");
   });
 
@@ -359,6 +359,9 @@ describe("FigmaQuestionnaireScreen", () => {
       "Тип принимающей стороны",
       "ФИО приглашающего лица или название отеля",
       "Адрес",
+      "Страна",
+      "Город",
+      "Почтовый индекс",
       "Email",
       "Телефон",
     ]);
@@ -462,9 +465,8 @@ describe("FigmaQuestionnaireScreen", () => {
 
     const email = screen.getByLabelText("Email");
     fireEvent.change(email, { target: { value: "anna" } });
-    expect(
-      Array.from(result.container.querySelectorAll("datalist option")).map((option) => option.getAttribute("value")),
-    ).toContain("anna@gmail.com");
+    fireEvent.focus(email);
+    expect(screen.getByRole("option", { name: "anna@gmail.com" })).toBeInTheDocument();
 
     clickPinnedSection(result.container, "Отель / приглашение");
     const hotelPhone = screen.getByLabelText("Телефон");
@@ -472,8 +474,8 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(hotelPhone).toHaveValue("+34");
   });
 
-  test("keeps citizenship and birth country empty until each family applicant chooses them", () => {
-    let submission = createDraftSubmission({
+  test("defaults Russia-related fields and derives USSR for a pre-1991 birth date", () => {
+    const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
       familyCount: 2,
@@ -481,8 +483,6 @@ describe("FigmaQuestionnaireScreen", () => {
       submissions: [],
       type: "family",
     });
-    submission = setApplicantField(submission, 0, "birth-date", "20.08.1990");
-    submission = setApplicantField(submission, 1, "birth-date", "20.08.1991");
     const onSaveDraft = vi.fn();
     const result = render(
       <FigmaQuestionnaireScreen
@@ -493,9 +493,14 @@ describe("FigmaQuestionnaireScreen", () => {
       />,
     );
 
-    expect(dropdownTrigger(result.container, "Текущее гражданство")).toHaveTextContent("Выберите");
-    expect(dropdownTrigger(result.container, "Страна рождения")).toHaveTextContent("Выберите");
+    expect(dropdownTrigger(result.container, "Текущее гражданство")).toHaveTextContent("Russian Federation");
+    expect(dropdownTrigger(result.container, "Страна рождения")).toHaveTextContent("Russian Federation");
     expect(screen.queryByRole("button", { name: "Другое" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Дата рождения"), {
+      target: { value: "20081990" },
+    });
+    expect(dropdownTrigger(result.container, "Страна рождения")).toHaveTextContent("USSR");
 
     fireEvent.click(screen.getByRole("button", { name: "Черновик" }));
     expect(onSaveDraft).toHaveBeenCalledWith(
@@ -558,7 +563,7 @@ describe("FigmaQuestionnaireScreen", () => {
     expect(result.container).toBeTruthy();
   });
 
-  test("preserves typed address spaces and offers city completion without filling the field with hints", () => {
+  test("keeps addresses compact, expands common abbreviations, and offers city completion", () => {
     const submission = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON"],
       city: "Москва",
@@ -577,18 +582,20 @@ describe("FigmaQuestionnaireScreen", () => {
 
     clickPinnedSection(result.container, "Адрес и контакты");
     const address = screen.getByLabelText("Домашний адрес");
-    expect(address).not.toHaveAttribute("placeholder");
+    expect(address.tagName).toBe("INPUT");
+    expect(address).toHaveAttribute("placeholder", "ул ленина д 5 кв 12");
 
-    fireEvent.change(address, { target: { value: "ул Ленина " } });
-    expect(address).toHaveValue("ул Ленина ");
-    fireEvent.change(address, { target: { value: "ул Ленина дом 5 квартира 12" } });
-    expect(address).toHaveValue("ул Ленина дом 5 квартира 12");
+    fireEvent.change(address, { target: { value: "ул ленина д 5 кв 12" } });
+    fireEvent.blur(address);
+    expect(address).toHaveValue("улица ленина дом 5 квартира 12");
 
     const city = screen.getByLabelText("Город проживания");
     fireEvent.focus(city);
     fireEvent.change(city, { target: { value: "спб" } });
     fireEvent.click(screen.getByRole("option", { name: "Санкт-Петербург" }));
     expect(city).toHaveValue("Санкт-Петербург");
+    fireEvent.change(city, { target: { value: "с" } });
+    expect(screen.getByRole("option", { name: "Самара" })).toBeInTheDocument();
   });
 
   test("shows actionable file slots and uploads a passport in one selection", async () => {
@@ -692,11 +699,7 @@ describe("FigmaQuestionnaireScreen", () => {
 
     expect(screen.getByLabelText("Дата выдачи")).toHaveValue("20.08.2016");
     expect(screen.getByLabelText("Действителен до")).toHaveValue("20.08.2026");
-    expect(
-      screen.getByText(
-        "Если дата окончания не считалась: введите дату выдачи — подставим +10 лет. Для 5-летнего паспорта исправьте дату.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/подставим \+10 лет/u)).not.toBeInTheDocument();
     expect(onFieldChange).toHaveBeenCalledWith(
       expect.objectContaining({
         fieldId: "passport-expiry-date",

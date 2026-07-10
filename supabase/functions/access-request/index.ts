@@ -56,15 +56,19 @@ function adminKey(): string {
   if (direct) return direct;
 
   const secretKeys = Deno.env.get("SUPABASE_SECRET_KEYS")?.trim();
-  if (!secretKeys) return "";
-
-  try {
-    const parsed = JSON.parse(secretKeys) as Record<string, unknown>;
-    const defaultKey = parsed.default;
-    return typeof defaultKey === "string" ? defaultKey : "";
-  } catch {
-    return "";
+  if (secretKeys) {
+    try {
+      const parsed = JSON.parse(secretKeys) as Record<string, unknown>;
+      const defaultKey = parsed.default;
+      if (typeof defaultKey === "string" && defaultKey.trim()) {
+        return defaultKey.trim();
+      }
+    } catch {
+      // Fall through to the hosted legacy server-only key.
+    }
   }
+
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ?? "";
 }
 
 function supabaseAdmin() {
@@ -261,6 +265,7 @@ async function handleApprove(
           city: accessRequest.city,
           display_name: accessRequest.full_name,
           organization_name: accessRequest.company_name,
+          password_setup_required: true,
           phone: accessRequest.phone,
         },
       });

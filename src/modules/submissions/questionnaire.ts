@@ -16,6 +16,7 @@ type FieldSeed = {
   options?: string[];
   required?: boolean;
   span?: QuestionnaireField["span"];
+  value?: string;
 };
 
 export type QuestionnaireSectionPreview = {
@@ -190,8 +191,8 @@ const questionnaireBlueprint: Array<{
       { id: "birth-date", label: "Дата рождения", placeholder: "ДД.ММ.ГГГГ" },
       { id: "birth-place", label: "Место рождения", placeholder: "Введите место рождения" },
       { id: "birth-country", label: "Страна рождения", placeholder: "Выберите страну", control: "select", options: blsCountryOptions },
-      { id: "nationality", label: "Текущее гражданство", placeholder: "Выберите гражданство", control: "select", options: blsCountryOptions },
-      { id: "birth-citizenship", label: "Гражданство при рождении, если отличается", placeholder: "Выберите или введите гражданство", control: "select", options: blsCountryOptions, required: false },
+      { id: "nationality", label: "Текущее гражданство", placeholder: "Выберите гражданство", control: "select", options: blsCountryOptions, value: "Russian Federation" },
+      { id: "birth-citizenship", label: "Гражданство при рождении, если отличается", placeholder: "Выберите или введите гражданство", control: "select", options: blsCountryOptions, required: false, value: "Russian Federation" },
       { id: "other-citizenship", label: "Иное гражданство", placeholder: "Выберите или введите гражданство", control: "select", options: blsCountryOptions, required: false },
       { id: "gender", label: "Пол", placeholder: "Выберите пол", control: "select", options: ["Мужской", "Женский"] },
       { id: "marital-status", label: "Семейное положение", placeholder: "Выберите статус", control: "select", options: ["Холост/не замужем", "Женат/замужем", "Зарегистрированное партнерство", "Раздельно", "Разведен(а)", "Вдовец/вдова", "Иное"] },
@@ -208,7 +209,7 @@ const questionnaireBlueprint: Array<{
       { id: "passport-no", label: "Номер паспорта", placeholder: "Введите номер паспорта" },
       { id: "passport-issue-date", label: "Дата выдачи", placeholder: "ДД.ММ.ГГГГ" },
       { id: "passport-expiry-date", label: "Действителен до", placeholder: "ДД.ММ.ГГГГ" },
-      { id: "passport-issue-country", label: "Страна выдачи", placeholder: "Выберите страну", control: "select", options: blsCountryOptions },
+      { id: "passport-issue-country", label: "Страна выдачи", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Russian Federation" },
       { id: "passport-issue-place", label: "Место выдачи", placeholder: "Введите место выдачи" },
     ],
   },
@@ -229,7 +230,7 @@ const questionnaireBlueprint: Array<{
       { id: "home-address", label: "Домашний адрес", placeholder: "Введите домашний адрес", span: "full" },
       { id: "email", label: "Email", placeholder: "name@example.com" },
       { id: "contact-number", label: "Телефон", placeholder: "Введите телефон" },
-      { id: "home-country", label: "Страна проживания", placeholder: "Выберите страну", control: "select", options: blsCountryOptions },
+      { id: "home-country", label: "Страна проживания", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Russian Federation" },
       { id: "home-city", label: "Город проживания", placeholder: "Введите город проживания" },
       { id: "postal-code", label: "Почтовый индекс", placeholder: "Введите почтовый индекс" },
       { id: "lives-outside-citizenship", label: "Проживание не в стране гражданства", placeholder: "Выберите ответ", control: "select", options: yesNoOptions },
@@ -280,6 +281,9 @@ const questionnaireBlueprint: Array<{
       { id: "inviting-party-type", label: "Тип принимающей стороны", placeholder: "Выберите тип", control: "select", options: ["Приглашающая компания/организация", "Гостиница/временное жилье", "Приглашающее лицо"] },
       { id: "hotel-name", label: "ФИО приглашающего лица или название отеля", placeholder: "Введите ФИО или название" },
       { id: "hotel-address", label: "Адрес", placeholder: "Введите адрес", span: "full" },
+      { id: "hotel-country", label: "Страна", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Spain" },
+      { id: "hotel-city", label: "Город", placeholder: "Введите город" },
+      { id: "hotel-postal-code", label: "Почтовый индекс", placeholder: "Введите почтовый индекс" },
       { id: "hotel-email", label: "Email", placeholder: "name@example.com", required: false },
       { id: "hotel-contact", label: "Телефон", placeholder: "Введите телефон", required: false },
       { id: "company-org-details", label: "Название и адрес компании/организации", placeholder: "Для business/invitation", required: false, span: "full" },
@@ -823,7 +827,7 @@ function seedField(
   return {
     id: field.id,
     label: field.label,
-    value: "",
+    value: field.value ?? "",
     required: field.required ?? true,
     control: field.control,
     options: field.options,
@@ -882,7 +886,13 @@ function recalculateQuestionnaire(submission: Submission): Submission {
 
 function sectionStatus(fields: QuestionnaireField[]): QuestionnaireStatus {
   if (!fields.length) return "empty";
-  if (fields.some((field) => field.error || validateQuestionnaireFieldValue(field))) {
+  if (
+    fields.some(
+      (field) =>
+        field.error ||
+        (field.value.trim() && validateQuestionnaireFieldValue(field)),
+    )
+  ) {
     return "needs_fix";
   }
   const ready = fields.filter(isFieldReady).length;

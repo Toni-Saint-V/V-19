@@ -171,13 +171,13 @@ const mediaTargets: Array<{
 }> = [
   { id: "passport_scan", label: "Скан паспорта", shortLabel: "Паспорт" },
   { id: "selfie", label: "Селфи 1", shortLabel: "Селфи 1" },
-  { id: "selfie_2", label: "Селфи N2", shortLabel: "Селфи 2" },
+  { id: "selfie_2", label: "Селфи 2", shortLabel: "Селфи 2" },
 ];
 
 const remarkTemplates = [
-  "Значение в анкете не совпадает с документом. Проверьте и исправьте поле.",
-  "Документ читается не полностью. Загрузите файл в лучшем качестве.",
-  "Нужно добавить подтверждающий документ для этого поля.",
+  "Значение в анкете не совпадает со сканом паспорта или селфи. Проверьте и исправьте поле.",
+  "Скан паспорта или селфи читается не полностью. Загрузите файл в лучшем качестве.",
+  "Нужно добавить актуальный скан паспорта или селфи для этого поля.",
 ];
 
 export function AdminReviewDrawer({
@@ -1576,7 +1576,7 @@ function AdminPassportReviewWorkspace({
       </header>
 
       <main ref={workspaceMainRef} className="admin-passport-workspace-main">
-        <section className="admin-passport-document-zone" aria-label="Документ">
+        <section className="admin-passport-document-zone" aria-label="Скан паспорта">
           <MediaReviewPane
             documentApplicant={selectedApplicant}
             file={passportFile}
@@ -1599,7 +1599,7 @@ function AdminPassportReviewWorkspace({
             </span>
             <h3>Сверка полей</h3>
             <p>
-              Проверьте совпадения между анкетой и документом. Замечания создаются
+              Проверьте совпадения между анкетой и сканом паспорта. Замечания создаются
               как точные задачи для агента.
             </p>
           </div>
@@ -1655,6 +1655,10 @@ function AdminPassportReviewWorkspace({
         <button type="button" onClick={onRemark}>
           <MessageSquarePlus aria-hidden="true" size={15} />
           Замечание
+        </button>
+        <button disabled={!canAcceptPassport} type="button" onClick={onAcceptFile}>
+          <CheckCircle2 aria-hidden="true" size={15} />
+          Завершить сверку
         </button>
         <button type="button" onClick={onNext}>
           К анкете
@@ -2406,9 +2410,9 @@ function AdminRemarkForm({
             <div className="admin-remark-targets">
               {[
                 { id: "questionnaire" as const, icon: FileText, label: "Анкета" },
-                { id: "passport_scan" as const, icon: ImageIcon, label: "Скан загранпаспорта" },
-                { id: "selfie" as const, icon: User, label: "Селфи" },
-                { id: "selfie_2" as const, icon: User, label: "Селфи N2" },
+                { id: "passport_scan" as const, icon: ImageIcon, label: "Скан паспорта" },
+                { id: "selfie" as const, icon: User, label: "Селфи 1" },
+                { id: "selfie_2" as const, icon: User, label: "Селфи 2" },
               ].map((target) => {
                 const TargetIcon = target.icon;
                 const selected =
@@ -2768,7 +2772,7 @@ function issueTargetPath(issue: Submission["issues"][number]) {
   if (issue.target.fileType && issue.target.field) {
     return `${fileLabel(issue.target.fileType)} / ${issue.target.field}`;
   }
-  if (issue.target.fileType) return `Документ / ${fileLabel(issue.target.fileType)}`;
+  if (issue.target.fileType) return fileLabel(issue.target.fileType);
   if (issue.target.field) return `Анкета · ${issue.target.field}`;
   return issue.target.section ? `Анкета · ${issue.target.section}` : "Анкета";
 }
@@ -2807,7 +2811,7 @@ function mediaChecklist(target: AdminReviewFileTarget) {
     ];
   }
   if (target === "selfie") {
-    return ["Лицо заявителя видно", "Документ совпадает с заявителем", "Нет бликов и сильного размытия"];
+    return ["Лицо заявителя видно", "Селфи соответствует заявителю", "Нет бликов и сильного размытия"];
   }
   return ["Дополнительное селфи читаемо", "Лицо совпадает с заявителем", "Файл соответствует требованиям центра"];
 }

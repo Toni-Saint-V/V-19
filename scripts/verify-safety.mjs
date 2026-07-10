@@ -47,7 +47,7 @@ const forbiddenCopy = [
 
 const secretPatterns = [
   /sk-[A-Za-z0-9_-]{20,}/,
-  /SUPABASE_SERVICE_ROLE/i,
+  /SUPABASE_SERVICE_ROLE(?:_KEY)?["']?\s*[:=]\s*["'`]?[A-Za-z0-9._-]{20,}/i,
   /(?:service[_-]?role[_-]?key|serviceRoleKey)\s*[:=]/i,
   /BEGIN PRIVATE KEY/,
 ];

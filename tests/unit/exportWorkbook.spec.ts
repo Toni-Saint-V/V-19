@@ -241,6 +241,33 @@ describe("V-19 export workbook contract", () => {
     expect(row?.lastName).toBe("Сергеева");
   });
 
+  test("normalizes Russian questionnaire choices and hotel location into the BLS row", () => {
+    const [row] = buildExportContractRows([
+      withQuestionnaireFieldValues(readySubmission(), {
+        "cost-covered-by": "Сам заявитель",
+        gender: "Мужской",
+        "hotel-city": "Madrid",
+        "hotel-country": "Spain",
+        "hotel-postal-code": "28001",
+        "marital-status": "Женат/замужем",
+        "means-of-support": "Наличные",
+        "contact-number": "+7 900 111-22-33",
+      }),
+    ]);
+
+    expect(row).toMatchObject({
+      costCoveredBy: "Applicant",
+      gender: "Male",
+      invitingCompanyCity: "Madrid",
+      invitingCompanyCountry: "Spain",
+      invitingCompanyZipCode: "28001",
+      maritalStatus: "Married",
+      meansOfSupport: "Cash",
+      applicantMobile: "9001112233",
+      addressContactNo: "79001112233",
+    });
+  });
+
   test("does not pre-fill questionnaire name fields from applicant display names", () => {
     const sections = createQuestionnaireSections(
       "applicant-test",

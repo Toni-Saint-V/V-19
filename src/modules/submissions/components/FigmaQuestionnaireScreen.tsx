@@ -115,6 +115,7 @@ const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
 };
 
 type FormFieldProps = {
+  compact?: boolean;
   excelMap?: string;
   errorMessage?: string;
   focused?: boolean;
@@ -123,6 +124,7 @@ type FormFieldProps = {
   label: string;
   number?: string;
   onAcknowledgeReview?: () => void;
+  onBlur?: () => void;
   onChange?: (value: string) => void;
   options?: string[];
   phonePrefix?: "+7" | "+34";
@@ -354,6 +356,7 @@ const commonEmailDomains = ["gmail.com", "yandex.ru", "mail.ru", "icloud.com", "
 
 const optionSearchAliases: Record<string, string[]> = {
   "Санкт-Петербург": ["спб", "питер", "санкт петербург"],
+  "Самара": ["с"],
   "Нижний Новгород": ["нижний", "нн"],
   "Ростов-на-Дону": ["ростов"],
   "Екатеринбург": ["екат", "екб"],
@@ -398,6 +401,20 @@ function formatPhoneInput(value: string, prefix: "+7" | "+34") {
   );
 }
 
+function normalizeRussianAddress(value: string) {
+  return value
+    .trim()
+    .replace(/(^|[\s,])ул\.?(?=\s|,|$)\s*/giu, "$1улица ")
+    .replace(/(^|[\s,])пр(?:-?т)?\.?(?=\s|,|$)\s*/giu, "$1проспект ")
+    .replace(/(^|[\s,])д\.?(?=\s|\d|,|$)\s*/giu, "$1дом ")
+    .replace(/(^|[\s,])кв\.?(?=\s|\d|,|$)\s*/giu, "$1квартира ")
+    .replace(/(^|[\s,])корп\.?(?=\s|\d|,|$)\s*/giu, "$1корпус ")
+    .replace(/(^|[\s,])стр\.?(?=\s|\d|,|$)\s*/giu, "$1строение ")
+    .replace(/(^|[\s,])оф\.?(?=\s|\d|,|$)\s*/giu, "$1офис ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function emailSuggestions(value: string) {
   const [localPart = "", domainPart = ""] = value.trim().split("@", 2);
   if (!localPart) return [];
@@ -424,6 +441,7 @@ function inputAutocomplete(label: string, type: FormFieldProps["type"]) {
 }
 
 function FormField({
+  compact,
   errorMessage,
   focused,
   fullWidth,
@@ -431,6 +449,7 @@ function FormField({
   label,
   number,
   onAcknowledgeReview,
+  onBlur,
   onChange,
   options,
   phonePrefix,
@@ -604,7 +623,8 @@ function FormField({
       ) : type === "textarea" ? (
         <textarea
           aria-label={label}
-          className={`${baseClasses} is-textarea ${stateClasses}`}
+          className={`${baseClasses} is-textarea ${compact ? "is-compact-address" : ""} ${stateClasses}`}
+          onBlur={onBlur}
           placeholder={placeholder}
           readOnly={readOnly ?? !onChange}
           value={value}
@@ -618,7 +638,7 @@ function FormField({
             aria-autocomplete={inputSuggestions.length ? "list" : undefined}
             aria-expanded={inputSuggestions.length ? isSuggestionsOpen : undefined}
             autoComplete={inputAutocomplete(label, type)}
-            className={`${baseClasses} ${stateClasses}`}
+            className={`${baseClasses} ${compact ? "is-compact-address" : ""} ${stateClasses}`}
             inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
             maxLength={phonePrefix ? (phonePrefix === "+7" ? 17 : 15) : undefined}
             placeholder={
@@ -634,6 +654,7 @@ function FormField({
             readOnly={readOnly ?? !onChange}
             type={type === "email" || type === "number" || type === "tel" ? type : "text"}
             value={value}
+            onBlur={onBlur}
             onChange={(event) => {
               const nextValue = phonePrefix
                 ? formatPhoneInput(event.target.value, phonePrefix)
@@ -720,7 +741,7 @@ function fallbackQuestionnaireFormData(): QuestionnaireFormData {
   return {
     appointmentCity: "",
     appointmentNote: "",
-    birthCountry: "",
+    birthCountry: "Russian Federation",
     birthCitizenship: "",
     birthPlace: "",
     category: "",
@@ -888,6 +909,12 @@ function passportExpiryFromIssueDate(value: string) {
   return [day, month + 1, expiryYear]
     .map((part, index) => (index === 2 ? String(part) : String(part).padStart(2, "0")))
     .join(".");
+}
+
+function defaultBirthCountryForDate(value: string) {
+  const birthDate = parseQuestionnaireDate(value);
+  if (!birthDate) return undefined;
+  return birthDate.getFullYear() <= 1990 ? "USSR" : "Russian Federation";
 }
 
 function isQuestionnaireMinor(value: string) {
@@ -1499,6 +1526,9 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "inviting-party-type", formKey: "invitingPartyType", sectionId: "hotel" },
   { fieldId: "hotel-name", formKey: "hotelName", sectionId: "hotel" },
   { fieldId: "hotel-address", formKey: "hotelAddress", sectionId: "hotel" },
+  { fieldId: "hotel-country", formKey: "hotelCountry", sectionId: "hotel" },
+  { fieldId: "hotel-city", formKey: "hotelCity", sectionId: "hotel" },
+  { fieldId: "hotel-postal-code", formKey: "hotelPostalCode", sectionId: "hotel" },
   { fieldId: "hotel-email", formKey: "hotelEmail", sectionId: "hotel" },
   { fieldId: "hotel-contact", formKey: "hotelContact", sectionId: "hotel" },
   { fieldId: "company-org-details", formKey: "companyOrgDetails", sectionId: "hotel" },
@@ -2041,6 +2071,23 @@ export function FigmaQuestionnaireScreen({
     updateField("passportExpiry", suggestedExpiry);
   }
 
+  function updateBirthDate(value: string) {
+    const suggestedBirthCountry = defaultBirthCountryForDate(value);
+    const birthCountryIsUntouchedDefault =
+      formData.birthCountry === baseFormData.birthCountry &&
+      ["", "USSR", "Russian Federation"].includes(baseFormData.birthCountry);
+
+    updateField("dob", value);
+    if (suggestedBirthCountry && birthCountryIsUntouchedDefault) {
+      updateField("birthCountry", suggestedBirthCountry);
+    }
+  }
+
+  function normalizeAddressField(key: "contactAddress" | "employerAddress") {
+    const normalized = normalizeRussianAddress(formData[key]);
+    if (normalized !== formData[key]) updateField(key, normalized);
+  }
+
   function copyFamilySectionFromPrimaryApplicant() {
     if (!primaryApplicant || !canCopyFamilySection) return;
 
@@ -2320,7 +2367,6 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: C5"
             errorMessage={fieldErrorMessage("passport-expiry-date", "Действителен до")}
             focused={fieldReviewState("passport-expiry-date", "Действителен до") === "needs_review"}
-            hint="Если дата окончания не считалась: введите дату выдачи — подставим +10 лет. Для 5-летнего паспорта исправьте дату."
             label="Действителен до"
             number="4"
             required
@@ -2378,11 +2424,14 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: D2"
             fullWidth
+            hint="Можно без заглавных и знаков: ул ленина д 5 кв 12 — расшифруем после ввода."
             label="Домашний адрес"
             number="1"
+            placeholder="ул ленина д 5 кв 12"
             required
-            type="textarea"
+            compact
             value={formData.contactAddress}
+            onBlur={() => normalizeAddressField("contactAddress")}
             onChange={(value) => updateField("contactAddress", value)}
           />
           <FormField
@@ -2414,6 +2463,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: residence-city"
             label="Город проживания"
             number="5"
+            placeholder="Начните: с"
             suggestions={POPULAR_RUSSIAN_CITY_OPTIONS}
             value={formData.residenceCity}
             onChange={(value) => updateField("residenceCity", value)}
@@ -2505,10 +2555,13 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: E4"
             fullWidth
+            hint="Можно без заглавных и знаков: пр мира д 10 оф 4 — расшифруем после ввода."
             label="Адрес работодателя / учебного заведения"
             number="5"
-            type="textarea"
+            placeholder="пр мира д 10 оф 4"
+            compact
             value={formData.employerAddress}
+            onBlur={() => normalizeAddressField("employerAddress")}
             onChange={(value) => updateField("employerAddress", value)}
           />
         </>
@@ -2683,15 +2736,37 @@ export function FigmaQuestionnaireScreen({
             onChange={(value) => updateField("hotelAddress", value)}
           />
           <FormField
-            label="Email"
+            label="Страна"
             number="4"
+            options={selectOptions.hotelCountry}
+            required
+            value={formData.hotelCountry}
+            onChange={(value) => updateField("hotelCountry", value)}
+          />
+          <FormField
+            label="Город"
+            number="5"
+            required
+            value={formData.hotelCity}
+            onChange={(value) => updateField("hotelCity", value)}
+          />
+          <FormField
+            label="Почтовый индекс"
+            number="6"
+            required
+            value={formData.hotelPostalCode}
+            onChange={(value) => updateField("hotelPostalCode", value)}
+          />
+          <FormField
+            label="Email"
+            number="7"
             type="email"
             value={formData.hotelEmail}
             onChange={(value) => updateField("hotelEmail", value)}
           />
           <FormField
             label="Телефон"
-            number="5"
+            number="8"
             phonePrefix="+34"
             value={formData.hotelContact}
             onChange={(value) => updateField("hotelContact", value)}
@@ -2702,7 +2777,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: company-org-details"
                 fullWidth
                 label="Название и адрес компании/организации"
-                number="6"
+                number="9"
                 type="textarea"
                 value={formData.companyOrgDetails}
                 onChange={(value) => updateField("companyOrgDetails", value)}
@@ -2711,7 +2786,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: company-contact-person"
                 fullWidth
                 label="Контактное лицо компании"
-                number="7"
+                number="10"
                 type="textarea"
                 value={formData.companyContactPerson}
                 onChange={(value) => updateField("companyContactPerson", value)}
@@ -2719,7 +2794,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: company-phone"
                 label="Телефон компании"
-                number="8"
+                number="11"
                 phonePrefix="+34"
                 value={formData.companyPhone}
                 onChange={(value) => updateField("companyPhone", value)}
@@ -2859,7 +2934,7 @@ export function FigmaQuestionnaireScreen({
             required
           state={fieldReviewState("birth-date", "Дата рождения")}
           value={formData.dob}
-          onChange={(value) => updateField("dob", value)}
+          onChange={updateBirthDate}
         />
         <FormField
           excelMap="Cell: B5"

@@ -70,7 +70,8 @@ function buildExportContractRow(
   const nameParts = applicantNameParts(applicant.fullName);
   const firstName = field("first-name", nameParts.first);
   const surname = field("surname", nameParts.surname);
-  const mobile = digitsOnly(field("contact-number"));
+  const contactNumber = digitsOnly(field("contact-number"));
+  const applicantMobile = normalizeApplicantMobile(contactNumber);
   const hotelName = field("hotel-name");
   const hotelCountry = field("hotel-country");
   const hotelCity = field("hotel-city");
@@ -90,7 +91,7 @@ function buildExportContractRow(
 
   return {
     addressCity: field("home-city"),
-    addressContactNo: mobile,
+    addressContactNo: contactNumber,
     addressCountry: field("home-country"),
     addressLine1: field("home-address"),
     addressPostalCode: field("postal-code"),
@@ -98,7 +99,7 @@ function buildExportContractRow(
     applicantEmail: field("email"),
     applicantId: applicant.id,
     applicantIndex: index + 1,
-    applicantMobile: mobile,
+    applicantMobile,
     applicantName: applicant.fullName,
     appointmentCategory: normalizeCategory(field("category")),
     appointmentType: normalizeAppointmentType(submission.type),
@@ -210,6 +211,13 @@ function normalizeCategory(value: string): string {
   return value.trim().toUpperCase();
 }
 
+function normalizeApplicantMobile(value: string): string {
+  if (value.length === 11 && (value.startsWith("7") || value.startsWith("8"))) {
+    return value.slice(1);
+  }
+  return value;
+}
+
 function normalizeAppointmentType(value: Submission["type"]): string {
   return value === "family" ? "FAMILY" : "INDIVIDUAL";
 }
@@ -233,15 +241,16 @@ function normalizeCountry(value: string): string {
 }
 
 function normalizeGender(value: string): string {
-  if (/female/i.test(value)) return "Female";
-  if (/male/i.test(value)) return "Male";
+  if (/female|жен/i.test(value)) return "Female";
+  if (/male|муж/i.test(value)) return "Male";
   return value;
 }
 
 function normalizeMaritalStatus(value: string): string {
-  if (/married/i.test(value)) return "Married";
-  if (/divorced/i.test(value)) return "Divorced";
-  if (/single/i.test(value)) return "Single";
+  if (/married|женат|замуж/i.test(value)) return "Married";
+  if (/divorced|развед/i.test(value)) return "Divorced";
+  if (/single|холост|не замуж/i.test(value)) return "Single";
+  if (/widow|вдов/i.test(value)) return "Widowed";
   return value;
 }
 
@@ -254,12 +263,12 @@ function normalizeEntryCount(value: string): string {
 
 function normalizeCost(value: string): string {
   if (!value.trim()) return "";
-  return /sponsor/i.test(value) ? "Sponsor" : "Applicant";
+  return /sponsor|спонсор/i.test(value) ? "Sponsor" : "Applicant";
 }
 
 function normalizeMeans(value: string): string {
-  if (/credit/i.test(value)) return "CreditCard";
-  if (/accommodation/i.test(value)) return "Accommodation Provided";
-  if (/cash/i.test(value)) return "Cash";
+  if (/credit|кредит/i.test(value)) return "CreditCard";
+  if (/accommodation|жиль/i.test(value)) return "Accommodation Provided";
+  if (/cash|налич/i.test(value)) return "Cash";
   return value;
 }

@@ -38,6 +38,7 @@ function renderDrawer({
   onAddIssue = vi.fn(),
   onAction = vi.fn(),
   onDismissAiSuggestion = vi.fn(),
+  onReviewFileAccept = vi.fn(),
   onRunAiReview = vi.fn(),
 }: {
   activeTab?: DrawerTab;
@@ -45,6 +46,7 @@ function renderDrawer({
   onAcceptAiSuggestion?: (suggestionId: string) => void;
   onAddIssue?: (input: IssueInput) => void;
   onDismissAiSuggestion?: (suggestionId: string) => void;
+  onReviewFileAccept?: (input: { applicantId: string; fileType: string }) => void;
   onRunAiReview?: () => void;
 } = {}) {
   return {
@@ -52,6 +54,7 @@ function renderDrawer({
     onAction,
     onAddIssue,
     onDismissAiSuggestion,
+    onReviewFileAccept,
     onRunAiReview,
     ...render(
       <AdminReviewDrawer
@@ -65,7 +68,7 @@ function renderDrawer({
         onClose={() => undefined}
         onClearFocusTarget={() => undefined}
         onDismissAiSuggestion={onDismissAiSuggestion}
-        onReviewFileAccept={() => undefined}
+        onReviewFileAccept={onReviewFileAccept}
         onRunAiReview={onRunAiReview}
         onTab={() => undefined}
       />,
@@ -124,13 +127,13 @@ describe("AdminReviewDrawer", () => {
     expect(screen.getByLabelText("Новое замечание")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Анкета" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Скан загранпаспорта" }),
+      screen.getByRole("button", { name: "Скан паспорта" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Селфи" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Селфи N2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Селфи 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Селфи 2" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Документ" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Скан загранпаспорта" }));
+    fireEvent.click(screen.getByRole("button", { name: "Скан паспорта" }));
     fireEvent.change(screen.getByPlaceholderText("Что именно не так..."), {
       target: { value: "Паспорт не совпадает с анкетой." },
     });
@@ -142,6 +145,26 @@ describe("AdminReviewDrawer", () => {
         section: "Файлы",
         type: "file",
       }),
+    );
+  });
+
+  test("opens the passport workspace and accepts the scanned passport through its callback", async () => {
+    const onReviewFileAccept = vi.fn();
+    renderDrawer({ activeTab: "files", onReviewFileAccept });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Проверить" }).at(-1)!);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Сверить" })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Сверить" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: "Сверка паспорта" })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Завершить сверку" }).at(-1)!);
+
+    expect(onReviewFileAccept).toHaveBeenCalledWith(
+      expect.objectContaining({ fileType: "passport_scan" }),
     );
   });
 
