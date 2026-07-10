@@ -520,7 +520,8 @@ export function AdminExportScreen({
         downloadPreparedExportMediaZip,
         prepareExportMediaZip,
       } = await import("../modules/submissions/exportMediaZip");
-      const zipOptions = getSupabaseClient()
+      const supabaseClient = getSupabaseClient();
+      const zipOptions = supabaseClient
         ? {}
         : buildLocalDemoExportMediaZipOptions(prepared.submissions);
       const zipArtifactResult = await prepareExportMediaZip(
@@ -540,10 +541,14 @@ export function AdminExportScreen({
         return;
       }
 
-      const commitResult = await commitExportMediaZipArtifact(zipArtifactResult.artifact);
-      if (!commitResult.ok) {
-        setExportError(commitResult.safeMessage);
-        return;
+      if (supabaseClient) {
+        const commitResult = await commitExportMediaZipArtifact(
+          zipArtifactResult.artifact,
+        );
+        if (!commitResult.ok) {
+          setExportError(commitResult.safeMessage);
+          return;
+        }
       }
 
       try {

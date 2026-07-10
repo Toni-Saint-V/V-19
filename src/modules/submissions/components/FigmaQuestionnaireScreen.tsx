@@ -13,6 +13,7 @@ import { V19ReadinessCard, V19SearchField } from "../../../shared/ui/v19-design-
 import type { Submission } from "../types";
 import {
   BLS_CITY_OPTIONS,
+  POPULAR_RUSSIAN_CITY_OPTIONS,
   updateQuestionnaireField,
   validateQuestionnaireFieldValue,
   type QuestionnaireFieldUpdate,
@@ -121,6 +122,7 @@ type FormFieldProps = {
   hint?: string;
   label: string;
   number?: string;
+  onAcknowledgeReview?: () => void;
   onChange?: (value: string) => void;
   options?: string[];
   phonePrefix?: "+7" | "+34";
@@ -128,6 +130,7 @@ type FormFieldProps = {
   readOnly?: boolean;
   required?: boolean;
   reviewSource?: string;
+  suggestions?: readonly string[];
   state?: FieldState;
   type?: "email" | "input" | "number" | "tel" | "textarea";
   value: string;
@@ -350,6 +353,11 @@ const YES_NO_OPTIONS = ["Нет", "Да"];
 const commonEmailDomains = ["gmail.com", "yandex.ru", "mail.ru", "icloud.com", "outlook.com"];
 
 const optionSearchAliases: Record<string, string[]> = {
+  "Санкт-Петербург": ["спб", "питер", "санкт петербург"],
+  "Нижний Новгород": ["нижний", "нн"],
+  "Ростов-на-Дону": ["ростов"],
+  "Екатеринбург": ["екат", "екб"],
+  "Новосибирск": ["новосиб"],
   "Russian Federation": ["россия", "рф"],
   Spain: ["испания"],
   "United Kingdom": ["великобритания", "англия"],
@@ -422,6 +430,7 @@ function FormField({
   hint,
   label,
   number,
+  onAcknowledgeReview,
   onChange,
   options,
   phonePrefix,
@@ -430,10 +439,12 @@ function FormField({
   required,
   reviewSource,
   state = "normal",
+  suggestions,
   type = "input",
   value,
 }: FormFieldProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const [optionQuery, setOptionQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const optionSearchRef = useRef<HTMLInputElement>(null);
@@ -461,8 +472,21 @@ function FormField({
   const dateField = isDateFieldLabel(label);
   const emailField = type === "email" || label.toLocaleLowerCase("ru-RU").includes("email");
   const fieldId = `questionnaire-${number ?? "field"}-${label}`.replace(/\s+/g, "-");
-  const suggestionsId = `${fieldId}-email-suggestions`;
-  const fieldEmailSuggestions = emailField ? emailSuggestions(value) : [];
+  const suggestionsId = `${fieldId}-suggestions`;
+  const fieldEmailSuggestions = useMemo(
+    () => (emailField ? emailSuggestions(value) : []),
+    [emailField, value],
+  );
+  const inputSuggestions = useMemo(
+    () => (emailField ? fieldEmailSuggestions : suggestions ?? []),
+    [emailField, fieldEmailSuggestions, suggestions],
+  );
+  const visibleInputSuggestions = useMemo(() => {
+    const query = value.trim().toLocaleLowerCase("ru-RU");
+    return inputSuggestions
+      .filter((option) => !query || optionMatchesSearch(option, query))
+      .slice(0, 10);
+  }, [inputSuggestions, value]);
 
   useEffect(() => {
     if (!isOpen || !usesOptionSearch) return;
@@ -584,16 +608,18 @@ function FormField({
           placeholder={placeholder}
           readOnly={readOnly ?? !onChange}
           value={value}
+          onFocus={onAcknowledgeReview}
           onChange={(event) => onChange?.(event.target.value)}
         />
       ) : (
-        <>
+        <div className={inputSuggestions.length ? "relative" : undefined}>
           <input
             aria-label={label}
+            aria-autocomplete={inputSuggestions.length ? "list" : undefined}
+            aria-expanded={inputSuggestions.length ? isSuggestionsOpen : undefined}
             autoComplete={inputAutocomplete(label, type)}
             className={`${baseClasses} ${stateClasses}`}
             inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
-            list={fieldEmailSuggestions.length ? suggestionsId : undefined}
             maxLength={phonePrefix ? (phonePrefix === "+7" ? 17 : 15) : undefined}
             placeholder={
               placeholder ??
@@ -615,19 +641,48 @@ function FormField({
                   ? formatDateInput(event.target.value)
                   : event.target.value;
               onChange?.(nextValue);
+              if (inputSuggestions.length) setIsSuggestionsOpen(true);
             }}
             onFocus={() => {
+              onAcknowledgeReview?.();
               if (phonePrefix && !value) onChange?.(phonePrefix);
+              if (inputSuggestions.length) setIsSuggestionsOpen(true);
             }}
           />
-          {fieldEmailSuggestions.length ? (
-            <datalist id={suggestionsId}>
-              {fieldEmailSuggestions.map((suggestion) => (
-                <option key={suggestion} value={suggestion} />
+          {inputSuggestions.length && isSuggestionsOpen ? (
+            <motion.div
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="v19-questionnaire-dropdown"
+              exit={{ opacity: 0, scale: 0.98, y: -4 }}
+              id={suggestionsId}
+              initial={{ opacity: 0, scale: 0.98, y: -4 }}
+              role="listbox"
+              transition={{ duration: 0.15 }}
+            >
+              {visibleInputSuggestions.map((suggestion) => (
+                <button
+                  aria-selected={value === suggestion}
+                  className={`v19-questionnaire-dropdown-option ${
+                    value === suggestion ? "is-selected" : ""
+                  }`}
+                  key={suggestion}
+                  role="option"
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onChange?.(suggestion);
+                    setIsSuggestionsOpen(false);
+                  }}
+                >
+                  {suggestion}
+                </button>
               ))}
-            </datalist>
+              {!visibleInputSuggestions.length ? (
+                <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
+              ) : null}
+            </motion.div>
           ) : null}
-        </>
+        </div>
       )}
 
       {shouldShowError ? (
@@ -749,9 +804,9 @@ function submissionFieldValue(
   fieldId: string,
   fallback: string,
 ) {
-  const value = questionnaireField(applicant, fieldId)?.value.trim();
+  const value = questionnaireField(applicant, fieldId)?.value;
 
-  return value || fallback;
+  return value?.trim() ? value : fallback;
 }
 
 function submissionFieldValueAny(
@@ -760,8 +815,8 @@ function submissionFieldValueAny(
   fallback: string,
 ) {
   for (const fieldId of fieldIds) {
-    const value = questionnaireField(applicant, fieldId)?.value.trim();
-    if (value) return value;
+    const value = questionnaireField(applicant, fieldId)?.value;
+    if (value?.trim()) return value;
   }
 
   return fallback;
@@ -1618,6 +1673,12 @@ export function FigmaQuestionnaireScreen({
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
+  const [acknowledgedReviewFields, setAcknowledgedReviewFields] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [euRelativeApplicantIds, setEuRelativeApplicantIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [showPreviousSurnameForMale, setShowPreviousSurnameForMale] = useState(false);
   const baseFormData = useMemo(
     () => questionnaireFormDataFromSubmission(submission, activeApplicant),
@@ -1824,9 +1885,19 @@ export function FigmaQuestionnaireScreen({
     };
   }, [draftSubmission]);
 
+  const hasEuRelativeData = Boolean(
+    formData.euRelativeDetails.trim() || formData.euRelationship.trim(),
+  );
+  const showEuRelativeSection =
+    activeSection === "euRelative" ||
+    hasEuRelativeData ||
+    euRelativeApplicantIds.has(activeApplicant);
+
   const sections = useMemo(
     () =>
-      sectionDefinitions.map(({ canonicalId, ...definition }) => {
+      sectionDefinitions
+      .filter((definition) => definition.id !== "euRelative" || showEuRelativeSection)
+      .map(({ canonicalId, ...definition }) => {
         if (definition.id === "files") {
           const applicantFiles = activeApplicantModel
             ? requiredQuestionnaireFileTypes.map((type) =>
@@ -1863,7 +1934,7 @@ export function FigmaQuestionnaireScreen({
             hasRisk ? "issue" : total > 0 && completed === total ? "complete" : "pending",
         } satisfies SectionTab & { id: SectionId };
       }),
-    [activeApplicantModel, draftSubmission.files],
+    [activeApplicantModel, draftSubmission.files, showEuRelativeSection],
   );
   const isCompleteButtonDisabled = !readinessStats.canSubmit;
   const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
@@ -2009,6 +2080,8 @@ export function FigmaQuestionnaireScreen({
   function fieldReviewState(fieldId: string, label: string): FieldState {
     if (fieldIssue(fieldId, label)) return "invalid";
 
+    if (acknowledgedReviewFields.has(`${activeApplicant}:${fieldId}`)) return "normal";
+
     const field = questionnaireField(activeApplicantModel, fieldId);
     if (field && hasActionableFieldProblem(field)) return "invalid";
     if (field?.reviewState === "needs_review") return "needs_review";
@@ -2017,6 +2090,26 @@ export function FigmaQuestionnaireScreen({
       initialFieldTarget?.labels.some((candidate) => sameFieldLabel(candidate, label))
       ? "needs_review"
       : "normal";
+  }
+
+  function acknowledgeFieldReview(fieldId: string) {
+    setAcknowledgedReviewFields((current) => {
+      const key = `${activeApplicant}:${fieldId}`;
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }
+
+  function openEuRelativeSection() {
+    setEuRelativeApplicantIds((current) => {
+      if (current.has(activeApplicant)) return current;
+      const next = new Set(current);
+      next.add(activeApplicant);
+      return next;
+    });
+    setActiveSection("euRelative");
   }
 
   function fieldErrorMessage(fieldId: string, label: string) {
@@ -2285,10 +2378,8 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: D2"
             fullWidth
-            hint="Можно без запятых и точек: ул Ленина дом 5 квартира 12"
             label="Домашний адрес"
             number="1"
-            placeholder="Улица дом квартира"
             required
             type="textarea"
             value={formData.contactAddress}
@@ -2323,6 +2414,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: residence-city"
             label="Город проживания"
             number="5"
+            suggestions={POPULAR_RUSSIAN_CITY_OPTIONS}
             value={formData.residenceCity}
             onChange={(value) => updateField("residenceCity", value)}
           />
@@ -2758,12 +2850,13 @@ export function FigmaQuestionnaireScreen({
           value={formData.firstName}
           onChange={(value) => updateField("firstName", value)}
         />
-        <FormField
-          excelMap="Cell: B4"
-          errorMessage={fieldErrorMessage("birth-date", "Дата рождения")}
-          label="Дата рождения"
-          number="4"
-          required
+          <FormField
+            excelMap="Cell: B4"
+            errorMessage={fieldErrorMessage("birth-date", "Дата рождения")}
+            label="Дата рождения"
+            number="4"
+            onAcknowledgeReview={() => acknowledgeFieldReview("birth-date")}
+            required
           state={fieldReviewState("birth-date", "Дата рождения")}
           value={formData.dob}
           onChange={(value) => updateField("dob", value)}
@@ -2994,6 +3087,15 @@ export function FigmaQuestionnaireScreen({
                 </QuestionnaireProgressBadge>
               </button>
             ))}
+            {!showEuRelativeSection ? (
+              <button
+                className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
+                type="button"
+                onClick={openEuRelativeSection}
+              >
+                Добавить родственника ЕС
+              </button>
+            ) : null}
           </div>
 
           <QuestionnaireWorkspaceShell className="v19-questionnaire-workspace-shell flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 min-h-0">
@@ -3040,6 +3142,15 @@ export function FigmaQuestionnaireScreen({
                     </QuestionnaireProgressBadge>
                   </button>
                 ))}
+                {!showEuRelativeSection ? (
+                  <button
+                    className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
+                    type="button"
+                    onClick={openEuRelativeSection}
+                  >
+                    Добавить родственника ЕС
+                  </button>
+                ) : null}
               </div>
             </aside>
 

@@ -106,6 +106,22 @@ export class DocumentRepository {
   }
 
   async recordExportAudit(input: DocumentExportAuditInput): Promise<void> {
+    const { data: existingEvents, error: existingEventsError } = await this.client
+      .from("document_export_events")
+      .select("id")
+      .eq("package_identity_key", input.packageId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (existingEventsError) {
+      throw mapSupabasePersistenceError(existingEventsError, {
+        operation: "document_export_events.find_existing",
+        fallbackKind: "database",
+      });
+    }
+
+    if (existingEvents?.length) return;
+
     const actorId = await this.currentUserId();
     const payload: DocumentExportEventInsert = {
       event_type: "DOCUMENT_EXPORT_CREATED",
