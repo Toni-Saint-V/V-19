@@ -73,6 +73,58 @@ async function openAdminSubmission(page: Page, preferredText: RegExp) {
 }
 
 test.describe("V-19 pilot admin review click flow", () => {
+  test("admin passport reconciliation accepts the real passport scan", async ({
+    page,
+  }) => {
+    const browserProblems = collectBrowserProblems(page);
+
+    await openFreshWorkspace(page, {
+      heading: "Проверка",
+      workspaceEmail: "admin@visaflow.local",
+    });
+
+    const reviewAction = page
+      .getByRole("button", { name: /Ручная проверка заявки Нина Волкова/ })
+      .first();
+    await expect(reviewAction).toBeVisible();
+    await reviewAction.click();
+    await expect(drawer(page)).toBeVisible();
+
+    await openDrawerTab(page, ["Файлы"]);
+    const passportRow = drawer(page)
+      .locator(".v19-drawer-file-item")
+      .filter({ hasText: "Скан паспорта" })
+      .first();
+    await expect(passportRow).toBeVisible();
+    await passportRow.getByRole("button", { name: "Проверить" }).click();
+
+    await drawer(page).getByRole("button", { name: "Сверить" }).click();
+    const passportWorkspace = page.getByRole("dialog", {
+      name: "Сверка паспорта",
+    });
+    await expect(passportWorkspace).toBeVisible();
+
+    expect(
+      await page.evaluate(() => {
+        const browser = globalThis as unknown as {
+          document: { documentElement: { scrollWidth: number } };
+          innerWidth: number;
+        };
+        return browser.document.documentElement.scrollWidth <= browser.innerWidth;
+      }),
+    ).toBe(true);
+
+    await passportWorkspace
+      .getByRole("button", { name: "Завершить сверку" })
+      .last()
+      .click();
+    await expect(passportWorkspace.getByText("Принято", { exact: true })).toBeVisible();
+
+    expect(blockingBrowserProblems(browserProblems), browserProblems.join("\n")).toEqual(
+      [],
+    );
+  });
+
   test("admin queue opens drawer tabs and issue action is reachable", async ({
     page,
   }) => {

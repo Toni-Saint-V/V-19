@@ -78,6 +78,13 @@ describe("Supabase security contract", () => {
     expect(authService).not.toContain(".signUp(");
   });
 
+  test("uses the active admin UUID for file-review persistence", () => {
+    const app = readProjectFile("src/App.tsx");
+
+    expect(app).toContain("reviewedBy: activeApprovedSession.userId");
+    expect(app).not.toContain("reviewedBy: 'local-admin'");
+  });
+
   test("keeps access requests admin-approved with requester-only status reads", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260629193805_v19_access_requests_admin_pdfs.sql",
@@ -113,6 +120,7 @@ describe("Supabase security contract", () => {
     expect(accessRequestFunction).toContain("inviteUserByEmail");
     expect(accessRequestFunction).toContain("role: \"agent\"");
     expect(accessRequestFunction).toContain("requireAdminProfile");
+    expect(accessRequestFunction).toContain("SUPABASE_SERVICE_ROLE_KEY");
     expect(accessRequestFunction).not.toContain("email_confirm: true");
     expect(accessRequestFunction).not.toContain("updateUserById");
     expect(accessRequestFunction).not.toContain("password:");

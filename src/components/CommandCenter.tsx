@@ -1001,6 +1001,7 @@ export function CommandCenter({
           submissionId={selectedRow}
           submission={selectedCanonicalSubmission}
           onOpenQuestionnaire={() => selectedRow && handleOpenQuestionnaire(selectedRow)}
+          onSubmissionAction={(_, action) => executeAgentSubmissionAction(action)}
         />
       )}
 

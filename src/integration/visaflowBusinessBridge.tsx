@@ -1,5 +1,9 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { SubmissionAction } from '../modules/submissions/types';
+import type {
+  IssueInput,
+  SubmissionAction,
+  SubmissionFileType,
+} from '../modules/submissions/types';
 import type { SubmissionStatus } from '../components/Drawer';
 
 export type VisaflowWorkspace = 'agent' | 'admin';
@@ -35,6 +39,22 @@ export interface RemarkBridgePayload {
   message?: string;
 }
 
+export interface AdminIssueBridgePayload {
+  submissionId: string;
+  input: IssueInput;
+}
+
+export interface AdminFileReviewBridgePayload {
+  submissionId: string;
+  applicantId: string;
+  fileType: SubmissionFileType;
+}
+
+export interface AdminAiSuggestionBridgePayload {
+  submissionId: string;
+  suggestionId: string;
+}
+
 export type VisaflowUiEvent =
   | { type: 'workspace.switch'; workspace: VisaflowWorkspace }
   | { type: 'agent.nav'; section: AgentNavSection }
@@ -45,7 +65,13 @@ export type VisaflowUiEvent =
   | { type: 'package.create' }
   | { type: 'upload.open' }
   | { type: 'admin.review.open'; submissionId: string }
+  | { type: 'admin.issue.add'; payload: AdminIssueBridgePayload }
+  | { type: 'admin.file.accept'; payload: AdminFileReviewBridgePayload }
+  | { type: 'admin.ai.run'; submissionId: string }
+  | { type: 'admin.ai.accept'; payload: AdminAiSuggestionBridgePayload }
+  | { type: 'admin.ai.dismiss'; payload: AdminAiSuggestionBridgePayload }
   | { type: 'admin.document.verify'; submissionId: string | null }
+  | { type: 'admin.document.download'; submissionId: string | null }
   | { type: 'returned-pdf-handoff.publish'; submissionId: string }
   | { type: 'remark.open'; payload: RemarkBridgePayload }
   | { type: 'remark.submit'; payload: RemarkBridgePayload }
@@ -61,7 +87,19 @@ export interface VisaflowBusinessBridge {
   onCreatePackage?: () => void;
   onUploadOpen?: () => void;
   onAdminReviewOpen?: (submissionId: string) => void;
+  onAdminIssueAdd?: (payload: AdminIssueBridgePayload) => void | Promise<void>;
+  onAdminFileAccept?: (
+    payload: AdminFileReviewBridgePayload,
+  ) => void | Promise<void>;
+  onAdminAiReviewRun?: (submissionId: string) => void | Promise<void>;
+  onAdminAiSuggestionAccept?: (
+    payload: AdminAiSuggestionBridgePayload,
+  ) => void | Promise<void>;
+  onAdminAiSuggestionDismiss?: (
+    payload: AdminAiSuggestionBridgePayload,
+  ) => void | Promise<void>;
   onVerifyDocument?: (submissionId: string | null) => void;
+  onDownloadOriginalDocument?: (submissionId: string | null) => void;
   onPublishReturnedPdfHandoff?: (submissionId: string) => void | Promise<void>;
   onRemarkOpen?: (payload: RemarkBridgePayload) => void;
   onRemarkSubmit?: (payload: RemarkBridgePayload) => void | Promise<void>;

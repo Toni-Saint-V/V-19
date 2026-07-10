@@ -402,7 +402,85 @@ export function updateQuestionnaireField(
   update: QuestionnaireFieldUpdate,
 ): Submission {
   const updated = updateQuestionnaireFieldInSubmission(submission, update);
-  return syncTripDateRangeFromQuestionnaireUpdate(updated, update);
+  const withTripDates = syncTripDateRangeFromQuestionnaireUpdate(updated, update);
+  return syncApplicantNameFromQuestionnaireUpdate(
+    submission,
+    withTripDates,
+    update,
+  );
+}
+
+function syncApplicantNameFromQuestionnaireUpdate(
+  previousSubmission: Submission,
+  submission: Submission,
+  update: QuestionnaireFieldUpdate,
+): Submission {
+  if (update.fieldId !== "first-name" && update.fieldId !== "surname") {
+    return submission;
+  }
+
+  const applicantIndex = submission.applicants.findIndex(
+    (applicant) => applicant.id === update.applicantId,
+  );
+  const applicant = submission.applicants[applicantIndex];
+  if (!applicant) {
+    return submission;
+  }
+
+  const previousApplicant = previousSubmission.applicants.find(
+    (candidate) => candidate.id === update.applicantId,
+  );
+  const previousFields = previousApplicant?.sections.flatMap(
+    (section) => section.fields,
+  );
+  const previousFirstName =
+    previousFields?.find((field) => field.id === "first-name")?.value.trim() ?? "";
+  const previousSurname =
+    previousFields?.find((field) => field.id === "surname")?.value.trim() ?? "";
+  const previousQuestionnaireName = [previousFirstName, previousSurname]
+    .filter(Boolean)
+    .join(" ");
+  if (
+    !isPlaceholderApplicantName(applicant.fullName) &&
+    applicant.fullName !== previousQuestionnaireName
+  ) {
+    return submission;
+  }
+
+  const fields = applicant.sections.flatMap((section) => section.fields);
+  const firstName = fields.find((field) => field.id === "first-name")?.value.trim() ?? "";
+  const surname = fields.find((field) => field.id === "surname")?.value.trim() ?? "";
+  const fullName = [firstName, surname].filter(Boolean).join(" ");
+  if (!fullName || fullName === applicant.fullName) {
+    return submission;
+  }
+
+  const applicants = submission.applicants.map((candidate) =>
+    candidate.id === applicant.id ? { ...candidate, fullName } : candidate,
+  );
+  if (applicantIndex !== 0) {
+    return { ...submission, applicants };
+  }
+
+  return {
+    ...submission,
+    applicants,
+    listTitle:
+      submission.type === "family"
+        ? familyListTitleFromMainApplicantName(surname) ?? submission.listTitle
+        : submission.listTitle,
+    title: draftTitle(submission.type, fullName, surname),
+  };
+}
+
+function isPlaceholderApplicantName(value: string) {
+  const normalized = value.trim();
+  return (
+    normalized === "Новый заявитель" ||
+    normalized === "Основной заявитель" ||
+    normalized === "Супруг" ||
+    /^Ребёнок \d+$/u.test(normalized)
+  );
 }
 
 function syncTripDateRangeFromQuestionnaireUpdate(
@@ -986,13 +1064,17 @@ function draftApplicantRole(index: number, type: Submission["type"]) {
   return "child" as const;
 }
 
-function draftTitle(type: Submission["type"], firstApplicantName?: string) {
+function draftTitle(
+  type: Submission["type"],
+  firstApplicantName?: string,
+  familySurname?: string,
+) {
   if (!firstApplicantName || firstApplicantName === "Новый заявитель") {
     return type === "family" ? "Новая семейная подача" : "Новая подача";
   }
   if (type === "single") return firstApplicantName;
 
-  const firstToken = firstApplicantName.split(/\s+/)[0];
+  const firstToken = (familySurname || firstApplicantName).split(/\s+/)[0];
   if (!firstToken || firstToken === "Основной") return "Новая семейная подача";
   return `Семья ${firstToken.replace(/а$/i, "")}ых`;
 }

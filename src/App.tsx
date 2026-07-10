@@ -9,7 +9,17 @@ import {
   noopVisaflowBusinessBridge,
   type VisaflowBusinessBridge,
 } from './integration/visaflowBusinessBridge';
-import { applyExportStateToSelection, applyActionToSubmissionListResult } from './modules/submissions/submissionActions';
+import {
+  addPreciseAdminIssue,
+  applyExportStateToSelection,
+  applyActionToSubmissionListResult,
+  markSubmissionFileAccepted,
+} from './modules/submissions/submissionActions';
+import {
+  acceptAiSuggestionAsIssue,
+  dismissAiSuggestion,
+  runAiReview,
+} from './modules/submissions/aiSuggestions';
 import { completeExportPackage } from './modules/submissions/exportWorkflow';
 import { loadSubmissions, saveSubmissions } from './modules/submissions/persistence';
 import {
@@ -30,6 +40,11 @@ import {
   signInSupabaseWithPassword,
   signOutCurrentSession,
 } from './services/authService';
+import {
+  completeSupabaseInvitePasswordSetup,
+  getPendingSupabaseInvitePasswordSetup,
+} from './services/supabaseInviteFlow';
+import { fetchCurrentProfile } from './services/profileService';
 import type { Role, Submission, SubmissionAction } from './modules/submissions/types';
 import type { AppProfile, AppSession } from './types/session';
 
@@ -53,17 +68,38 @@ function sessionFromSupabase(appSession: AppSession): Session {
   };
 }
 
+function pendingSessionFromAccessRequest(request: AccessRequest): Session {
+  return {
+    approvalStatus: 'pending',
+    companyName: request.companyName,
+    createdAt: request.createdAt,
+    email: request.email,
+    fullName: request.fullName,
+    role: 'agent',
+    status: 'pending',
+    userId: request.userId,
+  };
+}
+
 export interface AppProps {
   bridge?: VisaflowBusinessBridge;
   initialWorkspace?: Workspace;
+  inviteSetupPromise?: Promise<{ email: string; userId: string } | null>;
 }
 
-export default function App({ bridge = noopVisaflowBusinessBridge, initialWorkspace = 'agent' }: AppProps = {}) {
+const noInviteSetupPromise = Promise.resolve(null);
+
+export default function App({
+  bridge = noopVisaflowBusinessBridge,
+  initialWorkspace = 'agent',
+  inviteSetupPromise = noInviteSetupPromise,
+}: AppProps = {}) {
   const [workspace, setWorkspace] = useState<Workspace>(initialWorkspace);
   const [submissions, setSubmissions] = useState<Submission[]>(() =>
     getSupabaseClient() ? [] : loadSubmissions(),
   );
   const [authSession, setAuthSession] = useState<Session | null>(null);
+  const [inviteSetupEmail, setInviteSetupEmail] = useState('');
   const [authChecked, setAuthChecked] = useState(false);
   const [authError, setAuthError] = useState('');
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
@@ -125,6 +161,28 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
       try {
         let restored: Session | null;
         if (supabaseEnabled) {
+          const client = getSupabaseClient();
+          const inviteSetup =
+            (await inviteSetupPromise) ??
+            (client
+              ? await getPendingSupabaseInvitePasswordSetup(client.auth)
+              : null);
+          if (inviteSetup) {
+            if (cancelled) return;
+            const inviteProfile = await fetchCurrentProfile(inviteSetup.userId);
+            const validInviteProfile =
+              inviteProfile?.role === 'agent' &&
+              inviteProfile.email.trim().toLowerCase() === inviteSetup.email;
+            if (!validInviteProfile) {
+              await client?.auth.signOut({ scope: 'local' });
+              throw new Error('Приглашение не связано с подтверждённым профилем агента.');
+            }
+            setInviteSetupEmail(inviteSetup.email);
+            setAuthSession(null);
+            setWorkspace('agent');
+            setAccessRequests([]);
+            return;
+          }
           const appSession = await getCurrentAppSession();
           restored = appSession ? sessionFromSupabase(appSession) : null;
         } else {
@@ -152,7 +210,7 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     return () => {
       cancelled = true;
     };
-  }, [refreshAccessRequests, supabaseEnabled]);
+  }, [inviteSetupPromise, refreshAccessRequests, supabaseEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -266,8 +324,8 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
   const handleRegister = useCallback(async (input: AccessRequestRegistrationInput) => {
     setAuthError('');
     if (supabaseEnabled) {
-      await supabaseAccessRequestRepository.submitAccessRequest(input);
-      setAuthSession(null);
+      const request = await supabaseAccessRequestRepository.submitAccessRequest(input);
+      setAuthSession(pendingSessionFromAccessRequest(request));
       setWorkspace('agent');
       setAccessRequests([]);
       return;
@@ -279,6 +337,19 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     setWorkspace('agent');
     await refreshAccessRequests(nextSession);
   }, [refreshAccessRequests, supabaseEnabled]);
+
+  const handleCompleteInvite = useCallback(async (password: string) => {
+    const client = getSupabaseClient();
+    if (!client) {
+      throw new Error('Supabase is inactive.');
+    }
+
+    await completeSupabaseInvitePasswordSetup(client.auth, password);
+    setInviteSetupEmail('');
+    setAuthSession(null);
+    setWorkspace('agent');
+    setAccessRequests([]);
+  }, []);
 
   const handleResetPassword = useCallback(async (email: string) => {
     setAuthError('');
@@ -345,12 +416,59 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     if (result.ok) void persistSubmissions(result.data);
   }, [persistSubmissions, submissions]);
 
+  const updateAdminSubmission = useCallback((
+    submissionId: string,
+    update: (submission: Submission) => Submission,
+  ) => {
+    let changed = false;
+    const nextSubmissions = submissions.map((submission) => {
+      if (submission.id !== submissionId) return submission;
+      const nextSubmission = update(submission);
+      changed ||= nextSubmission !== submission;
+      return nextSubmission;
+    });
+    if (changed) void persistSubmissions(nextSubmissions);
+  }, [persistSubmissions, submissions]);
+
   const appBridge = useMemo<VisaflowBusinessBridge>(
     () => ({
       ...bridge,
       onSubmissionAction: ({ submissionId, action, source }) => {
         bridge.onSubmissionAction?.({ submissionId, action, source });
         applySubmissionAction(submissionId, action, source);
+      },
+      onAdminIssueAdd: ({ submissionId, input }) => {
+        bridge.onAdminIssueAdd?.({ submissionId, input });
+        updateAdminSubmission(submissionId, (submission) =>
+          addPreciseAdminIssue(submission, input, 'local-admin'),
+        );
+      },
+      onAdminFileAccept: ({ submissionId, applicantId, fileType }) => {
+        if (activeApprovedSession?.role !== 'admin') return;
+        bridge.onAdminFileAccept?.({ submissionId, applicantId, fileType });
+        updateAdminSubmission(submissionId, (submission) =>
+          markSubmissionFileAccepted(submission, {
+            applicantId,
+            fileType,
+            reviewedBy: activeApprovedSession.userId,
+          }),
+        );
+      },
+      onAdminAiReviewRun: (submissionId) => {
+        bridge.onAdminAiReviewRun?.(submissionId);
+        updateAdminSubmission(submissionId, runAiReview);
+      },
+      onAdminAiSuggestionAccept: ({ submissionId, suggestionId }) => {
+        bridge.onAdminAiSuggestionAccept?.({ submissionId, suggestionId });
+        updateAdminSubmission(submissionId, (submission) =>
+          acceptAiSuggestionAsIssue(submission, suggestionId, 'admin'),
+        );
+      },
+      onAdminAiSuggestionDismiss: ({ submissionId, suggestionId }) => {
+        bridge.onAdminAiSuggestionDismiss?.({ submissionId, suggestionId });
+        updateAdminSubmission(submissionId, (submission) =>
+          dismissAiSuggestion(submission, suggestionId, 'admin'),
+        );
       },
       onExportPackages: async (submissionIds) => {
         if (
@@ -402,7 +520,15 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
         }
       },
     }),
-    [activeApprovedSession, applySubmissionAction, bridge, persistSubmissions, submissions, workspace],
+    [
+      activeApprovedSession,
+      applySubmissionAction,
+      bridge,
+      persistSubmissions,
+      submissions,
+      updateAdminSubmission,
+      workspace,
+    ],
   );
 
   const switchWorkspace = () => {
@@ -427,7 +553,10 @@ export default function App({ bridge = noopVisaflowBusinessBridge, initialWorksp
     return (
       <AccessGate
         error={authError}
+        inviteSetupEmail={inviteSetupEmail}
         pendingSession={authSession}
+        usesSupabase={supabaseEnabled}
+        onCompleteInvite={handleCompleteInvite}
         onLogin={handleLogin}
         onRegister={handleRegister}
         onResetPassword={handleResetPassword}

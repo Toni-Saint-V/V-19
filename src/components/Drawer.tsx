@@ -32,6 +32,7 @@ export interface SubmissionDetail {
   updated: string;
   owner: string;
   issuesCount: number;
+  documents: Array<{ label: string; status: 'done' | 'pending' }>;
 }
 
 interface DrawerProps {
@@ -70,15 +71,15 @@ const Skeleton = ({ className }: { className?: string }) => (
 const StatusBadge = ({ status }: { status: SubmissionStatus }) => {
   switch (status) {
     case 'in_progress':
-      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[10px] sm:text-[11px] font-medium uppercase tracking-wide"><Clock className="w-3.5 h-3.5" /> В работе</span>;
+      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><Clock className="w-3.5 h-3.5" /> В работе</span>;
     case 'returned':
-      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[10px] sm:text-[11px] font-medium uppercase tracking-wide"><AlertCircle className="w-3.5 h-3.5" /> Возвращено (Ошибки)</span>;
+      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-white/62 text-[11px] font-medium uppercase tracking-wide"><AlertCircle className="w-3.5 h-3.5" /> Возвращено (Ошибки)</span>;
     case 'submitted_for_review':
-      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[10px] sm:text-[11px] font-medium uppercase tracking-wide"><ShieldAlert className="w-3.5 h-3.5" /> На проверке</span>;
+      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#6f64ff]/20 border border-[#6f64ff]/30 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><ShieldAlert className="w-3.5 h-3.5" /> На проверке</span>;
     case 'ready_for_export':
-      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[10px] sm:text-[11px] font-medium uppercase tracking-wide"><CheckCircle2 className="w-3.5 h-3.5" /> Готово к выгрузке</span>;
+      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.045] border border-white/10 text-[#b8baff] text-[11px] font-medium uppercase tracking-wide"><CheckCircle2 className="w-3.5 h-3.5" /> Готово к выгрузке</span>;
     default:
-      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-[10px] sm:text-[11px] font-medium uppercase tracking-wide"><FileText className="w-3.5 h-3.5" /> Черновик</span>;
+      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/70 text-[11px] font-medium uppercase tracking-wide"><FileText className="w-3.5 h-3.5" /> Черновик</span>;
   }
 };
 
@@ -109,15 +110,10 @@ const OverviewTab = ({ data }: { data: SubmissionDetail }) => (
       <div className="bg-white/[0.02] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[11px] font-medium text-white/40 uppercase tracking-wider">Чеклист документов</h3>
-          <span className="text-[11px] font-mono text-[#b8baff] font-medium bg-white/[0.045] px-2 py-0.5 rounded-md">8/10</span>
+          <span className="text-[11px] font-mono text-[#b8baff] font-medium bg-white/[0.045] px-2 py-0.5 rounded-md">{data.documents.filter((document) => document.status === 'done').length}/{data.documents.length}</span>
         </div>
         <div className="space-y-3 flex-1 flex flex-col justify-center">
-          {[
-            { label: 'Паспорта (Загран, РФ)', status: 'done' },
-            { label: 'Финансовые гарантии', status: 'done' },
-            { label: 'Справки с работы', status: 'pending' },
-            { label: 'Бронирования (Отель, Авиа)', status: 'done' }
-          ].map((doc, i) => (
+          {data.documents.map((doc, i) => (
             <div key={i} className="flex items-center gap-3">
               {doc.status === 'done' ? (
                 <CheckCircle2 className="w-4 h-4 text-[#b8baff]" />
@@ -157,13 +153,14 @@ const QuestionnaireTab = ({ onOpenQuestionnaire }: { onOpenQuestionnaire?: () =>
   <div className="space-y-6">
     <div className="flex items-center justify-between">
       <div>
-        <h3 className="text-[14px] font-medium text-white">Прогресс заполнения</h3>
+        <h3 className="text-[16px] font-semibold text-white">Прогресс заполнения</h3>
+        <p className="text-[12px] text-white/50 mt-1">Осталось заполнить 2 блока данных</p>
       </div>
       <button 
         onClick={onOpenQuestionnaire}
-        className="h-9 px-4 border border-[#0b090b] bg-[#35324e] hover:bg-[#3d395a] text-[#aca5c0] text-[14px] font-medium rounded-[8px] transition-colors flex items-center gap-2"
+        className="h-9 px-4 bg-white/10 hover:bg-white/15 text-white text-[13px] font-medium rounded-lg transition-colors flex items-center gap-2"
       >
-        <Edit3 className="w-4 h-4" /> Открыть
+        <Edit3 className="w-4 h-4" /> Открыть анкету
       </button>
     </div>
 
@@ -293,6 +290,10 @@ function detailFromCanonicalSubmission(submission: CanonicalSubmission): Submiss
     updated: new Date(submission.updatedAt).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
     owner: submission.agentId,
     issuesCount: submission.issues.filter((issue) => issue.status !== 'closed_by_admin').length,
+    documents: submission.files.map((file) => ({
+      label: file.originalFileName || file.generatedFileName || file.type.replaceAll('_', ' '),
+      status: file.status === 'accepted' ? 'done' : 'pending',
+    })),
   };
 }
 
@@ -378,7 +379,8 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
           completeness: submissionId === 'SUB-1042' ? 92 : 64,
           updated: "12 мин назад",
           owner: "Татьяна Н.",
-          issuesCount: submissionId === 'SUB-1042' || submissionId === 'SUB-1088' ? 2 : 0
+          issuesCount: submissionId === 'SUB-1042' || submissionId === 'SUB-1088' ? 2 : 0,
+          documents: []
         });
         setStatus('success');
       }, submission ? 80 : 400);
@@ -415,9 +417,9 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
           onClick={() => handleAction('submit_corrections')}
           disabled={submission ? !actionGate(submission, 'submit_corrections', 'agent').ok : false}
           title={submission ? actionGate(submission, 'submit_corrections', 'agent').reason : undefined}
-          className="flex-1 sm:flex-none h-11 px-8 bg-[#24242a] hover:bg-[#2a2b32] disabled:bg-white/10 disabled:text-white/35 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-[8px] shadow-[0_0_28px_rgba(111,100,255,0.14)] transition-colors flex items-center justify-center gap-2"
+          className="flex-1 sm:flex-none h-11 px-8 bg-[#24242a] hover:bg-[#2a2b32] disabled:bg-white/10 disabled:text-white/35 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl shadow-[0_0_28px_rgba(111,100,255,0.14)] transition-colors flex items-center justify-center gap-2"
         >
-          <UploadCloud className="w-4 h-4" /> Отправить
+          <UploadCloud className="w-4 h-4" /> Отправить исправления
         </button>
       );
     }
@@ -488,16 +490,17 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
                 <header className="px-5 lg:px-8 pt-4 pb-0 bg-[#111113]/95 backdrop-blur-md relative lg:sticky lg:top-0 z-20 shrink-0 border-b border-white/5">
                   <div className="flex items-start justify-between gap-4 mb-6">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-[10px] sm:text-[11px] lg:text-xs text-white/50 mb-2">
+                      <div className="flex items-center gap-2 text-[11px] lg:text-xs text-white/50 mb-2">
                         <span className="font-mono font-medium tracking-wider text-white/70">{data.id}</span>
                         <span className="w-1 h-1 rounded-full bg-white/20" />
-                        <span className="font-medium uppercase tracking-wider">{data.type === 'family' ? 'Семейная' : 'Индивидуальная'}</span>
+                        <span className="uppercase tracking-wider">{data.type === 'family' ? 'Семейная' : 'Индивидуальная'}</span>
                       </div>
-                      <h2 className="text-[22px] sm:text-[24px] font-semibold text-white leading-tight tracking-tight mb-4">
+                      <h2 className="text-[24px] font-semibold text-white leading-tight tracking-tight mb-4">
                         {data.title}
                       </h2>
                       <div className="flex flex-wrap items-center gap-2.5">
                         <StatusBadge status={data.status} />
+                        <span className="text-[12px] text-white/40 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Обновлено {data.updated}</span>
                       </div>
                     </div>
                     
@@ -566,7 +569,7 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
                     {data.status === 'returned' ? 'Исправьте замечания перед повторной отправкой.' : 'Проверьте все данные перед отправкой администратору.'}
                   </div>
                   <div className="flex gap-3 w-full sm:w-auto">
-                    <button onClick={onClose} className="flex-1 sm:flex-none h-11 px-5 border border-[#253e6f] bg-transparent opacity-50 hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-[8px] transition-colors">
+                    <button onClick={onClose} className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors">
                       Отмена
                     </button>
                     {getFooterActions()}

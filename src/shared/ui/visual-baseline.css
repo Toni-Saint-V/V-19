@@ -22169,3 +22169,8 @@ body,
 [data-admin-review-drawer-surface="workspace"] .admin-review-metric--issues.is-open {
   color: var(--v19b-dot-danger) !important;
 }
+
+.vf-figma-questionnaire-screen .v19-questionnaire-field-control.is-compact-address {
+  min-height: var(--v19b-size-40) !important;
+  height: var(--v19b-size-40) !important;
+}
