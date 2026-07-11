@@ -993,14 +993,14 @@ export function buildAgentHandoffPackage(
   }
 
   for (const applicant of submission.applicants) {
-    const fileNames = buildApplicantArtifactFileNames(submission, applicant.id);
-    if (!fileNames) {
-      blockers.push("Не найден заявитель для PDF.");
+    if (!applicantHasPassportNumber(applicant)) {
+      blockers.push(`Нет номера паспорта: ${applicant.fullName}.`);
       continue;
     }
 
-    if (!applicantHasPassportNumber(applicant)) {
-      blockers.push(`Нет номера паспорта: ${applicant.fullName}.`);
+    const fileNames = buildApplicantArtifactFileNames(submission, applicant.id);
+    if (!fileNames) {
+      blockers.push("Не найден заявитель для PDF.");
       continue;
     }
 

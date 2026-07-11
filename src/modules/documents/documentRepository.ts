@@ -105,6 +105,22 @@ export class DocumentRepository {
     }
   }
 
+  async restoreReadyForExport(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+
+    const { error } = await this.client
+      .from("document_assets")
+      .update({ export_status: "ready" })
+      .in("id", ids);
+
+    if (error) {
+      throw mapSupabasePersistenceError(error, {
+        operation: "document_assets.restore_ready_for_export",
+        fallbackKind: "database",
+      });
+    }
+  }
+
   async recordExportAudit(input: DocumentExportAuditInput): Promise<void> {
     const { data: existingEvents, error: existingEventsError } = await this.client
       .from("document_export_events")

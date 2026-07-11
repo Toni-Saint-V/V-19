@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
 import visaflowLogo from '../assets/visaflow-logo.png';
-import type { AccessRequestRegistrationInput, Session } from '../shared/authRegistration';
+import type { AccessRequestRegistrationInput, Session } from '../shared/authContract';
 
-type AccessGateMode = 'invite' | 'login' | 'register' | 'reset' | 'pending';
+type AccessGateMode = 'invite' | 'login' | 'register' | 'reset' | 'pending' | 'recovery';
 
 type AccessGateProps = {
   error: string;
   inviteSetupEmail: string;
+  recoverySetupEmail: string;
   pendingSession: Session | null;
   usesSupabase?: boolean;
   onCompleteInvite: (password: string) => Promise<void>;
+  onCompleteRecovery: (password: string) => Promise<void>;
   onLogin: (email: string, password: string) => Promise<void>;
   onRegister: (input: AccessRequestRegistrationInput) => Promise<void>;
   onResetPassword: (email: string) => Promise<string>;
@@ -33,6 +35,7 @@ const accessTitleIds: Record<AccessGateMode, string> = {
   invite: 'workspace-invite-title',
   login: 'workspace-access-title',
   pending: 'workspace-pending-title',
+  recovery: 'workspace-recovery-title',
   register: 'workspace-register-title',
   reset: 'workspace-reset-title',
 };
@@ -41,6 +44,7 @@ const accessCopyIds: Record<AccessGateMode, string> = {
   invite: 'workspace-invite-copy',
   login: 'workspace-access-copy',
   pending: 'workspace-pending-copy',
+  recovery: 'workspace-recovery-copy',
   register: 'workspace-register-copy',
   reset: 'workspace-reset-copy',
 };
@@ -151,9 +155,11 @@ function AccessShell({
 export function AccessGate({
   error,
   inviteSetupEmail,
+  recoverySetupEmail,
   pendingSession,
   usesSupabase = false,
   onCompleteInvite,
+  onCompleteRecovery,
   onLogin,
   onRegister,
   onResetPassword,
@@ -194,6 +200,12 @@ export function AccessGate({
     setMode('invite');
     setEmail(inviteSetupEmail);
   }, [inviteSetupEmail]);
+
+  useEffect(() => {
+    if (!recoverySetupEmail) return;
+    setMode('recovery');
+    setEmail(recoverySetupEmail);
+  }, [recoverySetupEmail]);
 
   const activeTitleId = accessTitleIds[mode];
   const activeCopyId = accessCopyIds[mode];
@@ -319,9 +331,12 @@ export function AccessGate({
 
     setBusy(true);
     try {
-      await onCompleteInvite(invitePassword);
-      rememberWorkspaceEmail(inviteSetupEmail);
-      setEmail(inviteSetupEmail);
+      const setupEmail = mode === 'recovery' ? recoverySetupEmail : inviteSetupEmail;
+      const completePassword =
+        mode === 'recovery' ? onCompleteRecovery : onCompleteInvite;
+      await completePassword(invitePassword);
+      rememberWorkspaceEmail(setupEmail);
+      setEmail(setupEmail);
       setPassword('');
       setInvitePassword('');
       setInvitePasswordConfirmation('');
@@ -358,18 +373,25 @@ export function AccessGate({
     );
   }
 
-  if (mode === 'invite' && inviteSetupEmail) {
+  const setupEmail = mode === 'recovery' ? recoverySetupEmail : inviteSetupEmail;
+
+  if ((mode === 'invite' || mode === 'recovery') && setupEmail) {
+    const isRecovery = mode === 'recovery';
     return (
       <AccessShell activeCopyId={activeCopyId} activeTitleId={activeTitleId}>
         <div className="access-card-header">
           <div>
-            <p className="access-kicker">Приглашение подтверждено</p>
-            <h1 id="workspace-invite-title">Создайте пароль</h1>
+            <p className="access-kicker">
+              {isRecovery ? 'Восстановление подтверждено' : 'Приглашение подтверждено'}
+            </p>
+            <h1 id={activeTitleId}>
+              {isRecovery ? 'Установите новый пароль' : 'Создайте пароль'}
+            </h1>
           </div>
           <ShieldCheck aria-hidden="true" />
         </div>
-        <p className="access-intro" id="workspace-invite-copy">
-          Установите пароль для {inviteSetupEmail}. После сохранения войдите обычным способом.
+        <p className="access-intro" id={activeCopyId}>
+          Установите пароль для {setupEmail}. После сохранения войдите обычным способом.
         </p>
         <form className="access-form" onSubmit={(event) => void submitInvitePassword(event)} noValidate>
           <div className="access-field">

@@ -29,6 +29,7 @@ import { getPrimaryAction, statusLabels } from "../status";
 import {
   targetElementId,
   tabForTarget,
+  targetForIssue,
   type WorkspaceTarget,
 } from "../workspaceModel";
 import type {
@@ -677,6 +678,16 @@ const figmaSubmissionDrawerStyles = `
   .v20-upload-stage {
     display: grid;
     gap: 28px;
+  }
+
+  .v20-upload-error {
+    padding: 12px 14px;
+    border: 1px solid rgba(236, 165, 181, 0.36);
+    border-radius: var(--v20-radius-md);
+    color: var(--v20-warning);
+    background: rgba(236, 165, 181, 0.08);
+    font-size: 13px;
+    line-height: 1.45;
   }
 
   .v20-mode-toggle {
@@ -1682,6 +1693,11 @@ const figmaSubmissionDrawerStyles = `
       display: none;
     }
 
+    .v20-footer-note.is-error {
+      display: block;
+      white-space: normal;
+    }
+
     .v20-footer-actions {
       grid-template-columns: 1fr 1fr;
       gap: 12px;
@@ -1878,9 +1894,9 @@ type FigmaSubmissionDrawerProps = {
   actionError?: string;
   focusTarget?: WorkspaceTarget;
   onClearFocusTarget?: () => void;
-  onAction: (action: SubmissionAction) => void;
+  onAction: (action: SubmissionAction) => void | Promise<void>;
   onClose: () => void;
-  onMarkIssueFixed?: (issueId: string) => void;
+  onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onOpenQuestionnaireWorkspace: (target?: QuestionnaireFocusTarget) => void;
   role: Role;
@@ -2310,9 +2326,11 @@ const QuestionnaireTab = ({
 };
 
 const FilesTab = ({
+  focusTarget,
   onUploadFile,
   submission,
 }: {
+  focusTarget?: WorkspaceTarget;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   submission: Submission;
 }) => {
@@ -2330,6 +2348,8 @@ const FilesTab = ({
   );
   const fileInputsRef = useRef(new Map<string, HTMLInputElement>());
   const dropInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingUploadFileIdsRef = useRef(new Set<string>());
+  const [uploadError, setUploadError] = useState("");
   const firstActionFile = useMemo(
     () =>
       submission.files.find(
@@ -2345,6 +2365,15 @@ const FilesTab = ({
     setExpandedApplicantIds(firstUploadableApplicant ? [firstUploadableApplicant] : []);
   }, [firstUploadableApplicant, submission.id]);
 
+  useEffect(() => {
+    if (focusTarget?.tab !== "files") return;
+    setExpandedApplicantIds((current) =>
+      current.includes(focusTarget.applicantId)
+        ? current
+        : [...current, focusTarget.applicantId],
+    );
+  }, [focusTarget]);
+
   function toggleApplicant(applicantId: string) {
     setExpandedApplicantIds((current) =>
       current.includes(applicantId)
@@ -2353,8 +2382,19 @@ const FilesTab = ({
     );
   }
 
-  function uploadToFileSlot(fileId: string, selectedFile: File) {
-    void onUploadFile?.(fileId, selectedFile);
+  async function uploadToFileSlot(fileId: string, selectedFile: File) {
+    if (pendingUploadFileIdsRef.current.has(fileId)) return;
+    pendingUploadFileIdsRef.current.add(fileId);
+    setUploadError("");
+    try {
+      await onUploadFile?.(fileId, selectedFile);
+    } catch {
+      setUploadError(
+        "Не удалось загрузить файл. Состояние подачи не изменено. Повторите попытку.",
+      );
+    } finally {
+      pendingUploadFileIdsRef.current.delete(fileId);
+    }
   }
 
   function handleFileChange(
@@ -2364,7 +2404,7 @@ const FilesTab = ({
     const selectedFile = event.currentTarget.files?.[0];
     if (!selectedFile) return;
 
-    uploadToFileSlot(fileId, selectedFile);
+    void uploadToFileSlot(fileId, selectedFile);
     event.currentTarget.value = "";
   }
 
@@ -2372,7 +2412,7 @@ const FilesTab = ({
     const selectedFile = event.currentTarget.files?.[0];
     if (!selectedFile || !firstActionFile) return;
 
-    uploadToFileSlot(firstActionFile.id, selectedFile);
+    void uploadToFileSlot(firstActionFile.id, selectedFile);
     event.currentTarget.value = "";
   }
 
@@ -2383,11 +2423,16 @@ const FilesTab = ({
     const selectedFile = event.dataTransfer.files?.[0];
     if (!selectedFile) return;
 
-    uploadToFileSlot(firstActionFile.id, selectedFile);
+    void uploadToFileSlot(firstActionFile.id, selectedFile);
   }
 
   return (
     <div className="v20-upload-stage">
+      {uploadError ? (
+        <div className="v20-upload-error" role="alert">
+          {uploadError}
+        </div>
+      ) : null}
       <div className="v20-mode-toggle" aria-label="Тип подачи">
         <span className={`v20-mode-button ${submission.type === "family" ? "is-active" : ""}`}>
           <User aria-hidden="true" />
@@ -2542,19 +2587,50 @@ const FilesTab = ({
 const IssuesTab = ({
   data,
   onMarkIssueFixed,
-  onOpenQuestionnaire,
+  onOpenWorkspaceTarget,
   role,
   submission,
 }: {
   data: FigmaSubmissionDetail;
-  onMarkIssueFixed?: (issueId: string) => void;
-  onOpenQuestionnaire: (target?: QuestionnaireFocusTarget) => void;
+  onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
+  onOpenWorkspaceTarget: (target: WorkspaceTarget) => void;
   role: Role;
   submission: Submission;
 }) => {
+  const [issueFixError, setIssueFixError] = useState("");
+  const [pendingIssueId, setPendingIssueId] = useState<string | null>(null);
+  const issueFixPendingRef = useRef(false);
   const openIssues = submission.issues.filter((issue) => issue.status !== "closed_by_admin");
   const fixedIssues = submission.issues.filter((issue) => issue.status === "fixed_by_agent");
   const closedIssues = submission.issues.filter((issue) => issue.status === "closed_by_admin");
+  const issueStateKey = submission.issues
+    .map((issue) => `${issue.id}:${issue.status}`)
+    .join("|");
+
+  useEffect(() => {
+    setIssueFixError("");
+  }, [issueStateKey, submission.id]);
+
+  async function markIssueFixed(issueId: string) {
+    if (!onMarkIssueFixed || issueFixPendingRef.current) return;
+
+    issueFixPendingRef.current = true;
+    setIssueFixError("");
+    setPendingIssueId(issueId);
+    try {
+      await onMarkIssueFixed(issueId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      setIssueFixError(
+        message.includes("target must be corrected")
+          ? "Сначала внесите и сохраните исправление, затем отметьте замечание исправленным."
+          : "Не удалось отметить замечание исправленным. Состояние подачи не изменено. Повторите попытку.",
+      );
+    } finally {
+      issueFixPendingRef.current = false;
+      setPendingIssueId(null);
+    }
+  }
 
   return (
     <div className="v20-issues-screen">
@@ -2569,6 +2645,12 @@ const IssuesTab = ({
         <FileText aria-hidden="true" />
         Поиск по действиям...
       </div>
+
+      {issueFixError ? (
+        <div className="v20-upload-error" role="alert">
+          {issueFixError}
+        </div>
+      ) : null}
 
       {openIssues.length > 0 ? (
         <div className="v20-issue-list">
@@ -2602,26 +2684,37 @@ const IssuesTab = ({
                       className="v20-issue-button"
                       type="button"
                       onClick={() =>
-                        onOpenQuestionnaire({
-                          applicantId: issue.target.applicantId,
-                          field: issue.target.field,
-                          section: issue.target.section,
-                        })
+                        onOpenWorkspaceTarget(targetForIssue(issue))
                       }
                     >
                       Исправить в анкете
                     </button>
                   ) : null}
-                  {canMarkFixed ? (
+                  {issue.target.fileType && issue.status === "open" ? (
                     <button
-                      className="v20-issue-button is-ghost"
+                      className="v20-issue-button"
                       type="button"
-                      onClick={() => onMarkIssueFixed?.(issue.id)}
+                      onClick={() => onOpenWorkspaceTarget(targetForIssue(issue))}
                     >
-                      Отметить исправленным
+                      Заменить файл
                     </button>
                   ) : null}
-                  {!canMarkFixed && !(issue.type === "field" && issue.status === "open") ? (
+                  {canMarkFixed ? (
+                    <button
+                      aria-busy={pendingIssueId === issue.id}
+                      className="v20-issue-button is-ghost"
+                      disabled={pendingIssueId !== null}
+                      type="button"
+                      onClick={() => void markIssueFixed(issue.id)}
+                    >
+                      {pendingIssueId === issue.id
+                        ? "Отмечаем…"
+                        : "Отметить исправленным"}
+                    </button>
+                  ) : null}
+                  {!canMarkFixed &&
+                  !(issue.type === "field" && issue.status === "open") &&
+                  !(issue.target.fileType && issue.status === "open") ? (
                     <span className="v20-issue-state">
                       {issue.status === "fixed_by_agent" ? "Ждет проверки" : "Документ"}
                     </span>
@@ -2751,6 +2844,10 @@ export function FigmaSubmissionDrawer({
 }: FigmaSubmissionDrawerProps) {
   const [tab, setTab] = useState<TabId>(() => initialTab(activeTab));
   const [status, setStatus] = useState<"loading" | "success">("loading");
+  const [localActionError, setLocalActionError] = useState("");
+  const [actionPending, setActionPending] = useState(false);
+  const actionRequestIdRef = useRef(0);
+  const actionPendingRef = useRef(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerTabsRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
@@ -2805,8 +2902,12 @@ export function FigmaSubmissionDrawer({
   }, [submission.id]);
 
   useEffect(() => {
+    actionRequestIdRef.current += 1;
     setStatus("loading");
     setTab(initialTab(activeTab));
+    setLocalActionError("");
+    setActionPending(false);
+    actionPendingRef.current = false;
     const timer = window.setTimeout(() => setStatus("success"), 260);
     return () => window.clearTimeout(timer);
   }, [activeTab, submission.id]);
@@ -2922,8 +3023,9 @@ export function FigmaSubmissionDrawer({
     { id: "history", label: "История" },
   ];
 
+  const visibleActionError = localActionError || actionError;
   const footerStatusText =
-    actionError ||
+    visibleActionError ||
     primaryAction.reason ||
     (data.status === "returned"
       ? "Исправьте замечания перед повторной отправкой."
@@ -2931,6 +3033,28 @@ export function FigmaSubmissionDrawer({
   const primaryFooterLabel =
     data.status === "returned" ? "Отправить исправления" : (primaryAction.label || "Далее");
   const currentScreenTitle = screenTitle(tab, data);
+
+  async function handlePrimaryAction() {
+    if (primaryAction.disabled || actionPendingRef.current) return;
+
+    const requestId = ++actionRequestIdRef.current;
+    setLocalActionError("");
+    setActionPending(true);
+    actionPendingRef.current = true;
+    try {
+      await onAction(primaryAction.action);
+    } catch {
+      if (requestId !== actionRequestIdRef.current) return;
+      setLocalActionError(
+        "Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.",
+      );
+    } finally {
+      if (requestId === actionRequestIdRef.current) {
+        actionPendingRef.current = false;
+        setActionPending(false);
+      }
+    }
+  }
 
   return (
     <>
@@ -3033,13 +3157,17 @@ export function FigmaSubmissionDrawer({
                       <QuestionnaireTab onOpenQuestionnaire={onOpenQuestionnaireWorkspace} />
                     ) : null}
                     {tab === "files" ? (
-                      <FilesTab onUploadFile={onUploadFile} submission={submission} />
+                      <FilesTab
+                        focusTarget={pendingTargetRef.current ?? undefined}
+                        onUploadFile={onUploadFile}
+                        submission={submission}
+                      />
                     ) : null}
                     {tab === "issues" ? (
                       <IssuesTab
                         data={data}
                         onMarkIssueFixed={onMarkIssueFixed}
-                        onOpenQuestionnaire={onOpenQuestionnaireWorkspace}
+                        onOpenWorkspaceTarget={openWorkspaceTarget}
                         role={role}
                         submission={submission}
                       />
@@ -3050,7 +3178,10 @@ export function FigmaSubmissionDrawer({
               </main>
 
               <footer className="v20-footer">
-                <div className={`v20-footer-note ${actionError ? "is-error" : ""}`}>
+                <div
+                  className={`v20-footer-note ${visibleActionError ? "is-error" : ""}`}
+                  role={visibleActionError ? "alert" : undefined}
+                >
                   {footerStatusText}
                 </div>
                 <div className="v20-footer-actions">
@@ -3063,13 +3194,11 @@ export function FigmaSubmissionDrawer({
                   </button>
                   <button
                     className={`v20-action-button ${data.status === "returned" ? "is-warning" : "is-primary"}`}
-                    disabled={primaryAction.disabled}
+                    disabled={primaryAction.disabled || actionPending}
                     type="button"
-                    onClick={() => {
-                      if (!primaryAction.disabled) onAction(primaryAction.action);
-                    }}
+                    onClick={() => void handlePrimaryAction()}
                   >
-                    {primaryFooterLabel}
+                    {actionPending ? "Сохраняем…" : primaryFooterLabel}
                   </button>
                 </div>
               </footer>

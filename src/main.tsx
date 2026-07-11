@@ -11,25 +11,41 @@ import {
   cleanSupabaseAuthCallbackUrl,
   parseSupabaseInviteCallbackUrl,
 } from './services/supabaseInviteFlow';
+import {
+  beginSupabasePasswordRecovery,
+  cleanSupabaseRecoveryCallbackUrl,
+  parseSupabaseRecoveryCallbackUrl,
+} from './services/supabasePasswordRecovery';
 
 const bridge = createVisaflowRuntimeBridge();
 const initialUrl = window.location.href;
 const inviteCallback = parseSupabaseInviteCallbackUrl(initialUrl);
-const supabaseClient = inviteCallback ? getSupabaseClient() : null;
+const recoveryCallback = parseSupabaseRecoveryCallbackUrl(initialUrl);
+const supabaseClient = inviteCallback || recoveryCallback ? getSupabaseClient() : null;
 const inviteSetupPromise = supabaseClient
   ? beginSupabaseInvitePasswordSetup(supabaseClient.auth, initialUrl)
   : Promise.resolve(null);
+const recoverySetupPromise = supabaseClient
+  ? beginSupabasePasswordRecovery(supabaseClient.auth, initialUrl)
+  : Promise.resolve(null);
 
-if (inviteCallback && supabaseClient) {
+if ((inviteCallback || recoveryCallback) && supabaseClient) {
+  const cleanUrl = recoveryCallback
+    ? cleanSupabaseRecoveryCallbackUrl(initialUrl)
+    : cleanSupabaseAuthCallbackUrl(initialUrl);
   window.history.replaceState(
     window.history.state,
     document.title,
-    cleanSupabaseAuthCallbackUrl(initialUrl),
+    cleanUrl,
   );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App bridge={bridge} inviteSetupPromise={inviteSetupPromise} />
+    <App
+      bridge={bridge}
+      inviteSetupPromise={inviteSetupPromise}
+      recoverySetupPromise={recoverySetupPromise}
+    />
   </React.StrictMode>,
 );

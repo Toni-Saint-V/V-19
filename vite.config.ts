@@ -14,29 +14,37 @@ type BundleAsset = {
 
 type BuildBundle = Record<string, BundleAsset | unknown>;
 
-export default defineConfig({
-  plugins: [react(), splitLargeCssAssets()],
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (
-            id.includes("node_modules/react") ||
-            id.includes("node_modules/react-dom")
-          ) {
-            return "react";
-          }
-          if (id.includes("node_modules/@supabase/supabase-js")) {
-            return "supabase";
-          }
-          if (id.includes("node_modules/lucide-react")) {
-            return "lucide";
-          }
-          return undefined;
+export default defineConfig(({ mode }) => {
+  const localDemoBuildEnabled =
+    mode === "development" || mode === "local-demo" || mode === "test";
+
+  return {
+    define: {
+      __V19_LOCAL_DEMO_BUILD__: JSON.stringify(localDemoBuildEnabled),
+    },
+    plugins: [react(), splitLargeCssAssets()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (
+              id.includes("node_modules/react") ||
+              id.includes("node_modules/react-dom")
+            ) {
+              return "react";
+            }
+            if (id.includes("node_modules/@supabase/supabase-js")) {
+              return "supabase";
+            }
+            if (id.includes("node_modules/lucide-react")) {
+              return "lucide";
+            }
+            return undefined;
+          },
         },
       },
     },
-  },
+  };
 });
 
 function splitLargeCssAssets(): Plugin {

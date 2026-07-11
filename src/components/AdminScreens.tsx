@@ -1,42 +1,51 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
-  AlertCircle,
+  ArrowUpDown,
   Bot,
   CheckCircle2,
   ChevronRight,
   Clock,
-  FileText,
   FileCheck2,
   Flame,
   MessageSquareWarning,
+  RotateCcw,
   ShieldCheck,
+  Shapes,
   Sparkles,
   User,
   Users,
+  X,
 } from "lucide-react";
 import {
+  AdminContextToggle,
+  AdminListHeader,
   AdminMetricCard,
+  AdminMetricStrip,
   AdminQueueToolbar,
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
+import { V19PriorityHero, V19QueueCard } from "../shared/ui/v19-design-system";
 import {
   buildAdminTriageRadar,
   type AdminTriageRadarItem,
 } from "../modules/submissions/adminTriageRadar";
 import { agentOwnerDisplayName } from "../modules/submissions/ownership";
+import {
+  cityFilterValuesForSubmissions,
+  questionnaireCityForSubmission,
+} from "../modules/submissions/selectors";
 import { getPrimaryAction } from "../modules/submissions/status";
-import type {
-  Submission,
-  SubmissionStatus,
-} from "../modules/submissions/types";
+import type { Submission } from "../modules/submissions/types";
+import { isAdminReviewQueueSubmission } from "../modules/submissions/uiTypes";
 
 interface AdminScreenProps {
   onOpenDrawer: (id: string) => void;
+  onOpenExport?: () => void;
   submissions?: Submission[];
 }
 
-type Lane = "urgent" | "review" | "returned" | "ready";
+type Lane = "urgent" | "review" | "returned";
 type AdminReviewSort = "tripDate" | "createdAt";
 type AdminReviewTypeFilter = "all" | "family" | "single";
 
@@ -60,96 +69,6 @@ interface ReviewCard {
   createdAtIso: string;
   tripDateIso: string;
 }
-
-const reviews: ReviewCard[] = [
-  {
-    id: "SUB-1061",
-    title: "Семья Орловых",
-    type: "family",
-    applicants: 4,
-    country: "Испания",
-    city: "Москва",
-    lane: "urgent",
-    agent: "Мария Климова",
-    timeInQueue: "1 ч 15 мин",
-    questionnaire: 100,
-    files: 92,
-    blockers: 1,
-    warnings: 2,
-    aiFlags: 1,
-    nextAction: "Проверить паспорт основного заявителя",
-    lastEvent: "Агент загрузил исправленный scan 14 мин назад",
-    createdAtIso: "2026-07-06T10:30:00.000Z",
-    tripDateIso: "2026-08-11T00:00:00.000Z",
-  },
-  {
-    id: "SUB-1082",
-    title: "Евгений Смирнов",
-    type: "single",
-    applicants: 1,
-    country: "Испания",
-    city: "Санкт-Петербург",
-    lane: "review",
-    agent: "Игорь Сафонов",
-    timeInQueue: "45 мин",
-    questionnaire: 96,
-    files: 100,
-    blockers: 0,
-    warnings: 1,
-    aiFlags: 1,
-    nextAction: "Сверить место рождения в анкете и паспорте",
-    lastEvent: "OCR отметил расхождение 8 мин назад",
-    createdAtIso: "2026-07-07T08:40:00.000Z",
-    tripDateIso: "2026-08-02T00:00:00.000Z",
-  },
-  {
-    id: "FAM-005",
-    title: "Семья Кузнецовых",
-    type: "family",
-    applicants: 3,
-    country: "Испания",
-    city: "Екатеринбург",
-    lane: "returned",
-    agent: "Олег Морозов",
-    timeInQueue: "2 ч 05 мин",
-    questionnaire: 88,
-    files: 71,
-    blockers: 2,
-    warnings: 0,
-    aiFlags: 0,
-    nextAction: "Ждём новые справки по детям",
-    lastEvent: "Админ вернул 2 замечания сегодня в 11:42",
-    createdAtIso: "2026-07-05T15:10:00.000Z",
-    tripDateIso: "2026-08-19T00:00:00.000Z",
-  },
-  {
-    id: "SUB-1078",
-    title: "Дмитрий Волков",
-    type: "single",
-    applicants: 1,
-    country: "Испания",
-    city: "Москва",
-    lane: "ready",
-    agent: "Анна Ветрова",
-    timeInQueue: "18 мин",
-    questionnaire: 100,
-    files: 100,
-    blockers: 0,
-    warnings: 0,
-    aiFlags: 0,
-    nextAction: "Подтвердить и отправить в выгрузку",
-    lastEvent: "Все замечания закрыты 18 мин назад",
-    createdAtIso: "2026-07-07T09:20:00.000Z",
-    tripDateIso: "2026-09-06T00:00:00.000Z",
-  },
-];
-
-const adminReviewStatuses = new Set<SubmissionStatus>([
-  "submitted_for_review",
-  "corrections_received",
-  "returned",
-  "ready_for_export",
-]);
 
 function unresolvedIssues(submission: Submission) {
   return submission.issues.filter(
@@ -177,13 +96,11 @@ function unresolvedWarningCount(submission: Submission) {
 
 function reviewLaneForSubmission(submission: Submission): Lane {
   if (unresolvedBlockerCount(submission) > 0) return "urgent";
-  if (submission.status === "returned") return "returned";
-  if (submission.status === "ready_for_export") return "ready";
   if (
-    submission.status === "submitted_for_review" &&
-    submission.completeness.total >= 100
+    submission.status === "corrections_received" ||
+    submission.status === "returned"
   )
-    return "ready";
+    return "returned";
   return "review";
 }
 
@@ -218,7 +135,7 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
     type: submission.type,
     applicants: submission.applicants.length,
     country: submission.country,
-    city: submission.city,
+    city: questionnaireCityForSubmission(submission),
     lane: reviewLaneForSubmission(submission),
     agent: agentOwnerDisplayName(submission.agentId),
     timeInQueue: submission.updatedAt,
@@ -239,7 +156,7 @@ function reviewCardFromSubmission(submission: Submission): ReviewCard {
 
 function reviewCardsFromSubmissions(submissions: Submission[]): ReviewCard[] {
   return submissions
-    .filter((submission) => adminReviewStatuses.has(submission.status))
+    .filter(isAdminReviewQueueSubmission)
     .map(reviewCardFromSubmission);
 }
 
@@ -252,50 +169,26 @@ const lanes: {
 }[] = [
   {
     id: "urgent",
-    title: "Блокеры",
+    title: "Критичные",
     subtitle: "сначала сюда",
     tone: "red",
     icon: Flame,
   },
   {
     id: "review",
-    title: "Проверить",
+    title: "На проверке",
     subtitle: "ручная сверка",
     tone: "orange",
     icon: ShieldCheck,
   },
   {
     id: "returned",
-    title: "Исправления",
-    subtitle: "ответ агента",
+    title: "Правки",
+    subtitle: "у агента / на сверке",
     tone: "blue",
     icon: MessageSquareWarning,
   },
-  {
-    id: "ready",
-    title: "Готово",
-    subtitle: "к выгрузке",
-    tone: "green",
-    icon: CheckCircle2,
-  },
 ];
-
-const reviewIntroStorageKey = "visaflow.v19.adminReviewIntroSeen";
-
-function toneClasses(tone: string) {
-  switch (tone) {
-    case "red":
-      return "border-[#5b2b32]/45 bg-[#24191b]/60 text-[#ff5c67]";
-    case "orange":
-      return "border-[#6a481f]/45 bg-[#2d2118]/65 text-[#f59e0b]";
-    case "blue":
-      return "border-[#6f64ff]/25 bg-[#6f64ff]/15 text-[#8fa3ff]";
-    case "green":
-      return "border-[#244238]/45 bg-[#14251f]/45 text-[#34d399]";
-    default:
-      return "border-white/10 bg-white/5 text-white/50";
-  }
-}
 
 function reviewCountLabel(count: number) {
   const lastTwoDigits = count % 100;
@@ -309,19 +202,24 @@ function reviewCountLabel(count: number) {
 
 function ProgressLine({ label, value }: { label: string; value: number }) {
   return (
-    <div>
-      <div className="mb-1 flex justify-between text-[10.5px] text-white/40">
+    <div className="v19-admin-review-progress-line">
+      <div>
         <span>{label}</span>
         <span>{value}%</span>
       </div>
-      <div className="h-[3px] overflow-hidden rounded-full bg-white/5">
+      <div>
         <div
-          className="h-full rounded-full bg-[#8fa3ff]"
           style={{ width: `${value}%` }}
         />
       </div>
     </div>
   );
+}
+
+function reviewActionLabel(item: ReviewCard) {
+  if (item.lane === "urgent") return "Разобрать критические замечания";
+  if (item.lane === "returned") return "Проверить исправления агента";
+  return "Сверить анкету и документы";
 }
 
 function ReviewQueueCard({
@@ -335,85 +233,87 @@ function ReviewQueueCard({
   const shortQueueTime = item.timeInQueue.replace(/\s+\d+\s+мин$/, "");
 
   return (
-    <button
+    <V19QueueCard
+      as="button"
       aria-label={`Ручная проверка заявки ${item.title}`}
       data-submission-card=""
       data-submission-id={item.id}
       onClick={() => onOpenDrawer(item.id)}
-      className={`group w-full rounded-[10px] border p-4 text-left font-medium transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_40px_rgba(0,0,0,0.22)] ${hasBlocker ? "border-[#5b2b32]/45 bg-[#1d1719]/80 hover:border-[#74414a]/55" : "border-[#242529] bg-[#161617] hover:border-[#6f64ff]/40"}`}
+      className={`v19-admin-review-card group ${hasBlocker ? "has-blocker" : ""}`}
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="v19-admin-review-card-header">
         <div className="min-w-0">
-          <div className="mb-1.5 flex max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10.5px] font-medium tracking-wide text-white/40">
-            <span className="shrink-0 font-mono text-white/60">{item.id}</span>
-            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
+          <div className="v19-admin-review-card-meta">
+            <span>{item.id}</span>
+            <i />
             <span className="shrink-0">{item.city}</span>
-            <span className="h-1 w-1 shrink-0 rounded-full bg-white/20" />
+            <i />
             <span className="shrink-0">{shortQueueTime}</span>
           </div>
-          <h3 className="truncate text-[15px] font-semibold text-white group-hover:text-[#b8baff]">
+          <h3>
             {item.title}
           </h3>
-          <div className="mt-1 flex items-center gap-2 text-[11.5px] font-medium text-white/45">
+          <div className="v19-admin-review-card-people">
             {item.type === "family" ? (
-              <Users className="h-3.5 w-3.5" />
+              <Users />
             ) : (
-              <User className="h-3.5 w-3.5" />
+              <User />
             )}
             <span>{item.applicants} чел.</span>
           </div>
         </div>
-        <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white/30 transition-colors group-hover:bg-white/[0.09] group-hover:text-white/55">
-          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        <span className="v19-admin-review-card-open">
+          <ChevronRight />
         </span>
       </div>
 
-      <div className="mb-3 rounded-[8px] border border-white/5 bg-white/[0.025] p-3">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-white/75">
+      <div className="v19-admin-review-card-action">
+        <span>
           {item.aiFlags > 0 ? (
-            <Sparkles className="h-3.5 w-3.5 text-[#b8baff]" />
+            <Sparkles />
           ) : (
-            <FileCheck2 className="h-3.5 w-3.5 text-[#b8baff]" />
+            <FileCheck2 />
           )}
-          Следующее действие
+        </span>
+        <div>
+          <small>Следующий шаг</small>
+          <strong>{reviewActionLabel(item)}</strong>
         </div>
-        <p className="text-[12px] leading-relaxed text-white/50">
-          {item.nextAction}
-        </p>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2">
+      <div className="v19-admin-review-card-progress">
         <ProgressLine label="Анкета" value={item.questionnaire} />
         <ProgressLine label="Файлы" value={item.files} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="v19-admin-review-card-footer">
+        <div className="v19-admin-review-card-signals">
         {item.blockers > 0 && (
-          <span className="rounded-full border border-[#5b2b32]/45 bg-[#24191b]/60 px-2 py-1 text-[9px] font-medium text-[#d59aa3]">
-            {item.blockers} блокера
+          <span className="tone-danger">
+            {item.blockers} критичных
           </span>
         )}
         {item.warnings > 0 && (
-          <span className="rounded-full border border-[#6a481f]/45 bg-[#2d2118]/65 px-2 py-1 text-[9px] font-medium text-[#f59e0b]">
+          <span className="tone-warning">
             {item.warnings} проверить
           </span>
         )}
         {item.aiFlags > 0 && (
-          <span className="rounded-full border border-[#6f64ff]/25 bg-[#6f64ff]/15 px-2 py-1 text-[9px] font-medium text-[#b8baff]">
+          <span className="tone-info">
             ИИ {item.aiFlags}
           </span>
         )}
         {item.blockers === 0 && item.warnings === 0 && (
-          <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[9px] font-medium text-[#b8baff]">
+          <span className="tone-ready">
             без замечаний
           </span>
         )}
+        </div>
+        <span className="v19-admin-review-card-agent">
+          <User aria-hidden="true" /> {item.agent}
+        </span>
       </div>
-
-      <div className="mt-3 border-t border-white/5 pt-3 text-[11px] font-medium text-white/60">
-        {item.agent}
-      </div>
-    </button>
+    </V19QueueCard>
   );
 }
 
@@ -445,58 +345,45 @@ function watchToneClass(tone: ReviewAiWatchItem["tone"]) {
   return "border-[#6f64ff]/25 bg-[#6f64ff]/10";
 }
 
-function buildReviewAiWatchlist(
-  submissions: Submission[] | undefined,
-): ReviewAiWatchItem[] {
-  if (submissions) {
-    if (submissions.length === 0) return [];
-    const radarItems = buildAdminTriageRadar(submissions).items;
-    const signalItems = radarItems.filter(
-      (item) => item.band === "critical" || item.band === "attention",
-    );
-    const visibleItems = signalItems.length ? signalItems : radarItems;
+function buildReviewAiWatchlist(submissions: Submission[]): ReviewAiWatchItem[] {
+  if (submissions.length === 0) return [];
+  const radarItems = buildAdminTriageRadar(submissions).items;
+  const signalItems = radarItems.filter(
+    (item) => item.band === "critical" || item.band === "attention",
+  );
+  const visibleItems = signalItems.length ? signalItems : radarItems;
 
-    return visibleItems.slice(0, 3).map((item) => ({
-      id: item.submissionId,
-      reason: item.reasons[0] ?? item.nextAction,
-      score: item.score,
-      title: item.title,
-      tone: item.band,
-    }));
-  }
-
-  return reviews
-    .filter((item) => item.aiFlags > 0 || item.blockers > 0)
-    .slice(0, 3)
-    .map((item) => ({
-      agent: item.agent,
-      id: item.id,
-      reason: item.nextAction,
-      title: item.title,
-      tone: item.blockers > 0 ? "critical" : "attention",
-    }));
+  return visibleItems.slice(0, 3).map((item) => ({
+    id: item.submissionId,
+    reason: item.reasons[0] ?? item.nextAction,
+    score: item.score,
+    title: item.title,
+    tone: item.band,
+  }));
 }
 
-export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
+export function ReviewScreen({
+  onOpenDrawer,
+  onOpenExport,
+  submissions,
+}: AdminScreenProps) {
   const [activeLane, setActiveLane] = useState<Lane | "all">("all");
   const [cityFilter, setCityFilter] = useState("Все города");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<AdminReviewSort>("tripDate");
   const [typeFilter, setTypeFilter] = useState<AdminReviewTypeFilter>("all");
-  const [showIntro, setShowIntro] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return window.sessionStorage.getItem(reviewIntroStorageKey) !== "true";
-  });
-  const reviewSource = useMemo(
-    () => (submissions ? reviewCardsFromSubmissions(submissions) : reviews),
+  const [mobileContextOpen, setMobileContextOpen] = useState(false);
+  const reviewSubmissions = useMemo(
+    () => (submissions ?? []).filter(isAdminReviewQueueSubmission),
     [submissions],
   );
+  const reviewSource = useMemo(
+    () => reviewCardsFromSubmissions(reviewSubmissions),
+    [reviewSubmissions],
+  );
   const cityOptions = useMemo(
-    () => [
-      "Все города",
-      ...Array.from(new Set(reviewSource.map((item) => item.city))),
-    ],
-    [reviewSource],
+    () => cityFilterValuesForSubmissions(reviewSubmissions),
+    [reviewSubmissions],
   );
   const searchNeedle = searchQuery.trim().toLowerCase();
   const filteredReviews = reviewSource
@@ -526,115 +413,129 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
     (sum, item) => sum + item.blockers,
     0,
   );
-  const totalWarnings = filteredReviews.reduce(
-    (sum, item) => sum + item.warnings,
-    0,
-  );
-  const readyCount = filteredReviews.filter(
-    (item) => item.lane === "ready",
+  const packagesWithBlockers = filteredReviews.filter(
+    (item) => item.blockers > 0,
   ).length;
+  const laneCounts = {
+    review: filteredReviews.filter((item) => item.lane === "review").length,
+    returned: filteredReviews.filter((item) => item.lane === "returned").length,
+  };
+  const exportQueueCount = (submissions ?? []).filter(
+    (submission) => submission.status === "ready_for_export",
+  ).length;
+  const hasActiveFilters =
+    activeLane !== "all" ||
+    cityFilter !== "Все города" ||
+    searchQuery.length > 0 ||
+    sortBy !== "tripDate" ||
+    typeFilter !== "all";
   const aiWatchlist = useMemo(
-    () => buildReviewAiWatchlist(submissions),
-    [submissions],
+    () => buildReviewAiWatchlist(reviewSubmissions),
+    [reviewSubmissions],
   );
-
-  useEffect(() => {
-    if (!showIntro) return;
-
-    window.sessionStorage.setItem(reviewIntroStorageKey, "true");
-    const timeoutId = window.setTimeout(() => {
-      setShowIntro(false);
-    }, 5000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [showIntro]);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="v19-admin-screen grid h-full min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"
+      className="v19-admin-screen v19-admin-review-screen"
     >
-      <section className="min-w-0 space-y-5">
-        {showIntro && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="rounded-[10px] border border-[#242529] bg-gradient-to-br from-[#1a1a1d] via-[#161617] to-[#101011] p-5 lg:p-6"
-          >
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
-                <ShieldCheck className="h-3.5 w-3.5" /> Admin review cockpit
-              </div>
-              <h2 className="text-[24px] font-semibold tracking-tight text-white lg:text-[32px]">
-                Пакеты на проверку
-              </h2>
-              <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/50">
-                Не просто карточки: очередь показывает приоритет, блокеры,
-                следующее действие, AI-флаги и готовность к выгрузке за 3
-                секунды.
-              </p>
-            </div>
-          </motion.div>
-        )}
+      <section className="v19-admin-review-main min-w-0 space-y-5">
+        <V19PriorityHero
+          actionAriaLabel={`Открыть критические пакеты: ${totalBlockers} требуют решения`}
+          actionDisabled={totalBlockers === 0}
+          eyebrow="Контроль проверки"
+          eyebrowIcon={ShieldCheck}
+          hasBlockers={totalBlockers > 0}
+          summary={totalBlockers
+            ? "Сначала разберите пакеты с критичными замечаниями — они удерживают заявки от принятия и выгрузки."
+            : "Критичных препятствий нет. Продолжайте ручную проверку по ближайшей дате поездки."}
+          title={totalBlockers
+            ? `${totalBlockers} ${totalBlockers === 1 ? "критичное замечание требует" : "критичных замечания требуют"} решения`
+            : "Очередь готова к проверке"}
+          onAction={() => setActiveLane("urgent")}
+        />
 
-        <div className="grid grid-cols-4 gap-2">
-          <AdminMetricCard
-            active={activeLane === "all"}
-            icon={FileText}
-            label="В очереди"
-            value={`${filteredReviews.length}`}
-            onClick={() => setActiveLane("all")}
-          />
-          <AdminMetricCard
-            active={activeLane === "urgent"}
-            icon={Flame}
-            label="Блокеры"
-            value={`${totalBlockers}`}
-            tone="red"
-            onClick={() => setActiveLane("urgent")}
-          />
+        <AdminMetricStrip className="v19-admin-review-metrics">
           <AdminMetricCard
             active={activeLane === "review"}
-            icon={AlertCircle}
-            label="К проверке"
-            value={`${totalWarnings}`}
+            detail={reviewCountLabel(laneCounts.review)}
+            icon={ShieldCheck}
+            label="Ревью"
+            value={`${laneCounts.review}`}
             tone="orange"
-            onClick={() => setActiveLane("review")}
+            onClick={() => setActiveLane((current) => current === "review" ? "all" : "review")}
           />
           <AdminMetricCard
-            active={activeLane === "ready"}
-            icon={CheckCircle2}
-            label="К выгрузке"
-            value={`${readyCount}`}
-            tone="green"
-            onClick={() => setActiveLane("ready")}
+            active={activeLane === "returned"}
+            detail={reviewCountLabel(laneCounts.returned)}
+            icon={MessageSquareWarning}
+            label="Правки"
+            value={`${laneCounts.returned}`}
+            tone="blue"
+            onClick={() => setActiveLane((current) => current === "returned" ? "all" : "returned")}
           />
-        </div>
+          <AdminMetricCard
+            active={false}
+            detail={reviewCountLabel(exportQueueCount)}
+            icon={CheckCircle2}
+            label="Готово"
+            value={`${exportQueueCount}`}
+            tone="green"
+            onClick={onOpenExport}
+          />
+        </AdminMetricStrip>
 
-        <div className="rounded-[10px] border border-[#242529] bg-[#161617]">
+        <AdminContextToggle
+          badge={aiWatchlist.length}
+          className="v19-admin-review-context-toggle"
+          detail="AI, SLA и правила"
+          expanded={mobileContextOpen}
+          icon={Bot}
+          onClick={() => setMobileContextOpen(true)}
+          title="Контекст проверки"
+        />
+
+        <div className="v19-admin-review-board border border-[#242529] bg-[#161617]">
+          <AdminListHeader
+            actionDisabled={!hasActiveFilters}
+            actionLabel="Все"
+            className="v19-admin-review-list-head"
+            countLabel={`${visibleReviews.length} ${reviewCountLabel(visibleReviews.length)}`}
+            onAction={() => {
+              setActiveLane("all");
+              setCityFilter("Все города");
+              setSearchQuery("");
+              setSortBy("tripDate");
+              setTypeFilter("all");
+            }}
+            title="Очередь проверки"
+          />
           <AdminQueueToolbar
+            actionDisabled={!hasActiveFilters}
+            actionIcon={RotateCcw}
             cityFilter={cityFilter}
             cityOptions={cityOptions}
-            filterLabel="Фильтры проверки"
+            filterLabel="Сбросить фильтры"
             controls={
               <>
                 <AdminToolbarSelect<AdminReviewSort>
+                  icon={ArrowUpDown}
                   label="Сортировка"
                   value={sortBy}
                   onChange={setSortBy}
                   options={[
-                    { value: "tripDate", label: "Дата поездки" },
-                    { value: "createdAt", label: "Дата создания" },
+                    { value: "tripDate", label: "По дате вылета" },
+                    { value: "createdAt", label: "По дате создания" },
                   ]}
                 />
                 <AdminToolbarSelect<AdminReviewTypeFilter>
+                  icon={Shapes}
                   label="Тип"
                   value={typeFilter}
                   onChange={setTypeFilter}
                   options={[
-                    { value: "all", label: "Семьи и заявители" },
+                    { value: "all", label: "Все типы" },
                     { value: "family", label: "Семьи" },
                     { value: "single", label: "Заявители" },
                   ]}
@@ -650,11 +551,11 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
               setTypeFilter("all");
             }}
             onSearchChange={setSearchQuery}
-            searchPlaceholder="Поиск: ID, агент, семья"
+            searchPlaceholder="ID, семья или агент"
             searchValue={searchQuery}
           />
 
-          <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2 2xl:grid-cols-4">
+          <div className="v19-admin-review-lanes">
             {lanes.map((lane) => {
               const Icon = lane.icon;
               const laneItems = visibleReviews.filter(
@@ -670,30 +571,26 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
               return (
                 <div
                   key={lane.id}
-                  className="min-h-[360px] rounded-[10px] border border-[#242529] bg-[#141416] p-3"
+                  className="v19-admin-review-lane"
                 >
-                  <div className="mb-3 flex items-center justify-between gap-2 px-1">
-                    <div className="flex items-center gap-2">
+                  <div className="v19-admin-review-lane-header">
+                    <div>
                       <div
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border ${toneClasses(lane.tone)}`}
+                        className={`v19-admin-review-lane-icon tone-${lane.tone}`}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon />
                       </div>
                       <div>
-                        <div className="text-[13px] font-semibold text-white">
-                          {lane.title}
-                        </div>
-                        <div className="text-[10.5px] text-white/35">
-                          {lane.subtitle}
-                        </div>
+                        <strong>{lane.title}</strong>
+                        <small>{lane.subtitle}</small>
                       </div>
                     </div>
-                    <span className="rounded-[8px] bg-white/5 px-2 py-1 text-[11px] font-medium text-white/45">
+                    <span>
                       {laneItems.length} {reviewCountLabel(laneItems.length)}
                     </span>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="v19-admin-review-lane-list">
                     {laneItems.map((item) => (
                       <ReviewQueueCard
                         key={item.id}
@@ -709,7 +606,23 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
         </div>
       </section>
 
-      <aside className="flex min-h-0 flex-col gap-5">
+      <aside
+        aria-label="Контекст проверки"
+        className={`v19-admin-review-rail flex min-h-0 flex-col gap-5 ${mobileContextOpen ? "is-mobile-open" : ""}`}
+      >
+        <div className="v19-admin-review-sheet-header">
+          <div>
+            <strong>Контекст проверки</strong>
+            <small>AI-подсказки, SLA и правила</small>
+          </div>
+          <button
+            aria-label="Закрыть контекст проверки"
+            type="button"
+            onClick={() => setMobileContextOpen(false)}
+          >
+            <X aria-hidden="true" />
+          </button>
+        </div>
         <div className="rounded-[10px] border border-[#242529] bg-[#161617] p-5">
           <div className="mb-4 flex items-center gap-2">
             <Bot className="h-4 w-4 text-[#b8baff]" />
@@ -729,11 +642,11 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
                   onClick={() => onOpenDrawer(item.id)}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-[12px] font-semibold text-white">
+                    <span className="min-w-0 whitespace-normal text-[12px] font-semibold text-white">
                       {item.id} · {item.title}
                     </span>
                     {typeof item.score === "number" ? (
-                      <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/45">
+                      <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--v19b-color-text-muted)]">
                         {item.score}
                       </span>
                     ) : null}
@@ -768,26 +681,26 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
           <div className="mb-4 flex items-center gap-2">
             <Clock className="h-4 w-4 text-white/40" />
             <h3 className="text-[15px] font-semibold text-white">
-              SLA сегодня
+              Очередь сейчас
             </h3>
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-white/45">Среднее ревью</span>
+              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">Пакетов</span>
               <span className="text-[13px] font-semibold text-white">
-                37 мин
+                {filteredReviews.length}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-white/45">Старейший пакет</span>
+              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">С критичными замечаниями</span>
               <span className="text-[13px] font-semibold text-white/62">
-                2 ч 05 мин
+                {packagesWithBlockers}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-[10px] bg-white/[0.03] p-3">
-              <span className="text-[12px] text-white/45">К выгрузке</span>
+              <span className="text-[12px] text-[var(--v19b-color-text-muted)]">К выгрузке</span>
               <span className="text-[13px] font-semibold text-[#b8baff]">
-                1 пакет
+                {exportQueueCount}
               </span>
             </div>
           </div>
@@ -814,6 +727,14 @@ export function ReviewScreen({ onOpenDrawer, submissions }: AdminScreenProps) {
           </div>
         </div>
       </aside>
+      {mobileContextOpen ? (
+        <button
+          aria-label="Закрыть контекст проверки"
+          className="v19-admin-review-sheet-backdrop"
+          type="button"
+          onClick={() => setMobileContextOpen(false)}
+        />
+      ) : null}
     </motion.div>
   );
 }

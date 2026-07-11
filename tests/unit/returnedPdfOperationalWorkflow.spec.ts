@@ -216,7 +216,7 @@ describe("returned PDF operational handoff gate", () => {
     });
   });
 
-  test("missing passport artifact filenames use fallback and handoff creates blocker", () => {
+  test("missing passport artifact filenames fail closed and handoff creates blocker", () => {
     const withoutPassport = withApplicantIdentity(
       exportedSubmission("ПД-1056", "local-agent-tony"),
       {
@@ -227,12 +227,12 @@ describe("returned PDF operational handoff gate", () => {
       },
     );
 
-    expect(
+    expect(() =>
       buildApplicantArtifactFileNames(
         withoutPassport,
         withoutPassport.applicants[0]?.id ?? "",
-      )?.passportScan,
-    ).toMatch(/^missing-passport_passport_scan_/);
+      ),
+    ).toThrow("отсутствует номер паспорта");
     expect(buildAgentHandoffPackage(withoutPassport).blockers.join(" ")).toContain(
       "Нет номера паспорта",
     );

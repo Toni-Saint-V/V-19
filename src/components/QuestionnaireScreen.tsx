@@ -1,29 +1,45 @@
-import { useEffect, useMemo, useState } from 'react';
-import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
-import { FigmaQuestionnaireScreen } from '../modules/submissions/components/FigmaQuestionnaireScreen';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  emitVisaflowUiEvent,
+  useVisaflowBusinessBridge,
+} from "../integration/visaflowBusinessBridge";
+import {
+  FigmaQuestionnaireScreen,
+  type QuestionnaireInitialFocus,
+} from "../modules/submissions/components/FigmaQuestionnaireScreen";
 import {
   createQuestionnaireSections,
   normalizeSubmissionQuestionnaire,
   updateQuestionnaireField,
   type QuestionnaireFieldUpdate,
-} from '../modules/submissions/questionnaire';
-import { defaultLocalAgentOwnerId } from '../modules/submissions/ownership';
+} from "../modules/submissions/questionnaire";
+import { defaultLocalAgentOwnerId } from "../modules/submissions/ownership";
 import {
   applySubmissionActionResult,
+  markSubmissionIssueFixedResult,
   withRecalculatedSubmissionProgress,
-} from '../modules/submissions/status';
-import { productIntakeDraftToSubmission } from '../modules/submissions/productIntakeSubmissionAdapter';
-import type { City, Submission } from '../modules/submissions/types';
-import type { ProductIntakeDraft } from '../modules/submissions/productIntakeFlow';
+} from "../modules/submissions/status";
+import { productIntakeDraftToSubmission } from "../modules/submissions/productIntakeSubmissionAdapter";
+import type {
+  City,
+  PassportExtractedFieldKey,
+  Submission,
+} from "../modules/submissions/types";
+import type { ProductIntakeDraft } from "../modules/submissions/productIntakeFlow";
 
 interface QuestionnaireScreenProps {
-  agentId?: Submission['agentId'];
+  agentId?: Submission["agentId"];
+  initialFocus?: QuestionnaireInitialFocus;
   submissionId: string;
   onBack: () => void;
   draft?: ProductIntakeDraft;
   submission?: Submission;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
   onSaveDraft?: (submissionId: string) => void | Promise<void>;
+  onMarkIssueFixed?: (issueId: string) => Promise<Submission>;
+  onSubmissionUpdate?: (
+    update: (submission: Submission) => Submission,
+  ) => Promise<Submission>;
   onSubmissionChange?: (submission: Submission) => void | Promise<void>;
   onSubmitForReview?: (submissionId: string) => void | Promise<void>;
 }
@@ -31,36 +47,63 @@ interface QuestionnaireScreenProps {
 type QuestionnaireCommitPayload = {
   fieldUpdates: QuestionnaireFieldUpdate[];
   focusedUpdate?: QuestionnaireFieldUpdate;
+  reviewConfirmations?: QuestionnaireReviewConfirmation[];
+  saveIntent?: "autosave" | "completion" | "manual" | "navigation";
   travelEnd: string;
   travelStart: string;
 };
 
-const fallbackCity: City = 'Москва';
+type QuestionnaireReviewConfirmation = {
+  applicantId: string;
+  fieldId: string;
+  sectionId: string;
+};
+
+const questionnaireFieldIdByPassportExtractionKey: Record<
+  PassportExtractedFieldKey,
+  string
+> = {
+  birthCountry: "birth-country",
+  birthDate: "birth-date",
+  birthPlace: "birth-place",
+  citizenship: "nationality",
+  firstName: "first-name",
+  gender: "gender",
+  passportExpiresAt: "passport-expiry-date",
+  passportIssueCountry: "passport-issue-country",
+  passportIssuePlace: "passport-issue-place",
+  passportIssuedAt: "passport-issue-date",
+  passportNumber: "passport-no",
+  passportType: "passport-type",
+  surname: "surname",
+};
+
+const fallbackCity: City = "Москва";
 
 function fallbackSubmission(
   submissionId: string,
-  agentId: Submission['agentId'] = defaultLocalAgentOwnerId,
+  agentId: Submission["agentId"] = defaultLocalAgentOwnerId,
 ): Submission {
   const createdAt = new Date().toISOString();
   return normalizeSubmissionQuestionnaire({
     id: submissionId,
     agentId,
-    title: 'Новая анкета',
-    type: 'single',
-    country: 'Испания',
-    countryCode: 'ES',
+    title: "Новая анкета",
+    type: "single",
+    country: "Испания",
+    countryCode: "ES",
     city: fallbackCity,
-    tripDateFrom: '',
-    tripDateTo: '',
-    status: 'draft',
+    tripDateFrom: "",
+    tripDateTo: "",
+    status: "draft",
     applicants: [
       {
-        id: 'applicant-1',
-        fullName: 'Заявитель',
-        role: 'main',
-        questionnaireStatus: 'empty',
-        fileStatus: 'empty',
-        sections: createQuestionnaireSections('applicant-1', 'Заявитель', 'empty'),
+        id: "applicant-1",
+        fullName: "Заявитель",
+        role: "main",
+        questionnaireStatus: "empty",
+        fileStatus: "empty",
+        sections: createQuestionnaireSections("applicant-1", "Заявитель", "empty"),
       },
     ],
     issues: [],
@@ -87,98 +130,185 @@ function uniqueQuestionnaireUpdates(
   return [...byKey.values()];
 }
 
+function questionnaireReviewConfirmationKey(
+  input: Pick<QuestionnaireReviewConfirmation, "applicantId" | "fieldId">,
+) {
+  return `${input.applicantId}:${input.fieldId}`;
+}
+
+function questionnaireSectionMatches(sectionId: string, expectedSectionId: string) {
+  return sectionId === expectedSectionId || sectionId.endsWith(`-${expectedSectionId}`);
+}
+
+function applyQuestionnaireReviewConfirmations(
+  submission: Submission,
+  confirmations: QuestionnaireReviewConfirmation[],
+  actorId: string,
+  nowIso: string,
+) {
+  if (!confirmations.length) return submission;
+
+  const confirmationKeys = new Set(
+    confirmations.map((confirmation) => questionnaireReviewConfirmationKey(confirmation)),
+  );
+  const confirmationSections = new Map(
+    confirmations.map((confirmation) => [
+      questionnaireReviewConfirmationKey(confirmation),
+      confirmation.sectionId,
+    ]),
+  );
+
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => ({
+      ...applicant,
+      sections: applicant.sections.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => {
+          const key = questionnaireReviewConfirmationKey({
+            applicantId: applicant.id,
+            fieldId: field.id,
+          });
+          const expectedSectionId = confirmationSections.get(key);
+          if (
+            !confirmationKeys.has(key) ||
+            !expectedSectionId ||
+            !questionnaireSectionMatches(section.id, expectedSectionId) ||
+            !field.value.trim() ||
+            field.error
+          ) {
+            return field;
+          }
+
+          return {
+            ...field,
+            reviewConfirmedAtIso: nowIso,
+            reviewConfirmedBy: actorId,
+            reviewOriginSource: field.reviewOriginSource ?? field.reviewSource,
+            reviewSource: "manual" as const,
+            reviewState: "confirmed" as const,
+          };
+        }),
+      })),
+    })),
+    updatedAt: nowIso,
+  };
+}
+
+function synchronizePassportExtractionConfirmations(
+  submission: Submission,
+  fieldUpdates: QuestionnaireFieldUpdate[],
+  confirmations: QuestionnaireReviewConfirmation[],
+  nowIso: string,
+) {
+  const updatedKeys = new Set(
+    fieldUpdates.map((update) => questionnaireReviewConfirmationKey(update)),
+  );
+  const confirmationKeys = new Set(
+    confirmations.map((confirmation) => questionnaireReviewConfirmationKey(confirmation)),
+  );
+
+  return {
+    ...submission,
+    applicants: submission.applicants.map((applicant) => {
+      const extraction = applicant.passportExtraction;
+      if (!extraction || extraction.status !== "ready" || !extraction.extractedFields.length) {
+        return applicant;
+      }
+
+      const questionnaireFields = new Map(
+        applicant.sections
+          .flatMap((section) => section.fields)
+          .map((field) => [field.id, field]),
+      );
+      const extractedFields = extraction.extractedFields.map((field) => {
+        const questionnaireFieldId = questionnaireFieldIdByPassportExtractionKey[field.key];
+        const key = questionnaireReviewConfirmationKey({
+          applicantId: applicant.id,
+          fieldId: questionnaireFieldId,
+        });
+        const questionnaireField = questionnaireFields.get(questionnaireFieldId);
+        const explicitlyConfirmed =
+          confirmationKeys.has(key) &&
+          questionnaireField?.reviewState === "confirmed" &&
+          Boolean(questionnaireField.reviewConfirmedAtIso);
+        const previouslyConfirmed =
+          questionnaireField?.reviewState === "confirmed" &&
+          Boolean(questionnaireField.reviewConfirmedAtIso);
+
+        if (explicitlyConfirmed || previouslyConfirmed) {
+          return {
+            ...field,
+            needsManualReview: false,
+            value: questionnaireField?.value ?? field.value,
+            verified: true,
+          };
+        }
+        if (updatedKeys.has(key)) {
+          return { ...field, needsManualReview: true, verified: false };
+        }
+        return field;
+      });
+      const allExtractedFieldsVerified = extractedFields.every(
+        (field) => field.verified === true,
+      );
+
+      return {
+        ...applicant,
+        passportExtraction: {
+          ...extraction,
+          extractedFields,
+          verifiedAtIso: allExtractedFieldsVerified
+            ? (extraction.verifiedAtIso ?? nowIso)
+            : undefined,
+        },
+      };
+    }),
+  };
+}
+
 function applyQuestionnairePayload(
   submission: Submission,
   payload: QuestionnaireCommitPayload,
+  actorId: string,
+  nowIso: string,
 ) {
-  const updates = uniqueQuestionnaireUpdates([
-    ...payload.fieldUpdates,
-    payload.focusedUpdate,
-  ]);
+  const updates = uniqueQuestionnaireUpdates(payload.fieldUpdates);
   const withFields = updates.reduce(
     (nextSubmission, update) =>
-      updateQuestionnaireField(nextSubmission, {
-        ...update,
-        reviewOriginSource: update.reviewOriginSource ?? update.reviewSource,
-        reviewSource: 'manual',
-        reviewState: 'confirmed',
-      }),
+      updateQuestionnaireField(nextSubmission, update),
     submission,
+  );
+  const confirmations = payload.reviewConfirmations ?? [];
+  const withExplicitConfirmations = applyQuestionnaireReviewConfirmations(
+    withFields,
+    confirmations,
+    actorId,
+    nowIso,
+  );
+  const withPassportReview = synchronizePassportExtractionConfirmations(
+    withExplicitConfirmations,
+    updates,
+    confirmations,
+    nowIso,
   );
   const travelStart = payload.travelStart.trim();
   const travelEnd = payload.travelEnd.trim();
 
   return withRecalculatedSubmissionProgress(
     normalizeSubmissionQuestionnaire({
-      ...withFields,
-      tripDateFrom: travelStart || withFields.tripDateFrom,
-      tripDateTo: travelEnd || withFields.tripDateTo,
-      updatedAt: new Date().toISOString(),
-    }),
-  );
-}
-
-function confirmAnsweredQuestionnaireFields(
-  submission: Submission,
-  actorId: string,
-  nowIso: string,
-): Submission {
-  return withRecalculatedSubmissionProgress(
-    normalizeSubmissionQuestionnaire({
-      ...submission,
-      applicants: submission.applicants.map((applicant) => ({
-        ...applicant,
-        sections: applicant.sections.map((section) => ({
-          ...section,
-          fields: section.fields.map((field) => {
-            if (!field.value.trim() || field.error) return field;
-            return {
-              ...field,
-              reviewConfirmedAtIso: nowIso,
-              reviewConfirmedBy: actorId,
-              reviewOriginSource: field.reviewOriginSource ?? field.reviewSource,
-              reviewSource: 'manual',
-              reviewState: 'confirmed',
-            };
-          }),
-        })),
-      })),
+      ...withPassportReview,
+      tripDateFrom: travelStart || withPassportReview.tripDateFrom,
+      tripDateTo: travelEnd || withPassportReview.tripDateTo,
       updatedAt: nowIso,
     }),
   );
 }
 
-function markPassportExtractionVerifiedForSubmit(
-  submission: Submission,
-  nowIso: string,
-): Submission {
-  return {
-    ...submission,
-    applicants: submission.applicants.map((applicant) => {
-      const extraction = applicant.passportExtraction;
-      if (!extraction || extraction.status !== 'ready') return applicant;
-
-      return {
-        ...applicant,
-        passportExtraction: {
-          ...extraction,
-          extractedFields: extraction.extractedFields.map((field) => ({
-            ...field,
-            needsManualReview: false,
-            verified: true,
-          })),
-          verifiedAtIso: nowIso,
-        },
-      };
-    }),
-    updatedAt: nowIso,
-  };
-}
-
 function appendLocalHistory(
   submission: Submission,
   text: string,
-  source: 'agent' | 'system' = 'agent',
+  source: "agent" | "system" = "agent",
 ): Submission {
   const nowIso = new Date().toISOString();
   return {
@@ -198,12 +328,15 @@ function appendLocalHistory(
 
 export function QuestionnaireScreen({
   agentId,
+  initialFocus,
   submissionId,
   onBack,
   draft,
   submission,
   onUploadFile,
   onSaveDraft,
+  onMarkIssueFixed,
+  onSubmissionUpdate,
   onSubmissionChange,
   onSubmitForReview,
 }: QuestionnaireScreenProps) {
@@ -221,85 +354,131 @@ export function QuestionnaireScreen({
     [agentId, draft, submission, submissionId],
   );
   const [workingSubmission, setWorkingSubmission] = useState(sourceSubmission);
+  const workingSubmissionRef = useRef(sourceSubmission);
 
   useEffect(() => {
+    workingSubmissionRef.current = sourceSubmission;
     setWorkingSubmission(sourceSubmission);
   }, [sourceSubmission]);
 
-  const persistSubmission = (nextSubmission: Submission) => {
-    setWorkingSubmission(nextSubmission);
-    void onSubmissionChange?.(nextSubmission);
-  };
+  const persistSubmissionUpdate = useCallback(
+    async (update: (submission: Submission) => Submission) => {
+      const nextSubmission = onSubmissionUpdate
+        ? await onSubmissionUpdate(update)
+        : update(workingSubmissionRef.current);
+      if (!onSubmissionUpdate) await onSubmissionChange?.(nextSubmission);
+      workingSubmissionRef.current = nextSubmission;
+      setWorkingSubmission(nextSubmission);
+      return nextSubmission;
+    },
+    [onSubmissionChange, onSubmissionUpdate],
+  );
 
-  const handleSaveDraft = (payload: QuestionnaireCommitPayload) => {
-    const nextSubmission = appendLocalHistory(
-      applyQuestionnairePayload(workingSubmission, payload),
-      'Черновик анкеты сохранён',
-    );
+  const handleSaveDraft = useCallback(
+    async (payload: QuestionnaireCommitPayload) => {
+      const nextSubmission = await persistSubmissionUpdate((currentSubmission) => {
+        const preparedSubmission = applyQuestionnairePayload(
+          currentSubmission,
+          payload,
+          currentSubmission.agentId,
+          new Date().toISOString(),
+        );
 
-    persistSubmission(nextSubmission);
-    void onSaveDraft?.(nextSubmission.id);
-  };
+        return payload.saveIntent === "manual"
+          ? appendLocalHistory(preparedSubmission, "Черновик анкеты сохранён")
+          : preparedSubmission;
+      });
+      await onSaveDraft?.(nextSubmission.id);
+    },
+    [onSaveDraft, persistSubmissionUpdate],
+  );
 
-  const handleComplete = (payload: QuestionnaireCommitPayload) => {
-    const nowIso = new Date().toISOString();
-    const actorId = workingSubmission.agentId;
-    const preparedSubmission = withRecalculatedSubmissionProgress(
-      markPassportExtractionVerifiedForSubmit(
-        confirmAnsweredQuestionnaireFields(
-          applyQuestionnairePayload(workingSubmission, payload),
+  const handleComplete = useCallback(
+    async (payload: QuestionnaireCommitPayload) => {
+      const nextSubmission = await persistSubmissionUpdate((currentSubmission) => {
+        const nowIso = new Date().toISOString();
+        const actorId = currentSubmission.agentId;
+        const preparedSubmission = applyQuestionnairePayload(
+          currentSubmission,
+          payload,
           actorId,
           nowIso,
-        ),
-        nowIso,
-      ),
-    );
-
-    const savedResult =
-      preparedSubmission.status === 'draft'
-        ? applySubmissionActionResult(
-            preparedSubmission,
-            'save_progress',
-            'agent',
-            actorId,
-          )
-        : { ok: true as const, data: preparedSubmission };
-    const savedSubmission = savedResult.ok ? savedResult.data : preparedSubmission;
-    const submittedResult = applySubmissionActionResult(
-      savedSubmission,
-      'submit_for_review',
-      'agent',
-      actorId,
-    );
-    const submitSucceeded = 'data' in submittedResult;
-    const nextSubmission = submitSucceeded ? submittedResult.data : savedSubmission;
-
-    persistSubmission(nextSubmission);
-
-    if (submitSucceeded) {
-      void onSubmitForReview?.(nextSubmission.id);
+        );
+        const savedResult =
+          preparedSubmission.status === "draft"
+            ? applySubmissionActionResult(
+                preparedSubmission,
+                "save_progress",
+                "agent",
+                actorId,
+              )
+            : { ok: true as const, data: preparedSubmission };
+        if (!savedResult.ok) throw new Error(savedResult.error.message);
+        const completionAction =
+          savedResult.data.status === "returned"
+            ? "submit_corrections"
+            : "submit_for_review";
+        const submittedResult = applySubmissionActionResult(
+          savedResult.data,
+          completionAction,
+          "agent",
+          actorId,
+        );
+        if (!submittedResult.ok) throw new Error(submittedResult.error.message);
+        return submittedResult.data;
+      });
+      if (
+        nextSubmission.status !== "corrections_received" &&
+        nextSubmission.status !== "submitted_for_review"
+      ) {
+        throw new Error("Не удалось подтвердить отправку анкеты в актуальном состоянии.");
+      }
+      const completedAction =
+        nextSubmission.status === "corrections_received"
+          ? "submit_corrections"
+          : "submit_for_review";
+      await onSubmitForReview?.(nextSubmission.id);
       emitVisaflowUiEvent(bridge, {
-        type: 'submission.action',
+        type: "submission.action",
         payload: {
           submissionId: nextSubmission.id,
-          action: 'submit_for_review',
-          source: 'agent',
+          action: completedAction,
+          source: "agent",
         },
       });
-      return;
-    }
+    },
+    [bridge, onSubmitForReview, persistSubmissionUpdate],
+  );
 
-    void onSaveDraft?.(nextSubmission.id);
-    if (typeof window !== 'undefined' && 'error' in submittedResult) {
-      window.alert(submittedResult.error.message);
-    }
-  };
+  const handleMarkIssueFixed = useCallback(
+    async (issueId: string) => {
+      if (onMarkIssueFixed) {
+        const nextSubmission = await onMarkIssueFixed(issueId);
+        workingSubmissionRef.current = nextSubmission;
+        setWorkingSubmission(nextSubmission);
+        return;
+      }
+
+      await persistSubmissionUpdate((currentSubmission) => {
+        const result = markSubmissionIssueFixedResult(
+          currentSubmission,
+          issueId,
+          "agent",
+        );
+        if (!result.ok) throw new Error(result.error.message);
+        return result.data;
+      });
+    },
+    [onMarkIssueFixed, persistSubmissionUpdate],
+  );
 
   return (
     <FigmaQuestionnaireScreen
+      initialFocus={initialFocus}
       submission={workingSubmission}
       onBack={onBack}
       onComplete={handleComplete}
+      onMarkIssueFixed={handleMarkIssueFixed}
       onSaveDraft={handleSaveDraft}
       onUploadFile={onUploadFile}
     />

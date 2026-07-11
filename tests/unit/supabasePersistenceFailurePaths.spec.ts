@@ -22,6 +22,7 @@ vi.mock("../../src/lib/supabase/config", () => ({
 }));
 
 import {
+  requestPasswordReset,
   signInSupabaseWithPassword,
 } from "../../src/services/authService";
 import { saveSubmissionDraft } from "../../src/services/submissionService";
@@ -270,6 +271,32 @@ describe("Supabase persistence failure paths", () => {
         retryable: false,
       },
       userMessage: "Unable to sign in. Check email, password, and Supabase profile.",
+    });
+  });
+
+  test("requests real Supabase password reset when Auth is active", async () => {
+    const resetPasswordForEmail = vi.fn(async () => ({ error: null }));
+    supabaseMock.client = {
+      auth: {
+        resetPasswordForEmail,
+      },
+    };
+
+    await expect(requestPasswordReset("agent@example.com")).resolves.toEqual({
+      status: "requested",
+      message: "Если аккаунт существует, мы отправим инструкции на почту.",
+    });
+    expect(resetPasswordForEmail).toHaveBeenCalledWith(
+      "agent@example.com",
+      expect.objectContaining({ redirectTo: expect.any(String) }),
+    );
+  });
+
+  test("does not fake password reset in local mode", async () => {
+    supabaseMock.client = null;
+
+    await expect(requestPasswordReset("agent@example.com")).resolves.toMatchObject({
+      status: "unavailable",
     });
   });
 

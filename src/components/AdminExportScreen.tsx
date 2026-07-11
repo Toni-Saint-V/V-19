@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   AlertTriangle,
+  ArrowUpDown,
   ArrowRight,
   Bot,
   CheckCircle2,
@@ -16,10 +17,13 @@ import {
   Lock,
   MapPin,
   PackageCheck,
+  RotateCcw,
   ShieldCheck,
+  Shapes,
   UploadCloud,
   User,
   Users,
+  X,
   XCircle,
 } from "lucide-react";
 import {
@@ -39,11 +43,19 @@ import type {
 } from "../modules/submissions/types";
 import type { ExportWorkbookArtifact } from "../modules/submissions/exportWorkbook";
 import {
+  AdminContextToggle,
+  AdminListHeader,
   AdminMetricCard,
+  AdminMetricStrip,
   AdminQueueToolbar,
   AdminToolbarSelect,
 } from "./AdminSurfaceCommon";
+import { V19QueueCard } from "../shared/ui/v19-design-system";
 import { agentDisplayName } from "../modules/submissions/agentDirectory";
+import {
+  cityFilterValuesForSubmissions,
+  questionnaireCityForSubmission,
+} from "../modules/submissions/selectors";
 import { ExportWorkbookPreview } from "./ExportWorkbookPreview";
 
 interface ExportItem {
@@ -73,7 +85,7 @@ interface PreparedExportPackage {
   workbookArtifact: ExportWorkbookArtifact;
 }
 
-type ExportQueueTab = "all" | "selected" | "blocked";
+type ExportQueueTab = "ready" | "selected" | "blocked";
 type ExportSort = "tripDate" | "createdAt";
 type ExportTypeFilter = "all" | "family" | "single";
 
@@ -121,7 +133,7 @@ function ManifestRow({
     <div className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2.5">
       <div className="flex items-center gap-2 min-w-0">
         <Icon className={`h-4 w-4 shrink-0 ${stateClass}`} />
-        <span className="truncate text-[12px] text-white/55">{label}</span>
+        <span className="text-[12px] text-white/55">{label}</span>
       </div>
       <span className="shrink-0 text-[12px] font-medium text-white/85">
         {value}
@@ -134,11 +146,7 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
   return submissions
     .flatMap((submission) => {
       const summary = exportSummary([submission]);
-      if (
-        submission.status !== "ready_for_export" ||
-        submission.completeness.total !== 100 ||
-        !summary.ready
-      ) {
+      if (submission.status !== "ready_for_export") {
         return [];
       }
 
@@ -148,7 +156,7 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
         type: submission.type,
         applicantsCount: submission.applicants.length,
         country: submission.country,
-        city: submission.city,
+        city: questionnaireCityForSubmission(submission),
         appointmentDate: `${submission.tripDateFrom} – ${submission.tripDateTo}`,
         approvedDate: submission.updatedAt,
         selected: false,
@@ -157,7 +165,7 @@ function exportItemsFromSubmissions(submissions: Submission[]): ExportItem[] {
         blockers: summary.blockers.length,
         files: submission.files.length,
         agent: submission.agentId,
-        packageSize: `${summary.rowCount} строк`,
+        packageSize: `${summary.rowCount} ${rowCountLabel(summary.rowCount)}`,
         blockerReasons: summary.blockers.map((blocker) => blocker.reason),
         warningReasons: summary.warnings.map((warning) => warning.reason),
       }];
@@ -174,6 +182,34 @@ function dateValue(value: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function countLabel(
+  count: number,
+  forms: [singular: string, few: string, many: string],
+) {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return forms[2];
+  if (lastDigit === 1) return forms[0];
+  if (lastDigit >= 2 && lastDigit <= 4) return forms[1];
+  return forms[2];
+}
+
+function packageCountLabel(count: number) {
+  return countLabel(count, ["пакет", "пакета", "пакетов"]);
+}
+
+function applicantCountLabel(count: number) {
+  return countLabel(count, ["заявитель", "заявителя", "заявителей"]);
+}
+
+function rowCountLabel(count: number) {
+  return countLabel(count, ["строка", "строки", "строк"]);
+}
+
+function fileCountLabel(count: number) {
+  return countLabel(count, ["файл", "файла", "файлов"]);
+}
+
 export function AdminExportScreen({
   submissions = [],
 }: {
@@ -185,7 +221,7 @@ export function AdminExportScreen({
     [submissions],
   );
   const [selectedRealIds, setSelectedRealIds] = useState<string[]>([]);
-  const [activeQueueTab, setActiveQueueTab] = useState<ExportQueueTab>("all");
+  const [activeQueueTab, setActiveQueueTab] = useState<ExportQueueTab>("ready");
   const [activeId, setActiveId] = useState("");
   const [agentFilter, setAgentFilter] = useState("Все агенты");
   const [cityFilter, setCityFilter] = useState("Все города");
@@ -197,6 +233,7 @@ export function AdminExportScreen({
   const [exportNotice, setExportNotice] = useState("");
   const [preparedExport, setPreparedExport] =
     useState<PreparedExportPackage | null>(null);
+  const [mobileControlOpen, setMobileControlOpen] = useState(false);
 
   const clearPreparedExport = () => {
     setPreparedExport(null);
@@ -205,22 +242,12 @@ export function AdminExportScreen({
 
   useEffect(() => {
     setSelectedRealIds((current) => {
-      const available = new Set(realItems.map((item) => item.id));
-      const kept = current.filter((id) => available.has(id));
-      if (kept.length) return kept;
-      const preferred = realItems.find((item) =>
-        item.title.includes("Дмитрий Орлов"),
-      );
-      if (preferred) return [preferred.id];
-      const firstUnblocked = realItems.find((item) => item.blockers === 0);
-      return [(firstUnblocked ?? realItems[0])?.id].filter(Boolean) as string[];
+      const selectableItems = realItems.filter((item) => item.blockers === 0);
+      const available = new Set(selectableItems.map((item) => item.id));
+      return current.filter((id) => available.has(id));
     });
     setActiveId((current) => {
       if (realItems.some((item) => item.id === current)) return current;
-      const preferred = realItems.find((item) =>
-        item.title.includes("Дмитрий Орлов"),
-      );
-      if (preferred) return preferred.id;
       return (
         realItems.find((item) => item.blockers === 0)?.id ??
         realItems[0]?.id ??
@@ -238,11 +265,8 @@ export function AdminExportScreen({
     [realItems, selectedRealIds],
   );
   const cityOptions = useMemo(
-    () => [
-      "Все города",
-      ...Array.from(new Set(enrichedItems.map((item) => item.city))),
-    ],
-    [enrichedItems],
+    () => cityFilterValuesForSubmissions(submissions),
+    [submissions],
   );
   const agentOptions = useMemo(
     () => [
@@ -282,7 +306,7 @@ export function AdminExportScreen({
       return baseFilteredItems.filter((item) => item.selected);
     if (activeQueueTab === "blocked")
       return baseFilteredItems.filter((item) => item.blockers > 0);
-    return baseFilteredItems;
+    return baseFilteredItems.filter((item) => item.blockers === 0);
   }, [activeQueueTab, baseFilteredItems]);
   const selectedItems = useMemo(
     () => enrichedItems.filter((item) => item.selected),
@@ -330,6 +354,8 @@ export function AdminExportScreen({
     [activeSubmission],
   );
   const selectedCount = selectedItems.length;
+  const availableCount = enrichedItems.filter((item) => item.blockers === 0).length;
+  const blockedCount = enrichedItems.filter((item) => item.blockers > 0).length;
   const selectedApplicants = selectedItems.reduce(
     (sum, item) => sum + item.applicantsCount,
     0,
@@ -338,12 +364,53 @@ export function AdminExportScreen({
     (sum, item) => sum + item.files,
     0,
   );
-  const selectedWarnings = selectedPlan.warnings.length;
-  const selectedBlockers = selectedPlan.blockers.length;
-  const hasExportBlockers = selectedBlockers > 0;
-  const selectedExportStateLabel = preparedExport
-    ? "file_generated"
-    : selectedPlan.exportState;
+  const selectedWarnings = selectedCount ? selectedPlan.warnings.length : 0;
+  const selectedBlockers = selectedCount ? selectedPlan.blockers.length : 0;
+  const hasExportBlockers = selectedCount > 0 && selectedBlockers > 0;
+  const selectedExportStateLabel = !selectedCount
+    ? "Не выбран"
+    : preparedExport
+      ? "Excel готов"
+      : selectedPlan.exportState === "not_ready"
+        ? "Не готов"
+        : selectedPlan.exportState === "ready"
+          ? "Готов"
+          : selectedPlan.exportState === "file_generated"
+            ? "Excel готов"
+            : "Скачан";
+  const hasActiveFilters =
+    activeQueueTab !== "ready" ||
+    agentFilter !== "Все агенты" ||
+    cityFilter !== "Все города" ||
+    searchQuery.length > 0 ||
+    sortBy !== "tripDate" ||
+    typeFilter !== "all";
+  const selectableDisplayItems = displayItems.filter(
+    (item) => item.blockers === 0,
+  );
+  const allDisplaySelected =
+    selectableDisplayItems.length > 0 &&
+    selectableDisplayItems.every((item) => item.selected);
+  const emptyStateCopy =
+    activeQueueTab === "selected"
+      ? {
+          title: "Пакеты не выбраны",
+          description: "Вернитесь в «Доступно» и отметьте нужные пакеты.",
+        }
+      : activeQueueTab === "blocked"
+        ? {
+            title: "Пакетов с ограничениями нет",
+            description: "Все пакеты прошли обязательные проверки.",
+          }
+        : blockedCount > 0
+          ? {
+              title: "Нет пакетов без ограничений",
+              description: "Откройте «Стоп», чтобы увидеть причины блокировки.",
+            }
+          : {
+              title: "Очередь выгрузки пуста",
+              description: "Новые пакеты появятся после принятия проверки.",
+            };
   const selectedHistory = selectedSubmissions
     .flatMap((submission) =>
       submission.history.map((item) => ({
@@ -355,11 +422,18 @@ export function AdminExportScreen({
   const toggleAll = () => {
     setExportError("");
     clearPreparedExport();
-    const allSelected = displayItems.every((item) => item.selected);
-    setSelectedRealIds(allSelected ? [] : displayItems.map((item) => item.id));
+    const selectableItems = displayItems.filter((item) => item.blockers === 0);
+    const allSelected =
+      selectableItems.length > 0 && selectableItems.every((item) => item.selected);
+    setSelectedRealIds(
+      allSelected ? [] : selectableItems.map((item) => item.id),
+    );
   };
 
   const toggleItem = (id: string) => {
+    const item = enrichedItems.find((candidate) => candidate.id === id);
+    setActiveId(id);
+    if (!item || item.blockers > 0) return;
     setExportError("");
     clearPreparedExport();
     setSelectedRealIds((current) =>
@@ -367,7 +441,6 @@ export function AdminExportScreen({
         ? current.filter((item) => item !== id)
         : [...current, id],
     );
-    setActiveId(id);
   };
 
   const prepareWorkbookForCurrentSelection =
@@ -379,7 +452,7 @@ export function AdminExportScreen({
 
       if (hasExportBlockers) {
         setExportError(
-          "Пакет заблокирован pre-flight правилами. Уберите блокеры перед выгрузкой.",
+          "Пакет ограничен pre-flight правилами. Уберите ограничения перед выгрузкой.",
         );
         return null;
       }
@@ -436,7 +509,7 @@ export function AdminExportScreen({
 
       if (!identity || !plan.ready || !hasDownloadableState) {
         setExportError(
-          "Пакет выгрузки не готов: есть блокеры или устаревший preview.",
+          "Пакет выгрузки не готов: есть ограничения или устаревший preview.",
         );
         return null;
       }
@@ -516,15 +589,25 @@ export function AdminExportScreen({
         preparedExport ?? (await prepareWorkbookForCurrentSelection());
       if (!prepared) return;
       const {
-        buildLocalDemoExportMediaZipOptions,
         commitExportMediaZipArtifact,
         downloadPreparedExportMediaZip,
         prepareExportMediaZip,
+        restoreExportMediaZipArtifact,
       } = await import("../modules/submissions/exportMediaZip");
       const supabaseClient = getSupabaseClient();
-      const zipOptions = supabaseClient
-        ? {}
-        : buildLocalDemoExportMediaZipOptions(prepared.submissions);
+      let zipOptions = {};
+      if (!supabaseClient) {
+        if (!__V19_LOCAL_DEMO_BUILD__) {
+          setExportError(
+            "Supabase Storage недоступен. Production ZIP не может использовать локальные файлы.",
+          );
+          return;
+        }
+        const { buildLocalDemoExportMediaZipOptions } = await import(
+          "../modules/submissions/exportMediaZipLocalDemo"
+        );
+        zipOptions = buildLocalDemoExportMediaZipOptions(prepared.submissions);
+      }
       const zipArtifactResult = await prepareExportMediaZip(
         prepared.submissions,
         prepared.identity,
@@ -542,6 +625,7 @@ export function AdminExportScreen({
         return;
       }
 
+      let documentAssetsCommitted = false;
       if (supabaseClient) {
         const commitResult = await commitExportMediaZipArtifact(
           zipArtifactResult.artifact,
@@ -550,15 +634,25 @@ export function AdminExportScreen({
           setExportError(commitResult.safeMessage);
           return;
         }
+        documentAssetsCommitted = true;
       }
 
       try {
-        await bridge.onExportPackages?.(prepared.submissionIds);
+        if (!bridge.onExportPackages) {
+          throw new Error("Обработчик фиксации выгрузки недоступен.");
+        }
+        await bridge.onExportPackages(prepared.submissionIds);
       } catch (error) {
+        const restoreResult = documentAssetsCommitted
+          ? await restoreExportMediaZipArtifact(zipArtifactResult.artifact)
+          : { ok: true as const };
+        const recoveryMessage = restoreResult.ok
+          ? "Документы возвращены в состояние для безопасного повтора."
+          : restoreResult.safeMessage;
         setExportError(
           error instanceof Error
-            ? `ZIP скачан, но статус выгрузки не обновлён: ${error.message}`
-            : "ZIP скачан, но статус выгрузки не обновлён.",
+            ? `ZIP скачан, но статус выгрузки не обновлён: ${error.message} ${recoveryMessage}`
+            : `ZIP скачан, но статус выгрузки не обновлён. ${recoveryMessage}`,
         );
         return;
       }
@@ -585,74 +679,97 @@ export function AdminExportScreen({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="v19-admin-screen grid h-full min-h-[760px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]"
+      className="v19-admin-screen v19-admin-export-screen-v2"
     >
-      <section className="flex min-w-0 flex-col gap-5">
-        <div className="grid shrink-0 grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
+      <section className="v19-admin-export-main-v2">
+        <AdminMetricStrip className="v19-admin-export-metrics-v2">
           <AdminMetricCard
-            active={activeQueueTab === "all"}
-            detail="пакетов в очереди"
+            active={activeQueueTab === "ready"}
+            detail={packageCountLabel(availableCount)}
             icon={CheckCircle2}
-            label="Готовы"
-            value={displayItems.length}
+            label="Доступно"
+            value={availableCount}
             tone="green"
-            onClick={() => setActiveQueueTab("all")}
+            onClick={() => setActiveQueueTab("ready")}
           />
           <AdminMetricCard
             active={activeQueueTab === "selected"}
-            detail={`${selectedApplicants} заявителей`}
+            detail={packageCountLabel(selectedCount)}
             icon={PackageCheck}
             label="Выбрано"
             value={selectedCount}
-            tone="green"
-            onClick={() => setActiveQueueTab("selected")}
-          />
-          <AdminMetricCard
-            active={activeQueueTab === "selected"}
-            detail="файлов в ZIP-пакете"
-            icon={FileArchive}
-            label="Документы"
-            value={selectedFiles}
+            tone="blue"
             onClick={() => setActiveQueueTab("selected")}
           />
           <AdminMetricCard
             active={activeQueueTab === "blocked"}
-            icon={hasExportBlockers ? XCircle : ShieldCheck}
-            label="Pre-flight"
-            value={hasExportBlockers ? "STOP" : "OK"}
-            tone={hasExportBlockers ? "red" : "green"}
-            detail={`${selectedWarnings} предупреждений`}
+            detail={packageCountLabel(blockedCount)}
+            icon={blockedCount ? XCircle : ShieldCheck}
+            label="Стоп"
+            value={blockedCount}
+            tone={blockedCount ? "red" : "green"}
             onClick={() => setActiveQueueTab("blocked")}
           />
-        </div>
+        </AdminMetricStrip>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.15)]">
+        <AdminContextToggle
+          badge={hasExportBlockers || (activeItem?.blockers ?? 0) > 0 ? "Стоп" : selectedCount ? "Готов" : "—"}
+          badgeClassName={hasExportBlockers || (activeItem?.blockers ?? 0) > 0 ? "tone-danger" : "tone-ready"}
+          className="v19-admin-export-context-toggle-v2"
+          detail={selectedCount
+            ? `${selectedCount} ${packageCountLabel(selectedCount)} · ${selectedApplicants} ${applicantCountLabel(selectedApplicants)}`
+            : activeItem?.title ?? "Пакет не выбран"}
+          expanded={mobileControlOpen}
+          icon={FolderCheck}
+          onClick={() => setMobileControlOpen(true)}
+          title="Контроль пакета"
+        />
+
+        <div className="v19-admin-export-workspace-v2">
+          <AdminListHeader
+            actionDisabled={activeQueueTab !== "ready" || selectableDisplayItems.length === 0}
+            actionLabel={allDisplaySelected ? "Снять" : "Все"}
+            className="v19-admin-export-list-head-v2"
+            countLabel={`${displayItems.length} ${packageCountLabel(displayItems.length)}`}
+            onAction={toggleAll}
+            title={activeQueueTab === "ready"
+              ? "Пакеты к выгрузке"
+              : activeQueueTab === "selected"
+                ? "Выбранные пакеты"
+                : "Требуют решения"}
+          />
+
           <AdminQueueToolbar
+            actionDisabled={!hasActiveFilters}
+            actionIcon={RotateCcw}
             cityFilter={cityFilter}
             cityOptions={cityOptions}
             filterLabel="Сбросить фильтры выгрузки"
             controls={
               <>
                 <AdminToolbarSelect<ExportSort>
+                  icon={ArrowUpDown}
                   label="Сортировка"
                   value={sortBy}
                   onChange={setSortBy}
                   options={[
-                    { value: "tripDate", label: "Дата поездки" },
-                    { value: "createdAt", label: "Дата создания" },
+                    { value: "tripDate", label: "По дате вылета" },
+                    { value: "createdAt", label: "По дате создания" },
                   ]}
                 />
                 <AdminToolbarSelect<ExportTypeFilter>
+                  icon={Shapes}
                   label="Тип"
                   value={typeFilter}
                   onChange={setTypeFilter}
                   options={[
-                    { value: "all", label: "Семьи и заявители" },
+                    { value: "all", label: "Все типы" },
                     { value: "family", label: "Семьи" },
                     { value: "single", label: "Заявители" },
                   ]}
                 />
                 <AdminToolbarSelect<string>
+                  icon={User}
                   label="Агент"
                   value={agentFilter}
                   onChange={setAgentFilter}
@@ -665,7 +782,7 @@ export function AdminExportScreen({
             }
             onCityFilterChange={setCityFilter}
             onFilterClick={() => {
-              setActiveQueueTab("all");
+              setActiveQueueTab("ready");
               setAgentFilter("Все агенты");
               setCityFilter("Все города");
               setSearchQuery("");
@@ -673,23 +790,22 @@ export function AdminExportScreen({
               setTypeFilter("all");
             }}
             onSearchChange={setSearchQuery}
-            searchPlaceholder="Поиск по ID, семье, агенту"
+            searchPlaceholder="ID, семья или агент"
             searchValue={searchQuery}
           />
 
           <div className="grid shrink-0 grid-cols-[32px_minmax(140px,0.9fr)_minmax(190px,1.3fr)_minmax(120px,0.7fr)_minmax(140px,0.8fr)] gap-3 border-b border-[#242529] bg-[#141416] px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-white/35 max-lg:hidden">
             <button
               aria-label={
-                displayItems.every((item) => item.selected) && displayItems.length > 0
+                allDisplaySelected
                   ? "Снять выбор со всех подач"
                   : "Выбрать все подачи"
               }
-              aria-pressed={displayItems.every((item) => item.selected) && displayItems.length > 0}
+              aria-pressed={allDisplaySelected}
               onClick={toggleAll}
-              className={`flex h-5 w-5 items-center justify-center rounded-md border ${displayItems.every((item) => item.selected) && displayItems.length > 0 ? "border-[#6f64ff] bg-[#6f64ff]" : "border-[#242529] bg-[#161617]"}`}
+              className={`flex h-5 w-5 items-center justify-center rounded-md border ${allDisplaySelected ? "border-[#6f64ff] bg-[#6f64ff]" : "border-[#242529] bg-[#161617]"}`}
             >
-              {displayItems.every((item) => item.selected) &&
-                displayItems.length > 0 && (
+              {allDisplaySelected && (
                   <CheckSquare className="h-3.5 w-3.5 text-white" />
                 )}
             </button>
@@ -706,22 +822,25 @@ export function AdminExportScreen({
                   <CheckCircle2 className="h-5 w-5 text-white/35" />
                 </div>
                 <h3 className="mb-1 text-[15px] font-semibold text-white">
-                  Все досье выгружены
+                  {emptyStateCopy.title}
                 </h3>
                 <p className="text-[13px] text-white/40">
-                  Очередь на экспорт пуста.
+                  {emptyStateCopy.description}
                 </p>
               </div>
             ) : (
               <div className="space-y-1">
                 {displayItems.map((item) => (
-                  <label
+                  <V19QueueCard
+                    as="label"
                     key={item.id}
-                    className={`export-row grid w-full cursor-pointer grid-cols-1 gap-3 rounded-xl border px-3 py-3 text-left transition-colors lg:grid-cols-[32px_minmax(140px,0.9fr)_minmax(190px,1.3fr)_minmax(120px,0.7fr)_minmax(140px,0.8fr)] lg:items-center ${item.selected ? "border-[#6f64ff]/35 bg-[#6f64ff]/10" : activeId === item.id ? "border-white/10 bg-white/[0.035]" : "border-transparent bg-transparent hover:border-white/5 hover:bg-white/5"}`}
+                    className={`export-row v19-admin-export-row-v2 ${item.selected ? "is-selected" : ""} ${activeId === item.id ? "is-active" : ""} ${item.blockers > 0 ? "is-blocked" : ""}`}
+                    onClick={() => setActiveId(item.id)}
                   >
                     <input
                       aria-label={`Выбрать ${item.title}`}
                       checked={item.selected}
+                      disabled={item.blockers > 0}
                       className="h-5 w-5 shrink-0 accent-[#3a45b4]"
                       type="checkbox"
                       onChange={() => toggleItem(item.id)}
@@ -732,7 +851,7 @@ export function AdminExportScreen({
                         {item.id}
                       </span>
                       <MapPin className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                      <span className="truncate">{item.city}</span>
+                      <span>{item.city}</span>
                     </div>
 
                     <div className="min-w-0">
@@ -742,10 +861,15 @@ export function AdminExportScreen({
                         ) : (
                           <User className="h-3.5 w-3.5 shrink-0 text-[#8fa3ff]" />
                         )}
-                        <span className="truncate text-[14px] font-medium text-white">
+                        <span className="text-[14px] font-medium text-white">
                           {item.title}
                         </span>
                       </div>
+                      {item.blockerReasons[0] ? (
+                        <div className="v19-admin-export-row-reason-v2">
+                          {item.blockerReasons[0]}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="text-[12px] text-white/65 lg:text-[13px]">
@@ -754,9 +878,9 @@ export function AdminExportScreen({
 
                     <div className="flex items-center gap-2 text-[12px] text-white/65 lg:text-[13px]">
                       <User className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                      <span className="truncate">{agentDisplayName(item.agent)}</span>
+                      <span>{agentDisplayName(item.agent)}</span>
                     </div>
-                  </label>
+                  </V19QueueCard>
                 ))}
               </div>
             )}
@@ -764,24 +888,34 @@ export function AdminExportScreen({
         </div>
       </section>
 
-      <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[#242529] bg-[#161617] shadow-[0_4px_24px_rgba(0,0,0,0.18)]">
-        <div className="border-b border-[#242529] bg-[#1a1a1d] p-5">
+      <aside
+        aria-label="Контроль пакета"
+        className={`v19-admin-export-rail-v2 ${mobileControlOpen ? "is-mobile-open" : ""}`}
+      >
+        <div className="v19-admin-export-rail-head-v2">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wider text-[#b8baff]">
-                Export cockpit
+                Выгрузка
               </div>
               <h3 className="mt-1 text-[20px] font-semibold tracking-tight text-white">
-                Правая панель
+                Контроль пакета
               </h3>
               <p className="mt-2 text-[12px] leading-relaxed text-white/45">
-                Контроль состава, блокеров, Excel preview и истории перед
-                финальной выгрузкой.
+                Состав, проверки, Excel и история перед скачиванием.
               </p>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.045] text-[#b8baff]">
+            <div className="v19-admin-export-rail-icon-v2">
               <FolderCheck className="h-5 w-5" />
             </div>
+            <button
+              aria-label="Закрыть контроль пакета"
+              className="v19-admin-export-rail-close-v2"
+              type="button"
+              onClick={() => setMobileControlOpen(false)}
+            >
+              <X aria-hidden="true" />
+            </button>
           </div>
         </div>
 
@@ -800,8 +934,20 @@ export function AdminExportScreen({
                 </div>
               </div>
               {activeItem && (
-                <StatusPill tone={activeItem.warnings > 0 ? "orange" : "green"}>
-                  {activeItem.warnings > 0 ? "есть предупреждения" : "готов"}
+                <StatusPill
+                  tone={
+                    activeItem.blockers > 0
+                      ? "orange"
+                      : activeItem.warnings > 0
+                        ? "blue"
+                        : "green"
+                  }
+                >
+                  {activeItem.blockers > 0
+                    ? "заблокирован"
+                    : activeItem.warnings > 0
+                      ? "есть предупреждения"
+                      : "готов"}
                 </StatusPill>
               )}
             </div>
@@ -833,6 +979,13 @@ export function AdminExportScreen({
                 </div>
               </div>
             )}
+            {activeItem?.blockerReasons.length ? (
+              <div className="v19-admin-export-active-blockers-v2">
+                {activeItem.blockerReasons.map((reason) => (
+                  <div key={reason}>{reason}</div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {exportHelper ? (
@@ -878,8 +1031,20 @@ export function AdminExportScreen({
               <h4 className="text-[14px] font-semibold text-white">
                 Pre-flight checks
               </h4>
-              <StatusPill tone={hasExportBlockers ? "orange" : "green"}>
-                {hasExportBlockers ? "нужна правка" : "можно выгружать"}
+              <StatusPill
+                tone={
+                  selectedCount === 0
+                    ? "neutral"
+                    : hasExportBlockers
+                      ? "orange"
+                      : "green"
+                }
+              >
+                {selectedCount === 0
+                  ? "нет выбора"
+                  : hasExportBlockers
+                    ? "нужна правка"
+                    : "можно выгружать"}
               </StatusPill>
             </div>
             <div className="export-preview mb-3 rounded-xl border border-white/5 bg-white/[0.025] px-3 py-2 text-[12px] font-medium text-white/70">
@@ -910,7 +1075,7 @@ export function AdminExportScreen({
             <div className="space-y-2">
               <ManifestRow
                 icon={ShieldCheck}
-                label="Открытые блокеры"
+                label="Открытые ограничения"
                 value={`${selectedBlockers}`}
                 state={selectedBlockers ? "warn" : "ok"}
               />
@@ -923,13 +1088,13 @@ export function AdminExportScreen({
               <ManifestRow
                 icon={FileSpreadsheet}
                 label="Excel rows"
-                value={`${selectedPlan.rowCount} строк`}
+                value={`${selectedPlan.rowCount} ${rowCountLabel(selectedPlan.rowCount)}`}
                 state={selectedCount ? "ok" : "neutral"}
               />
               <ManifestRow
                 icon={FileArchive}
                 label="ZIP медиа"
-                value={`${selectedFiles} файлов`}
+                value={`${selectedFiles} ${fileCountLabel(selectedFiles)}`}
                 state={selectedCount ? "ok" : "neutral"}
               />
               <ManifestRow
@@ -945,13 +1110,9 @@ export function AdminExportScreen({
                 state={selectedWarnings ? "warn" : "ok"}
               />
             </div>
-            {selectedCount > 0 ? (
-              <div className="mt-3">
-                <ExportWorkbookPreview preview={selectedPlan.preview} />
-              </div>
-            ) : null}
-            {(selectedPlan.blockers.length > 0 ||
-              selectedPlan.warnings.length > 0) && (
+            {selectedCount > 0 &&
+              (selectedPlan.blockers.length > 0 ||
+                selectedPlan.warnings.length > 0) && (
               <div className="mt-3 space-y-1.5">
                 {[...selectedPlan.blockers, ...selectedPlan.warnings].map(
                   (item) => (
@@ -965,6 +1126,11 @@ export function AdminExportScreen({
                 )}
               </div>
             )}
+            {selectedCount > 0 && !hasExportBlockers ? (
+              <div className="mt-3">
+                <ExportWorkbookPreview preview={selectedPlan.preview} />
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-[#242529] bg-[#141416] p-4">
@@ -973,7 +1139,7 @@ export function AdminExportScreen({
                 Состав выгрузки
               </h4>
               <span className="text-[12px] text-white/40">
-                {selectedCount} пак.
+                {selectedCount} {packageCountLabel(selectedCount)}
               </span>
             </div>
             <div className="space-y-2">
@@ -995,11 +1161,12 @@ export function AdminExportScreen({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-medium text-white/85">
+                      <div className="text-[12px] font-medium text-white/85">
                         {item.title}
                       </div>
                       <div className="mt-0.5 text-[11px] text-white/35">
-                        {item.id} · {item.applicantsCount} чел.
+                        {item.id} · {item.applicantsCount}{" "}
+                        {applicantCountLabel(item.applicantsCount)}
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-white/25" />
@@ -1064,13 +1231,24 @@ export function AdminExportScreen({
             {exportError ||
               exportNotice ||
               (selectedCount
-                ? preparedExport
-                  ? "Excel готов, можно скачать ZIP"
-                  : "Можно сформировать Excel и ZIP"
+                ? hasExportBlockers
+                  ? selectedPlan.blockers[0]?.reason ??
+                    "Уберите ограничения перед выгрузкой"
+                  : preparedExport
+                    ? "Excel готов, можно скачать ZIP"
+                    : "Можно сформировать Excel и ZIP"
                 : "Выберите хотя бы одну подачу")}
           </div>
         </div>
       </aside>
+      {mobileControlOpen ? (
+        <button
+          aria-label="Закрыть контроль пакета"
+          className="v19-admin-export-backdrop-v2"
+          type="button"
+          onClick={() => setMobileControlOpen(false)}
+        />
+      ) : null}
     </motion.div>
   );
 }

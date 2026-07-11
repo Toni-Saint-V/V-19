@@ -150,7 +150,7 @@ export function mediaSlotTypeForSubmissionFileType(type: SubmissionFileType) {
 export function cockpitUploadExtensionForMimeType(
   mimeType: string,
   fileType: SubmissionFileType,
-): "jpg" | "png" | "webp" | "heic" | "heif" | "pdf" | "mp4" {
+): "jpg" | "png" | "heic" | "heif" | "pdf" | "mp4" {
   if (
     !isCanonicalFrontendMediaType(fileType) &&
     !isRejectedLegacyMediaType(fileType)
@@ -161,7 +161,6 @@ export function cockpitUploadExtensionForMimeType(
   if (fileType === "video" && mimeType === "video/mp4") return "mp4";
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/jpeg") return "jpg";
-  if (mimeType === "image/webp") return "webp";
   if (mimeType === "image/heic") return "heic";
   if (mimeType === "image/heif") return "heif";
   throw new Error("Unsupported media MIME type for this upload slot.");

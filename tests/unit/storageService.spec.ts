@@ -267,9 +267,9 @@ describe("media storage contract", () => {
     ).not.toThrow();
   });
 
-  test("accepts WEBP passport uploads and empty browser MIME with safe extensions", () => {
+  test("rejects production-incompatible WEBP and accepts safe empty-MIME extensions", () => {
     expect(isPassportScanUploadFileAccepted({ name: "passport.webp", type: "" })).toBe(
-      true,
+      false,
     );
     expect(isPassportScanUploadFileAccepted({ name: "passport.PDF", type: "" })).toBe(
       true,
@@ -291,7 +291,7 @@ describe("media storage contract", () => {
           "v19passport_passport_scan.webp",
         ),
       }),
-    ).not.toThrow();
+    ).toThrow(/extension is not allowed/i);
 
     expect(() =>
       validateMediaStorageTarget({

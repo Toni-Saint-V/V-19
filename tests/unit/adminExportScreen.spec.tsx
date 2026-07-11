@@ -5,7 +5,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { CityFilterMenu } from "../../src/modules/submissions/components/OperationalFilters";
 import { exportSummary } from "../../src/modules/submissions/exportRules";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
-import { ExportScreen } from "../../src/modules/submissions/pages/OperationsScreens";
+import {
+  AdminReviewScreen,
+  ExportScreen,
+} from "../../src/modules/submissions/pages/OperationsScreens";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
 
@@ -65,6 +68,34 @@ function zipButtons() {
 }
 
 describe("admin export screen", () => {
+  test("keeps only admin-owned statuses in the alternate Review surface", () => {
+    const review = byId("ПД-1053");
+    const returned = byId("ПД-1048");
+    const ready = byId("ПД-1056");
+    const { container } = render(
+      <AdminReviewScreen
+        onOpen={vi.fn()}
+        onSelect={vi.fn()}
+        onTab={vi.fn()}
+        reviewList={[review, returned, ready]}
+        reviewSource={[review, returned, ready]}
+        reviewTab="all"
+        searchControl={<input aria-label="Поиск проверки" />}
+        visibleSubmission={null}
+      />,
+    );
+
+    expect(
+      container.querySelector(`[data-submission-id="${review.id}"]`),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(`[data-submission-id="${returned.id}"]`),
+    ).toBeNull();
+    expect(
+      container.querySelector(`[data-submission-id="${ready.id}"]`),
+    ).toBeNull();
+  });
+
   test("renders the city filter in the export toolbar", () => {
     const moscowReady = byId("ПД-1056");
 

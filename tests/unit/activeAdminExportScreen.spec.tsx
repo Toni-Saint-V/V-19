@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { AdminExportScreen } from "../../src/components/AdminExportScreen";
@@ -51,6 +51,12 @@ describe("active admin export screen", () => {
     const passportColumn = preview.headers.indexOf("Passport No");
 
     render(<AdminExportScreen submissions={[submission]} />);
+
+    const packageCheckbox = screen.getByRole("checkbox", {
+      name: `Выбрать ${submission.listTitle ?? submission.title}`,
+    });
+    expect(packageCheckbox).not.toBeChecked();
+    fireEvent.click(packageCheckbox);
 
     const table = await screen.findByRole("table", {
       name: "Excel Preview Sheet1",

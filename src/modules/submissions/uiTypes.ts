@@ -22,6 +22,13 @@ export type LegacyRouteResolution = {
   surface: Surface;
 };
 
+export function isAdminReviewQueueSubmission(submission: Submission) {
+  return (
+    submission.status === "submitted_for_review" ||
+    submission.status === "corrections_received"
+  );
+}
+
 export function matchesAgentTab(tab: AgentTab) {
   return (submission: Submission) => {
     if (tab === "all") return true;
@@ -39,13 +46,7 @@ export function matchesAgentTab(tab: AgentTab) {
 
 export function matchesReviewTab(tab: ReviewTab) {
   return (submission: Submission) => {
-    if (tab === "all") {
-      return [
-        "submitted_for_review",
-        "corrections_received",
-        "ready_for_export",
-      ].includes(submission.status);
-    }
+    if (tab === "all") return isAdminReviewQueueSubmission(submission);
     if (tab === "review") return submission.status === "submitted_for_review";
     if (tab === "corrections") return submission.status === "corrections_received";
     return submission.status === "ready_for_export";

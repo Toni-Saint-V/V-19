@@ -153,7 +153,7 @@ describe("durable export package service", () => {
     const valueFor = (header: string) => firstDataRow[headers.indexOf(header)] ?? "";
 
     expect(parsed.sheetName).toBe("Sheet1");
-    expect(parsed.dimension).toBe("A1:BE1048572");
+    expect(parsed.dimension).toBe("A1:BD3");
     expect(parsed.rows[0]).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
     expect(firstDataRow).toEqual(
       headers.map((header) => draft.rows[0]?.[header] ?? ""),

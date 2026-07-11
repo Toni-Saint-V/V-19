@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../shared/ui/primitives";
-import type { AccessRequest } from "../../../shared/authRegistration";
+import type { AccessRequest } from "../../../shared/authContract";
 import type { Role } from "../types";
 
 type WorkspaceSettings = {

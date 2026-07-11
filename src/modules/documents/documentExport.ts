@@ -32,6 +32,7 @@ export type ExportDocumentAsset = DocumentAsset | GeneratedDocumentAsset;
 export type DocumentZipBlockedReason =
   | "empty_file"
   | "media_not_ready"
+  | "passport_number_missing"
   | "storage_download_failed"
   | "storage_unavailable";
 
@@ -75,6 +76,7 @@ export type BuildDocumentsZipResult = {
 export async function buildDocumentsZip(
   input: BuildDocumentsZipInput,
 ): Promise<BuildDocumentsZipResult> {
+  const passportNumbers = passportNumbersForExport(input.submissions);
   const zip = input.zip ?? new JSZip();
   const rootFolder = `VisaFlow_Export_${exportDateLabel(input.exportDate)}`;
   const entries: string[] = [];
@@ -163,6 +165,7 @@ export async function buildDocumentsZip(
           archiveDocumentFileName({
             applicant,
             asset,
+            passportNumber: passportNumbers.get(applicant),
             type,
           }),
         ].join("/");
@@ -190,11 +193,20 @@ export async function buildDocumentsZip(
 export function archiveDocumentFileName(input: {
   applicant: Applicant;
   asset: ExportDocumentAsset;
+  passportNumber?: string;
   type: ExportDocumentType;
 }): string {
   const extension = sanitizeExtension(documentExtension(input.asset));
-  const applicantPrefix = archiveApplicantPrefix(input.applicant);
-  return `${applicantPrefix}_${input.type}.${extension}`;
+  const passportNumber =
+    normalizePassportNumberForExport(input.passportNumber ?? "") ??
+    passportNumberForApplicant(input.applicant);
+  if (!passportNumber) {
+    throw new DocumentZipBuilderError(
+      "passport_number_missing",
+      "A verified passport number is required for every exported document.",
+    );
+  }
+  return `${passportNumber}_${input.type}.${extension}`;
 }
 
 function generatedVisaFormAsset(
@@ -203,8 +215,14 @@ function generatedVisaFormAsset(
   applicantIndex: number,
 ): GeneratedDocumentAsset {
   const now = "1970-01-01T00:00:00.000Z";
-  const applicantPrefix = archiveApplicantPrefix(applicant);
-  const filename = `${applicantPrefix}_visa_form.pdf`;
+  const passportNumber = passportNumberForApplicant(applicant);
+  if (!passportNumber) {
+    throw new DocumentZipBuilderError(
+      "passport_number_missing",
+      "A verified passport number is required for every exported document.",
+    );
+  }
+  const filename = `${passportNumber}_visa_form.pdf`;
 
   return {
     checksum: null,
@@ -240,21 +258,42 @@ function generatedVisaFormAsset(
   };
 }
 
-function archiveApplicantPrefix(applicant: Applicant): string {
-  return (
-    passportNumberForApplicant(applicant) ??
-    safeFilenameSegment(applicant.fullName, applicant.id)
-  );
-}
-
 function passportNumberForApplicant(applicant: Applicant): string | null {
   for (const section of applicant.sections) {
     const field = section.fields.find((candidate) => candidate.id === "passport-no");
-    const value = field?.value.trim();
-    if (value) return safeFilenameSegment(value, applicant.id);
+    const value = normalizePassportNumberForExport(field?.value ?? "");
+    if (value) return value;
   }
 
   return null;
+}
+
+export function normalizePassportNumberForExport(value: string): string | null {
+  const normalized = value
+    .normalize("NFKC")
+    .toUpperCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .slice(0, 32);
+  return normalized || null;
+}
+
+function passportNumbersForExport(
+  submissions: readonly Submission[],
+): ReadonlyMap<Applicant, string> {
+  const passportNumbers = new Map<Applicant, string>();
+  for (const submission of submissions) {
+    for (const applicant of submission.applicants) {
+      const passportNumber = passportNumberForApplicant(applicant);
+      if (!passportNumber) {
+        throw new DocumentZipBuilderError(
+          "passport_number_missing",
+          "A verified passport number is required for every exported document.",
+        );
+      }
+      passportNumbers.set(applicant, passportNumber);
+    }
+  }
+  return passportNumbers;
 }
 
 export function exportDateLabel(value: Date | string | undefined): string {

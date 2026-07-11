@@ -91,6 +91,28 @@ function assert(condition, message) {
   if (!condition) fail(message);
 }
 
+async function listProductionAuthUsers(admin) {
+  const users = [];
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
+    if (error) {
+      fail(`production Auth user list is unreadable: ${error.message}`);
+    }
+
+    const pageUsers = data?.users ?? [];
+    users.push(...pageUsers);
+    if (pageUsers.length < 1000) break;
+  }
+  return users;
+}
+
+function isAuthUserBanned(user) {
+  return Boolean(user?.banned_until && new Date(user.banned_until) > new Date());
+}
+
 async function verifyProductionSubmissionCaps() {
   assert(projectRef, "production project ref is available for read-only cap check");
   assert(projectRef !== sandboxProjectRef, "read-only cap check target is not sandbox");
@@ -107,15 +129,28 @@ async function verifyProductionSubmissionCaps() {
 
   const pilotCohort = readPilotCohortAggregate();
 
-  const { count: productionRegisteredAgentProfiles, error: agentProfileError } =
-    await admin
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "agent");
+  const { data: agentProfiles, error: agentProfileError } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("role", "agent");
 
   if (agentProfileError) {
     fail(`production registered agent profile count is unreadable: ${agentProfileError.message}`);
   }
+
+  const authUsers = await listProductionAuthUsers(admin);
+  const authUsersById = new Map(authUsers.map((user) => [user.id, user]));
+  const productionProfileRowsAgentCount = agentProfiles?.length ?? 0;
+  const productionBannedAgentProfiles = (agentProfiles ?? []).filter((profile) =>
+    isAuthUserBanned(authUsersById.get(profile.id)),
+  ).length;
+  const productionUnmatchedAgentProfiles = (agentProfiles ?? []).filter(
+    (profile) => !authUsersById.has(profile.id),
+  ).length;
+  const productionRegisteredAgentProfiles = (agentProfiles ?? []).filter(
+    (profile) =>
+      authUsersById.has(profile.id) && !isAuthUserBanned(authUsersById.get(profile.id)),
+  ).length;
 
   const { count: productionRegisteredAdminProfiles, error: adminProfileError } =
     await admin
@@ -136,6 +171,11 @@ async function verifyProductionSubmissionCaps() {
   } else if (productionRegisteredAgentProfiles > envelope.registeredAgents) {
     capViolations.push(
       `production has ${productionRegisteredAgentProfiles} registered agent profiles, above pilot cap ${envelope.registeredAgents}`,
+    );
+  }
+  if (productionUnmatchedAgentProfiles > 0) {
+    capViolations.push(
+      `production has ${productionUnmatchedAgentProfiles} agent profiles without a matching Auth user`,
     );
   }
   if (!Number.isInteger(productionRegisteredAdminProfiles)) {
@@ -204,6 +244,9 @@ async function verifyProductionSubmissionCaps() {
     projectRef,
     capViolations,
     productionRegisteredAgentProfiles,
+    productionProfileRowsAgentCount,
+    productionBannedAgentProfiles,
+    productionUnmatchedAgentProfiles,
     productionRegisteredAdminProfiles,
     pilotCohortRegisteredAgents: pilotCohort.registeredAgents,
     pilotCohortRegisteredAdmins: pilotCohort.registeredAdmins,
@@ -340,6 +383,8 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 ## Production Read-Only Cap Check
 
 - Production project: \`${productionCaps.projectRef}\`
+- Production agent profile rows (including banned): \`${productionCaps.productionProfileRowsAgentCount}\`
+- Production banned agent profiles excluded from pilot intake: \`${productionCaps.productionBannedAgentProfiles}\`
 - Production registered agent profiles: \`${productionCaps.productionRegisteredAgentProfiles}\`
 - Production registered admin profiles: \`${productionCaps.productionRegisteredAdminProfiles}\`
 - Pilot cohort registered agents: \`${productionCaps.pilotCohortRegisteredAgents}\`
@@ -374,7 +419,13 @@ console.log(`Max total submissions: ${maxTotalSubmissions}`);
 console.log(`Max total applicants: ${maxTotalApplicants}`);
 console.log(`Max required media objects: ${maxRequiredMediaObjects}`);
 console.log(
-  `Production registered agent profiles: ${productionCaps.productionRegisteredAgentProfiles}`,
+  `Production agent profile rows: ${productionCaps.productionProfileRowsAgentCount}`,
+);
+console.log(
+  `Production banned agent profiles: ${productionCaps.productionBannedAgentProfiles}`,
+);
+console.log(
+  `Production active registered agent profiles: ${productionCaps.productionRegisteredAgentProfiles}`,
 );
 console.log(`Pilot cohort registered agents: ${productionCaps.pilotCohortRegisteredAgents}`);
 console.log(`Production total submissions: ${productionCaps.totalSubmissions}`);

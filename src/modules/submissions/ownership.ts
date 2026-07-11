@@ -1,14 +1,7 @@
 import type { AgentOwnerId, Submission } from "./types";
 
-export const defaultLocalAgentOwnerId: AgentOwnerId = "local-agent-tony";
-export const alternateLocalAgentOwnerId: AgentOwnerId = "local-agent-alex";
-
-const localAgentOwnerNames = new Map<AgentOwnerId, string>([
-  [defaultLocalAgentOwnerId, "Татьяна Николаева"],
-  [alternateLocalAgentOwnerId, "Алексей Морозов"],
-  ["agent-1", "Ирина Агентова"],
-  ["local-agent-partner", "Ольга Морозова"],
-]);
+export const defaultLocalAgentOwnerId: AgentOwnerId = "unassigned-agent";
+export const alternateLocalAgentOwnerId: AgentOwnerId = "unassigned-agent-secondary";
 
 export function ensureSubmissionOwner(
   submission: Submission,
@@ -36,5 +29,5 @@ export function agentOwnerDisplayName(
   agentId: AgentOwnerId,
   override?: string,
 ): string {
-  return override?.trim() || localAgentOwnerNames.get(agentId) || agentId;
+  return override?.trim() || agentId;
 }

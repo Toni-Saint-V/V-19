@@ -1,6 +1,11 @@
 import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
   type ButtonHTMLAttributes,
   type CSSProperties,
+  type ComponentPropsWithoutRef,
   type ElementType,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -9,13 +14,19 @@ import {
 } from "react";
 import {
   AlertCircle,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Columns3,
+  Filter,
+  Flame,
   Folder,
   List,
+  MapPin,
   Search,
-  Sparkles,
+  ShieldCheck,
   User,
   Users,
   X,
@@ -210,6 +221,354 @@ export function V19SummaryTileGrid({
   return <div className={cn("v19-summary-tile-grid", className)}>{children}</div>;
 }
 
+export type V19SurfaceIcon = ElementType;
+
+type V19QueueCardProps<T extends ElementType> = {
+  as?: T;
+  className?: string;
+} & Omit<ComponentPropsWithoutRef<T>, 'as' | 'className'>;
+
+/**
+ * Shared interactive surface for operational queue items. Layout and content
+ * stay screen-specific; border, radius, focus and interaction state stay here.
+ */
+export function V19QueueCard<T extends ElementType = 'div'>(
+  { as, className, ...props }: V19QueueCardProps<T>,
+) {
+  const Component = as ?? 'div';
+
+  return <Component {...props} className={cn('v19-queue-card', className)} />;
+}
+
+export function V19MetricStrip({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`v19-admin-metric-strip ${className}`}>{children}</div>;
+}
+
+export function V19MetricCard({
+  active = false,
+  detail,
+  icon,
+  label,
+  onClick,
+  tone = 'neutral',
+  value,
+}: {
+  active?: boolean;
+  detail?: ReactNode;
+  icon: V19SurfaceIcon;
+  label: string;
+  onClick?: () => void;
+  tone?: string;
+  value: ReactNode;
+}) {
+  const mappedTone: V19SummaryTileTone =
+    tone === 'green'
+      ? 'green'
+      : tone === 'orange'
+        ? 'amber'
+        : tone === 'red'
+          ? 'danger'
+          : 'neutral';
+
+  return (
+    <V19SummaryTile
+      active={active}
+      detail={detail}
+      icon={icon}
+      label={label}
+      tone={mappedTone}
+      value={value}
+      onClick={onClick}
+    />
+  );
+}
+
+export function V19ContextToggle({
+  badge,
+  badgeClassName = '',
+  className = '',
+  detail,
+  expanded,
+  icon: Icon,
+  onClick,
+  title,
+}: {
+  badge: ReactNode;
+  badgeClassName?: string;
+  className?: string;
+  detail: ReactNode;
+  expanded: boolean;
+  icon: V19SurfaceIcon;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <button
+      aria-expanded={expanded}
+      className={`v19-admin-context-toggle ${className}`}
+      type="button"
+      onClick={onClick}
+    >
+      <Icon aria-hidden="true" />
+      <span>
+        <strong>{title}</strong>
+        <small>{detail}</small>
+      </span>
+      <em className={badgeClassName}>{badge}</em>
+      <ChevronRight aria-hidden="true" />
+    </button>
+  );
+}
+
+export function V19PriorityHero({
+  actionAriaLabel,
+  actionDisabled = false,
+  actionIcon: ActionIcon = Flame,
+  eyebrow,
+  eyebrowIcon: EyebrowIcon,
+  hasBlockers,
+  onAction,
+  summary,
+  title,
+}: {
+  actionAriaLabel: string;
+  actionDisabled?: boolean;
+  actionIcon?: V19SurfaceIcon;
+  eyebrow: string;
+  eyebrowIcon: V19SurfaceIcon;
+  hasBlockers: boolean;
+  onAction: () => void;
+  summary: string;
+  title: string;
+}) {
+  return (
+    <section
+      aria-label={eyebrow}
+      className={`v19-admin-review-hero ${hasBlockers ? 'has-blockers' : 'is-clear'}`}
+    >
+      <div className="v19-admin-review-hero-copy">
+        <span className="v19-admin-review-eyebrow">
+          <EyebrowIcon aria-hidden="true" /> {eyebrow}
+        </span>
+        <h2>{title}</h2>
+        <p>{summary}</p>
+      </div>
+      <button
+        aria-label={actionAriaLabel}
+        className={`v19-admin-review-priority-card ${hasBlockers ? 'has-blockers' : 'is-empty'}`}
+        disabled={actionDisabled}
+        type="button"
+        onClick={onAction}
+      >
+        <span className="v19-admin-review-priority-icon">
+          <ActionIcon aria-hidden="true" />
+        </span>
+        <ChevronRight aria-hidden="true" />
+      </button>
+    </section>
+  );
+}
+
+export function V19ListHeader({
+  actionDisabled = false,
+  actionLabel,
+  className = '',
+  countLabel,
+  onAction,
+  title,
+}: {
+  actionDisabled?: boolean;
+  actionLabel?: string;
+  className?: string;
+  countLabel: string;
+  onAction?: () => void;
+  title: string;
+}) {
+  return (
+    <div className={`v19-admin-list-header ${className}`}>
+      <div>
+        <strong>{title}</strong>
+        <small>{countLabel}</small>
+      </div>
+      {actionLabel && onAction ? (
+        <button disabled={actionDisabled} type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+export function V19ToolbarSelect<T extends string>({
+  ariaLabel,
+  className = '',
+  icon: Icon,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  ariaLabel?: string;
+  className?: string;
+  icon?: V19SurfaceIcon;
+  label: string;
+  onChange: (value: T) => void;
+  options: Array<{ label: string; value: T }>;
+  value: T;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedOption = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePress);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={rootRef}
+      className={`v19-admin-toolbar-select ${Icon ? 'has-icon' : ''} ${open ? 'is-open' : ''} ${className}`}
+    >
+      <button
+        aria-controls={menuId}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={`${ariaLabel ?? label}: ${selectedOption?.label ?? ''}`}
+        className="v19-admin-toolbar-select-trigger"
+        title={Icon ? `${label}: ${selectedOption?.label ?? ''}` : undefined}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+      >
+        {Icon ? <Icon aria-hidden="true" className="v19-admin-toolbar-select-icon" /> : null}
+        <span className="v19-admin-toolbar-select-label">{label}</span>
+        <span className="v19-admin-toolbar-select-value">{selectedOption?.label}</span>
+        <ChevronDown aria-hidden="true" className="v19-admin-toolbar-select-chevron" />
+      </button>
+      {open ? (
+        <div id={menuId} className="v19-admin-toolbar-select-menu" role="listbox" aria-label={ariaLabel ?? label}>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              aria-selected={option.value === value}
+              className={option.value === value ? 'is-selected' : ''}
+              role="option"
+              type="button"
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              <span>{option.label}</span>
+              {option.value === value ? <Check aria-hidden="true" /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function V19QueueToolbar({
+  actionDisabled = false,
+  actionIcon: ActionIcon = Filter,
+  cityFilter,
+  cityOptions,
+  controls,
+  filterLabel = 'Фильтры',
+  onCityFilterChange,
+  onFilterClick,
+  onSearchChange,
+  searchAriaLabel,
+  searchPlaceholder,
+  searchValue,
+  showCityFilter = true,
+}: {
+  actionDisabled?: boolean;
+  actionIcon?: V19SurfaceIcon;
+  cityFilter: string;
+  cityOptions: string[];
+  controls?: ReactNode;
+  filterLabel?: string;
+  onCityFilterChange: (city: string) => void;
+  onFilterClick?: () => void;
+  onSearchChange: (value: string) => void;
+  searchAriaLabel?: string;
+  searchPlaceholder: string;
+  searchValue: string;
+  showCityFilter?: boolean;
+}) {
+  const cityActive = cityFilter !== 'Все города';
+
+  return (
+    <V19TwoRowToolbar
+      className="v19-admin-queue-toolbar border-b border-[#242529] p-4 lg:p-5"
+      filters={
+        <>
+          {controls ? <div className="v19-admin-toolbar-controls">{controls}</div> : null}
+          {showCityFilter ? (
+            <V19ToolbarSelect<string>
+              ariaLabel="Фильтр городов"
+              className={`v19-admin-city-filter ${cityActive ? 'is-active' : ''}`}
+              icon={MapPin}
+              label="Город"
+              options={cityOptions.map((city) => ({ label: city, value: city }))}
+              value={cityFilter}
+              onChange={onCityFilterChange}
+            />
+          ) : null}
+        </>
+      }
+      search={
+        <div className="v19-admin-queue-toolbar-search relative min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/38" />
+          <input
+            aria-label={searchAriaLabel ?? searchPlaceholder}
+            className="h-10 w-full rounded-[10px] border border-[#242529] bg-[#111113] pl-9 pr-3 text-[11px] font-medium text-white/70 placeholder:text-[#525151] outline-none focus:border-[#6f64ff]/55"
+            placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.currentTarget.value)}
+          />
+        </div>
+      }
+      action={
+        onFilterClick ? (
+          <button
+            aria-label={filterLabel}
+            title={filterLabel}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#242529] bg-[#111113] text-white/55 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+            disabled={actionDisabled}
+            type="button"
+            onClick={onFilterClick}
+          >
+            <ActionIcon className="h-3.5 w-3.5" />
+          </button>
+        ) : undefined
+      }
+    />
+  );
+}
+
 export function V19SummaryTile({
   active = false,
   ariaLabel,
@@ -389,7 +748,7 @@ export function V19MemberStatusIcon({ tone }: { tone: V19MemberStatusTone }) {
 export function V19ReadinessCard({
   description,
   detail,
-  label = "AI readiness",
+  label = "Готовность по правилам BLS",
   scoreLabel,
   tone = "accent",
   value,
@@ -404,7 +763,7 @@ export function V19ReadinessCard({
   return (
     <section className="v19-readiness-card" aria-label="Готовность подачи">
       <div className="v19-readiness-kicker">
-        <Sparkles aria-hidden="true" size={14} />
+        <ShieldCheck aria-hidden="true" size={14} />
         {label}
       </div>
       <div className="v19-readiness-score-row">

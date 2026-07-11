@@ -21,6 +21,7 @@ import {
   isExportedTerminal,
   isIssueTransitionAllowed,
 } from "./domainContract";
+import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
 import type {
   ActionDecision,
   CommandResult,
@@ -104,7 +105,11 @@ export function submitForReview(
   }
 
   const completeness = getCompleteness(submission);
-  if (completeness.total < 100 || !canonicalRequiredMediaReadiness(submission).ok) {
+  if (
+    !blsQuestionnaireReadiness(submission).ready ||
+    completeness.total < 100 ||
+    !canonicalRequiredMediaReadiness(submission).ok
+  ) {
     return failure("VALIDATION_ERROR", "Questionnaire and files must be complete.");
   }
   if (!hasUsableTripDateRange(submission)) {

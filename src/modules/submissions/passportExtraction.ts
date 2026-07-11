@@ -111,6 +111,13 @@ function normalizeCompare(value: string) {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
+function isCanonicalPassportAutofillDefault(
+  key: PassportExtractedFieldKey,
+  value: string,
+) {
+  return key === "birthCountry" && normalizeCompare(value) === "RUSSIAN FEDERATION";
+}
+
 function createRequestId() {
   return (
     globalThis.crypto?.randomUUID?.() ??
@@ -253,6 +260,7 @@ export function passportExtractionRows(
     const extractedValue = field.value.trim();
     const conflict =
       Boolean(currentValue) &&
+      !isCanonicalPassportAutofillDefault(field.key, currentValue) &&
       normalizeCompare(currentValue) !== normalizeCompare(extractedValue);
 
     return [

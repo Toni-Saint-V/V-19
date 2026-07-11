@@ -10,6 +10,7 @@ import {
 import {
   buildExportWorkbookRowFills,
   buildExportWorkbookRows,
+  createExportWorkbookBlob,
   createExportWorkbookArtifact,
   default as downloadExportWorkbook,
 } from "../../src/modules/submissions/exportWorkbook";
@@ -188,6 +189,15 @@ async function workbookFilesFromBlob(blob: Blob): Promise<Record<string, string>
 }
 
 describe("V-19 export workbook contract", () => {
+  test("rejects workbook rows that are not exactly 56 columns wide", () => {
+    expect(() =>
+      createExportWorkbookBlob([Array.from({ length: 55 }, () => "")]),
+    ).toThrow("must contain exactly 56 columns");
+    expect(() =>
+      createExportWorkbookBlob([Array.from({ length: 57 }, () => "")]),
+    ).toThrow("must contain exactly 56 columns");
+  });
+
   test("generates a parseable Sheet1 workbook with exact A:BD 56-column shape", async () => {
     const selection = applyExportStateToSelection(
       [readySubmission()],
@@ -206,12 +216,22 @@ describe("V-19 export workbook contract", () => {
     expect(artifact.sheetName).toBe(EXPORT_WORKBOOK_SHEET_NAME);
     expect(artifact.range).toBe(EXPORT_WORKBOOK_RANGE);
     expect(parsed.sheetName).toBe("Sheet1");
-    expect(parsed.dimension).toBe("A1:BE1048572");
+    expect(parsed.dimension).toBe("A1:BD2");
     expect(parsed.rows[0]).toHaveLength(EXPORT_WORKBOOK_COLUMN_COUNT);
     expect(exportContractHeaders()).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
     expect(parsed.rows[0]).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
     expect(parsed.rows[0]?.at(0)).toBe("Location");
     expect(parsed.rows[0]?.at(-1)).toBe("Nationality At Birth");
+    expect(parsed.rows).toHaveLength(2);
+    const workbookFiles = await workbookFilesFromBlob(artifact.blob);
+    const worksheetXml = workbookFiles["xl/worksheets/sheet1.xml"] ?? "";
+    const workbookXml = workbookFiles["xl/workbook.xml"] ?? "";
+    expect(worksheetXml).toContain('<dimension ref="A1:BD2"/>');
+    expect(worksheetXml).toContain('<autoFilter ref="A1:BD2"/>');
+    expect(workbookXml).toContain("Sheet1!$A$1:$BD$2");
+    expect(worksheetXml.match(/<row\b/g)).toHaveLength(2);
+    expect(worksheetXml).not.toMatch(/\br="BE\d+"/);
+    expect(worksheetXml).not.toContain("1048572");
     expect(await verifyExportWorkbookArtifact(artifact)).toBe(true);
   });
 
@@ -346,7 +366,7 @@ describe("V-19 export workbook contract", () => {
       applicantId: "з-1056-1",
       excelRowNumber: 5,
       familyGroupId: undefined,
-      ownerAgentName: "Татьяна Николаева",
+      ownerAgentName: single.agentId,
       passportLast3: "614",
     });
   });
@@ -559,17 +579,17 @@ describe("V-19 export workbook contract", () => {
       expect.arrayContaining(["Agent", "Family", "Debug"]),
     );
     expect(stylesXml).toContain('<fills count="11">');
+    expect(stylesXml).toContain('<fonts count="8"');
+    expect(stylesXml).toContain('<borders count="9">');
+    expect(stylesXml).toContain('<dxfs count="3">');
     expect(stylesXml).toContain('<fgColor rgb="C6E0B4"/>');
     expect(stylesXml).toContain('<fgColor rgb="FFF2CC"/>');
     expect(stylesXml).toContain('<fgColor rgb="BDD7EE"/>');
     expect(stylesXml).toContain('<fgColor rgb="F4CCCC"/>');
     expect(stylesXml).toContain('<cellXfs count="84">');
-    expect(stylesXml).toContain(
-      '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1"/>',
-    );
-    expect(stylesXml).toContain(
-      '<xf numFmtId="164" fontId="0" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>',
-    );
+    expect(stylesXml).toMatch(/<xf\b[^>]*fillId="3"[^>]*applyFill="1"[^>]*>/);
+    expect(stylesXml).toMatch(/<xf\b[^>]*fillId="4"[^>]*applyFill="1"[^>]*>/);
+    expect(worksheetXml.match(/<conditionalFormatting\b/g)).toHaveLength(3);
     expect(worksheetXml).toContain('<c r="A2" s="52"');
     expect(worksheetXml).toContain('<c r="E2" s="53"');
     expect(worksheetXml).toContain('<c r="L2" s="54"');
@@ -771,18 +791,18 @@ describe("V-19 export workbook contract", () => {
     }
   });
 
-  test("missing passport filenames use fallback that can feed blockers", () => {
+  test("missing passport filenames fail closed instead of creating a fallback name", () => {
     const applicant = withQuestionnaireFieldValues(readySubmission(), {
       "passport-no": "",
     }).applicants[0]!;
 
-    expect(
+    expect(() =>
       buildApplicantDocumentFileName({
         applicant,
         applicantId: applicant.id,
         documentType: "passport_scan",
       }),
-    ).toBe(`missing-passport_passport_scan_${applicant.id}.pdf`);
+    ).toThrow("отсутствует номер паспорта");
   });
 
   test("keeps generated multi-row package members selectable while blocker rows are hidden", () => {

@@ -30,6 +30,7 @@ import {
   isKnownContractRole,
   isStatusTransitionAllowed,
 } from "./domainContract";
+import { blsQuestionnaireReadiness } from "./questionnaireBlsRules";
 
 const statusLabelVariants = {
   draft: { compact: "Черновик", full: "Черновик" },
@@ -304,14 +305,7 @@ export function hasRequiredDocuments(submission: Submission) {
 export function calculateSubmissionProgress(
   submission: Submission,
 ): Submission["completeness"] {
-  const fields = submission.applicants.flatMap((applicant) =>
-    applicant.sections.flatMap((section) => section.fields),
-  );
-  const requiredFields = fields.filter((field) => field.required);
-  const readyFields = requiredFields.filter(
-    (field) => field.value.trim().length > 0 && !field.error,
-  );
-  const questionnaire = percent(readyFields.length, requiredFields.length);
+  const questionnaire = blsQuestionnaireReadiness(submission).percent;
   const requiredFiles = submission.files.filter((file) =>
     CANONICAL_FRONTEND_MEDIA_TYPES.some((type) => type === file.type),
   );
@@ -364,15 +358,37 @@ export function withRecalculatedSubmissionProgress(
 }
 
 export function canAgentSubmitForReview(submission: Submission) {
+  const questionnaire = blsQuestionnaireReadiness(submission);
+
   return (
     submission.status === "in_progress" &&
-    calculateSubmissionProgress(submission).questionnaire === 100 &&
+    questionnaire.ready &&
     hasRequiredDocuments(submission) &&
     !hasBlockingIssues(submission) &&
     hasUsableTripDateRange(submission) &&
     !requiresPassportGateBeforeAction(submission, "submit_for_review") &&
     !requiresPassportExtractionReviewBeforeAction(submission, "submit_for_review")
   );
+}
+
+export function agentQuestionnaireCompletionDecision(
+  submission: Submission,
+): {
+  action: "submit_corrections" | "submit_for_review";
+  ok: boolean;
+  reason?: string;
+} {
+  const action =
+    submission.status === "returned"
+      ? "submit_corrections"
+      : "submit_for_review";
+  const candidate =
+    submission.status === "draft"
+      ? { ...submission, status: "in_progress" as const }
+      : submission;
+  const decision = canPerformAction(candidate, action, "agent");
+
+  return { action, ...decision };
 }
 
 export function canAdminReturnSubmission(submission: Submission) {
@@ -420,9 +436,10 @@ export function hasUsableTripDateRange(submission: Submission) {
 export function hasMissingRequiredWork(submission: Submission) {
   const media = canonicalRequiredMediaReadiness(submission);
   const progress = calculateSubmissionProgress(submission);
+  const questionnaire = blsQuestionnaireReadiness(submission);
 
   return (
-    progress.questionnaire < 100 ||
+    !questionnaire.ready ||
     progress.files < 100 ||
     !media.ok ||
     submission.files.some(

@@ -1,87 +1,108 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeftRight,
-  CalendarDays,
+  ArrowUpDown,
   CheckCircle2,
   Clock,
   FileText,
   Menu,
   Plus,
+  RotateCcw,
   Search,
   Settings,
+  Shapes,
   Users,
   X,
-} from 'lucide-react';
-import { Drawer } from './Drawer';
-import { QuestionnaireScreen } from './QuestionnaireScreen';
-import { ApplicantsScreen } from './ApplicantsScreen';
-import { AgentReturnPackagesPanel } from './AgentReturnPackagesPanel';
-import { DraftsScreen } from './DraftsScreen';
-import { PreUploadScreen } from './PreUploadScreen';
-import { CreateSubmissionDrawer } from '../modules/submissions/components/CreateSubmissionDrawer';
-import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from '../modules/submissions/components/adminAiAssistance';
-import visaflowLogo from '../assets/v-logo-premium-black-style.png';
+} from "lucide-react";
+import { Drawer } from "./Drawer";
+import { QuestionnaireScreen } from "./QuestionnaireScreen";
+import type { QuestionnaireInitialFocus } from "../modules/submissions/components/FigmaQuestionnaireScreen";
+import { ApplicantsScreen } from "./ApplicantsScreen";
+import { AgentReturnPackagesPanel } from "./AgentReturnPackagesPanel";
+import { DraftsScreen } from "./DraftsScreen";
+import { PreUploadScreen } from "./PreUploadScreen";
+import { CreateSubmissionDrawer } from "../modules/submissions/components/CreateSubmissionDrawer";
+import { FigmaSubmissionDrawer as OperationalSubmissionDrawer } from "../modules/submissions/components/adminAiAssistance";
+import visaflowLogo from "../assets/v-logo-premium-black-style.png";
 import {
   emitVisaflowUiEvent,
   useVisaflowBusinessBridge,
   type AgentNavSection,
-} from '../integration/visaflowBusinessBridge';
-import { createDraft } from '../modules/submissions/domainEngine';
+} from "../integration/visaflowBusinessBridge";
+import {
+  V19ListHeader,
+  V19MetricCard,
+  V19MetricStrip,
+  V19PriorityHero,
+  V19QueueCard,
+  V19QueueToolbar,
+  V19ToolbarSelect,
+} from "../shared/ui/v19-design-system";
+import { createDraft } from "../modules/submissions/domainEngine";
 import type {
   City,
   PassportUploadDraft,
   PreliminaryIntakeDraft,
   Submission,
   SubmissionAction,
-} from '../modules/submissions/types';
+} from "../modules/submissions/types";
 import {
   listItemsFromSubmissions,
   type LegacyAgentNavSection,
   type LegacySubmissionListItem,
-} from './v19BusinessScreenAdapter';
-import { updateQuestionnaireField } from '../modules/submissions/questionnaire';
+} from "./v19BusinessScreenAdapter";
 import {
   loadProductIntakeDrafts,
   saveProductIntakeDrafts,
   type ProductIntakeDraft,
-} from '../modules/submissions/productIntakeFlow';
-import { productIntakeDraftToSubmission } from '../modules/submissions/productIntakeSubmissionAdapter';
+} from "../modules/submissions/productIntakeFlow";
+import { productIntakeDraftToSubmission } from "../modules/submissions/productIntakeSubmissionAdapter";
 import {
   agentActionQueue,
   searchAgentActions,
   type AgentActionDue,
   type AgentActionItem,
-} from '../modules/submissions/agentActions';
+} from "../modules/submissions/agentActions";
 import {
   agentAgencyLabel,
   agentDisplayName,
   agentInitials,
-} from '../modules/submissions/agentDirectory';
+} from "../modules/submissions/agentDirectory";
+import { cityFilterValuesForSubmissions } from "../modules/submissions/selectors";
 import {
   generatedCockpitMediaFileName,
   mediaSlotTypeForSubmissionFileType,
   uploadRequiredFile,
-} from '../modules/submissions/submissionActions';
+} from "../modules/submissions/submissionActions";
 import {
   buildMediaStoragePath,
   mediaMimeTypeForFile,
   uploadMediaToStorage,
-} from '../modules/submissions/mediaStorage';
-import { V19SummaryTile, V19SummaryTileGrid } from '../shared/ui/v19-design-system';
-import { applySubmissionActionResult, canReplaceDocument } from '../modules/submissions/status';
+} from "../modules/submissions/mediaStorage";
+import {
+  applySubmissionActionResult,
+  canReplaceDocument,
+  markSubmissionIssueFixedResult,
+} from "../modules/submissions/status";
+import { persistCreatedSubmissionWithPassports } from "../modules/submissions/createSubmissionPassportUseCase";
 
 export type SubmissionListItem = LegacySubmissionListItem;
 
-type ViewState = 'main' | 'questionnaire' | 'upload';
+type ViewState = "main" | "questionnaire" | "upload";
 type AgentShellNavSection = Extract<
   LegacyAgentNavSection,
-  'actions' | 'documents' | 'submissions' | 'settings'
+  "actions" | "documents" | "submissions" | "settings"
 >;
-type ActionSummaryFilter = 'open' | 'today' | 'week' | 'completed';
+type ActionSummaryFilter = "blockers" | "open" | "today" | "week" | "completed";
+type ActionSort = "tripDate" | "createdAt";
 
 type CommandCenterProps = {
-  agentId?: Submission['agentId'];
+  agentId?: Submission["agentId"];
+  onSubmissionUpdate?: (
+    submissionId: string,
+    update: (submission: Submission) => Submission,
+  ) => Promise<Submission>;
   onSubmissionsChange?: (submissions: Submission[]) => void | Promise<void>;
   submissions?: Submission[];
   onSignOut?: () => void | Promise<void>;
@@ -92,60 +113,60 @@ type CommandCenterProps = {
 
 const fallbackSubmissions: SubmissionListItem[] = [
   {
-    id: 'SUB-1042',
-    title: 'Семья Петровых',
-    type: 'family',
+    id: "SUB-1042",
+    title: "Семья Петровых",
+    type: "family",
     applicantsCount: 4,
-    city: 'Санкт-Петербург',
-    tripDates: '18–23 июл 2026',
-    status: 'returned',
+    city: "Санкт-Петербург",
+    tripDates: "18–23 июл 2026",
+    status: "returned",
     completeness: 92,
-    updated: '12 мин назад',
-    owner: 'Татьяна Н.',
+    updated: "12 мин назад",
+    owner: "Татьяна Н.",
     issueCount: 2,
-    nextAction: 'Исправить замечания администратора',
+    nextAction: "Исправить замечания администратора",
   },
   {
-    id: 'SUB-1057',
-    title: 'Алина Смирнова',
-    type: 'single',
+    id: "SUB-1057",
+    title: "Алина Смирнова",
+    type: "single",
     applicantsCount: 1,
-    city: 'Москва',
-    tripDates: '02–09 авг 2026',
-    status: 'in_progress',
+    city: "Москва",
+    tripDates: "02–09 авг 2026",
+    status: "in_progress",
     completeness: 64,
-    updated: '34 мин назад',
-    owner: 'Татьяна Н.',
+    updated: "34 мин назад",
+    owner: "Татьяна Н.",
     issueCount: 0,
-    nextAction: 'Дособрать обязательные документы',
+    nextAction: "Дособрать обязательные документы",
   },
   {
-    id: 'SUB-1061',
-    title: 'Семья Орловых',
-    type: 'family',
+    id: "SUB-1061",
+    title: "Семья Орловых",
+    type: "family",
     applicantsCount: 4,
-    city: 'Москва',
-    tripDates: '11–21 авг 2026',
-    status: 'submitted_for_review',
+    city: "Москва",
+    tripDates: "11–21 авг 2026",
+    status: "submitted_for_review",
     completeness: 100,
-    updated: '1 ч назад',
-    owner: 'Татьяна Н.',
+    updated: "1 ч назад",
+    owner: "Татьяна Н.",
     issueCount: 0,
-    nextAction: 'Ожидать проверки администратора',
+    nextAction: "Ожидать проверки администратора",
   },
   {
-    id: 'SUB-1078',
-    title: 'Дмитрий Волков',
-    type: 'single',
+    id: "SUB-1078",
+    title: "Дмитрий Волков",
+    type: "single",
     applicantsCount: 1,
-    city: 'Москва',
-    tripDates: '06–12 сен 2026',
-    status: 'ready_for_export',
+    city: "Москва",
+    tripDates: "06–12 сен 2026",
+    status: "ready_for_export",
     completeness: 100,
-    updated: '2 ч назад',
-    owner: 'Марина К.',
+    updated: "2 ч назад",
+    owner: "Марина К.",
     issueCount: 0,
-    nextAction: 'Готово к Excel-выгрузке',
+    nextAction: "Готово к Excel-выгрузке",
   },
 ];
 
@@ -156,44 +177,53 @@ function intakeDraftToListItem(draft: ProductIntakeDraft): SubmissionListItem {
     type: draft.type,
     applicantsCount: draft.applicants.length,
     city: draft.city,
-    tripDates: draft.tripDates.replace(/\.2026/g, '').replace(/\s+–\s+/g, '–'),
-    status: draft.issues.some((issue) => issue.severity === 'blocker') ? 'returned' : 'in_progress',
+    tripDates: draft.tripDates.replace(/\.2026/g, "").replace(/\s+–\s+/g, "–"),
+    status: draft.issues.some((issue) => issue.severity === "blocker")
+      ? "returned"
+      : "in_progress",
     completeness: draft.readyPercent,
-    updated: 'только что',
-    owner: 'Татьяна Н.',
+    updated: "только что",
+    owner: "Татьяна Н.",
     issueCount: draft.issues.length,
     nextAction: draft.nextAction,
   };
 }
 
 function canonicalBridgeNav(section: LegacyAgentNavSection): AgentNavSection | null {
-  if (section === 'actions' || section === 'documents' || section === 'submissions' || section === 'settings') return section;
+  if (
+    section === "actions" ||
+    section === "documents" ||
+    section === "submissions" ||
+    section === "settings"
+  )
+    return section;
   return null;
 }
 
 function navLabel(section: AgentShellNavSection) {
   switch (section) {
-    case 'actions':
-      return 'Мои действия';
-    case 'documents':
-      return 'Сбор документов';
-    case 'submissions':
-      return 'Мои подачи';
-    case 'settings':
-      return 'Настройки';
+    case "actions":
+      return "Мои действия";
+    case "documents":
+      return "Сбор документов";
+    case "submissions":
+      return "Мои подачи";
+    case "settings":
+      return "Настройки";
   }
 }
 
 function normalizeAgentNav(section: LegacyAgentNavSection): AgentShellNavSection {
-  if (section === 'applicants') return 'submissions';
-  if (section === 'drafts') return 'submissions';
-  if (section === 'files' || section === 'media') return 'documents';
-  if (section === 'issues') return 'actions';
+  if (section === "applicants") return "submissions";
+  if (section === "drafts") return "submissions";
+  if (section === "files" || section === "media") return "documents";
+  if (section === "issues") return "actions";
   return section;
 }
 
 export function CommandCenter({
   agentId,
+  onSubmissionUpdate,
   onSubmissionsChange,
   submissions: canonicalSubmissions,
   onSignOut,
@@ -202,24 +232,35 @@ export function CommandCenter({
   usesSupabase = false,
 }: CommandCenterProps) {
   const bridge = useVisaflowBusinessBridge();
-  const [activeNav, setActiveNav] = useState<AgentShellNavSection>('actions');
-  const [currentView, setCurrentView] = useState<ViewState>('main');
+  const [activeNav, setActiveNav] = useState<AgentShellNavSection>("actions");
+  const [currentView, setCurrentView] = useState<ViewState>("main");
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
+  const [questionnaireInitialFocus, setQuestionnaireInitialFocus] =
+    useState<QuestionnaireInitialFocus>();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [actionSummaryFilter, setActionSummaryFilter] = useState<ActionSummaryFilter>('open');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [settingsDigest, setSettingsDigest] = useState<'instant' | 'daily'>('instant');
+  const [actionSummaryFilter, setActionSummaryFilter] =
+    useState<ActionSummaryFilter>("open");
+  const [actionCityFilter, setActionCityFilter] = useState("Все города");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [actionSort, setActionSort] = useState<ActionSort>("tripDate");
+  const [settingsDigest, setSettingsDigest] = useState<"instant" | "daily">("instant");
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [intakeDrafts, setIntakeDrafts] = useState<ProductIntakeDraft[]>(() =>
     usesSupabase ? [] : loadProductIntakeDrafts(),
   );
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
-  const [createCity, setCreateCity] = useState<City>('Москва');
+  const questionnaireOriginFocusRef = useRef<HTMLElement | null>(null);
+  const [createCity, setCreateCity] = useState<City>("Москва");
   const [createFamilyCount, setCreateFamilyCount] = useState(2);
-  const [createType, setCreateType] = useState<Submission['type']>('single');
-  const [canonicalOverrides, setCanonicalOverrides] = useState<Record<string, Submission>>({});
+  const [createType, setCreateType] = useState<Submission["type"]>("single");
+  const [canonicalOverrides, setCanonicalOverrides] = useState<
+    Record<string, Submission>
+  >({});
+  const pendingCreatedSubmissionRef = useRef<Submission | null>(null);
+  const createSubmissionPromiseRef = useRef<Promise<void> | null>(null);
+  const attemptedCreateStoragePathsRef = useRef(new Set<string>());
 
   const effectiveCanonicalSubmissions = useMemo(() => {
     const byId = new Map(
@@ -232,12 +273,15 @@ export function CommandCenter({
   }, [canonicalOverrides, canonicalSubmissions]);
 
   useEffect(() => {
-    if (!canonicalSubmissions?.length || !Object.keys(canonicalOverrides).length) return;
+    if (!canonicalSubmissions?.length || !Object.keys(canonicalOverrides).length)
+      return;
     setCanonicalOverrides((current) => {
       const next = { ...current };
       let changed = false;
       for (const [id, override] of Object.entries(current)) {
-        if (canonicalSubmissions.find((submission) => submission.id === id) === override) {
+        if (
+          canonicalSubmissions.find((submission) => submission.id === id) === override
+        ) {
           delete next[id];
           changed = true;
         }
@@ -246,31 +290,64 @@ export function CommandCenter({
     });
   }, [canonicalOverrides, canonicalSubmissions]);
 
-  const canonicalRows = useMemo(() => listItemsFromSubmissions(effectiveCanonicalSubmissions), [effectiveCanonicalSubmissions]);
-  const intakeRows = useMemo(() => intakeDrafts.map(intakeDraftToListItem), [intakeDrafts]);
+  const canonicalRows = useMemo(
+    () => listItemsFromSubmissions(effectiveCanonicalSubmissions),
+    [effectiveCanonicalSubmissions],
+  );
+  const intakeRows = useMemo(
+    () => intakeDrafts.map(intakeDraftToListItem),
+    [intakeDrafts],
+  );
   const rows = useMemo(
     () =>
       usesSupabase
         ? canonicalRows
-        : [...intakeRows, ...(canonicalRows.length ? canonicalRows : fallbackSubmissions)],
+        : [
+            ...intakeRows,
+            ...(canonicalRows.length ? canonicalRows : fallbackSubmissions),
+          ],
     [canonicalRows, intakeRows, usesSupabase],
   );
-  const actionQueue = useMemo(() => agentActionQueue(effectiveCanonicalSubmissions), [effectiveCanonicalSubmissions]);
+  const actionQueue = useMemo(
+    () => agentActionQueue(effectiveCanonicalSubmissions),
+    [effectiveCanonicalSubmissions],
+  );
+  const actionCityOptions = useMemo(
+    () => cityFilterValuesForSubmissions(effectiveCanonicalSubmissions),
+    [effectiveCanonicalSubmissions],
+  );
   const visibleActions = useMemo(() => {
     const matchesFilter = (due: AgentActionDue) => {
-      if (actionSummaryFilter === 'open') return true;
-      if (actionSummaryFilter === 'today') return due === 'today';
-      if (actionSummaryFilter === 'week') return due === 'today' || due === 'week';
-      return due === 'completed';
+      if (actionSummaryFilter === "blockers") return true;
+      if (actionSummaryFilter === "open") return true;
+      if (actionSummaryFilter === "today") return due === "today";
+      if (actionSummaryFilter === "week") return due === "today" || due === "week";
+      return due === "completed";
     };
-    const source = actionSummaryFilter === 'completed' ? actionQueue.completed : actionQueue.open;
-    return searchAgentActions(source.filter((action) => matchesFilter(action.due)), searchQuery);
-  }, [actionQueue.completed, actionQueue.open, actionSummaryFilter, searchQuery]);
+    const source =
+      actionSummaryFilter === "completed" ? actionQueue.completed : actionQueue.open;
+    const filtered = source.filter((action) => {
+      if (actionCityFilter !== "Все города" && action.submission.city !== actionCityFilter) {
+        return false;
+      }
+      if (actionSummaryFilter === "blockers") return action.severity === "blocker";
+      return matchesFilter(action.due);
+    });
+    return searchAgentActions(filtered, searchQuery).sort((left, right) =>
+      actionSort === "tripDate"
+        ? left.submission.tripDateFrom.localeCompare(right.submission.tripDateFrom)
+        : right.submission.createdAt.localeCompare(left.submission.createdAt),
+    );
+  }, [actionCityFilter, actionQueue.completed, actionQueue.open, actionSort, actionSummaryFilter, searchQuery]);
+  const blockerActionCount = actionQueue.open.filter(
+    (action) => action.severity === "blocker",
+  ).length;
   const agentName = agentDisplayName(agentId);
   const agentAgency = agentAgencyLabel(agentId);
   const agentAvatar = agentInitials(agentId);
   const selectedCanonicalSubmission = useMemo(
-    () => effectiveCanonicalSubmissions.find((submission) => submission.id === selectedRow),
+    () =>
+      effectiveCanonicalSubmissions.find((submission) => submission.id === selectedRow),
     [effectiveCanonicalSubmissions, selectedRow],
   );
   const selectedIntakeDraft = useMemo(
@@ -299,8 +376,8 @@ export function CommandCenter({
     const handleResize = () => {
       if (window.innerWidth >= 768) setMobileNavOpen(false);
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
@@ -313,39 +390,68 @@ export function CommandCenter({
     const canonicalNav = canonicalBridgeNav(normalizedNav);
     if (canonicalNav) {
       bridge.onAgentNavChange?.(canonicalNav);
-      emitVisaflowUiEvent(bridge, { type: 'agent.nav', section: canonicalNav });
-      if (canonicalNav === 'settings') onNavigateSettings?.();
+      emitVisaflowUiEvent(bridge, { type: "agent.nav", section: canonicalNav });
+      if (canonicalNav === "settings") onNavigateSettings?.();
     }
     setActiveNav(normalizedNav);
     setMobileNavOpen(false);
   };
 
   const handleRowClick = (id: string) => {
+    questionnaireOriginFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setQuestionnaireInitialFocus(undefined);
     if (intakeDrafts.some((draft) => draft.id === id)) {
       bridge.onQuestionnaireOpen?.(id);
-      emitVisaflowUiEvent(bridge, { type: 'questionnaire.open', submissionId: id });
+      emitVisaflowUiEvent(bridge, { type: "questionnaire.open", submissionId: id });
       setSelectedRow(id);
       setDrawerOpen(false);
-      setCurrentView('questionnaire');
+      setCurrentView("questionnaire");
       return;
     }
 
     bridge.onSubmissionOpen?.(id);
-    emitVisaflowUiEvent(bridge, { type: 'submission.open', submissionId: id });
+    emitVisaflowUiEvent(bridge, { type: "submission.open", submissionId: id });
     setSelectedRow(id);
     setDrawerOpen(true);
   };
 
-  const handleOpenQuestionnaire = (id: string) => {
+  const handleOpenQuestionnaire = (
+    id: string,
+    initialFocus?: QuestionnaireInitialFocus,
+  ) => {
+    questionnaireOriginFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     bridge.onQuestionnaireOpen?.(id);
-    emitVisaflowUiEvent(bridge, { type: 'questionnaire.open', submissionId: id });
+    emitVisaflowUiEvent(bridge, { type: "questionnaire.open", submissionId: id });
     setSelectedRow(id);
+    setQuestionnaireInitialFocus(initialFocus);
     setDrawerOpen(false);
-    setCurrentView('questionnaire');
+    setCurrentView("questionnaire");
+  };
+
+  const handleQuestionnaireBack = () => {
+    setQuestionnaireInitialFocus(undefined);
+    setCurrentView("main");
+    window.requestAnimationFrame(() => {
+      const origin = questionnaireOriginFocusRef.current;
+      if (origin?.isConnected) {
+        origin.focus({ preventScroll: true });
+        return;
+      }
+      if (!selectedRow) return;
+      const row = document.querySelector<HTMLElement>(
+        `[data-submission-id="${CSS.escape(selectedRow)}"]`,
+      );
+      const fallback = row?.matches("button, [tabindex]")
+        ? row
+        : row?.querySelector<HTMLElement>("button, [tabindex]");
+      fallback?.focus({ preventScroll: true });
+    });
   };
 
   const handleActionOpen = (action: AgentActionItem) => {
-    if (action.tab === 'questionnaire') {
+    if (action.tab === "questionnaire") {
       handleOpenQuestionnaire(action.submission.id);
       return;
     }
@@ -354,157 +460,114 @@ export function CommandCenter({
 
   const createPackage = () => {
     bridge.onCreatePackage?.();
-    emitVisaflowUiEvent(bridge, { type: 'package.create' });
+    emitVisaflowUiEvent(bridge, { type: "package.create" });
     if (usesSupabase) {
       setCreateDrawerOpen(true);
       return;
     }
-    setCurrentView('upload');
+    setCurrentView("upload");
   };
 
-  const createCanonicalDraft = async (
+  const executeCreateCanonicalDraft = async (
     passportUploads: PassportUploadDraft[] = [],
     preliminaryIntake?: PreliminaryIntakeDraft,
     options?: { openQuestionnaire?: boolean },
   ) => {
     const applicantNames = passportUploads.map((upload) => {
-      const firstName = upload.extractedFields.find((field) => field.key === 'firstName')?.value.trim();
-      const surname = upload.extractedFields.find((field) => field.key === 'surname')?.value.trim();
-      return [firstName, surname].filter(Boolean).join(' ');
+      const firstName = upload.extractedFields
+        .find((field) => field.key === "firstName")
+        ?.value.trim();
+      const surname = upload.extractedFields
+        .find((field) => field.key === "surname")
+        ?.value.trim();
+      return [firstName, surname].filter(Boolean).join(" ");
     });
-    const result = createDraft({
-      agentId,
-      applicantNames,
-      city: createCity,
-      familyCount: createFamilyCount,
-      idScheme: 'supabase',
-      preliminaryIntake,
-      submissions: canonicalSubmissions ?? [],
-      type: createType,
-    });
-    if (!result.ok) throw new Error(result.error.message);
-
-    const passportFieldIds: Record<string, string> = {
-      birthCountry: 'birth-country',
-      birthDate: 'birth-date',
-      birthPlace: 'birth-place',
-      citizenship: 'nationality',
-      firstName: 'first-name',
-      gender: 'gender',
-      passportExpiresAt: 'passport-expiry-date',
-      passportIssueCountry: 'passport-issue-country',
-      passportIssuePlace: 'passport-issue-place',
-      passportIssuedAt: 'passport-issue-date',
-      passportNumber: 'passport-no',
-      passportType: 'passport-type',
-      surname: 'surname',
-    };
-    const nowIso = new Date().toISOString();
-    let nextSubmission = result.data;
-    for (const upload of passportUploads) {
-      const applicant = nextSubmission.applicants[upload.applicantIndex];
-      if (!applicant) continue;
-      const passportFile = nextSubmission.files.find(
-        (file) => file.applicantId === applicant.id && file.type === 'passport_scan',
-      );
-      if (!passportFile || !upload.file) {
-        throw new Error(`Не удалось подготовить файл паспорта для ${applicant.fullName}.`);
-      }
-
-      const generatedFileName = generatedCockpitMediaFileName({
-        applicantId: applicant.id,
-        fileType: passportFile.type,
-        mimeType: upload.file.type,
-        submissionId: nextSubmission.id,
-        uploadNonce: upload.id,
+    let pendingSubmission = pendingCreatedSubmissionRef.current;
+    if (!pendingSubmission) {
+      const result = createDraft({
+        agentId,
+        applicantNames,
+        city: createCity,
+        familyCount: createFamilyCount,
+        idScheme: "supabase",
+        preliminaryIntake,
+        submissions: canonicalSubmissions ?? [],
+        type: createType,
       });
-      const storageTarget = buildMediaStoragePath(
-        nextSubmission.id,
-        applicant.id,
-        mediaSlotTypeForSubmissionFileType(passportFile.type),
-        generatedFileName,
-      );
-      const storedFile = await uploadMediaToStorage(storageTarget, upload.file);
-      if (!storedFile) {
-        throw new Error('Supabase Storage недоступен для сохранения паспорта.');
-      }
-      nextSubmission = uploadRequiredFile(nextSubmission, passportFile.id, {
-        generatedFileName,
-        mimeType: upload.file.type,
-        originalFileName: upload.file.name,
-        sizeBytes: upload.file.size,
-        storageAdapter: 'supabase-private',
-        storageBucket: storageTarget.bucket,
-        storagePath: storedFile.path,
-        uploadedAtIso: new Date().toISOString(),
-      });
-
-      nextSubmission = {
-        ...nextSubmission,
-        applicants: nextSubmission.applicants.map((candidate) =>
-          candidate.id === applicant.id
-            ? {
-                ...candidate,
-                passportExtraction: {
-                  appliedFieldKeys: upload.extractedFields.map((field) => field.key),
-                  attemptCount: 1,
-                  extractedFields: upload.extractedFields,
-                  lastAttemptAtIso: nowIso,
-                  sourceFileId: passportFile?.id,
-                  sourceFileName: upload.fileName,
-                  status: upload.status,
-                  summary:
-                    upload.status === 'ready'
-                      ? 'Паспортные данные перенесены в анкету.'
-                      : 'Паспорт принят, понадобится ручная проверка.',
-                },
-              }
-            : candidate,
-        ),
-      };
-      for (const field of upload.extractedFields) {
-        const fieldId = passportFieldIds[field.key];
-        if (!fieldId || !field.value.trim()) continue;
-        const section = applicant.sections.find((candidate) =>
-          candidate.fields.some((candidateField) => candidateField.id === fieldId),
-        );
-        if (!section) continue;
-        nextSubmission = updateQuestionnaireField(nextSubmission, {
-          applicantId: applicant.id,
-          fieldId,
-          reviewOriginSource: 'passport_ocr',
-          reviewSource: 'passport_ocr',
-          reviewState: 'needs_review',
-          sectionId: section.id,
-          value: field.value,
-        });
-      }
+      if (!result.ok) throw new Error(result.error.message);
+      pendingSubmission = result.data;
+    }
+    if (!onSubmissionsChange) {
+      throw new Error("Supabase persistence недоступен для создания подачи.");
     }
 
-    await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({ ...current, [nextSubmission.id]: nextSubmission }));
+    const nextSubmission = await persistCreatedSubmissionWithPassports({
+      attemptedStoragePaths: attemptedCreateStoragePathsRef.current,
+      onPendingSubmission: (submission) => {
+        pendingCreatedSubmissionRef.current = submission;
+      },
+      passportUploads,
+      persistSubmission: async (submission) => {
+        await onSubmissionsChange([submission]);
+        setCanonicalOverrides((current) => ({
+          ...current,
+          [submission.id]: submission,
+        }));
+      },
+      submission: pendingSubmission,
+    });
+
+    pendingCreatedSubmissionRef.current = null;
+    attemptedCreateStoragePathsRef.current.clear();
+    setCanonicalOverrides((current) => ({
+      ...current,
+      [nextSubmission.id]: nextSubmission,
+    }));
     setCreateDrawerOpen(false);
-    setActiveNav('submissions');
-    setSearchQuery('');
+    setActiveNav("submissions");
+    setSearchQuery("");
     if (options?.openQuestionnaire) {
       setSelectedRow(nextSubmission.id);
       setDrawerOpen(false);
-      setCurrentView('questionnaire');
+      setCurrentView("questionnaire");
     }
   };
 
+  const createCanonicalDraft = (
+    passportUploads: PassportUploadDraft[] = [],
+    preliminaryIntake?: PreliminaryIntakeDraft,
+    options?: { openQuestionnaire?: boolean },
+  ) => {
+    if (createSubmissionPromiseRef.current) {
+      return createSubmissionPromiseRef.current;
+    }
+    const promise = executeCreateCanonicalDraft(
+      passportUploads,
+      preliminaryIntake,
+      options,
+    ).finally(() => {
+      if (createSubmissionPromiseRef.current === promise) {
+        createSubmissionPromiseRef.current = null;
+      }
+    });
+    createSubmissionPromiseRef.current = promise;
+    return promise;
+  };
+
   const uploadCanonicalFile = async (fileId: string, file: File) => {
-    const submission = effectiveCanonicalSubmissions.find((candidate) => candidate.id === selectedRow);
+    const submission = effectiveCanonicalSubmissions.find(
+      (candidate) => candidate.id === selectedRow,
+    );
     const targetFile = submission?.files.find((candidate) => candidate.id === fileId);
     if (!submission || !targetFile) {
-      throw new Error('Не удалось определить слот файла для загрузки.');
+      throw new Error("Не удалось определить слот файла для загрузки.");
     }
     if (!canReplaceDocument(submission, targetFile)) {
-      throw new Error('Файл нельзя загрузить в текущем статусе подачи.');
+      throw new Error("Файл нельзя загрузить в текущем статусе подачи.");
     }
     const mimeType = mediaMimeTypeForFile(file);
     if (!mimeType) {
-      throw new Error('Не удалось определить тип выбранного файла.');
+      throw new Error("Не удалось определить тип выбранного файла.");
     }
 
     const generatedFileName = generatedCockpitMediaFileName({
@@ -520,44 +583,63 @@ export function CommandCenter({
       mediaSlotTypeForSubmissionFileType(targetFile.type),
       generatedFileName,
     );
-    const uploaded = await uploadMediaToStorage(target, file, { contentType: mimeType });
+    const uploaded = await uploadMediaToStorage(target, file, {
+      contentType: mimeType,
+    });
     if (!uploaded) {
-      throw new Error('Supabase Storage недоступен для загрузки файла.');
+      throw new Error("Supabase Storage недоступен для загрузки файла.");
     }
 
-    const uploadedSubmission = uploadRequiredFile(submission, fileId, {
+    const metadata = {
       generatedFileName,
       mimeType,
       originalFileName: file.name,
       sizeBytes: file.size,
-      storageAdapter: 'supabase-private',
+      storageAdapter: "supabase-private" as const,
       storageBucket: target.bucket,
       storagePath: uploaded.path,
       uploadedAtIso: new Date().toISOString(),
-    });
-    if (uploadedSubmission === submission) {
-      throw new Error('Файл нельзя загрузить в текущем статусе подачи.');
-    }
+    };
+    const applyUploadToLatest = (latestSubmission: Submission) => {
+      const latestTargetFile = latestSubmission.files.find(
+        (candidate) => candidate.id === fileId,
+      );
+      if (!latestTargetFile) {
+        throw new Error("Слот файла больше не существует. Обновите подачу.");
+      }
+      const uploadedSubmission = uploadRequiredFile(latestSubmission, fileId, metadata);
+      if (uploadedSubmission === latestSubmission) {
+        throw new Error("Файл нельзя загрузить в текущем статусе подачи.");
+      }
+      if (
+        latestTargetFile.type !== "passport_scan" ||
+        latestTargetFile.status === "needs_replacement"
+      ) {
+        return uploadedSubmission;
+      }
+      return {
+        ...uploadedSubmission,
+        applicants: uploadedSubmission.applicants.map((applicant) =>
+          applicant.id === latestTargetFile.applicantId
+            ? {
+                ...applicant,
+                passportExtraction: latestSubmission.applicants.find(
+                  (candidate) => candidate.id === applicant.id,
+                )?.passportExtraction,
+              }
+            : applicant,
+        ),
+      };
+    };
 
-    const nextSubmission =
-      targetFile.type === 'passport_scan' && targetFile.status !== 'needs_replacement'
-        ? {
-            ...uploadedSubmission,
-            applicants: uploadedSubmission.applicants.map((applicant) =>
-              applicant.id === targetFile.applicantId
-                ? {
-                    ...applicant,
-                    passportExtraction: submission.applicants.find(
-                      (candidate) => candidate.id === applicant.id,
-                    )?.passportExtraction,
-                  }
-                : applicant,
-            ),
-          }
-        : uploadedSubmission;
-
-    await onSubmissionsChange?.([nextSubmission]);
-    setCanonicalOverrides((current) => ({ ...current, [nextSubmission.id]: nextSubmission }));
+    const nextSubmission = onSubmissionUpdate
+      ? await onSubmissionUpdate(submission.id, applyUploadToLatest)
+      : applyUploadToLatest(submission);
+    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
+    setCanonicalOverrides((current) => ({
+      ...current,
+      [nextSubmission.id]: nextSubmission,
+    }));
   };
 
   const executeAgentSubmissionAction = async (action: SubmissionAction) => {
@@ -566,7 +648,7 @@ export function CommandCenter({
     const result = applySubmissionActionResult(
       selectedCanonicalSubmission,
       action,
-      'agent',
+      "agent",
       agentId ?? selectedCanonicalSubmission.agentId,
     );
     if (!result.ok) throw new Error(result.error.message);
@@ -575,50 +657,103 @@ export function CommandCenter({
     setCanonicalOverrides((current) => ({ ...current, [result.data.id]: result.data }));
   };
 
+  const markAgentIssueFixed = async (issueId: string) => {
+    if (!selectedCanonicalSubmission) {
+      throw new Error("Не удалось определить подачу для исправления замечания.");
+    }
+
+    const markFixedOnLatest = (latestSubmission: Submission) => {
+      const result = markSubmissionIssueFixedResult(
+        latestSubmission,
+        issueId,
+        "agent",
+      );
+      if (!result.ok) throw new Error(result.error.message);
+      return result.data;
+    };
+    const nextSubmission = onSubmissionUpdate
+      ? await onSubmissionUpdate(selectedCanonicalSubmission.id, markFixedOnLatest)
+      : markFixedOnLatest(selectedCanonicalSubmission);
+    if (!onSubmissionUpdate) await onSubmissionsChange?.([nextSubmission]);
+    setCanonicalOverrides((current) => ({
+      ...current,
+      [nextSubmission.id]: nextSubmission,
+    }));
+    return nextSubmission;
+  };
+
   const handleUploadComplete = (draft: ProductIntakeDraft) => {
     bridge.onQuestionnaireOpen?.(draft.id);
-    emitVisaflowUiEvent(bridge, { type: 'questionnaire.open', submissionId: draft.id });
-    setIntakeDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8));
+    emitVisaflowUiEvent(bridge, { type: "questionnaire.open", submissionId: draft.id });
+    setIntakeDrafts((current) =>
+      [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8),
+    );
     setSelectedRow(draft.id);
     setDrawerOpen(false);
-    setActiveNav('submissions');
-    setSearchQuery('');
-    setCurrentView('questionnaire');
+    setActiveNav("submissions");
+    setSearchQuery("");
+    setCurrentView("questionnaire");
   };
 
   const handleUploadDraftSave = (draft: ProductIntakeDraft) => {
-    setIntakeDrafts((current) => [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8));
+    setIntakeDrafts((current) =>
+      [draft, ...current.filter((item) => item.id !== draft.id)].slice(0, 8),
+    );
     setSelectedRow(draft.id);
     setDrawerOpen(false);
-    setActiveNav('submissions');
-    setSearchQuery('');
-    setCurrentView('main');
+    setActiveNav("submissions");
+    setSearchQuery("");
+    setCurrentView("main");
   };
 
   const persistQuestionnaireSubmission = (nextSubmission: Submission) => {
-    setIntakeDrafts((current) => current.filter((draft) => draft.id !== nextSubmission.id));
+    setIntakeDrafts((current) =>
+      current.filter((draft) => draft.id !== nextSubmission.id),
+    );
     return onSubmissionsChange?.([nextSubmission]);
   };
 
-  const renderNavButton = (section: LegacyAgentNavSection, icon: ReactNode, count?: number, warning?: boolean) => (
-    <button
-      aria-label={navLabel(normalizeAgentNav(section))}
-      onClick={() => navigateTo(section)}
-      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${activeNav === section ? 'bg-[#27272b] text-white' : 'hover:bg-white/5 text-white/70 hover:text-white'}`}
-    >
-      {icon}
-      <span className="flex-1 text-left">{navLabel(normalizeAgentNav(section))}</span>
-      {typeof count === 'number' && <span className="px-1.5 py-0.5 rounded-full bg-[#18181b] border border-white/5 text-[11px] font-medium text-white/80">{count}</span>}
-      {warning && <span className="w-2 h-2 rounded-full bg-[#a35f69]" />}
-    </button>
-  );
+  const renderNavButton = (
+    section: LegacyAgentNavSection,
+    icon: ReactNode,
+    count?: number,
+    warning?: boolean,
+  ) => {
+    const active = activeNav === section;
+
+    return (
+      <button
+        aria-current={active ? "page" : undefined}
+        aria-label={navLabel(normalizeAgentNav(section))}
+        onClick={() => navigateTo(section)}
+        className={`v19-agent-sidebar-nav-item w-full flex items-center gap-2.5 border px-2.5 py-2 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${active ? "is-active" : "border-transparent hover:bg-white/5 text-white/70 hover:text-white"}`}
+      >
+        <span
+          className={
+            active
+              ? "v19-agent-sidebar-nav-icon is-active"
+              : "v19-agent-sidebar-nav-icon"
+          }
+        >
+          {icon}
+        </span>
+        <span className="flex-1 text-left">{navLabel(normalizeAgentNav(section))}</span>
+        {typeof count === "number" ? (
+          <span
+            className={`v19-agent-sidebar-nav-count px-1.5 py-0.5 rounded-full border text-[11px] font-medium ${active ? "is-active" : "border-white/5 bg-[#18181b] text-white/80"}`}
+          >
+            {count}
+          </span>
+        ) : null}
+        {warning ? <span className="w-2 h-2 rounded-full bg-[#a35f69]" /> : null}
+      </button>
+    );
+  };
 
   const actionStatusTagClass = (action: AgentActionItem) => `tone-${action.severity}`;
 
   const actionPeopleCount = (action: AgentActionItem) =>
-    action.submission.type === 'family'
-      ? action.submission.applicants.length
-      : null;
+    action.submission.type === "family" ? action.submission.applicants.length : null;
 
   const renderNavContent = () => (
     <>
@@ -632,7 +767,10 @@ export function CommandCenter({
           <div className="text-sm font-semibold tracking-tight">VisaFlow V-19</div>
           <div className="text-[11px] text-white/50">Agent workspace</div>
         </div>
-        <button onClick={() => setMobileNavOpen(false)} className="md:hidden p-2 text-white/50 hover:text-white">
+        <button
+          onClick={() => setMobileNavOpen(false)}
+          className="md:hidden p-2 text-white/50 hover:text-white"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -640,195 +778,297 @@ export function CommandCenter({
       <button className="h-10 mb-4 bg-white/5 hover:bg-white/10 border border-[#242529] rounded-[10px] text-white/50 flex items-center gap-2 px-3 text-sm transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4] mx-2">
         <Search className="w-4 h-4" />
         <span>Поиск...</span>
-        <kbd className="ml-auto px-1.5 py-0.5 rounded bg-black/40 border border-[#242529] text-[10px] font-sans">⌘K</kbd>
+        <kbd className="ml-auto px-1.5 py-0.5 rounded bg-black/40 border border-[#242529] text-[10px] font-sans">
+          ⌘K
+        </kbd>
       </button>
 
       <div className="flex-1 overflow-y-auto px-2 space-y-5 scrollbar-hide">
         <nav className="space-y-0.5">
-          <div className="px-2 pb-1 text-[11px] text-white/40 font-medium tracking-wide uppercase">Работа</div>
-          {renderNavButton('actions', <Menu className="w-4 h-4" />, actionQueue.summary.open)}
-          {renderNavButton('documents', <FileText className="w-4 h-4" />, rows.filter((item) => item.completeness < 100 || item.status === 'returned').length)}
-          {renderNavButton('submissions', <Users className="w-4 h-4" />, rows.length)}
-          {renderNavButton('settings', <Settings className="w-4 h-4" />)}
+          <div className="px-2 pb-1 text-[11px] text-[var(--v19b-color-text-muted)] font-medium tracking-wide uppercase">
+            Работа
+          </div>
+          {renderNavButton(
+            "actions",
+            <Menu className="w-4 h-4" />,
+            actionQueue.summary.open,
+          )}
+          {renderNavButton(
+            "documents",
+            <FileText className="w-4 h-4" />,
+            rows.filter((item) => item.completeness < 100 || item.status === "returned")
+              .length,
+          )}
+          {renderNavButton("submissions", <Users className="w-4 h-4" />, rows.length)}
+          {renderNavButton("settings", <Settings className="w-4 h-4" />)}
         </nav>
       </div>
 
-      {onSwitchWorkspace ? (
-        <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
+      <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
+        <button
+          aria-label="Открыть профиль"
+          onClick={() => navigateTo("settings")}
+          className="v19-agent-sidebar-profile w-full min-h-[60px] rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+        >
+          <span className="flex items-center gap-2.5">
+            <span className="v19-agent-sidebar-avatar relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-[12px] font-bold text-white">
+              {agentAvatar}
+              <span
+                className="v19-agent-sidebar-presence absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2"
+                aria-label="Сеанс активен"
+              />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-semibold leading-5 text-white">
+                {agentName}
+              </span>
+              <span className="v19-agent-sidebar-profile-meta block truncate text-[11px] leading-4">
+                {agentAgency}
+              </span>
+            </span>
+            <Settings
+              className="v19-agent-sidebar-profile-icon h-4 w-4 shrink-0"
+              aria-hidden="true"
+            />
+          </span>
+        </button>
+        {onSwitchWorkspace ? (
           <button
             onClick={onSwitchWorkspace}
-            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+            className="v19-agent-sidebar-workspace w-full h-10 px-3 border rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
           >
-            <ArrowLeftRight className="w-4 h-4 text-white/50" />
-            В админскую зону
+            <ArrowLeftRight className="v19-agent-sidebar-workspace-icon w-4 h-4" />В
+            админскую зону
           </button>
-        </div>
-      ) : onSignOut ? (
-        <div className="mt-auto border-t border-[#202124] p-3 mx-2 space-y-2">
-          <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#242529] bg-white text-[12px] font-bold text-[#0a0a0b]">
-              {agentAvatar}
-            </span>
-            <div className="min-w-0 text-left">
-              <div className="truncate text-[13px] font-medium leading-5 text-white">{agentName}</div>
-              <div className="truncate text-[11px] leading-4 text-white/50">{agentAgency}</div>
-            </div>
-          </div>
+        ) : null}
+        {onSignOut ? (
           <button
             onClick={() => void onSignOut()}
-            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+            className="w-full h-10 px-3 bg-[#1e1e21] hover:bg-[#27272b] border border-[#242529] rounded-xl text-[13px] font-medium text-white/82 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
           >
             Выйти
           </button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </>
   );
 
   const renderActionsList = () => (
     <section
       aria-label="Мои действия"
-      className="v19-legacy-actions-screen"
+      className="v19-legacy-actions-screen v19-agent-shared-screen"
       data-testid="agent-actions-screen"
     >
-      <V19SummaryTileGrid className="v19-legacy-actions-summary">
-        <V19SummaryTile
-          active={actionSummaryFilter === 'open'}
+      <V19PriorityHero
+        actionAriaLabel={`Открыть приоритетные действия: ${blockerActionCount} требуют решения`}
+        actionDisabled={blockerActionCount === 0}
+        eyebrow="Контроль действий"
+        eyebrowIcon={Clock}
+        hasBlockers={blockerActionCount > 0}
+        summary={
+          blockerActionCount
+            ? "Сначала разберите действия, которые удерживают подачу от следующего шага."
+            : "Критичных действий нет. Продолжайте работу с ближайшими сроками."
+        }
+        title={
+          blockerActionCount
+            ? `${blockerActionCount} ${blockerActionCount === 1 ? "действие требует" : "действия требуют"} решения`
+            : "Очередь готова к работе"
+        }
+        onAction={() => setActionSummaryFilter("blockers")}
+      />
+
+      <V19MetricStrip className="v19-admin-review-metrics">
+        <V19MetricCard
+          active={actionSummaryFilter === "open"}
           detail="в работе"
           icon={FileText}
           label="Открыто"
           tone="neutral"
           value={actionQueue.summary.open}
-          onClick={() => setActionSummaryFilter('open')}
+          onClick={() => setActionSummaryFilter("open")}
         />
-        <V19SummaryTile
-          active={actionSummaryFilter === 'today'}
+        <V19MetricCard
+          active={actionSummaryFilter === "today"}
           detail="сегодня"
           icon={Clock}
           label="Сегодня"
           tone="amber"
           value={actionQueue.summary.today}
-          onClick={() => setActionSummaryFilter('today')}
+          onClick={() => setActionSummaryFilter("today")}
         />
-        <V19SummaryTile
-          active={actionSummaryFilter === 'week'}
-          detail="до недели"
-          icon={CalendarDays}
-          label="На неделе"
-          tone="indigo"
-          value={actionQueue.summary.week}
-          onClick={() => setActionSummaryFilter('week')}
-        />
-        <V19SummaryTile
-          active={actionSummaryFilter === 'completed'}
+        <V19MetricCard
+          active={actionSummaryFilter === "completed"}
           detail="закрыто"
           icon={CheckCircle2}
           label="Закрыто"
           tone="green"
           value={actionQueue.summary.completed}
-          onClick={() => setActionSummaryFilter('completed')}
+          onClick={() => setActionSummaryFilter("completed")}
         />
-      </V19SummaryTileGrid>
+      </V19MetricStrip>
 
-      <div className="v19-legacy-actions-searchbar">
-        <div className="v19-legacy-actions-search-field">
-          <Search className="v19-legacy-actions-search-icon" />
-          <input
-            aria-label="Поиск по действиям"
-            className="v19-legacy-actions-search-input"
-            data-testid="agent-action-search"
-            type="text"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.currentTarget.value)}
-            placeholder="Поиск по действиям..."
-          />
-        </div>
-      </div>
-
-      <div className="v19-legacy-actions-list">
-        <AnimatePresence mode="popLayout">
-          {visibleActions.length === 0 ? (
-            <motion.div key="empty-actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="v19-legacy-actions-empty">
-              Нет открытых действий по текущим подачам.
-            </motion.div>
-          ) : (
-            visibleActions.map((action, index) => (
+      <div className="v19-admin-review-board v19-agent-actions-board">
+        <V19ListHeader
+          actionDisabled={actionSummaryFilter === "open" && actionCityFilter === "Все города" && !searchQuery && actionSort === "tripDate"}
+          actionLabel="Все"
+          className="v19-admin-review-list-head"
+          countLabel={`${visibleActions.length} ${visibleActions.length === 1 ? "действие" : "действий"}`}
+          onAction={() => {
+            setActionSummaryFilter("open");
+            setActionCityFilter("Все города");
+            setSearchQuery("");
+            setActionSort("tripDate");
+          }}
+          title="Очередь действий"
+        />
+        <V19QueueToolbar
+          actionDisabled={actionSummaryFilter === "open" && actionCityFilter === "Все города" && !searchQuery && actionSort === "tripDate"}
+          actionIcon={RotateCcw}
+          cityFilter={actionCityFilter}
+          cityOptions={actionCityOptions}
+          controls={
+            <>
+              <V19ToolbarSelect<ActionSummaryFilter>
+                ariaLabel="Фильтр действий"
+                className={actionSummaryFilter !== "open" ? "is-active" : ""}
+                icon={Shapes}
+                label="Статус"
+                options={[
+                  { label: "Открыто", value: "open" },
+                  { label: "Блокеры", value: "blockers" },
+                  { label: "Сегодня", value: "today" },
+                  { label: "На неделе", value: "week" },
+                  { label: "Закрыто", value: "completed" },
+                ]}
+                value={actionSummaryFilter}
+                onChange={setActionSummaryFilter}
+              />
+              <V19ToolbarSelect<ActionSort>
+                ariaLabel="Сортировка действий"
+                className={actionSort !== "tripDate" ? "is-active" : ""}
+                icon={ArrowUpDown}
+                label="Сортировка"
+                options={[
+                  { label: "По дате вылета", value: "tripDate" },
+                  { label: "По дате создания", value: "createdAt" },
+                ]}
+                value={actionSort}
+                onChange={setActionSort}
+              />
+            </>
+          }
+          filterLabel="Сбросить фильтры"
+          onCityFilterChange={setActionCityFilter}
+          onFilterClick={() => {
+            setActionSummaryFilter("open");
+            setActionCityFilter("Все города");
+            setSearchQuery("");
+            setActionSort("tripDate");
+          }}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="ID, семья или город"
+          searchValue={searchQuery}
+        />
+        <div className="v19-admin-review-lane-list v19-legacy-actions-list">
+          <AnimatePresence mode="popLayout">
+            {visibleActions.length === 0 ? (
               <motion.div
-                layout
-                key={action.id}
-                initial={{ opacity: 0, y: 14, scale: 0.992 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.992 }}
-                transition={{ duration: 0.2, delay: index * 0.018 }}
-                onClick={() => handleActionOpen(action)}
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    handleActionOpen(action);
-                  }
-                }}
-                className={`v19-legacy-action-row severity-${action.severity}`}
-                data-testid="agent-action-row"
+                key="empty-actions"
+                initial={false}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="v19-legacy-actions-empty"
               >
-                <div className="v19-legacy-action-main">
-                  <div className="v19-legacy-action-title-line">
-                    <span className="v19-legacy-action-labels">
-                      <span className="v19-legacy-action-id">{action.submission.id}</span>
-                      {actionPeopleCount(action) ? (
-                        <span
-                          aria-label={`Семья: ${actionPeopleCount(action)} человек`}
-                          className="v19-legacy-action-family-tag"
-                        >
-                          <Users aria-hidden="true" />
-                          <span>{actionPeopleCount(action)}</span>
-                        </span>
-                      ) : null}
-                    </span>
-                    <strong className="v19-legacy-action-title">{action.title}</strong>
-                  </div>
-                </div>
-                <div className="v19-legacy-action-meta">
-                  <span
-                    className={`v19-legacy-action-status ${actionStatusTagClass(action)}`}
-                    data-testid="agent-action-status"
-                  >
-                    <span aria-hidden="true" className="v19-legacy-action-status-dot" />
-                    <span className="truncate">{action.dueLabel}</span>
-                  </span>
-                </div>
-                <div className="v19-legacy-action-city-column">
-                  <span className="v19-legacy-action-city">
-                    <span aria-hidden="true" />
-                    {action.submission.city}
-                  </span>
-                </div>
-                <div className="v19-legacy-action-badges">
-                  {action.badges.slice(0, 2).map((badge) => (
-                    <span
-                      key={`${action.id}-${badge.label}`}
-                      className="v19-legacy-action-badge is-desktop-badge"
-                    >
-                      {badge.label}
-                    </span>
-                  ))}
-                </div>
-                <div className="v19-legacy-action-cta-wrap">
-                  <button
-                    className="v19-legacy-action-cta"
-                    data-testid="agent-action-cta"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleActionOpen(action);
-                    }}
-                  >
-                    {action.cta}
-                  </button>
-                </div>
+                Нет открытых действий по текущим подачам.
               </motion.div>
-            ))
-          )}
-        </AnimatePresence>
+            ) : (
+              visibleActions.map((action, index) => (
+                <V19QueueCard
+                  as={motion.div}
+                  layout
+                  key={action.id}
+                  initial={{ opacity: 0, y: 14, scale: 0.992 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.992 }}
+                  transition={{ duration: 0.2, delay: index * 0.018 }}
+                  onClick={() => handleActionOpen(action)}
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleActionOpen(action);
+                    }
+                  }}
+                  className={`v19-legacy-action-row severity-${action.severity}`}
+                  data-testid="agent-action-row"
+                >
+                  <div className="v19-legacy-action-main">
+                    <div className="v19-legacy-action-title-line">
+                      <span className="v19-legacy-action-labels">
+                        <span className="v19-legacy-action-id">
+                          {action.submission.id}
+                        </span>
+                        {actionPeopleCount(action) ? (
+                          <span
+                            aria-label={`Семья: ${actionPeopleCount(action)} человек`}
+                            className="v19-legacy-action-family-tag"
+                          >
+                            <Users aria-hidden="true" />
+                            <span>{actionPeopleCount(action)}</span>
+                          </span>
+                        ) : null}
+                      </span>
+                      <strong className="v19-legacy-action-title">
+                        {action.title}
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="v19-legacy-action-meta">
+                    <span
+                      className={`v19-legacy-action-status ${actionStatusTagClass(action)}`}
+                      data-testid="agent-action-status"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="v19-legacy-action-status-dot"
+                      />
+                      <span className="truncate">{action.dueLabel}</span>
+                    </span>
+                  </div>
+                  <div className="v19-legacy-action-city-column">
+                    <span className="v19-legacy-action-city">
+                      <span aria-hidden="true" />
+                      {action.submission.city}
+                    </span>
+                  </div>
+                  <div className="v19-legacy-action-badges">
+                    {action.badges.slice(0, 2).map((badge) => (
+                      <span
+                        key={`${action.id}-${badge.label}`}
+                        className="v19-legacy-action-badge is-desktop-badge"
+                      >
+                        {badge.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="v19-legacy-action-cta-wrap">
+                    <button
+                      className="v19-legacy-action-cta"
+                      data-testid="agent-action-cta"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleActionOpen(action);
+                      }}
+                    >
+                      {action.cta}
+                    </button>
+                  </div>
+                </V19QueueCard>
+              ))
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </section>
   );
@@ -855,13 +1095,15 @@ export function CommandCenter({
 
       <label className="grid max-w-sm gap-2">
         <h2 className="m-0 text-[18px] font-semibold text-white">Уведомления</h2>
-        <span className="text-[13px] font-semibold text-white">Сводка по действиям</span>
+        <span className="text-[13px] font-semibold text-white">
+          Сводка по действиям
+        </span>
         <select
           aria-label="Сводка по действиям"
           className="h-10 rounded-[10px] border border-[#242529] bg-[#1e1e21] px-3 text-[13px] font-medium text-white outline-none focus:border-[#6f64ff]/55"
           value={settingsDigest}
           onChange={(event) => {
-            setSettingsDigest(event.currentTarget.value as 'instant' | 'daily');
+            setSettingsDigest(event.currentTarget.value as "instant" | "daily");
             setSettingsDirty(true);
             setSettingsSaved(false);
           }}
@@ -901,7 +1143,7 @@ export function CommandCenter({
         </div>
       ) : (
         <div className="text-[13px] font-medium text-white/60" role="status">
-          {settingsSaved ? 'Настройки сохранены' : 'Изменений нет'}
+          {settingsSaved ? "Настройки сохранены" : "Изменений нет"}
         </div>
       )}
     </section>
@@ -912,43 +1154,80 @@ export function CommandCenter({
   return (
     <div className="flex h-full w-full bg-[#101011] relative overflow-hidden">
       <AnimatePresence mode="wait">
-        {currentView === 'questionnaire' && selectedRow && (
+        {currentView === "questionnaire" && selectedRow && (
           <QuestionnaireScreen
             key={`questionnaire-${selectedRow}`}
             agentId={agentId}
+            initialFocus={questionnaireInitialFocus}
             submissionId={selectedRow}
             draft={selectedIntakeDraft}
             submission={selectedCanonicalSubmission}
-            onBack={() => setCurrentView('main')}
+            onBack={handleQuestionnaireBack}
+            onSubmissionUpdate={
+              onSubmissionUpdate
+                ? (update) => onSubmissionUpdate(selectedRow, update)
+                : undefined
+            }
             onSubmissionChange={persistQuestionnaireSubmission}
+            onMarkIssueFixed={markAgentIssueFixed}
             onUploadFile={usesSupabase ? uploadCanonicalFile : undefined}
           />
         )}
-        {currentView === 'upload' && (
-          <PreUploadScreen key="upload" onBack={() => setCurrentView('main')} onSaveDraft={handleUploadDraftSave} onComplete={handleUploadComplete} />
+        {currentView === "upload" && (
+          <PreUploadScreen
+            key="upload"
+            onBack={() => setCurrentView("main")}
+            onSaveDraft={handleUploadDraftSave}
+            onComplete={handleUploadComplete}
+          />
         )}
       </AnimatePresence>
 
+      <div
+        aria-hidden={currentView !== "main" ? "true" : undefined}
+        className="contents"
+        inert={currentView !== "main"}
+      >
       <AnimatePresence>
         {mobileNavOpen && (
           <div className="md:hidden">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMobileNavOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
-            <motion.aside initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ type: 'spring', damping: 25, stiffness: 250 }} className="fixed inset-y-0 left-0 w-[280px] bg-[#141416] border-r border-[#202124] z-50 flex flex-col py-3 font-medium shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileNavOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 250 }}
+              className="fixed inset-y-0 left-0 w-[280px] bg-[#141416] border-r border-[#202124] z-50 flex flex-col py-3 font-medium shadow-[0_0_40px_rgba(0,0,0,0.5)]"
+            >
               {renderNavContent()}
             </motion.aside>
           </div>
         )}
       </AnimatePresence>
 
-      <aside className="hidden md:flex w-[288px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20">{renderNavContent()}</aside>
+      <aside className="hidden md:flex w-[288px] shrink-0 bg-[#161617] border-r border-[#202124] flex-col py-3 z-20">
+        {renderNavContent()}
+      </aside>
 
       <main className="flex-1 min-w-0 flex flex-col bg-[#141416]">
         <header className="h-[60px] lg:h-16 shrink-0 border-b border-[#202124] flex items-center px-4 lg:px-6 gap-4 bg-[#141416] z-10 sticky top-0">
           <div className="flex items-center gap-3">
-            <button aria-label="Меню" onClick={() => setMobileNavOpen(true)} className="md:hidden w-10 h-10 -ml-2 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/70">
+            <button
+              aria-label="Меню"
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden w-10 h-10 -ml-2 rounded-lg hover:bg-white/5 flex items-center justify-center text-white/70"
+            >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight text-white m-0 leading-none">{title}</h1>
+            <h1 className="text-[19px] lg:text-[21px] font-semibold tracking-tight text-white m-0 leading-none">
+              {title}
+            </h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -964,7 +1243,7 @@ export function CommandCenter({
 
         <div className="flex-1 overflow-auto p-4 lg:p-6 pb-[max(24px,env(safe-area-inset-bottom))]">
           <div className="max-w-[1460px] mx-auto h-full">
-            {activeNav === 'documents' && (
+            {activeNav === "documents" && (
               <div>
                 <AgentReturnPackagesPanel enabled={usesSupabase} />
                 <DraftsScreen
@@ -974,9 +1253,14 @@ export function CommandCenter({
                 />
               </div>
             )}
-            {activeNav === 'settings' && renderSettings()}
-            {activeNav === 'actions' && renderActionsList()}
-            {activeNav === 'submissions' && <ApplicantsScreen onOpenDrawer={handleRowClick} submissions={submissionCards} />}
+            {activeNav === "settings" && renderSettings()}
+            {activeNav === "actions" && renderActionsList()}
+            {activeNav === "submissions" && (
+              <ApplicantsScreen
+                onOpenDrawer={handleRowClick}
+                submissions={submissionCards}
+              />
+            )}
           </div>
         </div>
       </main>
@@ -987,7 +1271,12 @@ export function CommandCenter({
             activeTab="overview"
             onAction={executeAgentSubmissionAction}
             onClose={() => setDrawerOpen(false)}
-            onOpenQuestionnaireWorkspace={() => handleOpenQuestionnaire(selectedCanonicalSubmission.id)}
+            onMarkIssueFixed={async (issueId) => {
+              await markAgentIssueFixed(issueId);
+            }}
+            onOpenQuestionnaireWorkspace={(target) =>
+              handleOpenQuestionnaire(selectedCanonicalSubmission.id, target)
+            }
             onUploadFile={uploadCanonicalFile}
             role="agent"
             submission={selectedCanonicalSubmission}
@@ -1000,7 +1289,9 @@ export function CommandCenter({
           onClose={() => setDrawerOpen(false)}
           submissionId={selectedRow}
           submission={selectedCanonicalSubmission}
-          onOpenQuestionnaire={() => selectedRow && handleOpenQuestionnaire(selectedRow)}
+          onOpenQuestionnaire={() =>
+            selectedRow && handleOpenQuestionnaire(selectedRow)
+          }
           onSubmissionAction={(_, action) => executeAgentSubmissionAction(action)}
         />
       )}
@@ -1020,6 +1311,7 @@ export function CommandCenter({
           />
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

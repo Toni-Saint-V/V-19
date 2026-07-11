@@ -89,6 +89,7 @@ export default defineConfig({
   testDir: "./tests/e2e-supabase-ui",
   reporter: [["list"]],
   timeout: 300_000,
+  workers: 1,
   use: {
     baseURL: "http://127.0.0.1:4201",
     launchOptions: { args: ["--disable-ipv6"] },
@@ -105,10 +106,33 @@ export default defineConfig({
     timeout: 120_000,
   },
   projects: [
-    { name: "production-ui-desktop", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "production-ui-desktop-1440",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+    },
+    {
+      name: "production-ui-desktop-1280",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
+    },
+    {
+      name: "production-ui-desktop-1024",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1024, height: 768 } },
+    },
+    {
+      name: "production-ui-mobile-375",
+      use: {
+        ...devices["iPhone 13"],
+        browserName: "chromium",
+        viewport: { width: 375, height: 812 },
+      },
+    },
     {
       name: "production-ui-mobile-390",
-      use: { ...devices["iPhone 13"], browserName: "chromium" },
+      use: {
+        ...devices["iPhone 13"],
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+      },
     },
     {
       name: "production-ui-mobile-430",

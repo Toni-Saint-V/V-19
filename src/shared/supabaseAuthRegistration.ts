@@ -8,7 +8,7 @@ import {
   type AccessRequestRegistrationInput,
   type AccessRequestRepository,
   type User,
-} from "./authRegistration";
+} from "./authContract";
 
 type AccessRequestEdgeResult = {
   request?: AccessRequestRow;

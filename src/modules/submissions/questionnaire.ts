@@ -190,7 +190,7 @@ const questionnaireBlueprint: Array<{
       { id: "first-name", label: "Имя", placeholder: "Введите имя" },
       { id: "birth-date", label: "Дата рождения", placeholder: "ДД.ММ.ГГГГ" },
       { id: "birth-place", label: "Место рождения", placeholder: "Введите место рождения" },
-      { id: "birth-country", label: "Страна рождения", placeholder: "Выберите страну", control: "select", options: blsCountryOptions },
+      { id: "birth-country", label: "Страна рождения", placeholder: "Выберите страну", control: "select", options: blsCountryOptions, value: "Russian Federation" },
       { id: "nationality", label: "Текущее гражданство", placeholder: "Выберите гражданство", control: "select", options: blsCountryOptions, value: "Russian Federation" },
       { id: "birth-citizenship", label: "Гражданство при рождении, если отличается", placeholder: "Выберите или введите гражданство", control: "select", options: blsCountryOptions, required: false, value: "Russian Federation" },
       { id: "other-citizenship", label: "Иное гражданство", placeholder: "Выберите или введите гражданство", control: "select", options: blsCountryOptions, required: false },

@@ -132,13 +132,50 @@ export async function clickFirstVisible(locator: Locator) {
 }
 
 export async function clickWorkspaceButton(page: Page, name: string | RegExp) {
-  const control = page.getByRole("button", { name });
-  if (await isVisible(control.first())) {
+  const canonicalNavigationLabels = [
+    "Проверка",
+    "Очередь на проверку",
+    "Работа",
+    "Выгрузка",
+    "Возврат",
+    "Мои действия",
+    "Мои подачи",
+    "Настройки",
+  ];
+  const exactNavigationLabel = canonicalNavigationLabels.find((label) =>
+    typeof name === "string" ? label === name : new RegExp(name.source, name.flags).test(label),
+  );
+  const control = page.getByRole("button", exactNavigationLabel
+    ? { exact: true, name: exactNavigationLabel }
+    : { name });
+  const desktopViewport = (page.viewportSize()?.width ?? 0) >= 768;
+  if (desktopViewport && (await isVisible(control.first()))) {
     await clickFirstVisible(control);
     return;
   }
 
-  const menu = page.getByRole("button", { exact: true, name: "Меню" }).first();
+  const adminMenu = page
+    .getByRole("button", { name: "Открыть меню администратора" })
+    .first();
+  if (await isVisible(adminMenu)) {
+    const dialog = page.getByRole("dialog", { name: "Меню администратора" });
+    await expect(adminMenu).toHaveAttribute("aria-expanded", "false");
+    await expect(dialog).toBeHidden();
+    await adminMenu.click();
+    await expect(dialog).toBeVisible();
+    await clickFirstVisible(
+      dialog.getByRole("button", exactNavigationLabel
+        ? { exact: true, name: exactNavigationLabel }
+        : { name }),
+    );
+    return;
+  }
+
+  const menu = page
+    .getByRole("button", {
+      name: /^(Меню|Открыть меню)$/,
+    })
+    .first();
   if (await isVisible(menu)) await menu.click();
   await clickFirstVisible(page.getByRole("button", { name }));
 }
