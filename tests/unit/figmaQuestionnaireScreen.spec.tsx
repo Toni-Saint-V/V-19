@@ -1411,8 +1411,7 @@ describe("FigmaQuestionnaireScreen", () => {
   });
 
   test("resolves an open issue through the full field binding catalog", async () => {
-    const submission = {
-      ...withQuestionnaireIssue(
+    const submission = withQuestionnaireIssue(
       withReadyQuestionnaireFiles(
         fillEveryQuestionnaireField(
           createDraftSubmission({
@@ -1449,20 +1448,21 @@ describe("FigmaQuestionnaireScreen", () => {
   });
 
   test("keeps a fixed_by_agent issue visible without blocking repeat submission", () => {
-    const submission = withQuestionnaireIssue(
-      withReadyQuestionnaireFiles(
-        fillEveryQuestionnaireField(
-          createDraftSubmission({
-            applicantNames: ["VOLKOV ANTON"],
-            city: "Москва",
-            familyCount: 1,
-            idScheme: "local",
-            submissions: [],
-            type: "single",
-          }),
+    const submission = {
+      ...withQuestionnaireIssue(
+        withReadyQuestionnaireFiles(
+          fillEveryQuestionnaireField(
+            createDraftSubmission({
+              applicantNames: ["VOLKOV ANTON"],
+              city: "Москва",
+              familyCount: 1,
+              idScheme: "local",
+              submissions: [],
+              type: "single",
+            }),
+          ),
         ),
-      ),
-      "fixed_by_agent",
+        "fixed_by_agent",
       ),
       status: "returned" as const,
       tripDateFrom: "10.07.2026",
@@ -1875,9 +1875,6 @@ describe("FigmaQuestionnaireScreen", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Заполнить общие поля семьи" }),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Подтвердить копирование" }),
-    );
 
     expect(onFieldChange).not.toHaveBeenCalled();
     expect(
@@ -2003,6 +2000,9 @@ describe("FigmaQuestionnaireScreen", () => {
 
     fireEvent.click(
       screen.getByRole("button", { name: "Заполнить общие поля семьи" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердить копирование" }),
     );
     fireEvent.click(applicantTabs[1] as HTMLButtonElement);
     clickPinnedSection(result.container, "Отель / приглашение");
