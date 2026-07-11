@@ -29,6 +29,13 @@ pnpm-debug.log*
 /src.backup.*/
 /codex-agent-system-visaflow.zip
 /v19-*.png
+/*.png
+/.claude-octopus/
+/.playwright-cli/
+/output/
 /docs/*.zip
 /docs/passport.jpeg
 /docs/References/passport.jpeg
+/docs/Для теста/passport.jpeg
+/docs/Для теста/скан_1.png
+/docs/Для теста/Скан_2.png
