@@ -108,7 +108,7 @@ function completedApplicants() {
       fields: section.fields.map((field) => ({
         ...field,
         error: undefined,
-        value: field.value || "ok",
+        value: field.id === "email" ? "ready@example.com" : field.value || "ok",
       })),
     })),
   }));

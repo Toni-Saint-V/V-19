@@ -18,6 +18,7 @@ export type SupabasePersistenceOperation =
   | "document_assets.get_applicant_documents"
   | "document_assets.get_ready_for_export"
   | "document_assets.mark_exported"
+  | "document_assets.restore_ready_for_export"
   | "document_export_events.find_existing"
   | "document_export_events.insert"
   | "corrections.list"

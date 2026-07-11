@@ -1,7 +1,7 @@
 # Supabase Pilot Volume Envelope - 2026-07-06
 
 Result: `BLOCKED_PILOT_VOLUME_CAP_EXCEEDED`
-Checked at: `2026-07-06T23:47:45.670Z`
+Checked at: `2026-07-11T09:50:57.412Z`
 
 No production data, Auth users, Storage objects, or Supabase settings were mutated by this check. The production cap check is read-only and records aggregates only.
 
@@ -27,14 +27,16 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 ## Production Read-Only Cap Check
 
 - Production project: `tsymifccglpepvbmrcgh`
-- Production registered agent profiles: `22`
+- Production agent profile rows (including banned): `22`
+- Production banned agent profiles excluded from pilot intake: `12`
+- Production registered agent profiles: `10`
 - Production registered admin profiles: `2`
 - Pilot cohort registered agents: `10`
 - Pilot cohort registered admins: `1`
 - Pilot cohort total users: `11`
-- Production total submissions: `6`
+- Production total submissions: `54`
 - Production active agents with submissions: `3`
-- Production max submissions for one agent: `3`
+- Production max submissions for one agent: `51`
 - Production registered agent profiles cap: `<= 10`
 - Pilot cohort registered-agent cap: `<= 10`
 - Production total submissions cap: `<= 500`
@@ -43,6 +45,6 @@ No production data, Auth users, Storage objects, or Supabase settings were mutat
 
 ## Current Blockers
 
-- production has 22 registered agent profiles, above pilot cap 10.
+- production has one agent with 51 submissions, above pilot cap 50.
 
 This check writes no production rows, Auth users, Storage objects, or Supabase settings. It intentionally records no emails, user IDs, submission IDs, or storage paths from production.

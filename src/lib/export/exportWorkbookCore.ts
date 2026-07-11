@@ -1,4 +1,12 @@
-import { EXPORT_WORKBOOK_SHEET_NAME } from "./exportContractCore";
+import {
+  EXPORT_WORKBOOK_COLUMN_COUNT,
+  EXPORT_WORKBOOK_SHEET_NAME,
+} from "./exportContractCore";
+import {
+  BLS_EXCEL_CANONICAL_COLUMNS_BASE64,
+  BLS_EXCEL_CANONICAL_STYLES_BASE64,
+  BLS_EXCEL_CANONICAL_THEME_BASE64,
+} from "./blsExcelTemplate";
 
 export const EXPORT_WORKBOOK_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -7,19 +15,38 @@ export type ExportWorkbookRowFill = `family-${number}`;
 
 export type ParsedExportWorkbook = {
   dimension: string;
+  layout: ParsedExportWorkbookLayout;
   rowFills: Array<ExportWorkbookRowFill | null>;
   rows: string[][];
   sheetName: string;
+};
+
+export type ParsedExportWorkbookLayout = {
+  autoFilter: string;
+  borderCount: number;
+  cellXfCount: number;
+  columnCount: number;
+  conditionalFormattingCount: number;
+  dataRowsMatchCanonicalStyle: boolean;
+  dxfCount: number;
+  fillCount: number;
+  fontCount: number;
+  freezePane: string;
+  hasBeCells: boolean;
+  hasExcelMaximumRowSentinel: boolean;
+  headerRowMatchesCanonicalStyle: boolean;
+  pageMargins: string;
+  rowElementCount: number;
+  sheetFormat: string;
+  sheetView: string;
+  workbookView: string;
 };
 
 export type CreateExportWorkbookBlobOptions = {
   rowFills?: readonly (ExportWorkbookRowFill | null | undefined)[];
 };
 
-const templateDataRowLimit = 216;
-const templateFinalRow = 1_048_572;
-const templateColumnCount = 56;
-const templateVisibleColumnCount = 57;
+const templateColumnCount = EXPORT_WORKBOOK_COLUMN_COUNT;
 const dateColumnNames = new Set(["L", "R", "T", "U", "AJ", "AK"]);
 const numericColumnNames = new Set([
   "F",
@@ -50,12 +77,14 @@ export function createExportWorkbookBlob(
   workbookRows: readonly (readonly string[])[],
   options: CreateExportWorkbookBlobOptions = {},
 ): Blob {
+  assertWorkbookShape(workbookRows);
   const rowFills = options.rowFills ?? [];
   const sharedStrings = buildSharedStrings(workbookRows);
+  const lastRow = Math.max(1, workbookRows.length);
   const files: Record<string, string> = {
     "[Content_Types].xml": contentTypesXml(),
     "_rels/.rels": packageRelsXml(),
-    "xl/workbook.xml": workbookXml(),
+    "xl/workbook.xml": workbookXml(lastRow),
     "xl/_rels/workbook.xml.rels": workbookRelsXml(),
     "xl/styles.xml": stylesXml(),
     "xl/theme/theme1.xml": themeXml(),
@@ -78,6 +107,7 @@ export async function parseExportWorkbookBlob(
   const files = unzipStore(await blob.arrayBuffer());
   const workbook = files["xl/workbook.xml"] ?? "";
   const worksheet = files["xl/worksheets/sheet1.xml"] ?? "";
+  const styles = files["xl/styles.xml"] ?? "";
   const sharedStrings = parseSharedStrings(files["xl/sharedStrings.xml"] ?? "");
   const sheetName = workbook.match(/<sheet[^>]+name="([^"]+)"/)?.[1] ?? "";
   const dimension = worksheet.match(/<dimension[^>]+ref="([^"]+)"/)?.[1] ?? "";
@@ -85,10 +115,98 @@ export async function parseExportWorkbookBlob(
 
   return {
     dimension,
+    layout: parseWorkbookLayout(workbook, worksheet, styles),
     rowFills: parseWorksheetRowFills(parsedRows),
     rows: parsedRows.map((row) => row.values),
     sheetName,
   };
+}
+
+function parseWorkbookLayout(
+  workbook: string,
+  worksheet: string,
+  styles: string,
+): ParsedExportWorkbookLayout {
+  const rows = [...worksheet.matchAll(/<row\b([^>]*)>/g)].map(
+    (match) => match[1] ?? "",
+  );
+  const dataRows = rows.filter((row) => attributeValue(row, "r") !== "1");
+  const cellColumns = [...worksheet.matchAll(/<c\b[^>]*\br="([A-Z]+)\d+"/g)].map(
+    (match) => match[1] ?? "",
+  );
+  return {
+    autoFilter: elementAttributes(worksheet, "autoFilter"),
+    borderCount: sectionCount(styles, "borders"),
+    cellXfCount: sectionCount(styles, "cellXfs"),
+    columnCount: elementCount(sectionBody(worksheet, "cols"), "col"),
+    conditionalFormattingCount: elementCount(
+      worksheet,
+      "conditionalFormatting",
+    ),
+    dataRowsMatchCanonicalStyle: dataRows.every(
+      (row) =>
+        attributeValue(row, "spans") === "1:56" &&
+        attributeValue(row, "s") === "40" &&
+        attributeValue(row, "customFormat") === "1" &&
+        attributeValue(row, "x14ac:dyDescent") === "0.25",
+    ),
+    dxfCount: sectionCount(styles, "dxfs"),
+    fillCount: sectionCount(styles, "fills"),
+    fontCount: sectionCount(styles, "fonts"),
+    freezePane: elementAttributes(worksheet, "pane"),
+    hasBeCells: cellColumns.some((column) => columnNumber(column) > 56),
+    hasExcelMaximumRowSentinel: worksheet.includes("1048572"),
+    headerRowMatchesCanonicalStyle:
+      attributeValue(rows[0] ?? "", "r") === "1" &&
+      attributeValue(rows[0] ?? "", "spans") === "1:56" &&
+      attributeValue(rows[0] ?? "", "s") === "3" &&
+      attributeValue(rows[0] ?? "", "customFormat") === "1" &&
+      attributeValue(rows[0] ?? "", "ht") === "45.75" &&
+      attributeValue(rows[0] ?? "", "thickBot") === "1" &&
+      attributeValue(rows[0] ?? "", "x14ac:dyDescent") === "0.3",
+    pageMargins: elementAttributes(worksheet, "pageMargins"),
+    rowElementCount: rows.length,
+    sheetFormat: elementAttributes(worksheet, "sheetFormatPr"),
+    sheetView: elementAttributes(worksheet, "sheetView"),
+    workbookView: elementAttributes(workbook, "workbookView"),
+  };
+}
+
+function sectionBody(xml: string, sectionName: string): string {
+  return (
+    xml.match(
+      new RegExp(`<${sectionName}\\b[^>]*>([\\s\\S]*?)<\\/${sectionName}>`),
+    )?.[1] ?? ""
+  );
+}
+
+function sectionCount(xml: string, sectionName: string): number {
+  return Number(
+    xml.match(new RegExp(`<${sectionName}\\b[^>]*count="(\\d+)"`))?.[1] ??
+      -1,
+  );
+}
+
+function elementCount(xml: string, elementName: string): number {
+  return [...xml.matchAll(new RegExp(`<${elementName}\\b`, "g"))].length;
+}
+
+function elementAttributes(xml: string, elementName: string): string {
+  return canonicalAttributes(
+    xml.match(new RegExp(`<${elementName}\\b([^>]*)`))?.[1] ?? "",
+  );
+}
+
+function canonicalAttributes(value: string): string {
+  return [...value.matchAll(/([\w:]+)="([^"]*)"/g)]
+    .map((match) => `${match[1]}=${match[2]}`)
+    .sort()
+    .join("|");
+}
+
+function attributeValue(value: string, name: string): string {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.match(new RegExp(`(?:^|\\s)${escaped}="([^"]*)"`))?.[1] ?? "";
 }
 
 function contentTypesXml(): string {
@@ -99,8 +217,8 @@ function packageRelsXml(): string {
   return '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>';
 }
 
-function workbookXml(): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><fileVersion appName="xl" lastEdited="7" lowestEdited="6" rupBuild="27932"/><workbookPr/><bookViews><workbookView xWindow="7590" yWindow="735" windowWidth="15960" windowHeight="14745"/></bookViews><sheets><sheet name="${EXPORT_WORKBOOK_SHEET_NAME}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Sheet1!$A$1:$BE$216</definedName></definedNames><calcPr calcId="162913"/></workbook>`;
+function workbookXml(lastRow: number): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><fileVersion appName="xl" lastEdited="7" lowestEdited="6" rupBuild="27932"/><workbookPr/><bookViews><workbookView xWindow="7590" yWindow="735" windowWidth="15960" windowHeight="14745"/></bookViews><sheets><sheet name="${EXPORT_WORKBOOK_SHEET_NAME}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Sheet1!$A$1:$BD$${lastRow}</definedName></definedNames><calcPr calcId="162913"/></workbook>`;
 }
 
 function workbookRelsXml(): string {
@@ -108,27 +226,51 @@ function workbookRelsXml(): string {
 }
 
 function stylesXml(): string {
-  const baseXfs = Array.from({ length: 52 }, (_, index) => {
-    const dateStyle = [2, 5, 15, 16, 29, 35, 44].includes(index);
-    const fillId = index === 1 || index === 2 || index === 3 ? 2 : 0;
-    return `<xf numFmtId="${dateStyle ? 164 : 0}" fontId="0" fillId="${fillId}" borderId="1" xfId="0"${dateStyle ? ' applyNumberFormat="1"' : ""}/>`;
-  }).join("");
-  const familyXfs = familyWorkbookFills.flatMap((_, paletteIndex) => {
-    const fillId = paletteIndex + 3;
-    return [
-      `<xf numFmtId="0" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyFill="1"/>`,
-      `<xf numFmtId="0" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyFill="1"/>`,
-      `<xf numFmtId="164" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1"/>`,
-      `<xf numFmtId="0" fontId="0" fillId="${fillId}" borderId="1" xfId="0" applyFill="1"/>`,
-    ];
-  }).join("");
+  const canonical = decodeOoxmlBase64(BLS_EXCEL_CANONICAL_STYLES_BASE64);
   const familyFills = familyWorkbookFills
     .map(
       (rgb) =>
         `<fill><patternFill patternType="solid"><fgColor rgb="${rgb}"/><bgColor indexed="64"/></patternFill></fill>`,
     )
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd;@"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts><fills count="${3 + familyWorkbookFills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor theme="4" tint="0.59999389629810485"/><bgColor indexed="64"/></patternFill></fill>${familyFills}</fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${52 + familyWorkbookFills.length * familyStyleVariantCount}">${baseXfs}${familyXfs}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const cellXfsMatch = canonical.match(
+    /<cellXfs count="52">([\s\S]*?)<\/cellXfs>/,
+  );
+  if (!cellXfsMatch) {
+    throw new Error("Canonical BLS styles are missing the 52 base cell styles.");
+  }
+  const baseXfs = [...cellXfsMatch[1].matchAll(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g)].map(
+    (match) => match[0],
+  );
+  const familyStyleSources = [33, 34, 35, 50].map((index) => baseXfs[index]);
+  if (familyStyleSources.some((style) => !style)) {
+    throw new Error("Canonical BLS family style sources are incomplete.");
+  }
+  const familyXfs = familyWorkbookFills
+    .flatMap((_, paletteIndex) =>
+      familyStyleSources.map((style) =>
+        applyFillToCellStyle(style ?? "", paletteIndex + 3),
+      ),
+    )
+    .join("");
+
+  return canonical
+    .replace(
+      /<fills count="3">([\s\S]*?)<\/fills>/,
+      `<fills count="${3 + familyWorkbookFills.length}">$1${familyFills}</fills>`,
+    )
+    .replace(
+      /<cellXfs count="52">([\s\S]*?)<\/cellXfs>/,
+      `<cellXfs count="${52 + familyWorkbookFills.length * familyStyleVariantCount}">$1${familyXfs}</cellXfs>`,
+    );
+}
+
+function applyFillToCellStyle(style: string, fillId: number): string {
+  const withFill = style.replace(/fillId="\d+"/, `fillId="${fillId}"`);
+  if (/applyFill="[^"]*"/.test(withFill)) {
+    return withFill.replace(/applyFill="[^"]*"/, 'applyFill="1"');
+  }
+  return withFill.replace(/^<xf\b/, '<xf applyFill="1"');
 }
 
 function worksheetXml(
@@ -148,25 +290,23 @@ function worksheetXml(
         sharedStrings,
       ),
     ),
-    ...blankTemplateRowsXml(rows, Math.max(dataRows.length + 2, 4), sharedStrings),
-    `<row r="${templateFinalRow}" spans="57:57"><c r="BE${templateFinalRow}" s="4" t="s"><v>${sharedStringIndex(sharedStrings, "NA")}</v></c></row>`,
   ].join("");
   const mergeCells = familyMergeCells(rowFills);
+  const lastRow = Math.max(1, rows.length);
 
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:BE1048572"/><sheetViews><sheetView tabSelected="1" zoomScale="85" zoomScaleNormal="85" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="F16" sqref="F16"/></sheetView></sheetViews><sheetFormatPr defaultColWidth="40.5703125" defaultRowHeight="15"/><cols>${templateColumnsXml()}</cols><sheetData>${templateRows}</sheetData><autoFilter ref="A1:BE216"/>${mergeCells}<phoneticPr fontId="1" type="noConversion"/><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"><dimension ref="A1:BD${lastRow}"/><sheetViews><sheetView tabSelected="1" zoomScale="85" zoomScaleNormal="85" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultColWidth="40.5703125" defaultRowHeight="15" x14ac:dyDescent="0.25"/><cols>${templateColumnsXml()}</cols><sheetData>${templateRows}</sheetData><autoFilter ref="A1:BD${lastRow}"/>${mergeCells}${canonicalConditionalFormattingXml()}<phoneticPr fontId="1" type="noConversion"/><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
 }
 
 function headerRowXml(
   row: readonly string[],
   sharedStrings: ReadonlyMap<string, number>,
 ): string {
-  const cells = Array.from({ length: templateVisibleColumnCount }, (_, index) => {
+  const cells = Array.from({ length: templateColumnCount }, (_, index) => {
     const column = columnName(index + 1);
-    if (index >= templateColumnCount) return `<c r="${column}1" s="1"/>`;
     const styleId = dateColumnNames.has(column) ? 2 : 1;
     return sharedStringCell(column, 1, row[index] ?? "", sharedStrings, styleId);
   }).join("");
-  return `<row r="1" spans="1:57" s="3" customFormat="1" ht="45.75" thickBot="1">${cells}</row>`;
+  return `<row r="1" spans="1:56" s="3" customFormat="1" ht="45.75" thickBot="1" x14ac:dyDescent="0.3">${cells}</row>`;
 }
 
 function dataRowXml(
@@ -177,12 +317,8 @@ function dataRowXml(
   sharedStrings: ReadonlyMap<string, number>,
 ): string {
   const isFirstFamilyRow = Boolean(rowFill) && rowFill !== previousRowFill;
-  const cells = Array.from({ length: templateVisibleColumnCount }, (_, index) => {
+  const cells = Array.from({ length: templateColumnCount }, (_, index) => {
     const column = columnName(index + 1);
-    if (index >= templateColumnCount) {
-      return `<c r="${column}${rowNumber}" s="${rowFill ? familyStyleId("", rowFill) : 33}"/>`;
-    }
-
     let value = row[index] ?? "";
     if (column === "BC" && rowFill) {
       value = isFirstFamilyRow ? familyAppointmentNote(row) : "";
@@ -196,33 +332,7 @@ function dataRowXml(
       rowFill ? familyStyleId(column, rowFill) : dataStyleId(column),
     );
   }).join("");
-  return `<row r="${rowNumber}" spans="1:57" s="40" customFormat="1">${cells}</row>`;
-}
-
-function blankTemplateRowsXml(
-  rows: readonly (readonly string[])[],
-  startRow: number,
-  sharedStrings: ReadonlyMap<string, number>,
-): string[] {
-  const firstDataRow = rows[1] ?? [];
-  const defaults = [
-    firstDataRow[0] || "SPB",
-    firstDataRow[1] || "Schengen",
-    firstDataRow[2] || "Tourism",
-    firstDataRow[3] || "Normal",
-  ];
-  const result: string[] = [];
-  for (let rowNumber = startRow; rowNumber <= 219; rowNumber += 1) {
-    const cells = Array.from({ length: templateColumnCount }, (_, index) => {
-      const column = columnName(index + 1);
-      const value = index < defaults.length && rowNumber <= templateDataRowLimit
-        ? defaults[index]
-        : "";
-      return templateCell(column, rowNumber, value, sharedStrings, blankStyleId(column));
-    }).join("");
-    result.push(`<row r="${rowNumber}" spans="1:56" s="12" customFormat="1">${cells}</row>`);
-  }
-  return result;
+  return `<row r="${rowNumber}" spans="1:56" s="40" customFormat="1" x14ac:dyDescent="0.25">${cells}</row>`;
 }
 
 function templateCell(
@@ -282,12 +392,6 @@ function familyWorkbookFillIndex(rowFill: ExportWorkbookRowFill): number {
   return (parsedIndex - 1) % familyWorkbookFills.length;
 }
 
-function blankStyleId(column: string) {
-  if (dateColumnNames.has(column)) return 15;
-  if (column === "E" || column === "AP" || column === "AY") return 11;
-  return 11;
-}
-
 function familyAppointmentNote(row: readonly string[]) {
   return `FAMILY \r\nPLEASE SCHEDULE FROM ${row[35] || ""} TILL ${row[36] || ""}`.trim();
 }
@@ -317,28 +421,11 @@ function familyMergeCells(
 }
 
 function templateColumnsXml() {
-  const widths = [
-    "10.5703125", "10.7109375", "10.42578125", "23.140625", "30.5703125",
-    "21.140625", "16", "17.7109375", "17.7109375", "16", "17",
-    "20.7109375", "25.42578125", "14", "14.28515625", "16.5703125",
-    "22.28515625", "19.28515625", "24.42578125", "25.5703125",
-    "26.28515625", "24.140625", "28.140625", "37.7109375", "39.140625",
-    "15.140625", "14.7109375", "14", "50.5703125", "15.7109375",
-    "41.7109375", "34.7109375", "31.140625", "15.85546875",
-    "49.85546875", "18.140625", "20.85546875", "45.140625",
-    "19.140625", "16.140625", "19.5703125", "30", "19.28515625",
-    "21.28515625", "19.5703125", "19.28515625", "17.42578125",
-    "14.5703125", "17.85546875", "40.28515625", "38.85546875",
-    "16.7109375", "26.28515625", "37.7109375", "57.140625",
-    "40.5703125",
-  ];
-  return `${widths
-    .map((width, index) => {
-      const column = index + 1;
-      const style = dateColumnNames.has(columnName(column)) ? 16 : 13;
-      return `<col min="${column}" max="${column}" width="${width}" style="${style}" customWidth="1"/>`;
-    })
-    .join("")}<col min="57" max="16384" width="40.5703125" style="14"/>`;
+  return decodeOoxmlBase64(BLS_EXCEL_CANONICAL_COLUMNS_BASE64);
+}
+
+function canonicalConditionalFormattingXml() {
+  return '<conditionalFormatting sqref="E1"><cfRule type="duplicateValues" dxfId="2" priority="3"/></conditionalFormatting><conditionalFormatting sqref="F1"><cfRule type="duplicateValues" dxfId="1" priority="1"/></conditionalFormatting><conditionalFormatting sqref="G1"><cfRule type="duplicateValues" dxfId="0" priority="2"/></conditionalFormatting>';
 }
 
 function excelSerialDate(value: string): number | null {
@@ -357,7 +444,6 @@ function buildSharedStrings(
     if (!strings.has(value)) strings.set(value, strings.size);
   };
   rows.forEach((row) => row.forEach((value) => add(value)));
-  ["SPB", "Schengen", "Tourism", "Normal", "NA"].forEach(add);
   rows.slice(1).forEach((row) => {
     if (row[54] === "Family") add(familyAppointmentNote(row));
   });
@@ -387,7 +473,13 @@ function parseSharedStrings(xml: string): string[] {
 }
 
 function themeXml() {
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1F497D"/></a:dk2><a:lt2><a:srgbClr val="EEECE1"/></a:lt2><a:accent1><a:srgbClr val="4F81BD"/></a:accent1><a:accent2><a:srgbClr val="C0504D"/></a:accent2><a:accent3><a:srgbClr val="9BBB59"/></a:accent3><a:accent4><a:srgbClr val="8064A2"/></a:accent4><a:accent5><a:srgbClr val="4BACC6"/></a:accent5><a:accent6><a:srgbClr val="F79646"/></a:accent6><a:hlink><a:srgbClr val="0000FF"/></a:hlink><a:folHlink><a:srgbClr val="800080"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Cambria"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"/></a:themeElements></a:theme>';
+  return decodeOoxmlBase64(BLS_EXCEL_CANONICAL_THEME_BASE64);
+}
+
+function decodeOoxmlBase64(value: string): string {
+  const binary = globalThis.atob(value);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 function worksheetRelsXml() {
@@ -453,7 +545,7 @@ function parseWorksheetRows(
   const rows: Array<{ familyStart: boolean; rowNumber: number; values: string[] }> = [];
   for (const rowMatch of xml.matchAll(/<row[^>]*r="(\d+)"[^>]*>(.*?)<\/row>/gs)) {
     const rowNumber = Number(rowMatch[1]);
-    if (!Number.isFinite(rowNumber) || rowNumber > templateDataRowLimit) continue;
+    if (!Number.isFinite(rowNumber)) continue;
 
     const values = Array.from({ length: templateColumnCount }, () => "");
     const body = rowMatch[2] ?? "";
@@ -488,6 +580,23 @@ function parseWorksheetRows(
     if (isHeader || isApplicantRow) rows.push({ familyStart, rowNumber, values });
   }
   return rows;
+}
+
+function assertWorkbookShape(
+  rows: readonly (readonly string[])[],
+): void {
+  if (rows.length === 0) {
+    throw new Error("Export workbook requires a header row.");
+  }
+
+  const invalidRowIndex = rows.findIndex(
+    (row) => row.length !== EXPORT_WORKBOOK_COLUMN_COUNT,
+  );
+  if (invalidRowIndex >= 0) {
+    throw new Error(
+      `Export workbook row ${invalidRowIndex + 1} must contain exactly ${EXPORT_WORKBOOK_COLUMN_COUNT} columns.`,
+    );
+  }
 }
 
 function parseWorksheetCells(

@@ -1,11 +1,11 @@
 # Supabase Production Pre-Activation Evidence - 2026-07-06
 
-Result: `BLOCKED_FOR_PENDING_AI_MIGRATION`
+Result: `BLOCKED_FOR_PENDING_PRODUCTION_GATES`
 Project: `tsymifccglpepvbmrcgh`
-Checked at: `2026-07-06T01:38:58Z`
-Git head: `6345019a`
-Readiness verifier hash: `e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9`
-Scoped diff hash: `2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151`
+Checked at: `2026-07-10T04:09:36Z`
+Git head: `d3906265a`
+Readiness verifier hash: `c9e0f7af67355dfe706187079ac0cc6b7bb37452f38672fba8cb771ac3b54031`
+Scoped diff hash: `f64fe8e7949be05ef2eaaed3d91329395f76e542d35ed9384b42c095cf45ccd4`
 
 ## Scope
 
@@ -20,20 +20,29 @@ Scoped diff hash: `2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6
 
 Shared verification fields:
 
-- checkedAt: `2026-07-06T01:38:58Z`
+- checkedAt: `2026-07-10T04:09:36Z`
 - exitCode: `0`
-- gitHead: `6345019a`
-- scopedDiffSha256: `2900bbee8741e1e54930b1c05da7a1a4e3fdc175d177194a578544f8f2fe6151`
-- readinessVerifierSha256: `e7ef020f69382ed343323a91473c32ebe7040818d77a7f7741c4961ca9b7afc9`
+- gitHead: `d3906265a`
+- scopedDiffSha256: `f64fe8e7949be05ef2eaaed3d91329395f76e542d35ed9384b42c095cf45ccd4`
+- readinessVerifierSha256: `c9e0f7af67355dfe706187079ac0cc6b7bb37452f38672fba8cb771ac3b54031`
+
+Pilot volume verification binding:
+
+- command: `npm run verify:pilot-volume`
+- checkedAt: `2026-07-10T04:08:26.968Z`
+- exitCode: `0`
+- gitHead: `d3906265a`
+- scopedDiffSha256: `f64fe8e7949be05ef2eaaed3d91329395f76e542d35ed9384b42c095cf45ccd4`
+- readinessVerifierSha256: `c9e0f7af67355dfe706187079ac0cc6b7bb37452f38672fba8cb771ac3b54031`
 
 Commands:
 
 - `npm run verify:auth-data-readiness`
-  - result: `Auth/data readiness verification passed: 154 checks.`
+  - result: `Auth/data readiness verification passed: 178 checks.`
 - `npm run verify:supabase-release`
-  - result: `Supabase release verification passed: 188 checks.`
+  - result: `Supabase release verification passed: 212 checks.`
 - `npm run verify:pilot-volume`
-  - result: `Blocked: production has 22 registered agent profiles, above pilot cap 10; local pilot cohort declares 19 registered agents, above pilot cap 10.`
+  - result: `Supabase pilot volume envelope verified: 10 active registered agents; 12 banned extra agent profiles excluded from intake.`
 - `npm run verify:production-readiness -- --expect-blocked`
   - result: `Production readiness is intentionally fail-closed until 20260706000100_ai_helper_admin_intent_quota_contract.sql is owner-approved, applied, and evidenced.`
 - `npm run test:e2e:supabase`
@@ -55,7 +64,7 @@ Deferred for this pilot scope:
 - `npm run verify:full` - deferred because broad UI/performance work is outside the Supabase launch-blocker scope.
 - Edge Function dry-runs - deferred because the pilot gate is bounded to Supabase Auth/RLS/Storage/workflow persistence.
 - Cross-role browser UI proof - deferred after the latest full Supabase Playwright run returned `4 passed / 1 failed`; production workflow smoke covers the backend handoff.
-- Pilot volume cap - blocked because production currently has `22` agent profiles and the local pilot cohort declares `19` registered agents, above the controlled-pilot cap of `10`.
+- Pilot volume cap - passed for active intake: production has `22` agent profile rows, `12` are Auth-banned and excluded, leaving `10` active registered agents in the controlled-pilot cap.
 - AI helper admin intent quota migration - blocked until `20260706000100_ai_helper_admin_intent_quota_contract.sql` has owner-approved production apply evidence.
 
 No email, password, service-role key, signed URL, or direct personal identifier is recorded in this artifact.

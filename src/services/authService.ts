@@ -201,7 +201,16 @@ export async function requestPasswordReset(
     };
   }
 
-  const { error } = await client.auth.resetPasswordForEmail(email);
+  const runtime = globalThis as typeof globalThis & {
+    location?: { origin: string; pathname: string };
+  };
+  const redirectTo = runtime.location
+    ? `${runtime.location.origin}${runtime.location.pathname}`
+    : undefined;
+  const { error } = await client.auth.resetPasswordForEmail(
+    email,
+    redirectTo ? { redirectTo } : undefined,
+  );
   if (error) {
     throw mapSupabasePersistenceError(error, {
       operation: "auth.reset_password",

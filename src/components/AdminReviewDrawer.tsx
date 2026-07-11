@@ -32,6 +32,7 @@ import type {
   Submission,
   SubmissionAction,
   SubmissionFile,
+  SubmissionFileType,
 } from "../modules/submissions/types";
 
 interface AdminReviewDrawerProps {
@@ -40,7 +41,11 @@ interface AdminReviewDrawerProps {
   submissionId: string | null;
   submission?: Submission | null;
   onVerifyDocument: () => void;
-  onAddRemark: (field?: string, applicant?: string) => void;
+  onAddRemark: (
+    field?: string,
+    applicant?: string,
+    fileType?: SubmissionFileType,
+  ) => void;
   onPrimaryAction?: (
     submissionId: string,
     action: SubmissionAction,
@@ -89,7 +94,7 @@ function issueStatusLabel(issue: Issue) {
 }
 
 function issueSeverityLabel(issue: Issue) {
-  if (issue.severity === "blocker") return "Блокер";
+  if (issue.severity === "blocker") return "Критичное";
   if (issue.severity === "warning") return "Проверить";
   return "Инфо";
 }
@@ -453,7 +458,13 @@ function QuestionnaireTab({
   );
 }
 
-function MediaTab({ submission }: { submission: Submission | null }) {
+function MediaTab({
+  onAddRemark,
+  submission,
+}: {
+  onAddRemark: AdminReviewDrawerProps["onAddRemark"];
+  submission: Submission | null;
+}) {
   if (!submission) {
     return (
       <EmptyTabState
@@ -490,11 +501,29 @@ function MediaTab({ submission }: { submission: Submission | null }) {
                   file.id}
               </p>
             </div>
-            <span
-              className={`text-[12px] font-semibold ${fileStatusTone(file)}`}
-            >
-              {fileStatusLabels[file.status]}
-            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span
+                className={`text-[12px] font-semibold ${fileStatusTone(file)}`}
+              >
+                {fileStatusLabels[file.status]}
+              </span>
+              <button
+                aria-label={`Добавить замечание: ${fileTypeLabels[file.type]} — ${applicant?.fullName ?? "заявитель"}`}
+                className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+                data-testid="admin-review-add-file-remark"
+                title="Добавить замечание к файлу"
+                type="button"
+                onClick={() =>
+                  onAddRemark(
+                    fileTypeLabels[file.type],
+                    applicant?.fullName,
+                    file.type,
+                  )
+                }
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+              </button>
+            </div>
           </article>
         );
       })}
@@ -517,7 +546,7 @@ function IssuesTab({ submission }: { submission: Submission | null }) {
     return (
       <EmptyTabState
         title="Замечаний нет"
-        copy="Заявку можно принять, если доменные проверки не нашли блокеров."
+        copy="Заявку можно принять, если доменные проверки не нашли критичных замечаний."
       />
     );
   }
@@ -835,7 +864,10 @@ export function AdminReviewDrawer({
                     />
                   )}
                   {activeTab === "media" && (
-                    <MediaTab submission={submission} />
+                    <MediaTab
+                      onAddRemark={onAddRemark}
+                      submission={submission}
+                    />
                   )}
                   {activeTab === "issues" && (
                     <IssuesTab submission={submission} />

@@ -3,6 +3,8 @@
 export {};
 
 declare global {
+  const __V19_LOCAL_DEMO_BUILD__: boolean;
+
   interface ImportMetaEnv {
     readonly VITE_SUPABASE_BACKEND_TARGET?: string;
     readonly VITE_SUPABASE_SANDBOX_PROBE_ENABLED?: string;

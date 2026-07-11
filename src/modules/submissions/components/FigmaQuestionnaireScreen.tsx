@@ -1,8 +1,19 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import {
+  type ChangeEvent,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   ChevronDown,
   FileText,
@@ -19,19 +30,44 @@ import {
   type QuestionnaireFieldUpdate,
 } from "../questionnaire";
 import {
+  isBlsQuestionnaireFieldBlockingIssue,
+  isBlsQuestionnaireFieldReady,
+  isBlsQuestionnaireFieldRequired,
+  isBlsQuestionnaireInvitingCompanySelected,
+  isBlsQuestionnaireMinorApplicant,
+  validateBlsQuestionnaireField,
+  type BlsFormData,
+} from "../questionnaireBlsRules";
+import {
   passportScanUploadAccept,
   passportScanUploadFormatLabel,
   selfieUploadAccept,
   selfieUploadFormatLabel,
 } from "../mediaStorage";
-import { canReplaceDocument } from "../status";
+import {
+  agentQuestionnaireCompletionDecision,
+  canAgentEditSubmissionContent,
+  canReplaceDocument,
+} from "../status";
+import {
+  passportGateIssues,
+  type PassportGateIssue,
+} from "../passportExtractionGuards";
 import {
   QuestionnaireProgressBadge,
   QuestionnaireWorkspaceShell,
 } from "./QuestionnaireWorkspacePrimitives";
 
 type FieldState = "normal" | "needs_review" | "invalid";
-type ApplicantTab = { hasIssue?: boolean; id: string; index: number; name: string };
+type ApplicantTabStatus = "complete" | "issue" | "pending";
+type ApplicantTab = {
+  completed: number;
+  id: string;
+  index: number;
+  name: string;
+  status: ApplicantTabStatus;
+  total: number;
+};
 type SectionTab = {
   id: string;
   meta: string;
@@ -52,17 +88,83 @@ type SectionId =
   | "filler";
 
 const sectionDefinitions: Array<SectionTab & { canonicalId: string; id: SectionId }> = [
-  { canonicalId: "files", id: "files", meta: "0 файлов", status: "pending", title: "Файлы" },
-  { canonicalId: "appointment", id: "appointment", meta: "0 из 0", status: "pending", title: "Запись" },
-  { canonicalId: "personal", id: "personal", meta: "0 из 0", status: "pending", title: "Личные данные" },
-  { canonicalId: "passport", id: "passport", meta: "0 из 0", status: "pending", title: "Паспорт" },
-  { canonicalId: "euRelative", id: "euRelative", meta: "0 из 0", status: "pending", title: "Родственник ЕС" },
-  { canonicalId: "contacts", id: "contact", meta: "0 из 0", status: "pending", title: "Адрес и контакты" },
-  { canonicalId: "employment", id: "employment", meta: "0 из 0", status: "pending", title: "Работа / учеба" },
-  { canonicalId: "trip", id: "trip", meta: "0 из 0", status: "pending", title: "Поездка" },
-  { canonicalId: "hotel", id: "hotel", meta: "0 из 0", status: "pending", title: "Отель / приглашение" },
-  { canonicalId: "payment", id: "payment", meta: "0 из 0", status: "pending", title: "Оплата поездки" },
-  { canonicalId: "filler", id: "filler", meta: "0 из 0", status: "pending", title: "Кто заполнил" },
+  {
+    canonicalId: "files",
+    id: "files",
+    meta: "0 файлов",
+    status: "pending",
+    title: "Файлы",
+  },
+  {
+    canonicalId: "appointment",
+    id: "appointment",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Запись",
+  },
+  {
+    canonicalId: "personal",
+    id: "personal",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Личные данные",
+  },
+  {
+    canonicalId: "passport",
+    id: "passport",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Паспорт",
+  },
+  {
+    canonicalId: "euRelative",
+    id: "euRelative",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Родственник ЕС",
+  },
+  {
+    canonicalId: "contacts",
+    id: "contact",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Адрес и контакты",
+  },
+  {
+    canonicalId: "employment",
+    id: "employment",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Работа / учеба",
+  },
+  {
+    canonicalId: "trip",
+    id: "trip",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Поездка",
+  },
+  {
+    canonicalId: "hotel",
+    id: "hotel",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Отель / приглашение",
+  },
+  {
+    canonicalId: "payment",
+    id: "payment",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Оплата поездки",
+  },
+  {
+    canonicalId: "filler",
+    id: "filler",
+    meta: "0 из 0",
+    status: "pending",
+    title: "Кто заполнил",
+  },
 ];
 
 const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
@@ -76,6 +178,8 @@ const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
     "appointment-note",
   ],
   contact: [
+    "email",
+    "contact-number",
     "home-address",
     "home-country",
     "home-city",
@@ -89,6 +193,9 @@ const familySharedFieldIds: Partial<Record<SectionId, string[]>> = {
     "inviting-party-type",
     "hotel-name",
     "hotel-address",
+    "hotel-country",
+    "hotel-city",
+    "hotel-postal-code",
     "hotel-email",
     "hotel-contact",
     "company-org-details",
@@ -122,15 +229,14 @@ type FormFieldProps = {
   fullWidth?: boolean;
   hint?: string;
   label: string;
+  modelFieldId: string;
   number?: string;
-  onAcknowledgeReview?: () => void;
   onBlur?: () => void;
   onChange?: (value: string) => void;
   options?: string[];
   phonePrefix?: "+7" | "+34";
   placeholder?: string;
   readOnly?: boolean;
-  required?: boolean;
   reviewSource?: string;
   suggestions?: readonly string[];
   state?: FieldState;
@@ -138,24 +244,69 @@ type FormFieldProps = {
   value: string;
 };
 
+type QuestionnaireFieldUiContract = {
+  confirmReview: (fieldId: string) => void;
+  errorMessage: (fieldId: string, label: string) => string | undefined;
+  focused: (fieldId: string) => boolean;
+  required: (fieldId: string) => boolean;
+  reviewSource: (fieldId: string, label: string) => string | undefined;
+  state: (fieldId: string, label: string) => FieldState;
+};
+
+const QuestionnaireFieldUiContext = createContext<QuestionnaireFieldUiContract | null>(
+  null,
+);
+
 type FigmaQuestionnaireScreenProps = {
   initialFocus?: QuestionnaireInitialFocus;
   onBack: () => void;
-  onComplete: (values: QuestionnaireCommitPayload) => void;
+  onComplete: (values: QuestionnaireCommitPayload) => void | Promise<void>;
   onFieldChange?: (update: QuestionnaireFieldUpdate) => void;
+  onMarkIssueFixed?: (issueId: string) => void | Promise<void>;
   onUploadFile?: (fileId: string, file: File) => void | Promise<void>;
-  onSaveDraft?: (values: QuestionnaireCommitPayload) => void;
+  onSaveDraft?: (values: QuestionnaireCommitPayload) => void | Promise<void>;
   submission: Submission;
 };
 
 type QuestionnaireCommitPayload = {
   fieldUpdates: QuestionnaireFieldUpdate[];
   focusedUpdate?: QuestionnaireFieldUpdate;
+  reviewConfirmations: QuestionnaireReviewConfirmation[];
+  saveIntent: QuestionnaireSaveIntent;
   travelEnd: string;
   travelStart: string;
 };
 
-type QuestionnaireInitialFocus = {
+type QuestionnaireReviewConfirmation = {
+  applicantId: string;
+  fieldId: string;
+  sectionId: string;
+};
+
+type QuestionnaireSaveIntent = "autosave" | "completion" | "manual" | "navigation";
+
+type QuestionnaireSaveWaiter = {
+  reject: (reason?: unknown) => void;
+  resolve: () => void;
+};
+
+type QuestionnaireSaveRequest = {
+  payload: QuestionnaireCommitPayload;
+  revision: number;
+  waiters: QuestionnaireSaveWaiter[];
+};
+
+type FamilyCopyPreview = {
+  affectedApplicants: number;
+  firstTarget?: {
+    applicantId: string;
+    label?: string;
+    sectionId: SectionId;
+  };
+  updates: QuestionnaireFieldUpdate[];
+};
+
+export type QuestionnaireInitialFocus = {
   applicantId?: string;
   field?: string;
   section?: string;
@@ -352,15 +503,21 @@ const BLS_OCCUPATION_OPTIONS = [
 
 const YES_NO_OPTIONS = ["Нет", "Да"];
 
-const commonEmailDomains = ["gmail.com", "yandex.ru", "mail.ru", "icloud.com", "outlook.com"];
+const commonEmailDomains = [
+  "gmail.com",
+  "yandex.ru",
+  "mail.ru",
+  "icloud.com",
+  "outlook.com",
+];
 
 const optionSearchAliases: Record<string, string[]> = {
   "Санкт-Петербург": ["спб", "питер", "санкт петербург"],
-  "Самара": ["с"],
+  Самара: ["с"],
   "Нижний Новгород": ["нижний", "нн"],
   "Ростов-на-Дону": ["ростов"],
-  "Екатеринбург": ["екат", "екб"],
-  "Новосибирск": ["новосиб"],
+  Екатеринбург: ["екат", "екб"],
+  Новосибирск: ["новосиб"],
   "Russian Federation": ["россия", "рф"],
   Spain: ["испания"],
   "United Kingdom": ["великобритания", "англия"],
@@ -388,15 +545,25 @@ function formatPhoneInput(value: string, prefix: "+7" | "+34") {
   if (prefix === "+7" && digits.startsWith("8")) digits = `7${digits.slice(1)}`;
   if (!digits.startsWith(prefixDigits)) digits = `${prefixDigits}${digits}`;
 
-  const localDigits = digits.slice(prefixDigits.length).slice(0, prefix === "+7" ? 10 : 9);
-  const groups = prefix === "+7"
-    ? [localDigits.slice(0, 3), localDigits.slice(3, 6), localDigits.slice(6, 8), localDigits.slice(8, 10)]
-    : [localDigits.slice(0, 3), localDigits.slice(3, 6), localDigits.slice(6, 9)];
+  const localDigits = digits
+    .slice(prefixDigits.length)
+    .slice(0, prefix === "+7" ? 10 : 9);
+  const groups =
+    prefix === "+7"
+      ? [
+          localDigits.slice(0, 3),
+          localDigits.slice(3, 6),
+          localDigits.slice(6, 8),
+          localDigits.slice(8, 10),
+        ]
+      : [localDigits.slice(0, 3), localDigits.slice(3, 6), localDigits.slice(6, 9)];
   const separator = prefix === "+7" ? [" ", "-", "-"] : [" ", " "];
 
   return groups.reduce(
     (formatted, group, index) =>
-      group ? `${formatted}${index === 0 ? " " : separator[index - 1]}${group}` : formatted,
+      group
+        ? `${formatted}${index === 0 ? " " : separator[index - 1]}${group}`
+        : formatted,
     prefix,
   );
 }
@@ -431,7 +598,8 @@ function optionMatchesSearch(option: string, query: string) {
 }
 
 function inputAutocomplete(label: string, type: FormFieldProps["type"]) {
-  if (type === "email" || label.toLocaleLowerCase("ru-RU").includes("email")) return "email";
+  if (type === "email" || label.toLocaleLowerCase("ru-RU").includes("email"))
+    return "email";
   if (label === "Фамилия") return "family-name";
   if (label === "Имя") return "given-name";
   if (label.toLocaleLowerCase("ru-RU").includes("адрес")) return "street-address";
@@ -447,31 +615,38 @@ function FormField({
   fullWidth,
   hint,
   label,
+  modelFieldId,
   number,
-  onAcknowledgeReview,
   onBlur,
   onChange,
   options,
   phonePrefix,
   placeholder,
   readOnly,
-  required,
   reviewSource,
   state = "normal",
   suggestions,
   type = "input",
   value,
 }: FormFieldProps) {
+  const fieldContract = useContext(QuestionnaireFieldUiContext);
   const [isOpen, setIsOpen] = useState(false);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const [optionQuery, setOptionQuery] = useState("");
+  const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const optionSearchRef = useRef<HTMLInputElement>(null);
+  const optionTriggerRef = useRef<HTMLButtonElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const generatedFieldId = useId();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setActiveOptionIndex(-1);
+        setOptionQuery("");
       }
     };
 
@@ -489,15 +664,19 @@ function FormField({
       : options;
   }, [optionQuery, options]);
   const dateField = isDateFieldLabel(label);
-  const emailField = type === "email" || label.toLocaleLowerCase("ru-RU").includes("email");
-  const fieldId = `questionnaire-${number ?? "field"}-${label}`.replace(/\s+/g, "-");
+  const emailField =
+    type === "email" || label.toLocaleLowerCase("ru-RU").includes("email");
+  const fieldId = `questionnaire-${generatedFieldId.replace(/:/g, "")}`;
+  const fieldLabelId = `${fieldId}-label`;
+  const fieldErrorId = `${fieldId}-error`;
+  const optionsListboxId = `${fieldId}-options`;
   const suggestionsId = `${fieldId}-suggestions`;
   const fieldEmailSuggestions = useMemo(
     () => (emailField ? emailSuggestions(value) : []),
     [emailField, value],
   );
   const inputSuggestions = useMemo(
-    () => (emailField ? fieldEmailSuggestions : suggestions ?? []),
+    () => (emailField ? fieldEmailSuggestions : (suggestions ?? [])),
     [emailField, fieldEmailSuggestions, suggestions],
   );
   const visibleInputSuggestions = useMemo(() => {
@@ -508,18 +687,38 @@ function FormField({
   }, [inputSuggestions, value]);
 
   useEffect(() => {
-    if (!isOpen || !usesOptionSearch) return;
-    optionSearchRef.current?.focus();
-  }, [isOpen, usesOptionSearch]);
+    if (!isOpen) return;
+    setActiveOptionIndex((current) => {
+      if (!filteredOptions.length) return -1;
+      if (current < 0) return 0;
+      return Math.min(current, filteredOptions.length - 1);
+    });
+  }, [filteredOptions, isOpen]);
 
-  const validationMessage = validateFormFieldValue({ label, required, type, value });
-  const isEmptyRequiredField = validationMessage === "Обязательное поле" && !value.trim();
+  const canonicalRequired = fieldContract?.required(modelFieldId) ?? false;
+  const canonicalFocused = fieldContract?.focused(modelFieldId) ?? focused;
+  const canonicalState = fieldContract?.state(modelFieldId, label) ?? state;
+  const canonicalReviewSource =
+    fieldContract?.reviewSource(modelFieldId, label) ?? reviewSource;
+  const canonicalErrorMessage =
+    fieldContract?.errorMessage(modelFieldId, label) ?? errorMessage;
+  const validationMessage = validateFormFieldValue({
+    label,
+    required: canonicalRequired,
+    type,
+    value,
+  });
+  const isEmptyRequiredField =
+    validationMessage === "Обязательное поле" && !value.trim();
   const effectiveState: FieldState =
-    (validationMessage && !isEmptyRequiredField) || state === "invalid"
-    ? "invalid"
-    : state;
+    (validationMessage && !isEmptyRequiredField) || canonicalState === "invalid"
+      ? "invalid"
+      : canonicalState;
   const effectiveErrorMessage =
-    errorMessage ?? validationMessage ?? reviewSource ?? "Нужно исправить значение";
+    canonicalErrorMessage ??
+    validationMessage ??
+    canonicalReviewSource ??
+    "Нужно исправить значение";
   const shouldShowError =
     effectiveState === "invalid" && (!isEmptyRequiredField || Boolean(errorMessage));
   const baseClasses = "v19-questionnaire-field-control";
@@ -529,29 +728,167 @@ function FormField({
       : effectiveState === "invalid"
         ? "is-invalid"
         : "is-normal";
+  const activeOptionId =
+    isOpen && activeOptionIndex >= 0 && activeOptionIndex < filteredOptions.length
+      ? `${optionsListboxId}-option-${activeOptionIndex}`
+      : undefined;
+  const activeSuggestionId =
+    isSuggestionsOpen &&
+    activeSuggestionIndex >= 0 &&
+    activeSuggestionIndex < visibleInputSuggestions.length
+      ? `${suggestionsId}-option-${activeSuggestionIndex}`
+      : undefined;
+
+  function closeOptions({ returnFocus = false } = {}) {
+    setIsOpen(false);
+    setActiveOptionIndex(-1);
+    setOptionQuery("");
+    if (returnFocus) optionTriggerRef.current?.focus();
+  }
+
+  function openOptions(edge: "first" | "last" = "first") {
+    setIsOpen(true);
+    setActiveOptionIndex(edge === "last" ? Math.max(filteredOptions.length - 1, 0) : 0);
+  }
+
+  function selectOptionAt(index: number) {
+    const option = filteredOptions[index];
+    if (!option) return;
+    onChange?.(option);
+    closeOptions({ returnFocus: true });
+  }
+
+  function moveOptionFocus(direction: 1 | -1) {
+    if (!filteredOptions.length) return;
+    setActiveOptionIndex((current) => {
+      if (current < 0) return direction > 0 ? 0 : filteredOptions.length - 1;
+      return (current + direction + filteredOptions.length) % filteredOptions.length;
+    });
+  }
+
+  function handleOptionKeyboard(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!isOpen) {
+        openOptions(event.key === "ArrowDown" ? "first" : "last");
+      } else {
+        moveOptionFocus(event.key === "ArrowDown" ? 1 : -1);
+      }
+      return;
+    }
+
+    if (
+      event.key === "Home" &&
+      isOpen &&
+      event.currentTarget === optionTriggerRef.current
+    ) {
+      event.preventDefault();
+      setActiveOptionIndex(0);
+      return;
+    }
+
+    if (
+      event.key === "End" &&
+      isOpen &&
+      event.currentTarget === optionTriggerRef.current
+    ) {
+      event.preventDefault();
+      setActiveOptionIndex(Math.max(filteredOptions.length - 1, 0));
+      return;
+    }
+
+    if ((event.key === "Enter" || event.key === " ") && !usesOptionSearch) {
+      event.preventDefault();
+      if (isOpen) selectOptionAt(activeOptionIndex);
+      else openOptions();
+      return;
+    }
+
+    if (event.key === "Enter" && usesOptionSearch && isOpen) {
+      event.preventDefault();
+      selectOptionAt(activeOptionIndex);
+      return;
+    }
+
+    if (event.key === "Escape" && isOpen) {
+      event.preventDefault();
+      closeOptions({ returnFocus: true });
+    }
+  }
+
+  function selectSuggestionAt(index: number) {
+    const suggestion = visibleInputSuggestions[index];
+    if (!suggestion) return;
+    onChange?.(suggestion);
+    setIsSuggestionsOpen(false);
+    setActiveSuggestionIndex(-1);
+  }
+
+  function handleSuggestionKeyboard(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (!inputSuggestions.length) return;
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setIsSuggestionsOpen(true);
+      setActiveSuggestionIndex((current) => {
+        if (!visibleInputSuggestions.length) return -1;
+        if (current < 0) {
+          return event.key === "ArrowDown" ? 0 : visibleInputSuggestions.length - 1;
+        }
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        return (
+          (current + direction + visibleInputSuggestions.length) %
+          visibleInputSuggestions.length
+        );
+      });
+      return;
+    }
+
+    if (event.key === "Enter" && isSuggestionsOpen && activeSuggestionIndex >= 0) {
+      event.preventDefault();
+      selectSuggestionAt(activeSuggestionIndex);
+      return;
+    }
+
+    if (event.key === "Escape" && isSuggestionsOpen) {
+      event.preventDefault();
+      setIsSuggestionsOpen(false);
+      setActiveSuggestionIndex(-1);
+    }
+  }
 
   return (
     <div
-      data-field-focused={focused ? "true" : undefined}
+      data-field-focused={canonicalFocused ? "true" : undefined}
       data-field-label={label}
       className={`flex flex-col gap-1.5 ${
         fullWidth ? "col-span-1 md:col-span-2" : "col-span-1"
       }`}
     >
-      <label className="flex items-start gap-2 text-[var(--v19b-size-12)] text-white/70 leading-snug">
+      <label
+        className="flex items-start gap-2 text-[var(--v19b-size-12)] text-white/70 leading-snug"
+        htmlFor={usesQuickOptions ? undefined : fieldId}
+      >
         {number ? (
-          <span className="v19-questionnaire-field-number">
-            {number}
-          </span>
+          <span className="v19-questionnaire-field-number">{number}</span>
         ) : null}
-        <span className="flex-1 mt-[var(--v19b-size-3)]">
+        <span className="flex-1 mt-[var(--v19b-size-3)]" id={fieldLabelId}>
           {label}
-          {required ? <span className="v19-questionnaire-required-mark">*</span> : null}
+          {canonicalRequired ? (
+            <span className="v19-questionnaire-required-mark">*</span>
+          ) : null}
         </span>
       </label>
 
       {options && usesQuickOptions ? (
-        <div aria-label={label} className="v19-questionnaire-quick-options" role="group">
+        <div
+          aria-describedby={shouldShowError ? fieldErrorId : undefined}
+          aria-invalid={effectiveState === "invalid" ? "true" : undefined}
+          aria-labelledby={fieldLabelId}
+          aria-required={canonicalRequired ? "true" : undefined}
+          className="v19-questionnaire-quick-options"
+          role="group"
+        >
           {options.map((option) => (
             <button
               aria-pressed={value === option}
@@ -567,11 +904,34 @@ function FormField({
           ))}
         </div>
       ) : options ? (
-        <div className="relative" ref={dropdownRef}>
+        <div
+          className="relative"
+          ref={dropdownRef}
+          onBlur={(event) => {
+            if (event.currentTarget.contains(event.relatedTarget as Node | null))
+              return;
+            closeOptions();
+          }}
+        >
           <button
+            aria-activedescendant={activeOptionId}
+            aria-controls={optionsListboxId}
+            aria-describedby={shouldShowError ? fieldErrorId : undefined}
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
+            aria-invalid={effectiveState === "invalid" ? "true" : undefined}
+            aria-labelledby={fieldLabelId}
+            aria-required={canonicalRequired ? "true" : undefined}
             className={`flex items-center justify-between text-left ${baseClasses} ${stateClasses}`}
+            id={fieldId}
+            ref={optionTriggerRef}
+            role="combobox"
             type="button"
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => {
+              if (isOpen) closeOptions();
+              else openOptions();
+            }}
+            onKeyDown={handleOptionKeyboard}
           >
             <span className="truncate">
               {value || <span className="text-white/30">Выберите...</span>}
@@ -590,56 +950,80 @@ function FormField({
               >
                 {usesOptionSearch ? (
                   <input
+                    aria-activedescendant={activeOptionId}
+                    aria-controls={optionsListboxId}
                     aria-label={`Поиск: ${label}`}
                     className="v19-questionnaire-field-control"
                     placeholder="Начните вводить"
                     ref={optionSearchRef}
+                    type="search"
                     value={optionQuery}
-                    onChange={(event) => setOptionQuery(event.target.value)}
+                    onChange={(event) => {
+                      setOptionQuery(event.target.value);
+                      setActiveOptionIndex(0);
+                    }}
+                    onKeyDown={handleOptionKeyboard}
                   />
                 ) : null}
-                {filteredOptions.map((option) => (
-                  <button
-                    className={`v19-questionnaire-dropdown-option ${
-                      value === option ? "is-selected" : ""
-                    }`}
-                    key={option}
-                    type="button"
-                    onClick={() => {
-                      onChange?.(option);
-                      setIsOpen(false);
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-                {!filteredOptions.length ? (
-                  <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
-                ) : null}
+                <div id={optionsListboxId} role="listbox">
+                  {filteredOptions.map((option, index) => (
+                    <button
+                      aria-selected={value === option}
+                      className={`v19-questionnaire-dropdown-option ${
+                        value === option ? "is-selected" : ""
+                      } ${activeOptionIndex === index ? "is-active" : ""}`}
+                      id={`${optionsListboxId}-option-${index}`}
+                      key={option}
+                      role="option"
+                      tabIndex={-1}
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setActiveOptionIndex(index)}
+                      onClick={() => selectOptionAt(index)}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                  {!filteredOptions.length ? (
+                    <p className="v19-questionnaire-dropdown-empty">Нет совпадений</p>
+                  ) : null}
+                </div>
               </motion.div>
             ) : null}
           </AnimatePresence>
         </div>
       ) : type === "textarea" ? (
         <textarea
+          aria-describedby={shouldShowError ? fieldErrorId : undefined}
+          aria-invalid={effectiveState === "invalid" ? "true" : undefined}
           aria-label={label}
+          aria-required={canonicalRequired ? "true" : undefined}
           className={`${baseClasses} is-textarea ${compact ? "is-compact-address" : ""} ${stateClasses}`}
+          id={fieldId}
           onBlur={onBlur}
           placeholder={placeholder}
           readOnly={readOnly ?? !onChange}
           value={value}
-          onFocus={onAcknowledgeReview}
           onChange={(event) => onChange?.(event.target.value)}
         />
       ) : (
-        <div className={inputSuggestions.length ? "relative" : undefined}>
+        <div
+          className={inputSuggestions.length ? "relative" : undefined}
+          ref={inputSuggestions.length ? suggestionsRef : undefined}
+        >
           <input
+            aria-describedby={shouldShowError ? fieldErrorId : undefined}
+            aria-invalid={effectiveState === "invalid" ? "true" : undefined}
             aria-label={label}
+            aria-required={canonicalRequired ? "true" : undefined}
+            aria-activedescendant={activeSuggestionId}
             aria-autocomplete={inputSuggestions.length ? "list" : undefined}
+            aria-controls={inputSuggestions.length ? suggestionsId : undefined}
             aria-expanded={inputSuggestions.length ? isSuggestionsOpen : undefined}
             autoComplete={inputAutocomplete(label, type)}
             className={`${baseClasses} ${compact ? "is-compact-address" : ""} ${stateClasses}`}
             inputMode={dateField ? "numeric" : phonePrefix ? "tel" : undefined}
+            id={fieldId}
             maxLength={phonePrefix ? (phonePrefix === "+7" ? 17 : 15) : undefined}
             placeholder={
               placeholder ??
@@ -652,9 +1036,18 @@ function FormField({
                     : undefined)
             }
             readOnly={readOnly ?? !onChange}
-            type={type === "email" || type === "number" || type === "tel" ? type : "text"}
+            role={inputSuggestions.length ? "combobox" : undefined}
+            type={
+              type === "email" || type === "number" || type === "tel" ? type : "text"
+            }
             value={value}
-            onBlur={onBlur}
+            onBlur={(event) => {
+              onBlur?.();
+              if (suggestionsRef.current?.contains(event.relatedTarget as Node | null))
+                return;
+              setIsSuggestionsOpen(false);
+              setActiveSuggestionIndex(-1);
+            }}
             onChange={(event) => {
               const nextValue = phonePrefix
                 ? formatPhoneInput(event.target.value, phonePrefix)
@@ -662,13 +1055,19 @@ function FormField({
                   ? formatDateInput(event.target.value)
                   : event.target.value;
               onChange?.(nextValue);
-              if (inputSuggestions.length) setIsSuggestionsOpen(true);
+              if (inputSuggestions.length) {
+                setIsSuggestionsOpen(true);
+                setActiveSuggestionIndex(0);
+              }
             }}
             onFocus={() => {
-              onAcknowledgeReview?.();
               if (phonePrefix && !value) onChange?.(phonePrefix);
-              if (inputSuggestions.length) setIsSuggestionsOpen(true);
+              if (inputSuggestions.length) {
+                setIsSuggestionsOpen(true);
+                setActiveSuggestionIndex(0);
+              }
             }}
+            onKeyDown={handleSuggestionKeyboard}
           />
           {inputSuggestions.length && isSuggestionsOpen ? (
             <motion.div
@@ -680,20 +1079,20 @@ function FormField({
               role="listbox"
               transition={{ duration: 0.15 }}
             >
-              {visibleInputSuggestions.map((suggestion) => (
+              {visibleInputSuggestions.map((suggestion, index) => (
                 <button
                   aria-selected={value === suggestion}
                   className={`v19-questionnaire-dropdown-option ${
                     value === suggestion ? "is-selected" : ""
-                  }`}
+                  } ${activeSuggestionIndex === index ? "is-active" : ""}`}
+                  id={`${suggestionsId}-option-${index}`}
                   key={suggestion}
                   role="option"
+                  tabIndex={-1}
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    onChange?.(suggestion);
-                    setIsSuggestionsOpen(false);
-                  }}
+                  onMouseEnter={() => setActiveSuggestionIndex(index)}
+                  onClick={() => selectSuggestionAt(index)}
                 >
                   {suggestion}
                 </button>
@@ -706,13 +1105,29 @@ function FormField({
         </div>
       )}
 
+      {canonicalState === "needs_review" ? (
+        <div className="v19-questionnaire-review-confirmation">
+          <span>{canonicalReviewSource ?? "Сверьте значение с документом"}</span>
+          <button
+            aria-label={`Подтвердить поле: ${label}`}
+            type="button"
+            onClick={() => fieldContract?.confirmReview(modelFieldId)}
+          >
+            Подтвердить
+          </button>
+        </div>
+      ) : null}
+
       {shouldShowError ? (
-      <div className="flex items-start gap-1.5 text-[var(--v19b-size-10-5)] text-white/40 mt-1">
-        <span className="v19-questionnaire-field-error flex items-center gap-1.5 font-medium">
-          <AlertCircle className="v19-questionnaire-field-error-icon w-3.5 h-3.5" />
-          {effectiveErrorMessage}
-        </span>
-      </div>
+        <div
+          className="flex items-start gap-1.5 text-[var(--v19b-size-10-5)] text-white/40 mt-1"
+          id={fieldErrorId}
+        >
+          <span className="v19-questionnaire-field-error flex items-center gap-1.5 font-medium">
+            <AlertCircle className="v19-questionnaire-field-error-icon w-3.5 h-3.5" />
+            {effectiveErrorMessage}
+          </span>
+        </div>
       ) : null}
 
       {hint ? <p className="v19-questionnaire-field-hint">{hint}</p> : null}
@@ -722,26 +1137,82 @@ function FormField({
 
 function applicantTabs(submission: Submission): ApplicantTab[] {
   if (!submission.applicants.length) {
-    return [{ id: "app-1", index: 1, name: "Иван Петров" }];
+    return [
+      {
+        completed: 0,
+        id: "app-1",
+        index: 1,
+        name: "Иван Петров",
+        status: "pending",
+        total: 0,
+      },
+    ];
   }
 
-  return submission.applicants.map((applicant, index) => ({
-    hasIssue: submission.issues.some(
-      (issue) =>
-        issue.status !== "closed_by_admin" &&
-        issue.target.applicantId === applicant.id,
-    ),
-    id: applicant.id ?? `app-${index + 1}`,
-    index: index + 1,
-    name: applicant.fullName || (index === 0 ? "Иван Петров" : `Заявитель ${index + 1}`),
-  }));
+  return submission.applicants.map((applicant, index) => {
+    const formData = questionnaireFormDataFromSubmission(
+      submission,
+      applicant.id,
+    ) as unknown as BlsFormData;
+    const fields = applicant.sections.flatMap((section) => section.fields);
+    const requiredFields = fields.filter((field) =>
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: applicant.role,
+        field,
+        formData,
+      }),
+    );
+    const completedFields = requiredFields.filter((field) =>
+      isBlsQuestionnaireFieldReady({
+        applicantRole: applicant.role,
+        field,
+        formData,
+      }),
+    ).length;
+    const completedFiles = requiredQuestionnaireFileTypes.filter((type) =>
+      fileIsReadyForQuestionnaire(
+        submission.files.find(
+          (file) => file.applicantId === applicant.id && file.type === type,
+        ),
+      ),
+    ).length;
+    const completed = completedFields + completedFiles;
+    const total = requiredFields.length + requiredQuestionnaireFileTypes.length;
+    const hasRisk =
+      fields.some((field) =>
+        isBlsQuestionnaireFieldBlockingIssue({
+          applicantRole: applicant.role,
+          field,
+          formData,
+        }),
+      ) ||
+      submission.issues.some(
+        (issue) =>
+          issue.status === "open" && issue.target.applicantId === applicant.id,
+      );
+
+    return {
+      completed,
+      id: applicant.id ?? `app-${index + 1}`,
+      index: index + 1,
+      name:
+        applicant.fullName ||
+        (index === 0 ? "Иван Петров" : `Заявитель ${index + 1}`),
+      status: hasRisk
+        ? "issue"
+        : total > 0 && completed === total
+          ? "complete"
+          : "pending",
+      total,
+    };
+  });
 }
 
 function fallbackQuestionnaireFormData(): QuestionnaireFormData {
   return {
     appointmentCity: "",
     appointmentNote: "",
-    birthCountry: "Russian Federation",
+    birthCountry: "",
     birthCitizenship: "",
     birthPlace: "",
     category: "",
@@ -852,9 +1323,7 @@ function questionnaireField(
     .find((field) => field.id === fieldId);
 }
 
-type QuestionnaireModelField = NonNullable<
-  ReturnType<typeof questionnaireField>
->;
+type QuestionnaireModelField = NonNullable<ReturnType<typeof questionnaireField>>;
 
 const requiredQuestionnaireFileTypes = ["passport_scan", "selfie", "selfie_2"] as const;
 type RequiredQuestionnaireFileType = (typeof requiredQuestionnaireFileTypes)[number];
@@ -917,20 +1386,6 @@ function defaultBirthCountryForDate(value: string) {
   return birthDate.getFullYear() <= 1990 ? "USSR" : "Russian Federation";
 }
 
-function isQuestionnaireMinor(value: string) {
-  const birthDate = parseQuestionnaireDate(value);
-  if (!birthDate) return false;
-
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const birthdayHasPassed =
-    today.getMonth() > birthDate.getMonth() ||
-    (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
-  if (!birthdayHasPassed) age -= 1;
-
-  return age < 18;
-}
-
 function validationMessageForQuestionnaireField(
   field: Pick<QuestionnaireModelField, "id" | "label" | "required">,
   value: string,
@@ -938,13 +1393,17 @@ function validationMessageForQuestionnaireField(
   return validateQuestionnaireFieldValue(field, value);
 }
 
-
 function validateFormFieldValue({
   label,
   required,
   type,
   value,
-}: Pick<FormFieldProps, "label" | "required" | "type" | "value">) {
+}: {
+  label: string;
+  required: boolean;
+  type?: FormFieldProps["type"];
+  value: string;
+}) {
   if (required && !value.trim()) return "Обязательное поле";
   if (!value.trim()) return undefined;
 
@@ -958,13 +1417,12 @@ function validateFormFieldValue({
 
   if (normalizedLabel.includes("телефон")) {
     const digits = value.replace(/\D/g, "");
-    return digits.length >= 7 && digits.length <= 18 ? undefined : "Проверьте номер телефона";
+    return digits.length >= 7 && digits.length <= 18
+      ? undefined
+      : "Проверьте номер телефона";
   }
 
-  if (
-    normalizedLabel.includes("дата") ||
-    normalizedLabel.includes("действител")
-  ) {
+  if (normalizedLabel.includes("дата") || normalizedLabel.includes("действител")) {
     return parseQuestionnaireDate(value.trim())
       ? undefined
       : "Дата должна быть в формате ДД.ММ.ГГГГ";
@@ -979,22 +1437,12 @@ function validateFormFieldValue({
 
 function hasActionableFieldProblem(field: QuestionnaireModelField) {
   const validationMessage = validationMessageForQuestionnaireField(field, field.value);
-  const requiredButEmpty = validationMessage === "Обязательное поле" && !field.value.trim();
+  const requiredButEmpty =
+    validationMessage === "Обязательное поле" && !field.value.trim();
 
   return Boolean(
     (field.error && !(field.error === "Обязательное поле" && !field.value.trim())) ||
-      (validationMessage && !requiredButEmpty),
-  );
-}
-
-function fieldIsReady(field: QuestionnaireModelField) {
-  return (
-    !field.required ||
-    Boolean(
-      field.value.trim() &&
-        !field.error &&
-        !validationMessageForQuestionnaireField(field, field.value),
-    )
+    (validationMessage && !requiredButEmpty),
   );
 }
 
@@ -1016,14 +1464,19 @@ function fileAcceptForQuestionnaire(fileType: RequiredQuestionnaireFileType) {
 }
 
 function fileFormatHint(fileType: RequiredQuestionnaireFileType) {
-  return fileType === "passport_scan" ? passportScanUploadFormatLabel : selfieUploadFormatLabel;
+  return fileType === "passport_scan"
+    ? passportScanUploadFormatLabel
+    : selfieUploadFormatLabel;
 }
 
 function questionnaireFileStatus(file: Submission["files"][number] | undefined) {
   if (!file) return "Слот файла не создан";
   if (file.status === "needs_replacement") return "Нужна замена";
   if (file.status === "missing") return "Нужно добавить";
-  if (file.reviewStatus === "replace_required" || file.reviewStatus === "poor_quality") {
+  if (
+    file.reviewStatus === "replace_required" ||
+    file.reviewStatus === "poor_quality"
+  ) {
     return "Нужна замена";
   }
   if (file.status === "pending_review") return "На проверке";
@@ -1048,8 +1501,11 @@ function QuestionnaireFileSlot({
 }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const needsUpload = file?.status === "missing" || file?.status === "needs_replacement";
-  const canUpload = Boolean(file && needsUpload && onUploadFile && canReplaceDocument(submission, file));
+  const needsUpload =
+    file?.status === "missing" || file?.status === "needs_replacement";
+  const canUpload = Boolean(
+    file && needsUpload && onUploadFile && canReplaceDocument(submission, file),
+  );
   const fileName = file?.originalFileName || file?.generatedFileName;
   const status = questionnaireFileStatus(file);
   const actionLabel = file?.status === "needs_replacement" ? "Заменить" : "Загрузить";
@@ -1080,7 +1536,9 @@ function QuestionnaireFileSlot({
         <span>{fileName || description}</span>
         <small>{fileFormatHint(fileType)}</small>
       </span>
-      <span className={`v19-questionnaire-file-status ${fileIsReadyForQuestionnaire(file) ? "is-ready" : ""}`}>
+      <span
+        className={`v19-questionnaire-file-status ${fileIsReadyForQuestionnaire(file) ? "is-ready" : ""}`}
+      >
         {status}
       </span>
       {canUpload ? (
@@ -1097,7 +1555,11 @@ function QuestionnaireFileSlot({
           />
         </label>
       ) : null}
-      {uploadError ? <span className="v19-questionnaire-file-error" role="alert">{uploadError}</span> : null}
+      {uploadError ? (
+        <span className="v19-questionnaire-file-error" role="alert">
+          {uploadError}
+        </span>
+      ) : null}
     </article>
   );
 }
@@ -1144,7 +1606,11 @@ function questionnaireFormDataFromSubmission(
       "appointment-note",
       fallback.appointmentNote,
     ),
-    birthCountry: submissionFieldValue(applicant, "birth-country", fallback.birthCountry),
+    birthCountry: submissionFieldValue(
+      applicant,
+      "birth-country",
+      fallback.birthCountry,
+    ),
     birthCitizenship: submissionFieldValueAny(
       applicant,
       ["birth-citizenship", "birth-nationality", "nationality-at-birth"],
@@ -1272,10 +1738,22 @@ function questionnaireFormDataFromSubmission(
       ["guardian-info", "minor-guardian"],
       fallback.guardianInfo,
     ),
-    hotelAddress: submissionFieldValue(applicant, "hotel-address", fallback.hotelAddress),
+    hotelAddress: submissionFieldValue(
+      applicant,
+      "hotel-address",
+      fallback.hotelAddress,
+    ),
     hotelCity: submissionFieldValue(applicant, "hotel-city", fallback.hotelCity),
-    hotelContact: submissionFieldValue(applicant, "hotel-contact", fallback.hotelContact),
-    hotelCountry: submissionFieldValue(applicant, "hotel-country", fallback.hotelCountry),
+    hotelContact: submissionFieldValue(
+      applicant,
+      "hotel-contact",
+      fallback.hotelContact,
+    ),
+    hotelCountry: submissionFieldValue(
+      applicant,
+      "hotel-country",
+      fallback.hotelCountry,
+    ),
     hotelEmail: submissionFieldValue(applicant, "hotel-email", fallback.hotelEmail),
     hotelName: submissionFieldValue(applicant, "hotel-name", fallback.hotelName),
     hotelPostalCode: submissionFieldValue(
@@ -1304,7 +1782,11 @@ function questionnaireFormDataFromSubmission(
       "marital-status",
       fallback.maritalStatus,
     ),
-    nationalId: submissionFieldValueAny(applicant, ["national-id"], fallback.nationalId),
+    nationalId: submissionFieldValueAny(
+      applicant,
+      ["national-id"],
+      fallback.nationalId,
+    ),
     occupation: submissionFieldValue(applicant, "occupation", fallback.occupation),
     otherCitizenship: submissionFieldValueAny(
       applicant,
@@ -1336,14 +1818,26 @@ function questionnaireFormDataFromSubmission(
       "passport-issue-place",
       fallback.passportIssuePlace,
     ),
-    passportNumber: submissionFieldValue(applicant, "passport-no", fallback.passportNumber),
-    passportType: submissionFieldValue(applicant, "passport-type", fallback.passportType),
+    passportNumber: submissionFieldValue(
+      applicant,
+      "passport-no",
+      fallback.passportNumber,
+    ),
+    passportType: submissionFieldValue(
+      applicant,
+      "passport-type",
+      fallback.passportType,
+    ),
     paymentSponsor: submissionFieldValue(
       applicant,
       "cost-covered-by",
       fallback.paymentSponsor,
     ),
-    paymentType: submissionFieldValue(applicant, "means-of-support", fallback.paymentType),
+    paymentType: submissionFieldValue(
+      applicant,
+      "means-of-support",
+      fallback.paymentType,
+    ),
     previousSurname: submissionFieldValueAny(
       applicant,
       ["previous-surname", "surname-at-birth", "maiden-name"],
@@ -1400,7 +1894,11 @@ function questionnaireFormDataFromSubmission(
       ["sponsor-means", "means-of-sponsor-support"],
       fallback.sponsorMeans,
     ),
-    stayDuration: submissionFieldValue(applicant, "stay-duration", fallback.stayDuration),
+    stayDuration: submissionFieldValue(
+      applicant,
+      "stay-duration",
+      fallback.stayDuration,
+    ),
     stayPurposeDetails: submissionFieldValueAny(
       applicant,
       ["stay-purpose-details", "purpose-details"],
@@ -1489,9 +1987,21 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "passport-no", formKey: "passportNumber", sectionId: "passport" },
   { fieldId: "passport-issue-date", formKey: "passportIssued", sectionId: "passport" },
   { fieldId: "passport-expiry-date", formKey: "passportExpiry", sectionId: "passport" },
-  { fieldId: "passport-issue-country", formKey: "passportIssueCountry", sectionId: "passport" },
-  { fieldId: "passport-issue-place", formKey: "passportIssuePlace", sectionId: "passport" },
-  { fieldId: "eu-relative-details", formKey: "euRelativeDetails", sectionId: "euRelative" },
+  {
+    fieldId: "passport-issue-country",
+    formKey: "passportIssueCountry",
+    sectionId: "passport",
+  },
+  {
+    fieldId: "passport-issue-place",
+    formKey: "passportIssuePlace",
+    sectionId: "passport",
+  },
+  {
+    fieldId: "eu-relative-details",
+    formKey: "euRelativeDetails",
+    sectionId: "euRelative",
+  },
   { fieldId: "eu-relationship", formKey: "euRelationship", sectionId: "euRelative" },
   { fieldId: "home-address", formKey: "contactAddress", sectionId: "contacts" },
   { fieldId: "email", formKey: "contactEmail", sectionId: "contacts" },
@@ -1499,10 +2009,26 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "home-country", formKey: "homeCountry", sectionId: "contacts" },
   { fieldId: "home-city", formKey: "residenceCity", sectionId: "contacts" },
   { fieldId: "postal-code", formKey: "residencePostalCode", sectionId: "contacts" },
-  { fieldId: "lives-outside-citizenship", formKey: "livesOutsideCitizenship", sectionId: "contacts" },
-  { fieldId: "residence-permit-type", formKey: "residencePermitType", sectionId: "contacts" },
-  { fieldId: "residence-permit-number", formKey: "residencePermitNumber", sectionId: "contacts" },
-  { fieldId: "residence-permit-valid-until", formKey: "residencePermitValidUntil", sectionId: "contacts" },
+  {
+    fieldId: "lives-outside-citizenship",
+    formKey: "livesOutsideCitizenship",
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "residence-permit-type",
+    formKey: "residencePermitType",
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "residence-permit-number",
+    formKey: "residencePermitNumber",
+    sectionId: "contacts",
+  },
+  {
+    fieldId: "residence-permit-valid-until",
+    formKey: "residencePermitValidUntil",
+    sectionId: "contacts",
+  },
   { fieldId: "occupation", formKey: "occupation", sectionId: "employment" },
   { fieldId: "occupation-specify", formKey: "currentJob", sectionId: "employment" },
   { fieldId: "employer-name", formKey: "employerName", sectionId: "employment" },
@@ -1517,12 +2043,28 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "departure-date", formKey: "travelEnd", sectionId: "trip" },
   { fieldId: "stay-duration", formKey: "stayDuration", sectionId: "trip" },
   { fieldId: "previous-biometrics", formKey: "previousBiometrics", sectionId: "trip" },
-  { fieldId: "previous-biometrics-date", formKey: "previousBiometricsDate", sectionId: "trip" },
+  {
+    fieldId: "previous-biometrics-date",
+    formKey: "previousBiometricsDate",
+    sectionId: "trip",
+  },
   { fieldId: "previous-visa-number", formKey: "previousVisaNumber", sectionId: "trip" },
   { fieldId: "final-entry-permit", formKey: "finalEntryPermit", sectionId: "trip" },
-  { fieldId: "final-entry-permit-issued-by", formKey: "finalEntryPermitIssuedBy", sectionId: "trip" },
-  { fieldId: "final-entry-permit-valid-from", formKey: "finalEntryPermitValidFrom", sectionId: "trip" },
-  { fieldId: "final-entry-permit-valid-to", formKey: "finalEntryPermitValidTo", sectionId: "trip" },
+  {
+    fieldId: "final-entry-permit-issued-by",
+    formKey: "finalEntryPermitIssuedBy",
+    sectionId: "trip",
+  },
+  {
+    fieldId: "final-entry-permit-valid-from",
+    formKey: "finalEntryPermitValidFrom",
+    sectionId: "trip",
+  },
+  {
+    fieldId: "final-entry-permit-valid-to",
+    formKey: "finalEntryPermitValidTo",
+    sectionId: "trip",
+  },
   { fieldId: "inviting-party-type", formKey: "invitingPartyType", sectionId: "hotel" },
   { fieldId: "hotel-name", formKey: "hotelName", sectionId: "hotel" },
   { fieldId: "hotel-address", formKey: "hotelAddress", sectionId: "hotel" },
@@ -1532,11 +2074,19 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
   { fieldId: "hotel-email", formKey: "hotelEmail", sectionId: "hotel" },
   { fieldId: "hotel-contact", formKey: "hotelContact", sectionId: "hotel" },
   { fieldId: "company-org-details", formKey: "companyOrgDetails", sectionId: "hotel" },
-  { fieldId: "company-contact-person", formKey: "companyContactPerson", sectionId: "hotel" },
+  {
+    fieldId: "company-contact-person",
+    formKey: "companyContactPerson",
+    sectionId: "hotel",
+  },
   { fieldId: "company-phone", formKey: "companyPhone", sectionId: "hotel" },
   { fieldId: "cost-covered-by", formKey: "paymentSponsor", sectionId: "payment" },
   { fieldId: "means-of-support", formKey: "paymentType", sectionId: "payment" },
-  { fieldId: "sponsor-in-host-fields", formKey: "sponsorInHostFields", sectionId: "payment" },
+  {
+    fieldId: "sponsor-in-host-fields",
+    formKey: "sponsorInHostFields",
+    sectionId: "payment",
+  },
   { fieldId: "other-sponsor", formKey: "otherSponsor", sectionId: "payment" },
   { fieldId: "sponsor-means", formKey: "sponsorMeans", sectionId: "payment" },
   { fieldId: "form-filler-name", formKey: "formFillerName", sectionId: "filler" },
@@ -1547,9 +2097,15 @@ const questionnaireFieldBindings: QuestionnaireFieldBinding[] = [
 function dependentFieldKeysFor(
   key: keyof QuestionnaireFormData,
   value: string,
+  applicantRole: Submission["applicants"][number]["role"] | undefined,
+  formData: QuestionnaireFormData,
 ): Array<keyof QuestionnaireFormData> {
   if (key === "livesOutsideCitizenship" && value !== "Да") {
-    return ["residencePermitType", "residencePermitNumber", "residencePermitValidUntil"];
+    return [
+      "residencePermitType",
+      "residencePermitNumber",
+      "residencePermitValidUntil",
+    ];
   }
   if (key === "stayPurpose" && value !== "OTHER") {
     return ["stayPurposeDetails"];
@@ -1563,7 +2119,13 @@ function dependentFieldKeysFor(
   if (key === "invitingPartyType" && value !== "Приглашающая компания/организация") {
     return ["companyOrgDetails", "companyContactPerson", "companyPhone"];
   }
-  if (key === "dob" && !isQuestionnaireMinor(value)) {
+  if (
+    key === "dob" &&
+    !isBlsQuestionnaireMinorApplicant(applicantRole, {
+      ...formData,
+      dob: value,
+    } as unknown as BlsFormData)
+  ) {
     return ["guardianInfo"];
   }
   return [];
@@ -1584,16 +2146,25 @@ function conditionalFieldClearsFor(
   ] as const satisfies Array<keyof QuestionnaireFormData>;
 
   return parentKeys.flatMap((parentKey) =>
-    dependentFieldKeysFor(parentKey, formData[parentKey]).flatMap((fieldKey) => {
-      const binding = questionnaireFieldBindings.find((item) => item.formKey === fieldKey);
+    dependentFieldKeysFor(
+      parentKey,
+      formData[parentKey],
+      applicant?.role,
+      formData,
+    ).flatMap((fieldKey) => {
+      const binding = questionnaireFieldBindings.find(
+        (item) => item.formKey === fieldKey,
+      );
       if (!binding || !questionnaireField(applicant, binding.fieldId)) return [];
 
-      return [{
-        applicantId,
-        fieldId: binding.fieldId,
-        sectionId: binding.sectionId,
-        value: "",
-      } satisfies QuestionnaireFieldUpdate];
+      return [
+        {
+          applicantId,
+          fieldId: binding.fieldId,
+          sectionId: binding.sectionId,
+          value: "",
+        } satisfies QuestionnaireFieldUpdate,
+      ];
     }),
   );
 }
@@ -1642,14 +2213,16 @@ function issueFieldMatches(fieldId: string, label: string, target?: string) {
   if (!normalizedTarget) return false;
 
   return [fieldId, label, ...(questionnaireFieldLabelAliases[fieldId] ?? [])].some(
-    (candidate) => normalizeFocusLabel(candidate).replace(/ё/g, "е") === normalizedTarget,
+    (candidate) =>
+      normalizeFocusLabel(candidate).replace(/ё/g, "е") === normalizedTarget,
   );
 }
 
 function focusableFieldFor(field?: string) {
-  return focusableQuestionnaireFields.find((target) =>
-    sameFieldLabel(target.fieldId, field) ||
-    target.labels.some((label) => sameFieldLabel(label, field)),
+  return focusableQuestionnaireFields.find(
+    (target) =>
+      sameFieldLabel(target.fieldId, field) ||
+      target.labels.some((label) => sameFieldLabel(label, field)),
   );
 }
 
@@ -1659,7 +2232,12 @@ function sectionForFocus(
 ): SectionId {
   if (target) return target.sectionId;
   const section = normalizeFocusLabel(focus?.section);
-  if (section.includes("файл") || section.includes("медиа") || section.includes("документ")) return "files";
+  if (
+    section.includes("файл") ||
+    section.includes("медиа") ||
+    section.includes("документ")
+  )
+    return "files";
   if (section.includes("запис")) return "appointment";
   if (section.includes("паспорт")) return "passport";
   if (section.includes("родствен")) return "euRelative";
@@ -1672,6 +2250,46 @@ function sectionForFocus(
   return "personal";
 }
 
+function questionnaireTargetForPassportIssue(issue: PassportGateIssue): {
+  applicantId: string;
+  label?: string;
+  sectionId: SectionId;
+} {
+  if (issue.code === "passport_not_confirmed") {
+    return { applicantId: issue.applicantId, sectionId: "files" };
+  }
+  if (issue.code === "passport_type_not_ordinary") {
+    return {
+      applicantId: issue.applicantId,
+      label: "Тип документа",
+      sectionId: "passport",
+    };
+  }
+  if (issue.code === "passport_issued_after_expiry") {
+    return {
+      applicantId: issue.applicantId,
+      label: "Дата выдачи",
+      sectionId: "passport",
+    };
+  }
+  if (
+    issue.code === "passport_expired" ||
+    issue.code === "passport_expires_before_trip"
+  ) {
+    return {
+      applicantId: issue.applicantId,
+      label: "Действителен до",
+      sectionId: "passport",
+    };
+  }
+
+  return {
+    applicantId: issue.applicantId,
+    label: "Номер паспорта",
+    sectionId: "passport",
+  };
+}
+
 function sectionIdMatches(sectionId: string, canonicalId: string) {
   return sectionId === canonicalId || sectionId.endsWith(`-${canonicalId}`);
 }
@@ -1681,6 +2299,7 @@ export function FigmaQuestionnaireScreen({
   onBack,
   onComplete,
   onFieldChange,
+  onMarkIssueFixed,
   onUploadFile,
   onSaveDraft,
   submission,
@@ -1689,6 +2308,7 @@ export function FigmaQuestionnaireScreen({
   const [pendingFieldUpdates, setPendingFieldUpdates] = useState<
     Record<string, QuestionnaireFieldUpdate>
   >({});
+  const pendingFieldUpdatesRef = useRef<Record<string, QuestionnaireFieldUpdate>>({});
   const pendingUpdates = useMemo(
     () => Object.values(pendingFieldUpdates),
     [pendingFieldUpdates],
@@ -1697,19 +2317,44 @@ export function FigmaQuestionnaireScreen({
     () => applyQuestionnaireUpdates(submission, pendingUpdates),
     [pendingUpdates, submission],
   );
+  const isEditable = canAgentEditSubmissionContent(draftSubmission);
   const applicants = useMemo(() => applicantTabs(draftSubmission), [draftSubmission]);
   const initialApplicantId = initialFocus?.applicantId ?? applicants[0]?.id ?? "app-1";
   const [activeApplicant, setActiveApplicant] = useState(initialApplicantId);
   const [activeSection, setActiveSection] = useState<SectionId>(
     sectionForFocus(initialFocus, initialFieldTarget),
   );
-  const [acknowledgedReviewFields, setAcknowledgedReviewFields] = useState<Set<string>>(
-    () => new Set(),
-  );
   const [euRelativeApplicantIds, setEuRelativeApplicantIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [showPreviousSurnameForMale, setShowPreviousSurnameForMale] = useState(false);
+  const [fieldSearchQuery, setFieldSearchQuery] = useState("");
+  const [familyCopyMessage, setFamilyCopyMessage] = useState<string>();
+  const [familyCopyPreview, setFamilyCopyPreview] =
+    useState<FamilyCopyPreview>();
+  const [lastFamilyCopyTarget, setLastFamilyCopyTarget] =
+    useState<FamilyCopyPreview["firstTarget"]>();
+  const [issueResolutionError, setIssueResolutionError] = useState("");
+  const [pendingIssueResolutionId, setPendingIssueResolutionId] = useState<
+    string | null
+  >(null);
+  const [saveMessage, setSaveMessage] = useState("Изменений нет");
+  const [saveStatus, setSaveStatus] = useState<
+    "dirty" | "error" | "idle" | "saved" | "saving"
+  >("idle");
+  const familyCopyStatusId = useId();
+  const prefersReducedMotion = useReducedMotion();
+  const autosaveRevisionRef = useRef(0);
+  const autosaveTimerRef = useRef<number | undefined>(undefined);
+  const completionInFlightRef = useRef(false);
+  const issueResolutionPendingRef = useRef(false);
+  const inFlightSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
+  const queuedSaveRef = useRef<QuestionnaireSaveRequest | undefined>(undefined);
+  const onSaveDraftRef = useRef(onSaveDraft);
+  const initialFocusAppliedRef = useRef(false);
+  const saveRequestRunnerRef = useRef<(request: QuestionnaireSaveRequest) => void>(
+    () => undefined,
+  );
   const baseFormData = useMemo(
     () => questionnaireFormDataFromSubmission(submission, activeApplicant),
     [activeApplicant, submission],
@@ -1719,10 +2364,24 @@ export function FigmaQuestionnaireScreen({
     [activeApplicant, draftSubmission],
   );
   const [formData, setFormData] = useState<QuestionnaireFormData>(() => sourceFormData);
+  const screenRef = useRef<HTMLDivElement>(null);
+  const activeApplicantTabRef = useRef<HTMLButtonElement>(null);
+  const activePinnedSectionTabRef = useRef<HTMLButtonElement>(null);
+  const activeSidebarSectionTabRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    pendingFieldUpdatesRef.current = {};
     setPendingFieldUpdates({});
+    setFamilyCopyMessage(undefined);
+    setFamilyCopyPreview(undefined);
+    setLastFamilyCopyTarget(undefined);
+    setSaveStatus("idle");
+    setSaveMessage("Изменений нет");
   }, [submission.id]);
+
+  useEffect(() => {
+    onSaveDraftRef.current = onSaveDraft;
+  }, [onSaveDraft]);
 
   useEffect(() => {
     if (applicants.some((applicant) => applicant.id === activeApplicant)) return;
@@ -1737,12 +2396,71 @@ export function FigmaQuestionnaireScreen({
     setFormData(sourceFormData);
   }, [sourceFormData]);
 
+  useEffect(() => {
+    activeApplicantTabRef.current?.scrollIntoView?.({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activeApplicant]);
+
+  useEffect(() => {
+    for (const element of [
+      activePinnedSectionTabRef.current,
+      activeSidebarSectionTabRef.current,
+    ]) {
+      element?.scrollIntoView?.({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    }
+  }, [activeSection]);
+
   const activeApplicantModel = useMemo(
     () =>
-      draftSubmission.applicants.find((applicant) => applicant.id === activeApplicant) ??
-      draftSubmission.applicants[0],
+      draftSubmission.applicants.find(
+        (applicant) => applicant.id === activeApplicant,
+      ) ?? draftSubmission.applicants[0],
     [activeApplicant, draftSubmission.applicants],
   );
+
+  useEffect(() => {
+    if (initialFocusAppliedRef.current) return;
+    initialFocusAppliedRef.current = true;
+    const timer = window.setTimeout(() => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        activeElement !== document.body &&
+        screenRef.current?.contains(activeElement)
+      ) {
+        return;
+      }
+      const fieldLabel = initialFieldTarget
+        ? (questionnaireField(activeApplicantModel, initialFieldTarget.fieldId)?.label ??
+          initialFieldTarget.labels[0])
+        : undefined;
+      if (fieldLabel) {
+        const element = screenRef.current?.querySelector<HTMLElement>(
+          `[data-field-label="${CSS.escape(fieldLabel)}"]`,
+        );
+        const target = element?.querySelector<HTMLElement>(
+          "input, textarea, button, [tabindex]",
+        );
+        if (target) {
+          target.focus({ preventScroll: true });
+          element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+          return;
+        }
+      }
+      screenRef.current
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Назад"]')
+        ?.focus({ preventScroll: true });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeApplicantModel, activeSection, initialFieldTarget]);
 
   const selectOptions = useMemo(
     () => ({
@@ -1757,7 +2475,10 @@ export function FigmaQuestionnaireScreen({
         BLS_COUNTRY_OPTIONS,
       ),
       birthCitizenship: BLS_COUNTRY_OPTIONS,
-      category: submissionFieldOptions(activeApplicantModel, "category", ["Premium", "Normal"]),
+      category: submissionFieldOptions(activeApplicantModel, "category", [
+        "Premium",
+        "Normal",
+      ]),
       citizenship: submissionFieldOptions(
         activeApplicantModel,
         "nationality",
@@ -1821,7 +2542,11 @@ export function FigmaQuestionnaireScreen({
         "Транспорт предоплачен",
         "Иное",
       ]),
-      occupation: submissionFieldOptions(activeApplicantModel, "occupation", BLS_OCCUPATION_OPTIONS),
+      occupation: submissionFieldOptions(
+        activeApplicantModel,
+        "occupation",
+        BLS_OCCUPATION_OPTIONS,
+      ),
       otherCitizenship: BLS_COUNTRY_OPTIONS,
       passportIssueCountry: submissionFieldOptions(
         activeApplicantModel,
@@ -1866,29 +2591,66 @@ export function FigmaQuestionnaireScreen({
     [activeApplicantModel],
   );
 
-  const openFieldIssues = useMemo(
+  const activeBlockingFieldIssues = useMemo(
     () =>
       draftSubmission.issues.filter(
         (issue) =>
-          issue.status === "open" &&
+          (issue.status === "open" || issue.status === "fixed_by_agent") &&
           issue.target.applicantId === activeApplicant &&
           issue.target.field,
       ),
     [activeApplicant, draftSubmission.issues],
   );
+  const openFieldIssues = useMemo(
+    () => activeBlockingFieldIssues.filter((issue) => issue.status === "open"),
+    [activeBlockingFieldIssues],
+  );
 
   const readinessStats = useMemo(() => {
-    const fields = draftSubmission.applicants.flatMap((applicant) =>
-      applicant.sections.flatMap((section) => section.fields),
+    const fieldSlots = draftSubmission.applicants.flatMap((applicant) => {
+      const applicantFormData = questionnaireFormDataFromSubmission(
+        draftSubmission,
+        applicant.id,
+      ) as unknown as BlsFormData;
+      return applicant.sections.flatMap((section) =>
+        section.fields.map((field) => ({
+          applicant,
+          field,
+          formData: applicantFormData,
+        })),
+      );
+    });
+    const requiredFields = fieldSlots.filter((slot) =>
+      isBlsQuestionnaireFieldRequired({
+        applicantRole: slot.applicant.role,
+        field: slot.field,
+        formData: slot.formData,
+      }),
     );
-    const requiredFields = fields.filter((field) => field.required);
-    const completedFields = requiredFields.filter(fieldIsReady);
-    const validationRisks = fields.filter(hasActionableFieldProblem).length;
-    const openIssueRisks = draftSubmission.issues.filter(
-      (issue) => issue.status === "open" || issue.status === "fixed_by_agent",
+    const completedFields = requiredFields.filter((slot) =>
+      isBlsQuestionnaireFieldReady({
+        applicantRole: slot.applicant.role,
+        field: slot.field,
+        formData: slot.formData,
+      }),
+    );
+    const validationRisks = fieldSlots.filter((slot) =>
+      isBlsQuestionnaireFieldBlockingIssue({
+        applicantRole: slot.applicant.role,
+        field: slot.field,
+        formData: slot.formData,
+      }),
     ).length;
+    const openIssueRisks = draftSubmission.issues.filter(
+      (issue) => issue.status === "open",
+    ).length;
+    const passportRisks = passportGateIssues(draftSubmission);
+    const completionDecision = agentQuestionnaireCompletionDecision(draftSubmission);
     const requiredFileSlots = draftSubmission.applicants.flatMap((applicant) =>
-      requiredQuestionnaireFileTypes.map((type) => ({ applicantId: applicant.id, type })),
+      requiredQuestionnaireFileTypes.map((type) => ({
+        applicantId: applicant.id,
+        type,
+      })),
     );
     const readyFiles = requiredFileSlots.filter((slot) =>
       fileIsReadyForQuestionnaire(
@@ -1900,10 +2662,11 @@ export function FigmaQuestionnaireScreen({
     const total = requiredFields.length + requiredFileSlots.length;
     const completed = completedFields.length + readyFiles.length;
     const percent = total ? Math.round((completed / total) * 100) : 0;
-    const risks = validationRisks + openIssueRisks;
+    const risks = validationRisks + openIssueRisks + passportRisks.length;
 
     return {
-      canSubmit: total > 0 && completed === total && risks === 0,
+      canSubmit: completionDecision.ok,
+      completionReason: completionDecision.reason,
       completed,
       completedFields: completedFields.length,
       completedFiles: readyFiles.length,
@@ -1926,46 +2689,77 @@ export function FigmaQuestionnaireScreen({
   const sections = useMemo(
     () =>
       sectionDefinitions
-      .filter((definition) => definition.id !== "euRelative" || showEuRelativeSection)
-      .map(({ canonicalId, ...definition }) => {
-        if (definition.id === "files") {
-          const applicantFiles = activeApplicantModel
-            ? requiredQuestionnaireFileTypes.map((type) =>
-                draftSubmission.files.find(
-                  (file) => file.applicantId === activeApplicantModel.id && file.type === type,
-                ),
-              )
-            : [];
-          const completed = applicantFiles.filter(fileIsReadyForQuestionnaire).length;
-          const total = requiredQuestionnaireFileTypes.length;
+        .filter((definition) => definition.id !== "euRelative" || showEuRelativeSection)
+        .map(({ canonicalId, ...definition }) => {
+          if (definition.id === "files") {
+            const applicantFiles = activeApplicantModel
+              ? requiredQuestionnaireFileTypes.map((type) =>
+                  draftSubmission.files.find(
+                    (file) =>
+                      file.applicantId === activeApplicantModel.id &&
+                      file.type === type,
+                  ),
+                )
+              : [];
+            const completed = applicantFiles.filter(fileIsReadyForQuestionnaire).length;
+            const total = requiredQuestionnaireFileTypes.length;
+
+            return {
+              ...definition,
+              meta: `${completed} из ${total}`,
+              status: completed === total ? "complete" : "pending",
+            } satisfies SectionTab & { id: SectionId };
+          }
+
+          const sourceSection = activeApplicantModel?.sections.find((section) =>
+            sectionIdMatches(section.id, canonicalId),
+          );
+
+          if (!sourceSection) return definition;
+
+          const activeFormData = questionnaireFormDataFromSubmission(
+            draftSubmission,
+            activeApplicantModel.id,
+          ) as unknown as BlsFormData;
+          const requiredFields = sourceSection.fields.filter((field) =>
+            isBlsQuestionnaireFieldRequired({
+              applicantRole: activeApplicantModel.role,
+              field,
+              formData: activeFormData,
+            }),
+          );
+          const total = requiredFields.length;
+          const completed = requiredFields.filter((field) =>
+            isBlsQuestionnaireFieldReady({
+              applicantRole: activeApplicantModel.role,
+              field,
+              formData: activeFormData,
+            }),
+          ).length;
+          const hasRisk = sourceSection.fields.some((field) =>
+            isBlsQuestionnaireFieldBlockingIssue({
+              applicantRole: activeApplicantModel.role,
+              field,
+              formData: activeFormData,
+            }),
+          );
 
           return {
             ...definition,
             meta: `${completed} из ${total}`,
-            status: completed === total ? "complete" : "pending",
+            status: hasRisk
+              ? "issue"
+              : total > 0 && completed === total
+                ? "complete"
+                : "pending",
           } satisfies SectionTab & { id: SectionId };
-        }
-
-        const sourceSection = activeApplicantModel?.sections.find((section) =>
-          sectionIdMatches(section.id, canonicalId),
-        );
-
-        if (!sourceSection) return definition;
-
-        const requiredFields = sourceSection.fields.filter((field) => field.required);
-        const total = requiredFields.length;
-        const completed = requiredFields.filter(fieldIsReady).length;
-        const hasRisk = sourceSection.fields.some(hasActionableFieldProblem);
-
-        return {
-          ...definition,
-          meta: `${completed} из ${total}`,
-          status:
-            hasRisk ? "issue" : total > 0 && completed === total ? "complete" : "pending",
-        } satisfies SectionTab & { id: SectionId };
-      }),
-    [activeApplicantModel, draftSubmission.files, showEuRelativeSection],
+        }),
+    [activeApplicantModel, draftSubmission, showEuRelativeSection],
   );
+  const activeApplicantContext = applicants.find(
+    (applicant) => applicant.id === activeApplicant,
+  );
+  const activeSectionContext = sections.find((section) => section.id === activeSection);
   const isCompleteButtonDisabled = !readinessStats.canSubmit;
   const showResidencePermitFields = formData.livesOutsideCitizenship === "Да";
   const showPurposeDetails = formData.stayPurpose === "OTHER";
@@ -1976,31 +2770,35 @@ export function FigmaQuestionnaireScreen({
     showPreviousSurnameForMale;
   const showSponsorFields = formData.paymentSponsor === "Спонсор";
   const showGuardianInfo =
-    isQuestionnaireMinor(formData.dob) || Boolean(formData.guardianInfo.trim());
+    isBlsQuestionnaireMinorApplicant(
+      activeApplicantModel?.role,
+      formData as unknown as BlsFormData,
+    ) || Boolean(formData.guardianInfo.trim());
   const showCompanyInviteFields =
-    formData.invitingPartyType === "Приглашающая компания/организация" ||
+    isBlsQuestionnaireInvitingCompanySelected(formData) ||
     Boolean(
       formData.companyOrgDetails.trim() ||
-        formData.companyContactPerson.trim() ||
-        formData.companyPhone.trim(),
+      formData.companyContactPerson.trim() ||
+      formData.companyPhone.trim(),
     );
   const primaryApplicant = draftSubmission.applicants[0];
-  const sharedFieldIds = familySharedFieldIds[activeSection] ?? [];
-  const canCopyFamilySection =
+  const canCopyFamilyWide =
     draftSubmission.type === "family" &&
     Boolean(primaryApplicant) &&
-    primaryApplicant?.id !== activeApplicant &&
-    sharedFieldIds.length > 0;
+    draftSubmission.applicants.length > 1;
 
   const currentSectionIssue = useMemo(() => {
     const currentSection = sections.find((section) => section.id === activeSection);
     if (!currentSection) return undefined;
+    const currentCanonicalSection = sectionDefinitions.find(
+      (definition) => definition.id === activeSection,
+    )?.canonicalId;
 
-    return openFieldIssues.find((issue) => {
+    return activeBlockingFieldIssues.find((issue) => {
       if (issue.target.section === currentSection.title) return true;
 
       return questionnaireFieldBindings
-        .filter((binding) => binding.sectionId === activeSection)
+        .filter((binding) => binding.sectionId === currentCanonicalSection)
         .some((binding) => {
           const field = questionnaireField(activeApplicantModel, binding.fieldId);
           return issueFieldMatches(
@@ -2010,12 +2808,47 @@ export function FigmaQuestionnaireScreen({
           );
         });
     });
-  }, [activeApplicantModel, activeSection, openFieldIssues, sections]);
+  }, [activeApplicantModel, activeBlockingFieldIssues, activeSection, sections]);
+
+  const clearAutosaveTimer = useCallback(() => {
+    if (autosaveTimerRef.current === undefined) return;
+    window.clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = undefined;
+  }, []);
+
+  const replacePendingFieldUpdates = useCallback(
+    (next: Record<string, QuestionnaireFieldUpdate>) => {
+      pendingFieldUpdatesRef.current = next;
+      setPendingFieldUpdates(next);
+    },
+    [],
+  );
+
+  function updateDirtyState(next: Record<string, QuestionnaireFieldUpdate>) {
+    autosaveRevisionRef.current += 1;
+    if (Object.keys(next).length > 0) {
+      setSaveStatus("dirty");
+      setSaveMessage("Есть несохранённые изменения");
+      return;
+    }
+
+    clearAutosaveTimer();
+    setSaveStatus("idle");
+    setSaveMessage("Изменений нет");
+  }
 
   function updateField(key: keyof QuestionnaireFormData, value: string) {
-    const dependentKeys = dependentFieldKeysFor(key, value);
+    if (!isEditable || completionInFlightRef.current) return;
+    const dependentKeys = dependentFieldKeysFor(
+      key,
+      value,
+      activeApplicantModel?.role,
+      formData,
+    );
     const buildUpdate = (fieldKey: keyof QuestionnaireFormData, fieldValue: string) => {
-      const binding = questionnaireFieldBindings.find((item) => item.formKey === fieldKey);
+      const binding = questionnaireFieldBindings.find(
+        (item) => item.formKey === fieldKey,
+      );
       if (!binding) return undefined;
 
       const modelField = questionnaireField(activeApplicantModel, binding.fieldId);
@@ -2027,6 +2860,12 @@ export function FigmaQuestionnaireScreen({
             ? validationMessageForQuestionnaireField(modelField, fieldValue)
             : undefined,
           fieldId: binding.fieldId,
+          reviewOriginSource:
+            modelField?.reviewOriginSource ?? modelField?.reviewSource,
+          reviewSource:
+            modelField?.reviewState === "needs_review" ? "manual" : undefined,
+          reviewState:
+            modelField?.reviewState === "needs_review" ? "confirmed" : undefined,
           sectionId: binding.sectionId,
           value: fieldValue,
         } satisfies QuestionnaireFieldUpdate,
@@ -2044,18 +2883,25 @@ export function FigmaQuestionnaireScreen({
       return next;
     });
 
-    setPendingFieldUpdates((current) => {
-      const next = { ...current };
+    if (updates.length) {
+      const next = { ...pendingFieldUpdatesRef.current };
       for (const { binding, update } of updates) {
         const updateKey = questionnaireUpdateKey(update);
-        if (update.value === baseFormData[binding.formKey]) {
+        const baseApplicant = submission.applicants.find(
+          (applicant) => applicant.id === update.applicantId,
+        );
+        const confirmsPendingReview =
+          update.reviewState === "confirmed" &&
+          questionnaireField(baseApplicant, update.fieldId)?.reviewState === "needs_review";
+        if (update.value === baseFormData[binding.formKey] && !confirmsPendingReview) {
           delete next[updateKey];
         } else {
           next[updateKey] = update;
         }
       }
-      return next;
-    });
+      replacePendingFieldUpdates(next);
+      updateDirtyState(next);
+    }
 
     for (const { binding, update } of updates) {
       if (update.value !== baseFormData[binding.formKey]) onFieldChange?.(update);
@@ -2088,34 +2934,116 @@ export function FigmaQuestionnaireScreen({
     if (normalized !== formData[key]) updateField(key, normalized);
   }
 
-  function copyFamilySectionFromPrimaryApplicant() {
-    if (!primaryApplicant || !canCopyFamilySection) return;
+  function copySharedDataToFamily() {
+    if (
+      !isEditable ||
+      completionInFlightRef.current ||
+      !primaryApplicant ||
+      !canCopyFamilyWide
+    ) {
+      return;
+    }
 
-    const updates = sharedFieldIds.flatMap((fieldId) => {
-      const sourceField = questionnaireField(primaryApplicant, fieldId);
-      const targetField = questionnaireField(activeApplicantModel, fieldId);
-      const binding = questionnaireFieldBindings.find((item) => item.fieldId === fieldId);
-      if (!sourceField?.value.trim() || !targetField || !binding) return [];
+    const allowlistedFields = (
+      Object.keys(familySharedFieldIds) as SectionId[]
+    ).flatMap((sectionId) => {
+      const canonicalSectionId = sectionDefinitions.find(
+        (definition) => definition.id === sectionId,
+      )?.canonicalId;
+      if (!canonicalSectionId) return [];
 
-      return [{
-        applicantId: activeApplicant,
-        error: validationMessageForQuestionnaireField(targetField, sourceField.value),
+      return (familySharedFieldIds[sectionId] ?? []).map((fieldId) => ({
+        canonicalSectionId,
         fieldId,
-        reviewOriginSource: "family_shared" as const,
-        reviewSource: "family_shared" as const,
-        reviewState: "needs_review" as const,
-        sectionId: binding.sectionId,
-        value: sourceField.value,
-      } satisfies QuestionnaireFieldUpdate];
+      }));
     });
-    if (!updates.length) return;
+    const updates = draftSubmission.applicants.slice(1).flatMap((applicant) =>
+      allowlistedFields.flatMap(({ canonicalSectionId, fieldId }) => {
+        const sourceField = questionnaireField(primaryApplicant, fieldId);
+        const targetField = questionnaireField(applicant, fieldId);
+        const binding = questionnaireFieldBindings.find(
+          (item) => item.fieldId === fieldId,
+        );
+        if (
+          !sourceField?.value.trim() ||
+          !targetField ||
+          targetField.value.trim() ||
+          !binding ||
+          binding.sectionId !== canonicalSectionId
+        ) {
+          return [];
+        }
 
-    setPendingFieldUpdates((current) => {
-      const next = { ...current };
-      for (const update of updates) next[questionnaireUpdateKey(update)] = update;
-      return next;
-    });
-    for (const update of updates) onFieldChange?.(update);
+        return [
+          {
+            applicantId: applicant.id,
+            error: validationMessageForQuestionnaireField(
+              targetField,
+              sourceField.value,
+            ),
+            fieldId,
+            reviewOriginSource: "family_shared" as const,
+            reviewSource: "family_shared" as const,
+            reviewState: "confirmed" as const,
+            sectionId: binding.sectionId,
+            value: sourceField.value,
+          } satisfies QuestionnaireFieldUpdate,
+        ];
+      }),
+    );
+    if (!updates.length) {
+      setFamilyCopyMessage(
+        "Общие поля уже заполнены или у первого заявителя нет данных для копирования.",
+      );
+      return;
+    }
+
+    const affectedApplicants = new Set(updates.map((update) => update.applicantId)).size;
+    const firstUpdate = updates[0];
+    const firstTarget = firstUpdate
+      ? {
+          applicantId: firstUpdate.applicantId,
+          label: questionnaireField(
+            draftSubmission.applicants.find(
+              (applicant) => applicant.id === firstUpdate.applicantId,
+            ),
+            firstUpdate.fieldId,
+          )?.label,
+          sectionId: sectionIdForQuestionnaireField(
+            firstUpdate.sectionId,
+            firstUpdate.fieldId,
+          ),
+        }
+      : undefined;
+    setFamilyCopyPreview({ affectedApplicants, firstTarget, updates });
+    setFamilyCopyMessage(
+      `Предпросмотр: ${updates.length} пустых полей у ${affectedApplicants} заявителей. Заполненные значения и личные/паспортные данные не изменятся.`,
+    );
+  }
+
+  function confirmFamilyCopy() {
+    if (!familyCopyPreview || !isEditable) return;
+    const next = { ...pendingFieldUpdatesRef.current };
+    for (const update of familyCopyPreview.updates) {
+      next[questionnaireUpdateKey(update)] = update;
+      onFieldChange?.(update);
+    }
+    replacePendingFieldUpdates(next);
+    updateDirtyState(next);
+    setLastFamilyCopyTarget(familyCopyPreview.firstTarget);
+    setFamilyCopyMessage(
+      `Скопировано и подтверждено после предпросмотра: ${familyCopyPreview.updates.length} полей · заявителей: ${familyCopyPreview.affectedApplicants}.`,
+    );
+    setFamilyCopyPreview(undefined);
+  }
+
+  function cancelFamilyCopy() {
+    setFamilyCopyPreview(undefined);
+    setFamilyCopyMessage("Копирование отменено; данные не изменены.");
+  }
+
+  function reviewLastFamilyCopy() {
+    if (lastFamilyCopyTarget) focusQuestionnaireTarget(lastFamilyCopyTarget);
   }
 
   function fieldIssue(fieldId: string, label: string) {
@@ -2127,29 +3055,68 @@ export function FigmaQuestionnaireScreen({
   function fieldReviewState(fieldId: string, label: string): FieldState {
     if (fieldIssue(fieldId, label)) return "invalid";
 
-    if (acknowledgedReviewFields.has(`${activeApplicant}:${fieldId}`)) return "normal";
-
     const field = questionnaireField(activeApplicantModel, fieldId);
+    const validationMessage = field
+      ? validateBlsQuestionnaireField({
+          applicantRole: activeApplicantModel?.role,
+          field,
+          formData: formData as unknown as BlsFormData,
+        })
+      : undefined;
+    if (
+      validationMessage &&
+      (field?.value.trim() || validationMessage !== "Обязательное поле")
+    ) {
+      return "invalid";
+    }
     if (field && hasActionableFieldProblem(field)) return "invalid";
     if (field?.reviewState === "needs_review") return "needs_review";
 
-    return initialFieldTarget?.fieldId === fieldId ||
-      initialFieldTarget?.labels.some((candidate) => sameFieldLabel(candidate, label))
-      ? "needs_review"
-      : "normal";
+    return "normal";
   }
 
-  function acknowledgeFieldReview(fieldId: string) {
-    setAcknowledgedReviewFields((current) => {
-      const key = `${activeApplicant}:${fieldId}`;
-      if (current.has(key)) return current;
-      const next = new Set(current);
-      next.add(key);
-      return next;
+  function fieldIsRequired(fieldId: string) {
+    const field = questionnaireField(activeApplicantModel, fieldId);
+    if (!field) return false;
+
+    return isBlsQuestionnaireFieldRequired({
+      applicantRole: activeApplicantModel?.role,
+      field,
+      formData: formData as unknown as BlsFormData,
     });
   }
 
+  function confirmFieldReview(fieldId: string) {
+    if (!isEditable || completionInFlightRef.current) return;
+    const field = questionnaireField(activeApplicantModel, fieldId);
+    const binding = questionnaireFieldBindings.find((item) => item.fieldId === fieldId);
+    if (!field || !binding || field.reviewState !== "needs_review") return;
+
+    const update = {
+      applicantId: activeApplicant,
+      error: validateBlsQuestionnaireField({
+        applicantRole: activeApplicantModel?.role,
+        field,
+        formData: formData as unknown as BlsFormData,
+      }),
+      fieldId,
+      reviewOriginSource: field.reviewOriginSource ?? field.reviewSource,
+      reviewSource: "manual" as const,
+      reviewState: "confirmed" as const,
+      sectionId: binding.sectionId,
+      value: field.value,
+    } satisfies QuestionnaireFieldUpdate;
+    const next = {
+      ...pendingFieldUpdatesRef.current,
+      [questionnaireUpdateKey(update)]: update,
+    };
+    replacePendingFieldUpdates(next);
+    updateDirtyState(next);
+    onFieldChange?.(update);
+  }
+
   function openEuRelativeSection() {
+    if (!isEditable) return;
     setEuRelativeApplicantIds((current) => {
       if (current.has(activeApplicant)) return current;
       const next = new Set(current);
@@ -2163,14 +3130,28 @@ export function FigmaQuestionnaireScreen({
     const issue = fieldIssue(fieldId, label);
     if (issue) return issue.comment ?? issue.reason;
     const field = questionnaireField(activeApplicantModel, fieldId);
-    return field?.error ?? (field ? validationMessageForQuestionnaireField(field, field.value) : undefined);
+    return (
+      field?.error ??
+      (field
+        ? (validateBlsQuestionnaireField({
+            applicantRole: activeApplicantModel?.role,
+            field,
+            formData: formData as unknown as BlsFormData,
+          }) ?? validationMessageForQuestionnaireField(field, field.value))
+        : undefined)
+    );
   }
 
   function fieldReviewSource(fieldId: string, label: string) {
     if (fieldReviewState(fieldId, label) !== "needs_review") return undefined;
-    return questionnaireField(activeApplicantModel, fieldId)?.reviewSource
-      ? "требует сверки OCR"
-      : undefined;
+    const field = questionnaireField(activeApplicantModel, fieldId);
+    const source = field?.reviewOriginSource ?? field?.reviewSource;
+    if (source === "family_shared") {
+      return "скопировано из анкеты основного заявителя — проверьте";
+    }
+    if (source === "passport_ocr") return "требует сверки OCR";
+    if (source === "pdf_reconciliation") return "требует сверки с PDF";
+    return source ? "требует ручной проверки" : undefined;
   }
 
   function requiredFileForActiveApplicant(
@@ -2184,9 +3165,18 @@ export function FigmaQuestionnaireScreen({
 
   const focusedApplicantId = initialFocus?.applicantId ?? activeApplicant;
   const focusedUpdatePayload = useMemo(() => {
-    if (!initialFieldTarget || focusedApplicantId === undefined) return undefined;
+    if (
+      !initialFieldTarget ||
+      focusedApplicantId === undefined ||
+      focusedApplicantId !== activeApplicant
+    ) {
+      return undefined;
+    }
 
-    const focusedField = questionnaireField(activeApplicantModel, initialFieldTarget.fieldId);
+    const focusedField = questionnaireField(
+      activeApplicantModel,
+      initialFieldTarget.fieldId,
+    );
     const value = formData[initialFieldTarget.formKey];
 
     return {
@@ -2198,31 +3188,496 @@ export function FigmaQuestionnaireScreen({
       sectionId: initialFieldTarget.sectionId,
       value,
     } satisfies QuestionnaireFieldUpdate;
-  }, [activeApplicantModel, focusedApplicantId, formData, initialFieldTarget]);
+  }, [
+    activeApplicant,
+    activeApplicantModel,
+    focusedApplicantId,
+    formData,
+    initialFieldTarget,
+  ]);
 
-  function completionPayload(): QuestionnaireCommitPayload {
+  const completionPayload = useCallback(
+    (saveIntent: QuestionnaireSaveIntent): QuestionnaireCommitPayload => {
     const conditionalClears = conditionalFieldClearsFor(
       activeApplicantModel,
       activeApplicant,
       formData,
     );
     const updates = new Map<string, QuestionnaireFieldUpdate>();
-    for (const update of [...Object.values(pendingFieldUpdates), ...conditionalClears]) {
+    for (const update of [
+      ...Object.values(pendingFieldUpdates),
+      ...conditionalClears,
+    ]) {
       updates.set(questionnaireUpdateKey(update), update);
     }
 
+    const fieldUpdates = [...updates.values()];
     return {
-      fieldUpdates: [...updates.values()],
+      fieldUpdates,
       focusedUpdate: focusedUpdatePayload,
+      reviewConfirmations: fieldUpdates
+        .filter((update) => update.reviewState === "confirmed")
+        .map((update) => ({
+          applicantId: update.applicantId,
+          fieldId: update.fieldId,
+          sectionId: update.sectionId,
+        })),
+      saveIntent,
       travelEnd: formData.travelEnd,
       travelStart: formData.travelStart,
     };
+    },
+    [
+      activeApplicant,
+      activeApplicantModel,
+      focusedUpdatePayload,
+      formData,
+      pendingFieldUpdates,
+    ],
+  );
+
+  const searchMatches = useMemo(() => {
+    const query = fieldSearchQuery.trim().toLocaleLowerCase("ru-RU");
+    if (!query) return [];
+
+    return draftSubmission.applicants.flatMap((applicant) =>
+      applicant.sections.flatMap((section) =>
+        section.fields
+          .filter((field) =>
+            [field.id, field.label, field.value].some((value) =>
+              value.toLocaleLowerCase("ru-RU").includes(query),
+            ),
+          )
+          .map((field) => ({
+            applicantId: applicant.id,
+            label: field.label,
+            sectionId: sectionIdForQuestionnaireField(section.id, field.id),
+          })),
+      ),
+    );
+  }, [draftSubmission.applicants, fieldSearchQuery]);
+
+  const runSaveRequest = useCallback(
+    async (request: QuestionnaireSaveRequest) => {
+      inFlightSaveRef.current = request;
+      if (autosaveRevisionRef.current === request.revision) {
+        setSaveStatus("saving");
+        setSaveMessage("Сохраняем...");
+      }
+
+      try {
+        await onSaveDraftRef.current?.(request.payload);
+        if (autosaveRevisionRef.current === request.revision) {
+          clearAutosaveTimer();
+          replacePendingFieldUpdates({});
+          setSaveStatus("saved");
+          setSaveMessage("Сохранено");
+        }
+        for (const waiter of request.waiters) waiter.resolve();
+      } catch (error) {
+        if (autosaveRevisionRef.current === request.revision) {
+          setSaveStatus("error");
+          setSaveMessage(
+            error instanceof Error ? error.message : "Не удалось сохранить анкету",
+          );
+        }
+        for (const waiter of request.waiters) waiter.reject(error);
+      } finally {
+        inFlightSaveRef.current = undefined;
+        const nextRequest = queuedSaveRef.current;
+        queuedSaveRef.current = undefined;
+        if (nextRequest) saveRequestRunnerRef.current(nextRequest);
+      }
+    },
+    [clearAutosaveTimer, replacePendingFieldUpdates],
+  );
+  saveRequestRunnerRef.current = (request) => {
+    void runSaveRequest(request);
+  };
+
+  const enqueueDraftSave = useCallback(
+    (payload: QuestionnaireCommitPayload, revision: number) =>
+      new Promise<void>((resolve, reject) => {
+        const waiter = { reject, resolve } satisfies QuestionnaireSaveWaiter;
+        const inFlight = inFlightSaveRef.current;
+        if (inFlight?.revision === revision) {
+          inFlight.waiters.push(waiter);
+          return;
+        }
+
+        const queued = queuedSaveRef.current;
+        if (queued) {
+          queuedSaveRef.current = {
+            payload,
+            revision,
+            waiters: [...queued.waiters, waiter],
+          };
+          return;
+        }
+
+        const request = { payload, revision, waiters: [waiter] };
+        if (inFlight) {
+          queuedSaveRef.current = request;
+          return;
+        }
+
+        saveRequestRunnerRef.current(request);
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    clearAutosaveTimer();
+    if (!pendingUpdates.length || !onSaveDraft) return;
+    const revision = autosaveRevisionRef.current;
+    const payload = completionPayload("autosave");
+    const timer = window.setTimeout(() => {
+      if (autosaveTimerRef.current === timer) autosaveTimerRef.current = undefined;
+      void enqueueDraftSave(payload, revision).catch(() => undefined);
+    }, 900);
+    autosaveTimerRef.current = timer;
+
+    return () => {
+      if (autosaveTimerRef.current !== timer) return;
+      window.clearTimeout(timer);
+      autosaveTimerRef.current = undefined;
+    };
+  }, [
+    clearAutosaveTimer,
+    completionPayload,
+    enqueueDraftSave,
+    onSaveDraft,
+    pendingUpdates.length,
+  ]);
+
+  useEffect(() => {
+    if (!pendingUpdates.length) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [pendingUpdates.length]);
+
+  useEffect(() => {
+    if (!pendingUpdates.length || !onSaveDraft) return;
+
+    const flushPendingWork = () => {
+      clearAutosaveTimer();
+      const revision = autosaveRevisionRef.current;
+      void enqueueDraftSave(completionPayload("autosave"), revision).catch(
+        () => undefined,
+      );
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushPendingWork();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", flushPendingWork);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushPendingWork);
+    };
+  }, [
+    clearAutosaveTimer,
+    completionPayload,
+    enqueueDraftSave,
+    onSaveDraft,
+    pendingUpdates.length,
+  ]);
+
+  function sectionIdForQuestionnaireField(
+    sectionId: string,
+    fieldId: string,
+  ): SectionId {
+    const binding = questionnaireFieldBindings.find((item) => item.fieldId === fieldId);
+    const bindingSection = binding
+      ? sectionDefinitions.find(
+          (definition) => definition.canonicalId === binding.sectionId,
+        )
+      : undefined;
+    if (bindingSection) return bindingSection.id;
+
+    const section = sectionDefinitions.find((definition) =>
+      sectionIdMatches(sectionId, definition.canonicalId),
+    );
+    return section?.id ?? "personal";
   }
 
-  function goToNextSection() {
-    const currentIndex = sections.findIndex((section) => section.id === activeSection);
-    const nextSection = sections[(currentIndex + 1) % sections.length];
-    setActiveSection(nextSection.id);
+  function focusFieldLabel(label: string | undefined) {
+    if (!label) return;
+    window.setTimeout(() => {
+      const element = screenRef.current?.querySelector<HTMLElement>(
+        `[data-field-label="${CSS.escape(label)}"]`,
+      );
+      const target = element?.querySelector<HTMLElement>(
+        "input, textarea, button, [tabindex]",
+      );
+      target?.focus({ preventScroll: true });
+      element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    }, 0);
+  }
+
+  function focusQuestionnaireTarget(target: {
+    applicantId: string;
+    label?: string;
+    sectionId: SectionId;
+  }) {
+    setActiveApplicant(target.applicantId);
+    setActiveSection(target.sectionId);
+    focusFieldLabel(target.label);
+  }
+
+  function focusFirstSearchMatch() {
+    const target = searchMatches[0];
+    if (!target) return;
+    focusQuestionnaireTarget(target);
+  }
+
+  function firstQuestionnaireBlockerTarget(applicantId?: string) {
+    const scopedApplicants = applicantId
+      ? draftSubmission.applicants.filter((applicant) => applicant.id === applicantId)
+      : draftSubmission.applicants;
+    const fieldSlots = scopedApplicants.flatMap((applicant) => {
+      const applicantFormData = questionnaireFormDataFromSubmission(
+        draftSubmission,
+        applicant.id,
+      ) as unknown as BlsFormData;
+
+      return applicant.sections.flatMap((section) =>
+        section.fields.map((field) => ({
+          applicant,
+          field,
+          formData: applicantFormData,
+          section,
+        })),
+      );
+    });
+    const validationRisk = fieldSlots.find((slot) =>
+      isBlsQuestionnaireFieldBlockingIssue({
+        applicantRole: slot.applicant.role,
+        field: slot.field,
+        formData: slot.formData,
+      }),
+    );
+    if (validationRisk) {
+      return {
+        applicantId: validationRisk.applicant.id,
+        label: validationRisk.field.label,
+        sectionId: sectionIdForQuestionnaireField(
+          validationRisk.section.id,
+          validationRisk.field.id,
+        ),
+      };
+    }
+
+    const requiredEmpty = fieldSlots.find(
+      (slot) =>
+        !slot.field.value.trim() &&
+        isBlsQuestionnaireFieldRequired({
+          applicantRole: slot.applicant.role,
+          field: slot.field,
+          formData: slot.formData,
+        }),
+    );
+    if (requiredEmpty) {
+      return {
+        applicantId: requiredEmpty.applicant.id,
+        label: requiredEmpty.field.label,
+        sectionId: sectionIdForQuestionnaireField(
+          requiredEmpty.section.id,
+          requiredEmpty.field.id,
+        ),
+      };
+    }
+
+    for (const applicant of scopedApplicants) {
+      const hasMissingFile = requiredQuestionnaireFileTypes.some(
+        (type) =>
+          !fileIsReadyForQuestionnaire(
+            draftSubmission.files.find(
+              (file) => file.applicantId === applicant.id && file.type === type,
+            ),
+          ),
+      );
+      if (hasMissingFile) {
+        return {
+          applicantId: applicant.id,
+          sectionId: "files" as const,
+        };
+      }
+    }
+
+    const passportIssue = passportGateIssues(draftSubmission).find(
+      (candidate) => !applicantId || candidate.applicantId === applicantId,
+    );
+    if (passportIssue) return questionnaireTargetForPassportIssue(passportIssue);
+
+    const issue = draftSubmission.issues.find(
+      (candidate) =>
+        candidate.status === "open" &&
+        candidate.target.applicantId &&
+        (!applicantId || candidate.target.applicantId === applicantId),
+    );
+    if (!issue?.target.applicantId) return undefined;
+
+    const issueApplicant = draftSubmission.applicants.find(
+      (applicant) => applicant.id === issue.target.applicantId,
+    );
+    const hasIssueSection = Boolean(issue.target.section?.trim());
+    const issueSectionId = sectionForFocus(
+      { section: issue.target.section },
+      undefined,
+    );
+    const issueCanonicalSection = sectionDefinitions.find(
+      (definition) => definition.id === issueSectionId,
+    )?.canonicalId;
+    const matchingBindings = questionnaireFieldBindings.filter((binding) => {
+      const field = questionnaireField(issueApplicant, binding.fieldId);
+      return issueFieldMatches(binding.fieldId, field?.label ?? "", issue.target.field);
+    });
+    const normalizedIssueField = normalizeFocusLabel(issue.target.field).replace(
+      /ё/g,
+      "е",
+    );
+    const exactIdBinding = matchingBindings.find(
+      (binding) =>
+        normalizeFocusLabel(binding.fieldId).replace(/ё/g, "е") ===
+        normalizedIssueField,
+    );
+    const sectionBinding =
+      hasIssueSection && issueCanonicalSection
+        ? matchingBindings.find(
+            (binding) => binding.sectionId === issueCanonicalSection,
+          )
+        : undefined;
+    const issueBinding = exactIdBinding ?? sectionBinding ?? matchingBindings[0];
+    const issueField = issueBinding
+      ? questionnaireField(issueApplicant, issueBinding.fieldId)
+      : undefined;
+
+    return {
+      applicantId: issue.target.applicantId,
+      label: issueField?.label ?? issue.target.field,
+      sectionId: issueBinding
+        ? sectionIdForQuestionnaireField(issueBinding.sectionId, issueBinding.fieldId)
+        : issueSectionId,
+    };
+  }
+
+  function focusNextIncomplete() {
+    const target = firstQuestionnaireBlockerTarget();
+    if (target) focusQuestionnaireTarget(target);
+  }
+
+  function focusApplicantNextIncomplete(applicantId: string) {
+    const target = firstQuestionnaireBlockerTarget(applicantId);
+    if (target) {
+      focusQuestionnaireTarget(target);
+      return;
+    }
+
+    setActiveApplicant(applicantId);
+  }
+
+  function focusFirstBlocker() {
+    const target = firstQuestionnaireBlockerTarget();
+    if (target) focusQuestionnaireTarget(target);
+  }
+
+  async function saveDraftFromButton() {
+    if (!isEditable || completionInFlightRef.current) return;
+    clearAutosaveTimer();
+    const revision = autosaveRevisionRef.current;
+    await enqueueDraftSave(completionPayload("manual"), revision);
+  }
+
+  async function resolveCurrentIssue() {
+    if (
+      !currentSectionIssue ||
+      currentSectionIssue.status !== "open" ||
+      !onMarkIssueFixed ||
+      issueResolutionPendingRef.current
+    ) {
+      return;
+    }
+
+    issueResolutionPendingRef.current = true;
+    setPendingIssueResolutionId(currentSectionIssue.id);
+    setIssueResolutionError("");
+    try {
+      await saveDraftFromButton();
+      await onMarkIssueFixed(currentSectionIssue.id);
+      setSaveStatus("saved");
+      setSaveMessage("Исправление отмечено и готово к отправке");
+    } catch (error) {
+      setIssueResolutionError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось отметить замечание исправленным.",
+      );
+    } finally {
+      issueResolutionPendingRef.current = false;
+      setPendingIssueResolutionId(null);
+    }
+  }
+
+  async function completeFromButton() {
+    if (!isEditable || completionInFlightRef.current) return;
+    completionInFlightRef.current = true;
+    clearAutosaveTimer();
+    const revision = autosaveRevisionRef.current;
+    const payload = completionPayload("completion");
+    setSaveStatus("saving");
+    setSaveMessage("Сохраняем перед отправкой...");
+    try {
+      const hasDraftWork =
+        Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
+        Boolean(inFlightSaveRef.current) ||
+        Boolean(queuedSaveRef.current);
+      if (hasDraftWork && onSaveDraftRef.current) {
+        await enqueueDraftSave(payload, revision);
+      }
+      setSaveStatus("saving");
+      setSaveMessage("Отправляем на проверку...");
+      await onComplete(payload);
+      if (autosaveRevisionRef.current === revision) {
+        replacePendingFieldUpdates({});
+        setSaveStatus("saved");
+        setSaveMessage("Отправлено на проверку");
+      }
+    } catch (error) {
+      setSaveStatus("error");
+      setSaveMessage(
+        error instanceof Error ? error.message : "Не удалось отправить анкету",
+      );
+      throw error;
+    } finally {
+      completionInFlightRef.current = false;
+    }
+  }
+
+  async function requestBack() {
+    if (completionInFlightRef.current) return;
+    clearAutosaveTimer();
+    const hasDraftWork =
+      Object.keys(pendingFieldUpdatesRef.current).length > 0 ||
+      Boolean(inFlightSaveRef.current) ||
+      Boolean(queuedSaveRef.current);
+    if (hasDraftWork && onSaveDraftRef.current) {
+      const revision = autosaveRevisionRef.current;
+      try {
+        await enqueueDraftSave(completionPayload("navigation"), revision);
+      } catch {
+        return;
+      }
+    }
+
+    onBack();
   }
 
   function renderSectionFields() {
@@ -2268,45 +3723,47 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: appointment-city"
             label="Город подачи"
+            modelFieldId="appointment-city"
             number="A1"
             options={selectOptions.appointmentCity}
-            required
             value={formData.appointmentCity}
             onChange={(value) => updateField("appointmentCity", value)}
           />
           <FormField
             excelMap="Анкета: visa-type"
             label="Тип визы"
+            modelFieldId="visa-type"
             number="A2"
             options={selectOptions.visaType}
-            required
             value={formData.visaType}
             onChange={(value) => updateField("visaType", value)}
           />
           <FormField
             excelMap="Анкета: category"
             label="Категория обслуживания"
+            modelFieldId="category"
             number="A3"
             options={selectOptions.category}
-            required
             value={formData.category}
             onChange={(value) => updateField("category", value)}
           />
           <FormField
             label="Желаемая дата 1"
+            modelFieldId="desired-date-1"
             number="A4"
-            required
             value={formData.desiredDate1}
             onChange={(value) => updateField("desiredDate1", value)}
           />
           <FormField
             label="Желаемая дата 2"
+            modelFieldId="desired-date-2"
             number="A5"
             value={formData.desiredDate2}
             onChange={(value) => updateField("desiredDate2", value)}
           />
           <FormField
             label="Желаемая дата 3"
+            modelFieldId="desired-date-3"
             number="A6"
             value={formData.desiredDate3}
             onChange={(value) => updateField("desiredDate3", value)}
@@ -2314,6 +3771,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             fullWidth
             label="Примечание"
+            modelFieldId="appointment-note"
             number="A7"
             type="textarea"
             value={formData.appointmentNote}
@@ -2329,11 +3787,13 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: C2"
             errorMessage={fieldErrorMessage("passport-type", "Тип документа")}
-            focused={fieldReviewState("passport-type", "Тип документа") === "needs_review"}
+            focused={
+              fieldReviewState("passport-type", "Тип документа") === "needs_review"
+            }
             label="Тип документа"
+            modelFieldId="passport-type"
             number="1"
             options={selectOptions.passportType}
-            required
             reviewSource={fieldReviewSource("passport-type", "Тип документа")}
             state={fieldReviewState("passport-type", "Тип документа")}
             value={formData.passportType}
@@ -2342,10 +3802,12 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: C3"
             errorMessage={fieldErrorMessage("passport-no", "Номер паспорта")}
-            focused={fieldReviewState("passport-no", "Номер паспорта") === "needs_review"}
+            focused={
+              fieldReviewState("passport-no", "Номер паспорта") === "needs_review"
+            }
             label="Номер паспорта"
+            modelFieldId="passport-no"
             number="2"
-            required
             reviewSource={fieldReviewSource("passport-no", "Номер паспорта")}
             state={fieldReviewState("passport-no", "Номер паспорта")}
             value={formData.passportNumber}
@@ -2354,10 +3816,12 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: C4"
             errorMessage={fieldErrorMessage("passport-issue-date", "Дата выдачи")}
-            focused={fieldReviewState("passport-issue-date", "Дата выдачи") === "needs_review"}
+            focused={
+              fieldReviewState("passport-issue-date", "Дата выдачи") === "needs_review"
+            }
             label="Дата выдачи"
+            modelFieldId="passport-issue-date"
             number="3"
-            required
             reviewSource={fieldReviewSource("passport-issue-date", "Дата выдачи")}
             state={fieldReviewState("passport-issue-date", "Дата выдачи")}
             value={formData.passportIssued}
@@ -2366,10 +3830,13 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: C5"
             errorMessage={fieldErrorMessage("passport-expiry-date", "Действителен до")}
-            focused={fieldReviewState("passport-expiry-date", "Действителен до") === "needs_review"}
+            focused={
+              fieldReviewState("passport-expiry-date", "Действителен до") ===
+              "needs_review"
+            }
             label="Действителен до"
+            modelFieldId="passport-expiry-date"
             number="4"
-            required
             reviewSource={fieldReviewSource("passport-expiry-date", "Действителен до")}
             state={fieldReviewState("passport-expiry-date", "Действителен до")}
             value={formData.passportExpiry}
@@ -2378,6 +3845,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: passport-issue-country"
             label="Страна выдачи"
+            modelFieldId="passport-issue-country"
             number="5"
             options={selectOptions.passportIssueCountry}
             value={formData.passportIssueCountry}
@@ -2386,6 +3854,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: C6"
             label="Место выдачи"
+            modelFieldId="passport-issue-place"
             number="6"
             value={formData.passportIssuePlace}
             onChange={(value) => updateField("passportIssuePlace", value)}
@@ -2401,6 +3870,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: eu-relative-details"
             fullWidth
             label="Данные родственника-гражданина ЕС / ЕЭЗ / Швейцарии"
+            modelFieldId="eu-relative-details"
             number="1"
             type="textarea"
             value={formData.euRelativeDetails}
@@ -2409,6 +3879,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: eu-relationship"
             label="Родственная связь"
+            modelFieldId="eu-relationship"
             number="2"
             options={selectOptions.euRelationship}
             value={formData.euRelationship}
@@ -2426,9 +3897,9 @@ export function FigmaQuestionnaireScreen({
             fullWidth
             hint="Можно без заглавных и знаков: ул ленина д 5 кв 12 — расшифруем после ввода."
             label="Домашний адрес"
+            modelFieldId="home-address"
             number="1"
             placeholder="ул ленина д 5 кв 12"
-            required
             compact
             value={formData.contactAddress}
             onBlur={() => normalizeAddressField("contactAddress")}
@@ -2437,8 +3908,8 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: D4"
             label="Email"
+            modelFieldId="email"
             number="2"
-            required
             type="email"
             value={formData.contactEmail}
             onChange={(value) => updateField("contactEmail", value)}
@@ -2446,14 +3917,15 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: D3"
             label="Телефон"
+            modelFieldId="contact-number"
             number="3"
             phonePrefix="+7"
-            required
             value={formData.contactPhone}
             onChange={(value) => updateField("contactPhone", value)}
           />
           <FormField
             label="Страна проживания"
+            modelFieldId="home-country"
             number="4"
             options={selectOptions.homeCountry}
             value={formData.homeCountry}
@@ -2462,6 +3934,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: residence-city"
             label="Город проживания"
+            modelFieldId="home-city"
             number="5"
             placeholder="Начните: с"
             suggestions={POPULAR_RUSSIAN_CITY_OPTIONS}
@@ -2471,6 +3944,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: residence-postal-code"
             label="Почтовый индекс"
+            modelFieldId="postal-code"
             number="6"
             value={formData.residencePostalCode}
             onChange={(value) => updateField("residencePostalCode", value)}
@@ -2478,6 +3952,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: lives-outside-citizenship"
             label="Проживание не в стране гражданства"
+            modelFieldId="lives-outside-citizenship"
             number="7"
             options={selectOptions.yesNo}
             value={formData.livesOutsideCitizenship}
@@ -2488,6 +3963,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: residence-permit-type"
                 label="Вид на жительство / документ"
+                modelFieldId="residence-permit-type"
                 number="8"
                 value={formData.residencePermitType}
                 onChange={(value) => updateField("residencePermitType", value)}
@@ -2495,6 +3971,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: residence-permit-number"
                 label="Номер документа"
+                modelFieldId="residence-permit-number"
                 number="9"
                 value={formData.residencePermitNumber}
                 onChange={(value) => updateField("residencePermitNumber", value)}
@@ -2502,6 +3979,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: residence-permit-valid-until"
                 label="Действителен до"
+                modelFieldId="residence-permit-valid-until"
                 number="10"
                 value={formData.residencePermitValidUntil}
                 onChange={(value) => updateField("residencePermitValidUntil", value)}
@@ -2519,9 +3997,9 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: E2"
             errorMessage={fieldErrorMessage("occupation", "Профессия")}
             label="Профессия"
+            modelFieldId="occupation"
             number="1"
             options={selectOptions.occupation}
-            required
             reviewSource={fieldReviewSource("occupation", "Профессия")}
             state={fieldReviewState("occupation", "Профессия")}
             value={formData.occupation}
@@ -2530,6 +4008,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: occupation-specify"
             label="Уточнение профессии"
+            modelFieldId="occupation-specify"
             number="2"
             value={formData.currentJob}
             onChange={(value) => updateField("currentJob", value)}
@@ -2538,8 +4017,8 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: E3"
             fullWidth
             label="Работодатель / учебное заведение"
+            modelFieldId="employer-name"
             number="3"
-            required
             type="textarea"
             value={formData.employerName}
             onChange={(value) => updateField("employerName", value)}
@@ -2547,6 +4026,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: employer-contact"
             label="Телефон работодателя / учебного заведения"
+            modelFieldId="employer-contact"
             number="4"
             phonePrefix="+7"
             value={formData.employerContact}
@@ -2557,6 +4037,7 @@ export function FigmaQuestionnaireScreen({
             fullWidth
             hint="Можно без заглавных и знаков: пр мира д 10 оф 4 — расшифруем после ввода."
             label="Адрес работодателя / учебного заведения"
+            modelFieldId="employer-address"
             number="5"
             placeholder="пр мира д 10 оф 4"
             compact
@@ -2574,9 +4055,9 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: F2"
             label="Цель поездки"
+            modelFieldId="purpose"
             number="1"
             options={selectOptions.purpose}
-            required
             value={formData.stayPurpose}
             onChange={(value) => updateField("stayPurpose", value)}
           />
@@ -2585,6 +4066,7 @@ export function FigmaQuestionnaireScreen({
               excelMap="Анкета: stay-purpose-details"
               fullWidth
               label="Дополнительные сведения о цели"
+              modelFieldId="stay-purpose-details"
               number="2"
               type="textarea"
               value={formData.stayPurposeDetails}
@@ -2594,6 +4076,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: main-destination"
             label="Основная страна назначения"
+            modelFieldId="main-destination"
             number="3"
             options={selectOptions.country}
             value={formData.mainDestination}
@@ -2602,6 +4085,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: F5"
             label="Страна первого въезда"
+            modelFieldId="first-entry-country"
             number="4"
             options={selectOptions.country}
             value={formData.firstEntryCountry}
@@ -2610,6 +4094,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: entry-count"
             label="Количество въездов"
+            modelFieldId="entry-count"
             number="5"
             options={selectOptions.entryCount}
             value={formData.entryCount}
@@ -2620,8 +4105,8 @@ export function FigmaQuestionnaireScreen({
             errorMessage={fieldErrorMessage("arrival-date", "Дата въезда")}
             focused={fieldReviewState("arrival-date", "Дата въезда") === "needs_review"}
             label="Дата въезда"
+            modelFieldId="arrival-date"
             number="6"
-            required
             reviewSource={fieldReviewSource("arrival-date", "Дата въезда")}
             state={fieldReviewState("arrival-date", "Дата въезда")}
             value={formData.travelStart}
@@ -2630,10 +4115,12 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: F4"
             errorMessage={fieldErrorMessage("departure-date", "Дата выезда")}
-            focused={fieldReviewState("departure-date", "Дата выезда") === "needs_review"}
+            focused={
+              fieldReviewState("departure-date", "Дата выезда") === "needs_review"
+            }
             label="Дата выезда"
+            modelFieldId="departure-date"
             number="7"
-            required
             reviewSource={fieldReviewSource("departure-date", "Дата выезда")}
             state={fieldReviewState("departure-date", "Дата выезда")}
             value={formData.travelEnd}
@@ -2642,6 +4129,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: stay-duration"
             label="Длительность пребывания"
+            modelFieldId="stay-duration"
             number="8"
             type="number"
             value={formData.stayDuration}
@@ -2650,6 +4138,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: previous-biometrics"
             label="Отпечатки ранее сдавались"
+            modelFieldId="previous-biometrics"
             number="9"
             options={selectOptions.yesNo}
             value={formData.previousBiometrics}
@@ -2660,6 +4149,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: previous-biometrics-date"
                 label="Дата сдачи отпечатков"
+                modelFieldId="previous-biometrics-date"
                 number="10"
                 value={formData.previousBiometricsDate}
                 onChange={(value) => updateField("previousBiometricsDate", value)}
@@ -2667,6 +4157,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: previous-visa-number"
                 label="Номер визы"
+                modelFieldId="previous-visa-number"
                 number="11"
                 value={formData.previousVisaNumber}
                 onChange={(value) => updateField("previousVisaNumber", value)}
@@ -2676,6 +4167,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: final-entry-permit"
             label="Разрешение на въезд в конечную страну"
+            modelFieldId="final-entry-permit"
             number="12"
             value={formData.finalEntryPermit}
             onChange={(value) => updateField("finalEntryPermit", value)}
@@ -2683,6 +4175,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: final-entry-permit-issued-by"
             label="Кем выдано"
+            modelFieldId="final-entry-permit-issued-by"
             number="13"
             value={formData.finalEntryPermitIssuedBy}
             onChange={(value) => updateField("finalEntryPermitIssuedBy", value)}
@@ -2690,6 +4183,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: final-entry-permit-valid-from"
             label="Действительно с"
+            modelFieldId="final-entry-permit-valid-from"
             number="14"
             value={formData.finalEntryPermitValidFrom}
             onChange={(value) => updateField("finalEntryPermitValidFrom", value)}
@@ -2697,6 +4191,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: final-entry-permit-valid-to"
             label="Действительно до"
+            modelFieldId="final-entry-permit-valid-to"
             number="15"
             value={formData.finalEntryPermitValidTo}
             onChange={(value) => updateField("finalEntryPermitValidTo", value)}
@@ -2712,6 +4207,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: inviting-party-type"
             fullWidth
             label="Тип принимающей стороны"
+            modelFieldId="inviting-party-type"
             number="1"
             options={selectOptions.invitingPartyType}
             value={formData.invitingPartyType}
@@ -2720,8 +4216,8 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: G2"
             label="ФИО приглашающего лица или название отеля"
+            modelFieldId="hotel-name"
             number="2"
-            required
             value={formData.hotelName}
             onChange={(value) => updateField("hotelName", value)}
           />
@@ -2729,36 +4225,37 @@ export function FigmaQuestionnaireScreen({
             excelMap="Cell: G3"
             fullWidth
             label="Адрес"
+            modelFieldId="hotel-address"
             number="3"
-            required
             type="textarea"
             value={formData.hotelAddress}
             onChange={(value) => updateField("hotelAddress", value)}
           />
           <FormField
             label="Страна"
+            modelFieldId="hotel-country"
             number="4"
             options={selectOptions.hotelCountry}
-            required
             value={formData.hotelCountry}
             onChange={(value) => updateField("hotelCountry", value)}
           />
           <FormField
             label="Город"
+            modelFieldId="hotel-city"
             number="5"
-            required
             value={formData.hotelCity}
             onChange={(value) => updateField("hotelCity", value)}
           />
           <FormField
             label="Почтовый индекс"
+            modelFieldId="hotel-postal-code"
             number="6"
-            required
             value={formData.hotelPostalCode}
             onChange={(value) => updateField("hotelPostalCode", value)}
           />
           <FormField
             label="Email"
+            modelFieldId="hotel-email"
             number="7"
             type="email"
             value={formData.hotelEmail}
@@ -2766,6 +4263,7 @@ export function FigmaQuestionnaireScreen({
           />
           <FormField
             label="Телефон"
+            modelFieldId="hotel-contact"
             number="8"
             phonePrefix="+34"
             value={formData.hotelContact}
@@ -2777,6 +4275,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: company-org-details"
                 fullWidth
                 label="Название и адрес компании/организации"
+                modelFieldId="company-org-details"
                 number="9"
                 type="textarea"
                 value={formData.companyOrgDetails}
@@ -2786,6 +4285,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: company-contact-person"
                 fullWidth
                 label="Контактное лицо компании"
+                modelFieldId="company-contact-person"
                 number="10"
                 type="textarea"
                 value={formData.companyContactPerson}
@@ -2794,6 +4294,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: company-phone"
                 label="Телефон компании"
+                modelFieldId="company-phone"
                 number="11"
                 phonePrefix="+34"
                 value={formData.companyPhone}
@@ -2811,18 +4312,18 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Cell: H2"
             label="Кто оплачивает поездку"
+            modelFieldId="cost-covered-by"
             number="1"
             options={selectOptions.costCoveredBy}
-            required
             value={formData.paymentSponsor}
             onChange={(value) => updateField("paymentSponsor", value)}
           />
           <FormField
             excelMap="Cell: H3"
             label="Средства заявителя"
+            modelFieldId="means-of-support"
             number="2"
             options={selectOptions.meansOfSupport}
-            required
             value={formData.paymentType}
             onChange={(value) => updateField("paymentType", value)}
           />
@@ -2831,6 +4332,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: sponsor-in-host-fields"
                 label="Спонсор указан в полях 30/31"
+                modelFieldId="sponsor-in-host-fields"
                 number="3"
                 options={selectOptions.sponsorInHostFields}
                 value={formData.sponsorInHostFields}
@@ -2839,6 +4341,7 @@ export function FigmaQuestionnaireScreen({
               <FormField
                 excelMap="Анкета: other-sponsor"
                 label="Другой спонсор"
+                modelFieldId="other-sponsor"
                 number="4"
                 value={formData.otherSponsor}
                 onChange={(value) => updateField("otherSponsor", value)}
@@ -2847,6 +4350,7 @@ export function FigmaQuestionnaireScreen({
                 excelMap="Анкета: sponsor-means"
                 fullWidth
                 label="Средства спонсора"
+                modelFieldId="sponsor-means"
                 number="5"
                 options={selectOptions.sponsorMeans}
                 value={formData.sponsorMeans}
@@ -2864,6 +4368,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: form-filler-name"
             label="ФИО заполнившего, если не заявитель"
+            modelFieldId="form-filler-name"
             number="1"
             value={formData.formFillerName}
             onChange={(value) => updateField("formFillerName", value)}
@@ -2872,6 +4377,7 @@ export function FigmaQuestionnaireScreen({
             excelMap="Анкета: form-filler-contact"
             fullWidth
             label="Адрес/email заполнившего"
+            modelFieldId="form-filler-contact"
             number="2"
             type="textarea"
             value={formData.formFillerContact}
@@ -2880,6 +4386,7 @@ export function FigmaQuestionnaireScreen({
           <FormField
             excelMap="Анкета: form-filler-phone"
             label="Телефон заполнившего"
+            modelFieldId="form-filler-phone"
             number="3"
             phonePrefix="+7"
             value={formData.formFillerPhone}
@@ -2891,139 +4398,162 @@ export function FigmaQuestionnaireScreen({
 
     if (activeSection === "personal") {
       return (
-      <>
-        <FormField
-          excelMap="Cell: B2"
-          label="Фамилия"
-          number="1"
-          required
-          value={formData.surname}
-          onChange={(value) => updateField("surname", value)}
-        />
-        {showPreviousSurname ? (
+        <>
           <FormField
-            excelMap="Анкета: previous-surname"
-            label="Фамилия при рождении / предыдущая"
-            number="2"
-            value={formData.previousSurname}
-            onChange={(value) => updateField("previousSurname", value)}
+            excelMap="Cell: B2"
+            label="Фамилия"
+            modelFieldId="surname"
+            number="1"
+            value={formData.surname}
+            onChange={(value) => updateField("surname", value)}
           />
-        ) : (
-          <button
-            className="v19-questionnaire-optional-reveal"
-            type="button"
-            onClick={() => setShowPreviousSurnameForMale(true)}
-          >
-            Указать предыдущую фамилию
-          </button>
-        )}
-        <FormField
-          excelMap="Cell: B3"
-          label="Имя"
-          number="3"
-          required
-          value={formData.firstName}
-          onChange={(value) => updateField("firstName", value)}
-        />
+          {showPreviousSurname ? (
+            <FormField
+              excelMap="Анкета: previous-surname"
+              label="Фамилия при рождении / предыдущая"
+              modelFieldId="previous-surname"
+              number="2"
+              value={formData.previousSurname}
+              onChange={(value) => updateField("previousSurname", value)}
+            />
+          ) : (
+            <button
+              className="v19-questionnaire-optional-reveal"
+              type="button"
+              onClick={() => setShowPreviousSurnameForMale(true)}
+            >
+              Указать предыдущую фамилию
+            </button>
+          )}
+          <FormField
+            excelMap="Cell: B3"
+            label="Имя"
+            modelFieldId="first-name"
+            number="3"
+            value={formData.firstName}
+            onChange={(value) => updateField("firstName", value)}
+          />
           <FormField
             excelMap="Cell: B4"
             errorMessage={fieldErrorMessage("birth-date", "Дата рождения")}
             label="Дата рождения"
+            modelFieldId="birth-date"
             number="4"
-            onAcknowledgeReview={() => acknowledgeFieldReview("birth-date")}
-            required
-          state={fieldReviewState("birth-date", "Дата рождения")}
-          value={formData.dob}
-          onChange={updateBirthDate}
-        />
-        <FormField
-          excelMap="Cell: B5"
-          errorMessage={fieldErrorMessage("birth-place", "Место рождения")}
-          label="Место рождения"
-          number="5"
-          required
-          reviewSource={fieldReviewSource("birth-place", "Место рождения")}
-          state={fieldReviewState("birth-place", "Место рождения")}
-          value={formData.birthPlace}
-          onChange={(value) => updateField("birthPlace", value)}
-        />
-        <FormField
-          excelMap="Cell: B6"
-          label="Страна рождения"
-          number="6"
-          options={selectOptions.birthCountry}
-          required
-          value={formData.birthCountry}
-          onChange={(value) => updateField("birthCountry", value)}
-        />
-        <FormField
-          excelMap="Cell: B7"
-          label="Текущее гражданство"
-          number="7"
-          options={selectOptions.citizenship}
-          required
-          value={formData.citizenship}
-          onChange={(value) => updateField("citizenship", value)}
-        />
-        <FormField
-          excelMap="Анкета: birth-citizenship"
-          label="Гражданство при рождении, если отличается"
-          number="8"
-          options={selectOptions.birthCitizenship}
-          value={formData.birthCitizenship}
-          onChange={(value) => updateField("birthCitizenship", value)}
-        />
-        <FormField
-          excelMap="Анкета: other-citizenship"
-          label="Иное гражданство"
-          number="9"
-          options={selectOptions.otherCitizenship}
-          value={formData.otherCitizenship}
-          onChange={(value) => updateField("otherCitizenship", value)}
-        />
-        <FormField
-          excelMap="Cell: B8"
-          label="Пол"
-          number="10"
-          options={selectOptions.gender}
-          required
-          value={formData.sex}
-          onChange={(value) => updateField("sex", value)}
-        />
-        <FormField
-          excelMap="Cell: B9"
-          fullWidth
-          label="Семейное положение"
-          number="11"
-          options={selectOptions.maritalStatus}
-          required
-          value={formData.maritalStatus}
-          onChange={(value) => updateField("maritalStatus", value)}
-        />
-        {showGuardianInfo ? (
-          <FormField
-            excelMap="Анкета: guardian-info"
-            fullWidth
-            label="Родитель/опекун несовершеннолетнего"
-            number="12"
-            type="textarea"
-            value={formData.guardianInfo}
-            onChange={(value) => updateField("guardianInfo", value)}
+            state={fieldReviewState("birth-date", "Дата рождения")}
+            value={formData.dob}
+            onChange={updateBirthDate}
           />
-        ) : null}
-        <FormField
-          excelMap="Анкета: national-id"
-          label="Национальный ID"
-          number="13"
-          value={formData.nationalId}
-          onChange={(value) => updateField("nationalId", value)}
-        />
-      </>
+          <FormField
+            excelMap="Cell: B5"
+            errorMessage={fieldErrorMessage("birth-place", "Место рождения")}
+            label="Место рождения"
+            modelFieldId="birth-place"
+            number="5"
+            reviewSource={fieldReviewSource("birth-place", "Место рождения")}
+            state={fieldReviewState("birth-place", "Место рождения")}
+            value={formData.birthPlace}
+            onChange={(value) => updateField("birthPlace", value)}
+          />
+          <FormField
+            excelMap="Cell: B6"
+            label="Страна рождения"
+            modelFieldId="birth-country"
+            number="6"
+            options={selectOptions.birthCountry}
+            value={formData.birthCountry}
+            onChange={(value) => updateField("birthCountry", value)}
+          />
+          <FormField
+            excelMap="Cell: B7"
+            label="Текущее гражданство"
+            modelFieldId="nationality"
+            number="7"
+            options={selectOptions.citizenship}
+            value={formData.citizenship}
+            onChange={(value) => updateField("citizenship", value)}
+          />
+          <FormField
+            excelMap="Анкета: birth-citizenship"
+            label="Гражданство при рождении, если отличается"
+            modelFieldId="birth-citizenship"
+            number="8"
+            options={selectOptions.birthCitizenship}
+            value={formData.birthCitizenship}
+            onChange={(value) => updateField("birthCitizenship", value)}
+          />
+          <FormField
+            excelMap="Анкета: other-citizenship"
+            label="Иное гражданство"
+            modelFieldId="other-citizenship"
+            number="9"
+            options={selectOptions.otherCitizenship}
+            value={formData.otherCitizenship}
+            onChange={(value) => updateField("otherCitizenship", value)}
+          />
+          <FormField
+            excelMap="Cell: B8"
+            label="Пол"
+            modelFieldId="gender"
+            number="10"
+            options={selectOptions.gender}
+            value={formData.sex}
+            onChange={(value) => updateField("sex", value)}
+          />
+          <FormField
+            excelMap="Cell: B9"
+            fullWidth
+            label="Семейное положение"
+            modelFieldId="marital-status"
+            number="11"
+            options={selectOptions.maritalStatus}
+            value={formData.maritalStatus}
+            onChange={(value) => updateField("maritalStatus", value)}
+          />
+          {showGuardianInfo ? (
+            <FormField
+              excelMap="Анкета: guardian-info"
+              fullWidth
+              label="Родитель/опекун несовершеннолетнего"
+              modelFieldId="guardian-info"
+              number="12"
+              type="textarea"
+              value={formData.guardianInfo}
+              onChange={(value) => updateField("guardianInfo", value)}
+            />
+          ) : null}
+          <FormField
+            excelMap="Анкета: national-id"
+            label="Национальный ID"
+            modelFieldId="national-id"
+            number="13"
+            value={formData.nationalId}
+            onChange={(value) => updateField("nationalId", value)}
+          />
+        </>
       );
     }
 
     return null;
   }
+
+  const questionnaireFieldUiContract: QuestionnaireFieldUiContract = {
+    confirmReview: confirmFieldReview,
+    errorMessage: fieldErrorMessage,
+    focused: (fieldId) =>
+      initialFieldTarget?.fieldId === fieldId &&
+      (initialFocus?.applicantId ?? activeApplicant) === activeApplicant,
+    required: fieldIsRequired,
+    reviewSource: fieldReviewSource,
+    state: fieldReviewState,
+  };
+  const mobileBlockerTarget = readinessStats.canSubmit
+    ? undefined
+    : firstQuestionnaireBlockerTarget();
+  const mobileBlockerLabel =
+    mobileBlockerTarget?.label ??
+    readinessStats.completionReason ??
+    sections.find((section) => section.id === mobileBlockerTarget?.sectionId)?.title ??
+    "Следующее обязательное поле";
 
   return (
     <motion.div
@@ -3031,15 +4561,16 @@ export function FigmaQuestionnaireScreen({
       className="vf-figma-surface vf-figma-questionnaire-screen v19-questionnaire-screen-shell"
       data-submission-id={draftSubmission.id}
       exit={{ opacity: 0 }}
-      initial={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      initial={prefersReducedMotion ? false : { opacity: 0 }}
+      ref={screenRef}
+      transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
     >
       <header className="v19-questionnaire-screen-header">
         <button
           aria-label="Назад"
           className="v19-questionnaire-back-button"
           type="button"
-          onClick={onBack}
+          onClick={() => void requestBack()}
         >
           <ArrowLeft className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
         </button>
@@ -3059,20 +4590,27 @@ export function FigmaQuestionnaireScreen({
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-[var(--v19b-size-11)] text-white/40 hidden md:inline-flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
-            {readinessStats.percent}% · {readinessStats.completed}/{readinessStats.total}
+            {readinessStats.percent}% · {readinessStats.completed}/
+            {readinessStats.total}
+            <span aria-live="polite" role="status">
+              · {saveMessage}
+            </span>
           </span>
           <button
             className="v19-questionnaire-draft-button"
+            disabled={!isEditable || saveStatus === "saving"}
             type="button"
-            onClick={() => onSaveDraft?.(completionPayload())}
+            onClick={() => void saveDraftFromButton().catch(() => undefined)}
           >
-            Черновик
+            {saveStatus === "saving" ? "Сохраняем" : "Черновик"}
           </button>
           <button
             className={`v19-questionnaire-complete-button ${readinessStats.canSubmit ? "is-ready" : "is-blocked"}`}
-            disabled={isCompleteButtonDisabled}
+            disabled={
+              !isEditable || isCompleteButtonDisabled || saveStatus === "saving"
+            }
             type="button"
-            onClick={() => onComplete(completionPayload())}
+            onClick={() => void completeFromButton().catch(() => undefined)}
           >
             <span className="hidden sm:inline">Готово к проверке</span>
             <span className="sm:hidden">Готово</span>
@@ -3084,40 +4622,112 @@ export function FigmaQuestionnaireScreen({
         <motion.div
           animate={{ width: `${readinessStats.percent}%` }}
           className="v19-questionnaire-progress-fill"
-          initial={{ width: 0 }}
-          transition={{ delay: 0.1, duration: 1.2, ease: "easeOut" }}
+          initial={prefersReducedMotion ? false : { width: 0 }}
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : { delay: 0.1, duration: 1.2, ease: "easeOut" }
+          }
         >
-          <motion.div
-            animate={{ x: ["-100%", "200%"] }}
-            className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-            transition={{ duration: 2.5, ease: "linear", repeat: Infinity }}
-          />
+          {!prefersReducedMotion ? (
+            <motion.div
+              animate={{ x: ["-100%", "200%"] }}
+              className="v19-questionnaire-progress-shimmer absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              transition={{ duration: 2.5, ease: "linear", repeat: Infinity }}
+            />
+          ) : null}
         </motion.div>
       </div>
+
+      <div className="v19-questionnaire-mobile-status">
+        <span className="v19-questionnaire-mobile-progress">
+          {readinessStats.percent}% · {readinessStats.completed}/{readinessStats.total}
+        </span>
+        <span aria-live="polite" className="v19-questionnaire-mobile-save" role="status">
+          {saveMessage}
+        </span>
+        {!readinessStats.canSubmit ? (
+          <button
+            aria-label={`Перейти к блокеру: ${mobileBlockerLabel}`}
+            type="button"
+            onClick={focusFirstBlocker}
+          >
+            {mobileBlockerLabel}
+          </button>
+        ) : null}
+      </div>
+
+      <p aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+        Контекст анкеты: заявитель {activeApplicantContext?.name ?? "не выбран"}; раздел{" "}
+        {activeSectionContext?.title ?? "не выбран"}.
+      </p>
 
       <div className="v19-questionnaire-scroll">
         <div className="v19-questionnaire-scroll-frame max-w-[var(--v19b-size-1240)] mx-auto flex flex-col h-full min-h-0 gap-3 lg:gap-4 pb-[env(safe-area-inset-bottom)]">
           <div className="v19-questionnaire-applicant-bar">
-            <div className="flex overflow-x-auto scrollbar-hide gap-1.5 lg:gap-2 flex-1 w-full snap-x pb-1 md:pb-0">
-              {applicants.map((applicant) => (
-                <button
-                  aria-selected={activeApplicant === applicant.id}
-                  className={`v19-questionnaire-applicant-tab ${
-                    activeApplicant === applicant.id ? "is-active" : ""
-                  }`}
-                  key={applicant.id}
-                  type="button"
-                  onClick={() => setActiveApplicant(applicant.id)}
-                >
-                  <span className="v19-questionnaire-applicant-index">
-                    {applicant.index}
-                  </span>
-                  {applicant.name}
-                  {applicant.hasIssue ? (
-                    <span className="v19-questionnaire-applicant-issue" />
-                  ) : null}
-                </button>
-              ))}
+            <div
+              aria-label="Заявители"
+              className="flex overflow-x-auto scrollbar-hide gap-1.5 lg:gap-2 flex-1 w-full snap-x pb-1 md:pb-0"
+              role="group"
+            >
+              {applicants.map((applicant) => {
+                const statusLabel =
+                  applicant.status === "complete"
+                    ? "готов"
+                    : applicant.status === "issue"
+                      ? "есть блокер"
+                      : "не завершён";
+
+                return (
+                  <div
+                    className="flex shrink-0 items-stretch gap-1 snap-start"
+                    key={applicant.id}
+                  >
+                    <button
+                      aria-label={`${applicant.name}: ${applicant.completed} из ${applicant.total}, ${statusLabel}`}
+                      aria-pressed={activeApplicant === applicant.id}
+                      className={`v19-questionnaire-applicant-tab ${
+                        activeApplicant === applicant.id ? "is-active" : ""
+                      }`}
+                      ref={
+                        activeApplicant === applicant.id
+                          ? activeApplicantTabRef
+                          : undefined
+                      }
+                      type="button"
+                      onClick={() => setActiveApplicant(applicant.id)}
+                    >
+                      <span className="v19-questionnaire-applicant-index">
+                        {applicant.index}
+                      </span>
+                      {applicant.name}
+                      <QuestionnaireProgressBadge
+                        aria-hidden="true"
+                        className={`v19-questionnaire-progress-badge status-${applicant.status}`}
+                      >
+                        {applicant.status === "complete" ? (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        ) : applicant.status === "issue" ? (
+                          <AlertCircle className="w-3.5 h-3.5" />
+                        ) : (
+                          `${applicant.completed}/${applicant.total}`
+                        )}
+                      </QuestionnaireProgressBadge>
+                    </button>
+                    {applicant.status !== "complete" ? (
+                      <button
+                        aria-label={`Следующее незаполненное: ${applicant.name}`}
+                        className="v19-questionnaire-draft-button min-w-[var(--v19b-size-40)] min-h-[var(--v19b-size-40)] shrink-0 px-0"
+                        title={`Перейти к следующему незаполненному полю: ${applicant.name}`}
+                        type="button"
+                        onClick={() => focusApplicantNextIncomplete(applicant.id)}
+                      >
+                        <ArrowRight className="w-[var(--v19b-size-16)] h-[var(--v19b-size-16)]" />
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="hidden md:flex shrink-0 items-center gap-2 text-[var(--v19b-size-12)] text-white/50 px-3 border-l border-white/5">
@@ -3130,14 +4740,21 @@ export function FigmaQuestionnaireScreen({
             </div>
           </div>
 
-          <div className="v19-questionnaire-section-list v19-questionnaire-section-list--pinned">
+          <div
+            aria-label="Разделы анкеты"
+            className="v19-questionnaire-section-list v19-questionnaire-section-list--pinned"
+            role="group"
+          >
             {sections.map((section) => (
               <button
-                aria-selected={activeSection === section.id}
+                aria-pressed={activeSection === section.id}
                 className={`v19-questionnaire-section-tab ${
                   activeSection === section.id ? "is-active" : ""
                 }`}
                 key={`pinned-${section.id}`}
+                ref={
+                  activeSection === section.id ? activePinnedSectionTabRef : undefined
+                }
                 type="button"
                 onClick={() => setActiveSection(section.id)}
               >
@@ -3165,6 +4782,7 @@ export function FigmaQuestionnaireScreen({
             {!showEuRelativeSection ? (
               <button
                 className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
+                disabled={!isEditable}
                 type="button"
                 onClick={openEuRelativeSection}
               >
@@ -3182,16 +4800,65 @@ export function FigmaQuestionnaireScreen({
                 value={readinessStats.percent}
               />
 
-              <V19SearchField label="Поиск поля анкеты" placeholder="Найти поле..." />
+              <div className="flex flex-col gap-2">
+                <V19SearchField
+                  label="Поиск поля анкеты"
+                  placeholder="Найти поле..."
+                  value={fieldSearchQuery}
+                  onChange={(event) => setFieldSearchQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    focusFirstSearchMatch();
+                  }}
+                />
+                <div
+                  aria-live="polite"
+                  className="text-[var(--v19b-size-11)] text-white/42"
+                  role="status"
+                >
+                  {fieldSearchQuery.trim()
+                    ? `${searchMatches.length} совпадений`
+                    : saveStatus === "error"
+                      ? saveMessage
+                      : "Поиск по полям и значениям"}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="v19-questionnaire-draft-button"
+                    type="button"
+                    onClick={focusNextIncomplete}
+                  >
+                    Следующее поле
+                  </button>
+                  <button
+                    className="v19-questionnaire-draft-button"
+                    disabled={readinessStats.canSubmit}
+                    type="button"
+                    onClick={focusFirstBlocker}
+                  >
+                    Блокер
+                  </button>
+                </div>
+              </div>
 
-              <div className="v19-questionnaire-section-list v19-questionnaire-section-list--sidebar">
+              <div
+                aria-label="Разделы анкеты"
+                className="v19-questionnaire-section-list v19-questionnaire-section-list--sidebar"
+                role="group"
+              >
                 {sections.map((section) => (
                   <button
-                    aria-selected={activeSection === section.id}
+                    aria-pressed={activeSection === section.id}
                     className={`v19-questionnaire-section-tab ${
                       activeSection === section.id ? "is-active" : ""
                     }`}
                     key={section.id}
+                    ref={
+                      activeSection === section.id
+                        ? activeSidebarSectionTabRef
+                        : undefined
+                    }
                     type="button"
                     onClick={() => setActiveSection(section.id)}
                   >
@@ -3220,6 +4887,7 @@ export function FigmaQuestionnaireScreen({
                 {!showEuRelativeSection ? (
                   <button
                     className="v19-questionnaire-optional-reveal v19-questionnaire-section-optional"
+                    disabled={!isEditable}
                     type="button"
                     onClick={openEuRelativeSection}
                   >
@@ -3231,43 +4899,146 @@ export function FigmaQuestionnaireScreen({
 
             <div className="v19-questionnaire-work-panel">
               {currentSectionIssue ? (
-                <div className="v19-questionnaire-review-alert">
+                <div
+                  aria-atomic={
+                    currentSectionIssue.status === "fixed_by_agent" ? "true" : undefined
+                  }
+                  aria-live={
+                    currentSectionIssue.status === "fixed_by_agent"
+                      ? "polite"
+                      : undefined
+                  }
+                  className={`v19-questionnaire-review-alert ${
+                    currentSectionIssue.status === "fixed_by_agent" ? "is-awaiting" : ""
+                  }`}
+                  role={
+                    currentSectionIssue.status === "fixed_by_agent"
+                      ? "status"
+                      : undefined
+                  }
+                >
                   <div className="v19-questionnaire-review-strip" />
                   <div className="v19-questionnaire-review-icon">
-                    <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+                    {currentSectionIssue.status === "fixed_by_agent" ? (
+                      <CheckCircle2 className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+                    ) : (
+                      <AlertCircle className="w-[var(--v19b-size-18)] h-[var(--v19b-size-18)]" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[var(--v19b-size-13-5)] font-semibold text-white">
-                      {currentSectionIssue.target.field
-                        ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
-                        : currentSectionIssue.reason}
+                      {currentSectionIssue.status === "fixed_by_agent"
+                        ? `Исправление${
+                            currentSectionIssue.target.field
+                              ? ` по полю «${currentSectionIssue.target.field}»`
+                              : ""
+                          } отправлено, ожидает проверки администратора`
+                        : currentSectionIssue.target.field
+                          ? `${currentSectionIssue.target.field}: ${currentSectionIssue.reason}`
+                          : currentSectionIssue.reason}
                     </div>
                     <p className="text-[var(--v19b-size-12)] text-white/60 mt-1.5 leading-relaxed">
-                      {currentSectionIssue.comment}
+                      {currentSectionIssue.status === "fixed_by_agent"
+                        ? "Исправление сохранено и не блокирует повторную отправку. Администратор увидит его при проверке."
+                        : currentSectionIssue.comment}
                     </p>
                   </div>
+                  {currentSectionIssue.status === "open" && onMarkIssueFixed ? (
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <button
+                        aria-busy={
+                          pendingIssueResolutionId === currentSectionIssue.id
+                        }
+                        className="v19-questionnaire-draft-button"
+                        disabled={pendingIssueResolutionId !== null}
+                        type="button"
+                        onClick={() => void resolveCurrentIssue()}
+                      >
+                        {pendingIssueResolutionId === currentSectionIssue.id
+                          ? "Сохраняем…"
+                          : "Пометить исправленным"}
+                      </button>
+                      {issueResolutionError ? (
+                        <span
+                          className="max-w-[var(--v19b-size-220)] text-right text-[var(--v19b-size-11)] text-[var(--v19b-dot-danger)]"
+                          role="alert"
+                        >
+                          {issueResolutionError}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
               <div className="v19-questionnaire-work-grid">
-                {canCopyFamilySection ? (
-                  <button
-                    className="v19-questionnaire-draft-button"
-                    type="button"
-                    onClick={copyFamilySectionFromPrimaryApplicant}
-                  >
-                    Скопировать общие данные от {primaryApplicant?.fullName || "первого заявителя"}
-                  </button>
+                {canCopyFamilyWide ? (
+                  <div className="col-span-1 md:col-span-2 flex flex-wrap items-center gap-2">
+                    <button
+                      aria-describedby={familyCopyMessage ? familyCopyStatusId : undefined}
+                      className="v19-questionnaire-draft-button"
+                      disabled={!isEditable || Boolean(familyCopyPreview)}
+                      type="button"
+                      onClick={copySharedDataToFamily}
+                    >
+                      Заполнить общие поля семьи
+                    </button>
+                    {familyCopyPreview ? (
+                      <>
+                        <button
+                          className="v19-questionnaire-complete-button is-ready"
+                          type="button"
+                          onClick={confirmFamilyCopy}
+                        >
+                          Подтвердить копирование
+                        </button>
+                        <button
+                          className="v19-questionnaire-draft-button"
+                          type="button"
+                          onClick={cancelFamilyCopy}
+                        >
+                          Отмена
+                        </button>
+                      </>
+                    ) : null}
+                    {!familyCopyPreview && lastFamilyCopyTarget ? (
+                      <button
+                        className="v19-questionnaire-draft-button"
+                        type="button"
+                        onClick={reviewLastFamilyCopy}
+                      >
+                        Проверить скопированные поля
+                      </button>
+                    ) : null}
+                    {familyCopyMessage ? (
+                      <p
+                        aria-live="polite"
+                        className="text-[var(--v19b-size-11)] text-white/50"
+                        id={familyCopyStatusId}
+                        role="status"
+                      >
+                        {familyCopyMessage}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
-                <div className="v19-questionnaire-fields-grid">
-                  {renderSectionFields()}
-                </div>
+                <QuestionnaireFieldUiContext.Provider value={questionnaireFieldUiContract}>
+                  <fieldset
+                    aria-label={
+                      isEditable ? "Поля анкеты" : "Поля анкеты — только просмотр"
+                    }
+                    className="v19-questionnaire-fields-grid"
+                    disabled={!isEditable}
+                  >
+                    {renderSectionFields()}
+                  </fieldset>
+                </QuestionnaireFieldUiContext.Provider>
               </div>
 
               <button
                 className="v19-questionnaire-next-button v19-questionnaire-next-button--simple"
                 type="button"
-                onClick={goToNextSection}
+                onClick={focusNextIncomplete}
               >
                 Продолжить
               </button>

@@ -246,6 +246,65 @@ describe("passport extraction state", () => {
     );
   });
 
+  test("lets OCR replace only the canonical birth-country default", () => {
+    const draft = draftSubmission();
+    const file = passportFile(draft);
+    const applicantId = draft.applicants[0]?.id;
+    if (!applicantId) throw new Error("expected applicant");
+    const extractedBirthCountry: PassportExtractionResult = {
+      fields: [
+        {
+          confidence: "medium",
+          key: "birthCountry",
+          needsManualReview: true,
+          value: "USSR",
+        },
+      ],
+      guardrails: [],
+      source: "edge-provider",
+      status: "extracted",
+      summary: "Страна рождения подготовлена.",
+    };
+
+    const readyDefault = finishPassportExtraction(
+      draft,
+      file,
+      extractedBirthCountry,
+    );
+    const autofilledDefault = applySafePassportExtractionFields(
+      readyDefault,
+      applicantId,
+    );
+    expect(questionnaireValue(autofilledDefault, "birth-country")).toBe("USSR");
+    expect(questionnaireField(autofilledDefault, "birth-country")).toMatchObject({
+      reviewOriginSource: "passport_ocr",
+      reviewSource: "passport_ocr",
+      reviewState: "needs_review",
+    });
+
+    const withManualCountry = updateQuestionnaireField(draft, {
+      applicantId,
+      fieldId: "birth-country",
+      sectionId: sectionIdForField(draft, "birth-country"),
+      value: "Spain",
+    });
+    const readyManual = finishPassportExtraction(
+      withManualCountry,
+      file,
+      extractedBirthCountry,
+    );
+    const preservedManual = applySafePassportExtractionFields(
+      readyManual,
+      applicantId,
+    );
+    expect(questionnaireValue(preservedManual, "birth-country")).toBe("Spain");
+    expect(passportExtractionRows(preservedManual.applicants[0]!)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ conflict: true, key: "birthCountry" }),
+      ]),
+    );
+  });
+
   test("autofills a family draft per applicant without mixing passport data", () => {
     const draft = createDraftSubmission({
       applicantNames: ["VOLKOV ANTON", "PETROVA ANNA"],

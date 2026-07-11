@@ -1,6 +1,9 @@
 import JSZip from "jszip";
-import { describe, expect, test } from "vitest";
-import { buildDocumentsZip } from "../../src/modules/documents/documentExport";
+import { describe, expect, test, vi } from "vitest";
+import {
+  buildDocumentsZip,
+  normalizePassportNumberForExport,
+} from "../../src/modules/documents/documentExport";
 import {
   DOCUMENT_TYPES,
   normalizeDocumentType,
@@ -73,6 +76,11 @@ async function zipFileNames(zip: JSZip): Promise<string[]> {
 }
 
 describe("document export ZIP builder", () => {
+  test("normalizes passport-only document prefixes", () => {
+    expect(normalizePassportNumberForExport(" ab 12-34/56 ")).toBe("AB123456");
+    expect(normalizePassportNumberForExport("  / -  ")).toBeNull();
+  });
+
   test("normalizes legacy selfie into selfie_1", () => {
     const parsed = parseDocumentStoragePath(
       "submissions/SUB-1/applicants/APP-1/selfie/selfie.jpg",
@@ -105,6 +113,66 @@ describe("document export ZIP builder", () => {
         "VisaFlow_Export_2026-07-07/Москва/Семья Волковых/660011023_visa_form.pdf",
       ]),
     );
+  });
+
+  test("fails closed before download when any applicant has no passport number", async () => {
+    const source = byId("SUB-1102");
+    const submission: Submission = {
+      ...source,
+      applicants: source.applicants.map((applicant, index) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            index === 1 && field.id === "passport-no"
+              ? { ...field, value: "" }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const downloadAsset = vi.fn(async () =>
+      new Blob(["bytes"], { type: "image/jpeg" }),
+    );
+
+    await expect(
+      buildDocumentsZip({
+        assets: documentAssetsFor(submission),
+        downloadAsset,
+        exportDate,
+        submissions: [submission],
+      }),
+    ).rejects.toMatchObject({ reason: "passport_number_missing" });
+    expect(downloadAsset).not.toHaveBeenCalled();
+  });
+
+  test("uses the normalized passport number as every document filename prefix", async () => {
+    const source = byId("ПД-1056");
+    const submission: Submission = {
+      ...source,
+      applicants: source.applicants.map((applicant) => ({
+        ...applicant,
+        sections: applicant.sections.map((section) => ({
+          ...section,
+          fields: section.fields.map((field) =>
+            field.id === "passport-no"
+              ? { ...field, value: " ab 12-34/56 " }
+              : field,
+          ),
+        })),
+      })),
+    };
+    const result = await buildDocumentsZip({
+      assets: documentAssetsFor(submission),
+      downloadAsset: async (asset) =>
+        new Blob([asset.id], { type: asset.mime ?? "image/jpeg" }),
+      exportDate,
+      submissions: [submission],
+    });
+
+    const names = await zipFileNames(result.zip);
+    expect(names).toHaveLength(4);
+    expect(names.every((name) => /\/AB123456_(?:passport_scan|selfie_1|selfie_2|visa_form)\.(?:jpg|pdf)$/.test(name))).toBe(true);
   });
 
   test("blocks missing selfie_2", () => {

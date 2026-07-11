@@ -84,6 +84,7 @@ import {
 import { CANONICAL_CITIES } from "../types";
 import type { DrawerTab, Submission } from "../types";
 import {
+  isAdminReviewQueueSubmission,
   matchesReviewTab,
   type AgentTab,
   type ExportTab,
@@ -1687,7 +1688,7 @@ function sortableDateValue(value: string) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-type AdminReviewLaneId = "urgent" | "review" | "returned" | "ready";
+type AdminReviewLaneId = "urgent" | "review" | "returned";
 type AdminReviewLaneFilter = AdminReviewLaneId | "all";
 
 type AdminReviewLaneConfig = {
@@ -1720,18 +1721,10 @@ const adminReviewLaneConfig: readonly AdminReviewLaneConfig[] = [
     title: "Исправления",
     tone: "blue",
   },
-  {
-    icon: CheckCircle2,
-    id: "ready",
-    subtitle: "к выгрузке",
-    title: "Готово",
-    tone: "green",
-  },
 ];
 
 const reviewTabForLane: Record<AdminReviewLaneFilter, AdminWorkTab> = {
   all: "all",
-  ready: "ready",
   returned: "corrections",
   review: "review",
   urgent: "review",
@@ -1745,7 +1738,6 @@ function adminReviewLaneFor(
   submission: Submission,
   triage: AdminTriageRadarItem = adminTriageRadarItem(submission),
 ): AdminReviewLaneId {
-  if (submission.status === "ready_for_export") return "ready";
   if (submission.status === "corrections_received" || fixedIssueCount(submission) > 0) {
     return "returned";
   }
@@ -2080,7 +2072,13 @@ export function AdminReviewScreen({
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
-  const sourceList = reviewSource.length ? reviewSource : reviewList;
+  const unfilteredSourceList = reviewSource.length ? reviewSource : reviewList;
+  const exportQueueCount = unfilteredSourceList.filter(
+    (submission) => submission.status === "ready_for_export",
+  ).length;
+  const sourceList = unfilteredSourceList.filter(
+    isAdminReviewQueueSubmission,
+  );
   const sortedReviewSourceList = useMemo(
     () => sortSubmissionsForOperations(sourceList, "priority"),
     [sourceList],
@@ -2112,7 +2110,6 @@ export function AdminReviewScreen({
   const allQueue = visibleReviewList.filter(matchesReviewTab("all"));
   const reviewQueue = visibleReviewList.filter(matchesReviewTab("review"));
   const correctionsQueue = visibleReviewList.filter(matchesReviewTab("corrections"));
-  const readyQueue = visibleReviewList.filter(matchesReviewTab("ready"));
   const triageRadar = useMemo(
     () => buildAdminTriageRadar(visibleReviewList),
     [visibleReviewList],
@@ -2131,7 +2128,6 @@ export function AdminReviewScreen({
   );
   const laneItems = useMemo(() => {
     const queues: Record<AdminReviewLaneId, typeof reviewItems> = {
-      ready: [],
       returned: [],
       review: [],
       urgent: [],
@@ -2168,7 +2164,6 @@ export function AdminReviewScreen({
   const tabCounts = {
     all: allQueue.length,
     corrections: correctionsQueue.length,
-    ready: readyQueue.length,
     review: reviewQueue.length,
   };
   const totalBlockers = visibleReviewList.reduce(
@@ -2301,7 +2296,7 @@ export function AdminReviewScreen({
             icon={CheckCircle2}
             label="К выгрузке"
             tone="green"
-            value={`${tabCounts.ready}`}
+            value={`${exportQueueCount}`}
           />
         </div>
 
@@ -2457,7 +2452,7 @@ export function AdminReviewScreen({
                 icon={CheckCircle2}
                 label="К выгрузке"
                 tone="green"
-                value={`${tabCounts.ready}`}
+                value={`${exportQueueCount}`}
               />
             </div>
             </motion.aside>

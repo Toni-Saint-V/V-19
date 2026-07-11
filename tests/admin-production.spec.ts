@@ -15,9 +15,9 @@ import {
   exportSummary,
 } from "../src/modules/submissions/exportRules";
 import {
-  buildLocalDemoExportMediaZipOptions,
   prepareExportMediaZip,
 } from "../src/modules/submissions/exportMediaZip";
+import { buildLocalDemoExportMediaZipOptions } from "../src/modules/submissions/exportMediaZipLocalDemo";
 import { completeExportPackage } from "../src/modules/submissions/exportWorkflow";
 import type {
   Applicant,

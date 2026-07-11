@@ -90,7 +90,7 @@
   --v19-fg-muted: var(--vf-text-tertiary);
   --v19-accent: rgb(var(--accent));
   --v19-accent-hover: rgb(var(--accent-hover));
-  --v19-accent-fg: #ffffff;
+  --v19-accent-fg: #e2cfcf;
   --v19-danger: rgb(var(--danger));
   --v19-success: rgb(var(--success));
   --v19-warning: rgb(var(--warning));
@@ -1016,18 +1016,18 @@
   --v19b-color-primary-deep: #3a45b4;
   --v19b-color-primary-deep-hover: #3a45b4;
   --v19b-color-primary-deep-border: #3a45b4;
-  --v19b-color-text-strong: #ffffff;
-  --v19b-color-text: rgb(255 255 255 / 0.94);
-  --v19b-color-text-80: rgb(255 255 255 / 0.8);
-  --v19b-color-text-70: rgb(255 255 255 / 0.7);
-  --v19b-color-text-60: rgb(255 255 255 / 0.6);
-  --v19b-color-text-50: rgb(255 255 255 / 0.5);
-  --v19b-color-text-40: rgb(255 255 255 / 0.4);
-  --v19b-color-text-35: rgb(255 255 255 / 0.35);
-  --v19b-color-text-30: rgb(255 255 255 / 0.3);
-  --v19b-color-text-25: rgb(255 255 255 / 0.25);
-  --v19b-color-text-muted: rgb(255 255 255 / 0.6);
-  --v19b-color-text-faint: rgb(255 255 255 / 0.5);
+  --v19b-color-text-strong: #e2cfcf;
+  --v19b-color-text: rgb(226 207 207 / 0.94);
+  --v19b-color-text-80: rgb(226 207 207 / 0.8);
+  --v19b-color-text-70: rgb(226 207 207 / 0.7);
+  --v19b-color-text-60: rgb(226 207 207 / 0.6);
+  --v19b-color-text-50: rgb(226 207 207 / 0.5);
+  --v19b-color-text-40: rgb(226 207 207 / 0.4);
+  --v19b-color-text-35: rgb(226 207 207 / 0.35);
+  --v19b-color-text-30: rgb(226 207 207 / 0.3);
+  --v19b-color-text-25: rgb(226 207 207 / 0.25);
+  --v19b-color-text-muted: rgb(226 207 207 / 0.6);
+  --v19b-color-text-faint: rgb(226 207 207 / 0.5);
   --v19b-color-border-faint: rgb(255 255 255 / 0.05);
   --v19b-color-border-soft: rgb(255 255 255 / 0.1);
   --v19b-color-focus: rgb(96 165 250 / 0.72);
@@ -1155,6 +1155,7 @@
   --v19b-size-228: var(--vf-ref-size-228px);
   --v19b-size-240: 240px;
   --v19b-size-304: 304px;
+  --v19b-size-320: 320px;
   --v19b-size-half: 50%;
   --v19b-size-full: 100%;
   --v19b-size-quarter: 25%;
@@ -1186,12 +1187,14 @@
   --v19b-shell-rail-max-width: var(--v19b-size-420);
   --v19b-z-shell-backdrop: 430;
   --v19b-z-shell-sheet: 440;
+  --v19b-opacity-full: 1;
   --v19b-opacity-disabled: 0.46;
   --v19b-z-base: 1;
 
   --v19b-weight-body: 400;
   --v19b-weight-regular: var(--v19b-weight-body);
   --v19b-weight-control: 500;
+  --v19b-font-weight-medium: var(--v19b-weight-control);
   --v19b-weight-title: 600;
   --v19b-weight-row-title: 600;
 
@@ -1202,6 +1205,8 @@
   --v19b-line-height-copy: 1.45;
   --v19b-line-height-label: 1.5;
   --v19b-letter-spacing-normal: 0;
+  --v19b-letter-spacing-label: var(--v19b-letter-spacing-wide);
+  --v19b-letter-spacing-title: var(--v19b-letter-spacing-normal);
   --v19b-letter-spacing-wide: var(--v19b-tracking-wide);
   --v19b-tracking-wide: 0.08em;
   --v19b-tracking-wider: 0.18em;
@@ -1210,6 +1215,7 @@
   --v19b-radius-segmented: 11px;
   --v19b-radius-row: 15px;
   --v19b-radius-panel: 18px;
+  --v19b-radius-sheet: var(--v19b-radius-panel);
   --v19b-radius-cockpit-hero: 24px;
   --v19b-radius-pill: 999px;
   --v19b-radius-tab-button: calc(
@@ -1291,6 +1297,9 @@
   --v19b-admin-blue-border: rgb(58 69 180 / 0.25);
   --v19b-admin-green-soft: rgb(16 185 129 / 0.1);
   --v19b-admin-green-border: rgb(16 185 129 / 0.25);
+  --v19b-admin-error-surface: rgba(29, 23, 25, 0.8);
+  --v19b-admin-unified-surface: rgba(111, 100, 255, 0.15);
+  --v19b-admin-unified-text: rgb(184, 186, 255);
   --v19b-admin-export-selected-bg: rgb(58 69 180 / 0.1);
   --v19b-admin-export-selected-border: rgb(58 69 180 / 0.35);
   --v19b-admin-export-active-bg: rgb(255 255 255 / 0.035);

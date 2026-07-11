@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { X, MessageSquarePlus, AlertTriangle, User, FileText, Send } from 'lucide-react';
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
+import type { SubmissionFileType } from '../modules/submissions/types';
 
 interface RemarkFormProps {
   isOpen: boolean;
   onClose: () => void;
   submissionId: string;
   defaultField?: string;
+  defaultFileType?: SubmissionFileType;
   defaultApplicant?: string;
   onSubmit?: (input: {
     field?: string;
+    fileType?: SubmissionFileType;
     applicant?: string;
     message: string;
     severity: 'warning' | 'critical';
@@ -23,7 +26,7 @@ const templates = [
   'Нужно добавить подтверждающий документ для этого поля.',
 ];
 
-export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaultApplicant, onSubmit }: RemarkFormProps) {
+export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaultFileType, defaultApplicant, onSubmit }: RemarkFormProps) {
   const bridge = useVisaflowBusinessBridge();
   const [message, setMessage] = useState(defaultField ? `Проверьте поле «${defaultField}».` : templates[0]);
   const [severity, setSeverity] = useState<'warning' | 'critical'>('warning');
@@ -38,6 +41,7 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
     const payload = {
       submissionId: submissionId || null,
       field: defaultField,
+      fileType: defaultFileType,
       applicant: defaultApplicant,
       severity,
       message,
@@ -46,6 +50,7 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
     emitVisaflowUiEvent(bridge, { type: 'remark.submit', payload });
     void onSubmit?.({
       field: defaultField,
+      fileType: defaultFileType,
       applicant: defaultApplicant,
       severity,
       message,

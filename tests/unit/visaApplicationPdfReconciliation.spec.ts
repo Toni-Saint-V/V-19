@@ -16,6 +16,7 @@ import {
 } from "../../src/modules/submissions/mediaStoragePolicy";
 import {
   createDraftSubmission,
+  updateQuestionnaireField,
   uploadRequiredFiles,
 } from "../../src/modules/submissions/submissionActions";
 import {
@@ -713,10 +714,29 @@ function submittedFixture(
       };
     }),
   };
+  let withValidTrip = withPassportFields;
+  for (const applicant of withValidTrip.applicants) {
+    for (const [fieldId, value] of [
+      ["arrival-date", "10.01.2026"],
+      ["departure-date", "18.01.2026"],
+      ["stay-duration", "9"],
+    ] as const) {
+      const section = applicant.sections.find((candidate) =>
+        candidate.fields.some((field) => field.id === fieldId),
+      );
+      if (!section) throw new Error(`Missing questionnaire field: ${fieldId}`);
+      withValidTrip = updateQuestionnaireField(withValidTrip, {
+        applicantId: applicant.id,
+        fieldId,
+        sectionId: section.id,
+        value,
+      });
+    }
+  }
   const withFiles = {
-    ...uploadRequiredFiles(withPassportFields),
-    tripDateFrom: "2026-07-10",
-    tripDateTo: "2026-07-18",
+    ...uploadRequiredFiles(withValidTrip),
+    tripDateFrom: "2026-01-10",
+    tripDateTo: "2026-01-18",
   };
   const inProgress = applySubmissionAction(withFiles, "save_progress", "agent");
   return applySubmissionAction(inProgress, "submit_for_review", "agent");

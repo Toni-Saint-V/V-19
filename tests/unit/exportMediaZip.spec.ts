@@ -5,6 +5,7 @@ import {
   commitExportMediaZipArtifact,
   createExportMediaZipArtifact,
   default as downloadExportMediaZip,
+  restoreExportMediaZipArtifact,
   type ExportMediaZipDocumentDownloader,
 } from "../../src/modules/submissions/exportMediaZip";
 import {
@@ -361,6 +362,7 @@ describe("export media mega ZIP", () => {
       getReadyForExport: vi.fn(async () => assets),
       markExported: vi.fn(async () => undefined),
       recordExportAudit: vi.fn(async () => undefined),
+      restoreReadyForExport: vi.fn(async () => undefined),
     };
 
     const result = await createExportMediaZipArtifact(selection, {
@@ -391,6 +393,15 @@ describe("export media mega ZIP", () => {
       }),
     );
     expect(repository.markExported).toHaveBeenCalledWith(
+      expect.arrayContaining(assets.map((asset) => asset.id)),
+    );
+
+    const restoreResult = await restoreExportMediaZipArtifact(
+      result.artifact,
+      repository,
+    );
+    expect(restoreResult).toEqual({ ok: true });
+    expect(repository.restoreReadyForExport).toHaveBeenCalledWith(
       expect.arrayContaining(assets.map((asset) => asset.id)),
     );
   });

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { supabaseRuntimeConfig } from "./config";
 import type { Database } from "./database.types";
+import { createSupabaseResilientFetch } from "./resilientFetch";
 
 export type VisaFlowSupabaseClient = SupabaseClient<Database>;
 
@@ -18,6 +19,9 @@ export function getSupabaseClient(): VisaFlowSupabaseClient | null {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+      },
+      global: {
+        fetch: createSupabaseResilientFetch(),
       },
     },
   );

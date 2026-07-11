@@ -28,23 +28,21 @@ const applicantStoragePrefix = "applicants";
 export const selfieUploadMimeTypes = [
   "image/jpeg",
   "image/png",
-  "image/webp",
   "image/heic",
   "image/heif",
 ] as const;
 export const selfieUploadAccept = selfieUploadMimeTypes.join(",");
-export const selfieUploadFormatLabel = "JPEG, PNG, WEBP, HEIC или HEIF";
+export const selfieUploadFormatLabel = "JPEG, PNG, HEIC или HEIF";
 export const passportScanUploadMimeTypes = [
   ...selfieUploadMimeTypes,
   "application/pdf",
 ] as const;
 export const passportScanUploadAccept = passportScanUploadMimeTypes.join(",");
-export const passportScanUploadFormatLabel = "JPEG, PNG, WEBP, HEIC, HEIF или PDF";
+export const passportScanUploadFormatLabel = "JPEG, PNG, HEIC, HEIF или PDF";
 const passportScanUploadExtensions = new Set([
   "jpg",
   "jpeg",
   "png",
-  "webp",
   "heic",
   "heif",
   "pdf",
@@ -101,8 +99,8 @@ function allowedExtensions(type: MediaStorageObjectType): Set<string> {
   if (type === "appointment_pdf") return new Set(["pdf"]);
   if (type === "visa_application_pdf") return new Set(["pdf"]);
   if (type === "passport_scan")
-    return new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "pdf"]);
-  return new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
+    return new Set(["jpg", "jpeg", "png", "heic", "heif", "pdf"]);
+  return new Set(["jpg", "jpeg", "png", "heic", "heif"]);
 }
 
 function allowedLegacyArchiveExtensions(type: string): Set<string> {
@@ -126,7 +124,6 @@ function allowedLegacyArchiveMimeTypes(type: string): Set<string> {
 function mimeTypeForExtension(extension: string): string | null {
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
   if (extension === "png") return "image/png";
-  if (extension === "webp") return "image/webp";
   if (extension === "heic") return "image/heic";
   if (extension === "heif") return "image/heif";
   if (extension === "mp4") return "video/mp4";
@@ -240,13 +237,13 @@ function hasExpectedGeneratedSuffix(
   fileName: string,
 ): boolean {
   if (type === "selfie")
-    return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png|webp|heic|heif)$/.test(fileName);
+    return /^[a-zA-Z0-9]+_selfie\.(jpg|jpeg|png|heic|heif)$/.test(fileName);
   if (type === "selfie_2")
-    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png|webp|heic|heif)$/.test(
+    return /^[a-zA-Z0-9]+_selfie_2\.(jpg|jpeg|png|heic|heif)$/.test(
       fileName,
     );
   if (type === "passport_scan")
-    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|webp|heic|heif|pdf)$/.test(
+    return /^[a-zA-Z0-9]+_passport_scan\.(jpg|jpeg|png|heic|heif|pdf)$/.test(
       fileName,
     );
   if (type === "application_pdf")

@@ -1,9 +1,9 @@
 # Supabase Production Migration Evidence - 2026-07-06
 
-Result: `BLOCKED_FOR_PENDING_AI_MIGRATION`
+Result: `APPLIED_WITH_EXPLICIT_USER_AUTHORIZATION`
 Project: `tsymifccglpepvbmrcgh`
-Latest recheck: `2026-07-06T00:16:12.628Z`
-Latest Supabase plugin read-only migration list: `2026-07-06T02:27:56Z`
+Latest recheck: `2026-07-10T04:15:02Z`
+Latest Supabase plugin migration list: `2026-07-10T04:15:02Z`
 
 No email, password, service-role key, signed URL, or personal identifier is recorded in this artifact.
 
@@ -37,6 +37,18 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 - `20260703165306_day10_review_readiness_storage_identity`
 - `20260704050806_day10_required_media_canonical_write_paths`
 - `20260706000100_ai_helper_admin_intent_quota_contract`
+- `20260706023000_typed_submission_files`
+- `20260707000100_typed_status_history_source`
+- `20260707001000_document_assets_production_pipeline`
+- `20260709234515_agent_return_packages`
+- `20260710000100_allow_submission_handoff_child_writes`
+- `20260710000200_allow_handoff_children_in_draft_rpc`
+- `20260710000300_persist_handoff_applicant_projection`
+- `20260710003127_agent_return_packages_duplicate_result`
+- `20260710003254_document_asset_function_search_path_hardening`
+- `20260710004000_harden_document_assets_projection`
+- `20260710021043_harden_media_asset_review_boundary`
+- `20260710022231_add_media_assets_applicant_submission_index`
 
 ## Applied Remote Migration Order
 
@@ -80,6 +92,19 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 - `20260703141744_day10_review_readiness_required_media_slots`
 - `20260703165306_day10_review_readiness_storage_identity`
 - `20260705235913_day10_required_media_canonical_write_paths`
+- `20260709221437_typed_status_history_source`
+- `20260709222911_document_assets_production_pipeline`
+- `20260709232214_allow_submission_handoff_child_writes`
+- `20260709233239_allow_handoff_children_in_draft_rpc_v2`
+- `20260709233641_persist_handoff_applicant_projection_v3`
+- `20260710034506_ai_helper_admin_intent_quota_contract`
+- `20260710034513_typed_submission_files`
+- `20260710041440_agent_return_packages`
+- `20260710041454_20260710003127_agent_return_packages_duplicate_result`
+- `20260710041457_20260710003254_document_asset_function_search_path_hardening`
+- `20260710041458_20260710004000_harden_document_assets_projection`
+- `20260710041500_20260710021043_harden_media_asset_review_boundary`
+- `20260710041502_20260710022231_add_media_assets_applicant_submission_index`
 
 ## Aggregate Checks
 
@@ -95,5 +120,7 @@ No email, password, service-role key, signed URL, or personal identifier is reco
 ## Production Apply Note
 
 - `20260705235913_day10_required_media_canonical_write_paths` is the Supabase MCP-recorded remote migration for local file `20260704050806_day10_required_media_canonical_write_paths.sql`.
-- `20260706000100_ai_helper_admin_intent_quota_contract.sql` is local-only in this evidence snapshot. It has no owner-approved production apply evidence yet, so production readiness must remain fail-closed.
-- Supabase plugin `list_migrations` against project `tsymifccglpepvbmrcgh` confirmed the remote list still ends at `20260705235913_day10_required_media_canonical_write_paths`; it did not mutate the project.
+- `20260706000100_ai_helper_admin_intent_quota_contract.sql` was applied remotely as `20260710034506_ai_helper_admin_intent_quota_contract` after explicit user authorization.
+- `20260706023000_typed_submission_files.sql` was applied remotely as `20260710034513_typed_submission_files`.
+- `20260709234515_agent_return_packages.sql` was applied remotely as `20260710041440_agent_return_packages`; its five dependent migrations were then applied in order.
+- Supabase plugin `list_migrations` against project `tsymifccglpepvbmrcgh` confirmed the complete post-apply order; it did not mutate the project.

@@ -56,7 +56,7 @@ function enabled(value: string | undefined): boolean {
 }
 
 function backendTarget(value: string | undefined): SupabaseBackendTarget {
-  return clean(value) === "supabase" ? "supabase" : "local-demo";
+  return clean(value) === "local-demo" ? "local-demo" : "supabase";
 }
 
 function activationTarget(value: string | undefined): SupabaseActivationTarget {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { emitVisaflowUiEvent, useVisaflowBusinessBridge } from '../integration/visaflowBusinessBridge';
 import type { Submission as CanonicalSubmission, SubmissionAction } from '../modules/submissions/types';
 import { actionGate } from './v19BusinessScreenAdapter';
@@ -330,6 +330,10 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [status, setStatus] = useState<DrawerState>('idle');
   const [data, setData] = useState<SubmissionDetail | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [actionPending, setActionPending] = useState(false);
+  const actionPendingRef = useRef(false);
+  const actionRequestIdRef = useRef(0);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   useEffect(() => {
@@ -350,8 +354,12 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
   // without making mock state a source of truth.
   useEffect(() => {
     if (isOpen && submissionId) {
+      actionRequestIdRef.current += 1;
       setStatus('loading');
       setActiveTab('overview');
+      setActionError('');
+      setActionPending(false);
+      actionPendingRef.current = false;
 
       const timer = setTimeout(() => {
         if (submission) {
@@ -387,6 +395,8 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
 
       return () => clearTimeout(timer);
     } else if (!isOpen) {
+      actionRequestIdRef.current += 1;
+      actionPendingRef.current = false;
       const resetTimer = setTimeout(() => setStatus('idle'), 300);
       return () => clearTimeout(resetTimer);
     }
@@ -399,12 +409,37 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
     { id: 'history', label: 'История' }
   ];
 
-  const handleAction = (action: SubmissionAction) => {
-    if (!submissionId) return;
+  const handleAction = async (action: SubmissionAction) => {
+    if (!submissionId || actionPendingRef.current) return;
     const payload = { submissionId, action, source: 'agent' as const };
-    void bridge.onSubmissionAction?.(payload);
-    void onSubmissionAction?.(submissionId, action);
-    emitVisaflowUiEvent(bridge, { type: 'submission.action', payload });
+    const requestId = ++actionRequestIdRef.current;
+    setActionError('');
+    setActionPending(true);
+    actionPendingRef.current = true;
+
+    try {
+      if (onSubmissionAction) {
+        await onSubmissionAction(submissionId, action);
+      } else if (bridge.onSubmissionAction) {
+        await bridge.onSubmissionAction(payload);
+      } else {
+        setActionError(
+          'Действие недоступно: обработчик сохранения не подключён.',
+        );
+        return;
+      }
+      emitVisaflowUiEvent(bridge, { type: 'submission.action', payload });
+    } catch {
+      if (requestId !== actionRequestIdRef.current) return;
+      setActionError(
+        'Не удалось сохранить действие. Состояние подачи не изменено. Повторите попытку.',
+      );
+    } finally {
+      if (requestId === actionRequestIdRef.current) {
+        actionPendingRef.current = false;
+        setActionPending(false);
+      }
+    }
   };
 
   // Dynamic Footer Actions
@@ -414,8 +449,8 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
     if (data.status === 'returned') {
       return (
         <button
-          onClick={() => handleAction('submit_corrections')}
-          disabled={submission ? !actionGate(submission, 'submit_corrections', 'agent').ok : false}
+          onClick={() => void handleAction('submit_corrections')}
+          disabled={actionPending || (submission ? !actionGate(submission, 'submit_corrections', 'agent').ok : false)}
           title={submission ? actionGate(submission, 'submit_corrections', 'agent').reason : undefined}
           className="flex-1 sm:flex-none h-11 px-8 bg-[#24242a] hover:bg-[#2a2b32] disabled:bg-white/10 disabled:text-white/35 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl shadow-[0_0_28px_rgba(111,100,255,0.14)] transition-colors flex items-center justify-center gap-2"
         >
@@ -427,8 +462,8 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
     if (data.status === 'in_progress') {
       return (
         <button
-          onClick={() => handleAction('submit_for_review')}
-          disabled={submission ? !actionGate(submission, 'submit_for_review', 'agent').ok : false}
+          onClick={() => void handleAction('submit_for_review')}
+          disabled={actionPending || (submission ? !actionGate(submission, 'submit_for_review', 'agent').ok : false)}
           title={submission ? actionGate(submission, 'submit_for_review', 'agent').reason : undefined}
           className="flex-1 sm:flex-none h-11 px-8 bg-[#6f64ff] hover:bg-[#4855d4] disabled:bg-white/10 disabled:text-white/35 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl shadow-[0_0_20px_rgba(58,69,180,0.3)] transition-colors flex items-center justify-center gap-2"
         >
@@ -439,8 +474,8 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
 
     return (
       <button
-        onClick={() => data.status === 'draft' ? handleAction('save_progress') : undefined}
-        disabled={data.status === 'exported'}
+        onClick={() => data.status === 'draft' ? void handleAction('save_progress') : undefined}
+        disabled={actionPending || data.status === 'exported'}
         className="flex-1 sm:flex-none h-11 px-8 bg-white/10 hover:bg-white/15 disabled:bg-white/5 disabled:text-white/30 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl transition-colors"
       >
         {data.status === 'exported' ? 'Подача выгружена' : data.status === 'draft' ? 'Сохранить прогресс' : 'Сохранить черновик'}
@@ -565,8 +600,15 @@ export function Drawer({ isOpen, onClose, submissionId, submission, onOpenQuesti
                 </div>
 
                 <footer className="p-4 lg:px-8 lg:py-5 border-t border-white/10 bg-[#111113]/95 backdrop-blur-md shrink-0 flex flex-col sm:flex-row items-center justify-between gap-4 pb-[max(16px,env(safe-area-inset-bottom))] lg:sticky lg:bottom-0 z-20">
-                  <div className="text-[12px] text-white/40 hidden sm:block">
-                    {data.status === 'returned' ? 'Исправьте замечания перед повторной отправкой.' : 'Проверьте все данные перед отправкой администратору.'}
+                  <div
+                    className={`text-[12px] ${actionError ? 'text-[#ffadb4]' : 'hidden text-white/40 sm:block'}`}
+                    role={actionError ? 'alert' : undefined}
+                  >
+                    {actionError || (actionPending
+                      ? 'Сохраняем действие…'
+                      : data.status === 'returned'
+                        ? 'Исправьте замечания перед повторной отправкой.'
+                        : 'Проверьте все данные перед отправкой администратору.')}
                   </div>
                   <div className="flex gap-3 w-full sm:w-auto">
                     <button onClick={onClose} className="flex-1 sm:flex-none h-11 px-5 bg-transparent hover:bg-white/5 text-white/70 hover:text-white font-medium text-[14px] rounded-xl transition-colors">

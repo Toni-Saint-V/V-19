@@ -9,9 +9,9 @@ import {
   exportSummary,
 } from "../src/modules/submissions/exportRules";
 import {
-  buildLocalDemoExportMediaZipOptions,
   prepareExportMediaZip,
 } from "../src/modules/submissions/exportMediaZip";
+import { buildLocalDemoExportMediaZipOptions } from "../src/modules/submissions/exportMediaZipLocalDemo";
 import { parseExportWorkbookBlob } from "../src/lib/export/exportWorkbookCore";
 import { createVisaApplicationFormPdfBlob } from "../src/modules/submissions/visaApplicationFormPdf";
 import type {

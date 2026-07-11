@@ -355,7 +355,6 @@ describe("V-19 submission status rules", () => {
     expect(matchingStatuses("all")).toEqual([
       "submitted_for_review",
       "corrections_received",
-      "ready_for_export",
     ]);
     expect(matchingStatuses("review")).toEqual(["submitted_for_review"]);
     expect(matchingStatuses("corrections")).toEqual(["corrections_received"]);

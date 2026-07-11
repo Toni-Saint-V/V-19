@@ -7,9 +7,17 @@ export type BlsRequiredFileType = (typeof BLS_REQUIRED_FILE_TYPES)[number];
 
 export type BlsFormData = Record<string, string | undefined>;
 
+export type BlsQuestionnaireReadiness = {
+  blockingIssueCount: number;
+  completedRequiredFieldCount: number;
+  percent: number;
+  ready: boolean;
+  requiredFieldCount: number;
+};
+
 export type BlsFieldForValidation = Pick<
   QuestionnaireField,
-  'id' | 'label' | 'required' | 'value' | 'error'
+  'id' | 'label' | 'required' | 'value' | 'error' | 'reviewState'
 >;
 
 export type BlsFieldValidationContext = {
@@ -35,6 +43,52 @@ const businessPurposeValues = new Set([
   'SPORTS',
   'STUDY',
 ]);
+
+const blsFormKeyByQuestionnaireFieldId: Record<string, string> = {
+  'birth-date': 'dob',
+  'company-contact-person': 'companyContactPerson',
+  'company-org-details': 'companyOrgDetails',
+  'company-phone': 'companyPhone',
+  'cost-covered-by': 'paymentSponsor',
+  'departure-date': 'travelEnd',
+  'entry-permit-final-country': 'finalEntryPermit',
+  'entry-permit-issued-by': 'finalEntryPermitIssuedBy',
+  'entry-permit-valid-from': 'finalEntryPermitValidFrom',
+  'entry-permit-valid-to': 'finalEntryPermitValidTo',
+  'eu-citizen-relative-details': 'euRelativeDetails',
+  'eu-relative-details': 'euRelativeDetails',
+  'eu-relative-relationship': 'euRelationship',
+  'eu-relationship': 'euRelationship',
+  'filler-contact': 'formFillerContact',
+  'filler-name': 'formFillerName',
+  'filler-phone': 'formFillerPhone',
+  'final-entry-permit': 'finalEntryPermit',
+  'final-entry-permit-issued-by': 'finalEntryPermitIssuedBy',
+  'final-entry-permit-valid-from': 'finalEntryPermitValidFrom',
+  'final-entry-permit-valid-to': 'finalEntryPermitValidTo',
+  'form-filler-contact': 'formFillerContact',
+  'form-filler-name': 'formFillerName',
+  'form-filler-phone': 'formFillerPhone',
+  'inviting-party-type': 'invitingPartyType',
+  'lives-outside-citizenship': 'livesOutsideCitizenship',
+  'means-of-sponsor-support': 'sponsorMeans',
+  'occupation': 'occupation',
+  'organization-contact-person': 'companyContactPerson',
+  'organization-details': 'companyOrgDetails',
+  'organization-phone': 'companyPhone',
+  'other-sponsor': 'otherSponsor',
+  'passport-expiry-date': 'passportExpiry',
+  'passport-issue-date': 'passportIssued',
+  'previous-biometrics': 'previousBiometrics',
+  'purpose': 'stayPurpose',
+  'residence-not-nationality': 'livesOutsideCitizenship',
+  'sponsor-fields-30-31': 'sponsorInHostFields',
+  'sponsor-in-host-fields': 'sponsorInHostFields',
+  'sponsor-means': 'sponsorMeans',
+  'sponsor-name': 'otherSponsor',
+  'travel-start': 'travelStart',
+  'arrival-date': 'travelStart',
+};
 
 function read(formData: BlsFormData, key: string) {
   return (formData[key] ?? '').trim();
@@ -63,7 +117,7 @@ function isOtherLike(value: string) {
   return normalized === 'other' || normalized.includes('другое') || normalized.includes('other');
 }
 
-function invitingCompanySelected(formData: BlsFormData) {
+export function isBlsQuestionnaireInvitingCompanySelected(formData: BlsFormData) {
   const invitingPartyType = normalizeForRule(read(formData, 'invitingPartyType'));
   const stayPurpose = read(formData, 'stayPurpose').toUpperCase();
 
@@ -185,7 +239,11 @@ export function isBlsQuestionnaireFieldApplicable({
     case 'company-org-details':
     case 'company-contact-person':
     case 'company-phone':
-      return invitingCompanySelected(formData) || companyInvitationGroupStarted(formData) || hasOwnValue;
+      return (
+        isBlsQuestionnaireInvitingCompanySelected(formData) ||
+        companyInvitationGroupStarted(formData) ||
+        hasOwnValue
+      );
 
     case 'means-of-support':
       return !sponsor(read(formData, 'paymentSponsor')) || hasOwnValue;
@@ -297,7 +355,7 @@ export function isBlsQuestionnaireFieldRequired({
       return false;
 
     case 'guardian-info':
-      return applicantRole === 'child';
+      return isBlsQuestionnaireMinorApplicant(applicantRole, formData);
 
     case 'eu-relative-details':
     case 'eu-relationship':
@@ -325,7 +383,7 @@ export function isBlsQuestionnaireFieldRequired({
     case 'company-org-details':
     case 'company-contact-person':
     case 'company-phone':
-      return invitingCompanySelected(formData);
+      return isBlsQuestionnaireInvitingCompanySelected(formData);
 
     case 'means-of-support':
       return !sponsor(read(formData, 'paymentSponsor'));
@@ -440,6 +498,8 @@ export function isBlsQuestionnaireFieldReady(context: BlsFieldValidationContext)
 export function isBlsQuestionnaireFieldBlockingIssue(context: BlsFieldValidationContext) {
   if (!isBlsQuestionnaireFieldApplicable(context)) return false;
 
+  if (context.field.reviewState === 'needs_review') return true;
+
   const value = (context.value ?? context.field.value).trim();
   const validationMessage = validateBlsQuestionnaireField(context);
   if (!validationMessage) return false;
@@ -457,4 +517,66 @@ export function isBlsQuestionnaireFileReady(file: Submission['files'][number] | 
     return false;
   }
   return true;
+}
+
+function blsFormDataForApplicant(applicant: Applicant): BlsFormData {
+  const formData: BlsFormData = {};
+
+  for (const field of applicant.sections.flatMap((section) => section.fields)) {
+    const formKey = blsFormKeyByQuestionnaireFieldId[field.id];
+    if (!formKey) continue;
+
+    const currentValue = formData[formKey] ?? '';
+    if (!currentValue.trim() || field.value.trim()) {
+      formData[formKey] = field.value;
+    }
+  }
+
+  return formData;
+}
+
+export function blsQuestionnaireReadiness(
+  submission: Pick<Submission, 'applicants'>,
+): BlsQuestionnaireReadiness {
+  let blockingIssueCount = 0;
+  let completedRequiredFieldCount = 0;
+  let requiredFieldCount = 0;
+
+  for (const applicant of submission.applicants) {
+    const formData = blsFormDataForApplicant(applicant);
+
+    for (const field of applicant.sections.flatMap((section) => section.fields)) {
+      const context = {
+        applicantRole: applicant.role,
+        field,
+        formData,
+      } satisfies BlsFieldValidationContext;
+
+      if (isBlsQuestionnaireFieldRequired(context)) {
+        requiredFieldCount += 1;
+        if (isBlsQuestionnaireFieldReady(context)) {
+          completedRequiredFieldCount += 1;
+        }
+      }
+
+      if (isBlsQuestionnaireFieldBlockingIssue(context)) {
+        blockingIssueCount += 1;
+      }
+    }
+  }
+
+  const percent = requiredFieldCount
+    ? Math.round((completedRequiredFieldCount / requiredFieldCount) * 100)
+    : 0;
+
+  return {
+    blockingIssueCount,
+    completedRequiredFieldCount,
+    percent,
+    ready:
+      requiredFieldCount > 0 &&
+      completedRequiredFieldCount === requiredFieldCount &&
+      blockingIssueCount === 0,
+    requiredFieldCount,
+  };
 }

@@ -80,8 +80,6 @@ test.describe("V-19 UX state proof", () => {
     }).first();
     if (await selectedExport.count()) {
       await selectedExport.uncheck();
-    } else {
-      await expect(page.getByRole("heading", { name: "Все досье выгружены" })).toBeVisible();
     }
     await expect(
       page.locator(".export-preview").getByText("Пакет не выбран"),

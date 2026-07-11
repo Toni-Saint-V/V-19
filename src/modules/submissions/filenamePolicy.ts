@@ -34,9 +34,9 @@ export function buildApplicantDocumentFileName(input: {
   );
 
   if (!passportNumber) {
-    return `missing-passport_${input.documentType}_${sanitizeFilenameSegment(
-      input.applicantId ?? input.applicant.id,
-    )}.${extension}`;
+    throw new Error(
+      `Нельзя сформировать файл ${input.documentType}: отсутствует номер паспорта.`,
+    );
   }
 
   const name = applicantFileNameParts(input.applicant.fullName);

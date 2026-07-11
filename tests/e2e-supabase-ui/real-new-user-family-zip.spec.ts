@@ -756,7 +756,7 @@ async function inspectGeneratedZip(
     }),
   );
   expect(parsed.sheetName).toBe("Sheet1");
-  expect(parsed.dimension).toBe("A1:BE1048572");
+  expect(parsed.dimension).toBe("A1:BD3");
   const headers = parsed.rows[0]?.slice(0, 56) ?? [];
   expect(headers).toEqual([...EXPECTED_EXPORT_CONTRACT_HEADERS]);
   const dataRows = parsed.rows
