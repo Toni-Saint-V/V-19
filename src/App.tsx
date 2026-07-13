@@ -19,7 +19,11 @@ import {
   dismissAiSuggestion,
   runAiReview,
 } from "./modules/submissions/aiSuggestions";
-import { completeExportPackage } from "./modules/submissions/exportWorkflow";
+import {
+  completeExportPackage,
+  ExportPackageCompletionUncertainError,
+  reconcileExportPackageCompletion,
+} from "./modules/submissions/exportWorkflow";
 import {
   loadCockpitSubmissionsForProfile,
   saveCockpitSubmissionsForProfile,
@@ -988,27 +992,99 @@ export default function App({
         const selectedDownloaded = downloadedSubmissions.filter((submission) =>
           submissionIds.includes(submission.id),
         );
-        const completed = await completeExportPackage(selectedDownloaded, {
+        const failWithRetryableExportState = async (
+          failure: unknown,
+        ): Promise<never> => {
+          const retryableSubmissions = applyExportStateToSelection(
+            downloadedSubmissions,
+            submissionIds,
+            "ready",
+          );
+          const failureMessage =
+            failure instanceof Error
+              ? failure.message
+              : typeof failure === "string"
+                ? failure
+                : "Export package completion failed.";
+          if (retryableSubmissions === downloadedSubmissions) {
+            throw new Error(
+              `${failureMessage} Export state could not be restored for retry.`,
+            );
+          }
+          try {
+            await persistSubmissions(retryableSubmissions);
+          } catch {
+            throw new Error(
+              `${failureMessage} Export state rollback could not be persisted.`,
+            );
+          }
+          throw new Error(failureMessage);
+        };
+
+        const completionOptions = {
+          batchId: crypto.randomUUID(),
           createdAt: new Date().toISOString(),
           createdBy: activeApprovedSession.userId,
-          format: "xlsx",
-        });
+          format: "xlsx" as const,
+        };
+        let completed: Awaited<ReturnType<typeof completeExportPackage>>;
+        try {
+          completed = await completeExportPackage(
+            selectedDownloaded,
+            completionOptions,
+          );
+        } catch (error) {
+          const reconciliation = await reconcileExportPackageCompletion(
+            selectedDownloaded,
+            completionOptions,
+            error,
+          );
+          if (reconciliation.status === "committed") {
+            // A lost RPC response can still represent a committed transaction.
+            // Converge from canonical Supabase state and never roll that commit back.
+            try {
+              await refreshCanonicalSubmissions();
+            } catch {
+              // Canonical refresh is follow-up only after durable commit proof.
+            }
+            try {
+              await bridge.onExportPackages?.(submissionIds);
+            } catch {
+              // External bridge/tracking is deliberately non-transactional.
+            }
+            return;
+          }
+          if (reconciliation.status === "not_committed") {
+            return failWithRetryableExportState(error);
+          }
+
+          try {
+            await refreshCanonicalSubmissions();
+          } catch {
+            // Preserve the uncertain outcome classification across refresh failures.
+          }
+          const failureMessage =
+            error instanceof Error
+              ? error.message
+              : "Export package completion failed.";
+          throw new ExportPackageCompletionUncertainError(
+            `${failureMessage} Canonical export commit could not be confirmed; automatic rollback was skipped.`,
+            { cause: error },
+          );
+        }
         if (completed.status === "blocked") {
-          throw new Error(completed.blockers.join("; "));
+          return failWithRetryableExportState(completed.blockers.join("; "));
         }
 
-        const exportedById = new Map(
-          completed.submissions.map((submission) => [submission.id, submission]),
-        );
-        const nextSubmissions = downloadedSubmissions.map(
-          (submission) => exportedById.get(submission.id) ?? submission,
-        );
+        // `complete_export_package` is the durable, atomic terminal transition.
+        // Do not send the exported snapshot through the generic draft writer: that
+        // endpoint correctly rejects terminal submissions and would surface a false
+        // save error after a successful export. Converge the workspace from the
+        // canonical Supabase state instead.
         try {
-          await persistSubmissions(nextSubmissions);
-        } catch {
-          // The export RPC is already durable and atomic. Reload canonical server state
-          // instead of reporting a false failure that would roll document assets back.
           await refreshCanonicalSubmissions();
+        } catch {
+          // A failed follow-up read must not undo a committed export package.
         }
         try {
           await bridge.onExportPackages?.(submissionIds);

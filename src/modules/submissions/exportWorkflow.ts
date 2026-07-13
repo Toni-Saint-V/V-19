@@ -1,8 +1,11 @@
 import type { ExportBatch } from "../../types/domain";
+import { safeDiagnosticsForPersistenceError } from "../../services/persistenceObservability";
 import {
   commitSubmissionExportPackage,
+  reconcileSubmissionExportPackage,
   type ExportPackageCommitBatch,
   type ExportPackageCommitOutcome,
+  type ExportPackageCommitReconciliation,
 } from "./exportPackagePersistence";
 import {
   buildExportPackageIdentity,
@@ -43,6 +46,45 @@ export interface CompleteExportPackageExported {
 export type CompleteExportPackageResult =
   | CompleteExportPackageBlocked
   | CompleteExportPackageExported;
+
+export class ExportPackageCompletionUncertainError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ExportPackageCompletionUncertainError";
+  }
+}
+
+export async function reconcileExportPackageCompletion(
+  submissions: Submission[],
+  options: CompleteExportPackageOptions,
+  failure: unknown,
+): Promise<ExportPackageCommitReconciliation> {
+  const identity = buildExportPackageIdentity(submissions, options.format);
+  if (!identity) return { status: "unknown" };
+
+  const diagnostics = safeDiagnosticsForPersistenceError(failure);
+  if (diagnostics?.retryable) {
+    try {
+      const retried = await completeExportPackage(submissions, options);
+      if (retried.status === "exported") {
+        return { batch: retried.batch, status: "committed" };
+      }
+    } catch {
+      // The canonical read below is the final authority after an idempotent retry.
+    }
+  }
+
+  const canonical = await reconcileSubmissionExportPackage(identity);
+  if (canonical.status === "committed") return canonical;
+  if (
+    canonical.status === "not_committed" &&
+    diagnostics &&
+    !diagnostics.retryable
+  ) {
+    return canonical;
+  }
+  return { status: "unknown" };
+}
 
 export async function completeExportPackage(
   submissions: Submission[],

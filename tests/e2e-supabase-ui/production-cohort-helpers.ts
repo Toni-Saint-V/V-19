@@ -41,6 +41,7 @@ const ignoredBrowserProblem =
   /ResizeObserver loop|favicon|net::ERR_ABORTED|Download the React DevTools/i;
 const cohortReferenceDate = new Date();
 cohortReferenceDate.setUTCHours(12, 0, 0, 0);
+const productionWorkspaceReadyTimeoutMs = 120_000;
 
 export type ProductionCohortAccount = {
   email: string;
@@ -189,7 +190,6 @@ async function assertAgentDrawerCaseContract(
 ) {
   await openDrawerTab(page, /Обзор/);
   const root = drawer(page);
-  await expect(root).toContainText(cohortCase.caseMarker);
   await expect(root).toContainText(cohortCase.city);
   await expect(root).toContainText("Участники");
   await expect(root).toContainText(`${cohortCase.applicantCount} человек`);
@@ -506,13 +506,13 @@ function sanitizeMutationPath(pathname: string) {
   return "/unclassified";
 }
 
-function isPermittedStaticRuntimeRequest(url: URL, method: string) {
+export function isPermittedCohortStaticRuntimeRequest(url: URL, method: string) {
   return (
     method === "GET" &&
     url.origin === PRODUCTION_COHORT_APP_ORIGIN &&
-    /^\/tesseract\/(?:core|lang)\/[^/]+$|^\/tesseract\/worker\.min\.js$/.test(
-      url.pathname,
-    )
+    (/^\/tesseract\/core\/[a-zA-Z0-9._-]+\.(?:js|wasm)$/.test(url.pathname) ||
+      url.pathname === "/tesseract/lang/eng.traineddata.gz" ||
+      url.pathname === "/tesseract/worker.min.js")
   );
 }
 
@@ -526,7 +526,7 @@ export class ProductionNetworkLedger {
       const method = request.method().toUpperCase();
       const isDataRequest =
         request.resourceType() === "fetch" || request.resourceType() === "xhr";
-      const isPermittedStaticRuntimeAsset = isPermittedStaticRuntimeRequest(
+      const isPermittedStaticRuntimeAsset = isPermittedCohortStaticRuntimeRequest(
         url,
         method,
       );
@@ -644,11 +644,16 @@ export async function signInCohortAccount(
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Пароль", { exact: true }).fill(account.password);
   const loginResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      response.url().startsWith(PRODUCTION_SUPABASE_ORIGIN) &&
-      /\/auth\/v1\/token\?grant_type=password/.test(response.url()),
-    { timeout: 45_000 },
+    (response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "POST" &&
+        url.origin === PRODUCTION_SUPABASE_ORIGIN &&
+        url.pathname === "/auth/v1/token" &&
+        url.searchParams.get("grant_type") === "password"
+      );
+    },
+    { timeout: 60_000 },
   );
   const [response] = await Promise.all([
     loginResponse,
@@ -665,7 +670,7 @@ export async function signInCohortAccount(
   await expect(
     page.getByRole("heading", { level: 1, name: expectedHeading }),
   ).toBeVisible({
-    timeout: 45_000,
+    timeout: productionWorkspaceReadyTimeoutMs,
   });
   ledger.assertNoOriginViolations();
   return { browserProblems, ledger, page };
@@ -971,6 +976,9 @@ async function openQuestionnaireFromDrawer(page: Page) {
 
 async function reopenQuestionnaireFromCanonicalState(page: Page, submissionId: string) {
   await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(
+    page.getByRole("button", { exact: true, name: "Мои подачи" }).first(),
+  ).toBeVisible({ timeout: 45_000 });
   await clickWorkspaceButton(page, /Мои подачи/);
   await waitForAgentSubmissionsSettled(page);
   await openSubmissionById(page, submissionId);
@@ -1203,6 +1211,17 @@ async function closeDrawerIfOpen(page: Page) {
   await expect(drawer(page)).toHaveCount(0);
 }
 
+async function assertCheckpointMatchesCohortCase(
+  page: Page,
+  cohortCase: ProductionCohortCase,
+) {
+  await openDrawerTab(page, /Файлы/);
+  await expect(drawer(page)).toContainText(cohortCase.caseMarker, {
+    timeout: 45_000,
+  });
+  await openDrawerTab(page, /Обзор/);
+}
+
 export async function createOrResumeCohortCase(input: {
   account: ProductionCohortAccount;
   cohortCase: ProductionCohortCase;
@@ -1261,16 +1280,13 @@ export async function createOrResumeCohortCase(input: {
     await clickWorkspaceButton(page, /Мои подачи/);
     await waitForAgentSubmissionsSettled(page);
     await openSubmissionById(page, checkpoint.submissionId);
+    await assertCheckpointMatchesCohortCase(page, cohortCase);
     const visibleDrawerText = await drawer(page).innerText();
     if (
       checkpoint.stage === "submitted" ||
       /На проверке|Отправлено на проверку/.test(visibleDrawerText)
     ) {
       await expect(drawer(page)).toContainText(/На проверке|Отправлено на проверку/);
-      if (!(await drawer(page).innerText()).includes(cohortCase.caseMarker)) {
-        await openDrawerTab(page, /Анкета/);
-      }
-      await expect(drawer(page)).toContainText(cohortCase.caseMarker);
       await assertAgentDrawerCaseContract(page, cohortCase);
       checkpoint.stage = "submitted";
       await saveCohortResumeState(resumeState);
@@ -1409,6 +1425,7 @@ export async function createOrResumeCohortCase(input: {
       timeout: 45_000,
     });
     ledger.assertHealthySince(mutationCheckpoint, `submit ${cohortCase.caseKey}`);
+    await assertCheckpointMatchesCohortCase(page, cohortCase);
     await assertAgentDrawerCaseContract(page, cohortCase);
     checkpoint.stage = "submitted";
     await saveCohortResumeState(resumeState);

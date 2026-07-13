@@ -19,6 +19,12 @@ const runtime = vi.hoisted(() => ({
 }));
 
 const exportMocks = vi.hoisted(() => ({
+  ExportPackageCompletionUncertainError: class extends Error {
+    constructor(message: string, options?: ErrorOptions) {
+      super(message, options);
+      this.name = "ExportPackageCompletionUncertainError";
+    }
+  },
   completeExportPackage: vi.fn(async (submissions: Array<Record<string, unknown>>) => ({
     batch: { id: "export-batch-1" },
     commit: { duplicate: false },
@@ -28,6 +34,9 @@ const exportMocks = vi.hoisted(() => ({
       exportState: "marked_exported",
       status: "exported",
     })),
+  })),
+  reconcileExportPackageCompletion: vi.fn(async () => ({
+    status: "not_committed" as const,
   })),
 }));
 
@@ -240,6 +249,7 @@ function resetDeferredRuntime() {
   persistenceMocks.loadCockpitSubmissionsForProfile.mockClear();
   persistenceMocks.saveCockpitSubmissionsForProfile.mockClear();
   exportMocks.completeExportPackage.mockClear();
+  exportMocks.reconcileExportPackageCompletion.mockClear();
 }
 
 const loadedSubmission = {
@@ -315,6 +325,7 @@ describe("App production workspace runtime", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add issue" }));
     await waitFor(() => {
       expect(runtime.issueActorId).toBe("admin-production-uuid");
+      expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
       expect(externalIssue).toHaveBeenCalledTimes(1);
     });
   });
@@ -344,9 +355,58 @@ describe("App production workspace runtime", () => {
     expect(runtime.lastMutationError?.message).toBe("Supabase mutation failed safely");
   });
 
-  test("persists file_downloaded before the atomic export RPC and then converges the snapshot", async () => {
+  test("persists file_downloaded before the atomic export RPC and refreshes canonical state without a terminal draft save", async () => {
     runtime.savePromise = Promise.resolve(
       new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    render(<App />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await act(async () => {
+      await runtime.lastMutationPromise;
+    });
+
+    expect(runtime.exportStateCalls).toEqual(["file_generated", "file_downloaded"]);
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    expect(
+      persistenceMocks.saveCockpitSubmissionsForProfile.mock.calls[0]?.[1],
+    ).toEqual([
+      expect.objectContaining({
+        exportState: "file_downloaded",
+        id: "submission-1",
+      }),
+    ]);
+    expect(exportMocks.completeExportPackage).toHaveBeenCalledWith(
+      [expect.objectContaining({ exportState: "file_downloaded" })],
+      expect.objectContaining({ createdBy: "admin-production-uuid" }),
+    );
+    // The draft save schedules a refresh and the durable terminal RPC queues
+    // the final canonical refresh. Both are reads; neither may become a second
+    // terminal draft persistence.
+    expect(persistenceMocks.loadCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
+    expect(runtime.lastMutationError).toBeNull();
+
+    const firstPersistenceOrder =
+      persistenceMocks.saveCockpitSubmissionsForProfile.mock.invocationCallOrder[0];
+    const rpcOrder = exportMocks.completeExportPackage.mock.invocationCallOrder[0];
+    expect(firstPersistenceOrder).toBeLessThan(rpcOrder ?? 0);
+  });
+
+  test("restores a retryable export state only when canonical reconciliation proves the RPC did not commit", async () => {
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    exportMocks.completeExportPackage.mockRejectedValueOnce(
+      new Error("Atomic export RPC failed safely"),
     );
     render(<App />);
     await screen.findByText("Загрузка данных Supabase...");
@@ -363,32 +423,103 @@ describe("App production workspace runtime", () => {
       await runtime.lastMutationPromise;
     });
 
-    expect(runtime.exportStateCalls).toEqual(["file_generated", "file_downloaded"]);
-    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
-    expect(
-      persistenceMocks.saveCockpitSubmissionsForProfile.mock.calls[0]?.[1],
-    ).toEqual([
-      expect.objectContaining({
-        exportState: "file_downloaded",
-        id: "submission-1",
-      }),
+    expect(runtime.exportStateCalls).toEqual([
+      "file_generated",
+      "file_downloaded",
+      "ready",
     ]);
-    expect(exportMocks.completeExportPackage).toHaveBeenCalledWith(
-      [expect.objectContaining({ exportState: "file_downloaded" })],
-      expect.objectContaining({ createdBy: "admin-production-uuid" }),
-    );
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(2);
     expect(
       persistenceMocks.saveCockpitSubmissionsForProfile.mock.calls[1]?.[1],
     ).toEqual([
       expect.objectContaining({
-        exportState: "marked_exported",
-        status: "exported",
+        exportState: "ready",
+        id: "submission-1",
       }),
     ]);
+    expect(runtime.lastMutationError?.message).toBe("Atomic export RPC failed safely");
+    expect(exportMocks.reconcileExportPackageCompletion).toHaveBeenCalledWith(
+      [expect.objectContaining({ exportState: "file_downloaded" })],
+      expect.objectContaining({
+        batchId: expect.any(String),
+        createdBy: "admin-production-uuid",
+        format: "xlsx",
+      }),
+      expect.objectContaining({ message: "Atomic export RPC failed safely" }),
+    );
+  });
 
-    const firstPersistenceOrder =
-      persistenceMocks.saveCockpitSubmissionsForProfile.mock.invocationCallOrder[0];
-    const rpcOrder = exportMocks.completeExportPackage.mock.invocationCallOrder[0];
-    expect(firstPersistenceOrder).toBeLessThan(rpcOrder ?? 0);
+  test("keeps committed export state when the atomic RPC response is lost", async () => {
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    exportMocks.completeExportPackage.mockRejectedValueOnce(
+      new Error("Atomic export RPC response was lost"),
+    );
+    exportMocks.reconcileExportPackageCompletion.mockResolvedValueOnce({
+      batch: {
+        contentFingerprint: "fingerprint-1",
+        createdAt: "2026-07-12T10:00:00.000Z",
+        createdBy: "admin-production-uuid",
+        fileName: "visaflow-export-package-1.xlsx",
+        format: "xlsx",
+        id: "export-batch-1",
+        idempotencyKey: "package-1",
+        rowCount: 1,
+        submissionIds: ["submission-1"],
+      },
+      status: "committed" as const,
+    });
+    render(<App />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await act(async () => {
+      await runtime.lastMutationPromise;
+    });
+
+    expect(runtime.exportStateCalls).toEqual(["file_generated", "file_downloaded"]);
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    expect(runtime.lastMutationError).toBeNull();
+    expect(exportMocks.reconcileExportPackageCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not roll back an export whose canonical RPC outcome remains unknown", async () => {
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    exportMocks.completeExportPackage.mockRejectedValueOnce(
+      new Error("Atomic export RPC response was lost"),
+    );
+    exportMocks.reconcileExportPackageCompletion.mockResolvedValueOnce({
+      status: "unknown" as const,
+    });
+    render(<App />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await act(async () => {
+      await runtime.lastMutationPromise;
+    });
+
+    expect(runtime.exportStateCalls).toEqual(["file_generated", "file_downloaded"]);
+    expect(persistenceMocks.saveCockpitSubmissionsForProfile).toHaveBeenCalledTimes(1);
+    expect(runtime.lastMutationError?.message).toContain(
+      "automatic rollback was skipped",
+    );
   });
 });
