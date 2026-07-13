@@ -50,6 +50,8 @@ Backup owner:
 - `20260710004000_harden_document_assets_projection.sql`
 - `20260710021043_harden_media_asset_review_boundary.sql`
 - `20260710022231_add_media_assets_applicant_submission_index.sql`
+- `20260712201203_allow_admin_waiting_review_issue_checkpoint.sql`
+- `20260712225209_save_returned_submission_update_first.sql`
 
 ## Required Evidence
 

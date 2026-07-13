@@ -64,6 +64,8 @@ Apply migrations only in the repository order declared by
 - `20260710004000_harden_document_assets_projection.sql`
 - `20260710021043_harden_media_asset_review_boundary.sql`
 - `20260710022231_add_media_assets_applicant_submission_index.sql`
+- `20260712201203_allow_admin_waiting_review_issue_checkpoint.sql`
+- `20260712225209_save_returned_submission_update_first.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 
@@ -93,6 +95,28 @@ owner approval, an actor list, a rollback note, and a dry-run report.
 Rollback is limited to migration-level remediation, disabling production
 activation env, and reverting client configuration. Do not delete production
 visa case data from Codex.
+
+For `20260712201203_allow_admin_waiting_review_issue_checkpoint.sql`, the exact
+forward-remediation template is
+`supabase/remediation/20260712201203_allow_admin_waiting_review_issue_checkpoint.rollback.sql`.
+After any production apply, rollback must be a newly timestamped migration made
+from that template; never delete or edit applied migration history. The template
+restores the function body from
+`20260703165306_day10_review_readiness_storage_identity.sql`, revokes direct
+browser-role execution, and verifies the deferred trigger, ACL, SECURITY DEFINER,
+and fixed search path before the remediation transaction can commit.
+
+For `20260712225209_save_returned_submission_update_first.sql`, the
+exact forward-remediation template is
+`supabase/remediation/20260712225209_save_returned_submission_update_first.rollback.sql`.
+After any production apply, rollback must be a newly timestamped migration made
+from that template; never delete or edit applied migration history. The template
+restores the exact function body from
+`20260710000300_persist_handoff_applicant_projection.sql`, restores authenticated
+execution while denying anon/public execution, and verifies the helper remains
+SECURITY INVOKER with its fixed search path before the remediation transaction
+can commit. The global submission mutation trigger is not changed by either the
+forward migration or this remediation template.
 
 Production client activation requires:
 
