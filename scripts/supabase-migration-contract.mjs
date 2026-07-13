@@ -39,6 +39,8 @@ export const requiredMigrationOrder = [
   "20260710004000_harden_document_assets_projection.sql",
   "20260710021043_harden_media_asset_review_boundary.sql",
   "20260710022231_add_media_assets_applicant_submission_index.sql",
+  "20260712201203_allow_admin_waiting_review_issue_checkpoint.sql",
+  "20260712225209_save_returned_submission_update_first.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -95,6 +97,8 @@ export const requiredRemoteMigrationOrder = [
   "20260710041458_20260710004000_harden_document_assets_projection",
   "20260710041500_20260710021043_harden_media_asset_review_boundary",
   "20260710041502_20260710022231_add_media_assets_applicant_submission_index",
+  "20260712201203_allow_admin_waiting_review_issue_checkpoint",
+  "20260712225209_save_returned_submission_update_first",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {

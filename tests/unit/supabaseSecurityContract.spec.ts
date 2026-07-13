@@ -526,6 +526,252 @@ describe("Supabase security contract", () => {
     expect(readinessMigration).toContain("split_part(m.storage_path, '/', 7) = ''");
   });
 
+  test("allows only admin same-status waiting-review issue checkpoints", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260712201203_allow_admin_waiting_review_issue_checkpoint.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const sql = normalizeSql(migration);
+    const blockingIssueGuard = sql.indexOf(
+      "c.severity = 'blocking' and c.status = 'open'",
+    );
+    const adminCheckpointException = sql.indexOf(
+      "actor_role = 'admin' and old.status = 'waiting_review' and new.status = 'waiting_review'",
+    );
+    const blockingIssueFailure = sql.indexOf(
+      "raise exception 'blocking corrections must be fixed before review'",
+    );
+
+    expectSqlStatement(
+      migration,
+      "create or replace function app_private.enforce_submission_review_readiness()",
+    );
+    expect(migration).toContain("security definer");
+    expect(migration).toContain("set search_path = public, app_private");
+    expect(migration).toContain("actor_role public.profile_role;");
+    expect(migration).toContain("if tg_op = 'UPDATE' then");
+    expect(migration).toContain(
+      "actor_role := app_private.current_profile_role();",
+    );
+    expect(
+      sql.indexOf("actor_role := app_private.current_profile_role()"),
+    ).toBeGreaterThan(blockingIssueGuard);
+    expect(blockingIssueGuard).toBeGreaterThan(-1);
+    expect(adminCheckpointException).toBeGreaterThan(blockingIssueGuard);
+    expect(blockingIssueFailure).toBeGreaterThan(adminCheckpointException);
+
+    for (const preservedGuard of [
+      "A single submission must have exactly one applicant before review",
+      "A family submission must have applicants before review",
+      "Applicant required fields must be complete before review",
+      "All required media must be uploaded before review",
+    ]) {
+      expect(migration).toContain(preservedGuard);
+    }
+
+    expect(migration).not.toMatch(/\b(?:grant|revoke)\b/i);
+    expect(migration).not.toMatch(/\bcreate\s+policy\b/i);
+    expect(migration).not.toMatch(/\balter\s+table\b/i);
+    expect(migrationContract).toContain(
+      "20260712201203_allow_admin_waiting_review_issue_checkpoint.sql",
+    );
+    expect(migrationContract).toContain(
+      "20260712201203_allow_admin_waiting_review_issue_checkpoint",
+    );
+  });
+
+  test("keeps the review-readiness rollback exact, forward-only, and ACL checked", () => {
+    const previousMigration = readProjectFile(
+      "supabase/migrations/20260703165306_day10_review_readiness_storage_identity.sql",
+    );
+    const rollbackTemplate = readProjectFile(
+      "supabase/remediation/20260712201203_allow_admin_waiting_review_issue_checkpoint.rollback.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const promotionRunbook = readProjectFile(
+      "docs/release/supabase-production-promotion.md",
+    );
+    const functionStart = rollbackTemplate.indexOf(
+      "create or replace function app_private.enforce_submission_review_readiness()",
+    );
+    const functionEnd = rollbackTemplate.indexOf("$$;", functionStart) + 3;
+    const restoredFunction = rollbackTemplate.slice(functionStart, functionEnd);
+
+    expect(functionStart).toBeGreaterThan(-1);
+    expect(functionEnd).toBeGreaterThan(functionStart + 3);
+    expect(normalizeSql(restoredFunction)).toBe(normalizeSql(previousMigration));
+    expectSqlStatement(
+      rollbackTemplate,
+      "revoke all on function app_private.enforce_submission_review_readiness() from public, anon, authenticated",
+    );
+    expect(rollbackTemplate).toContain("has_function_privilege(");
+    expect(rollbackTemplate).toContain("'anon'");
+    expect(rollbackTemplate).toContain("'authenticated'");
+    expect(rollbackTemplate).toContain("function_definition.prosecdef");
+    expect(rollbackTemplate).toContain("search_path=public, app_private");
+    expect(rollbackTemplate).toContain("submissions_review_readiness_guard");
+    expect(rollbackTemplate).toContain("readiness_trigger.tgdeferrable");
+    expect(rollbackTemplate).toContain("readiness_trigger.tginitdeferred");
+    expect(rollbackTemplate).toContain("readiness_trigger.tgfoid");
+    expect(rollbackTemplate).toContain(
+      "trigger_record.tgenabled is distinct from 'O'",
+    );
+    expect(migrationContract).not.toContain(
+      "20260712201203_allow_admin_waiting_review_issue_checkpoint.rollback.sql",
+    );
+    expect(promotionRunbook).toContain(
+      "supabase/remediation/20260712201203_allow_admin_waiting_review_issue_checkpoint.rollback.sql",
+    );
+  });
+
+  test("updates existing returned submissions before insert-on-miss without weakening the global guard", () => {
+    const previousMigration = readProjectFile(
+      "supabase/migrations/20260710000300_persist_handoff_applicant_projection.sql",
+    );
+    const migration = readProjectFile(
+      "supabase/migrations/20260712225209_save_returned_submission_update_first.sql",
+    );
+    const globalGuard = readProjectFile(
+      "supabase/migrations/20260630235513_allow_trip_date_sync_during_submit_handoff.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const previousLower = previousMigration.toLowerCase();
+    const migrationLower = migration.toLowerCase();
+    const previousWriteStart = previousLower.indexOf(
+      "  insert into public.submissions (",
+    );
+    const updateStart = migrationLower.indexOf("  update public.submissions");
+    const diagnosticsStart = migrationLower.indexOf(
+      "  get diagnostics submission_write_count = row_count;",
+      updateStart,
+    );
+    const insertStart = migrationLower.indexOf(
+      "    insert into public.submissions (",
+      diagnosticsStart,
+    );
+    const childrenStart = migrationLower.indexOf(
+      "  if can_write_children then",
+      insertStart,
+    );
+    const previousChildrenStart = previousLower.indexOf(
+      "  if can_write_children then",
+      previousWriteStart,
+    );
+    const updateStatement = migration.slice(updateStart, diagnosticsStart);
+    const submissionWrite = migration.slice(updateStart, childrenStart);
+    const migrationPrefix = migration
+      .slice(0, updateStart)
+      .replace(" SECURITY INVOKER\n", "")
+      .replace("  submission_write_count integer := 0;\n", "");
+    const normalizedPreviousSuffix = normalizeSql(
+      previousMigration.slice(previousChildrenStart),
+    ).replace(/;$/, "");
+    const normalizedMigrationSuffix = normalizeSql(
+      migration.slice(childrenStart),
+    ).replace(/;$/, "");
+
+    expect(previousWriteStart).toBeGreaterThan(-1);
+    expect(updateStart).toBeGreaterThan(-1);
+    expect(diagnosticsStart).toBeGreaterThan(updateStart);
+    expect(insertStart).toBeGreaterThan(diagnosticsStart);
+    expect(childrenStart).toBeGreaterThan(insertStart);
+    expect(normalizeSql(migrationPrefix)).toBe(
+      normalizeSql(previousMigration.slice(0, previousWriteStart)),
+    );
+    expect(normalizedMigrationSuffix).toBe(normalizedPreviousSuffix);
+
+    expect(migration).toContain(" SECURITY INVOKER");
+    expect(migration).toContain(" SET search_path TO 'public'");
+    expect(migration).not.toContain("SECURITY DEFINER");
+    expect(migration).not.toContain(
+      "app_private.enforce_submission_agent_mutation",
+    );
+    expect(updateStatement).toContain("where id = submission_record.id;");
+    expect(updateStatement).not.toMatch(/\bagent_id\s*=/i);
+    expect(submissionWrite).toContain(
+      "get diagnostics submission_write_count = row_count;",
+    );
+    expect(submissionWrite).toContain("if submission_write_count = 0 then");
+    expect(submissionWrite).toContain("insert into public.submissions (");
+    expect(submissionWrite).toContain("submission_record.agent_id,");
+    expect(submissionWrite).not.toContain("on conflict (id) do update");
+
+    expect(globalGuard).toContain("if tg_op = 'INSERT' then");
+    expect(globalGuard).toContain(
+      "new.status not in ('draft', 'filling', 'ready_for_review', 'waiting_review')",
+    );
+    expect(globalGuard).toContain("if old.status = 'returned' then");
+    expect(globalGuard).toContain(
+      "new.status not in ('returned', 'ready_for_review', 'waiting_review')",
+    );
+    expect(migrationContract).toContain(
+      "20260712225209_save_returned_submission_update_first.sql",
+    );
+    expect(migrationContract).toContain(
+      "20260712225209_save_returned_submission_update_first",
+    );
+  });
+
+  test("keeps the returned-save rollback exact, forward-only, and ACL checked", () => {
+    const previousMigration = readProjectFile(
+      "supabase/migrations/20260710000300_persist_handoff_applicant_projection.sql",
+    );
+    const rollbackTemplate = readProjectFile(
+      "supabase/remediation/20260712225209_save_returned_submission_update_first.rollback.sql",
+    );
+    const migrationContract = readProjectFile(
+      "scripts/supabase-migration-contract.mjs",
+    );
+    const promotionRunbook = readProjectFile(
+      "docs/release/supabase-production-promotion.md",
+    );
+    const functionStart = rollbackTemplate.indexOf(
+      "CREATE OR REPLACE FUNCTION app_private.save_submission_draft_without_questionnaire_rows(payload jsonb)",
+    );
+    const functionDelimiter = rollbackTemplate.indexOf(
+      "$function$;",
+      functionStart,
+    );
+    const functionEnd = functionDelimiter + "$function$".length;
+    const restoredFunction = rollbackTemplate.slice(functionStart, functionEnd);
+
+    expect(functionStart).toBeGreaterThan(-1);
+    expect(functionDelimiter).toBeGreaterThan(functionStart);
+    expect(normalizeSql(restoredFunction)).toBe(normalizeSql(previousMigration));
+    expectSqlStatement(
+      rollbackTemplate,
+      "revoke all on function app_private.save_submission_draft_without_questionnaire_rows(jsonb) from public, anon",
+    );
+    expectSqlStatement(
+      rollbackTemplate,
+      "grant execute on function app_private.save_submission_draft_without_questionnaire_rows(jsonb) to authenticated",
+    );
+    expect(rollbackTemplate).toContain("function_definition.prosecdef");
+    expect(rollbackTemplate).toContain("search_path=public");
+    expect(rollbackTemplate).toContain("is distinct from false");
+    expect(rollbackTemplate).toContain("has_function_privilege(");
+    expect(rollbackTemplate).toContain("'anon'");
+    expect(rollbackTemplate).toContain("'authenticated'");
+    expect(rollbackTemplate).not.toContain(
+      "app_private.enforce_submission_agent_mutation",
+    );
+    expect(migrationContract).not.toContain(
+      "20260712225209_save_returned_submission_update_first.rollback.sql",
+    );
+    expect(promotionRunbook).toContain(
+      "supabase/remediation/20260712225209_save_returned_submission_update_first.rollback.sql",
+    );
+    expect(promotionRunbook).toContain(
+      "The global submission mutation trigger is not changed",
+    );
+  });
+
   test("does not trust client-provided correction authors", () => {
     const submissionService = readProjectFile("src/services/submissionService.ts");
     const runtimeGuards = readProjectFile(
