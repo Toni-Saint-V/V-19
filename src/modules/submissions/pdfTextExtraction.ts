@@ -97,7 +97,7 @@ export async function extractPdfTextFromFile(file: File): Promise<ExtractedPdfTe
 
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.mjs",
+    "../../../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
     import.meta.url,
   ).toString();
   const arrayBuffer = await file.arrayBuffer();

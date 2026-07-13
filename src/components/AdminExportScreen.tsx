@@ -32,6 +32,7 @@ import {
 } from "../integration/visaflowBusinessBridge";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { applyExportStateToSelection } from "../modules/submissions/submissionActions";
+import { ExportPackageCompletionUncertainError } from "../modules/submissions/exportWorkflow";
 import {
   buildExportPackageIdentity,
   exportSummary,
@@ -330,7 +331,6 @@ export function AdminExportScreen({
 
   useEffect(() => {
     setPreparedExport(null);
-    setExportNotice("");
     setExportError("");
   }, [selectedSignature, submissions]);
 
@@ -643,12 +643,16 @@ export function AdminExportScreen({
         }
         await bridge.onExportPackages(prepared.submissionIds);
       } catch (error) {
-        const restoreResult = documentAssetsCommitted
+        const commitOutcomeUnknown =
+          error instanceof ExportPackageCompletionUncertainError;
+        const restoreResult = documentAssetsCommitted && !commitOutcomeUnknown
           ? await restoreExportMediaZipArtifact(zipArtifactResult.artifact)
           : { ok: true as const };
-        const recoveryMessage = restoreResult.ok
-          ? "Документы возвращены в состояние для безопасного повтора."
-          : restoreResult.safeMessage;
+        const recoveryMessage = commitOutcomeUnknown
+          ? "Документы уже помечены как выгруженные; их состояние сохранено до подтверждения канонического результата Supabase. Не запускайте повторную выгрузку."
+          : restoreResult.ok
+            ? "Документы возвращены в состояние для безопасного повтора."
+            : restoreResult.safeMessage;
         setExportError(
           error instanceof Error
             ? `ZIP скачан, но статус выгрузки не обновлён: ${error.message} ${recoveryMessage}`

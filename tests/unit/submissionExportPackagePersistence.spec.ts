@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   commitSubmissionExportPackage,
+  reconcileSubmissionExportPackage,
   type ExportPackageCommitBatch,
 } from "../../src/modules/submissions/exportPackagePersistence";
 
@@ -36,6 +37,33 @@ function row(overrides: Record<string, unknown> = {}) {
     row_count: batch.rowCount,
     submission_ids: batch.submissionIds,
     ...overrides,
+  };
+}
+
+function reconciliationClient(
+  batchRows: Array<Record<string, unknown>>,
+  submissionRows: Array<{ id: string; status: string }>,
+) {
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "export_batches") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              limit: vi.fn(async () => ({ data: batchRows, error: null })),
+            })),
+          })),
+        };
+      }
+      if (table === "submissions") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(async () => ({ data: submissionRows, error: null })),
+          })),
+        };
+      }
+      throw new Error(`Unexpected reconciliation table: ${table}`);
+    }),
   };
 }
 
@@ -110,5 +138,59 @@ describe("V-19 submission export package persistence", () => {
       userMessage:
         "Access was denied by Supabase policy. Ask an operator to confirm access.",
     });
+  });
+
+  test("classifies a thrown lost RPC response as retryable before reconciliation", async () => {
+    supabaseMock.client = {
+      rpc: vi.fn(async () => {
+        throw { message: "Request timed out", name: "TimeoutError" };
+      }),
+    };
+
+    await expect(commitSubmissionExportPackage(batch)).rejects.toMatchObject({
+      diagnostics: {
+        operation: "rpc.complete_export_package",
+        retryable: true,
+        safeCode: "rpc.complete_export_package:rpc:NETWORK",
+      },
+    });
+  });
+
+  test("reconciles a lost RPC response as committed only for the exact batch and exported submissions", async () => {
+    supabaseMock.client = reconciliationClient(
+      [row()],
+      batch.submissionIds.map((id) => ({ id, status: "exported" })),
+    );
+
+    await expect(
+      reconcileSubmissionExportPackage(batch),
+    ).resolves.toMatchObject({
+      batch: {
+        idempotencyKey: batch.idempotencyKey,
+        submissionIds: batch.submissionIds,
+      },
+      status: "committed",
+    });
+  });
+
+  test("reconciles a lost RPC response as not committed only when no batch exists and every exact submission remains ready", async () => {
+    supabaseMock.client = reconciliationClient(
+      [],
+      batch.submissionIds.map((id) => ({ id, status: "ready_for_excel" })),
+    );
+
+    await expect(
+      reconcileSubmissionExportPackage(batch),
+    ).resolves.toEqual({ status: "not_committed" });
+  });
+
+  test("keeps reconciliation unknown for a partial canonical submission set", async () => {
+    supabaseMock.client = reconciliationClient([], [
+      { id: batch.submissionIds[0]!, status: "ready_for_excel" },
+    ]);
+
+    await expect(
+      reconcileSubmissionExportPackage(batch),
+    ).resolves.toEqual({ status: "unknown" });
   });
 });

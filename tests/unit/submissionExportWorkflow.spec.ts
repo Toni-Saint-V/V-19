@@ -1,9 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   completeExportPackage,
+  reconcileExportPackageCompletion,
   type ExportPackageCommitter,
   type ExportedSubmissionPersister,
 } from "../../src/modules/submissions/exportWorkflow";
+import { mapSupabasePersistenceError } from "../../src/services/persistenceObservability";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
 import type { Submission } from "../../src/modules/submissions/types";
@@ -179,5 +181,45 @@ describe("submission export workflow", () => {
     expect(persistExportedSubmissions).toHaveBeenCalledTimes(1);
     expect(selection[0]?.status).toBe("ready_for_export");
     expect(selection[0]?.exportState).toBe("file_downloaded");
+  });
+
+  test("retries the exact idempotent package after a lost RPC response", async () => {
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+      batch: {
+        ...batch,
+        id: "00000000-0000-4000-8000-000000000777",
+        createdAt: serverCreatedAt,
+        createdBy: serverCreatedBy,
+      },
+      changedSubmissions: 0,
+      duplicate: true,
+      statusHistory: 0,
+    }));
+    const completionOptions = options(commitPackage);
+    const failure = mapSupabasePersistenceError(
+      { message: "Request timed out", name: "TimeoutError" },
+      { operation: "rpc.complete_export_package", fallbackKind: "rpc" },
+    );
+
+    const result = await reconcileExportPackageCompletion(
+      downloadedSelection(),
+      completionOptions,
+      failure,
+    );
+
+    expect(result).toMatchObject({
+      batch: {
+        id: "00000000-0000-4000-8000-000000000777",
+        idempotencyKey: expect.any(String),
+      },
+      status: "committed",
+    });
+    expect(commitPackage).toHaveBeenCalledTimes(1);
+    expect(commitPackage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createdAt,
+        id: completionOptions.batchId,
+      }),
+    );
   });
 });
