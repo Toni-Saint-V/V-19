@@ -14,7 +14,14 @@ import {
 
 export const REQUIRED_PRODUCTION_LIFECYCLE_WRITE_UNLOCK =
   "I_UNDERSTAND_EXISTING_COHORT_LIFECYCLE_MUTATIONS";
+/** Legacy terminal case kept exclusively for the A1-F6 export proof. */
 export const FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY = "A1-F6";
+/** Dedicated non-terminal record for the resumable admin-agent lifecycle proof. */
+export const RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY = "A1-S1";
+
+export type ProductionLifecycleCaseKey =
+  | typeof FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
+  | typeof RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY;
 
 export type ProductionLifecycleStage =
   | "pending_review"
@@ -31,7 +38,7 @@ export type ProductionLifecycleStage =
   | "accepted";
 
 export type ProductionLifecycleCaseRef = {
-  caseKey: typeof FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY;
+  caseKey: ProductionLifecycleCaseKey;
   ownerKey: string;
   submissionId: string;
 };
@@ -213,15 +220,28 @@ export function assertProductionLifecycleWriteUnlock() {
   );
 }
 
-export function productionLifecycleStatePath(runMarker: string) {
-  return resolve(process.cwd(), `.production-lifecycle-${runMarker}.state.local.json`);
+export function productionLifecycleStatePath(
+  runMarker: string,
+  caseKey = FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY,
+) {
+  const suffix =
+    caseKey === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY ? "" : `-${caseKey}`;
+  return resolve(process.cwd(), `.production-lifecycle-${runMarker}${suffix}.state.local.json`);
 }
 
 function productionLifecycleLockPath(runMarker: string) {
   return resolve(process.cwd(), `.production-lifecycle-${runMarker}.lock.local`);
 }
 
+function productionExportLockPath(runMarker: string) {
+  return resolve(process.cwd(), `.production-export-${runMarker}.lock.local`);
+}
+
 export async function acquireProductionLifecycleLock(runMarker: string) {
+  invariant(
+    !existsSync(productionExportLockPath(runMarker)),
+    "The production export gate is active; lifecycle refuses concurrent state changes.",
+  );
   const path = productionLifecycleLockPath(runMarker);
   const token = randomUUID();
   let handle;
@@ -269,9 +289,9 @@ export function productionLifecycleCorrectedNote(state: ProductionLifecycleState
 
 function focusedSubmittedCase(runMarker: string) {
   const cohortCase = buildProductionCohortPlan(runMarker).find(
-    (candidate) => candidate.caseKey === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY,
+    (candidate) => candidate.caseKey === RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
   );
-  invariant(cohortCase, "Focused A1-F6 case is absent from the production plan.");
+  invariant(cohortCase, "Focused A1-S1 case is absent from the production plan.");
   return cohortCase;
 }
 
@@ -287,18 +307,18 @@ function submittedCaseRef(
 ): ProductionLifecycleCaseRef {
   invariant(
     checkpoint?.stage === "submitted" && checkpoint.submissionId,
-    "A1-F6 must reach the submitted cohort checkpoint before lifecycle mutations.",
+    "A1-S1 must reach the submitted cohort checkpoint before lifecycle mutations.",
   );
   invariant(
     checkpoint.caseMarker === cohortCase.caseMarker,
-    "A1-F6 submitted checkpoint marker mismatch.",
+    "A1-S1 submitted checkpoint marker mismatch.",
   );
   invariant(
-    cohortCase.caseKey === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY,
-    "Production lifecycle refuses a case other than A1-F6.",
+    cohortCase.caseKey === RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
+    "Production lifecycle refuses a case other than A1-S1.",
   );
   return {
-    caseKey: FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY,
+    caseKey: RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
     ownerKey: cohortCase.ownerKey,
     submissionId: checkpoint.submissionId,
   };
@@ -318,10 +338,10 @@ function validateStoredState(
   invariant(state.runMarker === runMarker, "Lifecycle run marker mismatch.");
   invariant(lifecycleStages.has(state.stage), "Lifecycle stage is invalid.");
   invariant(
-    state.case.caseKey === FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY &&
+    state.case.caseKey === RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY &&
       state.case.ownerKey === expectedCase.ownerKey &&
       state.case.submissionId === expectedCase.submissionId,
-    "Lifecycle state no longer matches the submitted A1-F6 cohort checkpoint.",
+    "Lifecycle state no longer matches the submitted A1-S1 cohort checkpoint.",
   );
   if (["accepting", "accepted"].includes(state.stage)) {
     assertProductionLifecycleAcceptanceProof(state, expectedCaseMarker);
@@ -335,9 +355,12 @@ export async function loadOrCreateProductionLifecycleState(): Promise<ResolvedPr
   const cohortCase = focusedSubmittedCase(runMarker);
   const expectedCase = submittedCaseRef(
     cohortCase,
-    cohortState.cases[FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY],
+    cohortState.cases[RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY],
   );
-  const path = productionLifecycleStatePath(runMarker);
+  const path = productionLifecycleStatePath(
+    runMarker,
+    RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
+  );
 
   if (existsSync(path)) {
     const state = await readJson<ProductionLifecycleState>(path);
@@ -359,7 +382,10 @@ export async function loadOrCreateProductionLifecycleState(): Promise<ResolvedPr
 
 export async function saveProductionLifecycleState(state: ProductionLifecycleState) {
   state.updatedAt = new Date().toISOString();
-  await writeJsonAtomic(productionLifecycleStatePath(state.runMarker), state);
+  await writeJsonAtomic(
+    productionLifecycleStatePath(state.runMarker, state.case.caseKey),
+    state,
+  );
 }
 
 export async function writeProductionLifecycleEvidence(

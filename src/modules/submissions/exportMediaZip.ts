@@ -39,6 +39,7 @@ export type ExportMediaZipBlockedReason =
   | "export_not_ready"
   | "media_not_ready"
   | "passport_number_missing"
+  | "questionnaire_incomplete"
   | "row_mismatch"
   | "storage_download_failed"
   | "storage_unavailable"
@@ -553,6 +554,9 @@ function safeMessageForDocumentZipError(
   }
   if (reason === "passport_number_missing") {
     return "У каждого заявителя должен быть проверенный номер паспорта. ZIP не сформирован.";
+  }
+  if (reason === "questionnaire_incomplete") {
+    return "В анкете не заполнены обязательные данные для PDF. ZIP не сформирован.";
   }
   return "В выбранном пакете не все обязательные документы прошли проверку.";
 }

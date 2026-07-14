@@ -11,6 +11,7 @@ export const productionCohortExpectedFinalTotals: Readonly<ProductionCohortFinal
 
 export function productionCohortFinalGate(input: {
   expectedCaseCount: number;
+  expectedLifecyclePhase?: "pre_export" | "post_export";
   reports: Array<{ caseKey: string; stage: string; status: string }>;
   totals: ProductionCohortFinalTotals & { storageReadable: number };
 }): boolean;

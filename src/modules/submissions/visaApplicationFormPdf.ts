@@ -5,6 +5,10 @@ export function createVisaApplicationFormPdfBlob(
   applicant: Applicant,
 ): Blob {
   const data = buildVisaFormData(submission, applicant);
+  const validation = validateVisaFormData(data);
+  if (!validation.ok) {
+    throw new VisaApplicationFormDataError(validation.missingFields);
+  }
   return createPdfBlob([
     renderPage1(data),
     renderPage2(data),
@@ -38,6 +42,7 @@ type VisaFormData = {
   issueDate: string;
   issuePlace: string;
   maritalStatus: string;
+  mainDestination: string;
   meansOfSupport: string;
   nationalityAtBirth: string;
   occupation: string;
@@ -53,8 +58,27 @@ type VisaFormData = {
   tripFrom: string;
   tripTo: string;
   visaSubType: string;
-  visaType: string;
 };
+
+export type VisaApplicationFormMissingField = {
+  key: keyof VisaFormData;
+  label: string;
+};
+
+export type VisaApplicationFormDataValidation =
+  | { ok: true; missingFields: [] }
+  | { ok: false; missingFields: VisaApplicationFormMissingField[] };
+
+/**
+ * The PDF is an official export artifact. It must never silently substitute
+ * example values when an applicant answer is absent.
+ */
+export class VisaApplicationFormDataError extends Error {
+  constructor(readonly missingFields: VisaApplicationFormMissingField[]) {
+    super("Visa application form has incomplete questionnaire data.");
+    this.name = "VisaApplicationFormDataError";
+  }
+}
 
 type PdfPage = {
   content: string;
@@ -71,6 +95,45 @@ const left = 36;
 const right = 559;
 const fontRegular = "F1";
 const fontBold = "F2";
+
+const requiredVisaFormFields = [
+  { key: "surname", label: "Фамилия" },
+  { key: "firstName", label: "Имя" },
+  { key: "birthDate", label: "Дата рождения" },
+  { key: "birthPlace", label: "Место рождения" },
+  { key: "birthCountry", label: "Страна рождения" },
+  { key: "citizenship", label: "Гражданство" },
+  { key: "nationalityAtBirth", label: "Гражданство при рождении" },
+  { key: "gender", label: "Пол" },
+  { key: "maritalStatus", label: "Семейное положение" },
+  { key: "passportType", label: "Тип паспорта" },
+  { key: "passportNo", label: "Номер паспорта" },
+  { key: "issueDate", label: "Дата выдачи паспорта" },
+  { key: "passportExpiry", label: "Срок действия паспорта" },
+  { key: "issueCountry", label: "Страна выдачи паспорта" },
+  { key: "issuePlace", label: "Место выдачи паспорта" },
+  { key: "address", label: "Домашний адрес" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Телефон" },
+  { key: "residenceCountry", label: "Страна проживания" },
+  { key: "addressCity", label: "Город проживания" },
+  { key: "postalCode", label: "Почтовый индекс" },
+  { key: "occupation", label: "Профессия" },
+  { key: "employer", label: "Работодатель или учебное заведение" },
+  { key: "purpose", label: "Цель поездки" },
+  { key: "mainDestination", label: "Основная страна назначения" },
+  { key: "firstEntryCountry", label: "Страна первого въезда" },
+  { key: "entries", label: "Количество въездов" },
+  { key: "tripFrom", label: "Дата въезда" },
+  { key: "tripTo", label: "Дата выезда" },
+  { key: "duration", label: "Длительность пребывания" },
+  { key: "hotelName", label: "Принимающая сторона или отель" },
+  { key: "hotelAddress", label: "Адрес принимающей стороны или отеля" },
+  { key: "hotelCity", label: "Город принимающей стороны или отеля" },
+  { key: "hotelCountry", label: "Страна принимающей стороны или отеля" },
+  { key: "costCoveredBy", label: "Кто оплачивает поездку" },
+  { key: "meansOfSupport", label: "Средства на поездку" },
+] as const satisfies ReadonlyArray<VisaApplicationFormMissingField>;
 
 const transliteration: Record<string, string> = {
   А: "A",
@@ -146,61 +209,83 @@ function buildVisaFormData(
   applicant: Applicant,
 ): VisaFormData {
   const field = fieldReader(applicant);
-  const name = applicantNameParts(applicant.fullName);
-  const tripFrom = dateForVisaForm(field("arrival-date", submission.tripDateFrom));
-  const tripTo = dateForVisaForm(field("departure-date", submission.tripDateTo));
+  const tripFrom = dateForVisaForm(field("arrival-date"));
+  const tripTo = dateForVisaForm(field("departure-date"));
   const passportNo = cleanPassport(
-    field("passport-no", field("passport-number", field("passportNo"))),
+    firstNonEmpty(
+      field("passport-no"),
+      field("passport-number"),
+      field("passportNo"),
+    ),
   );
 
   return {
     address: field("home-address"),
-    addressCity: field("home-city", cityToLatin(submission.city)),
-    birthCountry: normalizeCountry(field("birth-country", "Russian Federation")),
+    addressCity: field("home-city"),
+    birthCountry: normalizeCountry(field("birth-country")),
     birthDate: dateForVisaForm(field("birth-date")),
     birthPlace: field("birth-place"),
-    citizenship: normalizeCountry(field("nationality", "Russian Federation")),
-    costCoveredBy: field("cost-covered-by", "Applicant"),
-    duration: field("stay-duration") || durationDays(tripFrom, tripTo),
+    citizenship: normalizeCountry(field("nationality")),
+    costCoveredBy: field("cost-covered-by"),
+    duration: field("stay-duration"),
     email: field("email"),
-    employer: firstNonEmpty(
-      field("employer-name"),
-      field("employer-address"),
-      field("occupation") || "NO OCCUPATION",
-    ),
-    entries: field("entry-count", "Multiple Entry"),
-    firstEntryCountry: normalizeCountry(field("first-entry-country", "Spain")),
-    firstName: field("first-name", name.first),
+    employer: firstNonEmpty(field("employer-name"), field("occupation")),
+    entries: field("entry-count"),
+    firstEntryCountry: normalizeCountry(field("first-entry-country")),
+    firstName: field("first-name"),
     gender: field("gender"),
     hotelAddress: field("hotel-address"),
-    hotelCity: field("hotel-city", "Barcelona"),
-    hotelCountry: normalizeCountry(field("hotel-country", "Spain")),
+    hotelCity: field("hotel-city"),
+    hotelCountry: normalizeCountry(field("hotel-country")),
     hotelEmail: field("hotel-email"),
-    hotelName: field("hotel-name", "HOTEL"),
+    hotelName: field("hotel-name"),
     hotelPhone: digitsOnly(field("hotel-contact")),
-    issueCountry: normalizeCountry(field("passport-issue-country", "Russian Federation")),
+    issueCountry: normalizeCountry(field("passport-issue-country")),
     issueDate: dateForVisaForm(field("passport-issue-date")),
     issuePlace: field("passport-issue-place"),
     maritalStatus: field("marital-status"),
-    meansOfSupport: field("means-of-support", "Cash"),
+    mainDestination: normalizeCountry(field("main-destination")),
+    meansOfSupport: field("means-of-support"),
     nationalityAtBirth: normalizeCountry(
-      field("nationality-at-birth", field("birth-country", "Russian Federation")),
+      firstNonEmpty(field("birth-citizenship"), field("nationality-at-birth")),
     ),
-    occupation: field("occupation-specify", field("occupation", "NO OCCUPATION")),
+    occupation: firstNonEmpty(field("occupation-specify"), field("occupation")),
     passportExpiry: dateForVisaForm(field("passport-expiry-date")),
     passportNo,
-    passportType: field("passport-type", "Ordinary Passport"),
+    passportType: field("passport-type"),
     phone: digitsOnly(field("contact-number")),
     postalCode: field("postal-code"),
-    purpose: field("purpose", field("visa-sub-type", "Tourism")),
-    residenceCountry: normalizeCountry(field("home-country", "Russian Federation")),
-    surname: field("surname", name.surname),
-    surnameAtBirth: field("surname-at-birth", field("surname", name.surname)),
+    purpose: field("purpose"),
+    residenceCountry: normalizeCountry(field("home-country")),
+    surname: field("surname"),
+    surnameAtBirth: firstNonEmpty(
+      field("previous-surname"),
+      field("surname-at-birth"),
+      field("surname"),
+    ),
     tripFrom,
     tripTo,
-    visaSubType: field("visa-sub-type", "Tourism"),
-    visaType: field("visa-type", "C"),
+    visaSubType: field("stay-purpose-details"),
   };
+}
+
+export function validateVisaApplicationFormData(
+  submission: Submission,
+  applicant: Applicant,
+): VisaApplicationFormDataValidation {
+  return validateVisaFormData(buildVisaFormData(submission, applicant));
+}
+
+function validateVisaFormData(
+  data: VisaFormData,
+): VisaApplicationFormDataValidation {
+  const missingFields = requiredVisaFormFields.filter(
+    (field) => !data[field.key].trim(),
+  );
+
+  return missingFields.length
+    ? { ok: false, missingFields: [...missingFields] }
+    : { ok: true, missingFields: [] };
 }
 
 function renderPage1(data: VisaFormData): PdfPage {
@@ -304,7 +389,7 @@ function renderPage2(data: VisaFormData): PdfPage {
   box(state, 42, 458, 500, 44);
   labelValue(state, 48, 472, "24. Additional information on purpose", data.visaSubType, 8);
   box(state, 42, 502, 250, 54);
-  labelValue(state, 48, 516, "25. Main destination", "Spain", 10);
+  labelValue(state, 48, 516, "25. Main destination", data.mainDestination, 10);
   box(state, 292, 502, 250, 54);
   labelValue(state, 300, 516, "26. First entry country", data.firstEntryCountry, 10);
   box(state, 42, 556, 500, 54);
@@ -387,7 +472,7 @@ function renderPage4(data: VisaFormData): PdfPage {
     `Applicant: ${data.firstName} ${data.surname}`,
     `Passport: ${data.passportNo}`,
     `Trip: ${data.tripFrom} - ${data.tripTo} (${data.duration} days)`,
-    `Destination: Spain / first entry: ${data.firstEntryCountry}`,
+    `Destination: ${data.mainDestination} / first entry: ${data.firstEntryCountry}`,
     `Accommodation: ${data.hotelName}, ${data.hotelAddress}`,
   ];
   summary.forEach((lineText, index) => text(state, 54, 695 + index * 15, lineText, 9));
@@ -544,20 +629,6 @@ function fieldReader(applicant: Applicant) {
   return (id: string, fallback = "") => values.get(id)?.trim() || fallback;
 }
 
-function applicantNameParts(fullName: string) {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { first: "", surname: "" };
-  const [first, ...rest] = parts;
-  if (looksLikeSurname(first) && rest.length) {
-    return { first: rest.join(" "), surname: first };
-  }
-  return { first, surname: rest.join(" ") || first };
-}
-
-function looksLikeSurname(value: string) {
-  return /(?:ov|ova|ev|eva|in|ina|sky|skiy|skaya|ко|ов|ова|ев|ева|ин|ина|ский|ская)$/i.test(value.trim());
-}
-
 function dateForVisaForm(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -566,20 +637,6 @@ function dateForVisaForm(value: string): string {
   const ru = trimmed.match(/^(\d{2})[./-](\d{2})[./-](\d{4})/);
   if (ru) return `${ru[1]}-${ru[2]}-${ru[3]}`;
   return trimmed;
-}
-
-function durationDays(from: string, to: string): string {
-  const start = parseVisaDate(from);
-  const end = parseVisaDate(to);
-  if (!start || !end || end < start) return "";
-  return String(Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
-}
-
-function parseVisaDate(value: string): Date | null {
-  const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (!match) return null;
-  const date = new Date(Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])));
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function normalizeCountry(value: string): string {

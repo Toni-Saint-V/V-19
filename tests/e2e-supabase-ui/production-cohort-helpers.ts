@@ -42,6 +42,7 @@ const ignoredBrowserProblem =
 const cohortReferenceDate = new Date();
 cohortReferenceDate.setUTCHours(12, 0, 0, 0);
 const productionWorkspaceReadyTimeoutMs = 120_000;
+const maxProductionPasswordAuthAttempts = 6;
 
 export type ProductionCohortAccount = {
   email: string;
@@ -511,6 +512,49 @@ function sanitizeMutationPath(pathname: string) {
   return "/unclassified";
 }
 
+function isProductionAuthMutation(record: MutationRecord) {
+  return record.method === "POST" && record.path === "/auth/v1/token";
+}
+
+/**
+ * Password login is retried by the production client (two auth-service
+ * attempts × three resilient-fetch attempts). A recovered transport failure
+ * is valid; an HTTP auth failure or any failed business mutation is not.
+ */
+export function assertProductionNetworkRecordsHealthy(
+  records: readonly MutationRecord[],
+  label: string,
+) {
+  invariant(records.length > 0, `${label}: no production mutation was observed.`);
+
+  const authRecords = records.filter(isProductionAuthMutation);
+  const businessRecords = records.filter((record) => !isProductionAuthMutation(record));
+  const failedBusinessMutation = businessRecords.find(
+    (record) => record.status < 200 || record.status >= 300,
+  );
+  invariant(
+    !failedBusinessMutation,
+    `${label}: production mutation failed (${failedBusinessMutation?.path ?? "unknown"}).`,
+  );
+
+  if (authRecords.length) {
+    invariant(
+      authRecords.length <= maxProductionPasswordAuthAttempts,
+      `${label}: password auth exceeded the bounded retry contract.`,
+    );
+    invariant(
+      authRecords.every(
+        (record) => record.status === 0 || (record.status >= 200 && record.status < 300),
+      ),
+      `${label}: password auth returned a non-retryable HTTP failure.`,
+    );
+    invariant(
+      authRecords.some((record) => record.status >= 200 && record.status < 300),
+      `${label}: password auth transport retry did not recover.`,
+    );
+  }
+}
+
 export function isPermittedCohortStaticRuntimeRequest(url: URL, method: string) {
   return (
     method === "GET" &&
@@ -581,14 +625,7 @@ export class ProductionNetworkLedger {
       `${label}: an unapproved data source or origin was contacted.`,
     );
     const records = this.#mutations.slice(checkpoint);
-    invariant(records.length > 0, `${label}: no production mutation was observed.`);
-    const failure = records.find(
-      (record) => record.status < 200 || record.status >= 300,
-    );
-    invariant(
-      !failure,
-      `${label}: production mutation failed (${failure?.path ?? "unknown"}).`,
-    );
+    assertProductionNetworkRecordsHealthy(records, label);
   }
 
   assertNoOriginViolations() {
@@ -648,26 +685,8 @@ export async function signInCohortAccount(
   await expect(page.getByRole("heading", { level: 1, name: "Вход" })).toBeVisible();
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Пароль", { exact: true }).fill(account.password);
-  const loginResponse = page.waitForResponse(
-    (response) => {
-      const url = new URL(response.url());
-      return (
-        response.request().method() === "POST" &&
-        url.origin === PRODUCTION_SUPABASE_ORIGIN &&
-        url.pathname === "/auth/v1/token" &&
-        url.searchParams.get("grant_type") === "password"
-      );
-    },
-    { timeout: 60_000 },
-  );
-  const [response] = await Promise.all([
-    loginResponse,
-    page.getByRole("button", { name: "Войти" }).click(),
-  ]);
-  invariant(
-    response.status() >= 200 && response.status() < 300,
-    `Production login failed (${account.key}).`,
-  );
+  const loginCheckpoint = ledger.checkpoint();
+  await page.getByRole("button", { name: "Войти" }).click();
   const expectedHeading =
     account.role === "admin"
       ? /^(Проверка|Очередь на проверку|Работа)$/
@@ -677,6 +696,10 @@ export async function signInCohortAccount(
   ).toBeVisible({
     timeout: productionWorkspaceReadyTimeoutMs,
   });
+  // The heading proves the authenticated UI state. The ledger independently
+  // proves the successful production token exchange without relying on a
+  // brittle SDK query-string serialization detail.
+  ledger.assertHealthySince(loginCheckpoint, `Production login (${account.key})`);
   ledger.assertNoOriginViolations();
   return { browserProblems, ledger, page };
 }

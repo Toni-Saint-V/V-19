@@ -24,6 +24,7 @@
     "verify:production-bundle": "node scripts/verify-production-bundle.mjs",
     "test:e2e:supabase:production": "npm run verify:supabase-ui-e2e && npm run verify:supabase-production-ui-e2e && cross-env SUPABASE_PRODUCTION_E2E_UNLOCK=1 playwright test --config playwright.supabase-production-ui.config.ts",
     "test:e2e:supabase:production:cohort": "playwright test --config playwright.supabase-production-cohort.config.ts",
+    "test:e2e:supabase:production:lifecycle": "npm run build:supabase-production && cross-env V19_PRODUCTION_LIFECYCLE_FRESH_BUILD=1 playwright test --config playwright.supabase-production-lifecycle.config.ts",
     "verify:production-cohort:reconcile": "node scripts/reconcile-production-cohort.mjs",
     "verify:performance": "node scripts/verify-performance.mjs",
     "verify:v19-ui-proof": "playwright test tests/e2e/v19-accessibility.spec.ts tests/e2e/v19-responsive-proof.spec.ts tests/e2e/v19-ux-states.spec.ts --project=chromium",

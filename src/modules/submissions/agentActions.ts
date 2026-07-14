@@ -768,9 +768,14 @@ function agentOpenActions(submission: Submission): AgentActionItem[] {
 }
 
 function agentCompletedActions(submission: Submission): AgentActionItem[] {
-  if (!["submitted_for_review", "corrections_received", "ready_for_export"].includes(
-    submission.status,
-  )) {
+  if (
+    ![
+      "submitted_for_review",
+      "corrections_received",
+      "ready_for_export",
+      "exported",
+    ].includes(submission.status)
+  ) {
     return [];
   }
 

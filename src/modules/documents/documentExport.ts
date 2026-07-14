@@ -8,6 +8,7 @@ import {
   type DocumentAsset,
 } from "./documentTypes";
 import { validateDocumentAsset, validateDocuments } from "./documentValidation";
+import { validateVisaApplicationFormData } from "../submissions/visaApplicationFormPdf";
 
 export const GENERATED_DOCUMENT_TYPES = ["visa_form"] as const;
 export const EXPORT_DOCUMENT_TYPES = [
@@ -33,6 +34,7 @@ export type DocumentZipBlockedReason =
   | "empty_file"
   | "media_not_ready"
   | "passport_number_missing"
+  | "questionnaire_incomplete"
   | "storage_download_failed"
   | "storage_unavailable";
 
@@ -94,6 +96,17 @@ export async function buildDocumentsZip(
     );
 
     for (const [applicantIndex, applicant] of submission.applicants.entries()) {
+      const visaFormValidation = validateVisaApplicationFormData(
+        submission,
+        applicant,
+      );
+      if (!visaFormValidation.ok) {
+        throw new DocumentZipBuilderError(
+          "questionnaire_incomplete",
+          "Required questionnaire values for the visa application form are missing.",
+        );
+      }
+
       const applicantDocs = input.assets.filter(
         (asset) =>
           asset.submissionId === submission.id &&

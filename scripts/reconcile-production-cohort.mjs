@@ -46,6 +46,9 @@ const expectedCases = [
 ];
 const expectedByCaseKey = new Map(expectedCases.map((item) => [item.caseKey, item]));
 const marker = clean(process.env.V19_PRODUCTION_COHORT_RUN_MARKER);
+const expectedLifecyclePhase = requiredLifecyclePhase(
+  process.env.V19_PRODUCTION_COHORT_EXPECTED_PHASE,
+);
 const repoRoot = process.cwd();
 const publicEnvPath = resolve(
   repoRoot,
@@ -187,7 +190,11 @@ async function main() {
       checkpoint.cases?.[expected.caseKey]?.stage ?? "remote_only";
     const submission = submissionById.get(found.submissionId);
     invariant(submission, `The ${expected.caseKey} submission row is absent.`);
-    const stage = effectiveCohortStage(checkpointStage, submission.status);
+    const stage = effectiveCohortStage(
+      expected.caseKey,
+      checkpointStage,
+      submission.status,
+    );
 
     const caseApplicants = forSubmission(applicants, found.submissionId);
     const caseMedia = forSubmission(media, found.submissionId);
@@ -262,11 +269,14 @@ async function main() {
     if (
       stage === "questionnaire_saved" ||
       stage === "submitted" ||
+      stage === "ready_for_export" ||
       stage === "exported"
     ) {
       const expectedDocumentState =
         stage === "exported"
           ? { exportStatus: "exported", validationStatus: "passed" }
+          : stage === "ready_for_export"
+            ? { exportStatus: "ready", validationStatus: "passed" }
           : { exportStatus: "not_ready", validationStatus: "pending" };
       const expectedAssetCount = expected.applicantCount * 3;
       invariant(
@@ -295,6 +305,10 @@ async function main() {
       invariant(
         stage !== "submitted" || submission.status === "waiting_review",
         `${expected.caseKey} is not in the submitted database status.`,
+      );
+      invariant(
+        stage !== "ready_for_export" || submission.status === "ready_for_excel",
+        `${expected.caseKey} is not in the ready-for-export database status.`,
       );
       invariant(
         stage !== "questionnaire_saved" || submission.status === "draft",
@@ -351,6 +365,7 @@ async function main() {
   );
   const complete = productionCohortFinalGate({
     expectedCaseCount: expectedCases.length,
+    expectedLifecyclePhase,
     reports,
     totals,
   });
@@ -366,6 +381,7 @@ async function main() {
       complete,
       discoveredCases: reports.length,
       expectedCases: expectedCases.length,
+      expectedLifecyclePhase,
       expectedFinal: productionCohortExpectedFinalTotals,
       totals,
     }),
@@ -377,8 +393,20 @@ function clean(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function effectiveCohortStage(checkpointStage, submissionStatus) {
+function requiredLifecyclePhase(value) {
+  const phase = clean(value) || "pre_export";
+  invariant(
+    phase === "pre_export" || phase === "post_export",
+    "The expected production cohort lifecycle phase is invalid.",
+  );
+  return phase;
+}
+
+function effectiveCohortStage(caseKey, checkpointStage, submissionStatus) {
   if (submissionStatus === "exported") return "exported";
+  if (caseKey === "A1-S1" && submissionStatus === "ready_for_excel") {
+    return "ready_for_export";
+  }
   if (
     checkpointStage === "questionnaire_saved" &&
     submissionStatus === "waiting_review"

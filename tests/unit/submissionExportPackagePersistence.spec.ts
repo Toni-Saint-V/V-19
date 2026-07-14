@@ -243,17 +243,36 @@ describe("V-19 submission export package persistence", () => {
     });
   });
 
-  test("returns not_committed only when all four durable surfaces remain pre-terminal", async () => {
+  test("returns not_committed for exact accepted or Excel-ready raw states without durable export proof", async () => {
     supabaseMock.client = reconciliationClient({
       assetRows: documentExport.assetIds.map((id) => ({ id, export_status: "ready" })),
       batchRows: [],
       eventRows: [],
-      submissionRows: batch.submissionIds.map((id) => ({ id, status: "ready_for_excel" })),
+      submissionRows: batch.submissionIds.map((id, index) => ({
+        id,
+        status: index === 0 ? "accepted" : "ready_for_excel",
+      })),
     });
 
     await expect(
       reconcileSubmissionExportPackage(batch, documentExport),
     ).resolves.toEqual({ status: "not_committed" });
+  });
+
+  test("fails closed for any non-pre-terminal raw submission status without export proof", async () => {
+    supabaseMock.client = reconciliationClient({
+      assetRows: documentExport.assetIds.map((id) => ({ id, export_status: "ready" })),
+      batchRows: [],
+      eventRows: [],
+      submissionRows: batch.submissionIds.map((id, index) => ({
+        id,
+        status: index === 0 ? "accepted" : "waiting_review",
+      })),
+    });
+
+    await expect(
+      reconcileSubmissionExportPackage(batch, documentExport),
+    ).resolves.toEqual({ status: "unknown" });
   });
 
   test("keeps partial audit or asset state unknown and never rolls it back", async () => {

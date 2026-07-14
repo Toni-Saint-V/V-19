@@ -57,6 +57,7 @@ const exportBatchReconciliationSelect =
 const documentExportEventReconciliationSelect =
   "id,submission_ids,asset_ids,zip_file_name,file_count,applicant_count,workbook_file_name,package_identity_key" as const;
 const documentAssetExportStateSelect = "id,export_status" as const;
+const rawPreTerminalExportStatuses = new Set(["accepted", "ready_for_excel"]);
 
 function toNullableUuid(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -259,7 +260,7 @@ export async function reconcileSubmissionExportPackage(
     if (
       batchRows.length === 0 &&
       eventRows.length === 0 &&
-      submissionRows.every((row) => row.status === "ready_for_excel") &&
+      submissionRows.every((row) => rawPreTerminalExportStatuses.has(row.status)) &&
       assetsHaveExactStatus(assetRows, documentExport.assetIds, "ready")
     ) {
       return { status: "not_committed" };
