@@ -97,6 +97,7 @@ import {
   buildExportPackageIdentity,
   exportSummaryForSelectedIds,
 } from "../../src/modules/submissions/exportRules";
+import { normalizeSubmissionForCanonicalRuntime } from "../../src/modules/submissions/submissionActions";
 import {
   changedCockpitSubmissions,
   cockpitSnapshotKey,
@@ -1540,9 +1541,11 @@ describe("V-19 Supabase cockpit persistence", () => {
   });
 
   it("keeps durable export batch metadata on the admin-only read path", async () => {
-    const submission = initialSubmissions.find(
-      (item) => item.id === "ПД-1056",
-    ) as Submission;
+    const submission = normalizeSubmissionForCanonicalRuntime(
+      fillRequiredQuestionnaireForTest(
+        initialSubmissions.find((item) => item.id === "ПД-1056") as Submission,
+      ),
+    );
     const identity = buildExportPackageIdentity([submission], "xlsx");
     if (!identity) throw new Error("Expected export package identity");
     const payload = toCockpitDraftPersistencePayload(
@@ -1710,9 +1713,11 @@ describe("V-19 Supabase cockpit persistence", () => {
   });
 
   it("ignores newer legacy csv batches in the Excel-only pilot", async () => {
-    const submission = initialSubmissions.find(
-      (item) => item.id === "ПД-1056",
-    ) as Submission;
+    const submission = normalizeSubmissionForCanonicalRuntime(
+      fillRequiredQuestionnaireForTest(
+        initialSubmissions.find((item) => item.id === "ПД-1056") as Submission,
+      ),
+    );
     const identity = buildExportPackageIdentity([submission], "xlsx");
     if (!identity) throw new Error("Expected export package identity");
     const payload = toCockpitDraftPersistencePayload(

@@ -10,16 +10,15 @@ import {
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
 } from "./tests/e2e-supabase-ui/production-cohort-helpers";
-import {
-  PRODUCTION_EXPORT_CASE_KEY,
-  assertProductionA1S1ExportWriteUnlock,
-} from "./tests/e2e-supabase-ui/production-export-a1-s1-helpers";
 
-assertProductionA1S1ExportWriteUnlock();
 requiredProductionRunMarker();
 loadProductionCohortAccounts();
 
 process.env.SUPABASE_UI_E2E_ENV_FILE = ".env.supabase-production.local";
+process.env.V19_PRODUCTION_A2_S1_ABORT_ONLY = "1";
+delete process.env.SUPABASE_PRODUCTION_E2E_UNLOCK;
+delete process.env.V19_PRODUCTION_A2_S1_EXPORT_WRITE_UNLOCK;
+delete process.env.V19_PRODUCTION_A2_S1_EXPORT_RESUME_UNLOCK;
 
 const productionEnvPath = resolve(process.cwd(), ".env.supabase-production.local");
 const verifiedDistUnlock = "I_UNDERSTAND_A2_S1_SCOPED_DIST_REUSE";
@@ -48,9 +47,7 @@ const browserSafeEnvNames = [
 
 function loadProductionEnv() {
   if (!existsSync(productionEnvPath)) {
-    throw new Error(
-      `.env.supabase-production.local is required for the ${PRODUCTION_EXPORT_CASE_KEY} production export gate.`,
-    );
+    throw new Error("The production public environment is required for abort-only proof.");
   }
   const values: Record<string, string> = {};
   for (const line of readFileSync(productionEnvPath, "utf8").split(/\r?\n/)) {
@@ -65,17 +62,17 @@ function loadProductionEnv() {
   }
 
   if (values.VITE_SUPABASE_PROJECT_ID !== PRODUCTION_PROJECT_REF) {
-    throw new Error(`${PRODUCTION_EXPORT_CASE_KEY} production export refuses an unapproved Supabase project ref.`);
+    throw new Error("Abort-only proof refuses an unapproved Supabase project ref.");
   }
   if (values.VITE_SUPABASE_URL !== PRODUCTION_SUPABASE_ORIGIN) {
-    throw new Error(`${PRODUCTION_EXPORT_CASE_KEY} production export refuses an unapproved Supabase URL.`);
+    throw new Error("Abort-only proof refuses an unapproved Supabase URL.");
   }
   if (values.VITE_SUPABASE_BACKEND_TARGET !== "supabase") {
-    throw new Error(`${PRODUCTION_EXPORT_CASE_KEY} production export requires VITE_SUPABASE_BACKEND_TARGET=supabase.`);
+    throw new Error("Abort-only proof requires VITE_SUPABASE_BACKEND_TARGET=supabase.");
   }
   const functionsUrl = values.VITE_SUPABASE_EDGE_FUNCTIONS_URL?.trim();
   if (functionsUrl && new URL(functionsUrl).origin !== PRODUCTION_SUPABASE_ORIGIN) {
-    throw new Error(`${PRODUCTION_EXPORT_CASE_KEY} production export refuses an unapproved Edge Functions origin.`);
+    throw new Error("Abort-only proof refuses an unapproved Edge Functions origin.");
   }
 
   const selected: Record<string, string> = {};
@@ -84,7 +81,7 @@ function loadProductionEnv() {
     if (value) selected[name] = value;
   }
   if (!selected.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    throw new Error(`VITE_SUPABASE_PUBLISHABLE_KEY is required for ${PRODUCTION_EXPORT_CASE_KEY} production export.`);
+    throw new Error("Abort-only proof requires the production publishable key.");
   }
   return {
     ...selected,
@@ -123,7 +120,7 @@ function productionServerCommand() {
 export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
-  outputDir: `test-results/production-export-${PRODUCTION_EXPORT_CASE_KEY.toLowerCase()}`,
+  outputDir: "test-results/production-export-a2-s1-abort",
   preserveOutput: "never",
   reporter: [["list"]],
   retries: 0,

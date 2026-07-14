@@ -739,7 +739,9 @@ describe("V-19 export rules", () => {
   });
 
   it("keeps download state locked until the selected package is generated", () => {
-    const submissions = [readyClone({ id: "ПД-1056" })];
+    const submissions = [
+      fillRequiredQuestionnaireForTest(readyClone({ id: "ПД-1056" })),
+    ];
 
     expect(
       applyExportStateToSelection(submissions, ["ПД-1056"], "file_downloaded"),
@@ -750,15 +752,19 @@ describe("V-19 export rules", () => {
       ["ПД-1056"],
       "file_generated",
     );
+    const downloaded = applyExportStateToSelection(
+      generated,
+      ["ПД-1056"],
+      "file_downloaded",
+    );
 
+    expect(downloaded[0]?.exportState).toBe("file_downloaded");
+    expect(downloaded[0]?.exportPackage).toEqual(generated[0]?.exportPackage);
+    expect(generated[0]?.history).toEqual(submissions[0]?.history);
+    expect(downloaded[0]?.history).toEqual(submissions[0]?.history);
     expect(
-      applyExportStateToSelection(generated, ["ПД-1056"], "file_downloaded")[0]
-        ?.exportState,
-    ).toBe("file_downloaded");
-    expect(
-      applyExportStateToSelection(generated, ["ПД-1056"], "file_downloaded")[0]
-        ?.exportPackage,
-    ).toEqual(generated[0]?.exportPackage);
+      downloaded[0]?.history.some((item) => item.id.includes("-export-file_")),
+    ).toBe(false);
   });
 
   it("blocks download and export when generated package content becomes stale", () => {

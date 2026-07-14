@@ -631,6 +631,7 @@ export function AdminExportScreen({
           documentExport: toExportPackageDocumentCommit(
             zipArtifactResult.artifact,
           ),
+          packageIdentity: zipArtifactResult.artifact.packageIdentity,
           submissionIds: prepared.submissionIds,
         });
       } catch (error) {

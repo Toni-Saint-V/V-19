@@ -21,6 +21,8 @@ import { parseExportWorkbookBlob } from "../../src/lib/export/exportWorkbookCore
 import { extractPdfTextFromFile } from "../../src/modules/submissions/pdfTextExtraction";
 import {
   PRODUCTION_PROJECT_REF,
+  buildProductionCohortPlan,
+  loadCohortResumeState,
   loadProductionCohortAccounts,
   requiredProductionRunMarker,
   signInCohortAccount,
@@ -37,11 +39,15 @@ import {
   assertProductionA1S1ExportWriteUnlock,
   downloadA1S1ExportBytes,
   loadAcceptedA1S1ProductionExportCase,
+  prepareProductionA2S1ExportRetryCheckpoint,
+  productionA2S1StartsInTerminalReadbackLane,
   productionA1S1ExportDigest,
   resolveA1S1ProductionExportPreflight,
   saveProductionA1S1ExportState,
   verifyA1S1ProductionExportFinalState,
   writeProductionA1S1ExportEvidence,
+  writeProductionA2S1AbortEvidence,
+  writeProductionA2S1TerminalReadbackEvidence,
   type ProductionA1S1ExportFinalStateProof,
   type ProductionA1S1ExportPreflight,
   type ProductionA1S1ExportNetworkContract,
@@ -67,6 +73,14 @@ type SessionEvidence = {
   mutations: CohortMutationSummary[];
   network: CohortMutationSummary[];
   role: "admin" | "agent";
+  violations: Array<{
+    count: number;
+    reason:
+      | "missing-release-gate"
+      | "payload-contract"
+      | "route-contract"
+      | "verified-artifact-contract";
+  }>;
 };
 
 type ExportEvidence = {
@@ -94,7 +108,7 @@ type ExportEvidence = {
   globalReconciliation?: {
     checkedAt: string;
     outputDigest: string;
-    phase: "pre_export_a2_s1";
+    phase: "post_export_a2_s1" | "pre_export_a2_s1";
   };
   postStatus?: "exported";
   preStatus?: "ready_for_excel";
@@ -521,6 +535,7 @@ async function closeSession(session: ExportSession, evidence: ExportEvidence) {
       mutations: session.gate.summary(),
       network: session.ledger.summary(),
       role: session.role,
+      violations: session.gate.violationSummary(),
     });
     if (session.gate.hasReleasedExportMutations) {
       session.gate.assertSuccessfulExport();
@@ -724,8 +739,8 @@ async function downloadAndInspectZip(
     await saveProductionA1S1ExportState(state);
     session.gate.bindVerifiedArtifact(inspected.artifactContract);
     session.gate.releaseExportMutations();
-    await expect(session.page.locator("#export-action-hint")).toContainText(
-      /ZIP скачан/,
+    await expect(session.page.locator("#export-action-hint")).toHaveText(
+      /^\s*ZIP скачан: visaflow-export-[a-z0-9]{7}_documents\.zip\s*$/,
       { timeout: 90_000 },
     );
     state.postCommitUiNoticeVerified = true;
@@ -812,47 +827,33 @@ function assertNoAutomaticResumeFromAmbiguousExport(
   );
 }
 
-function sameProductionExportPreflight(
-  left: ProductionA1S1ExportPreflight,
-  right: ProductionA1S1ExportPreflight,
-) {
-  return (
-    left.applicantDigest === right.applicantDigest &&
-    left.documentAssetCount === right.documentAssetCount &&
-    left.documentAssetIdentityDigest === right.documentAssetIdentityDigest &&
-    left.mediaAssetCount === right.mediaAssetCount &&
-    left.mediaDigest === right.mediaDigest &&
-    left.rawStatus === right.rawStatus
-  );
-}
-
 async function recoverAmbiguousA2S1ExportCheckpoint(input: {
   admin: ProductionCohortAccount;
   ownerId: string;
   state: ProductionA1S1ExportState;
   submissionId: string;
 }) {
-  if (input.state.stage !== "exporting") return;
+  if (
+    input.state.stage !== "exporting" &&
+    input.state.stage !== "artifact_verified" &&
+    input.state.stage !== "verified"
+  ) {
+    return;
+  }
   assertProductionA2S1ExportResumeUnlock();
-  invariant(
-    input.state.preflight && input.state.excelProof && !input.state.zipProof,
-    "Ambiguous A2-S1 export retry requires preflight and Excel proof without ZIP proof.",
-  );
   const fresh = await resolveA1S1ProductionExportPreflight({
     admin: input.admin,
     ownerId: input.ownerId,
     submissionId: input.submissionId,
   });
-  invariant(
-    sameProductionExportPreflight(input.state.preflight, fresh.preflight),
-    "A2-S1 production facts changed after the ambiguous ZIP attempt; retry is forbidden.",
-  );
-  input.state.preflight = fresh.preflight;
-  input.state.stage = "excel_verified";
+  prepareProductionA2S1ExportRetryCheckpoint(input.state, fresh.preflight);
   await saveProductionA1S1ExportState(input.state);
 }
 
-async function assertFreshPreExportA2S1Reconciliation(runMarker: string) {
+async function assertFreshA2S1Reconciliation(
+  runMarker: string,
+  phase: "post_export_a2_s1" | "pre_export_a2_s1",
+) {
   const checkedAt = new Date().toISOString();
   try {
     const { stdout, stderr } = await execFileAsync(
@@ -863,7 +864,7 @@ async function assertFreshPreExportA2S1Reconciliation(runMarker: string) {
         encoding: "utf8",
         env: {
           ...process.env,
-          V19_PRODUCTION_COHORT_EXPECTED_PHASE: "pre_export_a2_s1",
+          V19_PRODUCTION_COHORT_EXPECTED_PHASE: phase,
           V19_PRODUCTION_COHORT_RUN_MARKER: runMarker,
         },
         maxBuffer: 1_000_000,
@@ -876,7 +877,7 @@ async function assertFreshPreExportA2S1Reconciliation(runMarker: string) {
     return {
       checkedAt,
       outputDigest: productionA1S1ExportDigest(`${stdout}\n${stderr}`).slice(0, 16),
-      phase: "pre_export_a2_s1" as const,
+      phase,
     };
   } catch (error) {
     const record = error as { stderr?: unknown; stdout?: unknown };
@@ -884,7 +885,7 @@ async function assertFreshPreExportA2S1Reconciliation(runMarker: string) {
       .filter((value): value is string => typeof value === "string")
       .join("\n");
     throw new Error(
-      `A2-S1 pre-export reconciliation failed (digest=${productionA1S1ExportDigest(
+      `A2-S1 ${phase} reconciliation failed (digest=${productionA1S1ExportDigest(
         output || (error instanceof Error ? error.message : String(error)),
       ).slice(0, 16)}).`,
     );
@@ -892,6 +893,10 @@ async function assertFreshPreExportA2S1Reconciliation(runMarker: string) {
 }
 
 test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} export artifact gate`, () => {
+  test.skip(
+    process.env.V19_PRODUCTION_A2_S1_ABORT_ONLY === "1",
+    "The abort-only config runs the isolated no-write proof instead.",
+  );
   test("downloads and verifies one real technical tourist package plus exact Excel through real UI", async ({
     browser,
   }, testInfo) => {
@@ -919,6 +924,9 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} export artifact gate`, (
     };
     let releaseLock: (() => Promise<void>) | null = null;
     let state: ProductionA1S1ExportState | undefined;
+    // Preserve any prior terminal-write evidence unless a fresh pre-export
+    // reconciliation has positively selected the primary export lane.
+    let terminalReadbackRecovery = true;
     let failure: unknown;
 
     try {
@@ -934,15 +942,38 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} export artifact gate`, (
         owner,
         `Accepted ${PRODUCTION_EXPORT_CASE_KEY} owner account is unavailable.`,
       );
-      evidence.globalReconciliation = await assertFreshPreExportA2S1Reconciliation(
-        runMarker,
-      );
-      await recoverAmbiguousA2S1ExportCheckpoint({
-        admin: accounts.admin,
-        ownerId: owner.authUserId,
-        state,
-        submissionId,
-      });
+      if (productionA2S1StartsInTerminalReadbackLane(state.stage)) {
+        try {
+          evidence.globalReconciliation = await assertFreshA2S1Reconciliation(
+            runMarker,
+            "post_export_a2_s1",
+          );
+        } catch {
+          evidence.globalReconciliation = await assertFreshA2S1Reconciliation(
+            runMarker,
+            "pre_export_a2_s1",
+          );
+          await recoverAmbiguousA2S1ExportCheckpoint({
+            admin: accounts.admin,
+            ownerId: owner.authUserId,
+            state,
+            submissionId,
+          });
+          terminalReadbackRecovery = false;
+        }
+      } else {
+        evidence.globalReconciliation = await assertFreshA2S1Reconciliation(
+          runMarker,
+          "pre_export_a2_s1",
+        );
+        await recoverAmbiguousA2S1ExportCheckpoint({
+          admin: accounts.admin,
+          ownerId: owner.authUserId,
+          state,
+          submissionId,
+        });
+        terminalReadbackRecovery = false;
+      }
       assertNoAutomaticResumeFromAmbiguousExport(state);
       evidence.case = {
         caseKey: PRODUCTION_EXPORT_CASE_KEY,
@@ -1024,6 +1055,14 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} export artifact gate`, (
         state.preflight && state.excelProof && state.zipProof,
         "Sanitized A1-S1 export proofs are incomplete.",
       );
+      if (terminalReadbackRecovery) {
+        const admin = await openSession(browser, testInfo, accounts.admin);
+        try {
+          await assertAdminExportedState(admin.page, submissionId);
+        } finally {
+          await closeSession(admin, evidence);
+        }
+      }
       const finalState = await verifyA1S1ProductionExportFinalState({
         admin: accounts.admin,
         preflight: state.preflight,
@@ -1069,11 +1108,235 @@ test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} export artifact gate`, (
       evidence.finishedAt = new Date().toISOString();
       if (releaseLock) {
         try {
-          await writeProductionA1S1ExportEvidence(runMarker, evidence);
+          if (terminalReadbackRecovery) {
+            await writeProductionA2S1TerminalReadbackEvidence(runMarker, evidence);
+          } else {
+            await writeProductionA1S1ExportEvidence(runMarker, evidence);
+          }
         } finally {
           await releaseLock();
         }
       }
+    }
+
+    if (failure) throw failure;
+  });
+});
+
+test.describe(`production ${PRODUCTION_EXPORT_CASE_KEY} abort-only draft gate`, () => {
+  test.skip(
+    process.env.V19_PRODUCTION_A2_S1_ABORT_ONLY !== "1",
+    "Abort-only proof requires its dedicated no-write Playwright config.",
+  );
+
+  test("accepts the artifact-bound real draft and aborts it before production send", async ({
+    browser,
+  }, testInfo) => {
+    test.setTimeout(1_800_000);
+    const runMarker = requiredProductionRunMarker();
+    const evidence: {
+      acceptedDraftPayloadDigest?: string;
+      browserProblemCategories?: string[];
+      browserProblemCount?: number;
+      businessResponses2xx: number;
+      caseMarkerDigest?: string;
+      constraints: {
+        acceptedSaveDraftAttempts: 2;
+        completeExportPackageRequests: 0;
+        credentialsPersistedInEvidence: false;
+        directProductionWrites: false;
+        piiArtifactsPersisted: false;
+        screenshotsPersisted: false;
+        tracesPersisted: false;
+        videosPersisted: false;
+      };
+      errorDigest?: string;
+      excel?: SanitizedA1S1WorkbookProof;
+      finishedAt?: string;
+      mutationSummary?: CohortMutationSummary[];
+      preflight?: ProductionA1S1ExportPreflight;
+      projectRef: typeof PRODUCTION_PROJECT_REF;
+      result: "FAILED" | "PASS" | "RUNNING";
+      runMarker: string;
+      schemaVersion: 1;
+      startedAt: string;
+      submissionDigest?: string;
+      violationSummary?: Array<{
+        count: number;
+        reason:
+          | "missing-release-gate"
+          | "payload-contract"
+          | "route-contract"
+          | "verified-artifact-contract";
+      }>;
+      zip?: SanitizedA1S1ZipProof;
+    } = {
+      businessResponses2xx: 0,
+      constraints: {
+        acceptedSaveDraftAttempts: 2,
+        completeExportPackageRequests: 0,
+        credentialsPersistedInEvidence: false,
+        directProductionWrites: false,
+        piiArtifactsPersisted: false,
+        screenshotsPersisted: false,
+        tracesPersisted: false,
+        videosPersisted: false,
+      },
+      projectRef: PRODUCTION_PROJECT_REF,
+      result: "RUNNING",
+      runMarker,
+      schemaVersion: 1,
+      startedAt: new Date().toISOString(),
+    };
+    let failure: unknown;
+
+    try {
+      const cohortCase = buildProductionCohortPlan(runMarker).find(
+        (candidate) => candidate.caseKey === PRODUCTION_EXPORT_CASE_KEY,
+      );
+      invariant(
+        cohortCase?.applicantCount === 1 && cohortCase.type === "single",
+        "A2-S1 is absent from the immutable one-person cohort plan.",
+      );
+      const cohortState = await loadCohortResumeState(runMarker);
+      const cohortCheckpoint = cohortState.cases[PRODUCTION_EXPORT_CASE_KEY];
+      invariant(
+        cohortCheckpoint?.stage === "submitted" && cohortCheckpoint.submissionId,
+        "A2-S1 submitted checkpoint is unavailable for abort-only proof.",
+      );
+      invariant(
+        cohortCheckpoint.caseMarker === cohortCase.caseMarker,
+        "A2-S1 cohort marker changed before abort-only proof.",
+      );
+      const accounts = loadProductionCohortAccounts();
+      const owner = accounts.agents.find(
+        (account) => account.key === cohortCase.ownerKey,
+      );
+      invariant(owner, "A2-S1 owner account is unavailable for read-only preflight.");
+      const submissionId = cohortCheckpoint.submissionId;
+      const { networkContract, preflight } =
+        await resolveA1S1ProductionExportPreflight({
+          admin: accounts.admin,
+          ownerId: owner.authUserId,
+          submissionId,
+        });
+      evidence.caseMarkerDigest = productionA1S1ExportDigest(cohortCase.caseMarker);
+      evidence.preflight = preflight;
+      evidence.submissionDigest = productionA1S1ExportDigest(submissionId);
+
+      const admin = await openSession(
+        browser,
+        testInfo,
+        accounts.admin,
+        networkContract,
+      );
+      try {
+        await selectOnlySelectedCase(admin.page, {
+          city: cohortCase.city,
+          submissionId,
+        });
+        const workbook = await downloadAndInspectExcel(admin.page, cohortCase);
+        evidence.excel = workbook.proof;
+
+        // Mirror a resumed production retry: retain only the verified workbook
+        // proof, then clear browser-local preparedExport state before ZIP.
+        await admin.page.reload({ waitUntil: "domcontentloaded" });
+        await expect(
+          admin.page.getByRole("heading", {
+            level: 1,
+            name: /^(Проверка|Очередь на проверку|Работа)$/,
+          }),
+        ).toBeVisible({ timeout: 120_000 });
+        await waitForWorkspaceData(admin.page);
+        await selectOnlySelectedCase(admin.page, {
+          city: cohortCase.city,
+          submissionId,
+        });
+
+        admin.gate.beginExport();
+        let exportPhaseFinished = false;
+        try {
+          const button = admin.page.getByRole("button", {
+            name: "Скачать ZIP с Excel",
+          });
+          await expect(button).toBeEnabled();
+          const acceptedDraftPromise = admin.gate.waitForAcceptedExportDraft(
+            zipDownloadTimeoutMs,
+          );
+          const downloadPromise = admin.page.waitForEvent("download", {
+            timeout: zipDownloadTimeoutMs,
+          });
+          await button.click();
+          const [download, acceptedDraft] = await Promise.all([
+            downloadPromise,
+            acceptedDraftPromise,
+          ]);
+          invariant(
+            /^visaflow-export-.+_documents\.zip$/.test(
+              download.suggestedFilename(),
+            ),
+            "Abort-only ZIP filename is not canonical.",
+          );
+          const inspected = await inspectZip(
+            await downloadA1S1ExportBytes(download),
+            {
+              cohortCase,
+              expectedWorkbook: workbook.proof,
+              submissionId,
+              zipFileName: download.suggestedFilename(),
+            },
+          );
+          evidence.acceptedDraftPayloadDigest = acceptedDraft.payloadDigest;
+          evidence.zip = inspected.proof;
+          admin.gate.bindVerifiedArtifact(inspected.artifactContract);
+          admin.gate.cancelExportMutations();
+          await expect(admin.page.locator("#export-action-hint")).toContainText(
+            /ZIP скачан, но терминальная фиксация не подтверждена/,
+            { timeout: 90_000 },
+          );
+          admin.gate.finishExport();
+          exportPhaseFinished = true;
+          evidence.mutationSummary = admin.gate.summary();
+          evidence.violationSummary = admin.gate.violationSummary();
+          evidence.businessResponses2xx = evidence.mutationSummary
+            .filter((item) => item.status >= 200 && item.status < 300)
+            .reduce((total, item) => total + item.count, 0);
+          admin.gate.assertAbortedExportDraft();
+          invariant(
+            evidence.businessResponses2xx === 0,
+            "Abort-only proof observed a successful production business response.",
+          );
+        } catch (error) {
+          admin.gate.cancelExportMutations();
+          throw error;
+        } finally {
+          if (!exportPhaseFinished) admin.gate.finishExport();
+        }
+
+        admin.ledger.assertNoOriginViolations();
+        const browserProblems = admin.browserProblems();
+        const browserProblemCategories = admin.browserProblemCategories();
+        evidence.browserProblemCount = browserProblems.count;
+        evidence.browserProblemCategories = browserProblemCategories;
+        invariant(
+          browserProblems.count === 2 &&
+            browserProblemCategories.length === 1 &&
+            browserProblemCategories[0] === "network-runtime",
+          "Abort-only A2-S1 proof emitted errors beyond its two expected client-aborted fetches.",
+        );
+      } finally {
+        await admin.context.close();
+      }
+      evidence.result = "PASS";
+    } catch (error) {
+      failure = error;
+      evidence.errorDigest = productionA1S1ExportDigest(
+        error instanceof Error ? error.message : String(error),
+      ).slice(0, 16);
+      evidence.result = "FAILED";
+    } finally {
+      evidence.finishedAt = new Date().toISOString();
+      await writeProductionA2S1AbortEvidence(runMarker, evidence);
     }
 
     if (failure) throw failure;

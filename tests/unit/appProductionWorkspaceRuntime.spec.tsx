@@ -40,6 +40,60 @@ const exportMocks = vi.hoisted(() => ({
   })),
 }));
 
+const exportRuleMocks = vi.hoisted(() => {
+  const preparedIdentity = {
+    contentFingerprint: "prepared-export-fingerprint",
+    fileName: "visaflow-export-package-a.xlsx",
+    format: "xlsx" as const,
+    idempotencyKey: "package-a",
+    rowCount: 1,
+    submissionIds: ["submission-1"],
+  };
+
+  const buildExportPackageIdentity = vi.fn(
+    (submissions: Array<Record<string, unknown>>) => {
+      if (submissions.length === 0) return null;
+      const version = submissions.some(
+        (submission) => submission.exportIdentityVersion === "refreshed",
+      )
+        ? "b"
+        : "a";
+      return version === "a"
+        ? preparedIdentity
+        : {
+            ...preparedIdentity,
+            contentFingerprint: "refreshed-export-fingerprint",
+            fileName: "visaflow-export-package-b.xlsx",
+            idempotencyKey: "package-b",
+          };
+    },
+  );
+  const exportPackageIdentityMatches = vi.fn(
+    (
+      left: typeof preparedIdentity,
+      right: typeof preparedIdentity | null,
+    ) =>
+      Boolean(
+        right &&
+          left.contentFingerprint === right.contentFingerprint &&
+          left.fileName === right.fileName &&
+          left.format === right.format &&
+          left.idempotencyKey === right.idempotencyKey &&
+          left.rowCount === right.rowCount &&
+          left.submissionIds.length === right.submissionIds.length &&
+          left.submissionIds.every(
+            (value, index) => value === right.submissionIds[index],
+          ),
+      ),
+  );
+
+  return {
+    buildExportPackageIdentity,
+    exportPackageIdentityMatches,
+    preparedIdentity,
+  };
+});
+
 vi.mock("motion/react", async () => {
   const React = await import("react");
   return {
@@ -119,9 +173,10 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
                     applicantCount: 1,
                     assetIds: ["00000000-0000-4000-8000-000000000801"],
                     fileCount: 2,
-                    workbookFileName: "submission-1.xlsx",
-                    zipFileName: "submission-1.zip",
+                    workbookFileName: exportRuleMocks.preparedIdentity.fileName,
+                    zipFileName: `visaflow-export-${exportRuleMocks.preparedIdentity.idempotencyKey}_documents.zip`,
                   },
+                  packageIdentity: exportRuleMocks.preparedIdentity,
                   submissionIds: ["submission-1"],
                 }),
               )
@@ -159,11 +214,19 @@ vi.mock("../../src/modules/submissions/submissionActions", () => ({
   },
   applyExportStateToSelection: (
     submissions: Array<Record<string, unknown>>,
-    _submissionIds: string[],
+    submissionIds: string[],
     exportState: string,
   ) => {
     runtime.exportStateCalls.push(exportState);
-    return submissions.map((submission) => ({ ...submission, exportState }));
+    const selected = submissions.filter((submission) =>
+      submissionIds.includes(String(submission.id)),
+    );
+    const packageIdentity = exportRuleMocks.buildExportPackageIdentity(selected);
+    return submissions.map((submission) =>
+      submissionIds.includes(String(submission.id))
+        ? { ...submission, exportPackage: packageIdentity, exportState }
+        : submission,
+    );
   },
   markSubmissionFileAccepted: (submission: Record<string, unknown>) => ({
     ...submission,
@@ -178,6 +241,11 @@ vi.mock("../../src/modules/submissions/aiSuggestions", () => ({
 }));
 
 vi.mock("../../src/modules/submissions/exportWorkflow", () => exportMocks);
+
+vi.mock("../../src/modules/submissions/exportRules", () => ({
+  buildExportPackageIdentity: exportRuleMocks.buildExportPackageIdentity,
+  exportPackageIdentityMatches: exportRuleMocks.exportPackageIdentityMatches,
+}));
 
 const persistenceMocks = vi.hoisted(() => ({
   loadCockpitSubmissionsForProfile: vi.fn(() => runtime.loadPromise),
@@ -263,10 +331,13 @@ function resetDeferredRuntime() {
   persistenceMocks.saveCockpitSubmissionsForProfile.mockClear();
   exportMocks.completeExportPackage.mockClear();
   exportMocks.reconcileExportPackageCompletion.mockClear();
+  exportRuleMocks.buildExportPackageIdentity.mockClear();
+  exportRuleMocks.exportPackageIdentityMatches.mockClear();
 }
 
 const loadedSubmission = {
   agentId: "agent-owner-uuid",
+  exportIdentityVersion: "prepared",
   id: "submission-1",
 };
 
@@ -412,6 +483,54 @@ describe("App production workspace runtime", () => {
       persistenceMocks.saveCockpitSubmissionsForProfile.mock.invocationCallOrder[0];
     const rpcOrder = exportMocks.completeExportPackage.mock.invocationCallOrder[0];
     expect(firstPersistenceOrder).toBeLessThan(rpcOrder ?? 0);
+  });
+
+  test("fails closed before persistence when a canonical refresh makes the prepared ZIP identity stale", async () => {
+    runtime.savePromise = Promise.resolve(
+      new Map([["submission-1", "agent-owner-uuid"]]),
+    );
+    render(<App />);
+    await screen.findByText("Загрузка данных Supabase...");
+    await act(async () => {
+      runtime.resolveLoad({
+        ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+        submissions: [loadedSubmission],
+      });
+    });
+    await screen.findByTestId("admin-workspace");
+
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockClear();
+    persistenceMocks.loadCockpitSubmissionsForProfile.mockResolvedValueOnce({
+      ownerIdsBySubmissionId: new Map([["submission-1", "agent-owner-uuid"]]),
+      submissions: [
+        {
+          ...loadedSubmission,
+          exportIdentityVersion: "refreshed",
+        },
+      ],
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await waitFor(() =>
+      expect(
+        persistenceMocks.loadCockpitSubmissionsForProfile,
+      ).toHaveBeenCalledTimes(1),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Export submission" }));
+    await act(async () => {
+      await runtime.lastMutationPromise;
+    });
+
+    expect(runtime.exportStateCalls).toEqual([]);
+    expect(
+      persistenceMocks.saveCockpitSubmissionsForProfile,
+    ).not.toHaveBeenCalled();
+    expect(exportMocks.completeExportPackage).not.toHaveBeenCalled();
+    expect(runtime.lastMutationError?.message).toBe(
+      "Export artifact is stale; regenerate Excel and ZIP before retrying.",
+    );
   });
 
   test("restores a retryable export state only when canonical reconciliation proves the RPC did not commit", async () => {

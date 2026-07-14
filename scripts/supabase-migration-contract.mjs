@@ -44,6 +44,8 @@ export const requiredMigrationOrder = [
   "20260713095403_atomic_export_document_completion.sql",
   "20260714020334_atomic_export_guard_null_safe.sql",
   "20260714110000_repair_incomplete_export_document_completion.sql",
+  "20260714190000_fix_complete_export_package_zip_suffix_guard.sql",
+  "20260714200000_harden_null_safe_admin_rpc_guards.sql",
 ];
 
 export const requiredRemoteMigrationOrder = [
@@ -100,11 +102,15 @@ export const requiredRemoteMigrationOrder = [
   "20260710041458_20260710004000_harden_document_assets_projection",
   "20260710041500_20260710021043_harden_media_asset_review_boundary",
   "20260710041502_20260710022231_add_media_assets_applicant_submission_index",
-  "20260712201203_allow_admin_waiting_review_issue_checkpoint",
-  "20260712225209_save_returned_submission_update_first",
-  "20260713095403_atomic_export_document_completion",
-  "20260714020334_atomic_export_guard_null_safe",
-  "20260714110000_repair_incomplete_export_document_completion",
+  "20260712221327_20260712201203_allow_admin_waiting_review_issue_checkpoint",
+  "20260713033130_20260712225209_save_returned_submission_update_first",
+  "20260714064305_20260712201203_allow_admin_waiting_review_issue_checkpoint",
+  "20260714064308_20260712225209_save_returned_submission_update_first",
+  "20260714065154_20260713095403_atomic_export_document_completion",
+  "20260714065303_20260714020334_atomic_export_guard_null_safe",
+  "20260714065657_20260714110000_repair_incomplete_export_document_completion",
+  "20260714182809_20260714190000_fix_complete_export_package_zip_suffix_guard",
+  "20260714191730_20260714200000_harden_null_safe_admin_rpc_guards",
 ];
 
 export function requiredMigrationsInActualOrder(migrationFiles) {
