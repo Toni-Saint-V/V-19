@@ -7,16 +7,20 @@ export const productionCohortExpectedFinalTotals = Object.freeze({
   submissions: 12,
 });
 
+const exportedCohortCaseKeys = new Set(["A1-F6"]);
+
 export function productionCohortFinalGate({
   expectedCaseCount,
   reports,
   totals,
 }) {
   const expected = productionCohortExpectedFinalTotals;
-  const allCheckpointCasesSubmitted =
+  const exactExpectedLifecycle =
     reports.length === expectedCaseCount &&
-    reports.every(
-      (report) => report.stage === "submitted" && report.status === "waiting_review",
+    reports.every((report) =>
+      exportedCohortCaseKeys.has(report.caseKey)
+        ? report.stage === "exported" && report.status === "exported"
+        : report.stage === "submitted" && report.status === "waiting_review",
     );
   const exactFinalTotals =
     totals.answers === expected.answers &&
@@ -26,5 +30,5 @@ export function productionCohortFinalGate({
     totals.media === expected.media &&
     totals.storageReadable === expected.media;
 
-  return allCheckpointCasesSubmitted && exactFinalTotals;
+  return exactExpectedLifecycle && exactFinalTotals;
 }

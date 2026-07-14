@@ -1497,17 +1497,37 @@ export async function saveCockpitSubmissionsForProfile(
       ownerId,
       profile.role,
     );
-    const { error } = requiresCorrectionHandoff(submission)
-      ? await client.rpc("submit_corrections_handoff", { payload })
-      : await client.rpc("save_submission_draft", { payload });
+    const correctionHandoff = requiresCorrectionHandoff(submission);
+    const operation = correctionHandoff
+      ? "rpc.submit_corrections_handoff"
+      : "rpc.save_submission_draft";
+    const invokeSave = async (): Promise<{ error: unknown | null }> => {
+      try {
+        const { error } = correctionHandoff
+          ? await client.rpc("submit_corrections_handoff", { payload })
+          : await client.rpc("save_submission_draft", { payload });
+        return { error };
+      } catch (error) {
+        return { error };
+      }
+    };
 
-    if (error) {
-      throw mapSupabasePersistenceError(error, {
-        operation: requiresCorrectionHandoff(submission)
-          ? "rpc.submit_corrections_handoff"
-          : "rpc.save_submission_draft",
+    let result = await invokeSave();
+    if (result.error) {
+      let failure = mapSupabasePersistenceError(result.error, {
+        operation,
         fallbackKind: "save",
       });
+      if (!correctionHandoff && failure.diagnostics.retryable) {
+        result = await invokeSave();
+        if (result.error) {
+          failure = mapSupabasePersistenceError(result.error, {
+            operation,
+            fallbackKind: "save",
+          });
+        }
+      }
+      if (result.error) throw failure;
     }
 
     nextOwnerIds.set(submission.id, ownerId);

@@ -28,7 +28,7 @@ interface ApplicantsScreenProps {
   submissions?: Submission[];
 }
 
-// Mock Types
+// View types
 type ApplicantStatus = 'ready' | 'missing_docs' | 'in_progress';
 type ApplicantSummaryFilter = 'all' | 'blockers' | 'review' | 'ready';
 type ApplicantMarker = 'male' | 'female' | 'child' | 'person';
@@ -64,63 +64,7 @@ interface IndividualData {
   tripDateFrom: string;
 }
 
-const mockFamilies: FamilyData[] = [
-  {
-    id: "FAM-001",
-    title: "Семья Петровых",
-    city: "Москва",
-    createdAt: '2026-08-10T10:00:00.000Z',
-    lastActivity: "12 авг 2026",
-    readinessPercent: 50,
-    tripDateFrom: '2026-08-18',
-    members: [
-      { marker: "male", name: "Иван Петров", status: "ready" },
-      { marker: "female", name: "Анна Петрова", roleLabel: "Супруга", status: "ready" },
-      { marker: "child", name: "Максим Петров", roleLabel: "Ребёнок", status: "in_progress" },
-      { marker: "child", name: "Мария Петрова", roleLabel: "Ребёнок", status: "missing_docs" }
-    ]
-  },
-  {
-    id: "FAM-002",
-    title: "Семья Орловых",
-    city: "Санкт-Петербург",
-    createdAt: '2026-08-11T10:00:00.000Z',
-    lastActivity: "Вчера",
-    readinessPercent: 100,
-    tripDateFrom: '2026-09-02',
-    members: [
-      { marker: "male", name: "Сергей Орлов", status: "ready" },
-      { marker: "female", name: "Марина Орлова", roleLabel: "Супруга", status: "ready" },
-      { marker: "child", name: "Дмитрий Орлов", roleLabel: "Ребёнок", status: "ready" }
-    ]
-  }
-];
-
-const mockIndividuals: IndividualData[] = [
-  {
-    id: "IND-001",
-    city: "Москва",
-    createdAt: '2026-08-12T10:00:00.000Z',
-    marker: "female",
-    name: "Алина Смирнова",
-    readinessPercent: 64,
-    tripDateFrom: '2026-08-18',
-    status: "in_progress",
-    lastActivity: "Сегодня",
-  },
-  {
-    id: "IND-002",
-    city: "Казань",
-    createdAt: '2026-08-13T10:00:00.000Z',
-    marker: "male",
-    name: "Дмитрий Волков",
-    readinessPercent: 100,
-    tripDateFrom: '2026-09-02',
-    status: "ready",
-    lastActivity: "5 авг 2026",
-  }
-];
-
+const emptySubmissions: Submission[] = [];
 
 function applicantStatusFromSubmission(submission: Submission, applicantId: string): ApplicantStatus {
   const applicant = submission.applicants.find((item) => item.id === applicantId);
@@ -166,8 +110,7 @@ function ApplicantMarkerIcon({ marker }: { marker: ApplicantMarker }) {
   return <Icon aria-label={label} className="v19-applicant-person-icon" />;
 }
 
-function runtimeFamiliesFromSubmissions(submissions?: Submission[]): FamilyData[] {
-  if (!submissions?.length) return mockFamilies;
+function runtimeFamiliesFromSubmissions(submissions: Submission[]): FamilyData[] {
   return submissions
     .filter((submission) => submission.type === 'family')
     .map((submission) => ({
@@ -190,8 +133,7 @@ function runtimeFamiliesFromSubmissions(submissions?: Submission[]): FamilyData[
     }));
 }
 
-function runtimeIndividualsFromSubmissions(submissions?: Submission[]): IndividualData[] {
-  if (!submissions?.length) return mockIndividuals;
+function runtimeIndividualsFromSubmissions(submissions: Submission[]): IndividualData[] {
   return submissions
     .filter((submission) => submission.type === 'single')
     .map((submission) => {
@@ -224,16 +166,7 @@ function applicantStatusLabel(status: ApplicantStatus) {
   return 'Профиль готов';
 }
 
-function metricsFromSubmissions(submissions: Submission[] | undefined, fallbackTotal: number) {
-  if (!submissions?.length) {
-    return {
-      blockers: 3,
-      exportReady: 1,
-      queue: fallbackTotal,
-      review: 3,
-    };
-  }
-
+function metricsFromSubmissions(submissions: Submission[]) {
   return {
     blockers: submissions.reduce(
       (total, submission) =>
@@ -256,15 +189,21 @@ export function ApplicantsScreen({ onOpenDrawer, submissions }: ApplicantsScreen
   const [cityFilter, setCityFilter] = useState('Все города');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<ApplicantSort>('tripDate');
-  const families = useMemo(() => runtimeFamiliesFromSubmissions(submissions), [submissions]);
-  const individuals = useMemo(() => runtimeIndividualsFromSubmissions(submissions), [submissions]);
+  const canonicalSubmissions = submissions ?? emptySubmissions;
+  const families = useMemo(
+    () => runtimeFamiliesFromSubmissions(canonicalSubmissions),
+    [canonicalSubmissions],
+  );
+  const individuals = useMemo(
+    () => runtimeIndividualsFromSubmissions(canonicalSubmissions),
+    [canonicalSubmissions],
+  );
   const cityOptions = useMemo(() => {
-    if (submissions?.length) return cityFilterValuesForSubmissions(submissions);
-    return ['Все города', ...new Set([...families, ...individuals].map((item) => item.city))];
-  }, [families, individuals, submissions]);
+    return cityFilterValuesForSubmissions(canonicalSubmissions);
+  }, [canonicalSubmissions]);
   const metrics = useMemo(
-    () => metricsFromSubmissions(submissions, families.length + individuals.length),
-    [families.length, individuals.length, submissions],
+    () => metricsFromSubmissions(canonicalSubmissions),
+    [canonicalSubmissions],
   );
   const searchNeedle = searchQuery.trim().toLowerCase();
   const displayFamilies = useMemo(

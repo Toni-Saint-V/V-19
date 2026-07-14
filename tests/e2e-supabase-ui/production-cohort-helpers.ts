@@ -68,6 +68,11 @@ export type CohortCaseStage =
   | "questionnaire_saved"
   | "submitted";
 
+export type CohortCaseCompletion = {
+  lifecycle: "exported" | "submitted";
+  submissionId: string;
+};
+
 export type CohortResumeState = {
   cases: Record<
     string,
@@ -952,13 +957,12 @@ async function uploadApplicantRequiredFiles(
       .locator(".v19-questionnaire-file-slot")
       .filter({ hasText: label });
     await expect(slot).toBeVisible();
+    const ready = slot.locator(".v19-questionnaire-file-status.is-ready");
+    if (await isVisible(ready)) continue;
     const input = slot.locator('input[type="file"]');
-    if ((await input.count()) === 0) continue;
+    await expect(input).toHaveCount(1);
     await input.setInputFiles(file);
-    await expect(input).toHaveCount(0, { timeout: 45_000 });
-    await expect(slot.locator(".v19-questionnaire-file-status.is-ready")).toBeVisible({
-      timeout: 45_000,
-    });
+    await expect(ready).toBeVisible({ timeout: 45_000 });
   }
 }
 
@@ -977,7 +981,10 @@ async function openQuestionnaireFromDrawer(page: Page) {
 async function reopenQuestionnaireFromCanonicalState(page: Page, submissionId: string) {
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(
-    page.getByRole("button", { exact: true, name: "Мои подачи" }).first(),
+    page.getByRole("heading", {
+      level: 1,
+      name: /^(Мои действия|Мои подачи)$/,
+    }),
   ).toBeVisible({ timeout: 45_000 });
   await clickWorkspaceButton(page, /Мои подачи/);
   await waitForAgentSubmissionsSettled(page);
@@ -1228,7 +1235,7 @@ export async function createOrResumeCohortCase(input: {
   ledger: ProductionNetworkLedger;
   page: Page;
   resumeState: CohortResumeState;
-}) {
+}): Promise<CohortCaseCompletion> {
   const { cohortCase, ledger, page, resumeState } = input;
   let checkpoint = resumeState.cases[cohortCase.caseKey];
   let questionnaire: Locator;
@@ -1282,6 +1289,16 @@ export async function createOrResumeCohortCase(input: {
     await openSubmissionById(page, checkpoint.submissionId);
     await assertCheckpointMatchesCohortCase(page, cohortCase);
     const visibleDrawerText = await drawer(page).innerText();
+    const statusPill = drawer(page).locator(".v20-status-pill").first();
+    if (
+      (await isVisible(statusPill)) &&
+      /выгружено/i.test(await statusPill.innerText())
+    ) {
+      await expect(statusPill).toHaveText(/выгружено/i);
+      await assertAgentDrawerCaseContract(page, cohortCase);
+      await closeDrawerIfOpen(page);
+      return { lifecycle: "exported", submissionId: checkpoint.submissionId };
+    }
     if (
       checkpoint.stage === "submitted" ||
       /На проверке|Отправлено на проверку/.test(visibleDrawerText)
@@ -1291,7 +1308,7 @@ export async function createOrResumeCohortCase(input: {
       checkpoint.stage = "submitted";
       await saveCohortResumeState(resumeState);
       await closeDrawerIfOpen(page);
-      return checkpoint.submissionId;
+      return { lifecycle: "submitted", submissionId: checkpoint.submissionId };
     }
     questionnaire = await openQuestionnaireFromDrawer(page);
   } else {
@@ -1436,7 +1453,21 @@ export async function createOrResumeCohortCase(input: {
     checkpoint.submissionId,
     `Completed checkpoint id is absent (${cohortCase.caseKey}).`,
   );
-  return checkpoint.submissionId;
+  return { lifecycle: "submitted", submissionId: checkpoint.submissionId };
+}
+
+export async function verifyAdminDoesNotSeeReviewCase(
+  page: Page,
+  submissionId: string,
+) {
+  await closeDrawerIfOpen(page);
+  await clickWorkspaceButton(page, /Проверка|Работа/);
+  await waitForAgentSubmissionsSettled(page);
+  const search = page.getByRole("searchbox").first();
+  if (await isVisible(search)) await search.fill(submissionId);
+  await expect(page.locator(`[data-submission-id="${submissionId}"]`)).toHaveCount(0, {
+    timeout: 45_000,
+  });
 }
 
 export async function verifyAdminSeesSubmittedCase(
@@ -1455,10 +1486,15 @@ export async function verifyAdminSeesSubmittedCase(
   await expect(drawer(page)).toBeVisible();
   await openDrawerTab(page, /Обзор/);
   await expect(drawer(page)).toContainText(cohortCase.city);
-  await expect(drawer(page)).toContainText(`${cohortCase.applicantCount} заявителей`);
-  await expect(drawer(page)).toContainText(
-    cohortCase.type === "family" ? "Семейная подача" : "Один заявитель",
-  );
+  await expect(
+    drawer(page).getByRole("tab", {
+      name: new RegExp(`Заявители\\s+${cohortCase.applicantCount}`),
+    }),
+  ).toBeVisible();
+  await openDrawerTab(page, /Заявители/);
+  await expect(
+    drawer(page).locator(".admin-review-applicants-tab > article"),
+  ).toHaveCount(cohortCase.applicantCount);
   if (!(await drawer(page).innerText()).includes(cohortCase.caseMarker)) {
     await openDrawerTab(page, /Анкета/);
   }

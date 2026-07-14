@@ -15,6 +15,7 @@ const mockState = vi.hoisted(() => ({
     args: { answers?: unknown; payload?: unknown };
     name: string;
   }>,
+  rpcResults: [] as Array<{ error: unknown | null }>,
   submissionRows: [] as unknown[],
   statusHistoryRows: [] as unknown[],
 }));
@@ -86,7 +87,7 @@ vi.mock("../../src/lib/supabase/client", () => {
       },
       rpc: (name: string, args: { answers?: unknown; payload?: unknown }) => {
         mockState.rpcCalls.push({ args, name });
-        return Promise.resolve({ error: null });
+        return Promise.resolve(mockState.rpcResults.shift() ?? { error: null });
       },
     }),
   };
@@ -157,6 +158,7 @@ beforeEach(() => {
   mockState.mediaAssetRows = [];
   mockState.questionnaireRows = [];
   mockState.rpcCalls = [];
+  mockState.rpcResults = [];
   mockState.submissionRows = [];
   mockState.statusHistoryRows = [];
 });
@@ -200,6 +202,33 @@ describe("V-19 Supabase cockpit persistence", () => {
       id: changedSubmission.id,
       title: changedSubmission.title,
     });
+  });
+
+  it("retries a transient idempotent draft save once", async () => {
+    const changedSubmission = {
+      ...(initialSubmissions[0] as Submission),
+      title: "Повторяемая отправка",
+    };
+    mockState.rpcResults = [
+      {
+        error: {
+          message: "Failed to fetch",
+          name: "FetchError",
+        },
+      },
+      { error: null },
+    ];
+
+    await saveCockpitSubmissionsForProfile(
+      agentProfile,
+      [changedSubmission],
+      new Map(),
+    );
+
+    expect(rpcNames()).toEqual([
+      "save_submission_draft",
+      "save_submission_draft",
+    ]);
   });
 
   it("writes separate trip date range columns while keeping legacy travel_date", () => {
