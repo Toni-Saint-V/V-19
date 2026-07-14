@@ -32,7 +32,6 @@ import {
 } from "../integration/visaflowBusinessBridge";
 import { getSupabaseClient } from "../lib/supabase/client";
 import { applyExportStateToSelection } from "../modules/submissions/submissionActions";
-import { ExportPackageCompletionUncertainError } from "../modules/submissions/exportWorkflow";
 import {
   buildExportPackageIdentity,
   exportSummary,
@@ -589,10 +588,9 @@ export function AdminExportScreen({
         preparedExport ?? (await prepareWorkbookForCurrentSelection());
       if (!prepared) return;
       const {
-        commitExportMediaZipArtifact,
         downloadPreparedExportMediaZip,
         prepareExportMediaZip,
-        restoreExportMediaZipArtifact,
+        toExportPackageDocumentCommit,
       } = await import("../modules/submissions/exportMediaZip");
       const supabaseClient = getSupabaseClient();
       let zipOptions = {};
@@ -625,38 +623,21 @@ export function AdminExportScreen({
         return;
       }
 
-      let documentAssetsCommitted = false;
-      if (supabaseClient) {
-        const commitResult = await commitExportMediaZipArtifact(
-          zipArtifactResult.artifact,
-        );
-        if (!commitResult.ok) {
-          setExportError(commitResult.safeMessage);
-          return;
-        }
-        documentAssetsCommitted = true;
-      }
-
       try {
         if (!bridge.onExportPackages) {
           throw new Error("Обработчик фиксации выгрузки недоступен.");
         }
-        await bridge.onExportPackages(prepared.submissionIds);
+        await bridge.onExportPackages({
+          documentExport: toExportPackageDocumentCommit(
+            zipArtifactResult.artifact,
+          ),
+          submissionIds: prepared.submissionIds,
+        });
       } catch (error) {
-        const commitOutcomeUnknown =
-          error instanceof ExportPackageCompletionUncertainError;
-        const restoreResult = documentAssetsCommitted && !commitOutcomeUnknown
-          ? await restoreExportMediaZipArtifact(zipArtifactResult.artifact)
-          : { ok: true as const };
-        const recoveryMessage = commitOutcomeUnknown
-          ? "Документы уже помечены как выгруженные; их состояние сохранено до подтверждения канонического результата Supabase. Не запускайте повторную выгрузку."
-          : restoreResult.ok
-            ? "Документы возвращены в состояние для безопасного повтора."
-            : restoreResult.safeMessage;
         setExportError(
           error instanceof Error
-            ? `ZIP скачан, но статус выгрузки не обновлён: ${error.message} ${recoveryMessage}`
-            : `ZIP скачан, но статус выгрузки не обновлён. ${recoveryMessage}`,
+            ? `ZIP скачан, но терминальная фиксация не подтверждена: ${error.message}`
+            : "ZIP скачан, но терминальная фиксация не подтверждена.",
         );
         return;
       }

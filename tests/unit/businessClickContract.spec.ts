@@ -234,9 +234,17 @@ describe("V-19 business click contract", () => {
     );
     expect(downloaded[0]).toMatchObject({ exportState: "file_downloaded" });
 
-    const commitPackage = vi.fn(async (batch) => ({
+    const documentExport = {
+      applicantCount: 1,
+      assetIds: ["00000000-0000-4000-8000-000000000911"],
+      fileCount: 2,
+      workbookFileName: "business-click.xlsx",
+      zipFileName: "business-click.zip",
+    };
+    const commitPackage = vi.fn(async (batch, committedDocumentExport) => ({
       batch,
       changedSubmissions: downloaded.length,
+      documentExport: committedDocumentExport,
       duplicate: false,
       statusHistory: downloaded.length,
     }));
@@ -245,6 +253,7 @@ describe("V-19 business click contract", () => {
       commitPackage,
       createdAt: "2026-07-04T19:20:00.000Z",
       createdBy: "00000000-0000-4000-8000-000000000902",
+      documentExport,
       format: "xlsx",
     });
 

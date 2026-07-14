@@ -112,7 +112,20 @@ vi.mock("../../src/components/AdminWorkspace", async () => {
           </button>
           <button
             type="button"
-            onClick={() => capture(bridge.onExportPackages?.(["submission-1"]))}
+            onClick={() =>
+              capture(
+                bridge.onExportPackages?.({
+                  documentExport: {
+                    applicantCount: 1,
+                    assetIds: ["00000000-0000-4000-8000-000000000801"],
+                    fileCount: 2,
+                    workbookFileName: "submission-1.xlsx",
+                    zipFileName: "submission-1.zip",
+                  },
+                  submissionIds: ["submission-1"],
+                }),
+              )
+            }
           >
             Export submission
           </button>

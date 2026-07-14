@@ -453,13 +453,22 @@ test("admin export package: same-city sorting, Excel state, ZIP folders, passpor
 
   const downloaded = applyExportStateToSelection(selectedGenerated, ids, "file_downloaded");
   expect(exportSummary(downloaded).canMarkExported).toBe(true);
+  const documentExport = {
+    applicantCount: zipResult.artifact.applicantCount,
+    assetIds: zipResult.artifact.documentAssetIds,
+    fileCount: zipResult.artifact.fileCount,
+    workbookFileName: zipResult.artifact.workbookFileName,
+    zipFileName: zipResult.artifact.fileName,
+  };
   const completed = await completeExportPackage(downloaded, {
     createdAt: "2026-05-20T10:00:00.000Z",
     createdBy: "admin-prod-test",
+    documentExport,
     format: "xlsx",
-    commitPackage: async (batch) => ({
+    commitPackage: async (batch, committedDocumentExport) => ({
       batch,
       changedSubmissions: batch.submissionIds.length,
+      documentExport: committedDocumentExport,
       duplicate: false,
       statusHistory: batch.submissionIds.length,
     }),

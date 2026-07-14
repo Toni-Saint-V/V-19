@@ -420,6 +420,74 @@ describe("Supabase security contract", () => {
     );
   });
 
+  test("makes terminal document export a single server-owned transaction", () => {
+    const migration = readProjectFile(
+      "supabase/migrations/20260713095403_atomic_export_document_completion.sql",
+    );
+    const guardHardeningMigration = readProjectFile(
+      "supabase/migrations/20260714020334_atomic_export_guard_null_safe.sql",
+    );
+
+    expect(migration).toContain(
+      "create or replace function public.complete_export_package(payload jsonb)",
+    );
+    expect(migration).toContain("security definer");
+    expect(migration).toContain(
+      "set search_path = pg_catalog, public, app_private",
+    );
+    expect(migration).toContain("payload -> 'document_export'");
+    expect(migration).toContain("Export document asset ids must be unique UUIDs");
+    expect(migration).toContain(
+      "Export document assets must exactly match three ready documents per applicant",
+    );
+    expect(migration).toContain(
+      "coalesce(array_length(expected_document_asset_ids, 1), 0) <> expected_applicant_count * 3",
+    );
+    expect(migration).not.toContain("photo_white");
+    expect(migration).toContain("document_export_events_package_identity_key_uidx");
+    expect(migration).toContain(
+      "perform set_config('app.visaflow_complete_export_package', 'on', true)",
+    );
+    expect(migration).toContain("submissions_export_completion_boundary");
+    expect(migration).toContain(
+      "before update of status, exported_at on public.submissions",
+    );
+    expect(migration).toContain("status_history_export_completion_boundary");
+    expect(guardHardeningMigration).toContain(
+      "coalesce(current_setting('app.visaflow_complete_export_package', true), '') <> 'on'",
+    );
+    expect(migration).toContain("media_assets_prevent_exported_mutation");
+    expect(migration).toContain(
+      "before insert or update or delete on public.media_assets",
+    );
+    expect(migration).toContain(
+      'drop policy if exists "document assets admin export update" on public.document_assets',
+    );
+    expect(migration).toContain(
+      "revoke all on table public.document_assets from authenticated",
+    );
+    expect(migration).toContain(
+      "revoke update (export_status) on table public.document_assets from authenticated",
+    );
+    expect(migration).toContain(
+      "revoke all on table public.document_export_events from authenticated",
+    );
+    expect(migration).toContain(
+      "revoke all on table public.export_batches from authenticated",
+    );
+
+    const startReturnFunction = migration.slice(
+      migration.indexOf("create or replace function public.start_agent_return_package"),
+      migration.indexOf(
+        "create or replace function public.publish_agent_return_package",
+      ),
+    );
+    expect(startReturnFunction).toContain("from public.export_batches");
+    expect(startReturnFunction).not.toMatch(
+      /from public\.export_batches[\s\S]{0,240}for update/i,
+    );
+  });
+
   test("prevents stale draft saves from downgrading exported submissions", () => {
     const migration = readProjectFile(
       "supabase/migrations/20260616002000_prevent_export_regression.sql",

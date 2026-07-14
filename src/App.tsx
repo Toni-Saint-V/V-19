@@ -961,7 +961,7 @@ export default function App({
         );
         await bridge.onAdminAiSuggestionDismiss?.({ submissionId, suggestionId });
       },
-      onExportPackages: async (submissionIds) => {
+      onExportPackages: async ({ documentExport, submissionIds }) => {
         if (
           workspace !== "admin" ||
           activeApprovedSession?.role !== "admin" ||
@@ -1025,6 +1025,7 @@ export default function App({
           batchId: crypto.randomUUID(),
           createdAt: new Date().toISOString(),
           createdBy: activeApprovedSession.userId,
+          documentExport,
           format: "xlsx" as const,
         };
         let completed: Awaited<ReturnType<typeof completeExportPackage>>;
@@ -1048,7 +1049,10 @@ export default function App({
               // Canonical refresh is follow-up only after durable commit proof.
             }
             try {
-              await bridge.onExportPackages?.(submissionIds);
+              await bridge.onExportPackages?.({
+                documentExport,
+                submissionIds,
+              });
             } catch {
               // External bridge/tracking is deliberately non-transactional.
             }
@@ -1087,7 +1091,7 @@ export default function App({
           // A failed follow-up read must not undo a committed export package.
         }
         try {
-          await bridge.onExportPackages?.(submissionIds);
+          await bridge.onExportPackages?.({ documentExport, submissionIds });
         } catch {
           // External bridge/tracking is deliberately non-transactional after persistence.
         }

@@ -2,10 +2,9 @@ import JSZip from "jszip";
 import { describe, expect, test, vi } from "vitest";
 import { buildExportPackageIdentity } from "../../src/modules/submissions/exportRules";
 import {
-  commitExportMediaZipArtifact,
   createExportMediaZipArtifact,
   default as downloadExportMediaZip,
-  restoreExportMediaZipArtifact,
+  toExportPackageDocumentCommit,
   type ExportMediaZipDocumentDownloader,
 } from "../../src/modules/submissions/exportMediaZip";
 import {
@@ -355,14 +354,11 @@ describe("export media mega ZIP", () => {
     expect(result).toMatchObject({ ok: false, reason: "storage_unavailable" });
   });
 
-  test("uses document repository assets and commits export audit after download", async () => {
+  test("uses document repository assets and maps ZIP facts into the terminal RPC contract", async () => {
     const selection = generatedSelection(withCanonicalStorage(byId("ПД-1056")));
     const assets = documentAssetsFor(selection);
     const repository = {
       getReadyForExport: vi.fn(async () => assets),
-      markExported: vi.fn(async () => undefined),
-      recordExportAudit: vi.fn(async () => undefined),
-      restoreReadyForExport: vi.fn(async () => undefined),
     };
 
     const result = await createExportMediaZipArtifact(selection, {
@@ -377,33 +373,13 @@ describe("export media mega ZIP", () => {
     expect(repository.getReadyForExport).toHaveBeenCalledWith([
       selection[0]!.id,
     ]);
-    expect(repository.recordExportAudit).not.toHaveBeenCalled();
-    expect(repository.markExported).not.toHaveBeenCalled();
-
-    const commitResult = await commitExportMediaZipArtifact(result.artifact, repository);
-    expect(commitResult).toEqual({ ok: true });
-    expect(repository.recordExportAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        documentAssetIds: expect.arrayContaining(
-          assets.map((asset) => asset.id),
-        ),
-        fileCount: 4,
-        fileName: result.artifact.fileName,
-        submissionIds: [selection[0]!.id],
-      }),
-    );
-    expect(repository.markExported).toHaveBeenCalledWith(
-      expect.arrayContaining(assets.map((asset) => asset.id)),
-    );
-
-    const restoreResult = await restoreExportMediaZipArtifact(
-      result.artifact,
-      repository,
-    );
-    expect(restoreResult).toEqual({ ok: true });
-    expect(repository.restoreReadyForExport).toHaveBeenCalledWith(
-      expect.arrayContaining(assets.map((asset) => asset.id)),
-    );
+    expect(toExportPackageDocumentCommit(result.artifact)).toEqual({
+      applicantCount: 1,
+      assetIds: result.artifact.documentAssetIds,
+      fileCount: 4,
+      workbookFileName: result.artifact.workbookFileName,
+      zipFileName: result.artifact.fileName,
+    });
   });
 
   test("blocks packages with missing required documents before touching storage", async () => {

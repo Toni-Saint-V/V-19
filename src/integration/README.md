@@ -27,9 +27,9 @@ Open `src/main.tsx` and pass a bridge to `<App />`:
       // Load submission from src/modules/submissions or Supabase service.
       console.log('open submission', submissionId);
     },
-    onExportPackages: async (submissionIds) => {
+    onExportPackages: async ({ submissionIds, documentExport }) => {
       // Call exportWorkflow/exportService here.
-      console.log('export', submissionIds);
+      console.log('export', submissionIds, documentExport);
     },
   }}
 />

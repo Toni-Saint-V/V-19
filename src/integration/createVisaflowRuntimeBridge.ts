@@ -61,7 +61,7 @@ export function createVisaflowRuntimeBridge(): VisaflowBusinessBridge {
     onVerifyDocument: (activeSubmissionId) => patchRuntimeState({ activeSubmissionId }),
     onRemarkOpen: (lastRemark) => patchRuntimeState({ lastRemark }),
     onRemarkSubmit: (lastRemark) => patchRuntimeState({ lastRemark }),
-    onExportPackages: (submissionIds) => {
+    onExportPackages: ({ submissionIds }) => {
       trackEvent({ type: 'export.start', submissionIds });
       patchRuntimeState({ activeSubmissionId: submissionIds[0] ?? null });
     },

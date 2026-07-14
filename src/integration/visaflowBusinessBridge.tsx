@@ -4,6 +4,7 @@ import type {
   SubmissionAction,
   SubmissionFileType,
 } from '../modules/submissions/types';
+import type { ExportPackageCompletionRequest } from '../modules/submissions/exportPackageDocumentCommit';
 import type { SubmissionStatus } from '../components/Drawer';
 
 export type VisaflowWorkspace = 'agent' | 'admin';
@@ -104,7 +105,9 @@ export interface VisaflowBusinessBridge {
   onPublishReturnedPdfHandoff?: (submissionId: string) => void | Promise<void>;
   onRemarkOpen?: (payload: RemarkBridgePayload) => void;
   onRemarkSubmit?: (payload: RemarkBridgePayload) => void | Promise<void>;
-  onExportPackages?: (submissionIds: string[]) => void | Promise<void>;
+  onExportPackages?: (
+    request: ExportPackageCompletionRequest,
+  ) => void | Promise<void>;
   track?: (event: VisaflowUiEvent) => void;
 }
 
