@@ -617,6 +617,17 @@ function stableUuid(seed: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+/**
+ * Status-history rows are rehydrated with their durable database UUID. Keep
+ * that identity on a subsequent draft save so the database conflict boundary
+ * remains idempotent instead of generating a second audit event.
+ */
+function isDurableUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 function timestampOrNow(value: string | undefined): string {
   if (value && /^\d{4}-\d{2}-\d{2}(T.+)?$/.test(value)) {
     const parsed = new Date(value);
@@ -796,7 +807,9 @@ function toStatusHistoryInsert(
   actorId: string,
 ): StatusHistoryInsert {
   return {
-    id: stableUuid(`history:${submission.id}:${item.id}`),
+    id: isDurableUuid(item.id)
+      ? item.id
+      : stableUuid(`history:${submission.id}:${item.id}`),
     entity_type: "submission",
     entity_id: submission.id,
     from_status: item.fromStatus,

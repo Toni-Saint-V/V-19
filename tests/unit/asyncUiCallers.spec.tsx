@@ -44,6 +44,66 @@ function draftSubmission(): Submission {
 }
 
 describe("async UI callers", () => {
+  test("legacy Drawer moves focus into the modal and exposes roving tabs", async () => {
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const onClose = vi.fn();
+    const submission = draftSubmission();
+
+    render(
+      <Drawer
+        isOpen
+        onClose={onClose}
+        submission={submission}
+        submissionId={submission.id}
+      />,
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialog).toHaveFocus());
+    const tabs = await screen.findAllByRole("tab");
+    expect(tabs).toHaveLength(6);
+    expect(tabs.filter((tab) => tab.getAttribute("tabindex") === "0")).toHaveLength(1);
+    expect(tabs[0]).toHaveAttribute("aria-controls", "submission-drawer-panel-overview");
+
+    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
+    await waitFor(() => expect(tabs[1]).toHaveAttribute("aria-selected", "true"));
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("legacy Drawer keeps demo fallback explicit and fail-closed", async () => {
+    const onSubmissionAction = vi.fn();
+    render(
+      <Drawer
+        allowDemoFallback
+        isOpen
+        onClose={vi.fn()}
+        onSubmissionAction={onSubmissionAction}
+        submissionId="FAM-001"
+      />,
+    );
+
+    expect(await screen.findByLabelText("Демо-данные")).toBeInTheDocument();
+    const action = screen.getByRole("button", { name: "Действия отключены" });
+    expect(action).toBeDisabled();
+    fireEvent.click(action);
+    expect(onSubmissionAction).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Замечания/ }));
+    expect(await screen.findByText("Подача ещё не отправлялась на проверку.")).toBeInTheDocument();
+  });
+
+  test("legacy Drawer does not fabricate a submission outside demo mode", async () => {
+    render(
+      <Drawer isOpen onClose={vi.fn()} submissionId="missing-submission" />,
+    );
+
+    expect(await screen.findByText("Данные подачи недоступны")).toBeInTheDocument();
+    expect(screen.queryByText("Семья Петровых")).not.toBeInTheDocument();
+  });
+
   test("legacy Drawer awaits one explicit action handler and renders rejection", async () => {
     const explicitAction = vi.fn().mockRejectedValue(new Error("write failed"));
     const bridgeAction = vi.fn();

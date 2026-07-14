@@ -14,14 +14,30 @@ import {
 
 export const REQUIRED_PRODUCTION_LIFECYCLE_WRITE_UNLOCK =
   "I_UNDERSTAND_EXISTING_COHORT_LIFECYCLE_MUTATIONS";
+export const REQUIRED_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK =
+  "I_UNDERSTAND_A2_S1_EXISTING_COHORT_LIFECYCLE_MUTATIONS";
 /** Legacy terminal case kept exclusively for the A1-F6 export proof. */
 export const FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY = "A1-F6";
-/** Dedicated non-terminal record for the resumable admin-agent lifecycle proof. */
-export const RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY = "A1-S1";
+/** The only production mutation target authorized for this rollout. */
+export const PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY = "A2-S1";
+
+export type ProductionSingleCaseKey = `A${1 | 2 | 3}-S${1 | 2 | 3}`;
+
+export function requiredProductionLifecycleCaseKey(): typeof PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY {
+  const caseKey = process.env.V19_PRODUCTION_COHORT_CASE_KEY?.trim();
+  invariant(
+    caseKey === PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY,
+    "V19_PRODUCTION_COHORT_CASE_KEY=A2-S1 is required for this production lifecycle rollout.",
+  );
+  return PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY;
+}
+
+export const RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY =
+  PRODUCTION_A2_S1_LIFECYCLE_CASE_KEY;
 
 export type ProductionLifecycleCaseKey =
   | typeof FOCUSED_PRODUCTION_LIFECYCLE_CASE_KEY
-  | typeof RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY;
+  | ProductionSingleCaseKey;
 
 export type ProductionLifecycleStage =
   | "pending_review"
@@ -62,6 +78,102 @@ export type ResolvedProductionLifecycleState = {
   state: ProductionLifecycleState;
 };
 
+export type ProductionDraftPayloadMutationContract = {
+  correction: {
+    mode: "append" | "exact" | "existing";
+    reasonIncludes: string;
+    status: "closed" | "fixed" | "open";
+  };
+  draft: ProductionDraftPayloadIdentityContract;
+  history: ProductionDraftHistoryExpectation;
+  ownerId: string;
+  submissionId: string;
+};
+
+export type ProductionLifecycleMutationContract =
+  ProductionDraftPayloadMutationContract & {
+  submissionStatus: "ready_for_excel" | "returned" | "waiting_review";
+  };
+
+/**
+ * Raw identifiers are deliberately confined to the in-memory browser gate.
+ * These values must not be written to checkpoint or evidence files.
+ */
+export type ProductionDraftPayloadIdentityContract = {
+  applicants: readonly ProductionDraftApplicantIdentity[];
+  corrections: readonly ProductionDraftCorrectionIdentity[];
+  mediaAssets: readonly ProductionDraftMediaIdentity[];
+  questionnaireAnswers: readonly ProductionDraftQuestionnaireIdentity[];
+  snapshotHistoryCount: number;
+  snapshotIssueCount: number;
+  statusHistory: readonly ProductionDraftStatusHistoryIdentity[];
+};
+
+export type ProductionDraftApplicantIdentity = {
+  id: string;
+  submissionId: string;
+};
+
+export type ProductionDraftMediaIdentity = {
+  applicantId: string;
+  id: string;
+  storageBucket: string;
+  storagePathDigest: string;
+  submissionId: string;
+  type: string;
+};
+
+export type ProductionDraftQuestionnaireIdentity = {
+  applicantId: string;
+  fieldId: string;
+  labelDigest: string;
+  sectionId: string;
+  submissionId: string;
+  valueDigest: string;
+};
+
+export type ProductionDraftCorrectionIdentity = {
+  applicantId: string | null;
+  fieldKey: string | null;
+  id: string;
+  mediaType: string | null;
+  reasonDigest: string;
+  scope: string;
+  severity: string;
+  status: string;
+  submissionId: string;
+  targetMarker: boolean;
+};
+
+export type ProductionDraftStatusHistoryIdentity = {
+  commentDigest: string;
+  entityId: string;
+  entityType: "submission";
+  fromStatus: string | null;
+  id: string;
+  noteDigest: string | null;
+  source: "admin" | "agent" | "bb" | "system";
+  toStatus: string;
+};
+
+export type ProductionDraftHistoryExpectation = {
+  actorId: string;
+  actorSource: "admin" | "agent";
+  snapshotStatus:
+    | "corrections_received"
+    | "ready_for_export"
+    | "returned"
+    | "submitted_for_review";
+  transition?: {
+    comment: string;
+    fromStatus: string;
+    note: string;
+    toStatus: string;
+  };
+};
+
+export type ProductionCohortMutationLane = "export" | "lifecycle";
+
 const lifecycleStages = new Set<ProductionLifecycleStage>([
   "pending_review",
   "adding_issue",
@@ -81,12 +193,708 @@ function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+type JsonRecord = Record<string, unknown>;
+
+function jsonRecord(value: unknown): JsonRecord | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as JsonRecord;
+}
+
+function canonicalJson(value: unknown): string | null {
+  if (value === null) return "null";
+  if (typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : null;
+  if (Array.isArray(value)) {
+    const items = value.map((item) => canonicalJson(item));
+    return items.every((item): item is string => item !== null)
+      ? `[${items.join(",")}]`
+      : null;
+  }
+  const record = jsonRecord(value);
+  if (!record) return null;
+  const entries = Object.keys(record)
+    .sort()
+    .map((key) => {
+      const serialized = canonicalJson(record[key]);
+      return serialized === null ? null : `${JSON.stringify(key)}:${serialized}`;
+    });
+  return entries.every((entry): entry is string => entry !== null)
+    ? `{${entries.join(",")}}`
+    : null;
+}
+
+/** Hashes a value in memory without retaining its potentially sensitive text. */
+export function productionDraftValueDigest(value: unknown) {
+  const serialized = canonicalJson(value);
+  return serialized === null ? null : createHash("sha256").update(serialized).digest("hex");
+}
+
+/** Mirrors the deterministic persistence identity used by cockpit draft writes. */
+export function productionDraftStableUuid(seed: string) {
+  let hashA = 0x811c9dc5;
+  let hashB = 0x01000193;
+
+  for (const char of seed) {
+    const code = char.codePointAt(0) ?? 0;
+    hashA ^= code;
+    hashA = Math.imul(hashA, 0x01000193);
+    hashB ^= code + hashA;
+    hashB = Math.imul(hashB, 0x85ebca6b);
+  }
+
+  const hex = [hashA, hashB, hashA ^ hashB, hashA + hashB]
+    .map((value) => (value >>> 0).toString(16).padStart(8, "0"))
+    .join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+function productionDraftDurableUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+/** Mirrors the serializer: durable audit rows keep their database UUID. */
+export function productionDraftHistoryPayloadId(submissionId: string, historyId: string) {
+  return productionDraftDurableUuid(historyId)
+    ? historyId
+    : productionDraftStableUuid(`history:${submissionId}:${historyId}`);
+}
+
+function identityKey(...values: unknown[]) {
+  return JSON.stringify(values);
+}
+
+function recordArray(value: unknown): JsonRecord[] | null {
+  if (!Array.isArray(value)) return null;
+  const records = value.map(jsonRecord);
+  return records.every((record): record is JsonRecord => record !== null) ? records : null;
+}
+
+function text(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function nullableText(value: unknown) {
+  return value === null || typeof value === "string" ? value : undefined;
+}
+
+function exactIdentitySet(
+  actual: readonly string[],
+  expected: readonly string[],
+) {
+  const actualSet = new Set(actual);
+  const expectedSet = new Set(expected);
+  return (
+    actual.length === expected.length &&
+    actualSet.size === actual.length &&
+    expectedSet.size === expected.length &&
+    actualSet.size === expectedSet.size &&
+    [...actualSet].every((value) => expectedSet.has(value))
+  );
+}
+
+function isIsoTimestamp(value: unknown) {
+  return (
+    typeof value === "string" &&
+    Number.isFinite(Date.parse(value)) &&
+    /^\d{4}-\d{2}-\d{2}T/.test(value)
+  );
+}
+
+function applicantKey(value: ProductionDraftApplicantIdentity) {
+  return identityKey(value.id, value.submissionId);
+}
+
+function applicantPayloadKey(value: JsonRecord) {
+  const id = text(value.id);
+  const submissionId = text(value.submission_id);
+  return id && submissionId ? identityKey(id, submissionId) : null;
+}
+
+function mediaKey(value: ProductionDraftMediaIdentity) {
+  return identityKey(
+    value.id,
+    value.applicantId,
+    value.submissionId,
+    value.type,
+    value.storageBucket,
+    value.storagePathDigest,
+  );
+}
+
+function mediaPayloadKey(value: JsonRecord) {
+  const id = text(value.id);
+  const applicantId = text(value.applicant_id);
+  const submissionId = text(value.submission_id);
+  const type = text(value.type);
+  const storageBucket = text(value.storage_bucket);
+  const storagePathDigest = productionDraftValueDigest(value.storage_path);
+  return id && applicantId && submissionId && type && storageBucket && storagePathDigest
+    ? identityKey(id, applicantId, submissionId, type, storageBucket, storagePathDigest)
+    : null;
+}
+
+function answerKey(value: ProductionDraftQuestionnaireIdentity) {
+  return identityKey(
+    value.submissionId,
+    value.applicantId,
+    value.sectionId,
+    value.fieldId,
+    value.labelDigest,
+    value.valueDigest,
+  );
+}
+
+function answerPayloadKey(value: JsonRecord) {
+  const submissionId = text(value.submission_id);
+  const applicantId = text(value.applicant_id);
+  const sectionId = text(value.section_id);
+  const fieldId = text(value.field_id);
+  const labelDigest = productionDraftValueDigest(value.label);
+  const valueDigest = productionDraftValueDigest(value.value);
+  return submissionId && applicantId && sectionId && fieldId && labelDigest && valueDigest
+    ? identityKey(submissionId, applicantId, sectionId, fieldId, labelDigest, valueDigest)
+    : null;
+}
+
+function correctionKey(value: ProductionDraftCorrectionIdentity) {
+  return identityKey(
+    value.id,
+    value.submissionId,
+    value.applicantId,
+    value.scope,
+    value.fieldKey,
+    value.mediaType,
+    value.reasonDigest,
+    value.severity,
+    value.status,
+  );
+}
+
+function correctionPayloadKey(value: JsonRecord) {
+  const id = text(value.id);
+  const submissionId = text(value.submission_id);
+  const applicantId = nullableText(value.applicant_id);
+  const scope = text(value.scope);
+  const fieldKey = nullableText(value.field_key);
+  const mediaType = nullableText(value.media_type);
+  const reasonDigest = productionDraftValueDigest(value.reason);
+  const severity = text(value.severity);
+  const status = text(value.status);
+  if (
+    !id ||
+    !submissionId ||
+    applicantId === undefined ||
+    !scope ||
+    fieldKey === undefined ||
+    mediaType === undefined ||
+    !reasonDigest ||
+    !severity ||
+    !status
+  ) {
+    return null;
+  }
+  const fixedAt = value.fixed_at;
+  if (
+    (status === "open" && fixedAt !== null) ||
+    ((status === "fixed" || status === "closed") && !isIsoTimestamp(fixedAt))
+  ) {
+    return null;
+  }
+  return identityKey(
+    id,
+    submissionId,
+    applicantId,
+    scope,
+    fieldKey,
+    mediaType,
+    reasonDigest,
+    severity,
+    status,
+  );
+}
+
+type ExpectedStatusHistoryPayload = {
+  changedBy: string;
+  commentDigest: string;
+  entityId: string;
+  entityType: "submission";
+  fromStatus: string | null;
+  id: string;
+  noteDigest: string | null;
+  source: "admin" | "agent";
+  toStatus: string;
+};
+
+function historyPayloadKey(value: ExpectedStatusHistoryPayload) {
+  return identityKey(
+    value.id,
+    value.entityType,
+    value.entityId,
+    value.fromStatus,
+    value.toStatus,
+    value.source,
+    value.commentDigest,
+    value.noteDigest,
+    value.changedBy,
+  );
+}
+
+function historyPayloadRecordKey(value: JsonRecord) {
+  const id = text(value.id);
+  const entityType = text(value.entity_type);
+  const entityId = text(value.entity_id);
+  const fromStatus = nullableText(value.from_status);
+  const toStatus = text(value.to_status);
+  const source = text(value.source);
+  const commentDigest = productionDraftValueDigest(value.comment);
+  const noteDigest = value.note === null ? null : productionDraftValueDigest(value.note);
+  const changedBy = text(value.changed_by);
+  if (
+    !id ||
+    entityType !== "submission" ||
+    !entityId ||
+    fromStatus === undefined ||
+    !toStatus ||
+    (source !== "admin" && source !== "agent") ||
+    !commentDigest ||
+    noteDigest === null && value.note !== null ||
+    !changedBy ||
+    !isIsoTimestamp(value.changed_at)
+  ) {
+    return null;
+  }
+  return identityKey(
+    id,
+    entityType,
+    entityId,
+    fromStatus,
+    toStatus,
+    source,
+    commentDigest,
+    noteDigest,
+    changedBy,
+  );
+}
+
+function expectedHistoryPayload(
+  contract: ProductionDraftPayloadMutationContract,
+): ExpectedStatusHistoryPayload[] {
+  const expected = contract.draft.statusHistory
+    .filter((item) => item.source === contract.history.actorSource)
+    .map((item) => ({
+      changedBy: contract.history.actorId,
+      commentDigest: item.commentDigest,
+      entityId: item.entityId,
+      entityType: item.entityType,
+      fromStatus: item.fromStatus,
+      id: productionDraftHistoryPayloadId(contract.submissionId, item.id),
+      noteDigest: item.noteDigest,
+      source: contract.history.actorSource,
+      toStatus: item.toStatus,
+    }));
+  const transition = contract.history.transition;
+  if (!transition) return expected;
+  const commentDigest = productionDraftValueDigest(transition.comment);
+  const noteDigest = productionDraftValueDigest(transition.note);
+  if (!commentDigest || !noteDigest) return [];
+  return [
+    ...expected,
+    {
+      changedBy: contract.history.actorId,
+      commentDigest,
+      entityId: contract.submissionId,
+      entityType: "submission",
+      fromStatus: transition.fromStatus,
+      id: productionDraftStableUuid(
+        `history:${contract.submissionId}:и-${contract.submissionId}-${transition.fromStatus}-${transition.toStatus}-${contract.draft.snapshotHistoryCount + 1}`,
+      ),
+      noteDigest,
+      source: contract.history.actorSource,
+      toStatus: transition.toStatus,
+    },
+  ];
+}
+
+function expectedCorrections(
+  contract: ProductionDraftPayloadMutationContract,
+): ProductionDraftCorrectionIdentity[] | null {
+  const markerRows = contract.draft.corrections.filter((item) => item.targetMarker);
+  if (contract.correction.mode === "exact") return [...contract.draft.corrections];
+  if (contract.correction.mode === "existing") {
+    if (markerRows.length !== 1) return null;
+    return contract.draft.corrections.map((item) =>
+      item.targetMarker ? { ...item, status: contract.correction.status } : item,
+    );
+  }
+  if (markerRows.length !== 0 || contract.draft.applicants.length !== 1) return null;
+  const applicantId = contract.draft.applicants[0]!.id;
+  const reasonDigest = productionDraftValueDigest(
+    `Требуется исправить поле «Примечание» — ${contract.correction.reasonIncludes}`,
+  );
+  if (!reasonDigest) return null;
+  return [
+    ...contract.draft.corrections,
+    {
+      applicantId,
+      fieldKey: "Примечание",
+      id: productionDraftStableUuid(
+        `correction:${contract.submissionId}:зм-${contract.submissionId}-новое-${contract.draft.snapshotIssueCount + 1}`,
+      ),
+      mediaType: null,
+      reasonDigest,
+      scope: "field",
+      severity: "blocking",
+      status: "open",
+      submissionId: contract.submissionId,
+      targetMarker: true,
+    },
+  ];
+}
+
+function snapshotMediaType(value: unknown) {
+  const type = text(value);
+  if (!type) return null;
+  return type === "selfie_1" ? "selfie" : type;
+}
+
+function snapshotIssueStatus(value: unknown) {
+  if (value === "open") return "open";
+  if (value === "fixed_by_agent") return "fixed";
+  if (value === "closed_by_admin") return "closed";
+  return null;
+}
+
+function snapshotIssueSeverity(value: unknown) {
+  return value === "blocker" ? "blocking" : typeof value === "string" ? "note" : null;
+}
+
+function snapshotIssueKey(value: JsonRecord) {
+  const target = jsonRecord(value.target);
+  const applicantId = nullableText(target?.applicantId);
+  const fieldKey = nullableText(target?.field);
+  const mediaType =
+    target?.fileType === undefined || target.fileType === null
+      ? null
+      : snapshotMediaType(target.fileType);
+  const scope = value.type === "file" || value.type === "media" ? "media" : "field";
+  const reason = text(value.reason);
+  const comment = nullableText(value.comment);
+  const reasonDigest = productionDraftValueDigest(
+    reason === null ? undefined : comment ? `${reason} — ${comment}` : reason,
+  );
+  const severity = snapshotIssueSeverity(value.severity);
+  const status = snapshotIssueStatus(value.status);
+  return (
+    applicantId !== undefined &&
+    fieldKey !== undefined &&
+    mediaType !== undefined &&
+    reasonDigest &&
+    severity &&
+    status
+      ? identityKey(applicantId, scope, fieldKey, mediaType, reasonDigest, severity, status)
+      : null
+  );
+}
+
+function correctionSnapshotKey(value: JsonRecord) {
+  const applicantId = nullableText(value.applicant_id);
+  const scope = text(value.scope);
+  const fieldKey = nullableText(value.field_key);
+  const mediaType = nullableText(value.media_type);
+  const reasonDigest = productionDraftValueDigest(value.reason);
+  const severity = text(value.severity);
+  const status = text(value.status);
+  return (
+    applicantId !== undefined &&
+    scope &&
+    fieldKey !== undefined &&
+    mediaType !== undefined &&
+    reasonDigest &&
+    severity &&
+    status
+      ? identityKey(applicantId, scope, fieldKey, mediaType, reasonDigest, severity, status)
+      : null
+  );
+}
+
+function snapshotHistorySemanticKey(value: JsonRecord) {
+  const id = text(value.id);
+  const fromStatus = nullableText(value.fromStatus);
+  const toStatus = text(value.toStatus);
+  const source = text(value.source);
+  const textValue = text(value.text);
+  const detail = nullableText(value.detail);
+  const noteDigest =
+    value.note === undefined || value.note === null
+      ? null
+      : productionDraftValueDigest(value.note);
+  const commentDigest = productionDraftValueDigest(
+    textValue === null ? undefined : detail ? `${textValue} — ${detail}` : textValue,
+  );
+  return (
+    id &&
+    fromStatus !== undefined &&
+    toStatus &&
+    (source === "admin" || source === "agent" || source === "bb" || source === "system") &&
+    commentDigest
+      ? identityKey(id, fromStatus, toStatus, source, commentDigest, noteDigest)
+      : null
+  );
+}
+
+function expectedSnapshotHistoryKeys(
+  contract: ProductionDraftPayloadMutationContract,
+) {
+  const base = contract.draft.statusHistory.map((item) =>
+    identityKey(
+      item.id,
+      item.fromStatus,
+      item.toStatus,
+      item.source,
+      item.commentDigest,
+      item.noteDigest,
+    ),
+  );
+  const transition = contract.history.transition;
+  if (!transition) return base;
+  const commentDigest = productionDraftValueDigest(transition.comment);
+  const noteDigest = productionDraftValueDigest(transition.note);
+  return commentDigest && noteDigest
+    ? [
+        ...base,
+        identityKey(
+          `и-${contract.submissionId}-${transition.fromStatus}-${transition.toStatus}-${contract.draft.snapshotHistoryCount + 1}`,
+          transition.fromStatus,
+          transition.toStatus,
+          contract.history.actorSource,
+          commentDigest,
+          noteDigest,
+        ),
+      ]
+    : [];
+}
+
+function snapshotMatchesDraftPayload(input: {
+  applicants: readonly JsonRecord[];
+  corrections: readonly JsonRecord[];
+  history: readonly JsonRecord[];
+  media: readonly JsonRecord[];
+  payloadSubmission: JsonRecord;
+  questionnaireAnswers: readonly JsonRecord[];
+  contract: ProductionDraftPayloadMutationContract;
+}) {
+  const intelligence = jsonRecord(input.payloadSubmission.family_intelligence);
+  if (intelligence?.status !== "unreviewed") return false;
+  const envelope = jsonRecord(intelligence?.v19CockpitSnapshot);
+  if (envelope?.version !== 1) return false;
+  const snapshot = jsonRecord(envelope.submission);
+  if (
+    snapshot?.id !== input.contract.submissionId ||
+    snapshot.agentId !== input.contract.ownerId ||
+    snapshot.status !== input.contract.history.snapshotStatus
+  ) {
+    return false;
+  }
+
+  const snapshotApplicants = recordArray(snapshot.applicants);
+  if (!snapshotApplicants) return false;
+  const expectedApplicantIds = input.applicants.map((item) => text(item.id)).filter(
+    (item): item is string => Boolean(item),
+  );
+  const actualApplicantIds = snapshotApplicants
+    .map((item) => text(item.id))
+    .filter((item): item is string => Boolean(item));
+  if (!exactIdentitySet(actualApplicantIds, expectedApplicantIds)) return false;
+
+  const expectedAnswerKeys = input.questionnaireAnswers.map((answer) => {
+    const applicantId = text(answer.applicant_id);
+    const sectionId = text(answer.section_id);
+    const fieldId = text(answer.field_id);
+    return applicantId && sectionId && fieldId
+      ? identityKey(applicantId, sectionId, fieldId)
+      : null;
+  });
+  if (expectedAnswerKeys.some((key) => key === null)) return false;
+  const actualAnswerKeys: string[] = [];
+  for (const applicant of snapshotApplicants) {
+    const applicantId = text(applicant.id);
+    const sections = recordArray(applicant.sections);
+    if (!applicantId || !sections) return false;
+    for (const section of sections) {
+      const sectionId = text(section.id);
+      const fields = recordArray(section.fields);
+      if (!sectionId || !fields) return false;
+      for (const field of fields) {
+        const fieldId = text(field.id);
+        if (!fieldId) return false;
+        actualAnswerKeys.push(identityKey(applicantId, sectionId, fieldId));
+      }
+    }
+  }
+  if (!exactIdentitySet(actualAnswerKeys, expectedAnswerKeys as string[])) return false;
+
+  const snapshotFiles = recordArray(snapshot.files);
+  if (!snapshotFiles) return false;
+  const expectedFiles = input.media.map((media) => {
+    const applicantId = text(media.applicant_id);
+    const type = text(media.type);
+    const bucket = text(media.storage_bucket);
+    const pathDigest = productionDraftValueDigest(media.storage_path);
+    return applicantId && type && bucket && pathDigest
+      ? identityKey(applicantId, type, bucket, pathDigest)
+      : null;
+  });
+  const actualFiles = snapshotFiles.map((file) => {
+    const applicantId = text(file.applicantId);
+    const type = snapshotMediaType(file.type);
+    const bucket = text(file.storageBucket);
+    const pathDigest = productionDraftValueDigest(file.storagePath);
+    return applicantId && type && bucket && pathDigest
+      ? identityKey(applicantId, type, bucket, pathDigest)
+      : null;
+  });
+  if (
+    expectedFiles.some((key) => key === null) ||
+    actualFiles.some((key) => key === null) ||
+    !exactIdentitySet(actualFiles as string[], expectedFiles as string[])
+  ) {
+    return false;
+  }
+
+  const snapshotIssues = recordArray(snapshot.issues);
+  if (!snapshotIssues) return false;
+  const expectedIssues = input.corrections.map(correctionSnapshotKey);
+  const actualIssues = snapshotIssues.map(snapshotIssueKey);
+  if (
+    expectedIssues.some((key) => key === null) ||
+    actualIssues.some((key) => key === null) ||
+    !exactIdentitySet(actualIssues as string[], expectedIssues as string[])
+  ) {
+    return false;
+  }
+
+  const snapshotHistory = recordArray(snapshot.history);
+  if (!snapshotHistory) return false;
+  const actualHistory = snapshotHistory
+    .filter((item) => item.fromStatus !== undefined || item.toStatus !== undefined)
+    .map(snapshotHistorySemanticKey);
+  const expectedHistory = expectedSnapshotHistoryKeys(input.contract);
+  return (
+    !actualHistory.some((key) => key === null) &&
+    exactIdentitySet(actualHistory as string[], expectedHistory)
+  );
+}
+
+/**
+ * Exact nested-draft gate shared by lifecycle and export. It deliberately
+ * evaluates browser request JSON only in memory and returns a boolean so raw
+ * submission data cannot reach logs, checkpoints, or evidence.
+ */
+export function productionDraftPayloadMatches(
+  payload: JsonRecord,
+  contract: ProductionDraftPayloadMutationContract,
+) {
+  const submission = jsonRecord(payload.submission);
+  const applicants = recordArray(payload.applicants);
+  const media = recordArray(payload.media_assets);
+  const questionnaireAnswers = recordArray(payload.questionnaire_answers);
+  const corrections = recordArray(payload.corrections);
+  const history = recordArray(payload.status_history);
+  const expectedCorrectionRows = expectedCorrections(contract);
+  if (
+    !submission ||
+    submission.id !== contract.submissionId ||
+    submission.agent_id !== contract.ownerId ||
+    !applicants ||
+    !media ||
+    !questionnaireAnswers ||
+    !corrections ||
+    !history ||
+    !expectedCorrectionRows
+  ) {
+    return false;
+  }
+
+  const expectedHistoryRows = expectedHistoryPayload(contract);
+  const applicantKeys = applicants.map(applicantPayloadKey);
+  const mediaKeys = media.map(mediaPayloadKey);
+  const answerKeys = questionnaireAnswers.map(answerPayloadKey);
+  const correctionKeys = corrections.map(correctionPayloadKey);
+  const historyKeys = history.map(historyPayloadRecordKey);
+  if (
+    applicantKeys.some((key) => key === null) ||
+    mediaKeys.some((key) => key === null) ||
+    answerKeys.some((key) => key === null) ||
+    correctionKeys.some((key) => key === null) ||
+    historyKeys.some((key) => key === null)
+  ) {
+    return false;
+  }
+
+  if (
+    !exactIdentitySet(applicantKeys as string[], contract.draft.applicants.map(applicantKey)) ||
+    !exactIdentitySet(mediaKeys as string[], contract.draft.mediaAssets.map(mediaKey)) ||
+    !exactIdentitySet(
+      answerKeys as string[],
+      contract.draft.questionnaireAnswers.map(answerKey),
+    ) ||
+    !exactIdentitySet(
+      correctionKeys as string[],
+      expectedCorrectionRows.map(correctionKey),
+    ) ||
+    !exactIdentitySet(
+      historyKeys as string[],
+      expectedHistoryRows.map(historyPayloadKey),
+    )
+  ) {
+    return false;
+  }
+
+  return snapshotMatchesDraftPayload({
+    applicants,
+    contract,
+    corrections,
+    history,
+    media,
+    payloadSubmission: submission,
+    questionnaireAnswers,
+  });
+}
+
+/**
+ * Parses a browser-owned RPC body only in memory and returns a boolean so
+ * production request payloads never appear in diagnostics or evidence.
+ */
+export function productionLifecycleMutationPayloadMatches(
+  body: string | null,
+  contract: ProductionLifecycleMutationContract,
+) {
+  if (!body) return false;
+  try {
+    const request = jsonRecord(JSON.parse(body));
+    const payload = jsonRecord(request?.payload);
+    const submission = jsonRecord(payload?.submission);
+    if (
+      submission?.id !== contract.submissionId ||
+      submission.agent_id !== contract.ownerId ||
+      submission.status !== contract.submissionStatus
+    ) {
+      return false;
+    }
+    return payload !== null && productionDraftPayloadMatches(payload, contract);
+  } catch {
+    return false;
+  }
+}
+
 export function assertProductionLifecycleMutationAudit(
   mutationSummary: CohortMutationSummary[],
   allowedAuthAttemptCount: number,
 ) {
   invariant(
-    allowedAuthAttemptCount >= 1 && allowedAuthAttemptCount <= 3,
+    allowedAuthAttemptCount >= 1 && allowedAuthAttemptCount <= 6,
     "Production lifecycle auth attempts exceeded the bounded retry contract.",
   );
 
@@ -205,6 +1013,7 @@ async function writeJsonAtomic(path: string, value: unknown) {
 }
 
 export function assertProductionLifecycleWriteUnlock() {
+  requiredProductionLifecycleCaseKey();
   invariant(
     process.env.SUPABASE_PRODUCTION_E2E_UNLOCK === "1",
     "SUPABASE_PRODUCTION_E2E_UNLOCK=1 is required.",
@@ -213,6 +1022,11 @@ export function assertProductionLifecycleWriteUnlock() {
     process.env.V19_PRODUCTION_LIFECYCLE_WRITE_UNLOCK ===
       REQUIRED_PRODUCTION_LIFECYCLE_WRITE_UNLOCK,
     "The dedicated production lifecycle write unlock is absent.",
+  );
+  invariant(
+    process.env.V19_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK ===
+      REQUIRED_PRODUCTION_A2_S1_LIFECYCLE_WRITE_UNLOCK,
+    "The dedicated A2-S1 production lifecycle write unlock is absent.",
   );
   invariant(
     process.env.V19_PRODUCTION_COHORT_CONFIRM_PROJECT_REF === PRODUCTION_PROJECT_REF,
@@ -229,20 +1043,15 @@ export function productionLifecycleStatePath(
   return resolve(process.cwd(), `.production-lifecycle-${runMarker}${suffix}.state.local.json`);
 }
 
-function productionLifecycleLockPath(runMarker: string) {
-  return resolve(process.cwd(), `.production-lifecycle-${runMarker}.lock.local`);
+function productionCohortMutationLockPath(runMarker: string) {
+  return resolve(process.cwd(), `.production-cohort-${runMarker}.mutation.lock.local`);
 }
 
-function productionExportLockPath(runMarker: string) {
-  return resolve(process.cwd(), `.production-export-${runMarker}.lock.local`);
-}
-
-export async function acquireProductionLifecycleLock(runMarker: string) {
-  invariant(
-    !existsSync(productionExportLockPath(runMarker)),
-    "The production export gate is active; lifecycle refuses concurrent state changes.",
-  );
-  const path = productionLifecycleLockPath(runMarker);
+export async function acquireProductionCohortMutationLock(
+  runMarker: string,
+  lane: ProductionCohortMutationLane,
+) {
+  const path = productionCohortMutationLockPath(runMarker);
   const token = randomUUID();
   let handle;
   try {
@@ -250,7 +1059,7 @@ export async function acquireProductionLifecycleLock(runMarker: string) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") {
       throw new Error(
-        "Another production lifecycle process holds the run-marker lock; refusing concurrent mutations.",
+        `Another production cohort mutation process holds the run-marker lock; refusing concurrent ${lane} mutations.`,
       );
     }
     throw error;
@@ -260,6 +1069,7 @@ export async function acquireProductionLifecycleLock(runMarker: string) {
     await handle.writeFile(
       `${JSON.stringify({
         acquiredAt: new Date().toISOString(),
+        lane,
         pid: process.pid,
         runMarker,
         token,
@@ -270,13 +1080,21 @@ export async function acquireProductionLifecycleLock(runMarker: string) {
   }
 
   return async () => {
-    const lock = await readJson<{ runMarker?: string; token?: string }>(path);
+    const lock = await readJson<{
+      lane?: ProductionCohortMutationLane;
+      runMarker?: string;
+      token?: string;
+    }>(path);
     invariant(
-      lock.runMarker === runMarker && lock.token === token,
-      "Production lifecycle lock ownership changed; refusing to remove it.",
+      lock.lane === lane && lock.runMarker === runMarker && lock.token === token,
+      "Production cohort mutation lock ownership changed; refusing to remove it.",
     );
     await unlink(path);
   };
+}
+
+export async function acquireProductionLifecycleLock(runMarker: string) {
+  return acquireProductionCohortMutationLock(runMarker, "lifecycle");
 }
 
 export function productionLifecycleIssueMarker(state: ProductionLifecycleState) {
@@ -291,7 +1109,14 @@ function focusedSubmittedCase(runMarker: string) {
   const cohortCase = buildProductionCohortPlan(runMarker).find(
     (candidate) => candidate.caseKey === RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
   );
-  invariant(cohortCase, "Focused A1-S1 case is absent from the production plan.");
+  invariant(
+    cohortCase,
+    `Focused ${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} case is absent from the production plan.`,
+  );
+  invariant(
+    cohortCase.type === "single" && cohortCase.applicantCount === 1,
+    `${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} is not the expected one-person technical case.`,
+  );
   return cohortCase;
 }
 
@@ -307,15 +1132,15 @@ function submittedCaseRef(
 ): ProductionLifecycleCaseRef {
   invariant(
     checkpoint?.stage === "submitted" && checkpoint.submissionId,
-    "A1-S1 must reach the submitted cohort checkpoint before lifecycle mutations.",
+    `${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} must reach the submitted cohort checkpoint before lifecycle mutations.`,
   );
   invariant(
     checkpoint.caseMarker === cohortCase.caseMarker,
-    "A1-S1 submitted checkpoint marker mismatch.",
+    `${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} submitted checkpoint marker mismatch.`,
   );
   invariant(
     cohortCase.caseKey === RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
-    "Production lifecycle refuses a case other than A1-S1.",
+    `Production lifecycle refuses a case other than ${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY}.`,
   );
   return {
     caseKey: RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY,
@@ -341,7 +1166,7 @@ function validateStoredState(
     state.case.caseKey === RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY &&
       state.case.ownerKey === expectedCase.ownerKey &&
       state.case.submissionId === expectedCase.submissionId,
-    "Lifecycle state no longer matches the submitted A1-S1 cohort checkpoint.",
+    `Lifecycle state no longer matches the submitted ${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY} cohort checkpoint.`,
   );
   if (["accepting", "accepted"].includes(state.stage)) {
     assertProductionLifecycleAcceptanceProof(state, expectedCaseMarker);
@@ -392,11 +1217,12 @@ export async function writeProductionLifecycleEvidence(
   runMarker: string,
   value: unknown,
 ) {
+  const evidenceLane = `production-lifecycle-${RESUMABLE_PRODUCTION_LIFECYCLE_CASE_KEY.toLowerCase()}`;
   const path = resolve(
     process.cwd(),
     "output",
     "playwright",
-    "production-lifecycle",
+    evidenceLane,
     runMarker,
     "evidence.json",
   );
@@ -424,7 +1250,7 @@ export function assertProductionLifecycleAcceptanceProof(
       state.acceptanceProof.issueMarkerDigest ===
         lifecycleProofDigest(productionLifecycleIssueMarker(state)) &&
       state.acceptanceProof.issueStatus === "fixed_by_agent",
-    "Acceptance intent is missing the exact A1-F6 fixed-issue proof.",
+    `Acceptance intent is missing the exact ${state.case.caseKey} fixed-issue proof.`,
   );
 }
 

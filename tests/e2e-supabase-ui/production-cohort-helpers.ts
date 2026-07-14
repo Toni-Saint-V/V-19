@@ -45,6 +45,7 @@ const productionWorkspaceReadyTimeoutMs = 120_000;
 const maxProductionPasswordAuthAttempts = 6;
 
 export type ProductionCohortAccount = {
+  authUserId: string;
   email: string;
   key: string;
   password: string;
@@ -265,7 +266,12 @@ function validatedAccount(
     user.password?.trim(),
     `Production cohort account password is absent (${user.key}).`,
   );
+  invariant(
+    user.authUserId?.trim(),
+    `Production cohort account auth user id is absent (${user.key}).`,
+  );
   return {
+    authUserId: user.authUserId.trim(),
     email: user.email.trim(),
     key: user.key,
     password: user.password,

@@ -50,11 +50,11 @@ export function ReviewWorkspace({
   return (
     <motion.div
       animate={{ opacity: 1, scale: 1 }}
-      className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#101011] text-white"
+      className="v19-admin-passport-workspace fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#101011] text-white"
       exit={{ opacity: 0, scale: 0.985 }}
       initial={{ opacity: 0, scale: 0.985 }}
     >
-      <header className="flex h-[64px] shrink-0 items-center gap-4 border-b border-[#202124] bg-[#141416]/95 px-4 backdrop-blur-md lg:px-6">
+      <header className="v19-admin-passport-header flex h-[64px] shrink-0 items-center gap-4 border-b border-[#202124] bg-[#141416]/95 px-4 backdrop-blur-md lg:px-6">
         <button
           aria-label="Вернуться к подаче"
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#242529] bg-[#1e1e21] text-white/70 transition-colors hover:bg-[#27272b] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
@@ -73,8 +73,8 @@ export function ReviewWorkspace({
         </div>
       </header>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 overflow-auto xl:grid-cols-[minmax(420px,1fr)_minmax(480px,0.9fr)] xl:overflow-hidden">
-        <section className="flex min-h-[320px] flex-col border-b border-[#202124] bg-[#0e0e10] p-5 xl:min-h-0 xl:border-b-0 xl:border-r lg:p-8">
+      <main className="v19-admin-passport-main grid min-h-0 flex-1 grid-cols-1 overflow-auto xl:grid-cols-[minmax(420px,1fr)_minmax(480px,0.9fr)] xl:overflow-hidden">
+        <section className="v19-admin-passport-document-pane flex min-h-[320px] flex-col border-b border-[#202124] bg-[#0e0e10] p-5 xl:min-h-0 xl:border-b-0 xl:border-r lg:p-8">
           <div className="flex items-center gap-2 text-white/70">
             <FileText className="w-4" />
             <span className="truncate text-[13px] font-medium">
@@ -82,7 +82,7 @@ export function ReviewWorkspace({
             </span>
           </div>
 
-          <div className="my-auto rounded-2xl border border-[#3b321d] bg-[#221d13] p-5 text-center">
+          <div className="v19-admin-passport-preview-state my-auto rounded-2xl border border-[#3b321d] bg-[#221d13] p-5 text-center">
             <AlertCircle className="mx-auto mb-3 w-6 text-[#f6c66b]" />
             <h2 className="text-base font-semibold text-white">
               Предпросмотр оригинала недоступен
@@ -95,24 +95,24 @@ export function ReviewWorkspace({
           </div>
         </section>
 
-        <section className="min-w-0 bg-[#141416] p-5 lg:p-6">
+        <section className="v19-admin-passport-form-pane min-w-0 bg-[#141416] p-5 lg:p-6">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-wider text-white/62">
               Данные анкеты
             </p>
             <h2 className="mt-2 text-[24px] font-semibold tracking-tight text-white lg:text-[30px]">
-              Уточните замечания для агента
+              Сверка паспорта
             </h2>
             <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-white/50">
-              Значения ниже взяты только из анкеты и не подтверждены паспортом.
+              Сверьте значения анкеты с документом. При расхождении добавьте замечание.
             </p>
           </div>
 
-          <div className="mt-6 space-y-3">
+          <div className="v19-admin-passport-fields mt-6 space-y-3">
             {reviewFields.length ? (
               reviewFields.map((field) => (
                 <article
-                  className="flex flex-col justify-between gap-4 rounded-2xl border border-[#242529] bg-[#161617] p-4 md:flex-row md:items-center"
+                  className="v19-admin-passport-field flex flex-col justify-between gap-4 rounded-2xl border border-[#242529] bg-[#161617] p-4 md:flex-row md:items-center"
                   key={field.label}
                 >
                   <div className="min-w-0 flex-1">
@@ -127,7 +127,8 @@ export function ReviewWorkspace({
                     </p>
                   </div>
                   <button
-                    className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[12px] font-medium text-white/70 transition-colors hover:bg-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+                    aria-label={`Добавить замечание: ${field.label}`}
+                    className="v19-admin-passport-field-remark flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[12px] font-medium text-white/70 transition-colors hover:bg-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
                     onClick={() => onAddRemark(field.label)}
                     type="button"
                   >

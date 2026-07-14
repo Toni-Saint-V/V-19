@@ -1,5 +1,6 @@
 import {
   blockerCount,
+  canAgentEditSubmission,
   fixedIssueCount,
   canPerformAction,
   openIssueCount,
@@ -649,6 +650,8 @@ function activeFileCounts(submission: Submission) {
 }
 
 function agentOpenActions(submission: Submission): AgentActionItem[] {
+  if (!canAgentEditSubmission(submission)) return [];
+
   const actions: AgentActionItem[] = [];
 
   const replacementFile = submission.files.find(

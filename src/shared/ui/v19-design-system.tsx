@@ -595,11 +595,11 @@ export function V19SummaryTile({
       <span className="v19-summary-tile-label">{label}</span>
       <span className="v19-summary-tile-main">
         <strong>{value}</strong>
-        <span className="v19-summary-tile-icon" aria-hidden="true">
-          <Icon />
-        </span>
+        {detail ? <small>{detail}</small> : null}
       </span>
-      {detail ? <small>{detail}</small> : null}
+      <span className="v19-summary-tile-icon" aria-hidden="true">
+        <Icon />
+      </span>
     </>
   );
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -13,6 +13,7 @@ import {
   FileWarning,
   Info,
   DownloadCloud,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   emitVisaflowUiEvent,
@@ -75,6 +76,16 @@ const passportFieldNeedles = [
   "expires",
   "expiry",
 ];
+
+const mobileSecondaryTabs = new Set<TabId>(["media", "issues", "history"]);
+
+function drawerTabId(tab: TabId) {
+  return `admin-review-tab-${tab}`;
+}
+
+function drawerPanelId(tab: TabId) {
+  return `admin-review-panel-${tab}`;
+}
 
 function displaySubmissionTitle(submission: Submission | null | undefined) {
   return submission?.listTitle ?? submission?.title ?? "Заявка не выбрана";
@@ -145,6 +156,12 @@ function selectedApplicantLabel(applicant: Applicant) {
   return `${applicant.fullName} (${role})`;
 }
 
+function questionnaireStatusLabel(status: string) {
+  if (status === "complete") return "Готово";
+  if (status === "partial") return "Частично";
+  return status;
+}
+
 const FieldRow = ({
   label,
   value,
@@ -163,13 +180,13 @@ const FieldRow = ({
   onApprove?: () => void;
 }) => (
   <div
-    className={`flex flex-col justify-between gap-4 rounded-xl border bg-[#1a1a1d] p-4 transition-colors lg:flex-row lg:items-center
-    ${status === "error" ? "border-white/10 bg-white/[0.035]" : "border-[#242529] hover:border-[#2e2f34]"}
+    className={`admin-review-field-row flex flex-col justify-between gap-4 rounded-xl border bg-[#1a1a1d] p-4 transition-colors lg:flex-row lg:items-center
+    ${status === "error" ? "is-error border-white/10 bg-white/[0.035]" : status === "ok" ? "is-ok border-[#242529] hover:border-[#2e2f34]" : "border-[#242529] hover:border-[#2e2f34]"}
   `}
   >
     <div className="min-w-0 flex-1">
       <div className="mb-1 flex items-center gap-2">
-        <span className="text-[11.5px] font-medium uppercase tracking-wider text-white/40">
+        <span className="admin-review-row-label text-[11.5px] font-medium uppercase tracking-wider text-white/40">
           {label}
         </span>
         {status === "error" && (
@@ -183,11 +200,11 @@ const FieldRow = ({
           </span>
         )}
       </div>
-      <div className="truncate text-[14px] font-medium text-white">
+      <strong className="truncate text-[14px] font-medium text-white">
         {value || "—"}
-      </div>
+      </strong>
     </div>
-    <div className="flex shrink-0 items-center gap-2">
+    <div className="admin-review-row-actions flex shrink-0 items-center gap-2">
       {hasDocument && (
         <button
           type="button"
@@ -202,15 +219,16 @@ const FieldRow = ({
         data-testid="admin-review-add-remark"
         type="button"
         onClick={onRemark}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
+        className="admin-review-remark-action flex h-8 w-8 items-center justify-center rounded-lg border border-transparent bg-white/[0.045] text-white/62 outline-none transition-colors hover:border-white/10 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60"
         title="Добавить замечание"
       >
         <MessageSquarePlus className="h-4 w-4" />
       </button>
       <button
+        aria-label={`Пометить поле «${label}» как проверенное`}
         type="button"
         onClick={onApprove}
-        className={`flex h-8 w-8 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60
+        className={`admin-review-approve-action flex h-8 w-8 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#6f64ff]/60
           ${status === "ok" ? "border-white/12 bg-white/[0.06] text-[#b8baff]" : "border-transparent bg-white/5 text-white/40 hover:border-white/10 hover:bg-white/[0.045] hover:text-[#b8baff]"}`}
         title="Пометить как проверенное"
       >
@@ -252,36 +270,83 @@ function OverviewTab({
   const acceptedFiles = submission.files.filter(
     (file) => file.status === "accepted",
   ).length;
+  const nextAction =
+    primaryAction?.disabled && primaryAction.reason
+      ? primaryAction.reason
+      : (primaryAction?.label ?? "Нет действия");
+  const decisionChecks = [
+    {
+      label: "Анкета",
+      value: `${submission.completeness.questionnaire}% заполнено`,
+      state: submission.completeness.questionnaire === 100 ? "is-ready" : "is-pending",
+    },
+    {
+      label: "Документы",
+      value: `${acceptedFiles} из ${submission.files.length} приняты`,
+      state: acceptedFiles === submission.files.length ? "is-ready" : "is-pending",
+    },
+    {
+      label: "Замечания",
+      value: openIssues.length ? `${openIssues.length} требуют решения` : "Нет открытых",
+      state: openIssues.length ? "is-warning" : "is-ready",
+    },
+  ];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {[
-        ["Статус", statusLabelFor(submission.status)],
-        ["Город подачи", submission.city],
-        ["Поездка", `${submission.tripDateFrom} – ${submission.tripDateTo}`],
-        ["Заявителей", String(submission.applicants.length)],
-        ["Анкета", `${submission.completeness.questionnaire}%`],
-        ["Файлы", `${acceptedFiles}/${submission.files.length}`],
-        ["Незакрытых замечаний", String(openIssues.length)],
-        [
-          "Следующее действие",
-          primaryAction?.disabled && primaryAction.reason
-            ? `${primaryAction.label}: ${primaryAction.reason}`
-            : (primaryAction?.label ?? "Нет действия"),
-        ],
-      ].map(([label, value]) => (
-        <div
-          key={label}
-          className="rounded-2xl border border-white/5 bg-white/[0.025] p-4"
-        >
-          <div className="text-[11px] font-medium uppercase tracking-wider text-white/40">
-            {label}
-          </div>
-          <div className="mt-2 text-[14px] font-semibold text-white">
-            {value}
-          </div>
+    <div className="admin-review-overview-tab">
+      <section className="admin-review-overview-hero">
+        <div>
+          <span>Пакет на проверке</span>
+          <h3>{displaySubmissionTitle(submission)}</h3>
+          <p>
+            {submission.city} · {submission.tripDateFrom} – {submission.tripDateTo}
+          </p>
         </div>
-      ))}
+        <strong>{statusLabelFor(submission.status)}</strong>
+      </section>
+
+      <section className="admin-review-overview-metrics" aria-label="Состояние пакета">
+        {[
+          ["Анкета", `${submission.completeness.questionnaire}%`],
+          ["Файлы", `${acceptedFiles}/${submission.files.length}`],
+          ["Заявители", String(submission.applicants.length)],
+          ["Замечания", String(openIssues.length), openIssues.length > 0],
+        ].map(([label, value, isWarning]) => (
+          <article key={String(label)} className={isWarning ? "is-warning" : undefined}>
+            <span>{label}</span>
+            <strong>{String(value)}</strong>
+          </article>
+        ))}
+      </section>
+
+      <section className="admin-review-overview-detail-grid">
+        <div>
+          <span>Маршрут</span>
+          <strong>{submission.city}</strong>
+        </div>
+        <div>
+          <span>Следующее действие</span>
+          <strong>{nextAction}</strong>
+        </div>
+      </section>
+
+      <section className="admin-review-decision-checklist" aria-label="Контроль перед решением">
+        <header>
+          <div>
+            <span>Контроль перед решением</span>
+            <p>Сводка доменных сигналов перед итоговым действием.</p>
+          </div>
+          <strong>{nextAction}</strong>
+        </header>
+        <ul>
+          {decisionChecks.map((check) => (
+            <li key={check.label} className={check.state}>
+              <span>{check.label}</span>
+              <strong>{check.value}</strong>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }
@@ -297,7 +362,7 @@ function ApplicantsTab({ submission }: { submission: Submission | null }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="admin-review-applicants-tab">
       {submission.applicants.map((applicant, index) => {
         const files = submission.files.filter(
           (file) => file.applicantId === applicant.id,
@@ -306,28 +371,29 @@ function ApplicantsTab({ submission }: { submission: Submission | null }) {
           (issue) => issue.target.applicantId === applicant.id,
         );
         return (
-          <article
-            key={applicant.id}
-            className="rounded-2xl border border-white/5 bg-white/[0.025] p-4"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <article key={applicant.id} className={index === 0 ? "is-selected" : undefined}>
+            <header>
+              <span>{index + 1}</span>
               <div>
-                <div className="text-[11px] font-medium uppercase tracking-wider text-white/40">
-                  Заявитель {index + 1}
-                </div>
-                <h3 className="m-0 mt-1 text-[15px] font-semibold text-white">
-                  {selectedApplicantLabel(applicant)}
-                </h3>
+                <strong>{applicant.fullName}</strong>
+                <small>{selectedApplicantLabel(applicant).replace(`${applicant.fullName} `, "")}</small>
               </div>
-              <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[11px] font-medium text-white/62">
-                {applicant.questionnaireStatus} / {applicant.fileStatus}
-              </span>
-            </div>
-            <div className="mt-4 grid gap-2 text-[12px] text-white/55 sm:grid-cols-3">
-              <span>{applicant.sections.length} разделов анкеты</span>
-              <span>{files.length} файлов</span>
-              <span>{open.length} замечаний</span>
-            </div>
+              <em>{open.length ? `${open.length} замеч.` : "Без замечаний"}</em>
+            </header>
+            <dl>
+              <div>
+                <dt>Анкета</dt>
+                <dd>{questionnaireStatusLabel(applicant.questionnaireStatus)}</dd>
+              </div>
+              <div>
+                <dt>Файлы</dt>
+                <dd>{files.length}</dd>
+              </div>
+              <div>
+                <dt>Разделы</dt>
+                <dd>{applicant.sections.length}</dd>
+              </div>
+            </dl>
           </article>
         );
       })}
@@ -392,12 +458,12 @@ function QuestionnaireTab({
   ).length;
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4 sm:flex-row sm:items-center">
-        <div>
-          <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-white/50">
+    <div className="admin-review-questionnaire">
+      <div className="admin-review-applicant-strip">
+        <label className="admin-review-applicant-select">
+          <span>
             Заявитель
-          </div>
+          </span>
           <select
             aria-label="Заявитель"
             value={applicant.id}
@@ -410,35 +476,32 @@ function QuestionnaireTab({
               </option>
             ))}
           </select>
-        </div>
+        </label>
 
-        <div className="flex flex-wrap items-center gap-4 text-[12px] font-medium">
-          <div className="flex items-center gap-1.5 text-[#b8baff]">
+        <div className="admin-review-applicant-stats">
+          <span className="is-ok">
             <CheckCircle2 className="h-4 w-4" /> {checkedCount} проверено
-          </div>
-          <div className="flex items-center gap-1.5 text-white/40">
-            <span className="h-2 w-2 rounded-full bg-white/20" /> {missingCount}{" "}
-            осталось
-          </div>
-          <div
-            className="flex items-center gap-1.5 text-white/62"
-          >
+          </span>
+          <span className="is-warning">
+            <i /> {missingCount} осталось
+          </span>
+          <span className={applicantIssues.length ? "is-warning" : "is-ok"}>
             <AlertCircle className="h-4 w-4" /> {applicantIssues.length}{" "}
             замечаний
-          </div>
+          </span>
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="admin-review-field-pane">
         {applicant.sections.map((section, sectionIndex) => (
-          <section key={section.id}>
-            <h3 className="mb-4 flex items-center gap-2 text-[15px] font-semibold text-white">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/5 font-mono text-[12px] text-white/60">
+          <section key={section.id} className="admin-review-field-section">
+            <h3 className="admin-review-questionnaire-section-title mb-4 flex items-center gap-2 text-[15px] font-semibold text-white">
+              <span className="admin-review-section-number flex h-6 w-6 items-center justify-center rounded-md bg-white/5 font-mono text-[12px] text-white/60">
                 {sectionIndex + 1}
               </span>
               {section.title}
             </h3>
-            <div className="space-y-2">
+            <div className="admin-review-field-table space-y-2">
               {section.fields.map((field) => (
                 <FieldRow
                   key={field.id}
@@ -475,16 +538,13 @@ function MediaTab({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="admin-review-files-tab">
       {submission.files.map((file) => {
         const applicant = submission.applicants.find(
           (item) => item.id === file.applicantId,
         );
         return (
-          <article
-            key={file.id}
-            className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-white/[0.025] p-4 sm:flex-row sm:items-center sm:justify-between"
-          >
+          <article key={file.id} className="admin-review-file-row">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[13px] font-semibold text-white">
@@ -552,11 +612,11 @@ function IssuesTab({ submission }: { submission: Submission | null }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="admin-review-issues-list">
       {issues.map((issue) => (
         <article
           key={issue.id}
-          className="rounded-2xl border border-white/5 bg-white/[0.025] p-4"
+          className="admin-review-issue-card"
         >
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/62">
@@ -596,19 +656,17 @@ function HistoryTab({ submission }: { submission: Submission | null }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="admin-review-history-tab">
       {submission.history.map((item) => (
         <article
           key={item.id}
-          className="rounded-2xl border border-white/5 bg-white/[0.025] p-4"
+          className="admin-review-history-item"
         >
-          <div className="text-[13px] font-semibold text-white">
-            {item.text}
+          <span>{item.at}</span>
+          <div>
+            <strong>{item.text}</strong>
+            {item.detail && <p>{item.detail}</p>}
           </div>
-          <div className="mt-1 text-[11px] text-white/38">{item.at}</div>
-          {item.detail && (
-            <div className="mt-2 text-[12px] text-white/50">{item.detail}</div>
-          )}
         </article>
       ))}
     </div>
@@ -629,7 +687,9 @@ export function AdminReviewDrawer({
   onPublishReturnedPdfHandoff,
 }: AdminReviewDrawerProps) {
   const bridge = useVisaflowBusinessBridge();
+  const drawerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("questionnaire");
+  const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
   const activeSubmissionId = submission?.id ?? submissionId;
   const primaryAction = useMemo(
     () => (submission ? getPrimaryAction(submission, "admin", "review") : null),
@@ -670,7 +730,10 @@ export function AdminReviewDrawer({
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (isOpen) setActiveTab("questionnaire");
+    if (isOpen) {
+      setActiveTab("questionnaire");
+      setMobileTabsOpen(false);
+    }
   }, [isOpen, activeSubmissionId]);
 
   const tabs = useMemo<DrawerTabDefinition[]>(
@@ -740,6 +803,12 @@ export function AdminReviewDrawer({
     void onPrimaryAction?.(activeSubmissionId, primaryAction.action);
   };
 
+  const selectTab = (tab: TabId) => {
+    setActiveTab(tab);
+    setMobileTabsOpen(false);
+    window.requestAnimationFrame(() => drawerRef.current?.scrollTo({ left: 0 }));
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -749,11 +818,12 @@ export function AdminReviewDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            className="admin-review-backdrop fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
 
           <motion.div
+            ref={drawerRef}
             role="dialog"
             initial={{ x: "100%", opacity: 0.5, filter: "blur(8px)" }}
             animate={{ x: 0, opacity: 1, filter: "blur(0px)" }}
@@ -764,23 +834,24 @@ export function AdminReviewDrawer({
               stiffness: 220,
               mass: 1,
             }}
-            className="fixed inset-x-0 bottom-0 top-12 z-50 flex flex-col overflow-hidden rounded-t-[28px] border-x border-t border-white/10 bg-[#111113] shadow-[0_24px_80px_rgba(0,0,0,0.6)] lg:inset-y-2 lg:right-2 lg:left-auto lg:w-[860px] lg:rounded-2xl lg:border"
+            className="admin-review-drawer fixed inset-x-0 bottom-0 top-12 z-50 flex flex-col overflow-hidden rounded-t-[28px] border-x border-t border-white/10 bg-[#111113] shadow-[0_24px_80px_rgba(0,0,0,0.6)] lg:inset-y-2 lg:right-2 lg:left-auto lg:w-[860px] lg:rounded-2xl lg:border"
+            data-admin-review-drawer-surface="workspace"
           >
-            <header className="z-20 shrink-0 border-b border-white/5 bg-[#111113]/90 px-5 pb-0 pt-5 backdrop-blur-md lg:px-8">
-              <div className="mb-5 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] text-white/50 lg:text-xs">
+            <header className="admin-review-drawer-header z-20 shrink-0 border-b border-white/5 bg-[#111113]/90 px-5 pb-0 pt-5 backdrop-blur-md lg:px-8">
+              <div className="admin-review-titlebar mb-5 flex items-start justify-between gap-4">
+                <div className="admin-review-titlecopy min-w-0">
+                  <p className="mb-2 flex items-center gap-2 text-[11px] text-white/50 lg:text-xs">
                     <span className="admin-review-submission-tag font-mono font-medium tracking-wider text-white/70">
                       {activeSubmissionId ?? "—"}
                     </span>
-                    <span className="h-1 w-1 rounded-full bg-white/20" />
+                    <span className="admin-review-title-separator h-1 w-1 rounded-full bg-white/20" />
                     <span className="truncate">
                       {displaySubmissionTitle(submission)}
                     </span>
-                  </div>
+                  </p>
                   <h2 className="flex items-center gap-3 text-[20px] font-semibold leading-tight tracking-tight text-white lg:text-[24px]">
                     Проверка пакета
-                    <span className="rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
+                    <span className="admin-review-status-pill rounded-full border border-white/10 bg-white/[0.045] px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-white/62">
                       {submission
                         ? statusLabelFor(submission.status)
                         : "Не выбрана"}
@@ -792,21 +863,29 @@ export function AdminReviewDrawer({
                   aria-label="Закрыть проверку"
                   type="button"
                   onClick={onClose}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-white/70 outline-none transition-colors hover:border-white/10 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
+                  className="admin-review-close flex h-10 w-10 items-center justify-center rounded-xl border border-white/5 bg-white/5 text-white/70 outline-none transition-colors hover:border-white/10 hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#3a45b4]"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="-mx-5 w-full overflow-x-auto px-5 scrollbar-hide lg:mx-0 lg:px-0">
+              <div
+                aria-label="Разделы проверки"
+                className="admin-review-tabs relative -mx-5 w-full overflow-x-auto px-5 scrollbar-hide lg:mx-0 lg:px-0"
+                role="tablist"
+              >
                 <div className="mb-[-1px] flex w-max items-center gap-1.5">
                   {tabs.map((tab) => (
                     <button
+                      aria-controls={drawerPanelId(tab.id)}
+                      aria-selected={activeTab === tab.id}
+                      id={drawerTabId(tab.id)}
                       key={tab.id}
+                      role="tab"
                       type="button"
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`relative flex min-h-[44px] items-center gap-2 whitespace-nowrap px-4 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#3a45b4]
-                        ${activeTab === tab.id ? "text-white" : "text-white/50 hover:text-white/80"}
+                      onClick={() => selectTab(tab.id)}
+                      className={`relative flex min-h-[44px] items-center gap-2 whitespace-nowrap px-4 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#3a45b4] ${mobileSecondaryTabs.has(tab.id) ? "admin-review-tab--mobile-secondary" : ""}
+                        ${activeTab === tab.id ? "is-active text-white" : "text-white/50 hover:text-white/80"}
                       `}
                     >
                       <tab.icon
@@ -814,14 +893,14 @@ export function AdminReviewDrawer({
                       />
                       <span>{tab.label}</span>
                       {typeof tab.count === "number" && tab.count > 0 && (
-                        <span
-                          className={`ml-1 rounded-md px-1.5 py-0.5 text-[10px] leading-none ${tab.isWarning ? "bg-white/[0.06] text-white/62" : "bg-white/10 text-white/70"}`}
+                        <em
+                          className={`admin-review-tab-count ml-1 rounded-md px-1.5 py-0.5 text-[10px] leading-none ${tab.isWarning ? "is-warning bg-white/[0.06] text-white/62" : "bg-white/10 text-white/70"}`}
                         >
                           {tab.count}
-                        </span>
+                        </em>
                       )}
                       {activeTab === tab.id && (
-                        <motion.div
+                        <motion.i
                           layoutId="adminActiveTab"
                           className="absolute inset-x-0 bottom-0 h-0.5 bg-[#6f64ff]"
                           initial={false}
@@ -834,17 +913,53 @@ export function AdminReviewDrawer({
                       )}
                     </button>
                   ))}
+                  <button
+                    aria-controls={drawerPanelId(activeTab)}
+                    aria-expanded={mobileTabsOpen}
+                    aria-haspopup="menu"
+                    aria-selected={mobileSecondaryTabs.has(activeTab)}
+                    className={`admin-review-mobile-tabs-trigger ${mobileSecondaryTabs.has(activeTab) ? "is-active" : ""}`}
+                    onClick={() => setMobileTabsOpen((current) => !current)}
+                    role="tab"
+                    type="button"
+                  >
+                    <MoreHorizontal aria-hidden="true" />
+                    <span>Ещё</span>
+                  </button>
                 </div>
+                {mobileTabsOpen && (
+                  <div className="admin-review-mobile-tabs-menu" role="menu">
+                    {tabs
+                      .filter((tab) => mobileSecondaryTabs.has(tab.id))
+                      .map((tab) => (
+                        <button
+                          aria-current={activeTab === tab.id ? "page" : undefined}
+                          key={tab.id}
+                          onClick={() => selectTab(tab.id)}
+                          role="menuitem"
+                          type="button"
+                        >
+                          <tab.icon aria-hidden="true" />
+                          <span>{tab.label}</span>
+                          {typeof tab.count === "number" && tab.count > 0 && <em>{tab.count}</em>}
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
             </header>
 
-            <div className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 flex-1 overflow-y-auto p-5 lg:p-8">
+            <div className="admin-review-content scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 flex-1 overflow-y-auto p-5 lg:p-8">
               <AnimatePresence mode="wait">
                 <motion.div
+                  aria-labelledby={drawerTabId(activeTab)}
                   key={activeTab}
+                  id={drawerPanelId(activeTab)}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
+                  role="tabpanel"
+                  tabIndex={0}
                   transition={{ duration: 0.2 }}
                 >
                   {activeTab === "overview" && (
@@ -879,11 +994,11 @@ export function AdminReviewDrawer({
               </AnimatePresence>
             </div>
 
-            <footer className="flex shrink-0 justify-end gap-3 border-t border-white/10 bg-[#111113]/90 p-4 pb-[max(16px,env(safe-area-inset-bottom))] backdrop-blur-md lg:px-8 lg:py-5">
+            <footer className="admin-review-footer flex shrink-0 justify-end gap-3 border-t border-white/10 bg-[#111113]/90 p-4 pb-[max(16px,env(safe-area-inset-bottom))] backdrop-blur-md lg:px-8 lg:py-5">
               <button
                 type="button"
                 onClick={onClose}
-                className="h-11 rounded-xl border border-white/5 bg-white/5 px-5 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+                className="admin-review-secondary h-11 rounded-xl border border-white/5 bg-white/5 px-5 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
               >
                 Отложить
               </button>
@@ -892,7 +1007,7 @@ export function AdminReviewDrawer({
                   type="button"
                   onClick={handlePublishReturnedPdfHandoff}
                   title={returnedPdfHandoffReason}
-                  className="h-11 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.08]"
+                  className="admin-review-secondary h-11 rounded-xl border border-white/10 bg-white/[0.045] px-5 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.08]"
                 >
                   Передать PDF агенту
                 </button>
@@ -902,7 +1017,7 @@ export function AdminReviewDrawer({
                 onClick={handlePrimaryAction}
                 disabled={primaryDisabled}
                 title={primaryReason}
-                className="flex h-11 items-center gap-2 rounded-xl bg-[#202126] px-6 text-[13px] font-medium text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/30"
+                className="admin-review-primary flex h-11 items-center gap-2 rounded-xl bg-[#202126] px-6 text-[13px] font-medium text-white shadow-[0_0_28px_rgba(111,100,255,0.16)] transition-colors hover:bg-[#2a2b32] disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-white/30"
               >
                 {primaryAction?.action === "generate_export" ? (
                   <DownloadCloud className="h-4 w-4" />

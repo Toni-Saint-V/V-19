@@ -66,7 +66,7 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] bg-black/65 backdrop-blur-sm"
+            className="v19-remark-form-backdrop fixed inset-0 bg-black/65 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
@@ -75,9 +75,9 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 22, scale: 0.98 }}
             transition={{ type: 'spring', damping: 24, stiffness: 260 }}
-            className="fixed z-[80] inset-x-3 bottom-3 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[560px] bg-[#111113] border border-white/10 rounded-3xl shadow-[0_24px_100px_rgba(0,0,0,0.65)] overflow-hidden"
+            className="v19-remark-form-dialog fixed inset-x-3 bottom-3 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[560px] bg-[#111113] border border-white/10 rounded-3xl shadow-[0_24px_100px_rgba(0,0,0,0.65)] overflow-hidden"
           >
-            <header className="px-5 py-4 border-b border-white/10 flex items-start gap-4">
+            <header className="v19-remark-form-header px-5 py-4 border-b border-white/10 flex items-start gap-4">
               <div className="w-11 h-11 rounded-2xl bg-white/[0.045] border border-white/10 flex items-center justify-center shrink-0">
                 <MessageSquarePlus className="w-5 h-5 text-white/62" />
               </div>
@@ -86,6 +86,7 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
                 <h2 className="text-[18px] font-semibold text-white tracking-tight mt-1">Добавить замечание</h2>
               </div>
               <button
+                aria-label="Закрыть форму замечания"
                 onClick={onClose}
                 className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-white/60 hover:text-white transition-colors"
               >
@@ -93,7 +94,7 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
               </button>
             </header>
 
-            <div className="p-5 space-y-5">
+            <div className="v19-remark-form-body p-5 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3 rounded-2xl bg-[#161617] border border-[#242529]">
                   <div className="flex items-center gap-2 text-[11px] text-white/40 uppercase tracking-wider font-medium mb-2">
@@ -113,12 +114,16 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
                 <label className="block text-[12px] text-white/50 font-medium mb-2">Важность</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
+                    aria-pressed={severity === 'warning'}
+                    type="button"
                     onClick={() => setSeverity('warning')}
                     className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === 'warning' ? 'bg-white/[0.045] border-white/10 text-white/62' : 'bg-[#161617] border-[#242529] text-white/60 hover:text-white'}`}
                   >
                     <AlertTriangle className="w-4 h-4" /> Исправить
                   </button>
                   <button
+                    aria-pressed={severity === 'critical'}
+                    type="button"
                     onClick={() => setSeverity('critical')}
                     className={`h-10 rounded-xl border text-[13px] font-medium flex items-center justify-center gap-2 transition-colors ${severity === 'critical' ? 'bg-[#24191b]/60 border-[#5b2b32]/45 text-[#d59aa3]' : 'bg-[#161617] border-[#242529] text-white/60 hover:text-white'}`}
                   >
@@ -128,8 +133,9 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
               </div>
 
               <div>
-                <label className="block text-[12px] text-white/50 font-medium mb-2">Текст для клиента</label>
+                <label className="block text-[12px] text-white/50 font-medium mb-2" htmlFor="remark-message">Текст для клиента</label>
                 <textarea
+                  id="remark-message"
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   className="min-h-[120px] w-full resize-none rounded-2xl bg-[#161617] border border-[#242529] px-4 py-3 text-[14px] text-white placeholder-white/35 outline-none focus:border-[#6f64ff]/55 focus:ring-1 focus:ring-[#6f64ff]/25"
@@ -142,6 +148,7 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
                 {templates.map((template) => (
                   <button
                     key={template}
+                    type="button"
                     onClick={() => setMessage(template)}
                     className="w-full text-left p-3 rounded-xl bg-[#161617] hover:bg-[#1e1e21] border border-[#242529] text-[12px] text-white/65 hover:text-white transition-colors"
                   >
@@ -151,7 +158,7 @@ export function RemarkForm({ isOpen, onClose, submissionId, defaultField, defaul
               </div>
             </div>
 
-            <footer className="p-4 border-t border-white/10 bg-[#111113]/95 flex justify-end gap-3">
+            <footer className="v19-remark-form-footer p-4 border-t border-white/10 bg-[#111113]/95 flex justify-end gap-3">
               <button
                 onClick={onClose}
                 className="h-11 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-[13px] font-medium text-white/70 hover:text-white transition-colors"

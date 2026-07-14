@@ -583,6 +583,19 @@ describe("V-19 Supabase cockpit persistence", () => {
       source: "agent",
       toStatus: "submitted_for_review",
     });
+
+    const reserialized = toCockpitDraftPersistencePayload(
+      loaded.submissions[0]!,
+      agentProfile.id,
+      submitted.agentId,
+      "agent",
+    );
+    expect(reserialized.status_history).toHaveLength(1);
+    expect(reserialized.status_history[0]).toMatchObject({
+      id: "00000000-0000-4000-8000-000000000777",
+      from_status: "in_progress",
+      to_status: "submitted_for_review",
+    });
   });
 
   it("fails closed before RPC when acceptance keeps fixed issues unresolved", async () => {

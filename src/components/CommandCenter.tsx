@@ -1285,6 +1285,7 @@ export function CommandCenter({
         ) : null
       ) : (
         <Drawer
+          allowDemoFallback
           isOpen={drawerOpen}
           onClose={() => setDrawerOpen(false)}
           submissionId={selectedRow}
@@ -1292,6 +1293,10 @@ export function CommandCenter({
           onOpenQuestionnaire={() =>
             selectedRow && handleOpenQuestionnaire(selectedRow)
           }
+          onOpenDocuments={() => {
+            setDrawerOpen(false);
+            navigateTo("documents");
+          }}
           onSubmissionAction={(_, action) => executeAgentSubmissionAction(action)}
         />
       )}
