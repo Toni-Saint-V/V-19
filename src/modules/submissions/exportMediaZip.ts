@@ -17,6 +17,7 @@ import {
   orderSubmissionsForExportPackage,
   exportSummary,
 } from "./exportRules";
+import type { ExportPackageDocumentCommit } from "./exportPackageDocumentCommit";
 import { createExportWorkbookArtifact } from "./exportWorkbook";
 import { createVisaApplicationFormPdfBlob } from "./visaApplicationFormPdf";
 import {
@@ -89,15 +90,7 @@ export type ExportMediaZipDownloader = (
 
 export type ExportMediaZipDocumentDownloader = DocumentZipDownloader;
 
-type DocumentExportRepository = Pick<
-  DocumentRepository,
-  "getReadyForExport" | "markExported" | "recordExportAudit"
->;
-
-type DocumentExportRecoveryRepository = Pick<
-  DocumentRepository,
-  "restoreReadyForExport"
->;
+type DocumentExportRepository = Pick<DocumentRepository, "getReadyForExport">;
 
 export type ExportMediaZipOptions = {
   documentAssets?: DocumentAsset[];
@@ -244,73 +237,16 @@ export async function createExportMediaZipArtifact(
   }
 }
 
-export async function commitExportMediaZipArtifact(
+export function toExportPackageDocumentCommit(
   artifact: ExportMediaZipArtifact,
-  repository: DocumentExportRepository | null = DocumentRepository.optional(),
-): Promise<
-  | { ok: true }
-  | { ok: false; reason: "audit_failed"; safeMessage: string }
-> {
-  if (!artifact.documentAssetIds.length) return { ok: true };
-  if (!repository) {
-    return {
-      ok: false,
-      reason: "audit_failed",
-      safeMessage: "ZIP скачан, но audit event не записан. Экспорт остановлен.",
-    };
-  }
-
-  try {
-    await repository.recordExportAudit({
-      documentAssetIds: artifact.documentAssetIds,
-      fileCount: artifact.fileCount,
-      fileName: artifact.fileName,
-      metadata: {
-        applicantCount: artifact.applicantCount,
-        workbookFileName: artifact.workbookFileName,
-      },
-      packageId: artifact.packageIdentity.idempotencyKey,
-      submissionIds: artifact.packageIdentity.submissionIds,
-    });
-    await repository.markExported(artifact.documentAssetIds);
-    return { ok: true };
-  } catch {
-    return {
-      ok: false,
-      reason: "audit_failed",
-      safeMessage: "ZIP скачан, но audit event не записан. Экспорт остановлен.",
-    };
-  }
-}
-
-export async function restoreExportMediaZipArtifact(
-  artifact: ExportMediaZipArtifact,
-  repository: DocumentExportRecoveryRepository | null = DocumentRepository.optional(),
-): Promise<
-  | { ok: true }
-  | { ok: false; reason: "audit_failed"; safeMessage: string }
-> {
-  if (!artifact.documentAssetIds.length) return { ok: true };
-  if (!repository) {
-    return {
-      ok: false,
-      reason: "audit_failed",
-      safeMessage:
-        "Статус документов не восстановлен. Повторная выгрузка требует проверки администратором.",
-    };
-  }
-
-  try {
-    await repository.restoreReadyForExport(artifact.documentAssetIds);
-    return { ok: true };
-  } catch {
-    return {
-      ok: false,
-      reason: "audit_failed",
-      safeMessage:
-        "Статус документов не восстановлен. Повторная выгрузка требует проверки администратором.",
-    };
-  }
+): ExportPackageDocumentCommit {
+  return {
+    applicantCount: artifact.applicantCount,
+    assetIds: [...artifact.documentAssetIds],
+    fileCount: artifact.fileCount,
+    workbookFileName: artifact.workbookFileName,
+    zipFileName: artifact.fileName,
+  };
 }
 
 export function downloadPreparedExportMediaZip(
@@ -358,11 +294,7 @@ export default async function downloadExportMediaZip(
   if (!artifactResult.ok) return artifactResult;
   const downloadResult = downloadPreparedExportMediaZip(artifactResult.artifact);
   if (!downloadResult.ok) return downloadResult;
-  const commitResult = await commitExportMediaZipArtifact(
-    artifactResult.artifact,
-    options.documentRepository ?? DocumentRepository.optional(),
-  );
-  return commitResult.ok ? downloadResult : commitResult;
+  return downloadResult;
 }
 
 function validateExportMediaZipIdentity(
@@ -418,7 +350,6 @@ async function resolveDocumentAssetsForZip(
   | {
       ok: true;
       assets: DocumentAsset[];
-      repository: DocumentExportRepository | null;
     }
   | { ok: false; reason: ExportMediaZipBlockedReason; safeMessage: string }
 > {
@@ -431,7 +362,6 @@ async function resolveDocumentAssetsForZip(
       assets: options.documentAssets.filter((asset) =>
         submissionIdSet.has(asset.submissionId),
       ),
-      repository: null,
     };
   }
 
@@ -439,7 +369,6 @@ async function resolveDocumentAssetsForZip(
     return {
       ok: true,
       assets: documentAssetsFromSubmissionFiles(submissions),
-      repository: null,
     };
   }
 
@@ -454,7 +383,7 @@ async function resolveDocumentAssetsForZip(
 
   try {
     const assets = await repository.getReadyForExport(submissionIds);
-    return { ok: true, assets, repository };
+    return { ok: true, assets };
   } catch {
     return blocked(
       "storage_unavailable",

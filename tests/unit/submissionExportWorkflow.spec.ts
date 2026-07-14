@@ -8,12 +8,20 @@ import {
 import { mapSupabasePersistenceError } from "../../src/services/persistenceObservability";
 import { initialSubmissions } from "../../src/modules/submissions/mockData";
 import { applyExportStateToSelection } from "../../src/modules/submissions/submissionActions";
+import type { ExportPackageDocumentCommit } from "../../src/modules/submissions/exportPackageDocumentCommit";
 import type { Submission } from "../../src/modules/submissions/types";
 
 const createdAt = "2026-06-16T09:00:00.000Z";
 const createdBy = "00000000-0000-4000-8000-000000000010";
 const serverCreatedAt = "2026-06-16T09:01:00.000Z";
 const serverCreatedBy = "00000000-0000-4000-8000-000000000020";
+const documentExport: ExportPackageDocumentCommit = {
+  applicantCount: 1,
+  assetIds: ["00000000-0000-4000-8000-000000000601"],
+  fileCount: 4,
+  workbookFileName: "visaflow-export-export-content-1.xlsx",
+  zipFileName: "visaflow-export-export-content-1_documents.zip",
+};
 
 function byId(id: string): Submission {
   const submission = initialSubmissions.find((item) => item.id === id);
@@ -55,6 +63,7 @@ function options(
     batchId: "00000000-0000-4000-8000-000000000501",
     createdAt,
     createdBy,
+    documentExport,
     format: "xlsx" as const,
     commitPackage,
     persistExportedSubmissions,
@@ -63,7 +72,7 @@ function options(
 
 describe("submission export workflow", () => {
   test("records the durable batch before marking submissions exported", async () => {
-    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch, artifact) => ({
       batch: {
         ...batch,
         id: "00000000-0000-4000-8000-000000000777",
@@ -71,6 +80,7 @@ describe("submission export workflow", () => {
         createdBy: serverCreatedBy,
       },
       changedSubmissions: 1,
+      documentExport: artifact,
       duplicate: false,
       statusHistory: 1,
     }));
@@ -132,12 +142,13 @@ describe("submission export workflow", () => {
   });
 
   test("does not mark exported when durable batch identity drifts", async () => {
-    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch, artifact) => ({
       batch: {
         ...batch,
         contentFingerprint: `${batch.contentFingerprint}:tampered`,
       },
       changedSubmissions: 1,
+      documentExport: artifact,
       duplicate: false,
       statusHistory: 1,
     }));
@@ -154,7 +165,7 @@ describe("submission export workflow", () => {
   });
 
   test("fails closed when exported snapshot persistence fails after batch record", async () => {
-    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch, artifact) => ({
       batch: {
         ...batch,
         id: "00000000-0000-4000-8000-000000000777",
@@ -162,6 +173,7 @@ describe("submission export workflow", () => {
         createdBy: serverCreatedBy,
       },
       changedSubmissions: 1,
+      documentExport: artifact,
       duplicate: false,
       statusHistory: 1,
     }));
@@ -184,7 +196,7 @@ describe("submission export workflow", () => {
   });
 
   test("retries the exact idempotent package after a lost RPC response", async () => {
-    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch) => ({
+    const commitPackage = vi.fn<ExportPackageCommitter>(async (batch, artifact) => ({
       batch: {
         ...batch,
         id: "00000000-0000-4000-8000-000000000777",
@@ -192,6 +204,7 @@ describe("submission export workflow", () => {
         createdBy: serverCreatedBy,
       },
       changedSubmissions: 0,
+      documentExport: artifact,
       duplicate: true,
       statusHistory: 0,
     }));
@@ -220,6 +233,7 @@ describe("submission export workflow", () => {
         createdAt,
         id: completionOptions.batchId,
       }),
+      documentExport,
     );
   });
 });

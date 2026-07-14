@@ -608,6 +608,8 @@ export interface DocumentExportEventRow extends DbRecord {
   asset_ids: string[];
   zip_file_name: string;
   file_count: number;
+  applicant_count: number | null;
+  workbook_file_name: string | null;
   package_identity_key: string | null;
   created_by: string | null;
   created_at: string;
@@ -615,11 +617,17 @@ export interface DocumentExportEventRow extends DbRecord {
 
 export type DocumentExportEventInsert = Omit<
   DocumentExportEventRow,
-  "id" | "created_by" | "created_at"
+  | "id"
+  | "created_by"
+  | "created_at"
+  | "applicant_count"
+  | "workbook_file_name"
 > & {
+  applicant_count?: number | null;
   id?: string;
   created_by?: string | null;
   created_at?: string;
+  workbook_file_name?: string | null;
 };
 
 export interface ExportPackageCommitPayload extends DbRecord {
@@ -632,10 +640,27 @@ export interface ExportPackageCommitPayload extends DbRecord {
     row_count: number;
     submission_ids: string[];
   };
+  document_export: {
+    asset_ids: string[];
+    zip_file_name: string;
+    file_count: number;
+    applicant_count: number;
+    workbook_file_name: string;
+  };
+}
+
+export interface ExportPackageDocumentCommitResult extends DbRecord {
+  id: string;
+  asset_ids: string[];
+  zip_file_name: string;
+  file_count: number;
+  applicant_count: number;
+  workbook_file_name: string;
 }
 
 export interface ExportPackageCommitResult extends DbRecord {
   exportBatch: ExportBatchRow;
+  documentExport: ExportPackageDocumentCommitResult;
   submissions: number;
   statusHistory: number;
   duplicate: boolean;

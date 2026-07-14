@@ -66,6 +66,8 @@ Apply migrations only in the repository order declared by
 - `20260710022231_add_media_assets_applicant_submission_index.sql`
 - `20260712201203_allow_admin_waiting_review_issue_checkpoint.sql`
 - `20260712225209_save_returned_submission_update_first.sql`
+- `20260713095403_atomic_export_document_completion.sql`
+- `20260714020334_atomic_export_guard_null_safe.sql`
 
 ## Final Sandbox RLS And Storage Smoke
 

@@ -8,6 +8,10 @@ import {
   type ExportPackageCommitReconciliation,
 } from "./exportPackagePersistence";
 import {
+  exportPackageDocumentCommitMatches,
+  type ExportPackageDocumentCommit,
+} from "./exportPackageDocumentCommit";
+import {
   buildExportPackageIdentity,
   exportPackageIdentityMatches,
   exportSummary,
@@ -18,6 +22,7 @@ import type { Submission } from "./types";
 
 export type ExportPackageCommitter = (
   batch: ExportPackageCommitBatch,
+  documentExport: ExportPackageDocumentCommit,
 ) => Promise<ExportPackageCommitOutcome | null>;
 export type ExportedSubmissionPersister = (submissions: Submission[]) => Promise<void>;
 
@@ -25,6 +30,7 @@ export interface CompleteExportPackageOptions {
   batchId?: string;
   createdAt: string;
   createdBy: string;
+  documentExport: ExportPackageDocumentCommit;
   format: ExportBatch["format"];
   commitPackage?: ExportPackageCommitter;
   persistExportedSubmissions?: ExportedSubmissionPersister;
@@ -74,7 +80,10 @@ export async function reconcileExportPackageCompletion(
     }
   }
 
-  const canonical = await reconcileSubmissionExportPackage(identity);
+  const canonical = await reconcileSubmissionExportPackage(
+    identity,
+    options.documentExport,
+  );
   if (canonical.status === "committed") return canonical;
   if (
     canonical.status === "not_committed" &&
@@ -117,12 +126,20 @@ export async function completeExportPackage(
     ...packageIdentity,
   };
   const committer = options.commitPackage ?? commitSubmissionExportPackage;
-  const commit = await committer(batch);
+  const commit = await committer(batch, options.documentExport);
   if (!commit) {
     throw new Error("Export package persistence did not return a commit result.");
   }
   if (!exportPackageIdentityMatches(packageIdentity, commit.batch)) {
     throw new Error("Committed export package identity does not match selection.");
+  }
+  if (
+    !exportPackageDocumentCommitMatches(
+      options.documentExport,
+      commit.documentExport,
+    )
+  ) {
+    throw new Error("Committed export package document proof does not match ZIP artifact.");
   }
 
   const exportedSubmissions = markSubmissionsExported(submissions, commit.batch);

@@ -428,6 +428,13 @@ describeLive("V-19 canonical Supabase live smoke", () => {
             row_count: 1,
             submission_ids: [submission.id],
           },
+          document_export: {
+            applicant_count: 1,
+            asset_ids: ["00000000-0000-4000-8000-000000000901"],
+            file_count: 4,
+            workbook_file_name: `${submission.id}.xlsx`,
+            zip_file_name: `${submission.id}.zip`,
+          },
         },
       },
     );

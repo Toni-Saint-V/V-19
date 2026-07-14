@@ -86,9 +86,7 @@ const stages = new Set<ProductionExportStage>([
   "verified",
 ]);
 const businessMutationAllowlist = new Map<string, number>([
-  ["POST /rest/v1/document_export_events", 1],
-  ["PATCH /rest/v1/document_assets", 2],
-  ["POST /rest/v1/rpc/save_submission_draft", 2],
+  ["POST /rest/v1/rpc/save_submission_draft", 1],
   ["POST /rest/v1/rpc/complete_export_package", 1],
 ]);
 
@@ -524,10 +522,6 @@ export class StrictProductionExportNetworkGate {
       (mutation) => `${mutation.method} ${mutation.path}`,
     );
     invariant(
-      keys.filter((key) => key === "PATCH /rest/v1/document_assets").length === 1,
-      "Successful export must mark document assets exactly once.",
-    );
-    invariant(
       keys.filter((key) => key === "POST /rest/v1/rpc/save_submission_draft").length ===
         1,
       "Successful export must persist only the pre-commit downloaded state; the terminal export is owned by complete_export_package.",
@@ -538,8 +532,12 @@ export class StrictProductionExportNetworkGate {
       "Successful export must call complete_export_package exactly once.",
     );
     invariant(
-      keys.filter((key) => key === "POST /rest/v1/document_export_events").length <= 1,
-      "Successful export wrote duplicate document audit events.",
+      !keys.includes("PATCH /rest/v1/document_assets"),
+      "Successful export must not directly patch document assets outside complete_export_package.",
+    );
+    invariant(
+      !keys.includes("POST /rest/v1/document_export_events"),
+      "Successful export must not directly create a document audit outside complete_export_package.",
     );
   }
 
